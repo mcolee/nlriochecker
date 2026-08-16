@@ -43,7 +43,7 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - Codekwaliteit: ruff (lint en format), type hints overal, Nederlandse docstrings, Engelse code-identifiers.
 - CLI-ingang: gwswpijplijn (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
 - Rapportage-output: Markdown en CSV naar een output-map; nooit invoerbestanden overschrijven.
-- Voordat je commit, doe je nog een keer /review en verbeter je de codebase. 
+- Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
 
 ## Werkwijze
 - Kleine stappen, na elke werkende stap een git-commit met een duidelijke boodschap.
