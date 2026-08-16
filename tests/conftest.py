@@ -31,3 +31,15 @@ def mini_hyd_other_dataset() -> Path:
 def mini_broken() -> Path:
     """Uittreksel met een onherkenbare titelregel."""
     return FIXTURE_DIR / "mini_broken.csv"
+
+
+@pytest.fixture
+def mini_mds_later() -> Path:
+    """MdsPlan-uittreksel van een later meetmoment, met bekende verschillen."""
+    return FIXTURE_DIR / "mini_mdsplan_later.csv"
+
+
+@pytest.fixture
+def mini_hyd_later() -> Path:
+    """Hyd-uittreksel van een later meetmoment, met bekende verschillen."""
+    return FIXTURE_DIR / "mini_hyd_later.csv"
