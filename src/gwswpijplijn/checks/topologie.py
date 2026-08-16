@@ -322,8 +322,8 @@ class DubbelePut(Check):
                     node.label,
                     f"Ligt {afstand:.3f} m van put {ander.label!r}, binnen de "
                     f"tolerantie van {tolerantie:g} m.",
-                    andere_put=ander.label,
-                    andere_uri=ander.uri,
+                    object2_label=ander.label,
+                    object2_uri=ander.uri,
                     afstand_m=round(afstand, 3),
                     tolerantie_m=tolerantie,
                 )
@@ -403,8 +403,8 @@ class OverlappendeStreng(Check):
                     conduit.label,
                     f"Valt over {lengte:.2f} m samen met streng {ander.label!r} "
                     f"(tolerantie {tolerantie:g} m).",
-                    andere_streng=ander.label,
-                    andere_uri=ander.uri,
+                    object2_label=ander.label,
+                    object2_uri=ander.uri,
                     overlaplengte_m=round(lengte, 3),
                     tolerantie_m=tolerantie,
                 )
@@ -621,8 +621,8 @@ class StrengenRakenMetBuffer(Check):
                     conduit.label,
                     f"Ligt {afstand:.2f} m van streng "
                     f"{ander.label!r}, binnen de gezamenlijke buisbuffer van {buffer:.2f} m.",
-                    andere_streng=ander.label,
-                    andere_uri=ander.uri,
+                    object2_label=ander.label,
+                    object2_uri=ander.uri,
                     afstand_m=round(afstand, 3),
                     buffer_m=round(buffer, 3),
                 )
@@ -697,8 +697,8 @@ class Hartlijnkruising(Check):
                     conduit.label,
                     f"De hartlijn kruist die van streng {ander.label!r} "
                     f"op {self._plaats(snijpunt)}.",
-                    andere_streng=ander.label,
-                    andere_uri=ander.uri,
+                    object2_label=ander.label,
+                    object2_uri=ander.uri,
                 )
 
     def notes(self, context: CheckContext) -> list[str]:

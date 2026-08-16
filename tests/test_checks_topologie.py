@@ -64,7 +64,7 @@ def test_top005_meldt_beide_putten_een_keer() -> None:
 
     # Een paar levert een melding, niet twee spiegelbeelden.
     assert len(bevindingen) == 1
-    assert bevindingen[0].details["andere_put"] == "B2"
+    assert bevindingen[0].details["object2_label"] == "B2"
     assert bevindingen[0].details["afstand_m"] == pytest.approx(0.1)
 
 

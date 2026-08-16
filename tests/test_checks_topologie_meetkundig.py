@@ -92,7 +92,7 @@ def test_top006_meldt_de_overlaplengte() -> None:
     bevinding = bevindingen(TTL_DIR / "top006_overlappende_streng.ttl", "TOP-006")[0]
 
     assert bevinding.details["overlaplengte_m"] == pytest.approx(50.0, abs=0.2)
-    assert bevinding.details["andere_streng"] == "2"
+    assert bevinding.details["object2_label"] == "2"
 
 
 def test_top007_noemt_de_nul_lengte() -> None:
@@ -182,3 +182,15 @@ def test_top021_meldt_niets_bij_een_echt_losliggende_put() -> None:
     # TOP-001 vindt deze put wel; TOP-021 is de verfijning en hoort te zwijgen.
     assert bevindingen(TTL_DIR / "top001_losliggende_put.ttl", "TOP-021") == []
     assert bevindingen(TTL_DIR / "top001_losliggende_put.ttl", "TOP-001") != []
+
+
+def test_paarmeldingen_dragen_het_tweede_object() -> None:
+    """De uitvoer heeft de URI van de tegenpartij nodig, niet alleen haar label.
+
+    TOP-005, TOP-006, TOP-010 en TOP-011 melden over precies twee objecten; zonder
+    de tweede URI is de melding in CSV en GIS niet aan beide kanten te koppelen.
+    """
+    bevinding = bevindingen(TTL_DIR / "top011_hartlijnkruising.ttl", "TOP-011")[0]
+
+    assert bevinding.details["object2_uri"].startswith("http")
+    assert bevinding.details["object2_label"]
