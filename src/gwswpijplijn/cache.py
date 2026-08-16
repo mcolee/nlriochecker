@@ -12,10 +12,13 @@ opnieuw ingelezen.
 
 from __future__ import annotations
 
+import logging
 import os
 import pickle
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
+from functools import partial
 from hashlib import sha256
 from pathlib import Path
 
@@ -26,6 +29,8 @@ from rdflib import Graph
 from gwswpijplijn import dataset as dataset_module
 from gwswpijplijn import geometry as geometry_module
 from gwswpijplijn.dataset import GwswDataset, load_dataset
+
+logger = logging.getLogger(__name__)
 
 # Losstaand van de bestandshashes, zodat een test hem kan verzetten.
 LADER_VERSIE = "1"
@@ -49,19 +54,42 @@ class LuieGraaf:
 
     De checks gebruiken de graaf voor onderdelen die niet in de structuren zitten
     (hasPart, hasConnection, labels van drempels). Dat is een minderheid van de
-    checks, en de graaf teruglezen kost 58 s; hem pas laden bij het eerste gebruik
-    scheelt die tijd in alle andere runs.
+    checks, en de graaf teruglezen kost tot een minuut; hem pas laden bij het eerste
+    gebruik scheelt die tijd in alle andere runs.
+
+    Blijkt de graafcache zelf beschadigd (de structurencache was dat niet, anders
+    was er nooit een `LuieGraaf` gemaakt), dan is dat geen fout: `_herstel` leest
+    de graaf alsnog uit de brondata en de cache wordt opnieuw weggeschreven, zodat
+    de volgende aanraking weer de snelle weg neemt. `cache.py` stelt die functie
+    samen; deze klasse kent zelf geen paden naar de brondata en geen `load_dataset`.
     """
 
-    def __init__(self, pad: Path) -> None:
+    def __init__(self, pad: Path, herstel: Callable[[], Graph]) -> None:
         self._pad = pad
+        self._herstel = herstel
         self._graaf: Graph | None = None
 
     def _geladen(self) -> Graph:
         """Leest de graaf de eerste keer dat er iets uit gevraagd wordt."""
         if self._graaf is None:
-            with self._pad.open("rb") as bestand:
-                self._graaf = pickle.load(bestand)
+            begin = time.perf_counter()
+            try:
+                with self._pad.open("rb") as bestand:
+                    self._graaf = pickle.load(bestand)
+            except (pickle.UnpicklingError, EOFError, TypeError, AttributeError) as fout:
+                logger.warning(
+                    "De graafcache in %s is onbruikbaar (%s); graaf opnieuw "
+                    "ingelezen uit de brondata.",
+                    self._pad,
+                    fout,
+                )
+                self._graaf = self._herstel()
+                _schrijf_atomair(self._pad, self._graaf)
+            logger.info(
+                "Graaf van schijf gelezen in %.1f s (%d triples).",
+                time.perf_counter() - begin,
+                len(self._graaf),
+            )
         return self._graaf
 
     def __getattr__(self, naam: str):
@@ -124,32 +152,56 @@ def laad_met_cache(
     sleutel = cachesleutel(dataset_path, ontology_paths)
     map_ = (cache_dir or standaard_cachemap()) / sleutel
     melding = ""
-    if (map_ / BESTAND_STRUCTUREN).exists() and (map_ / BESTAND_GRAAF).exists():
+    pad_structuren = map_ / BESTAND_STRUCTUREN
+    pad_graaf = map_ / BESTAND_GRAAF
+    if pad_structuren.exists() and pad_graaf.exists():
         try:
-            with (map_ / BESTAND_STRUCTUREN).open("rb") as bestand:
+            with pad_structuren.open("rb") as bestand:
                 velden = pickle.load(bestand)
-            dataset = replace(
-                GwswDataset(graph=Graph(), **velden), graph=LuieGraaf(map_ / BESTAND_GRAAF)
-            )
-            return dataset, CacheUitslag("cache", sleutel, time.perf_counter() - begin)
         except (pickle.UnpicklingError, EOFError, TypeError, AttributeError) as fout:
             melding = f"De cache in {map_} is onbruikbaar ({fout}); opnieuw ingelezen."
+        else:
+            # De structurencache is geldig; de graafcache wordt niet hier al
+            # gelezen (dat kost tot een minuut) maar pas als een check hem
+            # aanraakt. Is die dan beschadigd, dan herstelt LuieGraaf zichzelf
+            # via deze functie in plaats van de hele run te laten crashen.
+            herstel = partial(_herlees_graaf, dataset_path, ontology_paths)
+            dataset = replace(
+                GwswDataset(graph=Graph(), **velden), graph=LuieGraaf(pad_graaf, herstel)
+            )
+            return dataset, CacheUitslag("cache", sleutel, time.perf_counter() - begin)
 
     dataset = load_dataset(dataset_path, ontology_paths)
     _schrijf(map_, dataset)
     return dataset, CacheUitslag("bestand", sleutel, time.perf_counter() - begin, melding)
 
 
-def _schrijf(map_: Path, dataset: GwswDataset) -> None:
-    """Legt structuren en graaf weg, elk via een tijdelijk bestand.
+def _herlees_graaf(dataset_path: Path, ontology_paths: list[Path]) -> Graph:
+    """Leest de rdflib-graaf opnieuw uit de brondata; herstelweg voor `LuieGraaf`.
 
-    Zonder die omweg laat een afgebroken run een half bestand achter dat de volgende
-    run als geldige cache zou lezen.
+    Alleen `cache.py` kent paden en `load_dataset`; `LuieGraaf` krijgt enkel deze
+    kant-en-klare functie mee en hoeft van beide dus niets te weten.
     """
-    map_.mkdir(parents=True, exist_ok=True)
+    return load_dataset(dataset_path, ontology_paths).graph
+
+
+def _schrijf(map_: Path, dataset: GwswDataset) -> None:
+    """Legt structuren en graaf weg, elk via een tijdelijk bestand."""
     velden = {naam: waarde for naam, waarde in vars(dataset).items() if naam != "graph"}
-    for naam, inhoud in ((BESTAND_STRUCTUREN, velden), (BESTAND_GRAAF, dataset.graph)):
-        tijdelijk = map_ / f"{naam}.tijdelijk"
-        with tijdelijk.open("wb") as bestand:
-            pickle.dump(inhoud, bestand, protocol=5)
-        tijdelijk.replace(map_ / naam)
+    _schrijf_atomair(map_ / BESTAND_STRUCTUREN, velden)
+    _schrijf_atomair(map_ / BESTAND_GRAAF, dataset.graph)
+
+
+def _schrijf_atomair(pad: Path, inhoud: object) -> None:
+    """Schrijft eerst naar een tijdelijk bestand en hernoemt dan atomisch.
+
+    Zonder die omweg laat een afgebroken schrijfactie een half bestand achter dat
+    een volgende lezer als geldige cache zou lezen. Zowel het wegschrijven van een
+    verse dataset als het zelfherstel van een beschadigde `LuieGraaf` lopen via
+    deze functie, dus de garantie geldt voor beide schrijfmomenten.
+    """
+    pad.parent.mkdir(parents=True, exist_ok=True)
+    tijdelijk = pad.with_name(f"{pad.name}.tijdelijk")
+    with tijdelijk.open("wb") as bestand:
+        pickle.dump(inhoud, bestand, protocol=5)
+    tijdelijk.replace(pad)

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.cache import cachesleutel, laad_met_cache
+from gwswpijplijn.cache import BESTAND_GRAAF, cachesleutel, laad_met_cache
 from gwswpijplijn.dataset import load_dataset
 
 DATA = Path(__file__).resolve().parents[1] / "data"
@@ -63,6 +63,32 @@ def test_een_beschadigde_cache_leidt_tot_opnieuw_inlezen(tmp_path: Path) -> None
     assert dataset.nodes
     assert uitslag.bron == "bestand"
     assert "cache" in uitslag.melding.lower()
+
+
+def test_een_beschadigde_graafcache_herstelt_zichzelf_bij_gebruik(tmp_path: Path) -> None:
+    """Alleen de graafcache is corrupt; de structurencache blijft geldig.
+
+    Dat is het gevaarlijke geval: `laad_met_cache` meldt een schone treffer (de
+    structurencache is immers prima), en pas een check die `dataset.graph`
+    aanraakt -- ADM-007 t/m ADM-009, NET-007, de RVZ-checks -- zou zonder herstel
+    een kale `UnpicklingError` krijgen in plaats van een nette terugval. De test
+    die beide bestanden bederft, dekt dat pad niet: daar faalt de structurencache
+    het eerst en komt de graaf nooit aan bod.
+    """
+    laad_met_cache(VOORBEELD, [], cache_dir=tmp_path)
+    graafbestanden = list(tmp_path.rglob(BESTAND_GRAAF))
+    assert graafbestanden, "de graafcache had al moeten bestaan"
+    graafbestanden[0].write_bytes(b"dit is geen pickle")
+
+    dataset, uitslag = laad_met_cache(VOORBEELD, [], cache_dir=tmp_path)
+    assert uitslag.bron == "cache"  # de structurencache was intact
+
+    vers = load_dataset(VOORBEELD, [])
+    assert len(dataset.graph) == len(vers.graph)  # geen crash, en de juiste graaf
+
+    # de graafcache is zelf ook hersteld: een volgende aanraking gaat weer soepel
+    dataset_opnieuw, _ = laad_met_cache(VOORBEELD, [], cache_dir=tmp_path)
+    assert len(dataset_opnieuw.graph) == len(vers.graph)
 
 
 def test_zonder_cache_wordt_er_niets_weggeschreven(tmp_path: Path) -> None:
