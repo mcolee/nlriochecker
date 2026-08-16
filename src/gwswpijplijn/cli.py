@@ -243,6 +243,14 @@ def check_command(
     click.echo(
         f"{dataset_path.name}: {len(dataset.nodes)} knooppunten, {len(dataset.conduits)} strengen"
     )
+    if dataset.decode_fallback is not None:
+        fallback = dataset.decode_fallback
+        click.echo(
+            f"  Let op: geen geldige UTF-8; gelezen als {fallback.encoding} "
+            f"({fallback.byte_count} bytes buiten ASCII). Zie het rapport."
+        )
+    if dataset.geometry_errors:
+        click.echo(f"  {len(dataset.geometry_errors)} objecten met onleesbare geometrie.")
     if not gate_applied:
         click.echo("  Geen typeringspoort toegepast (--mds en --hyd niet opgegeven).")
     for outcome in run.outcomes:

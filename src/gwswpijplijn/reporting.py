@@ -522,6 +522,18 @@ def _render_checks(run: CheckRun) -> str:
             "",
         ]
 
+    fallback = run.dataset.decode_fallback
+    if fallback is not None:
+        lines += [
+            f"> **Codering:** `{fallback.path.name}` is geen geldige UTF-8, zoals Turtle "
+            f"voorschrijft. Het bestand is gelezen als {fallback.encoding}; "
+            f"{fallback.byte_count} bytes vallen buiten ASCII. Controleer of deze waarden "
+            "kloppen:",
+            "",
+        ]
+        lines += [f"> - `{sample}`" for sample in fallback.samples]
+        lines += [""]
+
     if run.dataset.geometry_errors:
         lines += [
             f"> {len(run.dataset.geometry_errors)} objecten hebben een onleesbare geometrie "

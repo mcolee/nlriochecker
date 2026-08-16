@@ -256,3 +256,24 @@ def test_toets_meldt_onleesbare_dataset(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "geldige Turtle" in result.output
+
+
+def test_toets_meldt_afwijkende_codering(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "codering_cp850.ttl"),
+            "--check",
+            "TOP-001",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "geen geldige UTF-8" in result.output
+    rapport = (tmp_path / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert "**Codering:**" in rapport
+    assert "cavalj" in rapport
