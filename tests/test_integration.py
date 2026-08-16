@@ -8,6 +8,9 @@ from pathlib import Path
 import pytest
 
 from gwswpijplijn.analysis import MESSAGE_TOO_GENERIC_PREFIX
+from gwswpijplijn.comparison import compare_pairs
+from gwswpijplijn.config import load_coverage_config
+from gwswpijplijn.coverage import CoverageResult, Verdict, assess_coverage
 from gwswpijplijn.pair import ReportPair, load_pair
 from gwswpijplijn.reporting import write_reports
 
@@ -93,3 +96,95 @@ def test_reporting_on_full_files(pair: ReportPair, tmp_path: Path) -> None:
 
     assert "DeWolden" in markdown_path.read_text(encoding="utf-8")
     assert csv_path.stat().st_size > 0
+
+
+def _independent_coverage_count(path: Path, melding: str, aspecten: set[str] | None) -> int:
+    """Telt meldingregels van een meldingtype (optioneel op aspect), buiten de code om."""
+    with path.open(encoding="cp1252", newline="") as handle:
+        rows = list(csv.reader(handle, delimiter=";"))
+
+    return sum(
+        1 for row in rows[2:] if row[1] == melding and (aspecten is None or row[4] in aspecten)
+    )
+
+
+@pytest.fixture(scope="module")
+def coverage(pair: ReportPair) -> CoverageResult:
+    """De dekkinganalyse over het volledige paar, met de meegeleverde mapping."""
+    return assess_coverage(pair, load_coverage_config())
+
+
+def test_alle_geschrapte_checks_worden_geraakt(coverage: CoverageResult) -> None:
+    assert {check.mapping.id for check in coverage.checks} == {
+        "ADM-001",
+        "ADM-004",
+        "ADM-005",
+        "ATTR-011",
+        "RVZ-002",
+        "RVZ-003",
+    }
+    assert all(check.verdict is Verdict.TOUCHED for check in coverage.checks)
+    assert coverage.untouched == []
+
+
+def test_rvz_003_leunt_aantoonbaar_alleen_op_hyd(coverage: CoverageResult) -> None:
+    check = next(item for item in coverage.checks if item.mapping.id == "RVZ-003")
+    per_cfk = {item.cfk: item.row_count for item in check.evidence}
+
+    # Onafhankelijke telling: Drempelbreedte ontbreekt alleen in het Hyd-rapport.
+    assert per_cfk["MdsPlan"] == _independent_coverage_count(
+        MDS_FULL, "Ontbrekende relatie [hasAspect]", {"Drempelbreedte"}
+    )
+    assert per_cfk["Hyd"] == _independent_coverage_count(
+        HYD_FULL, "Ontbrekende relatie [hasAspect]", {"Drempelbreedte"}
+    )
+    assert per_cfk == {"MdsPlan": 0, "Hyd": 3}
+    assert check.evidence_cfks == ["Hyd"]
+
+
+def test_adm_001_bewijs_komt_vooral_uit_hyd(coverage: CoverageResult) -> None:
+    check = next(item for item in coverage.checks if item.mapping.id == "ADM-001")
+    per_cfk = {item.cfk: item.row_count for item in check.evidence}
+
+    assert per_cfk["MdsPlan"] == _independent_coverage_count(
+        MDS_FULL, "Ontbrekende relatie [hasConnection]", {"Knooppunt"}
+    )
+    assert per_cfk["Hyd"] == _independent_coverage_count(
+        HYD_FULL, "Ontbrekende relatie [hasConnection]", {"Knooppunt"}
+    )
+    assert per_cfk == {"MdsPlan": 3, "Hyd": 117}
+
+
+def test_adm_005_heeft_tegenbewijs_uit_beide_rapporten(coverage: CoverageResult) -> None:
+    check = next(item for item in coverage.checks if item.mapping.id == "ADM-005")
+    tegen = {item.cfk: item.row_count for item in check.counter_evidence}
+
+    # Collecties die in deze CFK juist niet getoetst worden: drie in MdsPlan, een in Hyd.
+    assert tegen == {"MdsPlan": 3, "Hyd": 1}
+    assert check.has_counter_evidence
+
+
+def test_typeringsvoorbehoud_geldt_voor_de_mds_gebonden_claims(coverage: CoverageResult) -> None:
+    oordelen = {check.mapping.id: check.typing_reliable for check in coverage.checks}
+
+    # MdsPlan scoort 87,9% en blijft onder de standaarddrempel van 95%.
+    assert oordelen["ADM-004"] is False
+    # ADM-001 en RVZ-003 leunen alleen op Hyd, dat 100% scoort.
+    assert oordelen["ADM-001"] is True
+    assert oordelen["RVZ-003"] is True
+
+
+def test_zelfvergelijking_van_het_volledige_paar(pair: ReportPair) -> None:
+    comparison = compare_pairs(pair, pair, load_coverage_config())
+
+    assert comparison.timestamps_out_of_order is True
+    for item in comparison.per_cfk:
+        telling = item.status_counts()
+        assert item.total_delta == 0
+        assert item.typing_score_delta == 0.0
+        assert int(item.by_message_type["Verschil"].abs().sum()) == 0
+        assert int(item.by_object_type["Verschil"].abs().sum()) == 0
+        assert telling["opgelost"] == 0
+        assert telling["nieuw"] == 0
+        assert telling["gebleven"] == len(item.object_changes)
+    assert not comparison.coverage_changes["Gewijzigd"].any()
