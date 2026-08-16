@@ -729,19 +729,72 @@ class _DekselAfwijking(_AhnCheck):
             if boven is not None and afwijking > boven:
                 continue
             bron = "putdekselniveau" if node.dekselniveau is not None else "maaiveldhoogte"
+            wijze = _inwinningswijze(node)
+            uit_model = _uit_hoogtemodel(context, wijze)
+            kanttekening = (
+                f" Let op: dat {bron} is zelf ingewonnen via {wijze}, dus hier staan twee "
+                "hoogtemodellen naast elkaar en niet beheerdata naast een meting."
+                if uit_model
+                else ""
+            )
             yield self.finding(
                 context,
                 node.uri,
                 node.label,
                 f"Het {bron} ({geregistreerd:.3f} m NAP) wijkt {afwijking:.3f} m af van het "
-                f"AHN ({gemeten:.3f} m NAP).",
+                f"AHN ({gemeten:.3f} m NAP).{kanttekening}",
                 afwijking_m=round(afwijking, 3),
                 geregistreerd=geregistreerd,
                 ahn=round(gemeten, 3),
                 bron=bron,
+                inwinning=wijze or "",
+                uit_hoogtemodel=uit_model,
                 ondergrens_m=onder,
                 bovengrens_m=boven,
             )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Vult de bereiknotities aan met de herkomst van de vergeleken hoogten."""
+        notities = super().notes(context)
+        if context.bronnen is None or self.raster(context) is None:
+            return notities
+
+        uit_model = [node for node, _ in self.monsters(context) if _uit_model_node(context, node)]
+        if not uit_model:
+            return notities
+
+        vergeleken = sum(1 for _ in self.monsters(context))
+        wijzen = sorted({_inwinningswijze(node) or "onbekend" for node in uit_model})
+        notities.append(
+            f"{len(uit_model)} van de {vergeleken} vergeleken hoogten zijn zelf uit een "
+            f"hoogtemodel ingewonnen ({', '.join(wijzen)}). Voor die putten vergelijkt deze "
+            "check twee hoogtemodellen met elkaar; een afwijking daar is geen gebrek in de "
+            "beheerdata en valt niet met een veldmeting te herstellen."
+        )
+        return notities
+
+
+def _inwinningswijze(node: Node) -> str | None:
+    """De inwinningswijze van de hoogte die deze checks van een put gebruiken.
+
+    Het putdekselniveau gaat voor; ontbreekt dat, dan is de maaiveldhoogte de
+    gebruikte waarde en telt haar herkomst.
+    """
+    if node.dekselniveau is not None:
+        inwinning = node.deksel_aspect.inwinning if node.deksel_aspect is not None else None
+    else:
+        inwinning = node.maaiveld_inwinning
+    return inwinning.wijze if inwinning is not None else None
+
+
+def _uit_hoogtemodel(context: CheckContext, wijze: str | None) -> bool:
+    """Geeft aan of deze inwinningswijze uit een landelijk hoogtemodel komt."""
+    return wijze is not None and wijze in context.config.inwinning.uit_hoogtemodel
+
+
+def _uit_model_node(context: CheckContext, node: Node) -> bool:
+    """Geeft aan of de gebruikte hoogte van deze put uit een hoogtemodel komt."""
+    return _uit_hoogtemodel(context, _inwinningswijze(node))
 
 
 @register

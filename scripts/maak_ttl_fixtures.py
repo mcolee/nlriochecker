@@ -125,12 +125,28 @@ def maat(naam: str, breedte: int, hoogte: int, materiaal: str = "Beton", vorm: s
     )
 
 
-def maaiveld(naam: str, hoogte: float) -> str:
-    """Hangt een maaiveldorientatie met maaiveldhoogte aan een putorientatie."""
-    return f"""
+def maaiveld(naam: str, hoogte: float, wijze: str | None = None) -> str:
+    """Hangt een maaiveldorientatie met maaiveldhoogte aan een putorientatie.
+
+    Met `wijze` krijgt de orientatie ook een puntgeometrie met inwinning erop, zoals
+    de BrutIS-export van De Wolden die schrijft: de inwinningswijze hangt daar aan
+    het Punt-aspect en niet aan de maaiveldhoogte zelf.
+    """
+    if wijze is None:
+        return f"""
 :{naam}_ori gwsw:hasConnection :{naam}_maa .
 :{naam}_maa rdf:type gwsw:Maaiveldorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue {hoogte} ] .
+"""
+    return f"""
+:{naam}_ori gwsw:hasConnection :{naam}_maa .
+:{naam}_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue {hoogte} ] ;
+    gwsw:hasAspect :{naam}_maa_pun .
+:{naam}_maa_pun rdf:type gwsw:Punt ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>0.0 0.0</gml:pos></gml:Point>"^^geo:gmlLiteral ;
+    gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+        gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:{wijze} ] ] .
 """
 
 
@@ -610,14 +626,16 @@ FIXTURES["attr012_metselwerk_rond.ttl"] = (
 C = (1100.0, 2000.0)
 
 
-def hoogteput(naam, label, punt, mv=10.0, dek=10.0, hoogte=1500, **extra):
+def hoogteput(
+    naam, label, punt, mv=10.0, dek=10.0, hoogte=1500, mv_wijze=None, dek_wijze=None, **extra
+):
     """Een put met maaiveld, putdeksel en puthoogte."""
     waarden = {**STANDAARDPUT, "HoogtePut": hoogte}
     waarden.update(extra)
     return (
         put(naam, label, punt[0], punt[1], extra=kenmerken(naam, **waarden))
-        + maaiveld(naam, mv)
-        + deksel(naam, dek)
+        + maaiveld(naam, mv, mv_wijze)
+        + deksel(naam, dek, dek_wijze)
     )
 
 
@@ -1034,10 +1052,12 @@ FIXTURES["ext_scenario.ttl"] = (
     "meerdere; deze fixture voedt de EXT- en AHN-checks tegelijk, zie de tests",
     # Put A: maaiveld en deksel gelijk aan het AHN.
     hoogteput("PutA", "A", EXT_A, mv=10.00, dek=10.00)
-    # Put B: 0,10 m afwijking van het AHN, dus HGT-001.
-    + hoogteput("PutB", "B", EXT_B, mv=10.10, dek=10.10)
+    # Put B: 0,10 m afwijking van het AHN, dus HGT-001. Zijn maaiveldhoogte komt
+    # zelf uit het AHN; de vergelijking met het raster is voor deze put dus een
+    # vergelijking van twee hoogtemodellen.
+    + hoogteput("PutB", "B", EXT_B, mv=10.10, dek=10.10, mv_wijze="AHN2", dek_wijze="AHN2")
     # Put C: 0,50 m afwijking, dus HGT-002; en geen BGT-deksel in de buurt.
-    + hoogteput("PutC", "C", EXT_C, mv=10.50, dek=10.50)
+    + hoogteput("PutC", "C", EXT_C, mv=10.50, dek=10.50, mv_wijze="Inmeting", dek_wijze="Inmeting")
     # Put D ligt buiten het studiegebied en mag geen enkele uitslag krijgen.
     + hoogteput("PutD", "D", EXT_D, mv=99.00, dek=99.00)
     # Put F ligt op de nodata-vlek van het raster.

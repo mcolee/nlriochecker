@@ -128,3 +128,18 @@ richting = "administratief"
 # De conformiteitsklassen die de GWSW-server aanbiedt en die alle drie aanwezig
 # moeten zijn. Ontbreekt er een, dan faalt de pijplijn.
 vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
+
+[inwinning]
+# Hoe de inwinningsmetagegevens van deze bronexport gelezen moeten worden. De
+# waarden komen uit de collectie WijzeVanInwinningColl van de GWSW-ontologie; die
+# maakt geen onderscheid naar kenmerksoort, dus de betekenis is projectafspraak.
+#
+# Wijzen die uit een landelijk hoogtemodel komen. Een maaiveldhoogte die zo is
+# ingewonnen, vergelijken HGT-001 en HGT-002 met haar eigen bron; de bevinding
+# krijgt daarom een kanttekening. In De Wolden geldt dat voor 5104 van de 22363
+# maaiveldhoogten: daar staat AHN2 op het Punt-aspect van de maaiveldorientatie.
+uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN5"]
+# Waarden die expliciet "onbekend" zeggen. Ze passeren elke kardinaliteits- en
+# collectietoets van de nulmeting maar zijn informatief leeg; het bevindingen-
+# rapport telt ze apart zodat een compleetheidscijfer niet te rooskleurig leest.
+onbekend = ["NietAchterhaald"]

@@ -64,13 +64,20 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 :PutB_ori gwsw:hasConnection :PutB_maa .
 :PutB_maa rdf:type gwsw:Maaiveldorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.1 ] .
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.1 ] ;
+    gwsw:hasAspect :PutB_maa_pun .
+:PutB_maa_pun rdf:type gwsw:Punt ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>0.0 0.0</gml:pos></gml:Point>"^^geo:gmlLiteral ;
+    gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+        gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:AHN2 ] ] .
 
 :PutB gwsw:hasPart :PutB_dek .
 :PutB_dek rdf:type gwsw:Putdeksel ;
     gwsw:hasAspect :PutB_dek_ori .
 :PutB_dek_ori rdf:type gwsw:Dekselorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.1 ] .
+    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.1 ;
+        gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+            gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:AHN2 ] ] ] .
 :PutC rdf:type gwsw:Inspectieput ; rdfs:label "C" ;
     gwsw:hasAspect :PutC_ori .
 :PutC gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
@@ -83,13 +90,20 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 :PutC_ori gwsw:hasConnection :PutC_maa .
 :PutC_maa rdf:type gwsw:Maaiveldorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.5 ] .
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.5 ] ;
+    gwsw:hasAspect :PutC_maa_pun .
+:PutC_maa_pun rdf:type gwsw:Punt ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>0.0 0.0</gml:pos></gml:Point>"^^geo:gmlLiteral ;
+    gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+        gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:Inmeting ] ] .
 
 :PutC gwsw:hasPart :PutC_dek .
 :PutC_dek rdf:type gwsw:Putdeksel ;
     gwsw:hasAspect :PutC_dek_ori .
 :PutC_dek_ori rdf:type gwsw:Dekselorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.5 ] .
+    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.5 ;
+        gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+            gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:Inmeting ] ] ] .
 :PutD rdf:type gwsw:Inspectieput ; rdfs:label "D" ;
     gwsw:hasAspect :PutD_ori .
 :PutD gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,

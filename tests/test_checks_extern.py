@@ -229,3 +229,40 @@ def test_hgt003_meldt_beide_richtingen(config: CheckConfig, bronnen: ExternalDat
 
     assert "boven het AHN-maaiveld" in meldingen["1"]
     assert "onder het AHN-maaiveld" in meldingen["2"]
+
+
+def test_hgt001_meldt_een_maaiveld_uit_hetzelfde_hoogtemodel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Put B heeft een maaiveldhoogte uit AHN2 en wijkt af van het AHN-raster.
+
+    Een afwijking is daar geen fout in de beheerdata maar het verschil tussen twee
+    hoogtemodellen. Zonder die kanttekening leest de bevinding als iets wat in het
+    veld te herstellen valt.
+    """
+    outcome = uitkomst("HGT-001", config, bronnen)
+
+    bevinding = next(f for f in outcome.findings if f.object_label == "B")
+    assert bevinding.details["inwinning"] == "AHN2"
+    assert bevinding.details["uit_hoogtemodel"] is True
+    assert any("hoogtemodel" in note for note in outcome.notes)
+
+
+def test_hgt002_meldt_een_gemeten_maaiveld_zonder_voorbehoud(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    outcome = uitkomst("HGT-002", config, bronnen)
+
+    bevinding = next(f for f in outcome.findings if f.object_label == "C")
+    assert bevinding.details["inwinning"] == "Inmeting"
+    assert bevinding.details["uit_hoogtemodel"] is False
+
+
+def test_lege_lijst_zet_de_kanttekening_uit(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Zonder geconfigureerde hoogtemodelwijzen valt er niets te kwalificeren."""
+    config.inwinning.uit_hoogtemodel = []
+
+    outcome = uitkomst("HGT-001", config, bronnen)
+
+    bevinding = next(f for f in outcome.findings if f.object_label == "B")
+    assert bevinding.details["uit_hoogtemodel"] is False

@@ -142,6 +142,7 @@ class Node(_MetAspecten):
     parent: str | None
     aspects: tuple[Aspect, ...] = ()
     maaiveld_aspect: Aspect | None = None
+    maaiveld_inwinning: Inwinning | None = None
     deksel_aspect: Aspect | None = None
     multipart: bool = False
 
@@ -430,8 +431,8 @@ def _aspect_van_klasse(graph: Graph, subject: RdfNode, klasse: URIRef) -> Aspect
     return None
 
 
-def _maaiveld_aspect(graph: Graph, orientation: RdfNode) -> Aspect | None:
-    """De maaiveldhoogte bij een knooppunt.
+def _maaiveld_kenmerk(graph: Graph, orientation: RdfNode) -> tuple[Aspect | None, Inwinning | None]:
+    """De maaiveldhoogte bij een knooppunt, met de herkomst ervan.
 
     Het GWSW hangt het maaiveld niet aan de put zelf maar aan een aparte
     maaiveldorientatie, die via hasConnection aan de putorientatie hangt.
@@ -441,8 +442,23 @@ def _maaiveld_aspect(graph: Graph, orientation: RdfNode) -> Aspect | None:
             continue
         aspect = _aspect_van_klasse(graph, buur, KLASSE_MAAIVELDHOOGTE)
         if aspect is not None:
-            return aspect
-    return None
+            return aspect, _herkomst(graph, buur, aspect)
+    return None, None
+
+
+def _herkomst(graph: Graph, orientation: RdfNode, aspect: Aspect) -> Inwinning | None:
+    """De inwinning van een kenmerk, met terugval op die van de puntgeometrie.
+
+    De BrutIS-export van De Wolden hangt een record-brede inwinningswijze aan het
+    Punt-aspect van de orientatie en herhaalt hem op het kenmerk zelf. Bij AHN2
+    blijft die herhaling uit: dan staat de wijze uitsluitend op het Punt. Zonder
+    deze terugval zou juist de uit het AHN afgeleide helft van de maaiveldhoogten
+    als herkomstloos gelden.
+    """
+    if aspect.inwinning is not None:
+        return aspect.inwinning
+    punt = _aspect_van_klasse(graph, orientation, KLASSE_PUNT)
+    return punt.inwinning if punt is not None else None
 
 
 def _deksel_aspect(graph: Graph, subject: RdfNode, deksel_klassen: frozenset[str]) -> Aspect | None:
@@ -704,7 +720,7 @@ def _read_nodes(
 
     for orientation in bron:
         point, z_waarden = _geometry(graph, orientation, KLASSE_PUNT, errors)
-        maaiveld = _maaiveld_aspect(graph, orientation)
+        maaiveld, maaiveld_inwinning = _maaiveld_kenmerk(graph, orientation)
         multipart = _is_multipart(graph, orientation, KLASSE_PUNT)
         for subject in graph.subjects(HAS_ASPECT, orientation):
             uri = str(subject)
@@ -721,6 +737,7 @@ def _read_nodes(
                 parent=_parent(graph, subject),
                 aspects=_read_aspects(graph, subject),
                 maaiveld_aspect=maaiveld,
+                maaiveld_inwinning=maaiveld_inwinning,
                 deksel_aspect=_deksel_aspect(graph, subject, deksel_klassen),
                 multipart=multipart,
             )

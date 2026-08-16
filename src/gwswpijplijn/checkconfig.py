@@ -212,6 +212,26 @@ class NulmetingOptions(BaseModel):
     vereiste_cfk: list[str] = Field(default=["Hyd", "MdsPlan", "MdsProj"], min_length=1)
 
 
+class InwinningOptions(BaseModel):
+    """Hoe de inwinningsmetagegevens van deze bronexport gelezen moeten worden.
+
+    Welke waarden in `WijzeVanInwinning` voorkomen verschilt per bronsysteem, en de
+    betekenis ervan is een projectafspraak. De GWSW-ontologie zet ze alle in een
+    collectie zonder onderscheid, dus de code kan het niet zelf afleiden.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # HGT-001 en HGT-002 vergelijken de geregistreerde hoogte met een AHN-raster.
+    # Is die hoogte zelf uit een hoogtemodel afgeleid, dan vergelijkt de check twee
+    # modellen met elkaar en is een afwijking geen fout in de beheerdata. Een lege
+    # lijst zet die kanttekening uit.
+    uit_hoogtemodel: list[str] = Field(default_factory=list)
+    # Waarden die "onbekend" zeggen zonder het kenmerk leeg te laten. Ze passeren
+    # elke kardinaliteits- en collectietoets maar dragen geen informatie.
+    onbekend: list[str] = Field(default_factory=list)
+
+
 class NamingOptions(BaseModel):
     """ADM-003: de naamgevingsconventie als configureerbaar regex-patroon."""
 
@@ -266,6 +286,7 @@ class CheckConfig(BaseModel):
     netwerk: NetworkOptions = Field(default_factory=NetworkOptions)
     nulmeting: NulmetingOptions = Field(default_factory=NulmetingOptions)
     naamgeving: NamingOptions = Field(default_factory=NamingOptions)
+    inwinning: InwinningOptions = Field(default_factory=InwinningOptions)
     puttyperegels: list[PutTypeRule] = Field(default_factory=list)
     bronnen: ExternalSources = Field(default_factory=ExternalSources)
 
