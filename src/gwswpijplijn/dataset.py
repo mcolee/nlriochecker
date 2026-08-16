@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from rdflib import RDF, RDFS, Graph, URIRef
@@ -12,7 +14,12 @@ from rdflib.term import Node as RdfNode
 from shapely.geometry import LineString, Point
 
 from gwswpijplijn.errors import DatasetError
-from gwswpijplijn.geometry import GeometryError, parse_gml, parse_gml_z
+from gwswpijplijn.geometry import (
+    GeometryError,
+    is_multipart_literal,
+    parse_gml,
+    parse_gml_z,
+)
 
 GWSW = "http://data.gwsw.nl/1.6/totaal/"
 
@@ -24,6 +31,14 @@ HAS_ASPECT = URIRef(f"{GWSW}hasAspect")
 HAS_PART = URIRef(f"{GWSW}hasPart")
 HAS_CONNECTION = URIRef(f"{GWSW}hasConnection")
 HAS_VALUE = URIRef(f"{GWSW}hasValue")
+HAS_REFERENCE = URIRef(f"{GWSW}hasReference")
+
+KLASSE_INWINNING = URIRef(f"{GWSW}Inwinning")
+KLASSE_WIJZE_VAN_INWINNING = URIRef(f"{GWSW}WijzeVanInwinning")
+KLASSE_DATUM_INWINNING = URIRef(f"{GWSW}DatumInwinning")
+KLASSE_MAAIVELDORIENTATIE = URIRef(f"{GWSW}Maaiveldorientatie")
+KLASSE_MAAIVELDHOOGTE = URIRef(f"{GWSW}Maaiveldhoogte")
+KLASSE_PUTDEKSELNIVEAU = URIRef(f"{GWSW}Putdekselniveau")
 
 KLASSE_PUNT = URIRef(f"{GWSW}Punt")
 KLASSE_LIJN = URIRef(f"{GWSW}Lijn")
@@ -44,7 +59,77 @@ KLASSE_BOB_EIND = URIRef(f"{GWSW}BobEindpuntLeiding")
 
 
 @dataclass(frozen=True)
-class Node:
+class Inwinning:
+    """De inwinningsmetagegevens die aan een kenmerk kunnen hangen."""
+
+    wijze: str | None = None
+    datum: date | None = None
+
+    def __bool__(self) -> bool:
+        """Waar zodra er iets ingevuld is."""
+        return self.wijze is not None or self.datum is not None
+
+
+@dataclass(frozen=True)
+class Aspect:
+    """Een kenmerk van een object: een waarde of een verwijzing naar een GWSW-begrip.
+
+    Het GWSW hangt kenmerken als `gwsw:hasAspect [ rdf:type gwsw:MateriaalLeiding ;
+    gwsw:hasReference gwsw:Beton ]` aan een object. Waardekenmerken gebruiken
+    `hasValue`, domeinlijstkenmerken `hasReference`.
+    """
+
+    kind: str
+    value: str | None = None
+    reference: str | None = None
+    inwinning: Inwinning | None = None
+
+    @property
+    def number(self) -> float | None:
+        """De waarde als getal, of None als die er niet is of niet numeriek is."""
+        if self.value is None:
+            return None
+        try:
+            return float(self.value)
+        except ValueError:
+            return None
+
+    @property
+    def date(self) -> date | None:
+        """De waarde als datum (ISO of jaartal), of None."""
+        return _as_date(self.value)
+
+
+class _MetAspecten:
+    """Toegang tot de kenmerken van een object, per GWSW-klassenaam."""
+
+    aspects: tuple[Aspect, ...]
+
+    def aspect(self, kind: str) -> Aspect | None:
+        """Het eerste kenmerk van deze soort, of None."""
+        for aspect in self.aspects:
+            if aspect.kind == kind:
+                return aspect
+        return None
+
+    def number(self, kind: str) -> float | None:
+        """De numerieke waarde van dit kenmerk, of None."""
+        aspect = self.aspect(kind)
+        return aspect.number if aspect is not None else None
+
+    def reference(self, kind: str) -> str | None:
+        """De domeinlijstverwijzing van dit kenmerk (korte naam), of None."""
+        aspect = self.aspect(kind)
+        return aspect.reference if aspect is not None else None
+
+    def date(self, kind: str) -> date | None:
+        """De datumwaarde van dit kenmerk, of None."""
+        aspect = self.aspect(kind)
+        return aspect.date if aspect is not None else None
+
+
+@dataclass(frozen=True)
+class Node(_MetAspecten):
     """Een knooppunt in het netwerk: een put, gemaal of lozingspunt."""
 
     uri: str
@@ -55,10 +140,52 @@ class Node:
     point: Point | None
     z: float | None
     parent: str | None
+    aspects: tuple[Aspect, ...] = ()
+    maaiveld_aspect: Aspect | None = None
+    deksel_aspect: Aspect | None = None
+
+    @property
+    def maaiveld(self) -> float | None:
+        """De maaiveldhoogte bij dit knooppunt, in m NAP."""
+        return self.maaiveld_aspect.number if self.maaiveld_aspect is not None else None
+
+    @property
+    def dekselniveau(self) -> float | None:
+        """Het putdekselniveau, in m NAP."""
+        return self.deksel_aspect.number if self.deksel_aspect is not None else None
+
+    @property
+    def bovenkant(self) -> float | None:
+        """Het bovenkantniveau: het dekselniveau, of anders het maaiveld.
+
+        Het register spreekt bij HGT-004, HGT-012 en HGT-018 over de dekselhoogte.
+        Ontbreekt die, dan is de maaiveldhoogte de dichtstbijzijnde benadering; welke
+        van de twee gebruikt is, hoort in de bevinding te staan.
+        """
+        return self.dekselniveau if self.dekselniveau is not None else self.maaiveld
+
+    @property
+    def hoogte_m(self) -> float | None:
+        """De hoogte van de put in meters; het GWSW noteert die in millimeters."""
+        waarde = self.number("HoogtePut")
+        return waarde / 1000 if waarde is not None else None
+
+    @property
+    def bodem(self) -> float | None:
+        """Het putbodemniveau, afgeleid uit bovenkant minus puthoogte.
+
+        Het GWSW kent geen kenmerk `Putbodemniveau`; de bodem volgt uit het
+        dekselniveau en `HoogtePut`. Ontbreekt een van beide, dan is de bodem
+        onbekend en mag er niet op getoetst worden.
+        """
+        boven, hoogte = self.bovenkant, self.hoogte_m
+        if boven is None or hoogte is None:
+            return None
+        return boven - hoogte
 
 
 @dataclass(frozen=True)
-class Conduit:
+class Conduit(_MetAspecten):
     """Een streng: een leiding met een begin- en eindpunt."""
 
     uri: str
@@ -67,8 +194,51 @@ class Conduit:
     line: LineString | None
     start_node: str | None
     end_node: str | None
-    bob_start: float | None
-    bob_end: float | None
+    bob_start_aspect: Aspect | None = None
+    bob_end_aspect: Aspect | None = None
+    aspects: tuple[Aspect, ...] = ()
+    multipart: bool = False
+
+    @property
+    def bob_start(self) -> float | None:
+        """De binnenonderkant buis aan het beginpunt, in m NAP."""
+        return self.bob_start_aspect.number if self.bob_start_aspect is not None else None
+
+    @property
+    def bob_end(self) -> float | None:
+        """De binnenonderkant buis aan het eindpunt, in m NAP."""
+        return self.bob_end_aspect.number if self.bob_end_aspect is not None else None
+
+    @property
+    def breedte_mm(self) -> float | None:
+        """De breedte (bij een rond profiel: de diameter) in millimeters."""
+        return self.number("BreedteLeiding")
+
+    @property
+    def hoogte_mm(self) -> float | None:
+        """De hoogte van het profiel in millimeters."""
+        return self.number("HoogteLeiding")
+
+    @property
+    def lengte_m(self) -> float | None:
+        """De administratieve lengte in meters."""
+        return self.number("LengteLeiding")
+
+    @property
+    def materiaal(self) -> str | None:
+        """Het leidingmateriaal als korte GWSW-naam."""
+        return self.reference("MateriaalLeiding")
+
+    @property
+    def vorm(self) -> str | None:
+        """De profielvorm als korte GWSW-naam."""
+        return self.reference("VormLeiding")
+
+    @property
+    def aanlegjaar(self) -> int | None:
+        """Het jaartal uit de begindatum."""
+        datum = self.date("Begindatum")
+        return datum.year if datum is not None else None
 
 
 @dataclass(frozen=True)
@@ -157,6 +327,133 @@ class GwswDataset:
 def _uri(naam: str) -> str:
     """Maakt van een korte klassenaam een volledige GWSW-URI."""
     return naam if naam.startswith("http") else f"{GWSW}{naam}"
+
+
+def _short(uri: str) -> str:
+    """De korte klassenaam achter de laatste scheidingstekens van een URI."""
+    return uri.rsplit("/", 1)[-1].rsplit("#", 1)[-1]
+
+
+ISO_DATUM = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
+JAARTAL = re.compile(r"^(\d{4})$")
+
+
+def _as_date(waarde: str | None) -> date | None:
+    """Leest een GWSW-datumwaarde; een kaal jaartal telt als 1 januari."""
+    if waarde is None:
+        return None
+    match = ISO_DATUM.match(waarde)
+    if match is not None:
+        try:
+            return date(int(match[1]), int(match[2]), int(match[3]))
+        except ValueError:
+            return None
+    jaar = JAARTAL.match(waarde.strip())
+    if jaar is not None:
+        try:
+            return date(int(jaar[1]), 1, 1)
+        except ValueError:
+            return None
+    return None
+
+
+def _read_aspects(graph: Graph, subject: RdfNode) -> tuple[Aspect, ...]:
+    """Leest de kenmerken die via hasAspect aan een object hangen.
+
+    Aspecten zonder waarde en zonder verwijzing zijn geen kenmerken maar
+    orientaties en geometrieen; die horen hier niet thuis en vallen af.
+    """
+    gevonden: list[Aspect] = []
+    for aspect in graph.objects(subject, HAS_ASPECT):
+        waarde = graph.value(aspect, HAS_VALUE)
+        referentie = graph.value(aspect, HAS_REFERENCE)
+        if waarde is None and referentie is None:
+            continue
+        inwinning = _read_inwinning(graph, aspect)
+        for soort in graph.objects(aspect, RDF.type):
+            gevonden.append(
+                Aspect(
+                    kind=_short(str(soort)),
+                    value=str(waarde) if waarde is not None else None,
+                    reference=_short(str(referentie)) if referentie is not None else None,
+                    inwinning=inwinning,
+                )
+            )
+    return tuple(gevonden)
+
+
+def _read_inwinning(graph: Graph, subject: RdfNode) -> Inwinning | None:
+    """Leest de inwinningsmetagegevens die aan een kenmerk hangen."""
+    for aspect in graph.objects(subject, HAS_ASPECT):
+        if (aspect, RDF.type, KLASSE_INWINNING) not in graph:
+            continue
+        wijze: str | None = None
+        datum: date | None = None
+        for deel in graph.objects(aspect, HAS_ASPECT):
+            if (deel, RDF.type, KLASSE_WIJZE_VAN_INWINNING) in graph:
+                referentie = graph.value(deel, HAS_REFERENCE)
+                wijze = _short(str(referentie)) if referentie is not None else None
+            elif (deel, RDF.type, KLASSE_DATUM_INWINNING) in graph:
+                waarde = graph.value(deel, HAS_VALUE)
+                datum = _as_date(str(waarde)) if waarde is not None else None
+        gevonden = Inwinning(wijze=wijze, datum=datum)
+        if gevonden:
+            return gevonden
+    return None
+
+
+def _aspect_van_klasse(graph: Graph, subject: RdfNode, klasse: URIRef) -> Aspect | None:
+    """Het kenmerk van deze klasse dat direct aan het object hangt."""
+    for aspect in graph.objects(subject, HAS_ASPECT):
+        if (aspect, RDF.type, klasse) not in graph:
+            continue
+        waarde = graph.value(aspect, HAS_VALUE)
+        if waarde is None:
+            continue
+        return Aspect(
+            kind=_short(str(klasse)),
+            value=str(waarde),
+            inwinning=_read_inwinning(graph, aspect),
+        )
+    return None
+
+
+def _maaiveld_aspect(graph: Graph, orientation: RdfNode) -> Aspect | None:
+    """De maaiveldhoogte bij een knooppunt.
+
+    Het GWSW hangt het maaiveld niet aan de put zelf maar aan een aparte
+    maaiveldorientatie, die via hasConnection aan de putorientatie hangt.
+    """
+    for buur in _connections(graph, orientation):
+        if (buur, RDF.type, KLASSE_MAAIVELDORIENTATIE) not in graph:
+            continue
+        aspect = _aspect_van_klasse(graph, buur, KLASSE_MAAIVELDHOOGTE)
+        if aspect is not None:
+            return aspect
+    return None
+
+
+def _deksel_aspect(graph: Graph, subject: RdfNode, deksel_klassen: frozenset[str]) -> Aspect | None:
+    """Het putdekselniveau van een put.
+
+    Het niveau hangt aan de dekselorientatie van een Putdeksel-onderdeel; sommige
+    exports hangen het rechtstreeks aan de put. Beide wegen worden gevolgd.
+    """
+    direct = _aspect_van_klasse(graph, subject, KLASSE_PUTDEKSELNIVEAU)
+    if direct is not None:
+        return direct
+
+    for deel in graph.objects(subject, HAS_PART):
+        if not any((deel, RDF.type, URIRef(klasse)) in graph for klasse in deksel_klassen):
+            continue
+        for orientatie in graph.objects(deel, HAS_ASPECT):
+            aspect = _aspect_van_klasse(graph, orientatie, KLASSE_PUTDEKSELNIVEAU)
+            if aspect is not None:
+                return aspect
+        aspect = _aspect_van_klasse(graph, deel, KLASSE_PUTDEKSELNIVEAU)
+        if aspect is not None:
+            return aspect
+    return None
 
 
 def load_dataset(
@@ -374,7 +671,10 @@ def _geometry(graph: Graph, orientation: RdfNode, klasse: URIRef, errors: dict[s
 
 
 def _read_nodes(
-    graph: Graph, errors: dict[str, str], knooppunt_klassen: frozenset[str] | None = None
+    graph: Graph,
+    errors: dict[str, str],
+    knooppunt_klassen: frozenset[str] | None = None,
+    deksel_klassen: frozenset[str] = frozenset({_uri("Putdeksel")}),
 ) -> dict[str, Node]:
     """Leest de knooppunten van het netwerk.
 
@@ -392,6 +692,7 @@ def _read_nodes(
 
     for orientation in bron:
         point, z_waarden = _geometry(graph, orientation, KLASSE_PUNT, errors)
+        maaiveld = _maaiveld_aspect(graph, orientation)
         for subject in graph.subjects(HAS_ASPECT, orientation):
             uri = str(subject)
             if uri in nodes:
@@ -405,6 +706,9 @@ def _read_nodes(
                 point=point,
                 z=z_waarden[0] if z_waarden else None,
                 parent=_parent(graph, subject),
+                aspects=_read_aspects(graph, subject),
+                maaiveld_aspect=maaiveld,
+                deksel_aspect=_deksel_aspect(graph, subject, deksel_klassen),
             )
 
     return nodes
@@ -462,6 +766,7 @@ def _read_conduits(
     )
     for orientation in bron:
         line, _ = _geometry(graph, orientation, KLASSE_LIJN, errors)
+        multipart = _is_multipart(graph, orientation, KLASSE_LIJN)
         begin = _endpoint(graph, orientation, KLASSEN_BEGINPUNT)
         eind = _endpoint(graph, orientation, KLASSEN_EINDPUNT)
 
@@ -476,11 +781,29 @@ def _read_conduits(
                 line=line,
                 start_node=_connected_node(graph, begin, orientation_to_node),
                 end_node=_connected_node(graph, eind, orientation_to_node),
-                bob_start=_bob(graph, begin, KLASSE_BOB_BEGIN),
-                bob_end=_bob(graph, eind, KLASSE_BOB_EIND),
+                bob_start_aspect=_bob(graph, begin, KLASSE_BOB_BEGIN),
+                bob_end_aspect=_bob(graph, eind, KLASSE_BOB_EIND),
+                aspects=_read_aspects(graph, subject),
+                multipart=multipart,
             )
 
     return conduits
+
+
+def _is_multipart(graph: Graph, orientation: RdfNode, klasse: URIRef) -> bool:
+    """Geeft aan of de geometrie van deze orientatie uit meerdere losse delen bestaat.
+
+    Twee vormen tellen mee: een GML-literaal met een multi-geometrie erin, en meer
+    dan een geometrie-aspect van dezelfde soort aan dezelfde orientatie.
+    """
+    literalen = [
+        str(graph.value(aspect, HAS_VALUE))
+        for aspect in graph.objects(orientation, HAS_ASPECT)
+        if (aspect, RDF.type, klasse) in graph and graph.value(aspect, HAS_VALUE) is not None
+    ]
+    if len(literalen) > 1:
+        return True
+    return any(is_multipart_literal(literal) for literal in literalen)
 
 
 def _leiding_orientations(graph: Graph):
@@ -527,16 +850,8 @@ def _connections(graph: Graph, subject: RdfNode):
     yield from graph.subjects(HAS_CONNECTION, subject)
 
 
-def _bob(graph: Graph, endpoint: RdfNode | None, klasse: URIRef) -> float | None:
-    """De BOB-waarde die aan een strengeindpunt hangt."""
+def _bob(graph: Graph, endpoint: RdfNode | None, klasse: URIRef) -> Aspect | None:
+    """Het BOB-kenmerk dat aan een strengeindpunt hangt, met zijn inwinning."""
     if endpoint is None:
         return None
-    for aspect in graph.objects(endpoint, HAS_ASPECT):
-        if (aspect, RDF.type, klasse) in graph:
-            waarde = graph.value(aspect, HAS_VALUE)
-            if waarde is not None:
-                try:
-                    return float(waarde)
-                except (TypeError, ValueError):
-                    return None
-    return None
+    return _aspect_van_klasse(graph, endpoint, klasse)

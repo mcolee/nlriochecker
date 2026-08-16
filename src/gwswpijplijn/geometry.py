@@ -9,6 +9,8 @@ from shapely.geometry import LineString, Point, Polygon
 GML_SOORT_PATROON = re.compile(r"<gml:(Point|LineString|Polygon|LinearRing)\b")
 SRS_DIMENSIE_PATROON = re.compile(r'srsDimension="(\d+)"')
 COORDINATEN_PATROON = re.compile(r"<gml:(?:pos|posList)[^>]*>([^<]*)</gml:(?:pos|posList)>")
+# Multi-geometrieen uit GML 3 en de oudere GML 2-namen; TOP-015 vraagt ernaar.
+MULTI_PATROON = re.compile(r"<gml:(Multi(?:Point|Curve|Surface|LineString|Polygon|Geometry))\b")
 
 
 class GeometryError(ValueError):
@@ -32,6 +34,18 @@ def parse_gml(literal: str) -> Point | LineString | Polygon:
         return Polygon(coordinaten)
     except (IndexError, ValueError) as error:
         raise GeometryError(f"onbruikbare {soort}-geometrie: {error}") from error
+
+
+def is_multipart_literal(literal: str) -> bool:
+    """Geeft aan of de GML-literaal een multi-geometrie of meerdere delen bevat.
+
+    Twee vormen tellen mee: een expliciete `gml:Multi*`-verpakking, en meerdere
+    `gml:pos`- of `gml:posList`-elementen naast elkaar. De parser leest alleen het
+    eerste deel, dus zonder deze signalering zou het verschil onzichtbaar blijven.
+    """
+    if MULTI_PATROON.search(literal) is not None:
+        return True
+    return len(COORDINATEN_PATROON.findall(literal)) > 1
 
 
 def parse_gml_z(literal: str) -> list[float | None]:

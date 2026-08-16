@@ -10,9 +10,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1",
+    "geopandas>=1.1.4",
     "networkx>=3.3",
     "pandas>=2.2",
     "pydantic>=2.7",
+    "pyproj>=3.7.2",
+    "rasterio>=1.5.1",
     "rdflib>=7.0",
     "shapely>=2.0",
 ]

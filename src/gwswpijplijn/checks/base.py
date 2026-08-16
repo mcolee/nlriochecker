@@ -94,6 +94,7 @@ class CheckOutcome:
     findings: list[Finding]
     notes: list[str] = field(default_factory=list)
     weggelaten: int = 0
+    skeleton: str = ""
 
     @property
     def unreliable_count(self) -> int:
@@ -139,6 +140,7 @@ class CheckRun:
                 findings=[f for f in outcome.findings if f.object_uri in binnen],
                 notes=outcome.notes,
                 weggelaten=sum(1 for f in outcome.findings if f.object_uri not in binnen),
+                skeleton=outcome.skeleton,
             )
             for outcome in self.outcomes
         ]
@@ -193,6 +195,31 @@ class Check(ABC):
         )
 
 
+class SkeletonCheck(Check):
+    """Een check die in het register staat maar (nog) geen uitslag kan geven.
+
+    Stilzwijgend overslaan mag niet: een check die er niet is, leest in het rapport
+    als een check zonder bevindingen. Een skelet levert daarom nul bevindingen op
+    met een expliciete markering en reden erbij, zodat rapport en dekkingsmatrix
+    laten zien wat er *niet* gekeken is.
+    """
+
+    markering: ClassVar[str]
+    reden: ClassVar[str]
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Levert nooit bevindingen; deze check is niet uitvoerbaar."""
+        return iter(())
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt de markering en de reden waarom er niets getoetst is."""
+        return [f"**{self.markering}** — {self.reden}"]
+
+    def examined(self, context: CheckContext) -> int:
+        """Een skelet bekijkt niets."""
+        return 0
+
+
 def objecten_in_gebied(dataset: GwswDataset, area: StudyArea) -> frozenset[str]:
     """De URI's van de objecten waarvan de geometrie het studiegebied raakt."""
     binnen = {uri for uri, node in dataset.nodes.items() if area.bevat(node.point)}
@@ -235,6 +262,7 @@ def run_checks(
                 examined=check.examined(context),
                 findings=list(check.run(context)),
                 notes=check.notes(context),
+                skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
             )
         )
 
