@@ -10,7 +10,7 @@ __pycache__/
 .ruff_cache/
 
 # Uitvoer van de pijplijn
-uitvoer/
+/uitvoer/
 
 # Invoerdata en referentiedocumenten (groot, niet in versiebeheer)
 data/*
