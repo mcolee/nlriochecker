@@ -92,8 +92,9 @@ def schrijf_geopackage(
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
 
     Is er een studiegebied, dan is dat de grens van het bestand: de featurelagen
-    bevatten alleen objecten binnen of snijdend met het gebied. De checks zijn op de
-    volledige dataset gedraaid, dus zonder randeffecten.
+    bevatten alleen objecten binnen of snijdend met het gebied. De checks draaiden
+    op de kern plus de contextschil (ruim genoeg voor randeffectvrije netwerkchecks),
+    dus wat hier buiten valt is bewust weggelaten, niet over het hoofd gezien.
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)

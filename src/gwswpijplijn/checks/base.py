@@ -177,9 +177,12 @@ class CheckRun:
     def beperk_tot_studiegebied(self, area: StudyArea) -> CheckRun:
         """Geeft een run terug met alleen de bevindingen binnen het gebied.
 
-        De checks zijn op de volledige dataset gedraaid; pas hier wordt afgebakend.
-        Zo blijven de netwerkchecks over het hele stelsel redeneren en ontstaan er
-        geen randeffecten doordat een streng het gebied uit loopt.
+        Met een studiegebied zijn de checks al op de kern plus de contextschil
+        gedraaid -- ruim genoeg dat de netwerkchecks hetzelfde antwoord geven als
+        op de volledige dataset -- en pas hier wordt tot de kern afgebakend. Zo
+        ontstaan er geen randeffecten doordat een streng het gebied uit loopt.
+        Checks die over de hele populatie gaan (`Check.volledig_bereik`) zijn
+        sowieso op de volledige export blijven draaien.
         """
         binnen = objecten_in_gebied(self.dataset, area)
         if not binnen:
@@ -345,14 +348,19 @@ def run_checks(
             )
         )
 
+    # De datakarakteristiek en de telling van onbetrouwbaar getypeerde objecten
+    # gaan altijd over de volledige export, ook met een studiegebied: het rapport
+    # noemt ze expliciet stabiel onder afbakening, en beide zijn een goedkope
+    # doorloop respectievelijk verzamelingsdoorsnede, dus versmallen heeft geen nut.
+    volledig = context.volledige_context()
     return CheckRun(
         dataset=context.dataset,
         outcomes=outcomes,
         typing_gate_applied=typing_gate_applied,
         unreliable_labels=len(context.unreliable_objects),
-        unreliable_labels_in_dataset=len(context.matched_objects()),
+        unreliable_labels_in_dataset=len(volledig.matched_objects()),
         bronnen=context.bronnen,
-        karakteristiek=bepaal_karakteristiek(context.dataset, context.config),
+        karakteristiek=bepaal_karakteristiek(volledig.dataset, context.config),
         config=context.config,
         analyseset=context.analyseset,
     )

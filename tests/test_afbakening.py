@@ -168,3 +168,42 @@ def test_de_run_onthoudt_de_omvang_van_kern_en_schil() -> None:
     )
 
     assert run.analyseset is analyseset
+
+
+def _uri_van(dataset, label: str) -> str:
+    """De URI van het object met dit label; nodig om iets buiten de kern te pakken."""
+    alles = {**dataset.nodes, **dataset.conduits}
+    return next(uri for uri, object_ in alles.items() if object_.label == label)
+
+
+def test_karakteristiek_en_typeringstelling_blijven_over_de_volledige_export() -> None:
+    """Het rapport belooft dat deze getallen niet met de afbakening meebewegen.
+
+    Put E hoort bij het losstaande netje dat buiten de analyseset valt (zie
+    `test_een_losstaand_net_blijft_buiten_de_analyseset`). Zonder de reparatie zou
+    `matched_objects()` hem missen zodra er een studiegebied is, en zou de
+    typeringstelling met en zonder studiegebied uiteenlopen.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+    onbetrouwbaar = frozenset({_uri_van(dataset, "E")})
+
+    zonder_gebied = run_checks(
+        CheckContext(dataset=dataset, config=config, unreliable_objects=onbetrouwbaar),
+        ["TOP-001"],
+    )
+    met_gebied = run_checks(
+        CheckContext(
+            dataset=analyseset.dataset,
+            config=config,
+            unreliable_objects=onbetrouwbaar,
+            volledige_dataset=dataset,
+            analyseset=analyseset,
+        ),
+        ["TOP-001"],
+    )
+
+    assert met_gebied.karakteristiek == zonder_gebied.karakteristiek
+    assert (
+        met_gebied.unreliable_labels_in_dataset == zonder_gebied.unreliable_labels_in_dataset == 1
+    )

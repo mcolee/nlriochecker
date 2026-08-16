@@ -173,9 +173,10 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
             f"**Studiegebied:** {gebied.name} ({gebied.area_ha:.1f} ha, "
             f"{gebied.feature_count} vlak(ken), bron `{gebied.source.name}`).",
             "",
-            f"> De checks zijn op de volledige dataset gedraaid en pas daarna afgebakend, "
-            f"zodat netwerkchecks geen randeffecten krijgen van strengen die het gebied "
-            f"uit lopen. **{getal(weggelaten, 'bevinding viel', 'bevindingen vielen')} buiten "
+            f"> De checks draaiden op de kern plus de contextschil -- ruim genoeg dat "
+            f"netwerkchecks geen randeffecten krijgen van strengen die het gebied uit lopen "
+            f"-- en pas daarna is tot de kern afgebakend. "
+            f"**{getal(weggelaten, 'bevinding viel', 'bevindingen vielen')} buiten "
             "het gebied** en staat hier niet in; dit rapport zegt dus niets over de rest van "
             "de dataset.",
             "",
