@@ -629,13 +629,18 @@ C = (1100.0, 2000.0)
 def hoogteput(
     naam, label, punt, mv=10.0, dek=10.0, hoogte=1500, mv_wijze=None, dek_wijze=None, **extra
 ):
-    """Een put met maaiveld, putdeksel en puthoogte."""
+    """Een put met maaiveld, putdeksel en puthoogte.
+
+    Met `dek=None` krijgt de put geen putdeksel. Zo ziet de De Wolden-export eruit:
+    daarin komt `Putdekselniveau` geen enkele keer voor, zodat de hoogtechecks op de
+    maaiveldhoogte terugvallen.
+    """
     waarden = {**STANDAARDPUT, "HoogtePut": hoogte}
     waarden.update(extra)
     return (
         put(naam, label, punt[0], punt[1], extra=kenmerken(naam, **waarden))
         + maaiveld(naam, mv, mv_wijze)
-        + deksel(naam, dek, dek_wijze)
+        + (deksel(naam, dek, dek_wijze) if dek is not None else "")
     )
 
 
@@ -1088,7 +1093,10 @@ FIXTURES["ext_scenario.ttl"] = (
     # Put D ligt buiten het studiegebied en mag geen enkele uitslag krijgen.
     + hoogteput("PutD", "D", EXT_D, mv=99.00, dek=99.00)
     # Put F ligt op de nodata-vlek van het raster.
-    + hoogteput("PutE", "E", EXT_E, mv=10.00, dek=10.00)
+    # Put E heeft geen putdekselniveau, net als elke put in De Wolden. De hoogtechecks
+    # vallen dan terug op de maaiveldhoogte, en die komt hier uit AHN2. Zijn afwijking
+    # is 0,08 m, dus hij komt in HGT-001 terecht.
+    + hoogteput("PutE", "E", EXT_E, mv=10.08, dek=None, mv_wijze="AHN2")
     + hoogteput("PutF", "F", EXT_F, mv=12.00, dek=12.00)
     # Lozingsput ver van het water; Lozingsput vlakbij water-1.
     + put("PutL1", "L1", 1005.0, 1990.0, klasse="Lozingsput")

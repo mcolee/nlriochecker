@@ -310,9 +310,8 @@ def _discrepancy_section(result: CoverageResult) -> list[str]:
         "",
         "### Vormen die niet in alle vereiste CFK's vuren",
         "",
-        "Alle CFK's toetsen hetzelfde RDF-bestand. Vuurt een vorm in de ene wel en in de "
-        'andere niet, dan verschilt de vormverzameling en rust een claim "beide CFK\'s" '
-        "in werkelijkheid op een deel ervan.",
+        "Alle CFK's toetsen hetzelfde RDF-bestand, dus schone data verklaart deze "
+        "verschillen niet: ze zitten in de meting.",
         "",
         "| Check | Vorm | Wel meldingen | Geen meldingen |",
         "| --- | --- | --- | --- |",
@@ -323,6 +322,23 @@ def _discrepancy_section(result: CoverageResult) -> list[str]:
             f"{', '.join(afwijking.met_meldingen)} | "
             f"{', '.join(afwijking.zonder_meldingen)} |"
         )
+
+    if result.ongelijke_meting:
+        lines += [
+            "",
+            "> **Voorzichtig:** de rapporten zijn niet op dezelfde manier gedraaid ("
+            + "; ".join(result.ongelijke_meting)
+            + "). Dat verklaart deze verschillen evengoed, dus ze zeggen hier niets over "
+            "de vormverzameling van de conformiteitsklassen.",
+        ]
+    else:
+        lines += [
+            "",
+            "De rapporten zijn op dezelfde onderdelen gevalideerd en noemen dezelfde "
+            "uitzonderingen, dus het verschil zit in de vormverzameling van de CFK: een "
+            'dekkingclaim van de vorm "beide CFK\'s" rust in werkelijkheid op een deel '
+            "ervan.",
+        ]
     return lines
 
 
@@ -676,6 +692,16 @@ def _karakteristiek_section(run: CheckRun) -> list[str]:
         return []
 
     lines = ["**Datakarakteristieken**", ""]
+    if run.study_area is not None:
+        # De cijfers zijn over de hele dataset geteld, terwijl de bevindingen erboven
+        # tot het studiegebied zijn afgebakend. Zonder deze regel leest de tabel als
+        # een beschrijving van de afbakening.
+        lines += [
+            f"> Geteld over de **volledige dataset**, niet over {run.study_area.name}: het "
+            "gaat om eigenschappen van de aangeleverde export, en die veranderen niet met "
+            "de afbakening van de rapportage.",
+            "",
+        ]
 
     if karakteristiek.datums:
         lines += [

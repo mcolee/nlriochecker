@@ -135,13 +135,12 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 :PutE_ori gwsw:hasConnection :PutE_maa .
 :PutE_maa rdf:type gwsw:Maaiveldorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] .
-
-:PutE gwsw:hasPart :PutE_dek .
-:PutE_dek rdf:type gwsw:Putdeksel ;
-    gwsw:hasAspect :PutE_dek_ori .
-:PutE_dek_ori rdf:type gwsw:Dekselorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.08 ] ;
+    gwsw:hasAspect :PutE_maa_pun .
+:PutE_maa_pun rdf:type gwsw:Punt ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>0.0 0.0</gml:pos></gml:Point>"^^geo:gmlLiteral ;
+    gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+        gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:AHN2 ] ] .
 :PutF rdf:type gwsw:Inspectieput ; rdfs:label "F" ;
     gwsw:hasAspect :PutF_ori .
 :PutF gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,

@@ -183,3 +183,37 @@ def test_meegeleverde_mapping_kent_geen_discrepanties_op_de_minimeting(
     result: CoverageResult = assess_coverage(analyse, config)
 
     assert result.discrepanties == []
+
+
+def test_ongelijk_gedraaide_rapporten_ontkrachten_de_vergelijking(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Vormverschillen zeggen niets als de rapporten niet gelijk gedraaid zijn.
+
+    Twee CFK's over hetzelfde RDF-bestand zijn alleen vergelijkbaar als ze op
+    dezelfde onderdelen gevalideerd zijn. Is dat niet zo, dan verklaart dat een
+    vormverschil evengoed en mag het rapport er geen conclusie aan hangen.
+    """
+    paden = []
+    for bron in shacl_drieluik:
+        kopie = tmp_path / bron.name
+        tekst = bron.read_text(encoding="utf-8")
+        if bron.name.endswith("hyd.csv"):
+            tekst = tekst.replace(
+                "Gevalideerd op onderdelen;Datatype kenmerk,",
+                "Gevalideerd op onderdelen;Kardinaliteit,",
+            )
+        kopie.write_text(tekst, encoding="utf-8")
+        paden.append(kopie)
+
+    analyse = analyze(laad_nulmeting(paden, VEREIST))
+    result = assess_coverage(analyse, load_coverage_config())
+
+    assert result.ongelijke_meting
+    assert "verschillende onderdelen" in result.ongelijke_meting[0]
+
+
+def test_gelijk_gedraaide_rapporten_geven_geen_voorbehoud(analyse: MetingAnalysis) -> None:
+    result = assess_coverage(analyse, load_coverage_config())
+
+    assert result.ongelijke_meting == []

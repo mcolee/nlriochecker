@@ -72,11 +72,17 @@ class CheckCoverage:
 class ShapeDiscrepancy:
     """Een bewijspatroon dat niet in alle vereiste CFK's meldingen oplevert.
 
-    Alle CFK's toetsen hetzelfde RDF-bestand. Vuurt een vorm in de ene CFK wel en
-    in de andere niet, dan kan dat niet aan schone data liggen: de vormverzameling
-    van die CFK's verschilt. Een dekkingclaim van de vorm "beide CFK's" rust dan in
-    werkelijkheid op een deel ervan. Nul meldingen in *alle* CFK's zegt niets --
-    dat kan ook schone data zijn -- en telt hier dus niet mee.
+    Alle CFK's toetsen hetzelfde RDF-bestand, dus schone data verklaart het
+    verschil niet: als een vorm in de ene CFK wel en in de andere geen meldingen
+    geeft, ligt dat aan de meting en niet aan de dataset. Een dekkingclaim van de
+    vorm "beide CFK's" rust dan in werkelijkheid op een deel ervan. Nul meldingen
+    in *alle* CFK's zegt niets -- dat kan ook schone data zijn -- en telt hier
+    dus niet mee.
+
+    Blijft over dat de meting op twee manieren kan verschillen: de vormverzameling
+    van de CFK verschilt, of de rapporten zijn niet op dezelfde onderdelen
+    gedraaid. Dat tweede is uit het kopblok te zien en wordt apart gemeld, want
+    dan zegt het verschil niets over de CFK's.
     """
 
     check_id: str
@@ -145,6 +151,7 @@ class CoverageResult:
     checks: list[CheckCoverage]
     discrepanties: list[ShapeDiscrepancy] = field(default_factory=list)
     registercontrole: RegisterCheck | None = None
+    ongelijke_meting: list[str] = field(default_factory=list)
 
     @property
     def untouched(self) -> list[CheckCoverage]:
@@ -183,6 +190,7 @@ def assess_coverage(
         checks=checks,
         discrepanties=discrepanties,
         registercontrole=verify_register(config, register) if register is not None else None,
+        ongelijke_meting=_ongelijke_meting(analyses),
     )
 
 
@@ -223,6 +231,37 @@ def verify_register(
             "bij of voer de schrapronde opnieuw uit."
         )
     return controle
+
+
+def _ongelijke_meting(analyses: list[ReportAnalysis]) -> list[str]:
+    """Meldt waarin de metingen van de CFK's van elkaar verschillen.
+
+    Een vorm die in de ene CFK wel en in de andere geen meldingen geeft, wijst
+    alleen op een verschil in vormverzameling als de rapporten verder op dezelfde
+    manier gedraaid zijn. Is een rapport op minder onderdelen gevalideerd, dan
+    verklaart dat het verschil evengoed en zegt de vergelijking niets. Het kopblok
+    van de GWSW-server noemt die onderdelen, dus dat is te controleren.
+    """
+    verschillen = []
+    onderdelen = {
+        analysis.cfk: tuple(sorted(analysis.report.validated_parts)) for analysis in analyses
+    }
+    if len(set(onderdelen.values())) > 1:
+        overzicht = "; ".join(
+            f"{cfk}: {', '.join(delen) or 'niet vermeld'}"
+            for cfk, delen in sorted(onderdelen.items())
+        )
+        verschillen.append(
+            f"de rapporten zijn op verschillende onderdelen gevalideerd ({overzicht})"
+        )
+
+    niet = {analysis.cfk: analysis.report.not_validated for analysis in analyses}
+    if len(set(niet.values())) > 1:
+        overzicht = "; ".join(
+            f"{cfk}: {waarde or 'niet vermeld'}" for cfk, waarde in sorted(niet.items())
+        )
+        verschillen.append(f"de rapporten noemen verschillende uitzonderingen ({overzicht})")
+    return verschillen
 
 
 def _discrepanties(mapping: CheckMapping, analyses: list[ReportAnalysis]) -> list[ShapeDiscrepancy]:

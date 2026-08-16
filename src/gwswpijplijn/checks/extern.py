@@ -666,16 +666,27 @@ class _AhnCheck(_ExterneCheck):
             return False
         return self.raster(context) is not None
 
-    def monsters(self, context: CheckContext):
-        """Levert per toetsbare put het maaiveld uit de dataset en uit het AHN."""
+    def monsters(self, context: CheckContext) -> list[tuple[Node, float]]:
+        """Levert per toetsbare put het maaiveld uit de dataset en uit het AHN.
+
+        Het resultaat wordt per context bewaard. `run()`, `notes()` en de telling
+        van de nodata-cellen vragen er elk om, en elke doorloop bemonstert het
+        raster per put; op een volledige dataset is dat merkbaar duur.
+        """
         raster = self.raster(context)
         if raster is None:
-            return
-        for node in self.selectie(context).toetsbaar:
-            gemeten = raster.sample(node.point.x, node.point.y)
-            if gemeten is None:
-                continue
-            yield node, gemeten
+            return []
+
+        def bemonster() -> list[tuple[Node, float]]:
+            """Bemonstert het raster voor elke toetsbare put."""
+            gevonden = []
+            for node in self.selectie(context).toetsbaar:
+                gemeten = raster.sample(node.point.x, node.point.y)
+                if gemeten is not None:
+                    gevonden.append((node, gemeten))
+            return gevonden
+
+        return context.cached(f"ahn:monsters:{type(self).__name__}", bemonster)
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt het bereik en of het raster aanwezig was."""
@@ -688,11 +699,7 @@ class _AhnCheck(_ExterneCheck):
                 "deze check is overgeslagen."
             ]
         notities = _bereiknotities(context, self.selectie(context), self.soort)
-        zonder = sum(
-            1
-            for node in self.selectie(context).toetsbaar
-            if raster.sample(node.point.x, node.point.y) is None
-        )
+        zonder = len(self.selectie(context).toetsbaar) - len(self.monsters(context))
         notities.append(f"Hoogtereferentie: `{raster.source.name}` ({raster.crs}).")
         if zonder:
             notities.append(
@@ -759,14 +766,14 @@ class _DekselAfwijking(_AhnCheck):
         if context.bronnen is None or self.raster(context) is None:
             return notities
 
-        uit_model = [node for node, _ in self.monsters(context) if _uit_model_node(context, node)]
+        vergeleken = [node for node, _ in self.monsters(context)]
+        uit_model = [node for node in vergeleken if _uit_model_node(context, node)]
         if not uit_model:
             return notities
 
-        vergeleken = sum(1 for _ in self.monsters(context))
         wijzen = sorted({_inwinningswijze(node) or "onbekend" for node in uit_model})
         notities.append(
-            f"{len(uit_model)} van de {vergeleken} vergeleken hoogten zijn zelf uit een "
+            f"{len(uit_model)} van de {len(vergeleken)} vergeleken hoogten zijn zelf uit een "
             f"hoogtemodel ingewonnen ({', '.join(wijzen)}). Voor die putten vergelijkt deze "
             "check twee hoogtemodellen met elkaar; een afwijking daar is geen gebrek in de "
             "beheerdata en valt niet met een veldmeting te herstellen."
@@ -780,10 +787,7 @@ def _inwinningswijze(node: Node) -> str | None:
     Het putdekselniveau gaat voor; ontbreekt dat, dan is de maaiveldhoogte de
     gebruikte waarde en telt haar herkomst.
     """
-    if node.dekselniveau is not None:
-        inwinning = node.deksel_aspect.inwinning if node.deksel_aspect is not None else None
-    else:
-        inwinning = node.maaiveld_inwinning
+    inwinning = node.deksel_inwinning if node.dekselniveau is not None else node.maaiveld_inwinning
     return inwinning.wijze if inwinning is not None else None
 
 

@@ -11,7 +11,7 @@ from gwswpijplijn.analysis import MetingAnalysis, analyze
 from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import REGISTRY, CheckContext, Severity, run_checks
 from gwswpijplijn.comparison import compare_metingen
-from gwswpijplijn.config import load_coverage_config
+from gwswpijplijn.config import CoverageConfig, load_coverage_config
 from gwswpijplijn.coverage import assess_coverage, verify_register
 from gwswpijplijn.dataset import GwswDataset, load_dataset
 from gwswpijplijn.errors import PipelineError
@@ -138,20 +138,25 @@ def _checkregister_option():
         type=RAPPORT_TYPE,
         help=(
             "Checkregister (Markdown) om de dekkingmapping tegen te ijken. Zonder deze "
-            "optie wordt het register uit data/ gebruikt als dat er staat."
+            "optie wordt het register gebruikt dat de mapping zelf noemt in 'bron', en "
+            "anders de kopie in data/."
         ),
     )
 
 
-def _laad_register(register_path: Path | None) -> Register | None:
-    """Leest het checkregister; zonder pad de kopie in data/ als die er staat.
+def _laad_register(register_path: Path | None, config: CoverageConfig) -> Register | None:
+    """Leest het checkregister waartegen de dekkingmapping geijkt wordt.
 
-    Ontbreekt het register, dan wordt de ijking overgeslagen en meldt het rapport
-    dat. Stil doorgaan zou een dekking suggereren die niemand vergeleken heeft.
+    Zonder expliciet pad telt het register dat de mapping zelf in `bron` noemt; die
+    mapping is er immers tegen geverifieerd. Bestaat dat niet, dan de kopie in
+    data/. Is er helemaal geen register, dan wordt de ijking overgeslagen en meldt
+    het rapport dat: stil doorgaan zou een dekking suggereren die niemand
+    vergeleken heeft.
     """
     if register_path is None:
-        register_path = default_register_path()
-        if not register_path.exists():
+        kandidaten = [Path(config.bron), default_register_path()]
+        register_path = next((pad for pad in kandidaten if pad.is_file()), None)
+        if register_path is None:
             return None
     return load_register(register_path)
 
@@ -240,8 +245,11 @@ def analyze_command(
             shacl_paths, project_config_path, dataset_path, ontology_paths
         )
         config = load_coverage_config(config_path)
-        register = _laad_register(register_path)
-        verify_register(config, register, eisen=True)
+        register = _laad_register(register_path, config)
+        # Anders dan bij `dekking` is de dekkingclaim hier bijzaak: dit commando
+        # analyseert de nulmeting. Drift laat de samenvatting daarom niet falen maar
+        # verschijnt erin, zodat de lezer een rapport houdt dat zelf zegt wat eraan
+        # mankeert.
         coverage = assess_coverage(analyse, config, register)
         markdown_path, csv_path = write_reports(analyse, output_dir, coverage)
     except PipelineError as error:
@@ -277,7 +285,7 @@ def coverage_command(
             shacl_paths, project_config_path, dataset_path, ontology_paths
         )
         config = load_coverage_config(config_path)
-        register = _laad_register(register_path)
+        register = _laad_register(register_path, config)
         # Loopt de mapping uit de pas met het register, dan zegt de rest van dit
         # rapport niets meer; dan is stoppen eerlijker dan een dekking tonen.
         verify_register(config, register, eisen=True)

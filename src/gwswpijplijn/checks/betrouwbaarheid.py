@@ -44,11 +44,15 @@ class HoogteZonderInwinningsmetagegevens(_Metagegevensskelet):
     severity = Severity.WARNING
     dimension = Dimension.TRACEABILITY
     reden = (
-        "Niet gebouwd in deze fase. De De Wolden-export bevat wel `WijzeVanInwinning` "
-        "(circa 25.500 keer, met waarden AHN2, Inmeting, Revisie, Schatting, "
-        "Plan_Ontwerp, NietAchterhaald), maar die hangt aan de puntgeometrie en niet aan "
-        "de BOB's; er is geen enkele `DatumInwinning`. Een toets op hoogtekenmerken zou "
-        "daardoor voor elk kenmerk 'ontbreekt' melden. Zie het register, open punt 8."
+        "Niet gebouwd in deze fase. De De Wolden-export bevat 25.546 keer "
+        "`WijzeVanInwinning` en geen enkele `DatumInwinning`, dus de datumhelft van deze "
+        "check is er sowieso niet. De wijze is er wel, maar zo dun dat een toets vrijwel "
+        "alles zou melden: 266 van de 23.440 BOB's aan het beginpunt en 271 aan het "
+        "eindpunt hebben er een, 10.050 van de 22.363 maaiveldhoogten (waarvan 4.875 op "
+        "het kenmerk zelf en 5.175 pas via de terugval op het Punt-aspect, zie HGT-001), "
+        "en `Putdekselniveau` komt in deze export helemaal niet voor. Dat is een "
+        "eigenschap van de bronexport en geen gebrek per object. Zie het register, open "
+        "punt 8."
     )
 
 
@@ -61,10 +65,12 @@ class InwinningNietGemeten(_Metagegevensskelet):
     severity = Severity.WARNING
     dimension = Dimension.TRACEABILITY
     reden = (
-        "Niet gebouwd in deze fase. De inwinningswijze is in De Wolden wel aanwezig, maar "
-        "op de puntgeometrie van put en maaiveld, niet op de kritieke hoogtekenmerken die "
-        "het register noemt. Deze check is daarmee wel bouwbaar zodra er een export met "
-        "inwinning op de BOB's is."
+        "Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden wel op de "
+        "kritieke hoogtekenmerken, maar op te weinig ervan om een uitslag op te baseren: "
+        "537 van de 46.880 BOB's en 10.050 van de 22.363 maaiveldhoogten. Van die laatste "
+        "zijn er 5.104 uit het AHN afgeleid en 1.351 met de waarde NietAchterhaald, dus "
+        "geschat noch gemeten. Deze check wordt zinvol zodra een export de wijze op de "
+        "BOB's zelf meelevert."
     )
 
 

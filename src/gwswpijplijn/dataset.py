@@ -144,6 +144,7 @@ class Node(_MetAspecten):
     maaiveld_aspect: Aspect | None = None
     maaiveld_inwinning: Inwinning | None = None
     deksel_aspect: Aspect | None = None
+    deksel_inwinning: Inwinning | None = None
     multipart: bool = False
 
     @property
@@ -461,15 +462,19 @@ def _herkomst(graph: Graph, orientation: RdfNode, aspect: Aspect) -> Inwinning |
     return punt.inwinning if punt is not None else None
 
 
-def _deksel_aspect(graph: Graph, subject: RdfNode, deksel_klassen: frozenset[str]) -> Aspect | None:
-    """Het putdekselniveau van een put.
+def _deksel_kenmerk(
+    graph: Graph, subject: RdfNode, deksel_klassen: frozenset[str]
+) -> tuple[Aspect | None, Inwinning | None]:
+    """Het putdekselniveau van een put, met de herkomst ervan.
 
     Het niveau hangt aan de dekselorientatie van een Putdeksel-onderdeel; sommige
-    exports hangen het rechtstreeks aan de put. Beide wegen worden gevolgd.
+    exports hangen het rechtstreeks aan de put. Beide wegen worden gevolgd. De
+    herkomst volgt dezelfde terugval als bij de maaiveldhoogte: staat er geen
+    inwinning op het kenmerk zelf, dan telt die van de puntgeometrie ernaast.
     """
     direct = _aspect_van_klasse(graph, subject, KLASSE_PUTDEKSELNIVEAU)
     if direct is not None:
-        return direct
+        return direct, _herkomst(graph, subject, direct)
 
     for deel in graph.objects(subject, HAS_PART):
         if not any((deel, RDF.type, URIRef(klasse)) in graph for klasse in deksel_klassen):
@@ -477,11 +482,11 @@ def _deksel_aspect(graph: Graph, subject: RdfNode, deksel_klassen: frozenset[str
         for orientatie in graph.objects(deel, HAS_ASPECT):
             aspect = _aspect_van_klasse(graph, orientatie, KLASSE_PUTDEKSELNIVEAU)
             if aspect is not None:
-                return aspect
+                return aspect, _herkomst(graph, orientatie, aspect)
         aspect = _aspect_van_klasse(graph, deel, KLASSE_PUTDEKSELNIVEAU)
         if aspect is not None:
-            return aspect
-    return None
+            return aspect, _herkomst(graph, deel, aspect)
+    return None, None
 
 
 def load_dataset(
@@ -726,6 +731,7 @@ def _read_nodes(
             uri = str(subject)
             if uri in nodes:
                 continue
+            deksel, deksel_inwinning = _deksel_kenmerk(graph, subject, deksel_klassen)
             nodes[uri] = Node(
                 uri=uri,
                 label=_label(graph, subject),
@@ -738,7 +744,8 @@ def _read_nodes(
                 aspects=_read_aspects(graph, subject),
                 maaiveld_aspect=maaiveld,
                 maaiveld_inwinning=maaiveld_inwinning,
-                deksel_aspect=_deksel_aspect(graph, subject, deksel_klassen),
+                deksel_aspect=deksel,
+                deksel_inwinning=deksel_inwinning,
                 multipart=multipart,
             )
 

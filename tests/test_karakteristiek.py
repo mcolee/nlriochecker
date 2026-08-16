@@ -71,14 +71,25 @@ def test_expliciete_onbekend_waarden_worden_apart_geteld() -> None:
 
 
 def test_de_onbekend_lijst_is_configureerbaar() -> None:
-    """Welke waarde "onbekend" betekent is een projectafspraak, geen code."""
-    config = load_check_config()
-    config.inwinning.onbekend = ["AHN2"]
+    """Welke waarde "onbekend" betekent is een projectafspraak, geen code.
 
-    maaiveld = _vulling(_karakteristiek(config), "maaiveldhoogte")
+    De fixture heeft een AHN2 en een NietAchterhaald, dus een lijst met alleen
+    NietAchterhaald geeft 1. Om aan te tonen dat de lijst echt gelezen wordt moet
+    de telling meebewegen: leeg geeft 0, beide waarden geven 2.
+    """
+    standaard = _vulling(_karakteristiek(), "maaiveldhoogte")
+    assert standaard.onbekend == 1
 
-    assert maaiveld.onbekend == 1
-    assert maaiveld.per_wijze == {"AHN2": 1, "NietAchterhaald": 1}
+    leeg = load_check_config()
+    leeg.inwinning.onbekend = []
+    assert _vulling(_karakteristiek(leeg), "maaiveldhoogte").onbekend == 0
+
+    beide = load_check_config()
+    beide.inwinning.onbekend = ["AHN2", "NietAchterhaald"]
+    ruim = _vulling(_karakteristiek(beide), "maaiveldhoogte")
+    assert ruim.onbekend == 2
+    # De telling per wijze blijft ongemoeid; alleen het onbekend-oordeel verschuift.
+    assert ruim.per_wijze == {"AHN2": 1, "NietAchterhaald": 1}
 
 
 def test_kenmerken_zonder_waarden_komen_niet_in_de_tabel() -> None:

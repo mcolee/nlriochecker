@@ -5,9 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from click.testing import CliRunner
 
 from gwswpijplijn.cli import main
+from gwswpijplijn.register import default_register_path
 from gwswpijplijn.reporting import (
     FILE_CHECKS_CSV,
     FILE_CHECKS_MARKDOWN,
@@ -214,3 +216,71 @@ def test_ongeldige_config_geeft_exitcode_1(shacl_drieluik: list[Path], tmp_path:
 
     assert resultaat.exit_code == 1
     assert "geldige TOML" in resultaat.output
+
+
+def _drift_config(pad: Path) -> Path:
+    """Een dekkingmapping die een andere registerversie noemt dan het register."""
+    pad.write_text(
+        'checkregister_versie = "0.6"\n'
+        'bron = "x"\n'
+        "[[check]]\n"
+        'id = "ADM-001"\n'
+        'onderwerp = "x"\n'
+        'claim = "x"\n'
+        'vereiste_cfk = ["Hyd"]\n'
+        'bewijs = [{ vorm = "LengteLeiding_val" }]\n',
+        encoding="utf-8",
+    )
+    return pad
+
+
+def test_dekking_faalt_als_de_mapping_niet_bij_het_register_past(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """De dekkingclaim is het onderwerp van dit commando, dus drift is fataal."""
+    register = default_register_path()
+    if not register.exists():
+        pytest.skip("het checkregister staat niet in data/")
+
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "dekking",
+            *_shacl_args(shacl_drieluik),
+            "--config",
+            str(_drift_config(tmp_path / "drift.toml")),
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code == 1
+    assert "0.6" in resultaat.output
+    assert "0.7" in resultaat.output
+
+
+def test_analyseer_meldt_de_drift_in_het_rapport(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Hier is de dekking bijzaak, dus de lezer houdt een rapport dat het zelf zegt."""
+    register = default_register_path()
+    if not register.exists():
+        pytest.skip("het checkregister staat niet in data/")
+
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "analyseer",
+            *_shacl_args(shacl_drieluik),
+            "--config",
+            str(_drift_config(tmp_path / "drift.toml")),
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    tekst = (uitvoer / FILE_MARKDOWN).read_text(encoding="utf-8")
+    assert "Dekking vervallen" in tekst
+    assert "geverifieerd op checkregister 0.6" in tekst

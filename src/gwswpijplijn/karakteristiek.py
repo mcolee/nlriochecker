@@ -123,24 +123,22 @@ def _inwinningsvulling(dataset: GwswDataset, config: CheckConfig) -> list[Inwinn
     zeggen.
     """
     onbekend = set(config.inwinning.onbekend)
+    nodes = list(dataset.nodes.values())
+    conduits = list(dataset.conduits.values())
+    # Elke reeks leest de herkomst zoals de rest van de pijplijn hem leest, dus
+    # inclusief de terugval op de puntgeometrie waar die geldt. Anders zouden de
+    # kolommen van de ene rij niet met die van de volgende te vergelijken zijn.
     reeksen: list[tuple[str, list[Inwinning | None]]] = [
         (
             "maaiveldhoogte",
-            [
-                node.maaiveld_inwinning
-                for node in dataset.nodes.values()
-                if node.maaiveld_aspect is not None
-            ],
-        ),
-        ("putdekselniveau", _herkomsten(node.deksel_aspect for node in dataset.nodes.values())),
-        (
-            "BOB beginpunt",
-            _herkomsten(conduit.bob_start_aspect for conduit in dataset.conduits.values()),
+            [node.maaiveld_inwinning for node in nodes if node.maaiveld_aspect is not None],
         ),
         (
-            "BOB eindpunt",
-            _herkomsten(conduit.bob_end_aspect for conduit in dataset.conduits.values()),
+            "putdekselniveau",
+            [node.deksel_inwinning for node in nodes if node.deksel_aspect is not None],
         ),
+        ("BOB beginpunt", _herkomsten(conduit.bob_start_aspect for conduit in conduits)),
+        ("BOB eindpunt", _herkomsten(conduit.bob_end_aspect for conduit in conduits)),
     ]
 
     vullingen = []
@@ -165,7 +163,12 @@ def _inwinningsvulling(dataset: GwswDataset, config: CheckConfig) -> list[Inwinn
 
 
 def _herkomsten(aspecten) -> list[Inwinning | None]:
-    """De inwinning van de aanwezige kenmerken; ontbrekende kenmerken tellen niet mee."""
+    """De inwinning van de aanwezige kenmerken; ontbrekende kenmerken tellen niet mee.
+
+    Voor de BOB's is er geen terugval nodig: die hangen aan een begin- of
+    eindpunt van een leiding, en dat draagt geen eigen puntgeometrie waarop een
+    conversie de wijze zou kunnen parkeren.
+    """
     return [aspect.inwinning for aspect in aspecten if aspect is not None]
 
 

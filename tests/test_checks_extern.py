@@ -107,7 +107,7 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
         ("EXT-006", ["deksel-los"]),
         ("EXT-007", ["L1"]),
         ("EXT-008", ["bag-verweg"]),
-        ("HGT-001", ["B"]),
+        ("HGT-001", ["B", "E"]),
         ("HGT-002", ["C"]),
         ("HGT-003", ["1", "2"]),
     ],
@@ -246,6 +246,26 @@ def test_hgt001_meldt_een_maaiveld_uit_hetzelfde_hoogtemodel(
     assert bevinding.details["inwinning"] == "AHN2"
     assert bevinding.details["uit_hoogtemodel"] is True
     assert any("hoogtemodel" in note for note in outcome.notes)
+
+
+def test_hgt001_valt_terug_op_de_wijze_van_het_punt(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Put E heeft geen putdekselniveau, net als elke put in De Wolden.
+
+    De check valt dan terug op de maaiveldhoogte, en die draagt haar
+    inwinningswijze niet zelf maar op het Punt van de maaiveldorientatie. Zonder
+    die terugval zou juist de uit AHN afgeleide helft van de export als
+    herkomstloos gelden en zou de kanttekening nooit verschijnen.
+    """
+    outcome = uitkomst("HGT-001", config, bronnen)
+
+    bevinding = next(f for f in outcome.findings if f.object_label == "E")
+    assert bevinding.details["bron"] == "maaiveldhoogte"
+    assert bevinding.details["inwinning"] == "AHN2"
+    assert bevinding.details["uit_hoogtemodel"] is True
+    assert "twee hoogtemodellen" in bevinding.message
+    assert any("2 van de" in note and "hoogtemodel" in note for note in outcome.notes)
 
 
 def test_hgt002_meldt_een_gemeten_maaiveld_zonder_voorbehoud(
