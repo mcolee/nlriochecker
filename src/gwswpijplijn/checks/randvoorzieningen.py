@@ -186,6 +186,26 @@ def drempelnotitie(context: CheckContext) -> list[str]:
     return notities
 
 
+def _zwaartepunt(context: CheckContext, knopen: set[str]) -> tuple[float, float] | None:
+    """Het gemiddelde van de knooppunten van een deelstelsel.
+
+    Een melding over een deelstelsel hangt aan een enkele knoop, maar hoort op de
+    kaart midden in dat deel te staan; anders lijkt het gebrek bij die ene put te
+    zitten.
+    """
+    punten = [
+        node.point
+        for uri in knopen
+        if (node := context.dataset.nodes.get(uri)) is not None and node.point is not None
+    ]
+    if not punten:
+        return None
+    return (
+        sum(punt.x for punt in punten) / len(punten),
+        sum(punt.y for punt in punten) / len(punten),
+    )
+
+
 def _stelseldelen(context: CheckContext) -> list[set[str]]:
     """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen.
 
@@ -370,6 +390,7 @@ class GemengdDeelstelselZonderOverstort(Check):
                 "externe overstort of bergbezinkvoorziening.",
                 knopen_in_deelstelsel=len(deel),
                 cluster_id=clusters.get(uri, ""),
+                foutlocatie=_zwaartepunt(context, deel),
             )
 
     def notes(self, context: CheckContext) -> list[str]:

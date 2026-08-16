@@ -65,3 +65,19 @@ def test_ongeldige_config(tmp_path: Path, inhoud: str, melding: str) -> None:
 def test_ontbrekend_bestand(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="kan niet gelezen worden"):
         load_check_config(tmp_path / "weg.toml")
+
+
+def test_rapportinstellingen_hebben_bruikbare_defaults() -> None:
+    """Geen drempel hardgecodeerd: het rapport leest ze uit de projectconfig."""
+    rapport = load_check_config().rapport
+
+    assert rapport.richtingsdrempel == 0.10
+    assert rapport.multi_melding_checks == 3
+    assert rapport.max_bevindingen_per_check == 0
+    assert rapport.systemisch_drempel == 0.80
+    assert rapport.register_versie == "v0.7"
+
+
+def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
+    """Een fout op een overstort weegt zwaarder dan een fout op een gewone put."""
+    assert "Overstortput" in load_check_config().klassen.kritiek

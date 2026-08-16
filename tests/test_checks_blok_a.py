@@ -263,3 +263,29 @@ def test_rvz006_draagt_hetzelfde_deelstelsel_id_als_de_net_checks() -> None:
 
     bevinding = outcome.findings[0]
     assert bevinding.details["cluster_id"] == ids[bevinding.object_uri]
+
+
+def test_rvz006_zet_het_zwaartepunt_van_het_deelstelsel_als_foutlocatie() -> None:
+    """Het gebrek zit in het deelstelsel, niet in de knoop waar de melding aan hangt.
+
+    Op de kaart hoort de melding daarom midden in dat deel te staan.
+    """
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
+    context = CheckContext(dataset=dataset, config=fixtureconfig())
+    ids = deelstelsel_ids(context)
+
+    bevinding = run_checks(context, ["RVZ-006"]).outcomes[0].findings[0]
+
+    cluster = ids[bevinding.object_uri]
+    punten = [
+        dataset.nodes[uri].point
+        for uri, deel in ids.items()
+        if deel == cluster and dataset.nodes.get(uri) is not None
+        if dataset.nodes[uri].point is not None
+    ]
+    verwacht_x = sum(punt.x for punt in punten) / len(punten)
+    verwacht_y = sum(punt.y for punt in punten) / len(punten)
+    x, y = bevinding.details["foutlocatie"]
+
+    assert x == pytest.approx(verwacht_x)
+    assert y == pytest.approx(verwacht_y)

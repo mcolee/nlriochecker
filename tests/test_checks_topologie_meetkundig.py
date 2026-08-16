@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from shapely.geometry import Point
 
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckContext, Finding, run_checks
@@ -194,3 +195,52 @@ def test_paarmeldingen_dragen_het_tweede_object() -> None:
 
     assert bevinding.details["object2_uri"].startswith("http")
     assert bevinding.details["object2_label"]
+
+
+def _dataset_en_bevindingen(bestand: str, check_id: str):
+    """De dataset plus de bevindingen van een check erop."""
+    dataset = load_dataset(TTL_DIR / bestand)
+    context = CheckContext(dataset=dataset, config=fixtureconfig())
+    return dataset, run_checks(context, [check_id]).outcomes[0].findings
+
+
+def test_top011_zet_het_snijpunt_als_foutlocatie() -> None:
+    """De kruising zit op het snijpunt, niet op het midden van een van de strengen.
+
+    De coordinaat stond tot nu toe in de meldingtekst; als kolom en geometrie is
+    hij bruikbaar, in een zin is hij dat niet.
+    """
+    dataset, gevonden = _dataset_en_bevindingen("top011_hartlijnkruising.ttl", "TOP-011")
+    bevinding = gevonden[0]
+
+    x, y = bevinding.details["foutlocatie"]
+    eigen = dataset.conduits[bevinding.object_uri].line
+    ander = dataset.conduits[bevinding.details["object2_uri"]].line
+
+    assert eigen.distance(Point(x, y)) == pytest.approx(0.0, abs=1e-6)
+    assert ander.distance(Point(x, y)) == pytest.approx(0.0, abs=1e-6)
+    assert "(" not in bevinding.message
+
+
+def test_top010_zet_de_foutlocatie_tussen_de_twee_strengen() -> None:
+    """Het conflict zit waar de buizen elkaar naderen, niet op een strengmidden."""
+    dataset, gevonden = _dataset_en_bevindingen("top010_buffer_kruising.ttl", "TOP-010")
+    bevinding = gevonden[0]
+
+    punt = Point(*bevinding.details["foutlocatie"])
+    eigen = dataset.conduits[bevinding.object_uri].line
+    ander = dataset.conduits[bevinding.details["object2_uri"]].line
+
+    assert eigen.distance(punt) <= bevinding.details["afstand_m"] + 1e-6
+    assert ander.distance(punt) <= bevinding.details["afstand_m"] + 1e-6
+
+
+def test_top006_zet_de_foutlocatie_op_het_overlappende_deel() -> None:
+    dataset, gevonden = _dataset_en_bevindingen("top006_overlappende_streng.ttl", "TOP-006")
+    bevinding = gevonden[0]
+
+    punt = Point(*bevinding.details["foutlocatie"])
+
+    assert dataset.conduits[bevinding.object_uri].line.distance(punt) == pytest.approx(
+        0.0, abs=1e-6
+    )

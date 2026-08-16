@@ -115,6 +115,34 @@ def _knopen(context: CheckContext, conduit: Conduit) -> tuple[str | None, str | 
     )
 
 
+def _midden(links: Point, rechts: Point) -> tuple[float, float]:
+    """Het punt precies tussen twee punten in."""
+    return ((links.x + rechts.x) / 2, (links.y + rechts.y) / 2)
+
+
+def _dichtste_midden(links, rechts) -> tuple[float, float] | None:
+    """Het midden van het stuk waar twee geometrieen elkaar het dichtst naderen.
+
+    Bij overlappende of rakende strengen zit het probleem daar, niet in het midden
+    van een van beide strengen.
+    """
+    from shapely.ops import nearest_points
+
+    try:
+        eerste, tweede = nearest_points(links, rechts)
+    except (ValueError, AttributeError):
+        return None
+    return _midden(eerste, tweede)
+
+
+def _representatief(geometrie) -> tuple[float, float] | None:
+    """Een punt op een snijgeometrie; None als er geen snijding is."""
+    if geometrie is None or geometrie.is_empty:
+        return None
+    punt = geometrie.representative_point()
+    return (punt.x, punt.y)
+
+
 def _buren(topologie: _Topologie, conduit: Conduit, marge: float):
     """De andere strengen waarvan de omhullende binnen de marge komt.
 
@@ -280,6 +308,7 @@ class NietGesneptStrengeinde(Check):
                         afstand_m=round(afstand, 3),
                         put=node.label,
                         tolerantie_m=tolerantie,
+                        foutlocatie=(punt.x, punt.y),
                     )
 
     def examined(self, context: CheckContext) -> int:
@@ -326,6 +355,7 @@ class DubbelePut(Check):
                     object2_uri=ander.uri,
                     afstand_m=round(afstand, 3),
                     tolerantie_m=tolerantie,
+                    foutlocatie=_midden(node.point, ander.point),
                 )
 
     def examined(self, context: CheckContext) -> int:
@@ -407,6 +437,7 @@ class OverlappendeStreng(Check):
                     object2_uri=ander.uri,
                     overlaplengte_m=round(lengte, 3),
                     tolerantie_m=tolerantie,
+                    foutlocatie=_dichtste_midden(conduit.line, ander.line),
                 )
 
     def examined(self, context: CheckContext) -> int:
@@ -625,6 +656,7 @@ class StrengenRakenMetBuffer(Check):
                     object2_uri=ander.uri,
                     afstand_m=round(afstand, 3),
                     buffer_m=round(buffer, 3),
+                    foutlocatie=_dichtste_midden(conduit.line, ander.line),
                 )
 
     def _deelt_put(self, links: tuple[str | None, str | None], rechts) -> bool:
@@ -695,10 +727,10 @@ class Hartlijnkruising(Check):
                     context,
                     conduit.uri,
                     conduit.label,
-                    f"De hartlijn kruist die van streng {ander.label!r} "
-                    f"op {self._plaats(snijpunt)}.",
+                    f"De hartlijn kruist die van streng {ander.label!r}.",
                     object2_label=ander.label,
                     object2_uri=ander.uri,
+                    foutlocatie=_representatief(snijpunt),
                 )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -709,13 +741,6 @@ class Hartlijnkruising(Check):
             "wijst de plaatsen aan waar dat gebeurt; of het een conflict is volgt uit de "
             "hoogten (HGT-004, HGT-009, HGT-018), niet uit deze bevinding."
         ]
-
-    def _plaats(self, snijpunt) -> str:
-        """Een leesbare aanduiding van het snijpunt."""
-        if snijpunt.is_empty:
-            return "een onbekende plaats"
-        punt = snijpunt.representative_point()
-        return f"({punt.x:.1f}, {punt.y:.1f})"
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen met bruikbare geometrie."""

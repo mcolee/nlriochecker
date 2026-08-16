@@ -51,6 +51,8 @@ class ClassRoots(BaseModel):
     valconstructie: list[str] = Field(default_factory=list)
     # EXT-003: klassen die een kruising met een watergang verklaren.
     kruisingsleiding: list[str] = Field(default_factory=list)
+    # Prioriteit 1 in de GIS-uitvoer: een fout op deze klassen weegt het zwaarst.
+    kritiek: list[str] = Field(default_factory=list)
     # NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen.
     stelseltypen: dict[str, list[str]] = Field(default_factory=dict)
 
@@ -276,6 +278,23 @@ class ExternalSources(BaseModel):
     bgt_overige_bouwwerklagen: list[str] = Field(default_factory=list)
 
 
+class ReportOptions(BaseModel):
+    """Instellingen van de rapportage en de GIS-uitvoer."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # A1: boven welk aandeel strengen met stijgende bodem de rode draad wordt benoemd.
+    richtingsdrempel: float = Field(default=0.10, ge=0.0, le=1.0)
+    # A1: vanaf hoeveel verschillende checks op een object dat als een enkele fout geldt.
+    multi_melding_checks: int = Field(default=3, ge=2)
+    # A5.1: 0 betekent alle bevindingen tonen; het rapport kapt niet af.
+    max_bevindingen_per_check: int = Field(default=0, ge=0)
+    # Boven welk aandeel van de bekeken populatie een meldingtype systemisch heet.
+    systemisch_drempel: float = Field(default=0.80, gt=0.0, le=1.0)
+    # Versie van het checkregister, voor de metadata in de GIS-uitvoer.
+    register_versie: str = "v0.7"
+
+
 class CheckConfig(BaseModel):
     """De volledige projectconfiguratie van de check-engine."""
 
@@ -289,6 +308,7 @@ class CheckConfig(BaseModel):
     inwinning: InwinningOptions = Field(default_factory=InwinningOptions)
     puttyperegels: list[PutTypeRule] = Field(default_factory=list)
     bronnen: ExternalSources = Field(default_factory=ExternalSources)
+    rapport: ReportOptions = Field(default_factory=ReportOptions)
 
 
 def default_check_config_path() -> Path:

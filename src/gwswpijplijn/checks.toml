@@ -62,6 +62,10 @@ valconstructie = ["Valput", "Zandvangput"]
 # EXT-003: een streng die een watergang kruist hoort een van deze klassen te zijn.
 kruisingsleiding = ["Zinker", "Duiker"]
 
+# Prioriteit 1 in de GIS-uitvoer: een fout op een van deze klassen weegt het
+# zwaarst, want daar zijn de gevolgen van een gebrek het grootst.
+kritiek = ["Overstortput", "Bergbezinkbassin", "Gemaal"]
+
 # NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen. Anders dan
 # de rollen hierboven (die zeggen welk eindpunt een streng moet bereiken) deelt
 # deze tabel het net in soorten in, om buurstrengen te kunnen vergelijken.
@@ -143,3 +147,21 @@ uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN5"]
 # collectietoets van de nulmeting maar zijn informatief leeg; het bevindingen-
 # rapport telt ze apart zodat een compleetheidscijfer niet te rooskleurig leest.
 onbekend = ["NietAchterhaald"]
+
+# Instellingen van het rapport en de GIS-uitvoer. Geen enkele drempel staat in de
+# code; wie ze wil verleggen doet dat hier.
+[rapport]
+# Boven dit aandeel strengen met stijgende bodem benoemt het rapport systematisch
+# omgekeerde registratie als gezamenlijke oorzaak.
+richtingsdrempel = 0.10
+# Vanaf hoeveel verschillende checks op hetzelfde object dat als een enkele
+# vermoedelijke fout wordt gepresenteerd in plaats van als losse meldingen.
+multi_melding_checks = 3
+# 0 = alle bevindingen tonen. Het rapport verwijst toch al naar de CSV, maar
+# afkappen zonder het te zeggen leest als "dit is alles".
+max_bevindingen_per_check = 0
+# Boven dit aandeel van de bekeken populatie heet een meldingtype systemisch: het
+# zegt dan meer over de export als geheel dan over de losse objecten.
+systemisch_drempel = 0.80
+# Versie van het checkregister waaraan deze run getoetst is.
+register_versie = "v0.7"
