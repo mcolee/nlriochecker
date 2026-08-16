@@ -9,6 +9,7 @@ from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckContext, CheckRun, run_checks
 from gwswpijplijn.dataset import load_dataset
 from gwswpijplijn.studiegebied import load_study_area
+from gwswpijplijn.uitvoer.identiteit import melding_id
 from gwswpijplijn.uitvoer.melding import _is_systemisch, bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -118,6 +119,26 @@ def test_runmetadata_staat_op_elke_melding() -> None:
 
     assert meldingen[0].run_datum == "2026-08-16"
     assert meldingen[0].dataset == "top001_losliggende_put.ttl"
+
+
+def test_melding_draagt_zowel_fragment_als_uri() -> None:
+    run = _run("top005_dubbele_put.ttl", "TOP-005")
+
+    melding = bouw_meldingen(run, RUNDATUM)[0]
+
+    assert melding.object_uri.endswith(f"#{melding.object_id}")
+    assert "#" not in melding.object_id
+
+
+def test_de_melding_id_blijft_over_de_volledige_uri_gehasht() -> None:
+    """De ID's moeten vergelijkbaar blijven met die van eerdere runs."""
+    run = _run("top005_dubbele_put.ttl", "TOP-005")
+
+    melding = bouw_meldingen(run, RUNDATUM)[0]
+
+    assert melding.melding_id == melding_id(
+        melding.check_id, melding.object_uri, melding.object2_uri, {}
+    )
 
 
 def test_systemische_check_wordt_als_zodanig_gemarkeerd() -> None:

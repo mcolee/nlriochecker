@@ -26,7 +26,8 @@ MAX_CLUSTERS_IN_DUIDING = 5
 
 # De kolommen van het archief. De eerste negen stonden er al en houden hun naam en
 # plaats; hernoemen zou bestaande verwerking breken zonder dat er iets tegenover
-# staat. De nieuwe volgen dezelfde stijl; de GeoPackage gebruikt snake_case.
+# staat. `Object` draagt sinds v0.8 alleen nog het fragment; de volledige URI staat
+# in `ObjectURI`. De nieuwe volgen dezelfde stijl; de GeoPackage gebruikt snake_case.
 CSV_KOLOMMEN = [
     "Check",
     "Ernst",
@@ -51,6 +52,8 @@ CSV_KOLOMMEN = [
     "Systemisch",
     "RunDatum",
     "Dataset",
+    "ObjectURI",
+    "Object2URI",
 ]
 
 
@@ -86,7 +89,7 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
             "Ernst": melding.ernst,
             "Dimensie": melding.dimensie,
             "Label": melding.object_label,
-            "Object": melding.object_uri,
+            "Object": melding.object_id,
             "Melding": melding.boodschap,
             "TyperingBetrouwbaar": melding.typering_betrouwbaar,
             "X": melding.foutlocatie.x if melding.foutlocatie is not None else None,
@@ -95,7 +98,7 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
             "Categorie": melding.categorie,
             "Bron": melding.bron,
             "Object2Label": melding.object2_label,
-            "Object2": melding.object2_uri,
+            "Object2": melding.object2_id,
             "Waarde": melding.waarde,
             "Drempel": melding.drempel,
             "ClusterID": melding.cluster_id,
@@ -105,6 +108,8 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
             "Systemisch": melding.systemisch,
             "RunDatum": melding.run_datum,
             "Dataset": melding.dataset,
+            "ObjectURI": melding.object_uri,
+            "Object2URI": melding.object2_uri,
         }
         for melding in meldingen
     ]

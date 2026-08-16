@@ -275,6 +275,30 @@ def test_meldinglocatiestijl_filtert_systemische_meldingen_echt(tmp_path: Path) 
     assert all("systemisch" in uitdrukking for uitdrukking in filters)
 
 
+def test_feature_id_is_het_fragment_en_de_uri_staat_erbij(tmp_path: Path) -> None:
+    pad = _schrijf(_run("schoon.ttl"), tmp_path)
+
+    rijen = _rijen(pad, "select feature_id, gwsw_uri from putten limit 1")
+
+    feature_id, uri = rijen[0]
+    assert "#" not in feature_id
+    assert uri.endswith(f"#{feature_id}")
+
+
+def test_meldingen_dragen_fragment_en_uri(tmp_path: Path) -> None:
+    run = _run("top005_dubbele_put.ttl", "TOP-005")
+    pad = _schrijf(run, tmp_path)
+
+    rijen = _rijen(pad, "select feature_id, gwsw_uri, feature_id_2, gwsw_uri_2 from meldingen")
+
+    assert rijen
+    for feature_id, uri, tweede_id, tweede_uri in rijen:
+        assert "#" not in feature_id
+        assert uri.endswith(f"#{feature_id}")
+        assert "#" not in tweede_id
+        assert tweede_uri.endswith(f"#{tweede_id}")
+
+
 def test_featurelagen_dragen_het_stelseltype(tmp_path: Path) -> None:
     """Filteren op stelseltype is de eerste vraag van elke gebruiker.
 

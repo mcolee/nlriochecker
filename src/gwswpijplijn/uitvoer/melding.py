@@ -17,7 +17,7 @@ from shapely.geometry import Point
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import REGISTRY as CHECK_REGISTRY
 from gwswpijplijn.checks import CheckOutcome, CheckRun, Finding
-from gwswpijplijn.uitvoer.identiteit import melding_id
+from gwswpijplijn.uitvoer.identiteit import kort, melding_id
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,10 @@ class Melding:
     ernst: str
     dimensie: str
     object_uri: str
+    object_id: str
     object_label: str
     object2_uri: str
+    object2_id: str
     object2_label: str
     boodschap: str
     waarde: str
@@ -91,8 +93,10 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
                     ernst=finding.severity.value,
                     dimensie=finding.dimension.value,
                     object_uri=finding.object_uri,
+                    object_id=kort(finding.object_uri),
                     object_label=finding.object_label,
                     object2_uri=_tekst(finding.details.get(SLEUTEL_OBJECT2_URI)),
+                    object2_id=kort(_tekst(finding.details.get(SLEUTEL_OBJECT2_URI))),
                     object2_label=_tekst(finding.details.get(SLEUTEL_OBJECT2_LABEL)),
                     boodschap=finding.message,
                     waarde=_tekst(finding.details.get(SLEUTEL_WAARDE)),

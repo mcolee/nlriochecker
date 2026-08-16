@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gwswpijplijn.uitvoer.identiteit import melding_id
+from gwswpijplijn.uitvoer.identiteit import kort, melding_id
 
 
 def test_id_is_zestien_hextekens() -> None:
@@ -46,3 +46,14 @@ def test_sleutelvolgorde_doet_er_niet_toe() -> None:
     twee = melding_id("HGT-003", "urn:a", "", {"rol": "aanvoer", "zijde": "beginpunt"})
 
     assert een == twee
+
+
+def test_kort_geeft_het_fragment_van_een_gwsw_uri() -> None:
+    assert kort("http://sparql.gwsw.nl/kikker_vrij#knp3437") == "knp3437"
+    assert kort("http://sparql.gwsw.nl/kikker_vrij#lei3436-3435-1") == "lei3436-3435-1"
+
+
+def test_kort_laat_een_uri_zonder_fragment_ongemoeid() -> None:
+    """De EXT-checks melden objecten uit BGT en BAG; die hebben geen dataset-URI."""
+    assert kort("bgt:put/deksel-los") == "bgt:put/deksel-los"
+    assert kort("") == ""

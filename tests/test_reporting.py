@@ -198,6 +198,8 @@ def test_bevindingen_csv_draagt_de_uitgebreide_kolommen(tmp_path: Path) -> None:
         "Systemisch",
         "RunDatum",
         "Dataset",
+        "ObjectURI",
+        "Object2URI",
     ]
     assert [kolom for kolom in nieuw if kolom not in tabel.columns] == []
 
@@ -210,7 +212,9 @@ def test_bevindingen_csv_zet_de_foutlocatie_in_x_en_y(tmp_path: Path) -> None:
     rij = pd.read_csv(csv_path, sep=";", encoding="utf-8").iloc[0]
 
     assert pd.notna(rij["X"]) and pd.notna(rij["Y"])
-    assert rij["Object2"].startswith("http")
+    assert "#" not in rij["Object2"]
+    assert rij["Object2URI"].startswith("http")
+    assert rij["Object2URI"].endswith(f"#{rij['Object2']}")
 
 
 def test_rapport_toont_standaard_alle_bevindingen(tmp_path: Path) -> None:

@@ -29,6 +29,7 @@ from shapely.geometry.base import BaseGeometry
 from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import CheckRun, Severity
 from gwswpijplijn.errors import PipelineError
+from gwswpijplijn.uitvoer.identiteit import kort
 from gwswpijplijn.uitvoer.melding import Melding, categorie_van
 from gwswpijplijn.uitvoer.tabel import prepare
 
@@ -242,6 +243,7 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("run_datum", "text"),
         _Kolom("dataset_versie", "text"),
         _Kolom("register_versie", "text"),
+        _Kolom("gwsw_uri", "text"),
     ]
 
 
@@ -326,7 +328,7 @@ def _samenvatting(
         per_categorie[melding.categorie] += 1
 
     return (
-        uri,
+        kort(uri),
         getattr(object_, "label", ""),
         run.dataset.beheerobjecttype(uri),
         stelsel,
@@ -340,6 +342,7 @@ def _samenvatting(
         *[per_categorie.get(naam, 0) for naam in CATEGORIEEN],
         prioriteit,
         *metadata,
+        uri,
     )
 
 
@@ -379,6 +382,8 @@ MELDING_KOLOMMEN = [
     _Kolom("typering_betrouwbaar", "integer"),
     _Kolom("run_datum", "text"),
     _Kolom("dataset_versie", "text"),
+    _Kolom("gwsw_uri", "text"),
+    _Kolom("gwsw_uri_2", "text"),
 ]
 
 
@@ -386,8 +391,8 @@ def _melding_rij(melding: Melding) -> tuple:
     """Een melding als rij, in de volgorde van MELDING_KOLOMMEN."""
     return (
         melding.melding_id,
-        melding.object_uri,
-        melding.object2_uri,
+        melding.object_id,
+        melding.object2_id,
         melding.object_label,
         melding.check_id,
         melding.bron,
@@ -405,6 +410,8 @@ def _melding_rij(melding: Melding) -> tuple:
         int(melding.typering_betrouwbaar),
         melding.run_datum,
         melding.dataset,
+        melding.object_uri,
+        melding.object2_uri,
     )
 
 
