@@ -208,6 +208,8 @@ uitkomst geven. De ID's worden niet hergebruikt.
 
 12. Typering De Wolden (2026-08-16): een voorgestelde poortwachtercheck op te globaal getypeerde objecten is afgewezen als dubbel. De typeringspoort bestaat al (de SHACL-meting benoemt de te globale klassen, de dataset levert de instanties) en de drempel waaronder een dekkingclaim een voorbehoud krijgt is configureerbaar. Meten helpt hier bovendien niet: alle 20.758 putorientaties in De Wolden hangen aan een specifieke subklasse (19.322 Inspectieput, 1.107 Pompunit, 218 Overstortput, 55 Lozingsput, 27 Stuwput, 27 Kruisingsput, 1 Kolk, 1 Drainageput). Er is geen generiek getypeerde put.
 
+13. `checks/netwerk.py::_bouw_netwerk` bouwt de vrijvervalgraaf als `nx.DiGraph` en zet per streng `graph.add_edge(begin, eind, uri=conduit.uri, label=conduit.label)`. Twee parallelle strengen tussen hetzelfde knopenpaar (in dit domein normaal, zie TOP-013) delen een kantsleutel; de tweede `add_edge`-aanroep overschrijft `uri` en `label` van de eerste stilzwijgend. NET-004 leest die kantattributen in `_eerste_streng()` om de representatieve streng van een kringloop te noemen, en kan zo de verkeerde streng noemen. Pre-existent (niet in deze ronde geintroduceerd), maar nu opvallend naast `afbakening.py::_component`, die ditzelfde patroon voor de componentberekening bewust omzeilt door de kantsleutel los van de knopensamenhang bij te houden. Repareren: `_bouw_netwerk` net zo bijhouden welke strengen bij welk knopenpaar horen, in plaats van op het laatst toegevoegde kantattribuut te vertrouwen.
+
 ## Versiehistorie
 
 Versie 0.8 (2026-08-16): EXT-008 vervallen (BAG-verblijfsobjecten zijn voor deze opdracht

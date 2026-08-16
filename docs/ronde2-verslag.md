@@ -40,6 +40,18 @@ tekenrichting die niet tegen de getekende geometrie te toetsen viel. Zie §4a, e
 bevinding. De legendatekst is dienovereenkomstig "BOB-richting niet te bepalen"
 geworden, niet "BOB onbekend of vlak" zoals het ontwerp voorstelde.
 
+**Punt 5 (stapeling) specificeerde de schermoffset als een spiraal met een straal
+die per ring van acht bevindingen oploopt (§9 van het ontwerp); gebouwd is één
+vaste ring van 2,6 mm.** Bij `stapel_aantal = 4` zet de meegeleverde expressie de
+markeringen keurig op `0,2.6`, `-2.6,0`, `0,-2.6` en `2.6,0`, maar bij een grotere
+stapel blijft de straal 2,6 mm: een stapel van twintig bevindingen krijgt twintig
+punten verdeeld over dezelfde cirkel en overlapt dus alsnog. Dat de afwijking pas
+nu opvalt en niet alsnog naar een spiraal met oplopende ringen is omgebouwd, komt
+doordat de huidige offsetexpressie met PyQGIS geverifieerd is (taak 8); die
+zekerheid op het spel zetten door de QML laat in de ronde te wijzigen, weegt
+zwaarder dan het risico van een ongeverifieerde herziening. De afwijking staat
+hier vastgelegd in plaats van in de QML verholpen.
+
 ---
 
 ## 2. Wat er per taak gebouwd is
