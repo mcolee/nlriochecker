@@ -9,6 +9,7 @@ import pytest
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckContext, CheckOutcome, run_checks
 from gwswpijplijn.checks.netwerk import _netwerk
+from gwswpijplijn.checks.verbanden import deelstelsel_ids
 from gwswpijplijn.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -219,3 +220,41 @@ def test_orientatie_aspecten_zijn_geen_knoop_in_de_netwerkgraaf() -> None:
         # `types` zijn de typen van het object zelf; `orientation_types` die van het
         # aspect. Een knoop die alleen het laatste heeft, is een gelekt aspect.
         assert dataset.nodes[uri].types
+
+
+def test_deelstelsel_ids_delen_een_id_binnen_hetzelfde_netwerkdeel() -> None:
+    """Knopen in hetzelfde vrijvervaldeel horen bij hetzelfde deelstelsel.
+
+    De fixture heeft twee losse delen: A-B-G rond het gemaal, en C-D daarbuiten.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    ids = deelstelsel_ids(context)
+
+    per_label = {dataset.nodes[uri].label: cluster for uri, cluster in ids.items()}
+    assert per_label["A"] == per_label["B"] == per_label["G"]
+    assert per_label["C"] == per_label["D"]
+    assert per_label["A"] != per_label["C"]
+
+
+def test_net001_draagt_het_deelstelsel_id_van_zijn_streng() -> None:
+    """24 bevindingen op 2 deelstelsels zijn geen 24 losse gebreken.
+
+    Zonder ID op de bevinding is dat verband alleen uit de kaart af te leiden.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    ids = deelstelsel_ids(context)
+    verwacht = next(cluster for uri, cluster in ids.items() if dataset.nodes[uri].label == "C")
+
+    outcome = run_checks(context, ["NET-001"]).outcomes[0]
+
+    bevinding = next(f for f in outcome.findings if f.object_label == "3")
+    assert bevinding.details["cluster_id"] == verwacht
+
+
+def test_net001_vat_de_clusters_samen_in_de_toelichting() -> None:
+    outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
+
+    assert any("1 deelstelsel" in note for note in outcome.notes)

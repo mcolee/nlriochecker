@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import networkx as nx
+
 from gwswpijplijn.checks.base import CheckContext
 from gwswpijplijn.dataset import Conduit, Node
 
@@ -90,3 +92,66 @@ def objecten_van_klassen(context: CheckContext, wortels: list[str], bron: str) -
         if uri in verzameling
     }
     return list(gevonden.values())
+
+
+def netwerkdelen(context: CheckContext) -> list[set[str]]:
+    """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen.
+
+    Ongericht: voor de vraag of twee putten tot hetzelfde deelstelsel horen doet de
+    afvoerrichting niet ter zake. De delen staan op volgorde van hun eerste knoop,
+    zodat de nummering tussen runs gelijk blijft.
+    """
+    return context.cached("netwerkdelen", lambda: _bouw_netwerkdelen(context))
+
+
+def _bouw_netwerkdelen(context: CheckContext) -> list[set[str]]:
+    """Bouwt een ongerichte graaf van het vrijverval en splitst hem in delen."""
+    index = aansluitingen(context, "vrijvervalleiding")
+    graaf = nx.Graph()
+    for uri, (begin, eind) in index.knopen_per_streng.items():
+        if begin is None or eind is None:
+            graaf.add_node(begin or eind or uri)
+            continue
+        graaf.add_edge(begin, eind)
+    return sorted((set(deel) for deel in nx.connected_components(graaf)), key=min)
+
+
+def deelstelsel_ids(context: CheckContext) -> dict[str, str]:
+    """Geeft per knoop het ID van het vrijverval-deelstelsel waarin hij ligt.
+
+    NET-001, NET-002 en RVZ-006 melden alle drie over hetzelfde verschijnsel: een
+    deel van het net dat als geheel iets mist. Met een gedeeld ID is in het rapport
+    en op de kaart te zien dat 24 bevindingen twee deelstelsels betreffen en geen 24
+    losse gebreken.
+    """
+    return context.cached("deelstelsel:ids", lambda: _bouw_deelstelsel_ids(context))
+
+
+def _bouw_deelstelsel_ids(context: CheckContext) -> dict[str, str]:
+    """Nummert de deelstelsels naar hun eerste knoop, en houdt de namen uniek."""
+    ids: dict[str, str] = {}
+    gebruikt: set[str] = set()
+    for deel in netwerkdelen(context):
+        cluster = _uniek(f"ds-{_knoopnaam(context, min(deel))}", gebruikt)
+        gebruikt.add(cluster)
+        for uri in deel:
+            ids[uri] = cluster
+    return ids
+
+
+def _knoopnaam(context: CheckContext, uri: str) -> str:
+    """Het label van een knoop, of anders het laatste stuk van zijn URI."""
+    node = context.dataset.nodes.get(uri)
+    if node is not None and node.label:
+        return node.label
+    return uri.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+
+
+def _uniek(naam: str, gebruikt: set[str]) -> str:
+    """Maakt de naam uniek; twee deelstelsels mogen niet hetzelfde ID krijgen."""
+    if naam not in gebruikt:
+        return naam
+    volgnummer = 2
+    while f"{naam}-{volgnummer}" in gebruikt:
+        volgnummer += 1
+    return f"{naam}-{volgnummer}"

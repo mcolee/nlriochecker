@@ -15,6 +15,7 @@ from gwswpijplijn.checks.base import (
     Severity,
     register,
 )
+from gwswpijplijn.checks.verbanden import deelstelsel_ids
 from gwswpijplijn.dataset import HAS_PART, Conduit
 from gwswpijplijn.uitvoer.taal import getal, vorm
 
@@ -260,18 +261,7 @@ class _ZonderAfvoerpad(Check):
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen van dit stelseltype zonder pad naar een eindpunt."""
-        netwerk = _netwerk(context)
-        endpoints = _eindpunten(context, self.eindpuntrol)
-        bereikt = _bereikbaar_vanaf(netwerk, endpoints)
-        dataset = context.dataset
-        wortels = context.config.klassen.netwerkknopen
-        soorten = getattr(context.config.klassen, self.stelselrol)
-
-        gezocht = {
-            uri for wortel in soorten for uri in dataset.of_class(wortel) if uri in dataset.conduits
-        }
-
-        geen_eindpunten = not endpoints
+        onbereikbaar, geen_eindpunten = self._onbereikbaar(context)
         staart = (
             " De graaf bevat geen enkel bereikbaar eindpunt van dit type, dus geldt dit "
             "voor elke streng."
@@ -279,23 +269,62 @@ class _ZonderAfvoerpad(Check):
             else ""
         )
 
+        for conduit, cluster in onbereikbaar:
+            yield self.finding(
+                context,
+                conduit.uri,
+                conduit.label,
+                f"Geen afvoerpad naar {self.doel}.{staart}",
+                stelseltype=self.stelselrol,
+                geen_eindpunten_in_graaf=geen_eindpunten,
+                cluster_id=cluster,
+            )
+
+    def _onbereikbaar(self, context: CheckContext) -> tuple[list[tuple[Conduit, str]], bool]:
+        """De onbereikbare strengen met hun deelstelsel; een keer per context.
+
+        `run()` en `notes()` hebben allebei deze uitkomst nodig — de een om te
+        melden, de ander om te duiden hoeveel deelstelsels het betreft. Zonder deze
+        gedeelde bron zouden ze uit elkaar kunnen lopen.
+        """
+        sleutel = f"onbereikbaar:{self.stelselrol}:{self.eindpuntrol}"
+        return context.cached(sleutel, lambda: self._bouw_onbereikbaar(context))
+
+    def _bouw_onbereikbaar(self, context: CheckContext) -> tuple[list[tuple[Conduit, str]], bool]:
+        """Loopt de strengen van dit stelseltype langs en houdt de onbereikbare over."""
+        netwerk = _netwerk(context)
+        endpoints = _eindpunten(context, self.eindpuntrol)
+        bereikt = _bereikbaar_vanaf(netwerk, endpoints)
+        dataset = context.dataset
+        wortels = context.config.klassen.netwerkknopen
+        clusters = deelstelsel_ids(context)
+        soorten = getattr(context.config.klassen, self.stelselrol)
+
+        gezocht = {
+            uri for wortel in soorten for uri in dataset.of_class(wortel) if uri in dataset.conduits
+        }
+
+        gevonden: list[tuple[Conduit, str]] = []
         for conduit in netwerk.conduits:
             if conduit.uri not in gezocht:
                 continue
             begin = dataset.resolve_network_node(conduit.start_node, wortels)
             if begin not in bereikt:
-                yield self.finding(
-                    context,
-                    conduit.uri,
-                    conduit.label,
-                    f"Geen afvoerpad naar {self.doel}.{staart}",
-                    stelseltype=self.stelselrol,
-                    geen_eindpunten_in_graaf=geen_eindpunten,
-                )
+                gevonden.append((conduit, clusters.get(begin, "")))
+        return gevonden, not endpoints
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt wat er buiten de graaf viel; dat mag niet stilzwijgend verdwijnen."""
-        return _netwerk_notities(context, self.eindpuntrol)
+        notities = _netwerk_notities(context, self.eindpuntrol)
+        onbereikbaar, _ = self._onbereikbaar(context)
+        if onbereikbaar:
+            clusters = {cluster for _, cluster in onbereikbaar if cluster}
+            notities.append(
+                f"De bevindingen betreffen {getal(len(clusters), 'deelstelsel', 'deelstelsels')}; "
+                "elke bevinding draagt een cluster-ID, zodat het herstel per deelstelsel "
+                "opgepakt kan worden."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""

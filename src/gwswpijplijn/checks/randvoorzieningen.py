@@ -17,8 +17,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-import networkx as nx
-
 from gwswpijplijn.checks.base import (
     Check,
     CheckContext,
@@ -27,7 +25,12 @@ from gwswpijplijn.checks.base import (
     Severity,
     register,
 )
-from gwswpijplijn.checks.verbanden import aansluitingen, objecten_van_klassen
+from gwswpijplijn.checks.verbanden import (
+    aansluitingen,
+    deelstelsel_ids,
+    netwerkdelen,
+    objecten_van_klassen,
+)
 from gwswpijplijn.dataset import HAS_PART, Conduit, Node
 
 
@@ -184,20 +187,13 @@ def drempelnotitie(context: CheckContext) -> list[str]:
 
 
 def _stelseldelen(context: CheckContext) -> list[set[str]]:
-    """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen."""
-    return context.cached("rvz:delen", lambda: _bouw_stelseldelen(context))
+    """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen.
 
-
-def _bouw_stelseldelen(context: CheckContext) -> list[set[str]]:
-    """Bouwt een ongerichte graaf van het vrijverval en splitst hem in delen."""
-    index = aansluitingen(context, "vrijvervalleiding")
-    graaf = nx.Graph()
-    for uri, (begin, eind) in index.knopen_per_streng.items():
-        if begin is None or eind is None:
-            graaf.add_node(begin or eind or uri)
-            continue
-        graaf.add_edge(begin, eind)
-    return [set(deel) for deel in nx.connected_components(graaf)]
+    Een gedeelde afleiding met de NET-checks: RVZ-006 en NET-001 melden over
+    hetzelfde deelstelsel, en dat kan alleen als ze het op dezelfde manier
+    afbakenen.
+    """
+    return netwerkdelen(context)
 
 
 def _stelseltypen_van(context: CheckContext, knopen: set[str]) -> set[str]:
@@ -356,6 +352,7 @@ class GemengdDeelstelselZonderOverstort(Check):
         """Zoekt samenhangende gemengde deelstelsels zonder noodafvoer."""
         randvoorzieningen = {node.uri for node in _overstortputten(context)}
         randvoorzieningen |= {node.uri for node in _bergbezink(context)}
+        clusters = deelstelsel_ids(context)
 
         for deel in _stelseldelen(context):
             if "gemengd" not in _stelseltypen_van(context, deel):
@@ -372,6 +369,7 @@ class GemengdDeelstelselZonderOverstort(Check):
                 f"Ligt in een gemengd deelstelsel van {len(deel)} knopen zonder enige "
                 "externe overstort of bergbezinkvoorziening.",
                 knopen_in_deelstelsel=len(deel),
+                cluster_id=clusters.get(uri, ""),
             )
 
     def notes(self, context: CheckContext) -> list[str]:

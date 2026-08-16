@@ -15,6 +15,7 @@ import pytest
 
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
+from gwswpijplijn.checks.verbanden import deelstelsel_ids
 from gwswpijplijn.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -246,3 +247,19 @@ def test_btr_skeletten_melden_hun_markering(check_id: str) -> None:
     assert outcome.findings == []
     assert outcome.skeleton == "vereist inwinningsmetagegevens"
     assert any("vereist inwinningsmetagegevens" in note for note in outcome.notes)
+
+
+def test_rvz006_draagt_hetzelfde_deelstelsel_id_als_de_net_checks() -> None:
+    """RVZ-006 en NET-001 melden over hetzelfde deelstelsel.
+
+    Alleen met een gedeeld ID is in rapport en GIS te zien dat het om hetzelfde
+    stuk net gaat; anders lijkt het twee losse gebreken.
+    """
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
+    context = CheckContext(dataset=dataset, config=fixtureconfig())
+    ids = deelstelsel_ids(context)
+
+    outcome = run_checks(context, ["RVZ-006"]).outcomes[0]
+
+    bevinding = outcome.findings[0]
+    assert bevinding.details["cluster_id"] == ids[bevinding.object_uri]
