@@ -29,6 +29,7 @@ from gwswpijplijn.checks.base import (
 )
 from gwswpijplijn.checks.verbanden import objecten_van_klassen, verbonden_knopen
 from gwswpijplijn.dataset import Conduit, Node
+from gwswpijplijn.uitvoer.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
 MARKERING_NIET_TOETSBAAR = "niet betrouwbaar toetsbaar"
@@ -739,7 +740,7 @@ class _DekselAfwijking(_AhnCheck):
             wijze = _inwinningswijze(node)
             uit_model = _uit_hoogtemodel(context, wijze)
             kanttekening = (
-                f" Let op: dat {bron} is zelf ingewonnen via {wijze}, dus hier staan twee "
+                f" Let op: deze hoogte is zelf ingewonnen via {wijze}, dus hier staan twee "
                 "hoogtemodellen naast elkaar en niet beheerdata naast een meting."
                 if uit_model
                 else ""
@@ -748,8 +749,8 @@ class _DekselAfwijking(_AhnCheck):
                 context,
                 node.uri,
                 node.label,
-                f"Het {bron} ({geregistreerd:.3f} m NAP) wijkt {afwijking:.3f} m af van het "
-                f"AHN ({gemeten:.3f} m NAP).{kanttekening}",
+                f"{_hoofdletter(met_lidwoord(bron))} ({geregistreerd:.3f} m NAP) wijkt "
+                f"{afwijking:.3f} m af van het AHN ({gemeten:.3f} m NAP).{kanttekening}",
                 afwijking_m=round(afwijking, 3),
                 geregistreerd=geregistreerd,
                 ahn=round(gemeten, 3),
@@ -761,12 +762,14 @@ class _DekselAfwijking(_AhnCheck):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Vult de bereiknotities aan met de herkomst van de vergeleken hoogten."""
+        """Vult de bereiknotities aan met het getoetste kenmerk en zijn herkomst."""
         notities = super().notes(context)
         if context.bronnen is None or self.raster(context) is None:
             return notities
 
         vergeleken = [node for node, _ in self.monsters(context)]
+        notities += _kenmerknotitie(vergeleken)
+
         uit_model = [node for node in vergeleken if _uit_model_node(context, node)]
         if not uit_model:
             return notities
@@ -779,6 +782,37 @@ class _DekselAfwijking(_AhnCheck):
             "beheerdata en valt niet met een veldmeting te herstellen."
         )
         return notities
+
+
+def _hoofdletter(zin: str) -> str:
+    """Zet de eerste letter van een zin om in een hoofdletter."""
+    return zin[:1].upper() + zin[1:]
+
+
+def _kenmerknotitie(vergeleken: list[Node]) -> list[str]:
+    """Meldt welk hoogtekenmerk er feitelijk vergeleken is, met aantallen.
+
+    Het register spreekt van de dekselhoogte, maar de check valt terug op de
+    maaiveldhoogte als `Putdekselniveau` ontbreekt — zoals in de hele De
+    Wolden-export. Zonder deze regel claimt het rapport iets anders te hebben
+    getoetst dan het deed.
+    """
+    if not vergeleken:
+        return []
+
+    deksel = sum(1 for node in vergeleken if node.dekselniveau is not None)
+    maaiveld = len(vergeleken) - deksel
+    if deksel and maaiveld:
+        return [
+            f"Vergeleken is het putdekselniveau bij {getal(deksel, 'put', 'putten')} en de "
+            f"maaiveldhoogte bij {getal(maaiveld, 'put', 'putten')}."
+        ]
+    if maaiveld:
+        return [
+            f"Vergeleken is de maaiveldhoogte, bij alle {getal(maaiveld, 'put', 'putten')}; "
+            f"`Putdekselniveau` ontbreekt in deze export."
+        ]
+    return [f"Vergeleken is het putdekselniveau, bij alle {getal(deksel, 'put', 'putten')}."]
 
 
 def _inwinningswijze(node: Node) -> str | None:
@@ -803,10 +837,10 @@ def _uit_model_node(context: CheckContext, node: Node) -> bool:
 
 @register
 class DekselAfwijkingLicht(_DekselAfwijking):
-    """HGT-001: dekselhoogte wijkt meer dan de lichte drempel van het AHN af."""
+    """HGT-001: de deksel- of maaiveldhoogte wijkt meer dan de lichte drempel af."""
 
     id = "HGT-001"
-    title = "Dekselhoogte wijkt af van AHN: meer dan 5 cm"
+    title = "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 5 cm"
     severity = Severity.WARNING
     dimension = Dimension.ACCURACY
     ondergrens = "ahn_afwijking_waarschuwing_m"
@@ -815,10 +849,10 @@ class DekselAfwijkingLicht(_DekselAfwijking):
 
 @register
 class DekselAfwijkingFors(_DekselAfwijking):
-    """HGT-002: dekselhoogte wijkt meer dan de zware drempel van het AHN af."""
+    """HGT-002: de deksel- of maaiveldhoogte wijkt meer dan de zware drempel af."""
 
     id = "HGT-002"
-    title = "Dekselhoogte wijkt af van AHN: meer dan 25 cm"
+    title = "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 25 cm"
     severity = Severity.ERROR
     dimension = Dimension.ACCURACY
     ondergrens = "ahn_afwijking_fout_m"

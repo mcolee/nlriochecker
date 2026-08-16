@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
-from gwswpijplijn.checks import CheckContext, CheckOutcome, run_checks
+from gwswpijplijn.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from gwswpijplijn.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
 from gwswpijplijn.dataset import load_dataset
 from gwswpijplijn.externedata import ExternalData, load_external_data
@@ -286,3 +286,31 @@ def test_lege_lijst_zet_de_kanttekening_uit(config: CheckConfig, bronnen: Extern
 
     bevinding = next(f for f in outcome.findings if f.object_label == "B")
     assert bevinding.details["uit_hoogtemodel"] is False
+
+
+def test_hgt001_en_hgt002_claimen_geen_dekselhoogte() -> None:
+    """De titel mag niet meer onvoorwaardelijk over de dekselhoogte spreken.
+
+    In De Wolden ontbreekt `Putdekselniveau` en toetst de check de maaiveldhoogte;
+    de titel voedt ook de dekkingsmatrix en het registeroverzicht, dus hij hoort
+    beide kenmerken te dekken in plaats van er een te claimen.
+    """
+    assert REGISTRY["HGT-001"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 5 cm"
+    assert REGISTRY["HGT-002"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 25 cm"
+
+
+def test_hgt001_benoemt_welk_kenmerk_vergeleken_is(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Het feitelijk getoetste kenmerk hoort met aantallen in de toelichting."""
+    outcome = uitkomst("HGT-001", config, bronnen)
+
+    assert any("Vergeleken is" in note and "maaiveldhoogte" in note for note in outcome.notes)
+
+
+def test_hgt001_gebruikt_het_juiste_lidwoord(config: CheckConfig, bronnen: ExternalData) -> None:
+    """'De maaiveldhoogte', niet 'Het maaiveldhoogte'."""
+    outcome = uitkomst("HGT-001", config, bronnen)
+
+    bevinding = next(f for f in outcome.findings if f.details["bron"] == "maaiveldhoogte")
+    assert bevinding.message.startswith("De maaiveldhoogte ")
