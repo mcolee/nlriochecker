@@ -233,3 +233,24 @@ def test_afkap_is_configureerbaar_en_wordt_gemeld(tmp_path: Path) -> None:
     tekst = markdown_path.read_text(encoding="utf-8")
 
     assert "2 bevindingen niet getoond" in tekst
+
+
+def test_rapport_opent_met_de_rode_draad(tmp_path: Path) -> None:
+    """De synthese hoort voor de tabellen te staan, niet erachter."""
+    run = _checkrun("net003_tegen_de_richting.ttl")
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "**Rode draad**" in tekst
+    assert tekst.index("**Rode draad**") < tekst.index("Samenvatting per check")
+
+
+def test_rapport_zonder_rode_draad_heeft_geen_lege_kop(tmp_path: Path) -> None:
+    """Een enkele losliggende put heeft geen gezamenlijke oorzaak, dus geen kop."""
+    run = _checkrun("top001_losliggende_put.ttl", "TOP-001")
+    assert run.findings
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+
+    assert "Rode draad" not in markdown_path.read_text(encoding="utf-8")
