@@ -1,0 +1,59 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie. Knooppunt is hier bewust wel gedeclareerd, anders dan
+# in de andere afbakening-fixtures: zonder een Knooppunt-hierarchie valt de lader
+# terug op structurele herkenning via een puntgeometrie, en dan wordt een
+# compartiment zonder geometrie helemaal niet als knoop gelezen -- precies het geval
+# dat deze fixture moet kunnen voordoen.
+gwsw:Putorientatie          rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Compartimentorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput     rdfs:subClassOf gwsw:Put .
+gwsw:Vuilwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
+gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
+
+# DEFECT die deze fixture blootlegt: de streng A-B koppelt niet rechtstreeks aan
+# PutA_ori, maar aan de orientatie van een compartiment (Comp1) dat via hasPart bij
+# put A hoort en zelf geen geometrie heeft. resolve_network_node moet via dat
+# compartiment omhoog naar put A lopen (zie CLAUDE.md: "loop via hasPart omhoog tot
+# een put"). Kern en schil bestonden tot de reparatie alleen uit objecten met
+# geometrie en de knopen waar de componentberekening op uitkomt (put A zelf); het
+# geometrieloze compartiment viel daar tussenuit en de streng resolveerde op de
+# uitgedunde dataset naar niets. Put A en put B liggen allebei binnen
+# afbakening_gebied.geojson (990,1990)-(1060,2010).
+
+:PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
+    gwsw:hasPart :Comp1 ;
+    gwsw:hasAspect :PutA_ori .
+:PutA_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:Comp1 rdf:type gwsw:Compartiment ; rdfs:label "Comp1" ;
+    gwsw:hasAspect :Comp1_ori .
+:Comp1_ori rdf:type gwsw:Compartimentorientatie .
+# Comp1_ori heeft bewust geen gwsw:Punt-aspect: het compartiment zonder geometrie.
+
+:PutB rdf:type gwsw:Inspectieput ; rdfs:label "B" ;
+    gwsw:hasAspect :PutB_ori .
+:PutB_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:L_AB rdf:type gwsw:Vuilwaterriool ; rdfs:label "A-B" ;
+    gwsw:hasAspect :L_AB_ori .
+:L_AB_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_AB_b , :L_AB_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_AB_b rdf:type gwsw:BeginpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 10.00 ] .
+:L_AB_e rdf:type gwsw:EindpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.90 ] .
+:L_AB_b gwsw:hasConnection :Comp1_ori .
+:L_AB_e gwsw:hasConnection :PutB_ori .

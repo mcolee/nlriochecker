@@ -58,6 +58,7 @@ def bouw_analyseset(dataset: GwswDataset, area: StudyArea, config: CheckConfig) 
     kern = objecten_in_gebied(dataset, area)
     component, zonder_netwerkverband = _component(dataset, config, kern)
     schil = component | _binnen_buffer(dataset, area, config)
+    schil |= _sluit_tussenschakels(dataset, config, kern | schil)
     schil -= kern
     volledig = len(dataset.nodes) + len(dataset.conduits)
     return Analyseset(
@@ -67,6 +68,56 @@ def bouw_analyseset(dataset: GwswDataset, area: StudyArea, config: CheckConfig) 
         volledig_aantal=volledig,
         strengen_zonder_netwerkverband=zonder_netwerkverband,
     )
+
+
+def _sluit_tussenschakels(
+    dataset: GwswDataset, config: CheckConfig, behouden: frozenset[str] | set[str]
+) -> set[str]:
+    """De compartimenten en hulpstukken die de behouden strengen nodig hebben.
+
+    `GwswDataset.resolve_network_node` loopt via `parent` omhoog tot een put en
+    heeft daarbij elke tussenliggende schakel in `dataset.nodes` nodig -- in dit
+    domein normaal: een streng koppelt niet altijd rechtstreeks aan een put, maar
+    soms aan een compartiment of hulpstuk zonder eigen geometrie. Kern en schil
+    bevatten tot hier alleen objecten met geometrie (kern, buffer) en de knopen
+    waar de componentberekening op uitkomt (de put zelf); zo'n tussenschakel valt
+    daar tussenuit. Zonder deze sluiting resolveert een streng die er doorheen
+    loopt op de uitgedunde dataset naar niets en telt hij ten onrechte als niet
+    aangesloten, ook al klopt de aansluiting op de volledige export.
+    """
+    wortels = config.klassen.netwerkknopen
+    aanvulling: set[str] = set()
+    for uri in behouden:
+        conduit = dataset.conduits.get(uri)
+        if conduit is None:
+            continue
+        aanvulling |= _ouderketen(dataset, conduit.start_node, wortels)
+        aanvulling |= _ouderketen(dataset, conduit.end_node, wortels)
+    return aanvulling
+
+
+def _ouderketen(dataset: GwswDataset, uri: str | None, wortels: list[str]) -> set[str]:
+    """De schakels op de weg omhoog naar de herleidbare netwerkknoop, die erbij.
+
+    Loopt hetzelfde pad als `resolve_network_node`, met dezelfde cyclusbeveiliging.
+    Stopt zodra een schakel niet in `dataset.nodes` staat: op dat punt zou
+    `resolve_network_node` ook op de volledige dataset al None geven, en verder
+    toevoegen zou objecten in de analyseset zetten die niet in `dataset.nodes` of
+    `dataset.conduits` voorkomen.
+    """
+    keten: set[str] = set()
+    gezien: set[str] = set()
+    huidig = uri
+    while huidig is not None and huidig not in gezien:
+        gezien.add(huidig)
+        node = dataset.nodes.get(huidig)
+        if node is None:
+            break
+        keten.add(huidig)
+        if any(dataset.is_a(huidig, wortel) for wortel in wortels):
+            break
+        huidig = node.parent
+    return keten
 
 
 def _component(

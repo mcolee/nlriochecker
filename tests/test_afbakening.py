@@ -96,6 +96,30 @@ def test_de_buffer_haalt_ongekoppelde_buren_erbij() -> None:
     assert "H" not in _labels(dataset, zonder_buffer.alles)
 
 
+def test_streng_via_compartiment_zonder_geometrie_houdt_haar_netwerkverband() -> None:
+    """Een compartiment zonder geometrie moet in de analyseset terechtkomen.
+
+    De streng A-B koppelt aan de orientatie van compartiment Comp1, dat via
+    hasPart bij put A hoort maar zelf geen punt heeft. Kern en schil bestonden tot
+    de reparatie alleen uit objecten met geometrie en de knoop waar de
+    componentberekening op uitkomt (put A); Comp1 viel daar tussenuit, en
+    `resolve_network_node` gaf op de uitgedunde dataset dan None terug in plaats
+    van put A -- de streng zou ten onrechte als niet aangesloten tellen.
+    """
+    dataset = load_dataset(TTL_DIR / "afbakening_compartiment_zonder_geometrie.ttl")
+    area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+
+    analyseset = bouw_analyseset(dataset, area, config)
+    comp_uri = _uri_van(dataset, "Comp1")
+
+    assert comp_uri in analyseset.alles
+
+    resolved = analyseset.dataset.resolve_network_node(comp_uri, config.klassen.netwerkknopen)
+    assert resolved == _uri_van(dataset, "A")
+
+
 def test_objecten_in_gebied_blijft_importeerbaar_uit_checks() -> None:
     """De functie is verhuisd; bestaande importen mogen niet breken."""
     from gwswpijplijn.checks import objecten_in_gebied as via_checks
