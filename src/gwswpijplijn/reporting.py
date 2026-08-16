@@ -7,10 +7,15 @@ from pathlib import Path
 import pandas as pd
 
 from gwswpijplijn.analysis import MetingAnalysis
-from gwswpijplijn.checks import CheckRun, Severity
 from gwswpijplijn.comparison import ChangeStatus, MetingComparison
 from gwswpijplijn.coverage import CheckEvidence, CoverageResult
 from gwswpijplijn.errors import PipelineError
+from gwswpijplijn.uitvoer.bevindingen import (
+    FILE_CHECKS_CSV,
+    FILE_CHECKS_MARKDOWN,
+    write_check_report,
+)
+from gwswpijplijn.uitvoer.tabel import TOP_N, prepare, table, title
 
 FILE_MARKDOWN = "samenvatting.md"
 FILE_CSV = "geaggregeerde_meldingen.csv"
@@ -19,9 +24,6 @@ FILE_COVERAGE_CSV = "dekking.csv"
 FILE_COMPARISON_MARKDOWN = "vergelijking.md"
 FILE_COMPARISON_CSV = "verschillen.csv"
 FILE_OBJECT_CHANGES_CSV = "objectverschillen.csv"
-FILE_CHECKS_MARKDOWN = "bevindingen.md"
-FILE_CHECKS_CSV = "bevindingen.csv"
-TOP_N = 15
 
 TOELICHTING_NIET_GERAAKT = (
     "Een check die *niet geraakt* is, is niet goedgekeurd: de nulmeting geeft over dat "
@@ -37,7 +39,7 @@ def write_reports(
     coverage: CoverageResult | None = None,
 ) -> tuple[Path, Path]:
     """Schrijft de Markdown-samenvatting en de geaggregeerde CSV naar `output_dir`."""
-    output_dir = _prepare(output_dir)
+    output_dir = prepare(output_dir)
     return write_markdown(analyse, output_dir, coverage), write_csv(analyse, output_dir)
 
 
@@ -79,13 +81,6 @@ def _check_target(target: Path, analyse: MetingAnalysis) -> Path:
     return target
 
 
-def _prepare(output_dir: Path) -> Path:
-    """Maakt de uitvoermap aan en geeft hem terug."""
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    return output_dir
-
-
 def _render_markdown(analyse: MetingAnalysis, coverage: CoverageResult | None = None) -> str:
     """Stelt de volledige Markdown-samenvatting samen."""
     meting = analyse.meting
@@ -122,9 +117,9 @@ def _render_markdown(analyse: MetingAnalysis, coverage: CoverageResult | None = 
     for cfk in meting.cfks:
         deel = analyse.per_cfk[cfk]
         lines += ["", f"## Meldingen CFK {cfk}", ""]
-        lines += _table(deel.by_shape.head(TOP_N), _title("SHACL-vormen", deel.by_shape))
+        lines += table(deel.by_shape.head(TOP_N), title("SHACL-vormen", deel.by_shape))
         lines += [""]
-        lines += _table(deel.by_object_type.head(TOP_N), _title("Objecttypen", deel.by_object_type))
+        lines += table(deel.by_object_type.head(TOP_N), title("Objecttypen", deel.by_object_type))
 
     return "\n".join(lines) + "\n"
 
@@ -157,39 +152,9 @@ def _typing_section(analyse: MetingAnalysis) -> list[str]:
     return lines
 
 
-def _title(label: str, frame: pd.DataFrame) -> str:
-    """Maakt een tabeltitel die alleen 'top N' vermeldt als er daadwerkelijk is afgekapt."""
-    if len(frame) > TOP_N:
-        return f"{label} (top {TOP_N} van {len(frame)})"
-    return f"{label} ({len(frame)})"
-
-
-def _table(frame: pd.DataFrame, title: str) -> list[str]:
-    """Rendert een DataFrame als Markdown-tabel met een vetgedrukte titelregel."""
-    lines = [f"**{title}**", ""]
-    if frame.empty:
-        return [*lines, "_geen_"]
-
-    columns = list(frame.columns)
-    alignment = ["---:" if _is_numeric(frame[column]) else "---" for column in columns]
-    lines.append("| " + " | ".join(columns) + " |")
-    lines.append("| " + " | ".join(alignment) + " |")
-    for row in frame.itertuples(index=False):
-        lines.append("| " + " | ".join(str(value) for value in row) + " |")
-    return lines
-
-
-def _is_numeric(column: pd.Series) -> bool:
-    """Geeft aan of een kolom numeriek is en dus rechts uitgelijnd hoort te worden.
-
-    Booleans tellen niet mee: die lezen als tekst, niet als getal.
-    """
-    return pd.api.types.is_numeric_dtype(column) and not pd.api.types.is_bool_dtype(column)
-
-
 def write_coverage_report(result: CoverageResult, output_dir: Path) -> tuple[Path, Path]:
     """Schrijft de dekkinganalyse als Markdown en CSV en geeft beide paden terug."""
-    output_dir = _prepare(output_dir)
+    output_dir = prepare(output_dir)
 
     markdown_path = Path(output_dir) / FILE_COVERAGE_MARKDOWN
     markdown_path.write_text(_render_coverage(result), encoding="utf-8")
@@ -249,10 +214,10 @@ def _render_coverage(result: CoverageResult) -> str:
         lines += [f"**Oordeel:** {check.verdict.value}", ""]
         lines += [f"**Dekkingclaim uit het register:** {check.mapping.claim}", ""]
         lines += [f"**Bewijs moet komen uit:** {', '.join(check.mapping.vereiste_cfk)}", ""]
-        lines += _table(_evidence_frame(check.evidence), "Bewijs")
+        lines += table(_evidence_frame(check.evidence), "Bewijs")
         if check.counter_evidence:
             lines += [""]
-            lines += _table(_evidence_frame(check.counter_evidence), "Tegenbewijs")
+            lines += table(_evidence_frame(check.counter_evidence), "Tegenbewijs")
             if check.has_counter_evidence:
                 lines += [
                     "",
@@ -394,7 +359,7 @@ def write_comparison_reports(
     comparison: MetingComparison, output_dir: Path
 ) -> tuple[Path, Path, Path]:
     """Schrijft de vergelijking als Markdown plus twee CSV's."""
-    output_dir = _prepare(output_dir)
+    output_dir = prepare(output_dir)
 
     markdown_path = Path(output_dir) / FILE_COMPARISON_MARKDOWN
     markdown_path.write_text(_render_comparison(comparison), encoding="utf-8")
@@ -459,7 +424,7 @@ def _render_comparison(comparison: MetingComparison) -> str:
         ]
 
     lines += ["", "## Dekking van de geschrapte checks", ""]
-    lines += _table(comparison.coverage_changes, "Oordeel per meetmoment")
+    lines += table(comparison.coverage_changes, "Oordeel per meetmoment")
 
     for item in comparison.per_cfk:
         lines += ["", f"## CFK {item.cfk}", ""]
@@ -476,12 +441,12 @@ def _render_comparison(comparison: MetingComparison) -> str:
             f"| gebleven | {telling[ChangeStatus.REMAINING.value]} |",
             "",
         ]
-        lines += _table(
+        lines += table(
             _grootste_verschillen(item.by_shape, "Source"),
             "Grootste verschillen per SHACL-vorm",
         )
         lines += [""]
-        lines += _table(
+        lines += table(
             _grootste_verschillen(item.by_object_type, "Objecttype"),
             "Grootste verschillen per objecttype",
         )
@@ -502,348 +467,8 @@ def _grootste_verschillen(frame: pd.DataFrame, sleutel: str) -> pd.DataFrame:
     return gewijzigd.loc[volgorde].head(TOP_N)[[sleutel, "Eerder", "Later", "Verschil"]]
 
 
-def write_check_report(run: CheckRun, output_dir: Path) -> tuple[Path, Path]:
-    """Schrijft de bevindingen van de check-engine als Markdown en CSV."""
-    output_dir = _prepare(output_dir)
-
-    markdown_path = Path(output_dir) / FILE_CHECKS_MARKDOWN
-    markdown_path.write_text(_render_checks(run), encoding="utf-8")
-
-    csv_path = Path(output_dir) / FILE_CHECKS_CSV
-    _check_findings_table(run).to_csv(csv_path, sep=";", index=False, encoding="utf-8")
-
-    return markdown_path, csv_path
-
-
-def _check_findings_table(run: CheckRun) -> pd.DataFrame:
-    """Zet alle bevindingen in een tabel."""
-    rows = [
-        {
-            "Check": finding.check_id,
-            "Ernst": finding.severity.value,
-            "Dimensie": finding.dimension.value,
-            "Label": finding.object_label,
-            "Object": finding.object_uri,
-            "Melding": finding.message,
-            "TyperingBetrouwbaar": finding.typing_reliable,
-            "X": finding.location[0] if finding.location else None,
-            "Y": finding.location[1] if finding.location else None,
-        }
-        for finding in run.findings
-    ]
-    return pd.DataFrame(
-        rows,
-        columns=[
-            "Check",
-            "Ernst",
-            "Dimensie",
-            "Label",
-            "Object",
-            "Melding",
-            "TyperingBetrouwbaar",
-            "X",
-            "Y",
-        ],
-    )
-
-
-def _render_checks(run: CheckRun) -> str:
-    """Stelt het bevindingenrapport samen."""
-    onbetrouwbaar = sum(outcome.unreliable_count for outcome in run.outcomes)
-    lines = [
-        f"# Checkbevindingen {run.dataset.source.name}",
-        "",
-        f"Bron: `{run.dataset.source}` — {len(run.dataset.nodes)} knooppunten, "
-        f"{len(run.dataset.conduits)} strengen.",
-        "",
-        f"{run.count(Severity.ERROR)} fouten en {run.count(Severity.WARNING)} waarschuwingen "
-        f"uit {len(run.outcomes)} checks.",
-        "",
-    ]
-
-    if run.typing_gate_applied:
-        lines += [
-            f"De typeringspoort is toegepast: {onbetrouwbaar} bevindingen staan op objecten "
-            "die de nulmeting te globaal getypeerd noemt. Die bevindingen blijven staan, "
-            "maar zijn niet betrouwbaar te duiden.",
-            "",
-        ]
-        buiten = run.unreliable_labels - run.unreliable_labels_in_dataset
-        if buiten:
-            lines += [
-                f"> Van de {run.unreliable_labels} objecten die de nulmeting te globaal "
-                f"getypeerd noemt, komen er {run.unreliable_labels_in_dataset} in deze dataset "
-                f"voor; {buiten} niet. De detailrapporten en de OroX-export zijn losse "
-                "bestanden en hoeven niet uit dezelfde momentopname te komen.",
-                "",
-            ]
-    else:
-        lines += [
-            "> **Let op:** er is geen typeringspoort toegepast. Zonder de nulmeting-"
-            "detailrapporten (`--mds` en `--hyd`) is niet bekend welke objecten te globaal "
-            "getypeerd zijn, en dus welke bevindingen onbetrouwbaar zijn.",
-            "",
-        ]
-
-    fallback = run.dataset.decode_fallback
-    if fallback is not None:
-        lines += [
-            f"> **Codering:** `{fallback.path.name}` is geen geldige UTF-8, zoals Turtle "
-            f"voorschrijft. Het bestand is gelezen als {fallback.encoding}; "
-            f"{fallback.byte_count} bytes vallen buiten ASCII. Controleer of deze waarden "
-            "kloppen:",
-            "",
-        ]
-        lines += [f"> - `{sample}`" for sample in fallback.samples]
-        lines += [""]
-
-    if run.study_area is not None:
-        gebied = run.study_area
-        weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
-        lines += [
-            f"**Studiegebied:** {gebied.name} ({gebied.area_ha:.1f} ha, "
-            f"{gebied.feature_count} vlak(ken), bron `{gebied.source.name}`).",
-            "",
-            f"> De checks zijn op de volledige dataset gedraaid en pas daarna afgebakend, "
-            f"zodat netwerkchecks geen randeffecten krijgen van strengen die het gebied "
-            f"uit lopen. **{weggelaten} bevindingen vielen buiten het gebied** en staan "
-            "hier niet in; dit rapport zegt dus niets over de rest van de dataset.",
-            "",
-        ]
-
-    lines += _bronnen_section(run)
-    lines += _karakteristiek_section(run)
-
-    if run.dataset.ontologies:
-        namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)
-        lines += [f"Klassenhierarchie uit {namen}.", ""]
-    else:
-        lines += [
-            "> **Let op:** er is geen ontologie geladen. Knooppunten en verbindingen zijn "
-            "dan aan hun geometrie herkend in plaats van aan hun GWSW-type, en "
-            "klassenwortels dekken hun subklassen niet.",
-            "",
-        ]
-
-    if run.dataset.structural_diff:
-        onderdelen = ", ".join(
-            f"{sleutel.replace('_', ' ')}: {waarde}"
-            for sleutel, waarde in sorted(run.dataset.structural_diff.items())
-        )
-        lines += [
-            f"> De GWSW-definitie en de herkenning op geometrie wijken af ({onderdelen}). "
-            "Dat is geen fout, maar het laat zien hoezeer de dataset op geometrie leunt.",
-            "",
-        ]
-
-    if run.dataset.geometry_errors:
-        lines += [
-            f"> {len(run.dataset.geometry_errors)} objecten hebben een onleesbare geometrie "
-            "en konden niet volledig meedoen.",
-            "",
-        ]
-
-    lines += _table(_check_summary(run), "Samenvatting per check")
-
-    skeletten = [outcome for outcome in run.outcomes if outcome.skeleton]
-    if skeletten:
-        lines += [
-            "",
-            f"**{len(skeletten)} check{'s zijn' if len(skeletten) > 1 else ' is'} skelet** en "
-            "levert per definitie geen uitslag: "
-            + ", ".join(f"{outcome.check_id} ({outcome.skeleton})" for outcome in skeletten)
-            + ". De reden staat bij de check zelf.",
-            "",
-        ]
-
-    for outcome in run.outcomes:
-        lines += ["", f"## {outcome.check_id} — {outcome.title}", ""]
-        markering = f" **Skelet: {outcome.skeleton}.**" if outcome.skeleton else ""
-        lines += [
-            f"Ernst {outcome.severity.value}, dimensie {outcome.dimension.value}. "
-            f"{len(outcome.findings)} bevindingen op {outcome.examined} bekeken objecten."
-            f"{markering}",
-        ]
-        for note in outcome.notes:
-            lines += ["", f"> {note}"]
-        if not outcome.findings:
-            lines += ["", "_geen bevindingen_"]
-            continue
-        lines += [""]
-        lines += _table(
-            _findings_frame(outcome.findings[:TOP_N]),
-            _title("Bevindingen", pd.DataFrame(outcome.findings)),
-        )
-
-    lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
-    return "\n".join(lines) + "\n"
-
-
-def _karakteristiek_section(run: CheckRun) -> list[str]:
-    """Beschrijft eigenschappen van de dataset die de bevindingen kleuren.
-
-    Geen bevindingen: datums die allemaal op 1 januari vallen en registraties die
-    expliciet "niet achterhaald" zeggen, zijn niet per object te herstellen. Ze
-    bepalen wel hoe de rest van dit rapport gelezen moet worden, en ze staan hier
-    daarom als samenvattende regel in plaats van als duizenden meldingen.
-    """
-    karakteristiek = run.karakteristiek
-    if karakteristiek is None or (not karakteristiek.datums and not karakteristiek.inwinning):
-        return []
-
-    lines = ["**Datakarakteristieken**", ""]
-    if run.study_area is not None:
-        # De cijfers zijn over de hele dataset geteld, terwijl de bevindingen erboven
-        # tot het studiegebied zijn afgebakend. Zonder deze regel leest de tabel als
-        # een beschrijving van de afbakening.
-        lines += [
-            f"> Geteld over de **volledige dataset**, niet over {run.study_area.name}: het "
-            "gaat om eigenschappen van de aangeleverde export, en die veranderen niet met "
-            "de afbakening van de rapportage.",
-            "",
-        ]
-
-    if karakteristiek.datums:
-        lines += [
-            "| Datumkenmerk | Waarden | Op 1 januari | Precisie |",
-            "| --- | ---: | ---: | --- |",
-        ]
-        for precisie in karakteristiek.datums:
-            lines.append(
-                f"| {precisie.kenmerk} | {precisie.aantal} | {precisie.op_jaargrens} "
-                f"({precisie.aandeel:.1f}%) | "
-                f"{'jaar' if precisie.jaarprecisie else 'dag'} |"
-            )
-        jaar = karakteristiek.jaarprecisie
-        if jaar:
-            namen = ", ".join(precisie.kenmerk for precisie in jaar)
-            lines += [
-                "",
-                f"> Elke waarde van {namen} valt op 1 januari: alleen het jaartal draagt "
-                "informatie. Leeftijden en tijdsverschillen uit deze dataset gelden dus op "
-                "jaarniveau; een uitkomst op dagniveau zou een precisie suggereren die de "
-                "bron niet heeft.",
-            ]
-        lines += [""]
-
-    if karakteristiek.inwinning:
-        lines += [
-            "| Hoogtekenmerk | Waarden | Met inwinningswijze | Waarvan expliciet onbekend |",
-            "| --- | ---: | ---: | ---: |",
-        ]
-        for vulling in karakteristiek.inwinning:
-            onbekend = (
-                f"{vulling.onbekend} ({vulling.onbekend_aandeel:.1f}%)"
-                if vulling.met_wijze
-                else "—"
-            )
-            lines.append(
-                f"| {vulling.kenmerk} | {vulling.aantal} | {vulling.met_wijze} | {onbekend} |"
-            )
-        if karakteristiek.onbekend_totaal:
-            lines += [
-                "",
-                f"> {karakteristiek.onbekend_totaal} registraties zeggen expliciet dat de "
-                "inwinning niet te achterhalen is. Die passeren elke kardinaliteits- en "
-                "collectietoets van de nulmeting, maar dragen geen informatie: een "
-                "compleetheidscijfer dat ze meetelt leest te rooskleurig.",
-            ]
-        lines += [""]
-
-    return lines
-
-
-def _bronnen_section(run: CheckRun) -> list[str]:
-    """Beschrijft de externe bronnen, hun bereik en wat er niet bij zat.
-
-    Zonder deze sectie zou een lezer van het rapport niet kunnen zien waarom de
-    EXT-checks weinig of niets gevonden hebben; die informatie stond alleen op de
-    opdrachtregel.
-    """
-    bronnen = run.bronnen
-    if bronnen is None:
-        return [
-            "> **Externe bronnen:** geen geladen. De EXT-checks en HGT-001 t/m HGT-003 "
-            "hebben daardoor niets kunnen toetsen; geef `--bronnen` op voor een volledig "
-            "beeld.",
-            "",
-        ]
-
-    regels = ["**Externe bronnen**", ""]
-    if bronnen.extent is None:
-        regels += [
-            "> Er is geen begrenzingspolygoon geladen. Zonder begrenzing mag geen enkele "
-            "EXT-check een uitslag geven; ze zijn alle overgeslagen.",
-            "",
-        ]
-    lagen = pd.DataFrame(
-        [
-            {
-                "Rol": laag.role,
-                "Bestand": laag.source.name,
-                "Laag": laag.layer,
-                "Features": len(laag),
-                "CRS": laag.crs,
-                "Geherprojecteerd uit": laag.reprojected_from or "—",
-            }
-            for laag in bronnen.layers.values()
-        ],
-        columns=["Rol", "Bestand", "Laag", "Features", "CRS", "Geherprojecteerd uit"],
-    )
-    regels += _table(lagen, "Ingelezen lagen")
-    if bronnen.raster is not None:
-        regels += ["", f"Hoogteraster: `{bronnen.raster.source.name}` ({bronnen.raster.crs})."]
-    if bronnen.missing:
-        regels += [
-            "",
-            "> **Niet aangeleverd of leeg:** " + "; ".join(bronnen.missing) + ". De checks "
-            "die deze bronnen nodig hebben zijn overgeslagen; nul bevindingen betekent daar "
-            "niet dat het in orde is.",
-        ]
-    for note in bronnen.notes:
-        regels += ["", f"> {note}"]
-    return [*regels, ""]
-
-
-def _check_summary(run: CheckRun) -> pd.DataFrame:
-    """Een regel per check met de aantallen."""
-    return pd.DataFrame(
-        [
-            {
-                "Check": outcome.check_id,
-                "Omschrijving": outcome.title,
-                "Ernst": outcome.severity.value,
-                "Dimensie": outcome.dimension.value,
-                "Bekeken": outcome.examined,
-                "Bevindingen": len(outcome.findings),
-                "Typering onbetrouwbaar": outcome.unreliable_count,
-                "Skelet": outcome.skeleton or "—",
-            }
-            for outcome in run.outcomes
-        ],
-        columns=[
-            "Check",
-            "Omschrijving",
-            "Ernst",
-            "Dimensie",
-            "Bekeken",
-            "Bevindingen",
-            "Typering onbetrouwbaar",
-            "Skelet",
-        ],
-    )
-
-
-def _findings_frame(findings: list) -> pd.DataFrame:
-    """Zet bevindingen om in een tabel voor de Markdown-uitvoer."""
-    return pd.DataFrame(
-        [
-            {
-                "Label": finding.object_label or "—",
-                "Melding": finding.message,
-                "Typering": "betrouwbaar" if finding.typing_reliable else "onbetrouwbaar",
-            }
-            for finding in findings
-        ],
-        columns=["Label", "Melding", "Typering"],
-    )
+__all__ = [
+    "FILE_CHECKS_CSV",
+    "FILE_CHECKS_MARKDOWN",
+    "write_check_report",
+]

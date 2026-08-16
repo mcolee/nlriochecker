@@ -146,3 +146,90 @@ def test_studiegebied_zonder_enig_object_faalt_hard() -> None:
 
     with pytest.raises(StudyAreaError, match="geen GWSW-objecten"):
         run.beperk_tot_studiegebied(gebied)
+
+
+def _fixtureconfig():
+    """De standaardconfig, met het RD-bereik verruimd tot de fixturecoordinaten."""
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    return config
+
+
+def _checkrun(bestand: str, *check_ids: str, config=None):
+    """Draait checks op een TTL-fixture."""
+    dataset = load_dataset(TTL_DIR / bestand)
+    context = CheckContext(dataset=dataset, config=config or _fixtureconfig())
+    return run_checks(context, list(check_ids) or None)
+
+
+def test_bevindingen_csv_draagt_de_uitgebreide_kolommen(tmp_path: Path) -> None:
+    """De CSV is het volledige archief; het GIS en het rapport zijn afgeleiden."""
+    run = _checkrun("top011_hartlijnkruising.ttl", "TOP-011")
+
+    _, csv_path = write_check_report(run, tmp_path)
+    tabel = pd.read_csv(csv_path, sep=";", encoding="utf-8")
+
+    # De bestaande kolommen houden hun naam en plaats; hernoemen breekt bestaande
+    # verwerking zonder dat er iets tegenover staat.
+    assert list(tabel.columns)[:9] == [
+        "Check",
+        "Ernst",
+        "Dimensie",
+        "Label",
+        "Object",
+        "Melding",
+        "TyperingBetrouwbaar",
+        "X",
+        "Y",
+    ]
+    nieuw = [
+        "MeldingID",
+        "Categorie",
+        "Bron",
+        "Object2Label",
+        "Object2",
+        "Waarde",
+        "Drempel",
+        "ClusterID",
+        "Scope",
+        "Gebied",
+        "Prioriteit",
+        "Systemisch",
+        "RunDatum",
+        "Dataset",
+    ]
+    assert [kolom for kolom in nieuw if kolom not in tabel.columns] == []
+
+
+def test_bevindingen_csv_zet_de_foutlocatie_in_x_en_y(tmp_path: Path) -> None:
+    """De coordinaat stond in de meldingtekst; als kolom is hij bruikbaar."""
+    run = _checkrun("top011_hartlijnkruising.ttl", "TOP-011")
+
+    _, csv_path = write_check_report(run, tmp_path)
+    rij = pd.read_csv(csv_path, sep=";", encoding="utf-8").iloc[0]
+
+    assert pd.notna(rij["X"]) and pd.notna(rij["Y"])
+    assert rij["Object2"].startswith("http")
+
+
+def test_rapport_toont_standaard_alle_bevindingen(tmp_path: Path) -> None:
+    """Afkappen zonder het te zeggen leest als 'dit is alles'."""
+    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    assert len(run.findings) == 3
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    for bevinding in run.findings:
+        assert bevinding.object_label in tekst
+
+
+def test_afkap_is_configureerbaar_en_wordt_gemeld(tmp_path: Path) -> None:
+    config = _fixtureconfig()
+    config.rapport.max_bevindingen_per_check = 1
+    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "2 bevindingen niet getoond" in tekst
