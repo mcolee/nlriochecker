@@ -53,6 +53,66 @@ def test_de_sleutel_verandert_mee_met_de_lader(tmp_path: Path, monkeypatch) -> N
     assert cachesleutel(VOORBEELD, []) != eerste
 
 
+def test_de_sleutel_verandert_mee_met_de_inhoud_van_de_dataset(tmp_path: Path) -> None:
+    """De inhoudshash is de kern van de cachegarantie; monkeypatchen van
+    `LADER_VERSIE` alleen bewijst niet dat de bestandshash zelf ook echt meetelt.
+    """
+    kopie = tmp_path / "dataset.ttl"
+    kopie.write_bytes(VOORBEELD.read_bytes())
+    eerste = cachesleutel(kopie, [])
+
+    inhoud = bytearray(kopie.read_bytes())
+    inhoud[0] ^= 0xFF
+    kopie.write_bytes(bytes(inhoud))
+
+    assert cachesleutel(kopie, []) != eerste
+
+
+def test_de_sleutel_verandert_mee_met_de_inhoud_van_de_ontologie(tmp_path: Path) -> None:
+    ontologie = DATA / "gwsw_ontologieen" / "Ontologie_GWSW_Totaal.ttl"
+    if not ontologie.exists():
+        pytest.skip("de GWSW-ontologie staat niet in data/")
+    kopie = tmp_path / "ontologie.ttl"
+    kopie.write_bytes(ontologie.read_bytes())
+    eerste = cachesleutel(VOORBEELD, [kopie])
+
+    inhoud = bytearray(kopie.read_bytes())
+    inhoud[0] ^= 0xFF
+    kopie.write_bytes(bytes(inhoud))
+
+    assert cachesleutel(VOORBEELD, [kopie]) != eerste
+
+
+def test_de_sleutel_verandert_mee_met_de_terugvalcodering() -> None:
+    """Zonder dit zou de cache op een dag dat de codering doorgegeven wordt een met
+    de verkeerde codering ingelezen dataset kunnen teruggeven.
+    """
+    assert cachesleutel(VOORBEELD, [], fallback_encoding="cp850") != cachesleutel(
+        VOORBEELD, [], fallback_encoding="latin-1"
+    )
+
+
+def test_de_sleutel_verandert_mee_met_de_broncode_van_de_lader(tmp_path: Path, monkeypatch) -> None:
+    """De broncode van de lader hoort net zo goed bij de sleutel als de invoer zelf.
+
+    `test_de_sleutel_verandert_mee_met_de_lader` verzet alleen `LADER_VERSIE`; dat
+    bewijst niet dat de broncode-hash van de ladermodules zelf ook echt meetelt --
+    een refactor die dat deel van `cachesleutel` laat vallen, zou die test nog
+    steeds groen laten. Hier wordt in plaats daarvan `dataset_module.__file__`
+    naar een gewijzigde kopie verzet, zoals de bron die `cachesleutel` inleest.
+    """
+    import gwswpijplijn.cache as cache_module
+
+    origineel = Path(cache_module.dataset_module.__file__)
+    kopie = tmp_path / origineel.name
+    kopie.write_bytes(origineel.read_bytes() + b"\n# gewijzigd voor de test\n")
+
+    eerste = cachesleutel(VOORBEELD, [])
+    monkeypatch.setattr(cache_module.dataset_module, "__file__", str(kopie))
+
+    assert cachesleutel(VOORBEELD, []) != eerste
+
+
 def test_een_beschadigde_cache_leidt_tot_opnieuw_inlezen(tmp_path: Path) -> None:
     laad_met_cache(VOORBEELD, [], cache_dir=tmp_path)
     for bestand in tmp_path.rglob("*.pickle"):
@@ -89,6 +149,17 @@ def test_een_beschadigde_graafcache_herstelt_zichzelf_bij_gebruik(tmp_path: Path
     # de graafcache is zelf ook hersteld: een volgende aanraking gaat weer soepel
     dataset_opnieuw, _ = laad_met_cache(VOORBEELD, [], cache_dir=tmp_path)
     assert len(dataset_opnieuw.graph) == len(vers.graph)
+
+
+def test_laad_met_cache_geeft_de_terugvalcodering_door(tmp_path: Path) -> None:
+    """De sleutel die `laad_met_cache` gebruikt, moet dezelfde zijn als
+    `cachesleutel` met dezelfde codering zou geven -- anders wordt er met de ene
+    codering weggeschreven en met de andere teruggelezen.
+    """
+    _, uitslag = laad_met_cache(VOORBEELD, [], cache_dir=tmp_path, fallback_encoding="latin-1")
+
+    assert uitslag.sleutel == cachesleutel(VOORBEELD, [], fallback_encoding="latin-1")
+    assert uitslag.sleutel != cachesleutel(VOORBEELD, [])
 
 
 def test_zonder_cache_wordt_er_niets_weggeschreven(tmp_path: Path) -> None:

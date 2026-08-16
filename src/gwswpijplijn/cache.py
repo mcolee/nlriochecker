@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import pickle
+import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -28,7 +29,7 @@ from rdflib import Graph
 
 from gwswpijplijn import dataset as dataset_module
 from gwswpijplijn import geometry as geometry_module
-from gwswpijplijn.dataset import GwswDataset, load_dataset
+from gwswpijplijn.dataset import FALLBACK_ENCODING, GwswDataset, load_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class LuieGraaf:
             try:
                 with self._pad.open("rb") as bestand:
                     self._graaf = pickle.load(bestand)
-            except (pickle.UnpicklingError, EOFError, TypeError, AttributeError) as fout:
+            except (pickle.UnpicklingError, EOFError, TypeError, AttributeError, OSError) as fout:
                 logger.warning(
                     "De graafcache in %s is onbruikbaar (%s); graaf opnieuw "
                     "ingelezen uit de brondata.",
@@ -109,11 +110,23 @@ class LuieGraaf:
         return iter(self._geladen())
 
 
-def cachesleutel(dataset_path: Path, ontology_paths: list[Path]) -> str:
-    """De sleutel van deze combinatie van invoer, lader en bibliotheken."""
+def cachesleutel(
+    dataset_path: Path,
+    ontology_paths: list[Path],
+    fallback_encoding: str = FALLBACK_ENCODING,
+) -> str:
+    """De sleutel van deze combinatie van invoer, lader, terugvalcodering en bibliotheken.
+
+    De terugvalcodering telt mee: ze bepaalt hoe niet-UTF-8-bytes gelezen worden
+    (zie `dataset.py`), en een dataset die met een andere codering ingelezen is,
+    is een andere dataset. Zonder haar in de sleutel zou de cache op een dag dat
+    er een encoding-optie wordt doorgegeven, een met de verkeerde codering
+    ingelezen dataset teruggeven.
+    """
     haas = sha256()
     haas.update(LADER_VERSIE.encode("utf-8"))
     haas.update(f"rdflib{rdflib.__version__}shapely{shapely.__version__}".encode())
+    haas.update(fallback_encoding.encode("utf-8"))
     for module in (dataset_module, geometry_module):
         haas.update(Path(module.__file__).read_bytes())
     for pad in [Path(dataset_path), *sorted(Path(p) for p in ontology_paths)]:
@@ -142,14 +155,15 @@ def laad_met_cache(
     ontology_paths: list[Path],
     cache_dir: Path | None = None,
     gebruik_cache: bool = True,
+    fallback_encoding: str = FALLBACK_ENCODING,
 ) -> tuple[GwswDataset, CacheUitslag]:
     """Leest de dataset uit de cache, of leest hem in en legt hem weg."""
     begin = time.perf_counter()
     if not gebruik_cache:
-        dataset = load_dataset(dataset_path, ontology_paths)
+        dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding)
         return dataset, CacheUitslag("bestand", "", time.perf_counter() - begin)
 
-    sleutel = cachesleutel(dataset_path, ontology_paths)
+    sleutel = cachesleutel(dataset_path, ontology_paths, fallback_encoding)
     map_ = (cache_dir or standaard_cachemap()) / sleutel
     melding = ""
     pad_structuren = map_ / BESTAND_STRUCTUREN
@@ -165,24 +179,24 @@ def laad_met_cache(
             # gelezen (dat kost tot een minuut) maar pas als een check hem
             # aanraakt. Is die dan beschadigd, dan herstelt LuieGraaf zichzelf
             # via deze functie in plaats van de hele run te laten crashen.
-            herstel = partial(_herlees_graaf, dataset_path, ontology_paths)
+            herstel = partial(_herlees_graaf, dataset_path, ontology_paths, fallback_encoding)
             dataset = replace(
                 GwswDataset(graph=Graph(), **velden), graph=LuieGraaf(pad_graaf, herstel)
             )
             return dataset, CacheUitslag("cache", sleutel, time.perf_counter() - begin)
 
-    dataset = load_dataset(dataset_path, ontology_paths)
+    dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding)
     _schrijf(map_, dataset)
     return dataset, CacheUitslag("bestand", sleutel, time.perf_counter() - begin, melding)
 
 
-def _herlees_graaf(dataset_path: Path, ontology_paths: list[Path]) -> Graph:
+def _herlees_graaf(dataset_path: Path, ontology_paths: list[Path], fallback_encoding: str) -> Graph:
     """Leest de rdflib-graaf opnieuw uit de brondata; herstelweg voor `LuieGraaf`.
 
     Alleen `cache.py` kent paden en `load_dataset`; `LuieGraaf` krijgt enkel deze
     kant-en-klare functie mee en hoeft van beide dus niets te weten.
     """
-    return load_dataset(dataset_path, ontology_paths).graph
+    return load_dataset(dataset_path, ontology_paths, fallback_encoding).graph
 
 
 def _schrijf(map_: Path, dataset: GwswDataset) -> None:
@@ -199,9 +213,21 @@ def _schrijf_atomair(pad: Path, inhoud: object) -> None:
     een volgende lezer als geldige cache zou lezen. Zowel het wegschrijven van een
     verse dataset als het zelfherstel van een beschadigde `LuieGraaf` lopen via
     deze functie, dus de garantie geldt voor beide schrijfmomenten.
+
+    De naam van het tijdelijke bestand bevat het proces-ID: twee gelijktijdige
+    runs op dezelfde sleutel (dezelfde invoer, dezelfde lader) schreven anders
+    door elkaar heen naar dezelfde tijdelijke naam en het laatste `replace()` kon
+    het half geschreven bestand van de ander overnemen.
     """
     pad.parent.mkdir(parents=True, exist_ok=True)
-    tijdelijk = pad.with_name(f"{pad.name}.tijdelijk")
-    with tijdelijk.open("wb") as bestand:
-        pickle.dump(inhoud, bestand, protocol=5)
-    tijdelijk.replace(pad)
+    beschrijving, tijdelijk_pad = tempfile.mkstemp(
+        prefix=f"{pad.name}.{os.getpid()}.", suffix=".tijdelijk", dir=pad.parent
+    )
+    tijdelijk = Path(tijdelijk_pad)
+    try:
+        with os.fdopen(beschrijving, "wb") as bestand:
+            pickle.dump(inhoud, bestand, protocol=5)
+        tijdelijk.replace(pad)
+    except BaseException:
+        tijdelijk.unlink(missing_ok=True)
+        raise
