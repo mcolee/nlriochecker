@@ -69,6 +69,7 @@ class CheckOutcome:
     dimension: Dimension
     examined: int
     findings: list[Finding]
+    notes: list[str] = field(default_factory=list)
 
     @property
     def unreliable_count(self) -> int:
@@ -105,6 +106,10 @@ class Check(ABC):
     @abstractmethod
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Levert de bevindingen van deze check op de dataset."""
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Toelichtingen bij het bereik van deze check, bijvoorbeeld wat er buiten viel."""
+        return []
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal objecten dat deze check bekeken heeft."""
@@ -165,6 +170,7 @@ def run_checks(
                 dimension=check.dimension,
                 examined=check.examined(context),
                 findings=list(check.run(context)),
+                notes=check.notes(context),
             )
         )
 
