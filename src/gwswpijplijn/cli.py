@@ -7,12 +7,20 @@ from pathlib import Path
 import click
 
 from gwswpijplijn import __version__
+from gwswpijplijn.checkconfig import load_check_config
+from gwswpijplijn.checks import REGISTRY, CheckContext, Severity, run_checks
 from gwswpijplijn.comparison import compare_pairs
 from gwswpijplijn.config import load_coverage_config
 from gwswpijplijn.coverage import assess_coverage
+from gwswpijplijn.dataset import load_dataset
 from gwswpijplijn.errors import PipelineError
 from gwswpijplijn.pair import ReportPair, load_pair
-from gwswpijplijn.reporting import write_comparison_reports, write_coverage_report, write_reports
+from gwswpijplijn.reporting import (
+    write_check_report,
+    write_comparison_reports,
+    write_coverage_report,
+    write_reports,
+)
 
 
 class _CliError(click.ClickException):
@@ -163,3 +171,107 @@ def compare_command(
     click.echo(f"Geschreven: {markdown_path}")
     click.echo(f"Geschreven: {csv_path}")
     click.echo(f"Geschreven: {objects_path}")
+
+
+@main.command("toets")
+@click.option(
+    "--dataset",
+    "dataset_path",
+    required=True,
+    type=RAPPORT_TYPE,
+    help="GWSW-OroX-dataset (TTL).",
+)
+@click.option(
+    "--ontologie",
+    "ontology_paths",
+    multiple=True,
+    type=RAPPORT_TYPE,
+    help="GWSW-ontologie (TTL) voor de klassenhierarchie; meermaals toegestaan.",
+)
+@click.option(
+    "--mds",
+    "mds_path",
+    default=None,
+    type=RAPPORT_TYPE,
+    help="Nulmeting-detailrapport Mds of MdsPlan, voor de typeringspoort.",
+)
+@click.option(
+    "--hyd",
+    "hyd_path",
+    default=None,
+    type=RAPPORT_TYPE,
+    help="Nulmeting-detailrapport Hyd, voor de typeringspoort.",
+)
+@click.option(
+    "--check",
+    "check_ids",
+    multiple=True,
+    help="Check-ID uit het register; meermaals toegestaan. Zonder deze optie draaien ze alle.",
+)
+@_config_option()
+@_output_option("Map waarin het bevindingenrapport wordt geschreven.")
+def check_command(
+    dataset_path: Path,
+    ontology_paths: tuple[Path, ...],
+    mds_path: Path | None,
+    hyd_path: Path | None,
+    check_ids: tuple[str, ...],
+    config_path: Path | None,
+    output_dir: Path,
+) -> None:
+    """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
+    if (mds_path is None) != (hyd_path is None):
+        raise _CliError("Geef --mds en --hyd samen op: de typeringspoort vraagt beide rapporten.")
+
+    try:
+        dataset = load_dataset(dataset_path, list(ontology_paths))
+        config = load_check_config(config_path)
+        unreliable, gate_applied = _typing_gate(mds_path, hyd_path)
+        context = CheckContext(
+            dataset=dataset,
+            config=config,
+            unreliable_labels=unreliable,
+        )
+        run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
+        markdown_path, csv_path = write_check_report(run, output_dir)
+    except PipelineError as error:
+        raise _CliError(str(error)) from error
+    except KeyError as error:
+        bekend = ", ".join(sorted(REGISTRY))
+        raise _CliError(f"{error.args[0]}. Bekende checks: {bekend}.") from error
+
+    click.echo(
+        f"{dataset_path.name}: {len(dataset.nodes)} knooppunten, {len(dataset.conduits)} strengen"
+    )
+    if not gate_applied:
+        click.echo("  Geen typeringspoort toegepast (--mds en --hyd niet opgegeven).")
+    for outcome in run.outcomes:
+        voorbehoud = (
+            f", {outcome.unreliable_count} met typeringsvoorbehoud"
+            if outcome.unreliable_count
+            else ""
+        )
+        click.echo(
+            f"  {outcome.check_id:9s} {outcome.severity.value}  "
+            f"{len(outcome.findings):5d} bevindingen{voorbehoud}"
+        )
+    click.echo(
+        f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen"
+    )
+    click.echo(f"Geschreven: {markdown_path}")
+    click.echo(f"Geschreven: {csv_path}")
+
+
+def _typing_gate(mds_path: Path | None, hyd_path: Path | None) -> tuple[frozenset[str], bool]:
+    """Haalt de te globaal getypeerde objectlabels uit het rapportenpaar."""
+    if mds_path is None or hyd_path is None:
+        return frozenset(), False
+
+    pair = load_pair(mds_path, hyd_path)
+    labels = {
+        naam
+        for analysis in (pair.mds, pair.hyd)
+        for naam in analysis.typing_gate.objects["Naam"]
+        if naam
+    }
+    return frozenset(labels), True

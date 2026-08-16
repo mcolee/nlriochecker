@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from gwswpijplijn.checks import CheckRun, Severity
 from gwswpijplijn.comparison import ChangeStatus, PairComparison
 from gwswpijplijn.coverage import CheckEvidence, CoverageResult
 from gwswpijplijn.errors import PipelineError
@@ -18,6 +19,8 @@ FILE_COVERAGE_CSV = "dekking.csv"
 FILE_COMPARISON_MARKDOWN = "vergelijking.md"
 FILE_COMPARISON_CSV = "verschillen.csv"
 FILE_OBJECT_CHANGES_CSV = "objectverschillen.csv"
+FILE_CHECKS_MARKDOWN = "bevindingen.md"
+FILE_CHECKS_CSV = "bevindingen.csv"
 TOP_N = 15
 
 TOELICHTING_NIET_GERAAKT = (
@@ -438,3 +441,145 @@ def _grootste_verschillen(frame: pd.DataFrame, sleutel: str) -> pd.DataFrame:
         return gewijzigd
     volgorde = gewijzigd["Verschil"].abs().sort_values(ascending=False).index
     return gewijzigd.loc[volgorde].head(TOP_N)[[sleutel, "Eerder", "Later", "Verschil"]]
+
+
+def write_check_report(run: CheckRun, output_dir: Path) -> tuple[Path, Path]:
+    """Schrijft de bevindingen van de check-engine als Markdown en CSV."""
+    output_dir = _prepare(output_dir)
+
+    markdown_path = Path(output_dir) / FILE_CHECKS_MARKDOWN
+    markdown_path.write_text(_render_checks(run), encoding="utf-8")
+
+    csv_path = Path(output_dir) / FILE_CHECKS_CSV
+    _check_findings_table(run).to_csv(csv_path, sep=";", index=False, encoding="utf-8")
+
+    return markdown_path, csv_path
+
+
+def _check_findings_table(run: CheckRun) -> pd.DataFrame:
+    """Zet alle bevindingen in een tabel."""
+    rows = [
+        {
+            "Check": finding.check_id,
+            "Ernst": finding.severity.value,
+            "Dimensie": finding.dimension.value,
+            "Label": finding.object_label,
+            "Object": finding.object_uri,
+            "Melding": finding.message,
+            "TyperingBetrouwbaar": finding.typing_reliable,
+        }
+        for finding in run.findings
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "Check",
+            "Ernst",
+            "Dimensie",
+            "Label",
+            "Object",
+            "Melding",
+            "TyperingBetrouwbaar",
+        ],
+    )
+
+
+def _render_checks(run: CheckRun) -> str:
+    """Stelt het bevindingenrapport samen."""
+    onbetrouwbaar = sum(outcome.unreliable_count for outcome in run.outcomes)
+    lines = [
+        f"# Checkbevindingen {run.dataset.source.name}",
+        "",
+        f"Bron: `{run.dataset.source}` — {len(run.dataset.nodes)} knooppunten, "
+        f"{len(run.dataset.conduits)} strengen.",
+        "",
+        f"{run.count(Severity.ERROR)} fouten en {run.count(Severity.WARNING)} waarschuwingen "
+        f"uit {len(run.outcomes)} checks.",
+        "",
+    ]
+
+    if run.typing_gate_applied:
+        lines += [
+            f"De typeringspoort is toegepast: {onbetrouwbaar} bevindingen staan op objecten "
+            "die de nulmeting te globaal getypeerd noemt. Die bevindingen blijven staan, "
+            "maar zijn niet betrouwbaar te duiden.",
+            "",
+        ]
+    else:
+        lines += [
+            "> **Let op:** er is geen typeringspoort toegepast. Zonder de nulmeting-"
+            "detailrapporten (`--mds` en `--hyd`) is niet bekend welke objecten te globaal "
+            "getypeerd zijn, en dus welke bevindingen onbetrouwbaar zijn.",
+            "",
+        ]
+
+    if run.dataset.geometry_errors:
+        lines += [
+            f"> {len(run.dataset.geometry_errors)} objecten hebben een onleesbare geometrie "
+            "en konden niet volledig meedoen.",
+            "",
+        ]
+
+    lines += _table(_check_summary(run), "Samenvatting per check")
+
+    for outcome in run.outcomes:
+        lines += ["", f"## {outcome.check_id} — {outcome.title}", ""]
+        lines += [
+            f"Ernst {outcome.severity.value}, dimensie {outcome.dimension.value}. "
+            f"{len(outcome.findings)} bevindingen op {outcome.examined} bekeken objecten.",
+        ]
+        for note in outcome.notes:
+            lines += ["", f"> {note}"]
+        if not outcome.findings:
+            lines += ["", "_geen bevindingen_"]
+            continue
+        lines += [""]
+        lines += _table(
+            _findings_frame(outcome.findings[:TOP_N]),
+            _title("Bevindingen", pd.DataFrame(outcome.findings)),
+        )
+
+    lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
+    return "\n".join(lines) + "\n"
+
+
+def _check_summary(run: CheckRun) -> pd.DataFrame:
+    """Een regel per check met de aantallen."""
+    return pd.DataFrame(
+        [
+            {
+                "Check": outcome.check_id,
+                "Omschrijving": outcome.title,
+                "Ernst": outcome.severity.value,
+                "Dimensie": outcome.dimension.value,
+                "Bekeken": outcome.examined,
+                "Bevindingen": len(outcome.findings),
+                "Typering onbetrouwbaar": outcome.unreliable_count,
+            }
+            for outcome in run.outcomes
+        ],
+        columns=[
+            "Check",
+            "Omschrijving",
+            "Ernst",
+            "Dimensie",
+            "Bekeken",
+            "Bevindingen",
+            "Typering onbetrouwbaar",
+        ],
+    )
+
+
+def _findings_frame(findings: list) -> pd.DataFrame:
+    """Zet bevindingen om in een tabel voor de Markdown-uitvoer."""
+    return pd.DataFrame(
+        [
+            {
+                "Label": finding.object_label or "—",
+                "Melding": finding.message,
+                "Typering": "betrouwbaar" if finding.typing_reliable else "onbetrouwbaar",
+            }
+            for finding in findings
+        ],
+        columns=["Label", "Melding", "Typering"],
+    )

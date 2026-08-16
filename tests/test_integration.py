@@ -8,11 +8,14 @@ from pathlib import Path
 import pytest
 
 from gwswpijplijn.analysis import MESSAGE_TOO_GENERIC_PREFIX
+from gwswpijplijn.checkconfig import load_check_config
+from gwswpijplijn.checks import REGISTRY, CheckContext, run_checks
 from gwswpijplijn.comparison import compare_pairs
 from gwswpijplijn.config import load_coverage_config
 from gwswpijplijn.coverage import CoverageResult, Verdict, assess_coverage
+from gwswpijplijn.dataset import load_dataset
 from gwswpijplijn.pair import ReportPair, load_pair
-from gwswpijplijn.reporting import write_reports
+from gwswpijplijn.reporting import write_check_report, write_reports
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 MDS_FULL = DATA_DIR / "dewolden_nulmeting.csv"
@@ -188,3 +191,49 @@ def test_zelfvergelijking_van_het_volledige_paar(pair: ReportPair) -> None:
         assert telling["nieuw"] == 0
         assert telling["gebleven"] == len(item.object_changes)
     assert not comparison.coverage_changes["Gewijzigd"].any()
+
+
+ORox_DE_WOLDEN = DATA_DIR / "dewolden_orox.ttl"
+VOORBEELD_TTL = DATA_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
+ONTOLOGIE_TTL = DATA_DIR / "Ontologie_GWSW_Mds.ttl"
+
+
+@pytest.mark.skipif(
+    not (VOORBEELD_TTL.exists() and ONTOLOGIE_TTL.exists()),
+    reason="het OroX-voorbeeld of de ontologie staat niet in data/",
+)
+def test_alle_checks_draaien_op_het_voorbeeld(tmp_path: Path) -> None:
+    dataset = load_dataset(VOORBEELD_TTL, [ONTOLOGIE_TTL])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    run = run_checks(context)
+    markdown_path, csv_path = write_check_report(run, tmp_path)
+
+    assert len(run.outcomes) == len(REGISTRY)
+    assert markdown_path.exists()
+    assert csv_path.exists()
+    assert "geen typeringspoort" in markdown_path.read_text(encoding="utf-8").lower()
+
+
+@pytest.mark.skipif(
+    not (ORox_DE_WOLDEN.exists() and ONTOLOGIE_TTL.exists()),
+    reason="de De Wolden-OroX staat nog niet in data/",
+)
+def test_checks_op_de_wolden_met_typeringspoort(pair: ReportPair, tmp_path: Path) -> None:
+    dataset = load_dataset(ORox_DE_WOLDEN, [ONTOLOGIE_TTL])
+    onbetrouwbaar = frozenset(
+        naam
+        for analysis in (pair.mds, pair.hyd)
+        for naam in analysis.typing_gate.objects["Naam"]
+        if naam
+    )
+    context = CheckContext(
+        dataset=dataset, config=load_check_config(), unreliable_labels=onbetrouwbaar
+    )
+    run = run_checks(context, typing_gate_applied=True)
+
+    # De typeringspoort van MdsPlan noemt 1228 objecten te globaal getypeerd.
+    assert len(onbetrouwbaar) == 1228
+    assert dataset.conduits, "de dataset bevat geen strengen"
+    # Elke bevinding op zo'n object hoort de vlag te dragen.
+    for finding in run.findings:
+        assert finding.typing_reliable == (finding.object_label not in onbetrouwbaar)
