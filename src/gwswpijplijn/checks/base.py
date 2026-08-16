@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import ClassVar
 
+from shapely.geometry import Point
+
 from gwswpijplijn.checkconfig import CheckConfig
 from gwswpijplijn.dataset import GwswDataset
 from gwswpijplijn.externedata import ExternalData
@@ -47,6 +49,10 @@ class Finding:
     message: str
     typing_reliable: bool
     details: dict[str, object] = field(default_factory=dict)
+    # De EXT-checks melden ook objecten die niet uit de GWSW-dataset komen (een
+    # BGT-putdeksel zonder put, een BAG-pand zonder riolering). Die hebben geen
+    # dataset-URI om op af te bakenen; hun eigen RD-coordinaat neemt die rol over.
+    location: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -134,6 +140,15 @@ class CheckRun:
         geen randeffecten doordat een streng het gebied uit loopt.
         """
         binnen = objecten_in_gebied(self.dataset, area)
+
+        def hoort_erbij(finding: Finding) -> bool:
+            """Geeft aan of deze bevinding binnen het studiegebied valt."""
+            if finding.object_uri in binnen:
+                return True
+            if finding.location is not None:
+                return area.bevat(Point(*finding.location))
+            return False
+
         outcomes = [
             CheckOutcome(
                 check_id=outcome.check_id,
@@ -141,9 +156,9 @@ class CheckRun:
                 severity=outcome.severity,
                 dimension=outcome.dimension,
                 examined=outcome.examined,
-                findings=[f for f in outcome.findings if f.object_uri in binnen],
+                findings=[f for f in outcome.findings if hoort_erbij(f)],
                 notes=outcome.notes,
-                weggelaten=sum(1 for f in outcome.findings if f.object_uri not in binnen),
+                weggelaten=sum(1 for f in outcome.findings if not hoort_erbij(f)),
                 skeleton=outcome.skeleton,
             )
             for outcome in self.outcomes
@@ -184,6 +199,7 @@ class Check(ABC):
         uri: str,
         label: str,
         message: str,
+        location: tuple[float, float] | None = None,
         **details: object,
     ) -> Finding:
         """Bouwt een bevinding en zet de typeringsvlag op grond van het label."""
@@ -196,6 +212,7 @@ class Check(ABC):
             message=message,
             typing_reliable=context.is_reliable(uri),
             details=details,
+            location=location,
         )
 
 

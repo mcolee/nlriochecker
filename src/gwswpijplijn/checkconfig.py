@@ -43,16 +43,31 @@ class ClassRoots(BaseModel):
     overstortput: list[str] = Field(default_factory=list)
     overstortleiding: list[str] = Field(default_factory=list)
     bergbezinkvoorziening: list[str] = Field(default_factory=list)
+    # Bergbezinkriolen zijn leidingen en geen bouwwerken; ze horen niet in de
+    # knopenrol maar moeten wel geteld en gemeld worden.
+    bergbezinkleiding: list[str] = Field(default_factory=list)
     ledigingsvoorziening: list[str] = Field(default_factory=list)
     oppervlaktewater: list[str] = Field(default_factory=list)
     valconstructie: list[str] = Field(default_factory=list)
+    # EXT-003: klassen die een kruising met een watergang verklaren.
+    kruisingsleiding: list[str] = Field(default_factory=list)
     # NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen.
     stelseltypen: dict[str, list[str]] = Field(default_factory=dict)
 
     @property
     def netwerkknopen(self) -> list[str]:
-        """De klassen die als knooppunt in de netwerkgraaf meetellen."""
-        return [*self.put, *self.afvoer_eindpunt, *self.lozings_eindpunt]
+        """De klassen die als knooppunt in de netwerkgraaf meetellen.
+
+        Bergbezinkvoorzieningen horen erbij: een BBB is in het GWSW een Bouwwerk en
+        geen Put, maar het water loopt er wel doorheen. Zonder die klassen zou elke
+        streng die op een BBB uitkomt als niet-aangesloten gelden.
+        """
+        return [
+            *self.put,
+            *self.afvoer_eindpunt,
+            *self.lozings_eindpunt,
+            *self.bergbezinkvoorziening,
+        ]
 
     def stelseltype(self, dataset_types: frozenset[str], closure) -> str | None:
         """Het stelseltype waar deze leidingklassen onder vallen, of None."""

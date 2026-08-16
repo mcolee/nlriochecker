@@ -16,6 +16,7 @@ from gwswpijplijn.coverage import assess_coverage
 from gwswpijplijn.dataset import GwswDataset, load_dataset
 from gwswpijplijn.errors import PipelineError
 from gwswpijplijn.meting import laad_nulmeting
+from gwswpijplijn.plausibiliteit import load_plausibility
 from gwswpijplijn.reporting import (
     write_check_report,
     write_comparison_reports,
@@ -133,6 +134,20 @@ def _projectconfig_option():
         default=None,
         type=RAPPORT_TYPE,
         help="Projectconfiguratie (TOML); standaard de meegeleverde checks.toml.",
+    )
+
+
+def _plausibiliteit_option():
+    """Bouwt de optie voor de plausibiliteitstabellen van de ATTR-checks."""
+    return click.option(
+        "--plausibiliteit",
+        "plausibility_path",
+        default=None,
+        type=RAPPORT_TYPE,
+        help=(
+            "Plausibiliteitstabellen (TOML) voor de ATTR-checks; standaard de "
+            "meegeleverde plausibiliteit.toml."
+        ),
     )
 
 
@@ -312,6 +327,7 @@ def compare_command(
 )
 @_studiegebied_options()
 @_projectconfig_option()
+@_plausibiliteit_option()
 @_output_option("Map waarin het bevindingenrapport wordt geschreven.")
 def check_command(
     dataset_path: Path,
@@ -321,6 +337,7 @@ def check_command(
     study_path: Path | None,
     study_layer: str | None,
     project_config_path: Path | None,
+    plausibility_path: Path | None,
     output_dir: Path,
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
@@ -332,6 +349,7 @@ def check_command(
             dataset=dataset,
             config=config,
             unreliable_objects=onbetrouwbaar,
+            plausibiliteit=load_plausibility(plausibility_path),
         )
         run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
         if study_path is not None:

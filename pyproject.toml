@@ -39,6 +39,11 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "N"]
 
+[tool.ruff.lint.per-file-ignores]
+# De fixturegenerator bevat GML-literalen die niet af te breken zijn zonder de
+# TTL-uitvoer te veranderen.
+"scripts/maak_ttl_fixtures.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # De zware tests draaien niet mee in de standaardrun; met `pytest -m zwaar` wel.

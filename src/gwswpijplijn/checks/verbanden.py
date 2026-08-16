@@ -61,9 +61,10 @@ def _bouw_aansluitingen(context: CheckContext, rol: str) -> Aansluitingen:
     for uri, conduit in strengen.items():
         knopen = verbonden_knopen(context, conduit)
         index.knopen_per_streng[uri] = knopen
-        for knoop in knopen:
-            if knoop is not None:
-                index.per_knoop.setdefault(knoop, []).append(conduit)
+        # Een streng met dezelfde put aan begin en eind (TOP-012) mag daar maar een
+        # keer in de lijst staan; anders geldt hij later als zijn eigen buur.
+        for knoop in dict.fromkeys(knoop for knoop in knopen if knoop is not None):
+            index.per_knoop.setdefault(knoop, []).append(conduit)
     return index
 
 

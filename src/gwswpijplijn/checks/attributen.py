@@ -124,11 +124,32 @@ class DiameterOnderMinimum(_StrengCheck):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Wijst op de grens met de nulmeting."""
-        return [
-            "De nulmeting toetst alleen de harde ondergrens van 63 mm uit de "
-            "GWSW-waardebereiken; deze check gaat over het gat daarboven."
+        """Wijst op de grens met de nulmeting en op de aard van de kleine leidingen."""
+        minimum = context.config.drempels.minimale_diameter_mm
+        klein = [
+            conduit
+            for conduit in _strengen(context)
+            if (_grootste_maat(conduit) or minimum) < minimum
         ]
+        notities = [
+            "De nulmeting toetst alleen de harde ondergrens van 63 mm uit de "
+            "GWSW-waardebereiken; deze check gaat over het gat daarboven.",
+        ]
+        if klein:
+            telling: dict[str, int] = {}
+            for conduit in klein:
+                soort = _soortnaam(conduit)
+                telling[soort] = telling.get(soort, 0) + 1
+            top = ", ".join(
+                f"{soort} {aantal}"
+                for soort, aantal in sorted(telling.items(), key=lambda paar: -paar[1])[:6]
+            )
+            notities.append(
+                f"De bevindingen verdelen zich over deze klassen: {top}. Drains en "
+                "perceel- of kolkaansluitleidingen zijn van nature dunner dan 200 mm; die "
+                "bevindingen zeggen meer over de klasse-indeling dan over een gebrek."
+            )
+        return notities
 
 
 @register
@@ -568,6 +589,12 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
             f"{zonder} van de {totaal} strengen hebben een materiaal zonder vormregel in "
             "`plausibiliteit.toml` (of geen materiaal) en zijn niet getoetst."
         ]
+
+
+def _soortnaam(object_) -> str:
+    """De korte GWSW-klassenaam van een object."""
+    types = sorted(soort.rsplit("/", 1)[-1] for soort in object_.types)
+    return types[0] if types else "onbekend"
 
 
 def _grootste_maat(conduit: Conduit) -> float | None:

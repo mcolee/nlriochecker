@@ -12,6 +12,8 @@ gwsw:Lozingsput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Overstortput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Rioolput rdfs:subClassOf gwsw:Put .
 gwsw:Putorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Compartimentorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Bouwwerkorientatie rdfs:subClassOf gwsw:Knooppunt .
 gwsw:Leidingorientatie rdfs:subClassOf gwsw:Verbinding .
 gwsw:GemengdRiool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Hemelwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
@@ -22,6 +24,12 @@ gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
+gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
+gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
+gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 # DEFECT: streng 1 heeft een strikdas-polygoon als geometrie; die is niet OGC-geldig
 

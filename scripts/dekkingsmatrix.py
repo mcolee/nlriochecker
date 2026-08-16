@@ -31,10 +31,18 @@ STATUS_GESCHRAPT = "geschrapt (gedekt door nulmeting)"
 
 
 def check_ids_in_tests() -> set[str]:
-    """De check-ID's die letterlijk in de testsuite voorkomen."""
+    """De check-ID's die letterlijk in de testsuite voorkomen.
+
+    Regels die met een `#` beginnen tellen niet mee: een ID dat alleen in een
+    toelichting genoemd wordt ("HGT-001 staat in blok C") is geen test, en zou de
+    matrix anders een dekking laten claimen die er niet is.
+    """
     gevonden: set[str] = set()
     for pad in TESTMAP.rglob("*.py"):
-        gevonden.update(CHECK_ID_PATROON.findall(pad.read_text(encoding="utf-8")))
+        for regel in pad.read_text(encoding="utf-8").splitlines():
+            if regel.lstrip().startswith("#"):
+                continue
+            gevonden.update(CHECK_ID_PATROON.findall(regel))
     return gevonden
 
 

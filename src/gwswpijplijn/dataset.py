@@ -199,6 +199,17 @@ class Conduit(_MetAspecten):
     bob_end_aspect: Aspect | None = None
     aspects: tuple[Aspect, ...] = ()
     multipart: bool = False
+    z_values: tuple[float | None, ...] = ()
+
+    @property
+    def z_start(self) -> float | None:
+        """De z-waarde van het eerste lijnpunt, als de geometrie er een heeft."""
+        return self.z_values[0] if self.z_values else None
+
+    @property
+    def z_end(self) -> float | None:
+        """De z-waarde van het laatste lijnpunt, als de geometrie er een heeft."""
+        return self.z_values[-1] if self.z_values else None
 
     @property
     def bob_start(self) -> float | None:
@@ -768,7 +779,7 @@ def _read_conduits(
         else _leiding_orientations(graph)
     )
     for orientation in bron:
-        line, _ = _geometry(graph, orientation, KLASSE_LIJN, errors)
+        line, z_waarden = _geometry(graph, orientation, KLASSE_LIJN, errors)
         multipart = _is_multipart(graph, orientation, KLASSE_LIJN)
         begin = _endpoint(graph, orientation, KLASSEN_BEGINPUNT)
         eind = _endpoint(graph, orientation, KLASSEN_EINDPUNT)
@@ -788,6 +799,7 @@ def _read_conduits(
                 bob_end_aspect=_bob(graph, eind, KLASSE_BOB_EIND),
                 aspects=_read_aspects(graph, subject),
                 multipart=multipart,
+                z_values=tuple(z_waarden),
             )
 
     return conduits

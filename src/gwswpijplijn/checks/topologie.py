@@ -639,20 +639,26 @@ class StrengenRakenMetBuffer(Check):
         return any(links.distance(rechts) <= tolerantie for links in eigen for rechts in andere)
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen diameter hebben en dus geen buffer krijgen."""
+        """Meldt de tweedimensionale afbakening en de strengen zonder maatvoering."""
         topologie = _topologie(context)
+        notities = [
+            "Deze toets is tweedimensionaal. In een stedelijk stelsel kruisen leidingen "
+            "elkaar routinematig op verschillende diepte; zo'n kruising is pas een gebrek "
+            "als de buizen elkaar ook in hoogte raken. Gebruik HGT-004, HGT-009 en HGT-018 "
+            "om te bepalen welke van deze bevindingen een echt conflict zijn.",
+        ]
         zonder = sum(
             1
             for conduit in topologie.lined
             if half_diameter_m(conduit.breedte_mm, conduit.hoogte_mm) == 0.0
         )
-        if not zonder:
-            return []
-        return [
-            f"{zonder} van de {len(topologie.lined)} strengen hebben geen bruikbare "
-            "breedte- of hoogtemaat; die krijgen buffer nul en komen alleen in beeld als "
-            "de tegenpartij dik genoeg is."
-        ]
+        if zonder:
+            notities.append(
+                f"{zonder} van de {len(topologie.lined)} strengen hebben geen bruikbare "
+                "breedte- of hoogtemaat; die krijgen buffer nul en komen alleen in beeld als "
+                "de tegenpartij dik genoeg is."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen met bruikbare geometrie."""
@@ -694,6 +700,15 @@ class Hartlijnkruising(Check):
                     andere_streng=ander.label,
                     andere_uri=ander.uri,
                 )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt dat een kruising in het platte vlak nog geen conflict is."""
+        return [
+            "Een hartlijnkruising in het platte vlak is normaal: hemelwater en gemengd "
+            "kruisen elkaar in vrijwel elke straat, op verschillende diepte. Deze check "
+            "wijst de plaatsen aan waar dat gebeurt; of het een conflict is volgt uit de "
+            "hoogten (HGT-004, HGT-009, HGT-018), niet uit deze bevinding."
+        ]
 
     def _plaats(self, snijpunt) -> str:
         """Een leesbare aanduiding van het snijpunt."""

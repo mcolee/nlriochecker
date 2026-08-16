@@ -155,3 +155,94 @@ over waarin de buis in geen enkele richting past.
 
 **Alternatieven.** De kleinste putmaat (verworpen: te veel valse meldingen). De
 gemiddelde maat (verworpen: heeft geen fysieke betekenis).
+
+### BA-4 De putbodem, de puthoogte en HGT-012
+
+**Wat.** HGT-012 (putdiepte) toetst `HoogtePut` rechtstreeks, niet "deksel min bodem".
+
+**Waarom.** `Node.bodem` wordt zelf afgeleid als bovenkant min `HoogtePut` (zie B0-3).
+Deksel min bodem zou daardoor per definitie weer `HoogtePut` opleveren: een
+cirkelredenering die altijd binnen de marge valt. De check meldt in haar toelichting
+hoeveel putten geen puthoogte hebben.
+
+**Alternatieven.** De laagste aansluitende BOB als bodem nemen (verworpen: dan toetst
+HGT-012 hetzelfde als HGT-015).
+
+### BA-5 HGT-007 telt alleen verval naar beneden
+
+**Wat.** HGT-007 (te weinig verhang) meldt alleen strengen met een verval tussen nul
+en de drempel. Loopt de bodem omhoog, dan zwijgt de check.
+
+**Waarom.** Tegenverhang is een ander gebrek met een eigen ID (HGT-005 en HGT-006) en
+een eigen ernst. Zonder deze afbakening zou elke streng met tegenverhang in drie
+checks tegelijk opduiken en zou het totaal een verkeerd beeld geven.
+
+### BA-6 De HGT-fixtures raken meerdere checks tegelijk
+
+**Wat.** Elke HGT-fixture bevat precies een ingebouwd defect, maar zo'n defect laat
+meestal meerdere checks aanslaan: een BOB boven het deksel betekent per definitie ook
+te weinig gronddekking (HGT-013) en een buiskruin boven maaiveld (HGT-018).
+
+**Waarom.** Het hoogtemodel is een samenhangend geheel; deksel, maaiveld, puthoogte,
+bodem, BOB en profielhoogte zitten in elkaars formules. Een fixture bouwen die maar
+een check raakt zou fysiek onmogelijke combinaties vragen. De tests toetsen daarom per
+check-ID of *die* check het defect vindt, en er is per categorie een schone fixture
+waarop geen enkele check iets mag melden.
+
+### BA-7 RVZ-001 en RVZ-011 zijn wel gebouwd
+
+**Wat.** De opdracht noemt voor blok A alleen RVZ-004 t/m RVZ-010; RVZ-001 en RVZ-011
+zijn ook gebouwd.
+
+**Waarom.** Beide staan in het register, zijn niet geschrapt en zijn met de aanwezige
+gegevens implementeerbaar. Ze overslaan zou twee gaten in de dekkingsmatrix laten die
+niet uit de data of de architectuur volgen maar uit een opsomming.
+
+### BA-8 Bergbezinkriolen vallen buiten RVZ-007 t/m RVZ-009
+
+**Wat.** `klassen.bergbezinkvoorziening` bevat alleen bouwwerkklassen. `Bergbezinkleiding`
+en `Bergingsleiding` staan apart in `klassen.bergbezinkleiding` en worden geteld en
+gemeld, maar niet getoetst.
+
+**Waarom.** Die twee klassen zijn `VrijvervalRioolleiding`: ze komen in `conduits`
+terecht en niet in `nodes`. RVZ-007 t/m RVZ-009 redeneren over de voorziening als
+knoop in het netwerk (aanvoer, lediging, nooduitlaat), en dat werkt niet op een kant.
+Ze stilzwijgend in de knopenrol laten staan zou betekenen dat de toelichting "deze
+dataset bevat geen bergbezinkvoorziening" zegt terwijl er wel een bergbezinkriool is.
+
+### BA-9 De inwinningswijze zit in De Wolden op de geometrie, niet op de hoogten
+
+**Empirische bevinding.** De De Wolden-export bevat 25.546 keer `WijzeVanInwinning`
+(waarden AHN2, Inmeting, Revisie, Schatting, Plan_Ontwerp, NietAchterhaald,
+Afgeleid, Luchtfoto, Inspectie), maar telkens gekoppeld aan de *puntgeometrie* van de
+put of het maaiveld — niet aan de BOB's, het dekselniveau of het drempelniveau die het
+register bij BTR-001 en BTR-002 noemt. Er is geen enkele `DatumInwinning`.
+
+**Wat.** BTR-001 t/m BTR-005 blijven skelet, conform de opdracht. De reden bij elk
+skelet noemt deze bevinding, zodat duidelijk is dat BTR-002 wel bouwbaar wordt zodra
+er een export met inwinning op de BOB's is.
+
+### BA-10 Empirische bevinding: hoe overstorten in de De Wolden-export staan
+
+**Bevinding.** Getoetst op de volledige export (`rdf:type`-telling over 112 MB TTL):
+- `Overstortput` 218 keer, `Stuwput` 27 keer — overstorten zijn dus *putten met een
+  eigen klasse*, geen kunstwerken en geen aparte objecten;
+- `Overstortleiding` 68 keer — de leiding van de overstort naar buiten;
+- `Overstortdrempel` **nul** keer, en dus ook geen `Drempelniveau` en geen
+  `Drempelbreedte`; `Bergbezinkbassin` **nul** keer; `Ledigingsvoorziening` **nul** keer.
+
+Het GWSW-voorbeeldbestand (Juinen) kent die objecten wel: daar hangt een
+`Overstortdrempel` met `Drempelniveau` en `Drempelbreedte` via `hasPart` aan een
+`Overstortput`, met begin- en eindpunt op twee compartimenten.
+
+**Keuze.** De RVZ-module leest beide vormen. De overstort wordt herkend aan de
+putklasse (`klassen.overstortput`) en de overstortleiding aan de leidingklasse
+(`klassen.overstortleiding`); drempels worden gezocht als `hasPart`-onderdelen van het
+type `Overstortdrempel`. Waar de drempelgegevens ontbreken meldt de check dat
+expliciet in plaats van nul bevindingen te tonen. Dit bevestigt het openstaande punt
+uit CLAUDE.md: RVZ-002 en RVZ-003 zijn geschrapt omdat de nulmeting ze zou dekken,
+maar er is in deze dataset geen enkele SHACL-vorm en geen enkel object dat ze raakt.
+
+**Gevolg voor ADM-007.** 181 van de 273 overstort- en lozingsputten hebben geen
+overstortleiding of -drempel. Dat is geen 181 losse gebreken maar een systematisch
+registratiepatroon: er zijn 218 overstortputten tegenover 68 overstortleidingen.

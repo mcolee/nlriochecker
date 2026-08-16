@@ -49,11 +49,18 @@ functieloze_knoop = ["LozePut", "BlindePut", "Ontstoppingsstuk", "Verbindingsstu
 # Zie docs/beslislog.md.
 overstortput = ["Overstortput", "Stuwput"]
 overstortleiding = ["Overstortleiding"]
-bergbezinkvoorziening = ["Bergbezinkbassin", "Bergingsbassin", "Bezinkbassin", "Bergbezinkleiding"]
+# Alleen bouwwerkklassen: RVZ-007 t/m RVZ-009 redeneren over een BBB als knoop in
+# het netwerk (aanvoer, lediging, nooduitlaat). Bergbezinkleiding staat er bewust
+# niet bij, want dat is een VrijvervalRioolleiding en dus een kant, geen knoop;
+# hij wordt apart geteld en gemeld onder bergbezinkleiding.
+bergbezinkvoorziening = ["Bergbezinkbassin", "Bergingsbassin", "Bezinkbassin"]
+bergbezinkleiding = ["Bergbezinkleiding", "Bergingsleiding"]
 ledigingsvoorziening = ["Ledigingsvoorziening"]
 oppervlaktewater = ["Oppervlaktewater"]
 # HGT-009 en HGT-016: constructies die een BOB-sprong verklaren.
 valconstructie = ["Valput", "Zandvangput"]
+# EXT-003: een streng die een watergang kruist hoort een van deze klassen te zijn.
+kruisingsleiding = ["Zinker", "Duiker"]
 
 # NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen. Anders dan
 # de rollen hierboven (die zeggen welk eindpunt een streng moet bereiken) deelt
@@ -95,6 +102,13 @@ bag_pand = "bag_pand_koekangerveld.gpkg"
 nwb_wegvakken = "nwb_wegvakken_koekangerveld.gpkg"
 studiegebied = "cbs_buurt_koekangerveld_studiegebied.gpkg"
 ahn_dtm = "ahn5_dtm_koekangerveld.tif"
+# Welke BGT-lagen welke rol vervullen. De namen komen uit de aangeleverde export;
+# zie docs/gis-inventarisatie.md. Een lege of ontbrekende laag laat de bijbehorende
+# checks overslaan met de melding "laag niet aanwezig in aangeleverde data".
+bgt_pandlagen = ["pand"]
+bgt_waterlagen = ["waterdeel", "ondersteunendwaterdeel"]
+bgt_putdeksellagen = ["put"]
+bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
 
 [drempels]
 # TOP-004: hoe ver een strengeindpunt van zijn put mag liggen.
