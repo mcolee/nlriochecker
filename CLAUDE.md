@@ -3,7 +3,7 @@
 ## Doel
 Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen:
 1. Inlezen en analyseren van de GWSW-nulmeting, aangeleverd als SHACL-validatierapporten (apps.gwsw.nl/item_validate_shacl).
-2. Eigen aanvullende checks conform het checkregister (data/checkregister-gwsw-nulmeting-v0_7.md) op de GWSW-dataset (OroX/TTL) en later externe bronnen.
+2. Eigen aanvullende checks conform het checkregister (data/checkregister-gwsw-nulmeting-v0_8.md) op de GWSW-dataset (OroX/TTL) en later externe bronnen.
 
 We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis/.
 
@@ -59,10 +59,14 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - De geparseerde dataset wordt gecachet (`~/.cache/gwswpijplijn`, `--geen-cache` om hem
   over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
   `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
+- `tests/test_uitvoer_qgis.py` vindt PyQGIS door de systeem-site-packages achter
+  deze (van het systeem afgeschermde) venv aan `sys.path` te plakken; zonder QGIS
+  op de machine slaat hij gewoon over. Zie de moduledocstring van dat bestand voor
+  hoe dat pad afgeleid wordt en `GWSW_QGIS_SITE_PACKAGES` om het te overschrijven.
 
 ## Werkwijze
 - Kleine stappen, na elke werkende stap een git-commit met een duidelijke boodschap.
-- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_7.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
+- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_8.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
 - Voer na elke wijziging pytest en ruff uit voordat je afrondt.
 - Geloof onwaarschijnlijke uitkomsten niet. Duizenden bevindingen op een dataset wijzen meestal op een modelleerfout in de engine, niet op duizenden gebreken; zoek de oorzaak voordat je het cijfer rapporteert.
 - Wat een check NIET heeft bekeken hoort in het rapport: objecten buiten de graaf, weggelaten bevindingen, ontbrekende typeringspoort. Stilte leest als "alles gecontroleerd".

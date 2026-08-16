@@ -3,15 +3,58 @@
 Deze test is de enige die het echte antwoord geeft op de vraag waar ronde 2 mee
 begon: past QGIS de meegeleverde stijlen toe? Hij wordt overgeslagen waar PyQGIS
 niet geinstalleerd is, want QGIS is geen afhankelijkheid van dit project.
+
+Deze venv is met `include-system-site-packages = false` gebouwd (zie
+`.venv/pyvenv.cfg`), dus een `import qgis.core` faalt hier altijd, ook op een
+machine met een werkende systeem-QGIS: PyQGIS staat dan in de site-packages van
+de systeem-Python, niet in deze venv. `_voeg_systeem_pyqgis_toe()` plakt die map
+daarom vóór de import ACHTERAAN `sys.path`, zodat de nieuwere `pydantic`/
+`typing_extensions` uit de venv voorrang houden en alleen de ontbrekende modules
+(`qgis`, `PyQt5`, `osgeo`) van het systeem komen. Ontbreekt PyQGIS ook dan nog
+(een andere Python-versie, een andere distributie), dan blijft `importorskip`
+het vangnet: de test slaat gewoon over in plaats van te crashen.
 """
 
 from __future__ import annotations
 
 import os
+import sys
+import sysconfig
 from datetime import date
 from pathlib import Path
 
 import pytest
+
+
+def _systeem_pyqgis_pad() -> Path | None:
+    """Het pad waar de systeem-PyQGIS te vinden is, of None als dat niet lukt.
+
+    `GWSW_QGIS_SITE_PACKAGES` overschrijft het pad voor een machine met een
+    andere lay-out. Zonder die variabele wordt het pad afgeleid: het
+    `deb_system`-installatieschema van `sysconfig` is het schema dat
+    Debian/Ubuntu voor met apt geinstalleerde Python-pakketten gebruikt (zoals
+    `python3-qgis`), en levert daarmee het pad zonder dat wij het zelf
+    hoeven te verzinnen. Toegepast op `sys.base_prefix` (de Python-installatie
+    waar deze venv uit voortkomt), niet op de venv zelf -- anders krijg je een
+    pad binnen de venv terug.
+    """
+    override = os.environ.get("GWSW_QGIS_SITE_PACKAGES")
+    if override:
+        return Path(override)
+    if "deb_system" not in sysconfig.get_scheme_names():
+        return None
+    basisvars = {"base": sys.base_prefix, "platbase": sys.base_prefix}
+    return Path(sysconfig.get_path("purelib", scheme="deb_system", vars=basisvars))
+
+
+def _voeg_systeem_pyqgis_toe() -> None:
+    """Zet de systeem-site-packages achteraan `sys.path`, als ze bestaan."""
+    pad = _systeem_pyqgis_pad()
+    if pad is not None and pad.is_dir() and str(pad) not in sys.path:
+        sys.path.append(str(pad))
+
+
+_voeg_systeem_pyqgis_toe()
 
 qgis_core = pytest.importorskip("qgis.core", reason="PyQGIS is hier niet geinstalleerd")
 

@@ -190,15 +190,22 @@ vraag waar deze ronde mee begon: past QGIS de meegeleverde stijlen toe? Hij word
 overgeslagen waar `qgis.core` niet importeerbaar is — QGIS is geen afhankelijkheid
 van dit project. Op deze machine staat QGIS wel (`/usr/bin/qgis`), maar de
 project-venv (`uv run`) is geïsoleerd (`include-system-site-packages = false`) en
-ziet die installatie niet: `uv run pytest tests/test_uitvoer_qgis.py -v` slaat de
-test dus standaard over, en dat is precies het gedrag dat de test moet vertonen.
-Om hem echt te draaien heb ik de systeem-`dist-packages` (waar PyQGIS in zit) achter
-de venv aan `sys.path` geplakt, zodat de nieuwere `pydantic`/`typing_extensions` uit
-de venv voorrang houden en alleen de ontbrekende modules (`qgis`, `PyQt5`, `osgeo`)
-van het systeem komen. Zo gedraaid: alle zes tests slagen — `loadDefaultStyle()`
-geeft op alle vier de featurelagen `(True, "... Provider ...")`, de strengenlaag
-kent de drie richtingslabels (met de gecorrigeerde tekst uit §1), en geen enkele
-stijlexpressie verwijst naar een kolom die niet bestaat.
+ziet die installatie niet vanzelf: PyQGIS staat in de site-packages van de
+systeem-Python. Het testbestand vindt dat pad zelf, vóór de import van
+`qgis.core`: het `deb_system`-installatieschema van `sysconfig`, toegepast op
+`sys.base_prefix` (de Python-installatie waar deze venv uit voortkomt), levert de
+locatie zonder dat er iets hardgecodeerd hoeft te worden; een omgevingsvariabele
+(`GWSW_QGIS_SITE_PACKAGES`) overschrijft dat voor een andere lay-out. Dat pad komt
+ACHTERAAN `sys.path`, zodat de nieuwere `pydantic`/`typing_extensions` uit de venv
+voorrang houden en alleen de ontbrekende modules (`qgis`, `PyQt5`, `osgeo`) van het
+systeem komen. Zie §4a, zesde bevinding, voor waarom dit nodig werd: de eerste
+versie draaide alleen na een handmatige ingreep buiten de repository om, en sloeg
+onder een gewone `uv run pytest` altijd over. Met de fix draait
+`uv run pytest tests/test_uitvoer_qgis.py -v` de test nu vanzelf: alle zes slagen —
+`loadDefaultStyle()` geeft op alle vier de featurelagen `(True, "... Provider
+...")`, de strengenlaag kent de drie richtingslabels (met de gecorrigeerde tekst uit
+§1), en geen enkele stijlexpressie verwijst naar een kolom die niet bestaat. Staat
+er geen QGIS op de machine, dan slaat de test nog steeds gewoon over.
 
 De zware test `test_afbakening_op_koekangerveld_verandert_de_bevindingen_niet` in
 `tests/test_integration.py` toetst het kernbeloofde van taak 9/10: dezelfde
@@ -211,7 +218,7 @@ analyseset is aantoonbaar kleiner dan de volledige export.
 ## 4a. Wat de code review aan het licht bracht
 
 CLAUDE.md schrijft voor `/superpowers:requesting-code-review` te draaien voor elke
-commit. Over de hele ronde heeft dat vier echte gebreken in de eigen code van deze
+commit. Over de hele ronde heeft dat vijf echte gebreken in de eigen code van deze
 ronde blootgelegd, en één regressie in de bekabeling tussen twee taken.
 
 **De richtingspijl tekende een zelfverzekerde `mee`/`tegen` waar de tekenrichting
@@ -266,6 +273,17 @@ volledige dataset draaiden zijn tegelijk gecorrigeerd naar de nieuwe werkelijkhe
 `beperk_tot_studiegebied` en `schrijf_geopackage`, en de `notes()`-docstring van
 `_ZonderAfvoerpad` in `checks/netwerk.py`).
 
+**De QGIS-smoketest zelf sloeg onder `uv run pytest` altijd over en bewaakte dus
+niets.** De eerste versie van `tests/test_uitvoer_qgis.py` draaide alleen echt
+tegen QGIS na een handmatige `sys.path`-ingreep buiten het testbestand om (zie
+§3 van dit verslag); onder een gewone testrun bleef de import van `qgis.core`
+falen en sloeg de test stilzwijgend over — een regressie in het stijlen laden zou
+op deze machine dus nooit gemeld zijn. Een test die altijd overslaat wekt de
+indruk van bewaking zonder die te leveren. `_systeem_pyqgis_pad()` vindt de
+systeem-PyQGIS nu zelf, in het testbestand, vóór de import; `importorskip` blijft
+het vangnet voor een machine zonder QGIS. Zie §3 voor het resultaat: alle zes
+tests slagen nu onder een kale `uv run pytest tests/test_uitvoer_qgis.py -v`.
+
 ---
 
 ## 5. Tests
@@ -279,7 +297,10 @@ van deze taak.
 De PyQGIS-smoketest staat onder de nieuwe marker `qgis` (geregistreerd in
 `pyproject.toml`, naast `zwaar`), niet omdat de suite hem apart moet kunnen
 uitsluiten — `pytest.importorskip` doet dat al — maar zodat hij herkenbaar is als
-"vereist PyQGIS" voor wie later met `-m qgis` selectief wil draaien.
+"vereist PyQGIS" voor wie later met `-m qgis` selectief wil draaien. Op deze
+machine draait hij ook daadwerkelijk mee in `uv run pytest -m "not zwaar"`: geen
+skip meer, maar zes geslaagde tests (zie §4a, zesde bevinding, voor waarom dat
+eerst niet zo was).
 
 ---
 
