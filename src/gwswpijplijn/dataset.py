@@ -111,6 +111,17 @@ class GwswDataset:
             if item.types & gesloten
         ]
 
+    def subjects_of_class(self, root: str) -> list[RdfNode]:
+        """Alle objecten van dit type in de graaf, ook zonder eigen geometrie.
+
+        Onderdelen als een overstortdrempel hebben geen punt- of lijngeometrie en
+        komen daarom niet in `nodes` of `conduits` voor; die zijn hier wel te vinden.
+        """
+        gevonden: list[RdfNode] = []
+        for klasse in self.closure(root):
+            gevonden.extend(self.graph.subjects(RDF.type, URIRef(klasse)))
+        return gevonden
+
 
 def _uri(naam: str) -> str:
     """Maakt van een korte klassenaam een volledige GWSW-URI."""

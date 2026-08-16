@@ -1,0 +1,28 @@
+# Projectconfiguratie voor de check-engine.
+#
+# Klassenwortels bepalen welke objecten als put, vrijvervalleiding of netwerk-
+# eindpunt tellen; de engine gebruikt de subklasse-afsluiting uit de ontologie,
+# dus een wortel dekt al haar subklassen. Drempelwaarden zijn per project aan
+# te passen; er staat niets hardgecodeerd in de code.
+
+[klassen]
+put = ["Put"]
+vrijvervalleiding = ["VrijvervalRioolleiding"]
+# 'Overnamepunt' bestaat niet als klasse in de GWSW-ontologie (Mds noch Hyd);
+# dit is open punt 6 uit het checkregister. Gemalen, lozingspunten en uitlaten
+# tellen als eindpunt van de afvoer.
+netwerk_eindpunt = ["Gemaal", "Lozingspunt", "Uitlaat"]
+# Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
+# geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
+vuilwater = ["Vuilwaterriool", "GemengdRiool"]
+hemelwater = ["Hemelwaterriool"]
+# De ontologie kent geen klasse "IT-stelsel"; NET-007 leest een deelstelsel met
+# infiltratieleidingen als IT-stelsel. Zie open punt 6 van het checkregister.
+infiltratie = ["Infiltratieriool"]
+drempel = ["Overstortdrempel"]
+
+[drempels]
+# TOP-004: hoe ver een strengeindpunt van zijn put mag liggen.
+snapping_tolerantie_m = 0.10
+# TOP-005: binnen deze afstand gelden twee putten als dubbel.
+dubbele_put_tolerantie_m = 0.30
