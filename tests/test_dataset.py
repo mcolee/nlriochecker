@@ -11,6 +11,7 @@ from gwswpijplijn.errors import DatasetError
 
 JUINEN = "http://sparql.gwsw.nl/repositories/Juinen#"
 NETWERKWORTELS = ["Put", "Gemaal", "Lozingspunt"]
+TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
 
 def test_voorbeeld_levert_strengen_en_knooppunten(juinen: GwswDataset) -> None:
@@ -164,3 +165,35 @@ def test_beheerobjecttype_valt_terug_op_het_aspect() -> None:
     )
 
     assert dataset.beheerobjecttype("urn:bestaat-niet") == ""
+
+
+def test_bob_verval_is_het_verschil_over_de_streng(juinen) -> None:
+    conduit = next(c for c in juinen.conduits.values() if c.bob_start and c.bob_end)
+
+    assert conduit.bob_verval == pytest.approx(conduit.bob_start - conduit.bob_end)
+
+
+def test_bob_verval_ontbreekt_zonder_beide_bobs(juinen) -> None:
+    conduit = next(
+        (c for c in juinen.conduits.values() if c.bob_start is None or c.bob_end is None),
+        None,
+    )
+    if conduit is None:
+        pytest.skip("elke streng in het voorbeeld draagt beide BOB's")
+
+    assert conduit.bob_verval is None
+
+
+def test_richting_van_geometrie_ziet_een_omgekeerd_getekende_lijn() -> None:
+    from gwswpijplijn.checkconfig import load_check_config
+
+    dataset = load_dataset(TTL_DIR / "top020_omgekeerd_getekend.ttl")
+    wortels = load_check_config().klassen.netwerkknopen
+    conduit = next(iter(dataset.conduits.values()))
+
+    uitslag = dataset.richting_van_geometrie(conduit, wortels)
+
+    assert uitslag is not None
+    omgekeerd, begin, eind = uitslag
+    assert omgekeerd is True
+    assert begin.uri != eind.uri

@@ -76,9 +76,8 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
 
 def _stijgt(conduit: Conduit) -> bool:
     """Geeft aan of de bodem stijgt van begin- naar eindpunt."""
-    if conduit.bob_start is None or conduit.bob_end is None:
-        return False
-    return conduit.bob_start < conduit.bob_end
+    verval = conduit.bob_verval
+    return verval is not None and verval < 0
 
 
 def _eindpunten(context: CheckContext, rol: str) -> set[str]:

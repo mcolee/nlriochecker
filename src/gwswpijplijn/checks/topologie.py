@@ -1106,20 +1106,11 @@ class OmgekeerdeDigitalisatie(Check):
         dataset = context.dataset
 
         for conduit in _topologie(context).conduits:
-            uiteinden = _endpoints(conduit)
-            if uiteinden is None:
+            uitslag = dataset.richting_van_geometrie(conduit, context.config.klassen.netwerkknopen)
+            if uitslag is None:
                 continue
-            begin_uri, eind_uri = _knopen(context, conduit)
-            begin = dataset.nodes.get(begin_uri) if begin_uri else None
-            eind = dataset.nodes.get(eind_uri) if eind_uri else None
-            if begin is None or eind is None or begin.point is None or eind.point is None:
-                continue
-            if begin.uri == eind.uri:
-                continue
-
-            juist = uiteinden[0].distance(begin.point) + uiteinden[1].distance(eind.point)
-            omgekeerd = uiteinden[0].distance(eind.point) + uiteinden[1].distance(begin.point)
-            if juist <= omgekeerd:
+            omgekeerd, begin, eind = uitslag
+            if not omgekeerd:
                 continue
             yield self.finding(
                 context,

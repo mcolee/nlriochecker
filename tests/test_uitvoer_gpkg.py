@@ -346,3 +346,31 @@ def test_featurelagen_dragen_het_stelseltype(tmp_path: Path) -> None:
 
     assert strengen["1"] == "gemengd"
     assert putten["A"] == "gemengd"
+
+
+def test_strengen_dragen_de_bob_richting(tmp_path: Path) -> None:
+    pad = _schrijf(_run("hgt_schoon.ttl"), tmp_path)
+
+    rijen = _rijen(pad, "select richting_bob, bob_verval_m from strengen")
+
+    assert rijen
+    assert {rij[0] for rij in rijen} <= {"mee", "tegen", "onbekend"}
+    for richting, verval in rijen:
+        if richting == "mee":
+            assert verval > 0
+        elif richting == "tegen":
+            assert verval < 0
+        else:
+            assert verval is None or verval == 0
+
+
+def test_omgekeerd_getekende_streng_meet_het_verval_langs_de_lijn(tmp_path: Path) -> None:
+    """De pijl volgt de getekende lijn; het verval hoort daar dus bij te horen."""
+    pad = _schrijf(_run("richting_omgekeerd_met_bob.ttl"), tmp_path)
+
+    ((richting, verval),) = _rijen(pad, "select richting_bob, bob_verval_m from strengen")
+
+    # Administratief daalt de bodem 0,50 m van A naar B, maar de lijn is van B naar A
+    # getekend; langs de lijn stijgt de bodem dus.
+    assert richting == "tegen"
+    assert verval == pytest.approx(-0.50)

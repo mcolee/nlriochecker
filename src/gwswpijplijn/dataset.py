@@ -224,6 +224,17 @@ class Conduit(_MetAspecten):
         return self.bob_end_aspect.number if self.bob_end_aspect is not None else None
 
     @property
+    def bob_verval(self) -> float | None:
+        """Het verval van de bodem over de streng, in meters.
+
+        Positief als de bodem van het administratieve beginpunt naar het eindpunt
+        daalt. Ontbreekt een van beide BOB's, dan valt er niets te zeggen.
+        """
+        if self.bob_start is None or self.bob_end is None:
+            return None
+        return self.bob_start - self.bob_end
+
+    @property
     def breedte_mm(self) -> float | None:
         """De breedte (bij een rond profiel: de diameter) in millimeters."""
         return self.number("BreedteLeiding")
@@ -331,6 +342,37 @@ class GwswDataset:
             node = self.nodes.get(huidig)
             huidig = node.parent if node is not None else None
         return None
+
+    def richting_van_geometrie(
+        self, conduit: Conduit, roots: list[str]
+    ) -> tuple[bool, Node, Node] | None:
+        """Vergelijkt de tekenrichting van de lijn met de van-naar-richting.
+
+        Geeft (omgekeerd, beginput, eindput) terug, waarbij `omgekeerd` zegt of de
+        lijn bij de administratieve eindput begint. None als er niets te vergelijken
+        valt: geen geometrie, geen echte lijngeometrie, geen twee verschillende
+        putten, of putten zonder punt. TOP-020 en de kaartlaag met richtingspijlen
+        lezen allebei deze methode, zodat het kaartbeeld en de bevinding niet uit
+        elkaar kunnen lopen.
+        """
+        if conduit.line is None or conduit.line.is_empty:
+            return None
+        if not isinstance(conduit.line, LineString):
+            # Een GML-literaal in de leidinggeometrie hoeft geen lijn te zijn (zie
+            # TOP-016 en `checks.meetkunde.coords_of`); zonder lijn is er geen
+            # tekenrichting om te vergelijken.
+            return None
+        begin = self.nodes.get(self.resolve_network_node(conduit.start_node, roots) or "")
+        eind = self.nodes.get(self.resolve_network_node(conduit.end_node, roots) or "")
+        if begin is None or eind is None or begin.point is None or eind.point is None:
+            return None
+        if begin.uri == eind.uri:
+            return None
+        punten = list(conduit.line.coords)
+        eerste, laatste = Point(punten[0][:2]), Point(punten[-1][:2])
+        juist = eerste.distance(begin.point) + laatste.distance(eind.point)
+        omgekeerd = eerste.distance(eind.point) + laatste.distance(begin.point)
+        return omgekeerd < juist, begin, eind
 
     def closure(self, root: str) -> frozenset[str]:
         """De klasse zelf plus al haar subklassen, als volledige URI's."""

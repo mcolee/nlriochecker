@@ -28,6 +28,7 @@ from shapely.geometry.base import BaseGeometry
 
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckRun, Severity
+from gwswpijplijn.dataset import Conduit
 from gwswpijplijn.errors import PipelineError
 from gwswpijplijn.uitvoer.identiteit import kort
 from gwswpijplijn.uitvoer.melding import Melding, categorie_van
@@ -41,6 +42,10 @@ APPLICATION_ID = 0x47504B47
 USER_VERSION = 10300
 
 CATEGORIEEN = ("TOP", "ADM", "ATTR", "HGT", "NET", "RVZ", "BTR", "EXT", "NULMETING")
+
+RICHTING_MEE = "mee"
+RICHTING_TEGEN = "tegen"
+RICHTING_ONBEKEND = "onbekend"
 
 FEATURELAGEN = ("putten", "strengen", "meldinglocaties", "mechanisch_riool")
 
@@ -239,6 +244,22 @@ def _blob(geometrie: BaseGeometry) -> bytes:
 # --------------------------------------------------------------------------- #
 
 
+def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple[str, float | None]:
+    """De BOB-richting ten opzichte van de getekende lijn, en het verval erlangs.
+
+    Het BOB-verval is administratief: van beginpunt naar eindpunt. De pijl op de
+    kaart volgt de getekende lijn. Loopt de lijn andersom dan de administratie, dan
+    keert het teken om -- anders zou de kaart het tegenovergestelde tonen van wat er
+    staat.
+    """
+    verval = conduit.bob_verval
+    if verval is None or verval == 0.0:
+        return RICHTING_ONBEKEND, verval
+    uitslag = run.dataset.richting_van_geometrie(conduit, config.klassen.netwerkknopen)
+    langs_lijn = -verval if (uitslag is not None and uitslag[0]) else verval
+    return (RICHTING_MEE if langs_lijn > 0 else RICHTING_TEGEN), langs_lijn
+
+
 def _samenvatting_kolommen() -> list[_Kolom]:
     """De kolommen van `putten` en `strengen`."""
     return [
@@ -246,6 +267,8 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("label", "text"),
         _Kolom("objecttype", "text"),
         _Kolom("stelsel", "text"),
+        _Kolom("richting_bob", "text"),
+        _Kolom("bob_verval_m", "real"),
         _Kolom("gebied", "text"),
         _Kolom("ergste_ernst", "text"),
         _Kolom("n_fout", "integer"),
@@ -320,6 +343,9 @@ def _schrijf_features(
             if geometrie is None or geometrie.is_empty:
                 continue
             grenzen.append(geometrie.bounds)
+            richting, verval = (
+                _richting_bob(run, object_, config) if laag == "strengen" else ("", None)
+            )
             rijen.append(
                 (
                     _blob(geometrie),
@@ -330,6 +356,8 @@ def _schrijf_features(
                         per_object.get(uri, []),
                         metadata,
                         stelsels.get(uri, ""),
+                        richting,
+                        verval,
                     ),
                 )
             )
@@ -429,6 +457,8 @@ def _samenvatting(
     eigen: list[Melding],
     metadata: tuple[str, str, str],
     stelsel: str = "",
+    richting_bob: str = "",
+    bob_verval_m: float | None = None,
 ) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen."""
     niet_systemisch = [melding for melding in eigen if not melding.systemisch]
@@ -446,6 +476,8 @@ def _samenvatting(
         getattr(object_, "label", ""),
         run.dataset.beheerobjecttype(uri),
         stelsel,
+        richting_bob,
+        bob_verval_m,
         _gebied(run),
         ernst,
         len(fouten),
