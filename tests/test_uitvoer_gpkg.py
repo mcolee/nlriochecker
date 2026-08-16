@@ -306,34 +306,70 @@ def test_meldingen_dragen_fragment_en_uri(tmp_path: Path) -> None:
 
 
 def test_meldingen_op_dezelfde_plek_worden_genummerd(tmp_path: Path) -> None:
-    """Twee meldingen op hetzelfde punt moeten in de kaart uit elkaar te halen zijn."""
+    """Twee meldingen op hetzelfde punt moeten in de kaart uit elkaar te halen zijn.
+
+    Groepeer op de echte locatie (niet op `stapel_aantal` alleen): anders bewijst de
+    assertie niets meer zodra er twee stapels van gelijke grootte zijn -- hun
+    volgnummers zouden dan door elkaar heen gesorteerd worden en toevallig weer op
+    `1..aantal` kunnen uitkomen, of juist een correcte nummering laten falen.
+    """
+    from collections import defaultdict
+
+    from gwswpijplijn.studiegebied import _ontleed_gpkg
+    from gwswpijplijn.uitvoer.gpkg import STAPEL_RASTER_M
+
     run = _run("top005_dubbele_put.ttl")
     pad = _schrijf(run, tmp_path)
 
-    rijen = _rijen(
-        pad,
-        "select stapel_aantal, stapel_nr from meldinglocaties "
-        "order by stapel_aantal desc, stapel_nr",
-    )
-
+    rijen = _rijen(pad, "select geom, stapel_aantal, stapel_nr from meldinglocaties")
     assert rijen
-    aantallen = {aantal for aantal, _ in rijen}
-    for aantal in aantallen:
-        nummers = sorted(nr for a, nr in rijen if a == aantal)
-        assert nummers[:aantal] == list(range(1, aantal + 1)) or aantal == 1
+
+    per_plek: dict[tuple[int, int], list[tuple[int, int]]] = defaultdict(list)
+    for geom, aantal, nummer in rijen:
+        punt = _ontleed_gpkg(geom)
+        sleutel = (round(punt.x / STAPEL_RASTER_M), round(punt.y / STAPEL_RASTER_M))
+        per_plek[sleutel].append((aantal, nummer))
+
+    # De fixture moet zelf minstens een echte stapel bevatten, anders toetst deze
+    # test niets.
+    assert any(len(groep) > 1 for groep in per_plek.values())
+
+    for groep in per_plek.values():
+        aantallen = {aantal for aantal, _ in groep}
+        assert aantallen == {len(groep)}
+        nummers = sorted(nummer for _, nummer in groep)
+        assert nummers == list(range(1, len(groep) + 1))
 
 
-def test_stapelnummering_is_stabiel_tussen_runs(tmp_path: Path) -> None:
+def test_stapelnummering_is_onafhankelijk_van_lijstvolgorde(tmp_path: Path) -> None:
+    """De nummering moet stabiel zijn, ook als de meldingenlijst anders geordend is.
+
+    Beide runs dezelfde meldingenlijst in dezelfde volgorde meegeven bewijst deze
+    stabiliteit niet: een implementatie die simpelweg op lijstvolgorde nummert zou
+    die test even goed doorstaan. Pas de tweede run een omgekeerde lijst toe, zodat
+    alleen sortering op melding-ID -- en niet lijstvolgorde -- tot dezelfde uitkomst
+    kan leiden.
+    """
     run = _run("top005_dubbele_put.ttl")
-    eerste = _rijen(
-        _schrijf(run, tmp_path / "a"),
-        "select melding_id, stapel_nr from meldinglocaties order by melding_id",
-    )
-    tweede = _rijen(
-        _schrijf(run, tmp_path / "b"),
-        "select melding_id, stapel_nr from meldinglocaties order by melding_id",
-    )
+    meldingen = bouw_meldingen(run, RUNDATUM)
 
+    eerste_pad = schrijf_geopackage(run, meldingen, tmp_path / "a", RUNDATUM)
+    tweede_pad = schrijf_geopackage(run, list(reversed(meldingen)), tmp_path / "b", RUNDATUM)
+
+    eerste = {
+        melding_id: (aantal, nummer)
+        for melding_id, aantal, nummer in _rijen(
+            eerste_pad, "select melding_id, stapel_aantal, stapel_nr from meldinglocaties"
+        )
+    }
+    tweede = {
+        melding_id: (aantal, nummer)
+        for melding_id, aantal, nummer in _rijen(
+            tweede_pad, "select melding_id, stapel_aantal, stapel_nr from meldinglocaties"
+        )
+    }
+
+    assert eerste
     assert eerste == tweede
 
 
