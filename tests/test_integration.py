@@ -237,7 +237,21 @@ def test_checks_op_de_wolden_met_typeringspoort(pair: ReportPair, tmp_path: Path
 
     # De typeringspoort van MdsPlan noemt 1228 objecten te globaal getypeerd.
     assert len(onbetrouwbaar) == 1228
-    assert dataset.conduits, "de dataset bevat geen strengen"
-    # Elke bevinding op zo'n object hoort de vlag te dragen.
-    for finding in run.findings:
-        assert finding.typing_reliable == (finding.object_label not in onbetrouwbaar)
+    # Daarvan komen er 1174 in de OroX-export voor. De 54 die ontbreken zijn vooral
+    # rioolstelsels; detailrapport en export zijn losse bestanden en hoeven niet uit
+    # dezelfde momentopname te komen. Dat verschil hoort in het resultaat te staan.
+    assert run.unreliable_labels == 1228
+    assert run.unreliable_labels_in_dataset == 1174
+
+    assert len(dataset.conduits) == 23440
+    assert len(dataset.nodes) == 23485
+    assert dataset.geometry_errors == {}
+
+    # De export is niet UTF-8: vijf CP850-bytes in straatnamen.
+    assert dataset.decode_fallback is not None
+    assert dataset.decode_fallback.byte_count == 5
+
+    # De vlag landt daadwerkelijk op bevindingen, niet alleen in theorie.
+    gevlagd = [finding for finding in run.findings if not finding.typing_reliable]
+    assert gevlagd, "geen enkele bevinding kreeg het typeringsvoorbehoud"
+    assert all(finding.object_label in onbetrouwbaar for finding in gevlagd)
