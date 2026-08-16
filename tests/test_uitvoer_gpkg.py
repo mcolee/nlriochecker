@@ -180,13 +180,35 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
         ET.fromstring(qml)
 
 
-def test_stijlen_liggen_ook_los_naast_het_bestand(tmp_path: Path) -> None:
-    """Niet elk GIS-pakket leest layer_styles, maar QML importeren kan meestal wel."""
+def test_stijltabel_is_als_laag_geregistreerd(tmp_path: Path) -> None:
+    """Zonder rij in gpkg_contents vindt de OGR-provider layer_styles niet."""
+    pad = _schrijf(_run("schoon.ttl"), tmp_path)
+
+    rijen = _rijen(
+        pad,
+        "select data_type, srs_id from gpkg_contents where table_name = 'layer_styles'",
+    )
+
+    assert rijen == [("attributes", None)]
+
+
+def test_stijlen_dragen_een_tijdstempel_in_iso8601(tmp_path: Path) -> None:
+    """GDAL meldt elk ander formaat als non-conformant bij het lezen."""
+    import re
+
+    pad = _schrijf(_run("schoon.ttl"), tmp_path)
+
+    tijden = [tijd for (tijd,) in _rijen(pad, "select update_time from layer_styles")]
+
+    assert tijden
+    assert all(re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z", tijd) for tijd in tijden)
+
+
+def test_er_liggen_geen_losse_qml_bestanden_meer(tmp_path: Path) -> None:
+    """Een sidecar-QML werkt niet bij meerdere lagen; hem toch neerleggen misleidt."""
     _schrijf(_run("schoon.ttl"), tmp_path)
 
-    assert (tmp_path / "putten.qml").exists()
-    assert (tmp_path / "strengen.qml").exists()
-    assert (tmp_path / "meldinglocaties.qml").exists()
+    assert list(tmp_path.glob("*.qml")) == []
 
 
 def test_zonder_studiegebied_gaat_de_hele_dataset_mee(tmp_path: Path) -> None:

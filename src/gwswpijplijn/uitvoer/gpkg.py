@@ -8,6 +8,10 @@ Het bestand is bewust zelfvoorzienend: de featurelagen bevatten genoeg samenvatt
 om zonder join bruikbaar te zijn, `meldinglocaties` is bewust redundant met
 `meldingen`, en er zijn geen GPKG-relaties of andere uitbreidingen die niet elk
 GIS-pakket leest.
+
+QGIS-stijlen worden in de tabel `layer_styles` opgeslagen en via `gpkg_contents`
+geregistreerd. Zonder die registratie vindt de OGR-provider de tabel niet en
+past QGIS de default-symbologie toe.
 """
 
 from __future__ import annotations
@@ -82,7 +86,7 @@ def schrijf_geopackage(
         _schrijf_meldingen(verbinding, meldingen)
         _schrijf_overzicht(verbinding, run, meldingen)
         _schrijf_runmetadata(verbinding, run, meldingen, run_datum)
-        _schrijf_stijlen(verbinding, output_dir)
+        _schrijf_stijlen(verbinding)
         verbinding.commit()
     finally:
         verbinding.close()
@@ -558,27 +562,37 @@ def _schrijf_runmetadata(
     )
 
 
-def _schrijf_stijlen(verbinding: sqlite3.Connection, output_dir: Path) -> None:
-    """Zet de QML-stijlen in `layer_styles` en legt ze los naast het bestand neer.
+def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
+    """Zet de QML-stijlen in `layer_styles` en registreert die tabel.
 
-    `layer_styles` is een QGIS-conventie en staat bewust niet in gpkg_contents; dat
-    doet QGIS zelf ook niet. Andere pakketten negeren de tabel en kunnen de losse
-    QML-bestanden importeren.
+    Zonder rij in `gpkg_contents` vindt de OGR-provider van QGIS de tabel niet en
+    krijgt elke laag de standaard-symbologie; dat is met PyQGIS vastgesteld op deze
+    uitvoer. `update_time` moet ISO-8601 met T en Z zijn, anders meldt GDAL bij elke
+    rij "non-conformant content".
+
+    Een QML los naast het bestand is geen alternatief: die werkt alleen bij een
+    GeoPackage met een enkele laag en heet dan naar het bestand, niet naar de laag.
     """
     verbinding.execute(
         "create table layer_styles ("
         "id integer primary key autoincrement, f_table_catalog text, f_table_schema text, "
         "f_table_name text, f_geometry_column text, styleName text, styleQML text, "
         "styleSLD text, useAsDefault boolean, description text, owner text, ui text, "
-        "update_time datetime default (datetime('now')))"
+        "update_time datetime default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))"
+    )
+    _registreer(
+        verbinding,
+        "layer_styles",
+        "attributes",
+        "QGIS-stijlen van dit bestand; QGIS past de standaardstijl per laag zelf toe.",
     )
     for laag in FEATURELAGEN:
         qml = _stijl(laag)
-        (Path(output_dir) / f"{laag}.qml").write_text(qml, encoding="utf-8")
         verbinding.execute(
             "insert into layer_styles (f_table_catalog, f_table_schema, f_table_name, "
             "f_geometry_column, styleName, styleQML, styleSLD, useAsDefault, description, "
-            "owner, ui) values ('', '', ?, 'geom', ?, ?, '', 1, ?, 'gwswpijplijn', '')",
+            "owner, ui, update_time) values ('', '', ?, 'geom', ?, ?, '', 1, ?, "
+            "'gwswpijplijn', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
             (laag, f"{laag} (datakwaliteit)", qml, f"Standaardstijl voor {laag}."),
         )
 
