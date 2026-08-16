@@ -126,6 +126,9 @@ class CheckRun:
     study_area: StudyArea | None = None
     bronnen: ExternalData | None = None
     karakteristiek: DataCharacteristics | None = None
+    # De uitvoerlaag heeft de klassenlijsten en de rapportdrempels nodig; die
+    # meegeven is minder broos dan ze langs elke schrijver door te reiken.
+    config: CheckConfig | None = None
 
     @property
     def findings(self) -> list[Finding]:
@@ -182,6 +185,7 @@ class CheckRun:
             study_area=area,
             bronnen=self.bronnen,
             karakteristiek=self.karakteristiek,
+            config=self.config,
         )
 
 
@@ -192,6 +196,11 @@ class Check(ABC):
     title: ClassVar[str]
     severity: ClassVar[Severity]
     dimension: ClassVar[Dimension]
+    # De detailsleutels die twee bevindingen van deze check op hetzelfde object van
+    # elkaar onderscheiden. 'zijde' is de gangbare: verschillende HGT-checks melden
+    # per strengeinde. Heeft een check een eigen onderscheid, dan declareert ze dat
+    # hier; de meldingenlaag waarschuwt als er toch twee dezelfde ID krijgen.
+    id_sleutels: ClassVar[tuple[str, ...]] = ("zijde",)
 
     @abstractmethod
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -307,4 +316,5 @@ def run_checks(
         unreliable_labels_in_dataset=len(context.matched_objects()),
         bronnen=context.bronnen,
         karakteristiek=bepaal_karakteristiek(context.dataset, context.config),
+        config=context.config,
     )
