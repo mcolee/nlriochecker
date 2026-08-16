@@ -1,6 +1,6 @@
 """Inlezen van het checkregister als machineleesbare lijst van check-ID's.
 
-Het register in `data/checkregister-gwsw-nulmeting-v0_7.md` is de bron van waarheid
+Het register in `data/checkregister-gwsw-nulmeting-v0_8.md` is de bron van waarheid
 voor ID, omschrijving, ernst en dimensietag. Door het te parsen in plaats van over
 te tikken kan de dekkingsmatrix niet stilletjes uit de pas gaan lopen met het
 register.
@@ -147,4 +147,4 @@ def _version(tekst: str) -> str:
 
 def default_register_path() -> Path:
     """Pad naar het checkregister in de datamap van de repository."""
-    return Path(__file__).resolve().parents[2] / "data" / "checkregister-gwsw-nulmeting-v0_7.md"
+    return Path(__file__).resolve().parents[2] / "data" / "checkregister-gwsw-nulmeting-v0_8.md"

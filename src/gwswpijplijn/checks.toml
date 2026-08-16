@@ -164,4 +164,4 @@ max_bevindingen_per_check = 0
 # zegt dan meer over de export als geheel dan over de losse objecten.
 systemisch_drempel = 0.80
 # Versie van het checkregister waaraan deze run getoetst is.
-register_versie = "v0.7"
+register_versie = "v0.8"

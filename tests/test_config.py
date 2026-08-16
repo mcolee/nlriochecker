@@ -31,7 +31,7 @@ def test_standaardmapping_bevat_de_geschrapte_checks() -> None:
     config = load_coverage_config()
 
     assert default_config_path().exists()
-    assert config.checkregister_versie == "0.7"
+    assert config.checkregister_versie == "0.8"
     assert {mapping.id for mapping in config.check} == REGISTER_IDS
 
 

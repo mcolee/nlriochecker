@@ -1,6 +1,6 @@
 # Dekkingsmatrix checkregister
 
-Gegenereerd uit `data/checkregister-gwsw-nulmeting-v0_7.md` (versie 0.7) met `scripts/dekkingsmatrix.py`. Niet met de hand bijwerken.
+Gegenereerd uit `data/checkregister-gwsw-nulmeting-v0_8.md` (versie 0.8) met `scripts/dekkingsmatrix.py`. Niet met de hand bijwerken.
 
 Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, *ontbreekt*, of *geschrapt (gedekt door nulmeting)*. Een check die als skelet geregistreerd staat telt als geimplementeerd, maar levert per definitie geen uitslag; de markering en de reden staan in de kolom Toelichting.
 

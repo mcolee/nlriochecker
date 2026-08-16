@@ -9,7 +9,7 @@ import pytest
 
 from gwswpijplijn.checks import REGISTRY, Dimension, Severity
 
-REGISTER = Path(__file__).resolve().parents[1] / "data" / "checkregister-gwsw-nulmeting-v0_7.md"
+REGISTER = Path(__file__).resolve().parents[1] / "data" / "checkregister-gwsw-nulmeting-v0_8.md"
 RIJ_PATROON = re.compile(
     r"^\|\s*(?P<id>[A-Z]{3,4}-\d{3})\s*\|(?P<check>[^|]*)\|\s*(?P<ernst>[FW])\s*\|"
     r"\s*(?P<dimensie>[A-Za-z]+)\s*\|"
