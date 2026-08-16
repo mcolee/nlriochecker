@@ -18,7 +18,7 @@ status *buiten studiegebied* en geen check-uitslag.
 | --- | --- | --- | --- | --- |
 | `cbs_buurt_koekangerveld_studiegebied.gpkg` | GeoPackage | EPSG:28992 | `buurt_gegeneraliseerd` (1) | begrenzing van alle EXT- en AHN-checks |
 | `BGT.gpkg` | GeoPackage | EPSG:28992 | 49 lagen, 12 gevuld (zie hieronder) | EXT-001, EXT-002, EXT-003, EXT-005, EXT-006, EXT-007 |
-| `bag_pand_koekangerveld.gpkg` | GeoPackage | EPSG:28992 | `output` (166) | EXT-001 (aanvulling), EXT-008 |
+| `bag_pand_koekangerveld.gpkg` | GeoPackage | EPSG:28992 | `output` (166) | EXT-001 (aanvulling) |
 | `nwb_wegvakken_koekangerveld.gpkg` | GeoPackage | EPSG:28992 | `output` (13) | geen registercheck; zie `docs/nwb-voorstel.md` |
 | `ahn5_dtm_koekangerveld.tif` | GeoTIFF | EPSG:28992 | 1617 x 1833 cellen van 0,5 m | HGT-001, HGT-002, HGT-003 |
 
@@ -78,12 +78,13 @@ Bruikbare attributen: `type` en `plus_type` (bij `waterdeel` bijvoorbeeld
 Attributen: `identificatie` (BAG-pand-ID), `bouwjaar`, `status`,
 `aantal_verblijfsobjecten`, `gebruiksdoel`, `geconstateerd`.
 
-**Er zijn panden aangeleverd en geen verblijfsobjecten.** EXT-008 vraagt in het
-register om verblijfsobjecten. De check gebruikt de pandgeometrie als benadering;
-een pand met meerdere verblijfsobjecten telt daardoor als één. Het veld
-`aantal_verblijfsobjecten` staat wel in elke melding, zodat het verschil zichtbaar
-blijft. Deze benadering staat ook in de toelichting van de check zelf, zodat hij
-niet uit het rapport kan wegvallen.
+**Er zijn panden aangeleverd en geen verblijfsobjecten.** De laag voedt EXT-001
+als aanvulling op de BGT-panden: beide dekken het gebied grotendeels maar niet
+volledig, en de check gebruikt de vereniging van de twee lagen. Het veld
+`aantal_verblijfsobjecten` staat in de export maar wordt niet gebruikt: EXT-008
+(BAG-verblijfsobject zonder riolering binnen X m) is sinds checkregister v0.8
+vervallen — de dekkingsvraag hoort bij het rioleringsplan, niet bij deze toets.
+Zie `data/checkregister-gwsw-nulmeting-v0_8.md`.
 
 ## NWB-wegvakken
 
@@ -119,7 +120,6 @@ studiegebied op een nodata-cel vielen.
 | BRK-percelen | EXT-004 is skelet met de markering *bron buiten scope in deze fase*. |
 | Waterschapsdata (watergangen, overstortnormen) | EXT-002 draait alleen op BGT-waterdelen; het register staat die bron expliciet toe. |
 | BGT-putdeksels (`put`-laag leeg) | EXT-005 en EXT-006 worden overgeslagen met de melding *laag niet aanwezig in aangeleverde data*. |
-| BAG-verblijfsobjecten | EXT-008 gebruikt de pandgeometrie als benadering, expliciet gemarkeerd in de melding. |
 | Beheergebiedpolygoon | TOP-009 toetst wel het RD-bereik maar niet het beheergebied; het studiegebied is daar geen vervanging voor. |
 | Grondsoortenkaart | BTR-003 blijft skelet; de drempel per grondsoort is niet te differentiëren. |
 
@@ -130,5 +130,4 @@ Welke laag welke rol vervult staat in `src/gwswpijplijn/checks.toml` onder
 laag laat de bijbehorende checks overslaan met de melding *laag niet aanwezig in
 aangeleverde data*. Alle bufferafstanden staan onder `[drempels]`
 (`ext_pand_buffer_m`, `ext_watergang_buffer_m`, `ext_putdeksel_afstand_m`,
-`ext_lozingspunt_water_afstand_m`, `ext_riolering_bij_pand_m`,
-`ext_perceel_buffer_m`).
+`ext_lozingspunt_water_afstand_m`, `ext_perceel_buffer_m`).

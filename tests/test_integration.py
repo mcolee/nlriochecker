@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from gwswpijplijn.afbakening import bouw_analyseset
 from gwswpijplijn.analysis import analyze
 from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import REGISTRY, CheckContext, run_checks
@@ -251,3 +252,31 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")
     assert "Buiten studiegebied" in tekst
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DE_WOLDEN.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden-OroX of het studiegebied staat niet in data/",
+)
+def test_afbakening_op_koekangerveld_verandert_de_bevindingen_niet() -> None:
+    """De contextschil mag de uitkomst op de kern niet veranderen, alleen sneller maken."""
+    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    config = load_check_config()
+    area = load_study_area(STUDIEGEBIED)
+    ids = ["NET-001", "NET-002", "NET-004", "TOP-001", "TOP-005"]
+
+    volledig = run_checks(CheckContext(dataset=dataset, config=config), ids)
+    volledig = volledig.beperk_tot_studiegebied(area)
+
+    analyseset = bouw_analyseset(dataset, area, config)
+    afgebakend = run_checks(
+        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset), ids
+    )
+    afgebakend = afgebakend.beperk_tot_studiegebied(area)
+
+    def sleutel(run):
+        return sorted((finding.check_id, finding.object_uri) for finding in run.findings)
+
+    assert sleutel(afgebakend) == sleutel(volledig)
+    assert len(analyseset.alles) < len(dataset.nodes) + len(dataset.conduits)

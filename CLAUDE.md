@@ -33,7 +33,11 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 
 ### Studiegebied (data/gis/)
 - GeoPackage of GeoJSON, gelezen met stdlib sqlite3 plus shapely; geen extra afhankelijkheid. Moet in EPSG:28992 staan, net als de GWSW-coordinaten; herprojecteren doen we niet.
-- Analyseer breed, rapporteer smal: de checks draaien op de volledige dataset en pas het rapport wordt afgebakend. Anders lijkt een streng die het gebied uit loopt doodlopend en geven NET-001 en NET-002 valse bevindingen. Meld altijd hoeveel bevindingen buiten het gebied vielen.
+- Analyseer de kern plus een contextschil, rapporteer de kern. De schil is de
+  samenhangende vrijvervalcomponent waar de kern in ligt plus een buffer om het gebied;
+  precies zo groot dat NET-001 en NET-002 geen valse bevindingen geven. Zonder
+  studiegebied draait alles op de volledige dataset. Meld altijd hoeveel bevindingen
+  buiten het gebied vielen en hoe groot kern, schil en export zijn.
 
 ## Technische afspraken
 - Maak expliciet gebruik van de superpowers en dev-skills skills
@@ -49,6 +53,12 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
   sluit die regel ook `src/gwswpijplijn/uitvoer/` uit en verdwijnt de package stilzwijgend
   uit de repository (en uit het zicht van ruff).
 - Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
+- De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
+  `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
+  los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
+- De geparseerde dataset wordt gecachet (`~/.cache/gwswpijplijn`, `--geen-cache` om hem
+  over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
+  `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
 
 ## Werkwijze
 - Kleine stappen, na elke werkende stap een git-commit met een duidelijke boodschap.
@@ -58,7 +68,7 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - Wat een check NIET heeft bekeken hoort in het rapport: objecten buiten de graaf, weggelaten bevindingen, ontbrekende typeringspoort. Stilte leest als "alles gecontroleerd".
 
 ## Open punten
-- 1773 doodlopende eindknopen in De Wolden: het vrijverval watert af op 2148 knopen waarvan er maar 375 als uitstroompunt gelden. Bepaalt of NET-001 zinvolle uitkomsten geeft.
+- 1773 doodlopende eindknopen in De Wolden: het vrijverval watert af op 2148 knopen waarvan er maar 375 als uitstroompunt gelden. Bepaalt of NET-001 zinvolle uitkomsten geeft. Bij een afgebakende run raakt dit alleen de kern; de contextschil voorkomt dat de grens van het studiegebied zelf als doodlopend eindpunt meetelt.
 - Bij de SHACL-meting komt de put-strengkoppeling in alle drie de CFK's voor, terwijl het register stelt dat die alleen uit Hyd komt (ADM-001).
 - Er is geen SHACL-vorm voor Drempelniveau of Drempelbreedte; RVZ-002 en RVZ-003 gelden daardoor als niet geraakt terwijl ze juist geschrapt zijn omdat de nulmeting ze zou dekken.
 - Negentien TOP- en NET-checks uit het register zijn nog niet gebouwd.

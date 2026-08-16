@@ -51,4 +51,5 @@ addopts = "-m 'not zwaar'"
 markers = [
     "integratie: draait op de volledige De Wolden-bestanden in data/",
     "zwaar: laadt de volledige OroX-dataset (ruim 3 minuten en circa 3 GB geheugen)",
+    "qgis: vereist PyQGIS; overgeslagen waar qgis.core niet importeerbaar is",
 ]
