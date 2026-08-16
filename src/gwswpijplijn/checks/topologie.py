@@ -26,6 +26,7 @@ class _Topologie:
     nodes: list[Node]
     tree: STRtree | None
     conduits: list[Conduit]
+    all_conduits: list[Conduit]
 
     def nearest_node(self, punt: Point, tolerantie: float) -> Node | None:
         """De put binnen de tolerantie die het dichtst bij dit punt ligt."""
@@ -62,15 +63,24 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
     uniek = list({node.uri: node for node in nodes}.values())
     tree = STRtree([node.point for node in uniek]) if uniek else None
 
-    conduits = [
-        dataset.conduits[uri]
-        for wortel in context.config.klassen.vrijvervalleiding
+    return _Topologie(
+        nodes=uniek,
+        tree=tree,
+        conduits=_conduits(context, context.config.klassen.vrijvervalleiding),
+        all_conduits=_conduits(context, context.config.klassen.streng),
+    )
+
+
+def _conduits(context: CheckContext, wortels: list[str]) -> list[Conduit]:
+    """De unieke strengen van deze klassen."""
+    dataset = context.dataset
+    gevonden = {
+        uri: dataset.conduits[uri]
+        for wortel in wortels
         for uri in dataset.of_class(wortel)
         if uri in dataset.conduits
-    ]
-    uniek_conduits = list({conduit.uri: conduit for conduit in conduits}.values())
-
-    return _Topologie(nodes=uniek, tree=tree, conduits=uniek_conduits)
+    }
+    return list(gevonden.values())
 
 
 def _endpoints(conduit: Conduit) -> tuple[Point, Point] | None:
@@ -96,13 +106,16 @@ class LosliggendePut(Check):
         """Zoekt putten zonder strengeindpunt binnen de snapping-tolerantie.
 
         Dit is de geometrische variant; de administratieve koppeling dekt de
-        nulmeting al via Hyd.
+        nulmeting al via Hyd. Elke leiding telt mee, ook een persleiding of drain:
+        het register vraagt of er *enige* streng aansluit. Zou hier alleen op
+        vrijvervalleidingen gekeken worden, dan zou elke put van de drukriolering
+        als losliggend gelden.
         """
         topologie = _topologie(context)
         tolerantie = context.config.drempels.snapping_tolerantie_m
 
         aangesloten: set[str] = set()
-        for conduit in topologie.conduits:
+        for conduit in topologie.all_conduits:
             uiteinden = _endpoints(conduit)
             if uiteinden is None:
                 continue

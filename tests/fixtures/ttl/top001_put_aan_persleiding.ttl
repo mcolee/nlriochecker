@@ -16,7 +16,8 @@ gwsw:Hemelwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 
 
-# DEFECT: infiltratiestreng '8' ligt in een deelstelsel zonder enige overstortdrempel
+# DEFECT: alleen put 'LOS' ligt echt los. Put 'P' hangt uitsluitend aan een
+#         persleiding en is dus niet losliggend, ook al is dat geen vrijvervalstreng.
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .
@@ -30,11 +31,17 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 
-:Gemaal1 rdf:type gwsw:Rioolgemaal ; rdfs:label "G" ;
-    gwsw:hasAspect :Gemaal1_ori .
-:Gemaal1_ori rdf:type gwsw:Putorientatie ;
+:PutP rdf:type gwsw:Inspectieput ; rdfs:label "P" ;
+    gwsw:hasAspect :PutP_ori .
+:PutP_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1100.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutLos rdf:type gwsw:Inspectieput ; rdfs:label "LOS" ;
+    gwsw:hasAspect :PutLos_ori .
+:PutLos_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1500.0 2500.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 
 :L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
     gwsw:hasAspect :L1_ori .
@@ -42,41 +49,14 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
     gwsw:hasPart :L1_b , :L1_e ;
     gwsw:hasAspect [ rdf:type gwsw:Lijn ;
         gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
-:L1_b rdf:type gwsw:BeginpuntLeiding .
-:L1_e rdf:type gwsw:EindpuntLeiding .
-:L1_b gwsw:hasConnection :PutA_ori .
-:L1_e gwsw:hasConnection :PutB_ori .
+:L1_b rdf:type gwsw:BeginpuntLeiding ; gwsw:hasConnection :PutA_ori .
+:L1_e rdf:type gwsw:EindpuntLeiding ; gwsw:hasConnection :PutB_ori .
 
-:L2 rdf:type gwsw:GemengdRiool ; rdfs:label "2" ;
+:L2 rdf:type gwsw:Persleiding ; rdfs:label "2" ;
     gwsw:hasAspect :L2_ori .
 :L2_ori rdf:type gwsw:Leidingorientatie ;
     gwsw:hasPart :L2_b , :L2_e ;
     gwsw:hasAspect [ rdf:type gwsw:Lijn ;
         gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1050.0 2000.0 1100.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
-:L2_b rdf:type gwsw:BeginpuntLeiding .
-:L2_e rdf:type gwsw:EindpuntLeiding .
-:L2_b gwsw:hasConnection :PutB_ori .
-:L2_e gwsw:hasConnection :Gemaal1_ori .
-
-:PutC rdf:type gwsw:Inspectieput ; rdfs:label "C" ;
-    gwsw:hasAspect :PutC_ori .
-:PutC_ori rdf:type gwsw:Putorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Punt ;
-        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>2000.0 3000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
-
-:PutD rdf:type gwsw:Inspectieput ; rdfs:label "D" ;
-    gwsw:hasAspect :PutD_ori .
-:PutD_ori rdf:type gwsw:Putorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Punt ;
-        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>2050.0 3000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
-
-:L8 rdf:type gwsw:Infiltratieriool ; rdfs:label "8" ;
-    gwsw:hasAspect :L8_ori .
-:L8_ori rdf:type gwsw:Leidingorientatie ;
-    gwsw:hasPart :L8_b , :L8_e ;
-    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
-        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">2000.0 3000.0 2050.0 3000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
-:L8_b rdf:type gwsw:BeginpuntLeiding .
-:L8_e rdf:type gwsw:EindpuntLeiding .
-:L8_b gwsw:hasConnection :PutC_ori .
-:L8_e gwsw:hasConnection :PutD_ori .
+:L2_b rdf:type gwsw:BeginpuntLeiding ; gwsw:hasConnection :PutB_ori .
+:L2_e rdf:type gwsw:EindpuntLeiding ; gwsw:hasConnection :PutP_ori .

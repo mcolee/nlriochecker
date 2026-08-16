@@ -102,11 +102,22 @@ def test_juinen_voorbeeld_levert_verklaarbare_bevindingen(juinen: GwswDataset) -
     run = run_checks(context, TOP_IDS)
     per_check = {outcome.check_id: _labels(outcome.findings) for outcome in run.outcomes}
 
-    # Kolk "75" heeft geen vrijvervalstreng op zijn locatie en leiding "13"
-    # eindigt niet op een put; de overige TOP-checks zijn schoon.
-    assert per_check["TOP-001"] == ["75"]
+    # Kolk "75" hangt aan een kolkaansluitleiding en is dus niet losliggend;
+    # leiding "13" eindigt niet op een put. De overige TOP-checks zijn schoon.
+    assert per_check["TOP-001"] == []
     assert per_check["TOP-003"] == ["13"]
     assert per_check["TOP-002"] == []
     assert per_check["TOP-004"] == []
     assert per_check["TOP-005"] == []
     assert per_check["TOP-012"] == []
+
+
+def test_put_aan_alleen_een_persleiding_is_niet_losliggend() -> None:
+    """TOP-001 vraagt of er enige streng aansluit, niet of er vrijverval aansluit.
+
+    Zou alleen op vrijvervalleidingen gekeken worden, dan zou elke put van de
+    drukriolering als losliggend gelden; in De Wolden zijn dat er duizenden.
+    """
+    bevindingen = _bevindingen(TTL_DIR / "top001_put_aan_persleiding.ttl", "TOP-001")
+
+    assert _labels(bevindingen) == ["LOS"]

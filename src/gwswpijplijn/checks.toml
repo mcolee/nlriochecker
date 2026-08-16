@@ -8,9 +8,16 @@
 [klassen]
 put = ["Put"]
 vrijvervalleiding = ["VrijvervalRioolleiding"]
+# Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
+# Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
+streng = ["Leiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. 'Overnamepunt' bestaat
 # niet als klasse in de GWSW-ontologie; dat is open punt 6 uit het checkregister.
-afvoer_eindpunt = ["Gemaal"]
+# Pompunit staat erbij omdat een vrijvervalstreng die op een drukrioleringspomp
+# eindigt daar het mechanische stelsel in gaat; dat is het overnamepunt waar het
+# register over spreekt. Zonder deze regel geldt heel de drukriolering van De
+# Wolden als onbereikbaar.
+afvoer_eindpunt = ["Gemaal", "Pompunit"]
 # Geverifieerd tegen de De Wolden-dataset: die gebruikt Lozingsput en
 # Uitlaatconstructie. Let op dat Lozingsput volgens de ontologie een Rioolput is
 # en Uitlaatconstructie een Bouwwerk; geen van beide valt onder Lozingspunt, dus

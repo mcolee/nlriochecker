@@ -20,6 +20,9 @@ class ClassRoots(BaseModel):
 
     put: list[str] = Field(min_length=1)
     vrijvervalleiding: list[str] = Field(min_length=1)
+    # TOP-001 vraagt of er *enige* streng aansluit, niet of er een vrijvervalstreng
+    # aansluit; een put aan een persleiding is niet losliggend.
+    streng: list[str] = Field(default_factory=lambda: ["Leiding"])
     # NET-001 en NET-002 vragen elk om een ander soort eindpunt; een vuilwaterstreng
     # die alleen een uitlaat bereikt is niet in orde.
     afvoer_eindpunt: list[str] = Field(default_factory=list)
