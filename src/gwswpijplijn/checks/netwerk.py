@@ -16,6 +16,7 @@ from gwswpijplijn.checks.base import (
     register,
 )
 from gwswpijplijn.dataset import HAS_PART, Conduit
+from gwswpijplijn.uitvoer.taal import getal, vorm
 
 
 @dataclass(frozen=True)
@@ -139,17 +140,28 @@ def _eindknoop_notitie(context: CheckContext, netwerk: _Netwerk, rol: str) -> li
         f"{soort} {aantal}"
         for soort, aantal in sorted(tellen.items(), key=lambda paar: -paar[1])[:5]
     )
+    uitstroom = len(sinks) - len(doodlopend)
     return [
-        f"Het vrijverval watert af op {len(sinks)} eindknopen; {len(sinks) - len(doodlopend)} "
-        f"daarvan gelden als uitstroompunt van dit soort. De overige {len(doodlopend)} lopen "
-        f"dood ({top}). Alles wat daarachter ligt telt daardoor als zonder afvoerpad."
+        f"Het vrijverval watert af op {getal(len(sinks), 'eindknoop', 'eindknopen')}; "
+        f"{uitstroom} daarvan {vorm(uitstroom, 'geldt', 'gelden')} als uitstroompunt van dit "
+        f"soort; de overige {len(doodlopend)} {vorm(len(doodlopend), 'loopt', 'lopen')} dood "
+        f"({top}). Alles wat daarachter ligt telt daardoor als zonder afvoerpad."
     ]
 
 
 def _soort(context: CheckContext, uri: str) -> str:
-    """De korte naam van het eerste type van een object."""
-    types = sorted(t.rsplit("/", 1)[-1] for t in context.dataset.types_of(uri))
-    return types[0] if types else "onbekend"
+    """De korte naam van het beheerobjecttype van een knoop.
+
+    `types_of()` voegt de typen van de orientatie bij die van het object, en
+    terecht: Lozingspunt en UitlaatPunt staan volgens het GWSW op de orientatie.
+    Voor een soortnaam is dat aspecttype juist het verkeerde antwoord — een knoop
+    heet Uitlaatconstructie, niet Bouwwerkorientatie. De typen van het object zelf
+    gaan daarom voor; alleen als die ontbreken valt de naam terug op het aspect.
+    """
+    node = context.dataset.nodes.get(uri)
+    types = node.types if node is not None and node.types else context.dataset.types_of(uri)
+    namen = sorted(naam.rsplit("/", 1)[-1] for naam in types)
+    return namen[0] if namen else "onbekend"
 
 
 def _richtingsverlies(context: CheckContext, netwerk: _Netwerk, rol: str | None) -> tuple[int, int]:

@@ -8,6 +8,7 @@ import pytest
 
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckContext, CheckOutcome, run_checks
+from gwswpijplijn.checks.netwerk import _netwerk
 from gwswpijplijn.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -145,7 +146,7 @@ def test_notitie_telt_doodlopende_eindknopen() -> None:
     outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
 
     notitie = next(n for n in outcome.notes if "watert af op" in n)
-    assert "lopen dood" in notitie
+    assert "loopt dood" in notitie
     assert "Inspectieput" in notitie
 
 
@@ -180,3 +181,41 @@ def _labels_op(pad: Path, check_id: str, config: CheckConfig | None) -> list[str
     context = CheckContext(dataset=dataset, config=config or load_check_config())
     outcome = run_checks(context, [check_id]).outcomes[0]
     return sorted(finding.object_label for finding in outcome.findings)
+
+
+def test_eindknoopverdeling_noemt_het_beheerobject_niet_zijn_orientatie() -> None:
+    """De soortnaam van een eindknoop hoort het beheerobject te zijn.
+
+    Het GWSW hangt de topologische rol aan een orientatie-aspect, en `types_of()`
+    voegt die aspecttypen bewust bij de objecttypen (Lozingspunt en UitlaatPunt
+    staan er immers op). Alfabetisch sorteren liet daardoor "Bouwwerkorientatie"
+    winnen van "Uitlaatconstructie" en "Putorientatie" van "Rioolput", waardoor de
+    toelichting aspecten leek te tellen in plaats van bouwwerken.
+    """
+    outcome = _outcome("net001_bouwwerk_eindknoop.ttl", "NET-001")
+
+    verdeling = next(note for note in outcome.notes if "dood" in note)
+    assert "Uitlaatconstructie 1" in verdeling
+    assert "orientatie" not in verdeling
+    # En meteen de getalcongruentie: een eindknoop is er een, geen "1 eindknopen".
+    assert "1 eindknoop;" in verdeling
+    assert "de overige 1 loopt dood" in verdeling
+
+
+def test_orientatie_aspecten_zijn_geen_knoop_in_de_netwerkgraaf() -> None:
+    """Elke graafknoop is een beheerobject, niet het aspect waar zijn rol op hangt.
+
+    De lader neemt als knoop het subject dat de orientatie via hasAspect draagt.
+    Deze test legt dat vast, zodat een latere wijziging in `_read_nodes()` niet
+    stilzwijgend aspecten de graaf in laat lopen.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_bouwwerk_eindknoop.ttl")
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    graaf = _netwerk(context).graph
+
+    assert graaf.number_of_nodes() == 2
+    for uri in graaf:
+        # `types` zijn de typen van het object zelf; `orientation_types` die van het
+        # aspect. Een knoop die alleen het laatste heeft, is een gelekt aspect.
+        assert dataset.nodes[uri].types

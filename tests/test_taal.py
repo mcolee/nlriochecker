@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from gwswpijplijn.uitvoer.taal import getal, met_lidwoord
+from gwswpijplijn.uitvoer.taal import getal, met_lidwoord, vorm
 
 
 def test_getal_gebruikt_enkelvoud_bij_een():
@@ -40,3 +40,16 @@ def test_onbekend_woord_faalt_hard():
     """
     with pytest.raises(KeyError, match="drempelniveau"):
         met_lidwoord("drempelniveau")
+
+
+def test_vorm_kiest_enkelvoud_bij_een():
+    """Voor een werkwoord of zelfstandig naamwoord zonder telwoord ervoor."""
+    assert vorm(1, "loopt", "lopen") == "loopt"
+
+
+def test_vorm_kiest_meervoud_boven_een():
+    assert vorm(3, "loopt", "lopen") == "lopen"
+
+
+def test_vorm_kiest_meervoud_bij_nul():
+    assert vorm(0, "loopt", "lopen") == "lopen"
