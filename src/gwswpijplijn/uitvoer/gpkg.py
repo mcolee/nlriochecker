@@ -741,11 +741,15 @@ def _schrijf_runmetadata(
         _Kolom("n_putten", "integer"),
         _Kolom("n_strengen", "integer"),
         _Kolom("n_mechanisch", "integer"),
+        _Kolom("kern_objecten", "integer"),
+        _Kolom("schil_objecten", "integer"),
+        _Kolom("dataset_objecten", "integer"),
     ]
     _maak_attribuuttabel(verbinding, "gwsw_run", kolommen, "Herkomst en bereik van deze run.")
 
     config = run.config if run.config is not None else load_check_config()
     gebied = run.study_area
+    stel = run.analyseset
     fallback = run.dataset.decode_fallback
     velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
     plaatshouders = ", ".join("?" * len(kolommen))
@@ -770,6 +774,9 @@ def _schrijf_runmetadata(
             tellingen.putten,
             tellingen.strengen,
             tellingen.mechanisch,
+            len(stel.kern) if stel is not None else None,
+            len(stel.schil) if stel is not None else None,
+            stel.volledig_aantal if stel is not None else None,
         ),
     )
 

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
+from gwswpijplijn.afbakening import bouw_analyseset
 from gwswpijplijn.analysis import analyze
 from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import CheckContext, run_checks
@@ -129,6 +131,70 @@ def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
     assert "Studiegebied" in tekst
     assert beperkt.findings == []
     assert sum(outcome.weggelaten for outcome in beperkt.outcomes) == 1
+
+
+def test_checkrapport_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    gebied = load_study_area(
+        Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
+    )
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    analyseset = bouw_analyseset(dataset, gebied, config)
+
+    context = CheckContext(
+        dataset=analyseset.dataset,
+        config=config,
+        volledige_dataset=dataset,
+        analyseset=analyseset,
+    )
+    run = run_checks(context, ["NET-001"]).beperk_tot_studiegebied(gebied)
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert (
+        f"Analyseset: {len(analyseset.kern)} objecten in de kern, "
+        f"{len(analyseset.schil)} in de contextschil, van {analyseset.volledig_aantal} "
+        "in de export." in tekst
+    )
+    assert "ADM-002" in tekst
+
+
+def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path: Path) -> None:
+    """Zonder studiegebied is er geen analyseset en dus geen regel erover."""
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    run = run_checks(context, ["TOP-001"])
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "Analyseset" not in tekst
+
+
+def test_checkrapport_meldt_strengen_zonder_netwerkverband(tmp_path: Path) -> None:
+    """Wat de afbakening niet kon meewegen, hoort net zo goed in het rapport."""
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    gebied = load_study_area(
+        Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
+    )
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    analyseset = replace(bouw_analyseset(dataset, gebied, config), strengen_zonder_netwerkverband=3)
+
+    context = CheckContext(
+        dataset=analyseset.dataset,
+        config=config,
+        volledige_dataset=dataset,
+        analyseset=analyseset,
+    )
+    run = run_checks(context, ["NET-001"]).beperk_tot_studiegebied(gebied)
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "3 vrijvervalstrengen hebben" in tekst
 
 
 def test_studiegebied_zonder_enig_object_faalt_hard() -> None:

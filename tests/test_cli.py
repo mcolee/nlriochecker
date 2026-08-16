@@ -100,6 +100,12 @@ def test_toets_schrijft_uitvoer(tmp_path: Path) -> None:
 
 
 def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
+    """Put C ligt los en ver buiten gebied en buffer, en komt dus niet in de analyseset.
+
+    De check ziet hem niet eens, dus valt er niets meer weg op het moment dat het
+    rapport wordt afgebakend. Het rapport blijft leeg, alleen op een andere manier
+    dan toen de check nog over de volledige dataset liep.
+    """
     uitvoer = tmp_path / "uitvoer"
     resultaat = CliRunner().invoke(
         main,
@@ -118,9 +124,29 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
 
     assert resultaat.exit_code == 0, resultaat.output
     assert "Studiegebied" in resultaat.output
-    assert "1 bevinding buiten het gebied weggelaten" in resultaat.output
+    assert "0 bevindingen buiten het gebied weggelaten" in resultaat.output
     tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
     assert tabel.empty
+
+
+def test_toets_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            "--studiegebied",
+            str(GIS_DIR / "afbakening_gebied.geojson"),
+            "--check",
+            "NET-001",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "kern" in resultaat.output and "contextschil" in resultaat.output
 
 
 def test_toets_gebruikt_shacl_voor_de_typeringspoort(

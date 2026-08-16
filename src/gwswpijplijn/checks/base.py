@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import ClassVar
 
 from shapely.geometry import Point
 
-from gwswpijplijn.afbakening import objecten_in_gebied
+from gwswpijplijn.afbakening import Analyseset, objecten_in_gebied
 from gwswpijplijn.checkconfig import CheckConfig
 from gwswpijplijn.dataset import GwswDataset
 from gwswpijplijn.errors import StudyAreaError
@@ -67,7 +67,25 @@ class CheckContext:
     unreliable_objects: frozenset[str] = frozenset()
     plausibiliteit: PlausibilityTables = field(default_factory=load_plausibility)
     bronnen: ExternalData | None = None
+    # Met een studiegebied draaien de checks op de analyseset. Een check met
+    # `volledig_bereik` heeft de volledige export nodig; die staat hier.
+    volledige_dataset: GwswDataset | None = None
+    analyseset: Analyseset | None = None
     _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
+
+    def volledige_context(self) -> CheckContext:
+        """Dezelfde context, maar over de volledige export.
+
+        Krijgt een eigen cache: de topologie-index en de netwerkgraaf van de
+        volledige export zijn andere structuren dan die van de analyseset, en ze
+        door elkaar halen zou de verkeerde antwoorden geven.
+        """
+        if self.volledige_dataset is None or self.volledige_dataset is self.dataset:
+            return self
+        return self.cached(
+            "volledige-context",
+            lambda: replace(self, dataset=self.volledige_dataset, _cache={}),
+        )
 
     def cached(self, sleutel: str, bouw: Callable[[], object]) -> object:
         """Bouwt een afgeleide structuur een keer per context en hergebruikt die.
@@ -130,6 +148,9 @@ class CheckRun:
     # De uitvoerlaag heeft de klassenlijsten en de rapportdrempels nodig; die
     # meegeven is minder broos dan ze langs elke schrijver door te reiken.
     config: CheckConfig | None = None
+    # De kern en de contextschil waarop de checks gedraaid hebben; None zonder
+    # studiegebied. De uitvoerlaag meldt hieruit hoe groot elk deel was.
+    analyseset: Analyseset | None = None
     _binnen: frozenset[str] | None = field(default=None, compare=False, repr=False)
 
     @property
@@ -202,6 +223,7 @@ class CheckRun:
             bronnen=self.bronnen,
             karakteristiek=self.karakteristiek,
             config=self.config,
+            analyseset=self.analyseset,
             _binnen=binnen,
         )
 
@@ -218,6 +240,10 @@ class Check(ABC):
     # per strengeinde. Heeft een check een eigen onderscheid, dan declareert ze dat
     # hier; de meldingenlaag waarschuwt als er toch twee dezelfde ID krijgen.
     id_sleutels: ClassVar[tuple[str, ...]] = ("zijde",)
+    # Checks die over de hele populatie gaan in plaats van over losse objecten
+    # (ADM-002: dubbele identificaties kunnen overal in de export zitten). Ze
+    # draaien ook met een studiegebied op de volledige export.
+    volledig_bereik: ClassVar[bool] = False
 
     @abstractmethod
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -305,15 +331,16 @@ def run_checks(
     outcomes = []
     for check_id in gekozen:
         check = REGISTRY[check_id]()
+        gebruikt = context.volledige_context() if check.volledig_bereik else context
         outcomes.append(
             CheckOutcome(
                 check_id=check.id,
                 title=check.title,
                 severity=check.severity,
                 dimension=check.dimension,
-                examined=check.examined(context),
-                findings=list(check.run(context)),
-                notes=check.notes(context),
+                examined=check.examined(gebruikt),
+                findings=list(check.run(gebruikt)),
+                notes=check.notes(gebruikt),
                 skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
             )
         )
@@ -327,4 +354,5 @@ def run_checks(
         bronnen=context.bronnen,
         karakteristiek=bepaal_karakteristiek(context.dataset, context.config),
         config=context.config,
+        analyseset=context.analyseset,
     )

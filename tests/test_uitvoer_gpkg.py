@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from gwswpijplijn.afbakening import bouw_analyseset
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckContext, CheckRun, run_checks
 from gwswpijplijn.dataset import load_dataset
@@ -238,6 +239,37 @@ def test_met_studiegebied_is_het_gebied_de_grens(tmp_path: Path) -> None:
     grens = _rijen(pad, "select grens_bron, grens_oppervlak_ha from gwsw_run")[0]
     assert grens[0] == "rond_put_ab.geojson"
     assert grens[1] == pytest.approx(0.14, abs=0.01)
+
+
+def test_zonder_analyseset_blijven_de_kolommen_leeg(tmp_path: Path) -> None:
+    run = _run("schoon.ttl")
+    pad = _schrijf(run, tmp_path)
+
+    rij = _rijen(pad, "select kern_objecten, schil_objecten, dataset_objecten from gwsw_run")[0]
+    assert rij == (None, None, None)
+
+
+def test_de_analyseset_omvang_staat_in_de_runmetadata(tmp_path: Path) -> None:
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
+    config = _config()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    context = CheckContext(
+        dataset=analyseset.dataset,
+        config=config,
+        volledige_dataset=dataset,
+        analyseset=analyseset,
+    )
+    run = run_checks(context, ["NET-001"]).beperk_tot_studiegebied(area)
+    pad = _schrijf(run, tmp_path)
+
+    rij = _rijen(pad, "select kern_objecten, schil_objecten, dataset_objecten from gwsw_run")[0]
+    assert rij == (
+        len(analyseset.kern),
+        len(analyseset.schil),
+        analyseset.volledig_aantal,
+    )
 
 
 def test_export_overschrijft_geen_invoerbestand(tmp_path: Path) -> None:

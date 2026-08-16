@@ -50,6 +50,9 @@ class NietUniekeIdentificatie(Check):
     title = "Niet-unieke identificaties van putten of strengen"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    # Dubbele identificaties kunnen overal in de export zitten, niet alleen in de
+    # analyseset; deze check draait daarom altijd op de volledige export.
+    volledig_bereik = True
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt labels die aan meer dan een object hangen.

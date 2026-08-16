@@ -137,3 +137,34 @@ def test_streng_met_los_uiteinde_telt_mee_maar_verdwijnt_niet_ongemerkt() -> Non
 
     assert analyseset.strengen_zonder_netwerkverband == 1
     assert analyseset.alles == frozenset()
+
+
+def test_een_dataset_brede_check_ziet_de_hele_export() -> None:
+    """ADM-002 zoekt dubbele identificaties; die kunnen overal zitten."""
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    context = CheckContext(
+        dataset=analyseset.dataset,
+        config=config,
+        volledige_dataset=dataset,
+        analyseset=analyseset,
+    )
+    run = run_checks(context, ["ADM-002", "TOP-001"])
+    per_check = {outcome.check_id: outcome for outcome in run.outcomes}
+
+    volledig = len(dataset.nodes) + len(dataset.conduits)
+    assert per_check["ADM-002"].examined == volledig
+    assert per_check["TOP-001"].examined < volledig
+
+
+def test_de_run_onthoudt_de_omvang_van_kern_en_schil() -> None:
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    run = run_checks(
+        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
+        ["TOP-001"],
+    )
+
+    assert run.analyseset is analyseset

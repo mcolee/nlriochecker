@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from gwswpijplijn import __version__
+from gwswpijplijn.afbakening import bouw_analyseset
 from gwswpijplijn.analysis import MetingAnalysis, analyze
 from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import REGISTRY, CheckContext, Severity, run_checks
@@ -433,16 +434,20 @@ def check_command(
         dataset = load_dataset(dataset_path, list(ontology_paths))
         onbetrouwbaar, gate_applied = _typing_gate(shacl_paths, config, dataset)
         bronnen = _externe_bronnen(config, bronnen_dir)
+        area = load_study_area(study_path, study_layer) if study_path is not None else None
+        analyseset = bouw_analyseset(dataset, area, config) if area is not None else None
         context = CheckContext(
-            dataset=dataset,
+            dataset=analyseset.dataset if analyseset is not None else dataset,
             config=config,
             unreliable_objects=onbetrouwbaar,
             plausibiliteit=load_plausibility(plausibility_path),
             bronnen=bronnen,
+            volledige_dataset=dataset,
+            analyseset=analyseset,
         )
         run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
-        if study_path is not None:
-            run = run.beperk_tot_studiegebied(load_study_area(study_path, study_layer))
+        if area is not None:
+            run = run.beperk_tot_studiegebied(area)
         uitvoer = schrijf_uitvoer(run, output_dir, met_geopackage=not geen_gpkg)
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -468,6 +473,17 @@ def check_command(
             f"  Studiegebied {gebied.name} ({gebied.area_ha:.1f} ha): "
             f"{getal(weggelaten, 'bevinding', 'bevindingen')} buiten het gebied weggelaten."
         )
+    if run.analyseset is not None:
+        stel = run.analyseset
+        click.echo(
+            f"  Analyseset: {getal(len(stel.kern), 'object', 'objecten')} in de kern, "
+            f"{len(stel.schil)} in de contextschil, van {stel.volledig_aantal} in de export."
+        )
+        if stel.aandeel > config.studiegebied.component_waarschuwingsdrempel:
+            click.echo(
+                "  Let op: het net binnen dit gebied hangt met vrijwel de hele export samen; "
+                "de afbakening levert weinig tijdwinst op."
+            )
     if not gate_applied:
         click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
     if bronnen is None:

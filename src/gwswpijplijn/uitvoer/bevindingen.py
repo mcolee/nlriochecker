@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 from gwswpijplijn.checks import CheckRun, Severity
-from gwswpijplijn.taal import getal
+from gwswpijplijn.taal import getal, vorm
 from gwswpijplijn.uitvoer.melding import Melding, bouw_meldingen
 from gwswpijplijn.uitvoer.synthese import rode_draad
 from gwswpijplijn.uitvoer.tabel import prepare, table
@@ -180,6 +180,25 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
             "de dataset.",
             "",
         ]
+
+    if run.analyseset is not None:
+        stel = run.analyseset
+        lines += [
+            f"Analyseset: {getal(len(stel.kern), 'object', 'objecten')} in de kern, "
+            f"{len(stel.schil)} in de contextschil, van {stel.volledig_aantal} in de export. "
+            "De checks redeneren over kern en schil samen; gerapporteerd wordt alleen de "
+            "kern. Checks die over de hele populatie gaan (ADM-002) draaien op de volledige "
+            "export.",
+        ]
+        if stel.strengen_zonder_netwerkverband:
+            aantal = stel.strengen_zonder_netwerkverband
+            lines += [
+                f"{getal(aantal, 'vrijvervalstreng', 'vrijvervalstrengen')} "
+                f"{vorm(aantal, 'heeft', 'hebben')} een uiteinde dat niet naar een "
+                "netwerkknoop herleidt en kon daardoor niet meewegen bij het bepalen van de "
+                "schil; ze tellen niet mee in de aantallen hierboven.",
+            ]
+        lines += [""]
 
     lines += _bronnen_section(run)
     lines += _karakteristiek_section(run)
