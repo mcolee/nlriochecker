@@ -48,10 +48,11 @@ def test_net002_raakt_de_gemengde_strengen_niet() -> None:
 def test_net004_vindt_de_kringloop() -> None:
     bevindingen = _outcome("net004_kringloop.ttl", "NET-004").findings
 
+    # Een melding per samenhangend deel met een kringloop, niet per enkelvoudige
+    # kringloop: dat laatste groeit exponentieel op een echt stelsel.
     assert len(bevindingen) == 1
-    assert bevindingen[0].details["putten"] == ["C", "D", "E"] or set(
-        bevindingen[0].details["putten"]
-    ) == {"C", "D", "E"}
+    assert bevindingen[0].details["putten_in_deel"] == 3
+    assert set(bevindingen[0].details["voorbeeldkring"]) == {"C", "D", "E"}
 
 
 def test_net007_vindt_it_zonder_drempel() -> None:

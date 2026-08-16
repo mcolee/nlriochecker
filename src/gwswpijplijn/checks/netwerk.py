@@ -81,16 +81,23 @@ def _eindpunten(context: CheckContext, rol: str) -> set[str]:
 def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     """De knopen die stroomafwaarts een van deze eindpunten bereiken.
 
-    Een omgekeerde doorloop vanaf alle eindpunten tegelijk, in plaats van per
-    streng een pad zoeken; dat laatste wordt kwadratisch op een echt stelsel.
+    Een enkele doorloop over de omgekeerde graaf vanaf alle eindpunten tegelijk.
+    Per eindpunt afzonderlijk zoeken kost O(eindpunten x graaf): De Wolden heeft
+    893 gemalen op ruim 20.000 knopen, en dat loopt in de tientallen miljoenen
+    stappen. Zo blijft het een enkele O(knopen + kanten)-doorloop.
     """
     if not endpoints:
         return set()
+
     omgekeerd = netwerk.graph.reverse(copy=False)
-    bereikt: set[str] = set()
-    for endpoint in endpoints:
-        if endpoint in omgekeerd:
-            bereikt |= nx.descendants(omgekeerd, endpoint) | {endpoint}
+    bereikt = {uri for uri in endpoints if uri in omgekeerd}
+    stapel = list(bereikt)
+    while stapel:
+        knoop = stapel.pop()
+        for buur in omgekeerd[knoop]:
+            if buur not in bereikt:
+                bereikt.add(buur)
+                stapel.append(buur)
     return bereikt
 
 
@@ -200,23 +207,58 @@ class KringloopInNetwerk(Check):
     dimension = Dimension.CONSISTENCY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke gerichte kringloop een keer, op de eerste streng ervan."""
+        """Meldt elk deel van de graaf waarin een kringloop zit.
+
+        Per sterk samenhangend deel een melding, niet per enkelvoudige kringloop:
+        het aantal enkelvoudige kringlopen groeit exponentieel met de graafgrootte,
+        en op een echt stelsel loopt dat vast. Een deel met meer dan een knoop
+        bevat per definitie minstens een kringloop; van elk deel wordt een
+        voorbeeldkringloop getoond.
+        """
         netwerk = _netwerk(context)
         dataset = context.dataset
 
-        for kring in nx.simple_cycles(netwerk.graph):
-            labels = [dataset.nodes[uri].label if uri in dataset.nodes else uri for uri in kring]
-            kant = netwerk.graph.edges[kring[0], kring[1 % len(kring)]] if len(kring) > 1 else None
-            uri = kant["uri"] if kant else kring[0]
-            label = kant["label"] if kant else labels[0]
+        for deel in nx.strongly_connected_components(netwerk.graph):
+            if len(deel) < 2 and not self._heeft_zelflus(netwerk, deel):
+                continue
+            subgraaf = netwerk.graph.subgraph(deel)
+            kring = self._voorbeeldkring(subgraaf)
+            labels = [self._label(dataset, uri) for uri in kring]
+            uri, label = self._eerste_streng(subgraaf, kring, dataset)
             yield self.finding(
                 context,
                 uri,
                 label,
-                f"Maakt deel uit van een kringloop over {len(kring)} putten: "
-                f"{' -> '.join(labels)}.",
-                putten=labels,
+                f"Ligt in een deel van het netwerk met {len(deel)} putten waarin een "
+                f"kringloop zit; voorbeeld: {' -> '.join(labels)}.",
+                putten_in_deel=len(deel),
+                voorbeeldkring=labels,
             )
+
+    def _heeft_zelflus(self, netwerk: _Netwerk, deel: set[str]) -> bool:
+        """Geeft aan of het enige knooppunt in dit deel naar zichzelf wijst."""
+        knoop = next(iter(deel))
+        return netwerk.graph.has_edge(knoop, knoop)
+
+    def _voorbeeldkring(self, subgraaf) -> list[str]:
+        """Een kringloop uit dit deel, als illustratie in de melding."""
+        try:
+            kanten = nx.find_cycle(subgraaf)
+        except nx.NetworkXNoCycle:
+            return sorted(subgraaf)[:1]
+        return [begin for begin, _, *_ in kanten]
+
+    def _label(self, dataset, uri: str) -> str:
+        """Het label van een knooppunt, of de URI als dat er niet is."""
+        node = dataset.nodes.get(uri)
+        return node.label if node is not None and node.label else uri
+
+    def _eerste_streng(self, subgraaf, kring: list[str], dataset) -> tuple[str, str]:
+        """De streng waarop de melding wordt gehangen."""
+        if len(kring) > 1 and subgraaf.has_edge(kring[0], kring[1]):
+            kant = subgraaf.edges[kring[0], kring[1]]
+            return kant["uri"], kant["label"]
+        return kring[0], self._label(dataset, kring[0])
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt wat er buiten de graaf viel."""
