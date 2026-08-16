@@ -7,20 +7,22 @@ from pathlib import Path
 import click
 
 from gwswpijplijn import __version__
+from gwswpijplijn.analysis import MetingAnalysis, analyze
 from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import REGISTRY, CheckContext, Severity, run_checks
-from gwswpijplijn.comparison import compare_pairs
+from gwswpijplijn.comparison import compare_metingen
 from gwswpijplijn.config import load_coverage_config
 from gwswpijplijn.coverage import assess_coverage
-from gwswpijplijn.dataset import load_dataset
+from gwswpijplijn.dataset import GwswDataset, load_dataset
 from gwswpijplijn.errors import PipelineError
-from gwswpijplijn.pair import ReportPair, load_pair
+from gwswpijplijn.meting import laad_nulmeting
 from gwswpijplijn.reporting import (
     write_check_report,
     write_comparison_reports,
     write_coverage_report,
     write_reports,
 )
+from gwswpijplijn.studiegebied import load_study_area
 
 
 class _CliError(click.ClickException):
@@ -68,33 +70,120 @@ def _output_option(hulp: str):
     )
 
 
-def _echo_pair(pair: ReportPair) -> None:
-    """Toont dataset, CFK's en typeringsscore van een rapportenpaar."""
-    click.echo(f"Dataset {pair.dataset}: {pair.mds.report.cfk} + {pair.hyd.report.cfk}")
-    for analysis in (pair.mds, pair.hyd):
-        gate = analysis.typing_gate
+def _shacl_option():
+    """Bouwt de optie voor de SHACL-rapporten; meermaals toegestaan."""
+    return click.option(
+        "--shacl",
+        "shacl_paths",
+        multiple=True,
+        required=True,
+        type=RAPPORT_TYPE,
+        help="SHACL-nulmetingrapport (CSV); geef er een per conformiteitsklasse.",
+    )
+
+
+def _dataset_options():
+    """Bouwt de opties voor de OroX-dataset en de ontologie."""
+
+    def versier(functie):
+        functie = click.option(
+            "--ontologie",
+            "ontology_paths",
+            multiple=True,
+            type=RAPPORT_TYPE,
+            help="GWSW-ontologie (TTL); meermaals toegestaan.",
+        )(functie)
+        return click.option(
+            "--dataset",
+            "dataset_path",
+            default=None,
+            type=RAPPORT_TYPE,
+            help="GWSW-OroX-dataset (TTL); nodig om de typeringspoort te kunnen wegen.",
+        )(functie)
+
+    return versier
+
+
+def _studiegebied_options():
+    """Bouwt de opties voor de afbakening tot een studiegebied."""
+
+    def versier(functie):
+        functie = click.option(
+            "--studiegebied-laag",
+            "study_layer",
+            default=None,
+            help="Laagnaam binnen het studiegebiedbestand, als dat er meerdere heeft.",
+        )(functie)
+        return click.option(
+            "--studiegebied",
+            "study_path",
+            default=None,
+            type=RAPPORT_TYPE,
+            help="GeoPackage of GeoJSON met het gebied waartoe de rapportage beperkt wordt.",
+        )(functie)
+
+    return versier
+
+
+def _projectconfig_option():
+    """Bouwt de optie voor de projectconfiguratie."""
+    return click.option(
+        "--projectconfig",
+        "project_config_path",
+        default=None,
+        type=RAPPORT_TYPE,
+        help="Projectconfiguratie (TOML); standaard de meegeleverde checks.toml.",
+    )
+
+
+def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths):
+    """Leest de nulmeting en optioneel de dataset, en analyseert ze."""
+    project = load_check_config(project_config_path)
+    nulmeting = laad_nulmeting(list(shacl_paths), project.nulmeting.vereiste_cfk)
+    dataset = load_dataset(dataset_path, list(ontology_paths)) if dataset_path is not None else None
+    return project, nulmeting, analyze(nulmeting, dataset), dataset
+
+
+def _echo_meting(analyse: MetingAnalysis, dataset: GwswDataset | None) -> None:
+    """Toont de kern van een nulmeting op de opdrachtregel."""
+    click.echo(f"Dataset {analyse.meting.dataset_file}: {', '.join(analyse.meting.cfks)}")
+    for cfk in analyse.meting.cfks:
+        deel = analyse.per_cfk[cfk]
+        poort = deel.typing_gate
+        score = f", typeringsscore {poort.score:.1f}%" if poort.score is not None else ""
         click.echo(
-            f"  {analysis.report.cfk}: {analysis.total_count} meldingen, "
-            f"typeringsscore {gate.score:.1f}% "
-            f"({gate.too_generic_count} van {gate.named_object_count} objecten te globaal)"
+            f"  {cfk:8s} {deel.total_count:7d} meldingen "
+            f"({deel.error_count} F / {deel.warning_count} W){score}"
         )
+    if dataset is None:
+        click.echo("  Geen --dataset opgegeven; typeringsscore niet te bepalen.")
 
 
 @main.command("analyseer")
-@_report_option("--mds", "mds_path", "Detailrapport getoetst aan CFK Mds of MdsPlan.")
-@_report_option("--hyd", "hyd_path", "Detailrapport getoetst aan CFK Hyd.")
+@_shacl_option()
+@_dataset_options()
+@_projectconfig_option()
 @_config_option()
 @_output_option("Map waarin de samenvatting en de geaggregeerde CSV worden geschreven.")
-def analyze(mds_path: Path, hyd_path: Path, config_path: Path | None, output_dir: Path) -> None:
-    """Analyseert een rapportenpaar en schrijft samenvatting en aggregaties weg."""
+def analyze_command(
+    shacl_paths: tuple[Path, ...],
+    dataset_path: Path | None,
+    ontology_paths: tuple[Path, ...],
+    project_config_path: Path | None,
+    config_path: Path | None,
+    output_dir: Path,
+) -> None:
+    """Analyseert een SHACL-nulmeting en schrijft samenvatting en aggregaties weg."""
     try:
-        pair = load_pair(mds_path, hyd_path)
-        coverage = assess_coverage(pair, load_coverage_config(config_path))
-        markdown_path, csv_path = write_reports(pair, output_dir, coverage)
+        _, _, analyse, dataset = _laad_meting(
+            shacl_paths, project_config_path, dataset_path, ontology_paths
+        )
+        coverage = assess_coverage(analyse, load_coverage_config(config_path))
+        markdown_path, csv_path = write_reports(analyse, output_dir, coverage)
     except PipelineError as error:
         raise _CliError(str(error)) from error
 
-    _echo_pair(pair)
+    _echo_meting(analyse, dataset)
     niet_geraakt = [check.mapping.id for check in coverage.untouched]
     if niet_geraakt:
         click.echo(f"  Niet geraakte geschrapte checks: {', '.join(niet_geraakt)}")
@@ -103,17 +192,25 @@ def analyze(mds_path: Path, hyd_path: Path, config_path: Path | None, output_dir
 
 
 @main.command("dekking")
-@_report_option("--mds", "mds_path", "Detailrapport getoetst aan CFK Mds of MdsPlan.")
-@_report_option("--hyd", "hyd_path", "Detailrapport getoetst aan CFK Hyd.")
+@_shacl_option()
+@_dataset_options()
+@_projectconfig_option()
 @_config_option()
 @_output_option("Map waarin het dekkingrapport wordt geschreven.")
 def coverage_command(
-    mds_path: Path, hyd_path: Path, config_path: Path | None, output_dir: Path
+    shacl_paths: tuple[Path, ...],
+    dataset_path: Path | None,
+    ontology_paths: tuple[Path, ...],
+    project_config_path: Path | None,
+    config_path: Path | None,
+    output_dir: Path,
 ) -> None:
     """Toetst of de nulmeting de geschrapte checks in deze dataset daadwerkelijk raakt."""
     try:
-        pair = load_pair(mds_path, hyd_path)
-        result = assess_coverage(pair, load_coverage_config(config_path))
+        _, _, analyse, _ = _laad_meting(
+            shacl_paths, project_config_path, dataset_path, ontology_paths
+        )
+        result = assess_coverage(analyse, load_coverage_config(config_path))
         markdown_path, csv_path = write_coverage_report(result, output_dir)
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -131,37 +228,49 @@ def coverage_command(
 
 
 @main.command("vergelijk")
-@_report_option("--eerder-mds", "earlier_mds", "Mds-rapport van het eerste meetmoment.")
-@_report_option("--eerder-hyd", "earlier_hyd", "Hyd-rapport van het eerste meetmoment.")
-@_report_option("--later-mds", "later_mds", "Mds-rapport van het tweede meetmoment.")
-@_report_option("--later-hyd", "later_hyd", "Hyd-rapport van het tweede meetmoment.")
+@click.option(
+    "--eerder",
+    "earlier_paths",
+    multiple=True,
+    required=True,
+    type=RAPPORT_TYPE,
+    help="SHACL-rapport van het eerste meetmoment; meermaals toegestaan.",
+)
+@click.option(
+    "--later",
+    "later_paths",
+    multiple=True,
+    required=True,
+    type=RAPPORT_TYPE,
+    help="SHACL-rapport van het tweede meetmoment; meermaals toegestaan.",
+)
+@_projectconfig_option()
 @_config_option()
 @_output_option("Map waarin de vergelijking wordt geschreven.")
 def compare_command(
-    earlier_mds: Path,
-    earlier_hyd: Path,
-    later_mds: Path,
-    later_hyd: Path,
+    earlier_paths: tuple[Path, ...],
+    later_paths: tuple[Path, ...],
+    project_config_path: Path | None,
     config_path: Path | None,
     output_dir: Path,
 ) -> None:
     """Zet twee nulmetingen van dezelfde dataset naast elkaar voor trendbewaking."""
     try:
-        earlier = load_pair(earlier_mds, earlier_hyd)
-        later = load_pair(later_mds, later_hyd)
-        comparison = compare_pairs(earlier, later, load_coverage_config(config_path))
+        project = load_check_config(project_config_path)
+        eerder = analyze(laad_nulmeting(list(earlier_paths), project.nulmeting.vereiste_cfk))
+        later = analyze(laad_nulmeting(list(later_paths), project.nulmeting.vereiste_cfk))
+        comparison = compare_metingen(eerder, later, load_coverage_config(config_path))
         markdown_path, csv_path, objects_path = write_comparison_reports(comparison, output_dir)
     except PipelineError as error:
         raise _CliError(str(error)) from error
 
-    click.echo(f"Dataset {comparison.dataset}")
+    click.echo(f"Dataset {comparison.dataset_file}")
     if comparison.timestamps_out_of_order:
-        click.echo("  Let op: het latere paar is niet nieuwer dan het eerste.")
+        click.echo("  Let op: de latere meting is niet nieuwer dan de eerste.")
     for item in comparison.per_cfk:
         telling = item.status_counts()
         click.echo(
-            f"  {item.cfk}: totaal {item.total_delta:+d}, "
-            f"typering {item.typing_score_delta:+.1f} procentpunt, "
+            f"  {item.cfk:8s} meldingen {item.total_delta:+d}, fouten {item.error_delta:+d}, "
             f"{telling['opgelost']} opgelost / {telling['nieuw']} nieuw / "
             f"{telling['gebleven']} gebleven"
         )
@@ -189,18 +298,11 @@ def compare_command(
     help="GWSW-ontologie (TTL) voor de klassenhierarchie; meermaals toegestaan.",
 )
 @click.option(
-    "--mds",
-    "mds_path",
-    default=None,
+    "--shacl",
+    "shacl_paths",
+    multiple=True,
     type=RAPPORT_TYPE,
-    help="Nulmeting-detailrapport Mds of MdsPlan, voor de typeringspoort.",
-)
-@click.option(
-    "--hyd",
-    "hyd_path",
-    default=None,
-    type=RAPPORT_TYPE,
-    help="Nulmeting-detailrapport Hyd, voor de typeringspoort.",
+    help="SHACL-nulmetingrapport, voor de typeringspoort; geef ze alle op.",
 )
 @click.option(
     "--check",
@@ -208,31 +310,32 @@ def compare_command(
     multiple=True,
     help="Check-ID uit het register; meermaals toegestaan. Zonder deze optie draaien ze alle.",
 )
-@_config_option()
+@_studiegebied_options()
+@_projectconfig_option()
 @_output_option("Map waarin het bevindingenrapport wordt geschreven.")
 def check_command(
     dataset_path: Path,
     ontology_paths: tuple[Path, ...],
-    mds_path: Path | None,
-    hyd_path: Path | None,
+    shacl_paths: tuple[Path, ...],
     check_ids: tuple[str, ...],
-    config_path: Path | None,
+    study_path: Path | None,
+    study_layer: str | None,
+    project_config_path: Path | None,
     output_dir: Path,
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
-    if (mds_path is None) != (hyd_path is None):
-        raise _CliError("Geef --mds en --hyd samen op: de typeringspoort vraagt beide rapporten.")
-
     try:
+        config = load_check_config(project_config_path)
         dataset = load_dataset(dataset_path, list(ontology_paths))
-        config = load_check_config(config_path)
-        unreliable, gate_applied = _typing_gate(mds_path, hyd_path)
+        onbetrouwbaar, gate_applied = _typing_gate(shacl_paths, config, dataset)
         context = CheckContext(
             dataset=dataset,
             config=config,
-            unreliable_labels=unreliable,
+            unreliable_objects=onbetrouwbaar,
         )
         run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
+        if study_path is not None:
+            run = run.beperk_tot_studiegebied(load_study_area(study_path, study_layer))
         markdown_path, csv_path = write_check_report(run, output_dir)
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -251,8 +354,15 @@ def check_command(
         )
     if dataset.geometry_errors:
         click.echo(f"  {len(dataset.geometry_errors)} objecten met onleesbare geometrie.")
+    if run.study_area is not None:
+        gebied = run.study_area
+        weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
+        click.echo(
+            f"  Studiegebied {gebied.name} ({gebied.area_ha:.1f} ha): "
+            f"{weggelaten} bevindingen buiten het gebied weggelaten."
+        )
     if not gate_applied:
-        click.echo("  Geen typeringspoort toegepast (--mds en --hyd niet opgegeven).")
+        click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
     for outcome in run.outcomes:
         voorbehoud = (
             f", {outcome.unreliable_count} met typeringsvoorbehoud"
@@ -270,16 +380,20 @@ def check_command(
     click.echo(f"Geschreven: {csv_path}")
 
 
-def _typing_gate(mds_path: Path | None, hyd_path: Path | None) -> tuple[frozenset[str], bool]:
-    """Haalt de te globaal getypeerde objectlabels uit het rapportenpaar."""
-    if mds_path is None or hyd_path is None:
+def _typing_gate(
+    shacl_paths: tuple[Path, ...], config, dataset: GwswDataset
+) -> tuple[frozenset[str], bool]:
+    """Haalt de te globaal getypeerde objecten uit de nulmeting.
+
+    De SHACL-meting noemt de te globale klassen; de instanties komen uit de dataset.
+    Dat geeft een exacte verzameling in plaats van een labellijst.
+    """
+    if not shacl_paths:
         return frozenset(), False
 
-    pair = load_pair(mds_path, hyd_path)
-    labels = {
-        naam
-        for analysis in (pair.mds, pair.hyd)
-        for naam in analysis.typing_gate.objects["Naam"]
-        if naam
-    }
-    return frozenset(labels), True
+    nulmeting = laad_nulmeting(list(shacl_paths), config.nulmeting.vereiste_cfk)
+    analyse = analyze(nulmeting, dataset)
+    objecten: set[str] = set()
+    for deel in analyse.per_cfk.values():
+        objecten.update(deel.typing_gate.objects)
+    return frozenset(objecten), True

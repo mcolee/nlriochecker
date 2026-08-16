@@ -60,6 +60,16 @@ class NetworkOptions(BaseModel):
     richting: Literal["administratief", "bob"] = "administratief"
 
 
+class NulmetingOptions(BaseModel):
+    """Eisen aan de aangeleverde nulmeting."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Het checkregister eist dat de dataset aan alle conformiteitsklassen getoetst is;
+    # welke dat zijn, hangt af van wat de GWSW-server aanbiedt.
+    vereiste_cfk: list[str] = Field(default=["Hyd", "MdsPlan", "MdsProj"], min_length=1)
+
+
 class CheckConfig(BaseModel):
     """De volledige projectconfiguratie van de check-engine."""
 
@@ -68,6 +78,7 @@ class CheckConfig(BaseModel):
     klassen: ClassRoots
     drempels: CheckThresholds = Field(default_factory=CheckThresholds)
     netwerk: NetworkOptions = Field(default_factory=NetworkOptions)
+    nulmeting: NulmetingOptions = Field(default_factory=NulmetingOptions)
 
 
 def default_check_config_path() -> Path:

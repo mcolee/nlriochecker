@@ -10,6 +10,7 @@ from typing import ClassVar
 
 from gwswpijplijn.checkconfig import CheckConfig
 from gwswpijplijn.dataset import GwswDataset
+from gwswpijplijn.studiegebied import StudyArea
 
 
 class Severity(StrEnum):
@@ -52,7 +53,7 @@ class CheckContext:
 
     dataset: GwswDataset
     config: CheckConfig
-    unreliable_labels: frozenset[str] = frozenset()
+    unreliable_objects: frozenset[str] = frozenset()
     _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     def cached(self, sleutel: str, bouw: Callable[[], object]) -> object:
@@ -66,20 +67,19 @@ class CheckContext:
             self._cache[sleutel] = bouw()
         return self._cache[sleutel]
 
-    def is_reliable(self, label: str) -> bool:
-        """Geeft aan of de typering van dit object betrouwbaar genoeg is."""
-        return label not in self.unreliable_labels
+    def is_reliable(self, uri: str) -> bool:
+        """Geeft aan of de typering van dit object betrouwbaar genoeg is.
 
-    def matched_labels(self) -> frozenset[str]:
-        """De onbetrouwbare labels die daadwerkelijk in de dataset voorkomen.
-
-        De detailrapporten en de OroX-export zijn losse bestanden; labels die de
-        nulmeting noemt hoeven niet allemaal in de dataset te staan. Dat verschil
-        hoort zichtbaar te zijn, anders lijkt de typeringspoort vollediger dan hij is.
+        De vergelijking gaat op URI. De SHACL-meting benoemt de te globale klassen
+        en de instanties komen uit de dataset zelf, dus de koppeling is exact; het
+        vervallen detailrapportformaat kon alleen op labels joinen.
         """
-        aanwezig = {item.label for item in self.dataset.nodes.values()}
-        aanwezig |= {item.label for item in self.dataset.conduits.values()}
-        return frozenset(self.unreliable_labels & aanwezig)
+        return uri not in self.unreliable_objects
+
+    def matched_objects(self) -> frozenset[str]:
+        """De onbetrouwbare objecten die daadwerkelijk in de dataset voorkomen."""
+        aanwezig = set(self.dataset.nodes) | set(self.dataset.conduits)
+        return frozenset(self.unreliable_objects & aanwezig)
 
 
 @dataclass(frozen=True)
@@ -93,6 +93,7 @@ class CheckOutcome:
     examined: int
     findings: list[Finding]
     notes: list[str] = field(default_factory=list)
+    weggelaten: int = 0
 
     @property
     def unreliable_count(self) -> int:
@@ -109,15 +110,46 @@ class CheckRun:
     typing_gate_applied: bool
     unreliable_labels: int = 0
     unreliable_labels_in_dataset: int = 0
+    study_area: StudyArea | None = None
 
     @property
     def findings(self) -> list[Finding]:
-        """Alle bevindingen van alle checks."""
+        """Alle bevindingen van alle checks, na afbakening tot het studiegebied."""
         return [finding for outcome in self.outcomes for finding in outcome.findings]
 
     def count(self, severity: Severity) -> int:
         """Het aantal bevindingen van een ernstniveau."""
         return sum(1 for finding in self.findings if finding.severity is severity)
+
+    def beperk_tot_studiegebied(self, area: StudyArea) -> CheckRun:
+        """Geeft een run terug met alleen de bevindingen binnen het gebied.
+
+        De checks zijn op de volledige dataset gedraaid; pas hier wordt afgebakend.
+        Zo blijven de netwerkchecks over het hele stelsel redeneren en ontstaan er
+        geen randeffecten doordat een streng het gebied uit loopt.
+        """
+        binnen = objecten_in_gebied(self.dataset, area)
+        outcomes = [
+            CheckOutcome(
+                check_id=outcome.check_id,
+                title=outcome.title,
+                severity=outcome.severity,
+                dimension=outcome.dimension,
+                examined=outcome.examined,
+                findings=[f for f in outcome.findings if f.object_uri in binnen],
+                notes=outcome.notes,
+                weggelaten=sum(1 for f in outcome.findings if f.object_uri not in binnen),
+            )
+            for outcome in self.outcomes
+        ]
+        return CheckRun(
+            dataset=self.dataset,
+            outcomes=outcomes,
+            typing_gate_applied=self.typing_gate_applied,
+            unreliable_labels=self.unreliable_labels,
+            unreliable_labels_in_dataset=self.unreliable_labels_in_dataset,
+            study_area=area,
+        )
 
 
 class Check(ABC):
@@ -156,9 +188,16 @@ class Check(ABC):
             object_uri=uri,
             object_label=label,
             message=message,
-            typing_reliable=context.is_reliable(label),
+            typing_reliable=context.is_reliable(uri),
             details=details,
         )
+
+
+def objecten_in_gebied(dataset: GwswDataset, area: StudyArea) -> frozenset[str]:
+    """De URI's van de objecten waarvan de geometrie het studiegebied raakt."""
+    binnen = {uri for uri, node in dataset.nodes.items() if area.bevat(node.point)}
+    binnen |= {uri for uri, conduit in dataset.conduits.items() if area.bevat(conduit.line)}
+    return frozenset(binnen)
 
 
 REGISTRY: dict[str, type[Check]] = {}
@@ -203,6 +242,6 @@ def run_checks(
         dataset=context.dataset,
         outcomes=outcomes,
         typing_gate_applied=typing_gate_applied,
-        unreliable_labels=len(context.unreliable_labels),
-        unreliable_labels_in_dataset=len(context.matched_labels()),
+        unreliable_labels=len(context.unreliable_objects),
+        unreliable_labels_in_dataset=len(context.matched_objects()),
     )

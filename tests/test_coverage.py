@@ -1,4 +1,4 @@
-"""Tests voor de dekkinganalyse van de geschrapte checks."""
+"""Tests voor de dekkinganalyse op SHACL-vormen."""
 
 from __future__ import annotations
 
@@ -6,15 +6,18 @@ from pathlib import Path
 
 import pytest
 
+from gwswpijplijn.analysis import MetingAnalysis, analyze
 from gwswpijplijn.config import CoverageConfig, load_coverage_config
 from gwswpijplijn.coverage import CheckCoverage, CoverageResult, Verdict, assess_coverage
-from gwswpijplijn.pair import ReportPair, load_pair
+from gwswpijplijn.meting import laad_nulmeting
+
+VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 
 
 @pytest.fixture
-def pair(mini_mds: Path, mini_hyd: Path) -> ReportPair:
-    """Het rapportenpaar van de mini-uittreksels."""
-    return load_pair(mini_mds, mini_hyd)
+def analyse(shacl_drieluik: list[Path]) -> MetingAnalysis:
+    """De analyse van de mini-nulmeting."""
+    return analyze(laad_nulmeting(shacl_drieluik, VEREIST))
 
 
 @pytest.fixture
@@ -24,19 +27,14 @@ def config() -> CoverageConfig:
 
 
 @pytest.fixture
-def result(pair: ReportPair, config: CoverageConfig) -> CoverageResult:
-    """De dekkinganalyse over de mini-uittreksels."""
-    return assess_coverage(pair, config)
+def result(analyse: MetingAnalysis, config: CoverageConfig) -> CoverageResult:
+    """De dekkinganalyse over de mini-nulmeting."""
+    return assess_coverage(analyse, config)
 
 
 def _check(result: CoverageResult, check_id: str) -> CheckCoverage:
     """Zoekt het dekkingoordeel van een check op."""
     return next(check for check in result.checks if check.mapping.id == check_id)
-
-
-def _counts(check: CheckCoverage) -> dict[str, int]:
-    """Meldingregels per CFK."""
-    return {item.cfk: item.row_count for item in check.evidence}
 
 
 @pytest.mark.parametrize(
@@ -54,102 +52,53 @@ def test_oordeel_per_check(result: CoverageResult, check_id: str, verdict: Verdi
     assert _check(result, check_id).verdict is verdict
 
 
-def test_adm_001_leunt_op_hyd(result: CoverageResult) -> None:
+def test_drempelvormen_ontbreken_in_de_shacl_meting(result: CoverageResult) -> None:
+    """RVZ-002 en RVZ-003 zijn geschrapt omdat de nulmeting de drempel zou dekken.
+
+    In de SHACL-rapporten komt geen enkele vorm op Drempelniveau of Drempelbreedte
+    voor, dus die dekking is hier niet aan te tonen.
+    """
+    for check_id in ("RVZ-002", "RVZ-003"):
+        check = _check(result, check_id)
+        assert check.evidence_cfks == []
+        assert check in result.untouched
+
+
+def test_koppeling_zit_in_alle_drie_de_cfks(result: CoverageResult) -> None:
+    """Het register stelt dat de put-strengkoppeling alleen uit Hyd komt."""
     check = _check(result, "ADM-001")
 
-    assert _counts(check) == {"MdsPlan": 0, "Hyd": 4}
-    assert check.evidence_cfks == ["Hyd"]
-    # Alleen Hyd telt mee voor het oordeel; MdsPlan wordt wel gemeten.
-    assert [item.required for item in check.evidence] == [False, True]
+    assert check.evidence_cfks == ["Hyd", "MdsPlan", "MdsProj"]
+    assert all(item.required for item in check.evidence)
 
 
-def test_rvz_003_wordt_in_deze_uittreksels_niet_geraakt(result: CoverageResult) -> None:
-    check = _check(result, "RVZ-003")
+def test_bewijs_noemt_de_vormen(result: CoverageResult) -> None:
+    bewijs = _check(result, "ATTR-011").evidence[0]
 
-    assert _counts(check) == {"MdsPlan": 0, "Hyd": 0}
-    assert check.verdict is Verdict.UNTOUCHED
-    assert check in result.untouched
-
-
-def test_attr_011_telt_alleen_lengte_leiding(result: CoverageResult) -> None:
-    check = _check(result, "ATTR-011")
-
-    # Vier "Waarde te groot"-regels per rapport, waarvan drie op Lengte leiding.
-    assert _counts(check) == {"MdsPlan": 3, "Hyd": 3}
-    assert check.evidence[0].aspects == ["Lengte leiding (datatype)"]
+    assert bewijs.shapes == ["LengteLeiding_val"]
+    assert bewijs.row_count > 0
+    assert bewijs.object_count > 0
 
 
-def test_adm_005_telt_gewogen_en_heeft_tegenbewijs(result: CoverageResult) -> None:
-    check = _check(result, "ADM-005")
-
-    assert _counts(check) == {"MdsPlan": 1, "Hyd": 1}
-    assert [item.weighted_count for item in check.evidence] == [33, 33]
-    assert check.has_counter_evidence
-    assert [item.row_count for item in check.counter_evidence] == [3, 0]
-
-
-def test_typeringsvoorbehoud_volgt_de_vereiste_cfk(result: CoverageResult) -> None:
-    # MdsPlan-uittreksel scoort 75% en blijft onder de standaarddrempel van 95%;
-    # het Hyd-uittreksel scoort 100%.
-    assert _check(result, "ADM-004").typing_reliable is False
-    assert _check(result, "ADM-001").typing_reliable is True
-
-
-def test_lagere_drempel_haalt_het_voorbehoud_weg(pair: ReportPair, tmp_path: Path) -> None:
+def test_eigen_mapping_op_vormprefix(analyse: MetingAnalysis, tmp_path: Path) -> None:
     eigen = tmp_path / "eigen.toml"
     eigen.write_text(
         'checkregister_versie = "0.7"\n'
         'bron = "x"\n'
-        "[drempels]\n"
-        "typeringsscore_minimum = 70.0\n"
         "[[check]]\n"
-        'id = "ADM-004"\n'
+        'id = "EIGEN-001"\n'
         'onderwerp = "x"\n'
         'claim = "x"\n'
-        'vereiste_cfk = ["MdsPlan"]\n'
-        'bewijs = [{ melding = "Ontbrekende relatie [hasAspect]" }]\n',
+        'vereiste_cfk = ["Hyd"]\n'
+        'bewijs = [{ vorm_prefix = "Knooppunt_" }]\n',
         encoding="utf-8",
     )
 
-    result = assess_coverage(pair, load_coverage_config(eigen))
+    result = assess_coverage(analyse, load_coverage_config(eigen))
 
+    assert _check(result, "EIGEN-001").verdict is Verdict.TOUCHED
+
+
+def test_zonder_dataset_geen_typeringsvoorbehoud(result: CoverageResult) -> None:
+    # De score is niet te bepalen zonder OroX-bestand; dan valt er niets voor te behouden.
     assert _check(result, "ADM-004").typing_reliable is True
-
-
-def test_ontbrekende_cfk_is_niet_toetsbaar(pair: ReportPair, tmp_path: Path) -> None:
-    # Het paar is aan MdsPlan getoetst, niet aan Mds; er is dus geen vereiste CFK.
-    eigen = tmp_path / "eigen.toml"
-    eigen.write_text(
-        'checkregister_versie = "0.7"\n'
-        'bron = "x"\n'
-        "[[check]]\n"
-        'id = "ALLEEN-MDS"\n'
-        'onderwerp = "x"\n'
-        'claim = "x"\n'
-        'vereiste_cfk = ["Mds"]\n'
-        'bewijs = [{ melding = "Collectie-item onbekend" }]\n',
-        encoding="utf-8",
-    )
-
-    result = assess_coverage(pair, load_coverage_config(eigen))
-
-    assert _check(result, "ALLEEN-MDS").verdict is Verdict.UNVERIFIABLE
-
-
-def test_objecttypefilter_werkt(pair: ReportPair, tmp_path: Path) -> None:
-    eigen = tmp_path / "eigen.toml"
-    eigen.write_text(
-        'checkregister_versie = "0.7"\n'
-        'bron = "x"\n'
-        "[[check]]\n"
-        'id = "ALLEEN-DRAIN"\n'
-        'onderwerp = "x"\n'
-        'claim = "x"\n'
-        'vereiste_cfk = ["MdsPlan", "Hyd"]\n'
-        'bewijs = [{ melding = "Waarde te groot", objecttype = ["Drain"] }]\n',
-        encoding="utf-8",
-    )
-
-    result = assess_coverage(pair, load_coverage_config(eigen))
-
-    assert _counts(_check(result, "ALLEEN-DRAIN")) == {"MdsPlan": 2, "Hyd": 2}

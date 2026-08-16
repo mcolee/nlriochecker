@@ -9,8 +9,8 @@ class ReportFormatError(PipelineError):
     """Een detailrapport heeft niet het verwachte formaat."""
 
 
-class ReportPairError(PipelineError):
-    """Het aangeboden rapportenpaar voldoet niet aan de harde eisen."""
+class NulmetingError(PipelineError):
+    """De aangeboden SHACL-rapporten vormen samen geen geldige nulmeting."""
 
 
 class ConfigError(PipelineError):
@@ -23,3 +23,7 @@ class ComparisonError(PipelineError):
 
 class DatasetError(PipelineError):
     """De OroX-dataset ontbreekt, is onleesbaar of bevat geen toetsbare objecten."""
+
+
+class StudyAreaError(PipelineError):
+    """Het studiegebied ontbreekt, is onleesbaar of staat in een ander stelsel."""

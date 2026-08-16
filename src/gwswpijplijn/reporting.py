@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from gwswpijplijn.analysis import MetingAnalysis
 from gwswpijplijn.checks import CheckRun, Severity
-from gwswpijplijn.comparison import ChangeStatus, PairComparison
+from gwswpijplijn.comparison import ChangeStatus, MetingComparison
 from gwswpijplijn.coverage import CheckEvidence, CoverageResult
 from gwswpijplijn.errors import PipelineError
-from gwswpijplijn.pair import ReportPair
 
 FILE_MARKDOWN = "samenvatting.md"
 FILE_CSV = "geaggregeerde_meldingen.csv"
@@ -32,49 +32,46 @@ TOELICHTING_NIET_GERAAKT = (
 
 
 def write_reports(
-    pair: ReportPair,
+    analyse: MetingAnalysis,
     output_dir: Path,
     coverage: CoverageResult | None = None,
 ) -> tuple[Path, Path]:
     """Schrijft de Markdown-samenvatting en de geaggregeerde CSV naar `output_dir`."""
     output_dir = _prepare(output_dir)
-    return write_markdown(pair, output_dir, coverage), write_csv(pair, output_dir)
+    return write_markdown(analyse, output_dir, coverage), write_csv(analyse, output_dir)
 
 
 def write_markdown(
-    pair: ReportPair,
+    analyse: MetingAnalysis,
     output_dir: Path,
     coverage: CoverageResult | None = None,
 ) -> Path:
     """Schrijft de samenvatting als Markdown en geeft het geschreven pad terug."""
-    target = _check_target(Path(output_dir) / FILE_MARKDOWN, pair)
-    target.write_text(_render_markdown(pair, coverage), encoding="utf-8")
+    target = _check_target(Path(output_dir) / FILE_MARKDOWN, analyse)
+    target.write_text(_render_markdown(analyse, coverage), encoding="utf-8")
     return target
 
 
-def write_csv(pair: ReportPair, output_dir: Path) -> Path:
-    """Schrijft de geaggregeerde meldingen van beide CFK's als een enkele CSV."""
-    target = _check_target(Path(output_dir) / FILE_CSV, pair)
-    _aggregated_table(pair).to_csv(target, sep=";", index=False, encoding="utf-8")
+def write_csv(analyse: MetingAnalysis, output_dir: Path) -> Path:
+    """Schrijft de geaggregeerde meldingen van alle CFK's als een enkele CSV."""
+    target = _check_target(Path(output_dir) / FILE_CSV, analyse)
+    _aggregated_table(analyse).to_csv(target, sep=";", index=False, encoding="utf-8")
     return target
 
 
-def _aggregated_table(pair: ReportPair) -> pd.DataFrame:
-    """Zet beide analyses onder elkaar in een lang formaat met een CFK-kolom."""
+def _aggregated_table(analyse: MetingAnalysis) -> pd.DataFrame:
+    """Zet de analyses van alle CFK's onder elkaar met een CFK-kolom."""
     parts = []
-    for analysis in (pair.mds, pair.hyd):
-        part = analysis.by_message_and_object_type.copy()
-        part.insert(0, "CFK", analysis.report.cfk)
+    for cfk in analyse.meting.cfks:
+        part = analyse.per_cfk[cfk].by_shape_and_object_type.copy()
+        part.insert(0, "CFK", cfk)
         parts.append(part)
-    return pd.concat(parts, ignore_index=True)
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
 
-def _check_target(target: Path, pair: ReportPair) -> Path:
+def _check_target(target: Path, analyse: MetingAnalysis) -> Path:
     """Weigert te schrijven als het doelpad een van de invoerbestanden is."""
-    inputs = {
-        pair.mds.report.source_file.resolve(),
-        pair.hyd.report.source_file.resolve(),
-    }
+    inputs = {rapport.source_file.resolve() for rapport in analyse.meting.reports.values()}
     if target.resolve() in inputs:
         raise PipelineError(
             f"{target}: de uitvoer zou een invoerbestand overschrijven. Kies een andere uitvoermap."
@@ -89,81 +86,71 @@ def _prepare(output_dir: Path) -> Path:
     return output_dir
 
 
-def _render_markdown(pair: ReportPair, coverage: CoverageResult | None = None) -> str:
+def _render_markdown(analyse: MetingAnalysis, coverage: CoverageResult | None = None) -> str:
     """Stelt de volledige Markdown-samenvatting samen."""
+    meting = analyse.meting
     lines = [
-        f"# Nulmeting-samenvatting {pair.dataset}",
+        f"# Nulmeting-samenvatting {meting.dataset_file}",
         "",
         "## Herkomst",
         "",
-        "| CFK | Bronbestand | Toetsmoment | Meldingregels | Totaal Aantal |",
-        "| --- | --- | ---: | ---: | ---: |",
+        "| CFK | Bronbestand | Toetsmoment | Meldingen | Fouten | Waarschuwingen |",
+        "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
-    for analysis in (pair.mds, pair.hyd):
-        report = analysis.report
+    for cfk in meting.cfks:
+        deel = analyse.per_cfk[cfk]
         lines.append(
-            f"| {report.cfk} | `{report.source_file}` | "
-            f"{report.timestamp:%Y-%m-%d %H:%M:%S} | {len(report.messages)} | "
-            f"{analysis.total_count} |"
+            f"| {cfk} | `{deel.report.source_file.name}` | "
+            f"{deel.report.timestamp:%Y-%m-%d %H:%M:%S} | {deel.total_count} | "
+            f"{deel.error_count} | {deel.warning_count} |"
         )
-    if pair.timestamps_differ:
+    if meting.timestamps_differ:
         lines += [
             "",
-            "> **Let op:** de twee rapporten komen uit verschillende toetsmomenten.",
+            "> **Let op:** de rapporten komen uit verschillende toetsmomenten.",
         ]
 
     lines += ["", "## Typeringspoort", ""]
-    lines += _typing_section(pair)
+    lines += _typing_section(analyse)
 
     if coverage is not None:
         lines += ["", "## Dekking van de geschrapte checks", ""]
         lines += _coverage_section(coverage)
 
-    for analysis in (pair.mds, pair.hyd):
-        lines += ["", f"## Meldingen CFK {analysis.report.cfk}", ""]
-        lines += _table(
-            analysis.by_message_type.head(TOP_N),
-            _title("Meldingstypen", analysis.by_message_type),
-        )
+    for cfk in meting.cfks:
+        deel = analyse.per_cfk[cfk]
+        lines += ["", f"## Meldingen CFK {cfk}", ""]
+        lines += _table(deel.by_shape.head(TOP_N), _title("SHACL-vormen", deel.by_shape))
         lines += [""]
-        lines += _table(
-            analysis.by_object_type.head(TOP_N),
-            _title("Objecttypen", analysis.by_object_type),
-        )
+        lines += _table(deel.by_object_type.head(TOP_N), _title("Objecttypen", deel.by_object_type))
 
     return "\n".join(lines) + "\n"
 
 
-def _typing_section(pair: ReportPair) -> list[str]:
-    """Bouwt de sectie over de typeringspoort, inclusief de ondergrens-toelichting."""
+def _typing_section(analyse: MetingAnalysis) -> list[str]:
+    """Bouwt de sectie over de typeringspoort."""
     lines = [
-        "Meldingen van het type *Objecttype te globaal voor deze CFK* maken vervolg-",
-        "validaties voor die objecten onbetrouwbaar. De score hieronder is een",
-        "**ondergrens**: het detailrapport bevat alleen objecten met minstens een",
-        "melding, dus objecten zonder meldingen ontbreken in de noemer.",
+        "De SHACL-meting benoemt de klassen die binnen een conformiteitsklasse te",
+        "globaal zijn; vervolgvalidaties op objecten van die klassen zijn daardoor",
+        "onbetrouwbaar. De instanties volgen uit de dataset, dus zonder OroX-bestand",
+        "is er wel een klassenlijst maar geen score.",
         "",
-        "| CFK | Typeringsscore | Te globaal getypeerd | Benoemde objecten |",
-        "| --- | ---: | ---: | ---: |",
+        "| CFK | Te globale klassen | Objecten | Typeringsscore |",
+        "| --- | --- | ---: | ---: |",
     ]
-    for analysis in (pair.mds, pair.hyd):
-        gate = analysis.typing_gate
-        lines.append(
-            f"| {analysis.report.cfk} | {gate.score:.1f}% | {gate.too_generic_count} | "
-            f"{gate.named_object_count} |"
-        )
+    for cfk in analyse.meting.cfks:
+        gate = analyse.per_cfk[cfk].typing_gate
+        klassen = ", ".join(gate.classes) or "geen"
+        score = f"{gate.score:.1f}%" if gate.score is not None else "\u2014"
+        objecten = str(gate.too_generic_count) if gate.resolved else "\u2014"
+        lines.append(f"| {cfk} | {klassen} | {objecten} | {score} |")
 
-    for analysis in (pair.mds, pair.hyd):
-        gate = analysis.typing_gate
-        if gate.too_generic_count == 0:
-            continue
-        per_type = (
-            gate.objects.groupby("Type object").size().sort_values(ascending=False).reset_index()
-        )
-        per_type.columns = ["Type object", "Objecten"]
-        lines += ["", f"### Te globaal getypeerde objecten ({analysis.report.cfk})", ""]
-        lines += _table(per_type, "Per objecttype")
-        examples = ", ".join(f"`{name}`" for name in gate.objects["Naam"].head(10))
-        lines += ["", f"Eerste tien objecten: {examples}"]
+    if not any(analyse.per_cfk[cfk].typing_gate.resolved for cfk in analyse.meting.cfks):
+        lines += [
+            "",
+            "> Er is geen OroX-dataset meegegeven, dus het aantal betrokken objecten en "
+            "de score zijn niet te bepalen. Geef `--dataset` op voor een volledig beeld.",
+        ]
 
     return lines
 
@@ -225,7 +212,6 @@ def _coverage_table(result: CoverageResult) -> pd.DataFrame:
                         "Rol": rol,
                         "Vereist": item.required,
                         "Meldingregels": item.row_count,
-                        "Aantal": item.weighted_count,
                         "Objecten": item.object_count,
                     }
                 )
@@ -238,7 +224,6 @@ def _coverage_table(result: CoverageResult) -> pd.DataFrame:
             "Rol",
             "Vereist",
             "Meldingregels",
-            "Aantal",
             "Objecten",
         ],
     )
@@ -321,18 +306,17 @@ def _evidence_frame(evidence: list[CheckEvidence]) -> pd.DataFrame:
                 "CFK": item.cfk,
                 "Vereist": "ja" if item.required else "nee",
                 "Meldingregels": item.row_count,
-                "Aantal": item.weighted_count,
                 "Objecten": item.object_count,
-                "Aspecten": ", ".join(item.aspects) or "—",
+                "Vormen": ", ".join(item.shapes) or "—",
             }
             for item in evidence
         ],
-        columns=["CFK", "Vereist", "Meldingregels", "Aantal", "Objecten", "Aspecten"],
+        columns=["CFK", "Vereist", "Meldingregels", "Objecten", "Vormen"],
     )
 
 
 def write_comparison_reports(
-    comparison: PairComparison, output_dir: Path
+    comparison: MetingComparison, output_dir: Path
 ) -> tuple[Path, Path, Path]:
     """Schrijft de vergelijking als Markdown plus twee CSV's."""
     output_dir = _prepare(output_dir)
@@ -349,13 +333,13 @@ def write_comparison_reports(
     return markdown_path, csv_path, objects_path
 
 
-def _comparison_table(comparison: PairComparison) -> pd.DataFrame:
+def _comparison_table(comparison: MetingComparison) -> pd.DataFrame:
     """Zet de aggregaatdelta's van beide CFK's onder elkaar."""
     parts = []
     for item in comparison.per_cfk:
         for niveau, frame, sleutel in (
-            ("meldingtype", item.by_message_type, "Type Melding"),
-            ("objecttype", item.by_object_type, "Type object"),
+            ("vorm", item.by_shape, "Source"),
+            ("objecttype", item.by_object_type, "Objecttype"),
         ):
             deel = frame.rename(columns={sleutel: "Sleutel"}).copy()
             deel.insert(0, "CFK", item.cfk)
@@ -364,7 +348,7 @@ def _comparison_table(comparison: PairComparison) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
-def _object_changes_table(comparison: PairComparison) -> pd.DataFrame:
+def _object_changes_table(comparison: MetingComparison) -> pd.DataFrame:
     """Zet de objectverschillen van beide CFK's onder elkaar."""
     parts = []
     for item in comparison.per_cfk:
@@ -374,21 +358,22 @@ def _object_changes_table(comparison: PairComparison) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
-def _render_comparison(comparison: PairComparison) -> str:
+def _render_comparison(comparison: MetingComparison) -> str:
     """Stelt het volledige vergelijkingsrapport samen."""
     lines = [
-        f"# Trendvergelijking {comparison.dataset}",
+        f"# Trendvergelijking {comparison.dataset_file}",
         "",
-        "| Meetmoment | CFK | Toetsmoment | Meldingregels | Totaal Aantal | Typeringsscore |",
+        "| Meetmoment | CFK | Toetsmoment | Meldingen | Fouten | Typeringsscore |",
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
-    for label, pair in (("eerder", comparison.earlier), ("later", comparison.later)):
-        for analysis in (pair.mds, pair.hyd):
+    for label, kant in (("eerder", comparison.earlier), ("later", comparison.later)):
+        for cfk in kant.meting.cfks:
+            deel = kant.per_cfk[cfk]
+            score = deel.typing_gate.score
             lines.append(
-                f"| {label} | {analysis.report.cfk} | "
-                f"{analysis.report.timestamp:%Y-%m-%d %H:%M:%S} | "
-                f"{len(analysis.report.messages)} | {analysis.total_count} | "
-                f"{analysis.typing_gate.score:.1f}% |"
+                f"| {label} | {cfk} | {deel.report.timestamp:%Y-%m-%d %H:%M:%S} | "
+                f"{deel.total_count} | {deel.error_count} | "
+                f"{f'{score:.1f}%' if score is not None else '—'} |"
             )
 
     if comparison.timestamps_out_of_order:
@@ -404,8 +389,7 @@ def _render_comparison(comparison: PairComparison) -> str:
     for item in comparison.per_cfk:
         lines += ["", f"## CFK {item.cfk}", ""]
         lines += [
-            f"Totaal Aantal {item.total_delta:+d}, "
-            f"typeringsscore {item.typing_score_delta:+.1f} procentpunt.",
+            f"Meldingen {item.total_delta:+d}, waarvan fouten {item.error_delta:+d}.",
             "",
         ]
         telling = item.status_counts()
@@ -418,12 +402,12 @@ def _render_comparison(comparison: PairComparison) -> str:
             "",
         ]
         lines += _table(
-            _grootste_verschillen(item.by_message_type, "Type Melding"),
-            "Grootste verschillen per meldingtype",
+            _grootste_verschillen(item.by_shape, "Source"),
+            "Grootste verschillen per SHACL-vorm",
         )
         lines += [""]
         lines += _table(
-            _grootste_verschillen(item.by_object_type, "Type object"),
+            _grootste_verschillen(item.by_object_type, "Objecttype"),
             "Grootste verschillen per objecttype",
         )
 
@@ -533,6 +517,20 @@ def _render_checks(run: CheckRun) -> str:
         ]
         lines += [f"> - `{sample}`" for sample in fallback.samples]
         lines += [""]
+
+    if run.study_area is not None:
+        gebied = run.study_area
+        weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
+        lines += [
+            f"**Studiegebied:** {gebied.name} ({gebied.area_ha:.1f} ha, "
+            f"{gebied.feature_count} vlak(ken), bron `{gebied.source.name}`).",
+            "",
+            f"> De checks zijn op de volledige dataset gedraaid en pas daarna afgebakend, "
+            f"zodat netwerkchecks geen randeffecten krijgen van strengen die het gebied "
+            f"uit lopen. **{weggelaten} bevindingen vielen buiten het gebied** en staan "
+            "hier niet in; dit rapport zegt dus niets over de rest van de dataset.",
+            "",
+        ]
 
     if run.dataset.ontologies:
         namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)

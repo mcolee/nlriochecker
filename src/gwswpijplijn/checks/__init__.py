@@ -11,6 +11,7 @@ from gwswpijplijn.checks.base import (
     Dimension,
     Finding,
     Severity,
+    objecten_in_gebied,
     register,
     run_checks,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "Dimension",
     "Finding",
     "Severity",
+    "objecten_in_gebied",
     "register",
     "run_checks",
 ]

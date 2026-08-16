@@ -1,9 +1,10 @@
-# Mapping van meldingtypen uit de GWSW-nulmeting-detailrapporten op de dekkingclaims
-# van de geschrapte checks uit het checkregister.
+# Mapping van SHACL-vormen uit de GWSW-nulmeting op de dekkingclaims van de
+# geschrapte checks uit het checkregister.
 #
-# De veldwaarden 'onderwerp' en 'claim' zijn letterlijk overgenomen uit de tabel
+# De velden 'onderwerp' en 'claim' zijn letterlijk overgenomen uit de tabel
 # "Geschrapte checks" van het checkregister, zodat dit bestand auditeerbaar blijft
-# tegen die versie. Pas de patronen aan per project; niets is hardcoded in de code.
+# tegen die versie. De vormnamen zijn geverifieerd tegen de drie SHACL-rapporten
+# over dewolden_orox.ttl. Pas ze aan per project; niets is hardcoded in de code.
 
 checkregister_versie = "0.7"
 bron = "data/checkregister-gwsw-nulmeting-v0_7.md"
@@ -19,10 +20,12 @@ onderwerp = "Streng verwijst naar niet-bestaande begin- of eindput"
 claim = """Generieke melding gerefereerd object onbekend (CFK-onafhankelijk); \
 verplichte aanwezigheid van de koppeling alleen via Hyd (hasConnection Knooppunt \
 exact=1); Mds eist slechts max=1"""
-vereiste_cfk = ["Hyd"]
+# Anders dan het register stelt, vuren deze vormen in alle drie de CFK's.
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 bewijs = [
-  { melding = "Ontbrekende relatie [hasConnection]", aspect = ["Knooppunt"] },
-  { melding_prefix = "Gerefereerd object onbekend" },
+  { vorm = "BeginpuntLeiding_Knooppunt_card" },
+  { vorm = "EindpuntLeiding_Knooppunt_card" },
+  { vorm = "Knooppunt_Netwerk_conn" },
 ]
 tegenbewijs = []
 
@@ -32,19 +35,14 @@ onderwerp = "Verplichte GWSW-MdS-attributen niet gevuld"
 claim = """Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, \
 lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, \
 maaiveldhoogte); Hyd aanvullend inclusief BOB's en afmetingen exact=1"""
-vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 bewijs = [
-  { melding = "Ontbrekende relatie [hasAspect]", aspect = [
-    "Materiaal leiding",
-    "Vorm leiding",
-    "Lengte leiding",
-    "Breedte leiding",
-    "Hoogte leiding",
-    "Putdekselniveau",
-    "Maaiveldhoogte",
-    "B.o.b. beginpunt leiding",
-    "B.o.b. eindpunt leiding",
-  ] },
+  { vorm = "Leiding_MateriaalLeiding_card" },
+  { vorm = "Leiding_VormLeiding_card" },
+  { vorm = "Put_VormPut_card" },
+  { vorm = "Put_MateriaalPut_card" },
+  { vorm = "Put_HoogtePut_card" },
+  { vorm = "Rioolput_Maaiveldschematisering_card" },
 ]
 tegenbewijs = []
 
@@ -52,24 +50,21 @@ tegenbewijs = []
 id = "ADM-005"
 onderwerp = "Attribuutwaarden buiten de GWSW-domeinlijsten"
 claim = "Beide CFK's: collectietoetsing hasReference"
-vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
+# De collectietoetsing verschijnt als vormen die op _ref eindigen.
 bewijs = [
-  { melding = "Collectie-item onbekend" },
+  { vorm_prefix = "MateriaalPut_ref" },
 ]
-# Deze melding zegt dat een collectie in deze CFK juist niet getoetst wordt; dat is
-# een gat in de dekking waar ADM-005 op leunt.
-tegenbewijs = [
-  { melding_prefix = "Collectie ontbreekt in deze CFK" },
-]
+tegenbewijs = []
 
 [[check]]
 id = "ATTR-011"
 onderwerp = "Absurde lengtewaarde boven harde bovengrens"
 claim = """Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype \
 Dt_LengteLeiding)"""
-vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 bewijs = [
-  { melding = "Waarde te groot", aspect = ["Lengte leiding (datatype)"] },
+  { vorm = "LengteLeiding_val" },
 ]
 tegenbewijs = []
 
@@ -77,9 +72,12 @@ tegenbewijs = []
 id = "RVZ-002"
 onderwerp = "Overstort zonder geregistreerde drempelhoogte"
 claim = "Beide CFK's: Drempelniveau exact=1 (Mds) / min=1 (Hyd)"
-vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
+# In de SHACL-rapporten over De Wolden komt geen enkele vorm op Drempelniveau voor;
+# de dichtstbijzijnde vorm toetst of de overstortput een drempel *heeft*, niet of
+# het niveau ervan geregistreerd is.
 bewijs = [
-  { melding = "Ontbrekende relatie [hasAspect]", aspect = ["Drempelniveau"] },
+  { vorm_prefix = "Drempelniveau" },
 ]
 tegenbewijs = []
 
@@ -89,6 +87,6 @@ onderwerp = "Overstort zonder geregistreerde drempelbreedte"
 claim = "Alleen Hyd: Drempelbreedte exact=1; Mds staat ontbreken toe (max=1, geen min-eis)"
 vereiste_cfk = ["Hyd"]
 bewijs = [
-  { melding = "Ontbrekende relatie [hasAspect]", aspect = ["Drempelbreedte"] },
+  { vorm_prefix = "Drempelbreedte" },
 ]
 tegenbewijs = []

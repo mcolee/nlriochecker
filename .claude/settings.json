@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
-    "python-library-complete@dev-skills": true
+    "python-library-complete@dev-skills": true,
+    "superpowers@claude-plugins-official": true
   }
 }

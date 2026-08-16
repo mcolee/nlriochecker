@@ -15,20 +15,25 @@ DEFAULT_CONFIG_NAME = "dekking.toml"
 
 
 class MessagePattern(BaseModel):
-    """Een patroon dat meldingen selecteert op meldingtype, aspect en objecttype."""
+    """Een patroon dat SHACL-meldingen selecteert op vorm, objecttype en ernst.
+
+    De SHACL-nulmeting benoemt de geschonden regel als vormnaam (kolom Source),
+    bijvoorbeeld `LengteLeiding_val`. Dat is aanmerkelijk preciezer dan de vrije
+    meldingtekst van het vervallen detailrapportformaat.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    melding: str | None = None
-    melding_prefix: str | None = None
-    aspect: list[str] = Field(default_factory=list)
+    vorm: str | None = None
+    vorm_prefix: str | None = None
     objecttype: list[str] = Field(default_factory=list)
+    ernst: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _precies_een_meldingveld(self) -> Self:
-        """Eist precies een van `melding` en `melding_prefix`."""
-        if (self.melding is None) == (self.melding_prefix is None):
-            raise ValueError("geef precies een van 'melding' of 'melding_prefix' op")
+    def _precies_een_vormveld(self) -> Self:
+        """Eist precies een van `vorm` en `vorm_prefix`."""
+        if (self.vorm is None) == (self.vorm_prefix is None):
+            raise ValueError("geef precies een van 'vorm' of 'vorm_prefix' op")
         return self
 
 

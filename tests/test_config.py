@@ -23,7 +23,7 @@ id = "EIGEN-001"
 onderwerp = "Zelfbedachte check"
 claim = "Eigen claim"
 vereiste_cfk = ["Hyd"]
-bewijs = [{ melding = "Collectie-item onbekend" }]
+bewijs = [{ vorm = "MateriaalPut_ref" }]
 """
 
 
@@ -39,13 +39,19 @@ def test_rvz_003_leunt_uitsluitend_op_hyd() -> None:
     mapping = load_coverage_config().mapping("RVZ-003")
 
     assert mapping.vereiste_cfk == ["Hyd"]
-    assert mapping.bewijs[0].aspect == ["Drempelbreedte"]
+    assert mapping.bewijs[0].vorm_prefix == "Drempelbreedte"
 
 
-def test_adm_005_heeft_tegenbewijs() -> None:
-    mapping = load_coverage_config().mapping("ADM-005")
+def test_adm_001_leunt_op_de_koppelingsvormen() -> None:
+    """Anders dan het register stelt, vuren deze vormen in alle drie de CFK's."""
+    mapping = load_coverage_config().mapping("ADM-001")
 
-    assert mapping.tegenbewijs[0].melding_prefix == "Collectie ontbreekt in deze CFK"
+    assert mapping.vereiste_cfk == ["Hyd", "MdsPlan", "MdsProj"]
+    assert [patroon.vorm for patroon in mapping.bewijs] == [
+        "BeginpuntLeiding_Knooppunt_card",
+        "EindpuntLeiding_Knooppunt_card",
+        "Knooppunt_Netwerk_conn",
+    ]
 
 
 def test_eigen_config_vervangt_de_standaard(tmp_path: Path) -> None:
@@ -74,8 +80,8 @@ def test_ongeldige_toml_geeft_configerror(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("vervanging", "melding"),
     [
-        ('bewijs = [{ melding = "A", melding_prefix = "B" }]', "precies een"),
-        ('bewijs = [{ aspect = ["A"] }]', "precies een"),
+        ('bewijs = [{ vorm = "A", vorm_prefix = "B" }]', "precies een"),
+        ('bewijs = [{ objecttype = ["A"] }]', "precies een"),
         ("vereiste_cfk = []", "at least 1"),
         ("bewijs = []", "at least 1"),
     ],

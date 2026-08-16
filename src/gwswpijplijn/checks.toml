@@ -50,3 +50,8 @@ dubbele_put_tolerantie_m = 0.30
 #   bob            - afgeleid uit het bodemverloop, met terugval op de
 #                    administratieve richting bij ontbrekende of gelijke BOB's
 richting = "administratief"
+
+[nulmeting]
+# De conformiteitsklassen die de GWSW-server aanbiedt en die alle drie aanwezig
+# moeten zijn. Ontbreekt er een, dan faalt de pijplijn.
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]

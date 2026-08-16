@@ -1,0 +1,27 @@
+Rapport SHACL-meting dd;2026-08-16T12:51:51
+Gevalideerd RDF-bestand;dewolden_orox.ttl
+Gebruikte SHACL-processor;TopBraid 1.4.4
+SHACL-meting op basis GWSW;ja
+SHACL-meting op basis CFK;Hyd
+Lokale kwaliteitseisen uit bestand;geen
+Gevalideerd op onderdelen;Datatype kenmerk, Waardebereik kenmerk, Collectiewaarde kenmerk, Kardinaliteit, Datatype object, GWSW-relaties, GWSW-types, CFK-types, Verbindingen netwerk
+Niet gevalideerd op;Geen, alle metingen gedaan
+Maximaal aantal meldingen;onbeperkt
+
+Draaitijd;(227.2 sec bezig)
+Rapport 'conforms';false
+
+Focus node;Source;Value;Severity;Message;Path;Detail-message;Detail-value;
+lei9624-9682-1_lei9384_beg9384;BeginpuntLeiding_Knooppunt_card;te weinig voorkomens;Violation;Subject BeginpuntLeiding, path hasConnection, object Knooppunt - aantal voorkomens wijkt af (exact=1);b1003;;Focus-node: type=BeginpuntLeiding, hasAspect=lei9624-9682-1_lei9384_beg9384_bob, hasConnection=knp9624_put
+lei2577-2568-1_lei2445_beg2445;BeginpuntLeiding_Knooppunt_card;te weinig voorkomens;Violation;Subject BeginpuntLeiding, path hasConnection, object Knooppunt - aantal voorkomens wijkt af (exact=1);b1008;;Focus-node: type=BeginpuntLeiding, hasAspect=lei2577-2568-1_lei2445_beg2445_bob, hasConnection=knp2577_put
+lei2422-2441-1_lei2315_ein2315;EindpuntLeiding_Knooppunt_card;te weinig voorkomens;Violation;Subject EindpuntLeiding, path hasConnection, object Knooppunt - aantal voorkomens wijkt af (exact=1);b100003;;Focus-node: type=EindpuntLeiding, hasAspect=lei2422-2441-1_lei2315_ein2315_bob, hasConnection=knp2441_put
+lei5448-5200-1_lei5139_ein5139;EindpuntLeiding_Knooppunt_card;te weinig voorkomens;Violation;Subject EindpuntLeiding, path hasConnection, object Knooppunt - aantal voorkomens wijkt af (exact=1);b100008;;Focus-node: type=EindpuntLeiding, hasAspect=lei5448-5200-1_lei5139_ein5139_bob, hasConnection=knp5200_put
+knp2483;Knooppunt_Netwerk_conn;knp2483_put2483;Violation;Knooppunt (orientatie van Put, Bouwwerk, Compartiment, Hulpstuk, Aansluitpunt) heeft geen verbinding;hasAspect;;Focus-node: type=T_stuk, label=ID3499, hasAspect=knp2483_put2483
+knp2484;Knooppunt_Netwerk_conn;knp2484_put2484;Violation;Knooppunt (orientatie van Put, Bouwwerk, Compartiment, Hulpstuk, Aansluitpunt) heeft geen verbinding;hasAspect;;Focus-node: type=T_stuk, label=ID3500, hasAspect=knp2484_put2484
+knp7202;MateriaalPut_ref;Metselwerk ;Warning;Kenmerk MateriaalPut - waarde wijkt af (ontbreekt in collectie MateriaalPutColl);hasAspect;;Focus-node: type=Inspectieput, label=Wi1G0004, hasAspect=knp7202_bre, hasAspect=knp7202_len, hasAspect=knp7202_put, hasAspect=knp7202_mat, hasAspect=knp7202_vor
+knp8759;MateriaalPut_ref;Metselwerk ;Warning;Kenmerk MateriaalPut - waarde wijkt af (ontbreekt in collectie MateriaalPutColl);hasAspect;;Focus-node: type=Inspectieput, label=Zu1G0766, hasAspect=knp8759_bre, hasAspect=knp8759_len, hasAspect=knp8759_put, hasAspect=knp8759_mat, hasAspect=knp8759_bgd
+lei1551-1476-1;LengteLeiding_val;164.200 (decimal) ;Warning;Kenmerk LengteLeiding - waarde wijkt af (min=1,max=75);hasAspect;;Focus-node: type=Persleiding, label=388837-350724-1, hasAspect=lei1551-1476-1_len, hasAspect=lei1551-1476-1_mat, hasAspect=lei1551-1476-1_bre, hasAspect=lei1551-1476-1_hoo, hasAspect=lei1551-1476-1_lei1575, hasAspect=lei1551-1476-1_vor, hasAspect=lei1551-1476-1_wan, hasAspect=lei1551-1476-1xwan, hasAspect=lei1551-1476-1_wib
+lei2016-2009-1;LengteLeiding_val;844.800 (decimal) ;Warning;Kenmerk LengteLeiding - waarde wijkt af (min=1,max=75);hasAspect;;Focus-node: type=Persleiding, label=ID5390-ID4363-1, hasAspect=lei2016-2009-1_len, hasAspect=lei2016-2009-1_mat, hasAspect=lei2016-2009-1_bre, hasAspect=lei2016-2009-1_hoo, hasAspect=lei2016-2009-1_bgd, hasAspect=lei2016-2009-1_lei1905, hasAspect=lei2016-2009-1_vor, hasAspect=lei2016-2009-1_wan, hasAspect=lei2016-2009-1xwan, hasAspect=lei2016-2009-1_wib
+lei12752-14118-1;Leiding_MateriaalLeiding_card;te weinig voorkomens;Violation;Subject Leiding, path hasAspect, object MateriaalLeiding - aantal voorkomens wijkt af (exact=1);hasAspect;;Focus-node: type=Drain, label=368493-Ho2H0694-1, hasAspect=lei12752-14118-1_len, hasAspect=lei12752-14118-1_bre, hasAspect=lei12752-14118-1_hoo, hasAspect=lei12752-14118-1_bgd, hasAspect=lei12752-14118-1_lei12364, hasAspect=lei12752-14118-1_vor, hasAspect=lei12752-14118-1_wan, hasAspect=lei12752-14118-1xwan, hasAspect=lei12752-14118-1_wib
+lei21710-21711-1;Leiding_MateriaalLeiding_card;te weinig voorkomens;Violation;Subject Leiding, path hasAspect, object MateriaalLeiding - aantal voorkomens wijkt af (exact=1);hasAspect;;Focus-node: type=Persleiding, label=335295-335296-1, hasAspect=lei21710-21711-1_len, hasAspect=lei21710-21711-1_bre, hasAspect=lei21710-21711-1_hoo, hasAspect=lei21710-21711-1_lei21575, hasAspect=lei21710-21711-1_wan, hasAspect=lei21710-21711-1xwan, hasAspect=lei21710-21711-1_wib
+Rioolstelsel;CfkTypes_typ;;Violation;Type individu wijkt af (is abstract, te globaal binnen CFK);b95261;;

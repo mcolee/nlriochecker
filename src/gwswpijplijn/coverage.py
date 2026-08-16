@@ -7,9 +7,8 @@ from enum import StrEnum
 
 import pandas as pd
 
-from gwswpijplijn.analysis import ReportAnalysis
+from gwswpijplijn.analysis import MetingAnalysis, ReportAnalysis
 from gwswpijplijn.config import CheckMapping, CoverageConfig, MessagePattern
-from gwswpijplijn.pair import ReportPair
 
 
 class Verdict(StrEnum):
@@ -27,9 +26,8 @@ class CheckEvidence:
     cfk: str
     required: bool
     row_count: int
-    weighted_count: int
     object_count: int
-    aspects: list[str]
+    shapes: list[str]
 
     @property
     def found(self) -> bool:
@@ -72,11 +70,11 @@ class CoverageResult:
         return [check for check in self.checks if check.verdict is not Verdict.TOUCHED]
 
 
-def assess_coverage(pair: ReportPair, config: CoverageConfig) -> CoverageResult:
-    """Toetst elke geconfigureerde dekkingclaim tegen de meldingen van het paar."""
-    analyses = [pair.mds, pair.hyd]
+def assess_coverage(analyse: MetingAnalysis, config: CoverageConfig) -> CoverageResult:
+    """Toetst elke geconfigureerde dekkingclaim tegen de meldingen van de nulmeting."""
+    analyses = [analyse.per_cfk[cfk] for cfk in analyse.meting.cfks]
     checks = [_assess_check(mapping, analyses, config) for mapping in config.check]
-    return CoverageResult(dataset=pair.dataset, config=config, checks=checks)
+    return CoverageResult(dataset=analyse.meting.dataset_file, config=config, checks=checks)
 
 
 def _assess_check(
@@ -101,11 +99,13 @@ def _assess_check(
         verdict = Verdict.UNTOUCHED
 
     minimum = config.drempels.typeringsscore_minimum
-    typing_reliable = all(
-        analysis.typing_gate.score >= minimum
+    scores = [
+        analysis.typing_gate.score
         for analysis in analyses
-        if analysis.report.cfk in mapping.vereiste_cfk
-    )
+        if analysis.cfk in mapping.vereiste_cfk and analysis.typing_gate.score is not None
+    ]
+    # Zonder dataset is er geen score; dan valt er ook niets voor te behouden.
+    typing_reliable = all(score >= minimum for score in scores)
 
     return CheckCoverage(
         mapping=mapping,
@@ -122,38 +122,36 @@ def _gather(
     patterns: list[MessagePattern],
 ) -> CheckEvidence:
     """Telt de meldingen van een rapport die aan een van de patronen voldoen."""
-    messages = analysis.report.messages
-    matched = messages[_mask(messages, patterns)]
-    named = matched[matched["Naam"].str.strip() != ""]
+    meldingen = analysis.report.findings
+    geraakt = meldingen[_mask(meldingen, patterns)] if len(meldingen) else meldingen
 
     return CheckEvidence(
-        cfk=analysis.report.cfk,
-        required=analysis.report.cfk in mapping.vereiste_cfk,
-        row_count=len(matched),
-        weighted_count=int(matched["Aantal"].sum()),
-        object_count=len(named[["Type object", "Naam"]].drop_duplicates()),
-        aspects=sorted(set(matched["Type aspect"])),
+        cfk=analysis.cfk,
+        required=analysis.cfk in mapping.vereiste_cfk,
+        row_count=len(geraakt),
+        object_count=len(set(geraakt["Focus node"])) if len(geraakt) else 0,
+        shapes=sorted(set(geraakt["Source"])) if len(geraakt) else [],
     )
 
 
-def _mask(messages: pd.DataFrame, patterns: list[MessagePattern]) -> pd.Series:
+def _mask(meldingen: pd.DataFrame, patterns: list[MessagePattern]) -> pd.Series:
     """Bouwt een booleaans masker: waar als de regel aan minstens een patroon voldoet."""
-    total = pd.Series(False, index=messages.index)
+    total = pd.Series(False, index=meldingen.index)
     for pattern in patterns:
-        total |= _pattern_mask(messages, pattern)
+        total |= _pattern_mask(meldingen, pattern)
     return total
 
 
-def _pattern_mask(messages: pd.DataFrame, pattern: MessagePattern) -> pd.Series:
+def _pattern_mask(meldingen: pd.DataFrame, pattern: MessagePattern) -> pd.Series:
     """Bouwt het masker van een enkel patroon; lege lijsten filteren niet."""
-    if pattern.melding is not None:
-        mask = messages["Type Melding"] == pattern.melding
+    if pattern.vorm is not None:
+        mask = meldingen["Source"] == pattern.vorm
     else:
-        mask = messages["Type Melding"].str.startswith(pattern.melding_prefix)
+        mask = meldingen["Source"].str.startswith(pattern.vorm_prefix)
 
-    if pattern.aspect:
-        mask &= messages["Type aspect"].isin(pattern.aspect)
     if pattern.objecttype:
-        mask &= messages["Type object"].isin(pattern.objecttype)
+        mask &= meldingen["Objecttype"].isin(pattern.objecttype)
+    if pattern.ernst:
+        mask &= meldingen["Severity"].isin(pattern.ernst)
 
     return mask
