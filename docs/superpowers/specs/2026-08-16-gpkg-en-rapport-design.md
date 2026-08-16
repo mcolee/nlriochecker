@@ -557,6 +557,10 @@ Na elke wijziging `pytest` en `ruff`; vóór de commit `/superpowers:requesting-
 | 6 | Instructie §A6 | CSV-kolomnamen in de bestaande CamelCase-stijl; GPKG wél snake_case | Hernoemen breekt bestaande tests en verwerking zonder tegenprestatie |
 | 7 | Ontwerp §2.3 | Hash uitgebreid met identificerende detailsleutels | `check_id + feature_id + feature_id_2` botst bij HGT-003-paren op dezelfde streng |
 | 8 | Ontwerp §5.2 | `gebied` uit het studiegebiedbestand in plaats van een aparte buurtenlaag | Er is geen dekkende buurtenlaag, en die is bij een begrensde export niet nodig |
+| 9 | Instructie §A6, ontwerp §2.3 | `object2` alleen gevuld bij TOP-005, TOP-006, TOP-010 en TOP-011 | TOP-013 en TOP-019 hebben geen enkele tegenpartij maar een verzameling; die staat in de details, niet in een kolom die één object suggereert |
+| 10 | Ontwerp §3 | `Check.id_sleutels` heeft `("zijde",)` als default in plaats van `()` | Negen meldingen in vier modules gebruiken `zijde` als onderscheid; een lege default zou botsingen laten afhangen van wie eraan denkt. Een check met een eigen onderscheid declareert dat nog steeds zelf (ATTR-005 doet dat met `kenmerk`) |
+| 11 | Ontwerp §7.3 | Symboolgrootte is vast per ernstcategorie, niet afgeleid van `n_fout + n_waarschuwing` | Een data-defined grootte is QGIS-versiegevoelige XML die zonder QGIS in de buildomgeving niet te verifiëren is. Dezelfde afweging als bij het `.qgz`-bestand: liever een stijl die aantoonbaar werkt dan een die het misschien doet |
+| 12 | Ontwerp §6.6 | `taal.LIDWOORDEN` bevat twee woorden, niet de negen uit de opsomming | Alleen woorden opnemen die daadwerkelijk in een meldingsjabloon voorkomen; een onbekend woord valt hard om, dus de lijst groeit vanzelf mee met de sjablonen |
 
 ---
 

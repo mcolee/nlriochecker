@@ -251,3 +251,18 @@ def test_meldinglocatiestijl_filtert_systemische_meldingen_echt(tmp_path: Path) 
     filters = [regel.get("filter", "") for regel in boom.iter("rule")]
     assert filters, "de stijl kent geen regels en kan dus niet filteren"
     assert all("systemisch" in uitdrukking for uitdrukking in filters)
+
+
+def test_featurelagen_dragen_het_stelseltype(tmp_path: Path) -> None:
+    """Filteren op stelseltype is de eerste vraag van elke gebruiker.
+
+    Een streng draagt haar eigen type; een put ontleent het aan de strengen die
+    erop uitkomen, want het GWSW legt het stelseltype op de leiding vast.
+    """
+    pad = _schrijf(_run("net001_geen_afvoerpad.ttl"), tmp_path)
+
+    strengen = dict(_rijen(pad, "select label, stelsel from strengen"))
+    putten = dict(_rijen(pad, "select label, stelsel from putten"))
+
+    assert strengen["1"] == "gemengd"
+    assert putten["A"] == "gemengd"

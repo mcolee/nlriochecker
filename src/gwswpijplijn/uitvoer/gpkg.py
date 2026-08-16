@@ -225,6 +225,7 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("feature_id", "text"),
         _Kolom("label", "text"),
         _Kolom("objecttype", "text"),
+        _Kolom("stelsel", "text"),
         _Kolom("gebied", "text"),
         _Kolom("ergste_ernst", "text"),
         _Kolom("n_fout", "integer"),
@@ -262,6 +263,7 @@ def _schrijf_features(
 
     per_object = _meldingen_per_object(meldingen)
     metadata = _metadata(run, run_datum)
+    stelsels = _stelseltypen(run)
 
     for laag, verzameling, geometrie_veld in (
         ("putten", run.dataset.nodes, "point"),
@@ -279,7 +281,14 @@ def _schrijf_features(
             rijen.append(
                 (
                     _blob(geometrie),
-                    *_samenvatting(run, uri, object_, per_object.get(uri, []), metadata),
+                    *_samenvatting(
+                        run,
+                        uri,
+                        object_,
+                        per_object.get(uri, []),
+                        metadata,
+                        stelsels.get(uri, ""),
+                    ),
                 )
             )
         if rijen:
@@ -299,6 +308,7 @@ def _samenvatting(
     object_: object,
     eigen: list[Melding],
     metadata: tuple[str, str, str],
+    stelsel: str = "",
 ) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen."""
     niet_systemisch = [melding for melding in eigen if not melding.systemisch]
@@ -315,6 +325,7 @@ def _samenvatting(
         uri,
         getattr(object_, "label", ""),
         run.dataset.beheerobjecttype(uri),
+        stelsel,
         _gebied(run),
         ernst,
         len(fouten),
@@ -586,4 +597,31 @@ def _meldingen_per_object(meldingen: list[Melding]) -> dict[str, list[Melding]]:
     per_object: dict[str, list[Melding]] = defaultdict(list)
     for melding in meldingen:
         per_object[melding.object_uri].append(melding)
+    return per_object
+
+
+def _stelseltypen(run: CheckRun) -> dict[str, str]:
+    """Het stelseltype per streng, en per put dat van de aansluitende strengen.
+
+    Het GWSW legt het stelseltype op de leiding vast; een put ontleent het aan wat
+    erop uitkomt. Komen daar meerdere soorten samen, dan staan ze er allemaal --
+    dat is voor NET-006 juist het interessante geval.
+    """
+    config = run.config if run.config is not None else load_check_config()
+    dataset = run.dataset
+    per_object: dict[str, str] = {}
+    per_put: dict[str, set[str]] = defaultdict(set)
+
+    for uri, conduit in dataset.conduits.items():
+        soort = config.klassen.stelseltype(conduit.types, dataset.closure)
+        if soort is None:
+            continue
+        per_object[uri] = soort
+        for kant in (conduit.start_node, conduit.end_node):
+            knoop = dataset.resolve_network_node(kant, config.klassen.netwerkknopen)
+            if knoop is not None:
+                per_put[knoop].add(soort)
+
+    for knoop, soorten in per_put.items():
+        per_object[knoop] = ", ".join(sorted(soorten))
     return per_object
