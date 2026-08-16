@@ -42,7 +42,12 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost ruim drie minuten en circa 3 GB).
 - Codekwaliteit: ruff (lint en format), type hints overal, Nederlandse docstrings, Engelse code-identifiers.
 - CLI-ingang: gwswpijplijn (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
-- Rapportage-output: Markdown en CSV naar een output-map; nooit invoerbestanden overschrijven.
+- Rapportage-output: Markdown, CSV en een GeoPackage naar een output-map; nooit invoerbestanden
+  overschrijven. Alle drie komen uit dezelfde meldingenstroom (`uitvoer/melding.py`); een
+  schrijver die zelf een `Finding` interpreteert laat de drie uit elkaar lopen.
+- De uitvoermap heet `uitvoer/` en staat in `.gitignore` — met een leidende slash, anders
+  sluit die regel ook `src/gwswpijplijn/uitvoer/` uit en verdwijnt de package stilzwijgend
+  uit de repository (en uit het zicht van ruff).
 - Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
 
 ## Werkwijze

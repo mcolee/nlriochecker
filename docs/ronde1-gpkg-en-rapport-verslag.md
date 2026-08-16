@@ -2,7 +2,7 @@
 
 Datum: 2026-08-16. Opdracht: `instructie-claude-code-gpkg-en-rapport.md`.
 Ontwerp: `docs/superpowers/specs/2026-08-16-gpkg-en-rapport-design.md`.
-Commits: `dd81b25` t/m `a76a848` (twaalf stappen, elk met tests en een groene suite).
+Commits: `dd81b25` t/m `844a135` (zestien stappen, elk met tests en een groene suite).
 
 ---
 
@@ -102,7 +102,9 @@ afhankelijkheid. Zes lagen, EPSG:28992, embedded QGIS-stijlen plus losse QML's.
 
 Op de Koekangerveld-run: 192 kB, 48 putten, 50 strengen, 113 meldingen, 113
 meldinglocaties, 87 rijen in `overzicht_checks` (alle checks, ook de nulbevindingen en
-de skeletten) en één rij `gwsw_run` met de herkomst en de grens.
+de skeletten) en één rij `gwsw_run` met de herkomst en de grens. Per check komen de
+aantallen in Markdown, CSV en GeoPackage exact overeen; alle 113 melding-ID's zijn
+uniek zonder dat het volgnummer-vangnet eraan te pas kwam.
 
 ---
 
@@ -167,6 +169,55 @@ afgebakend te laten zien.
 
 ---
 
+## 4a. Wat de code review aan het licht bracht
+
+De review (`/superpowers:requesting-code-review`) vond één zaak die alles ervoor
+waardeloos maakte en zes die er echt toe deden.
+
+**De hele `uitvoer/`-package stond niet onder versiebeheer.** `.gitignore` bevatte
+`uitvoer/` zonder leidende slash, bedoeld voor de uitvoermap van de pijplijn. Die regel
+sloot ook `src/gwswpijplijn/uitvoer/` uit. Alle 1652 regels nieuwe code bestonden alleen
+in mijn werkboom: elke commit vanaf `2ff975b` importeert niet vanaf een schone checkout.
+Tweede gevolg: ruff respecteert `.gitignore`, dus ook de linter had de package nooit
+gezien — het "All checks passed" van twaalf stappen was vals, en er stonden vier
+lintfouten en een formatteerfout in. De regel is nu `/uitvoer/`, en een test controleert
+dat elk bronbestand op schijf ook in git zit.
+
+De overige punten, kort:
+
+- **ATTR-005 botste op zijn eigen melding-ID.** Die check meldt per profielmaat
+  (breedte, hoogte) en niet per strengeinde, dus de standaarddiscriminant `zijde` hielp
+  er niet. Het vangnet sloeg op de fixtures dus al aan, met een volgnummer dat van de
+  verwerkingsvolgorde afhangt — precies de eigenschap die de ID niet hoort te hebben.
+  ATTR-005 declareert nu `kenmerk`, en een sweep over alle fixtures eist dat het vangnet
+  nergens hoeft aan te slaan.
+- **Die sweep vond twee crashes** die geen enkele test raakte, beide op een
+  vlakgeometrie: `meetkunde._flat_coords` viel om doordat `hasattr` de
+  `coords`-property van een shapely-Polygon aanroept (die gooit `NotImplementedError`,
+  geen `AttributeError`), en de foutlocatie struikelde over `interpolate` op een vlak.
+  Juist TOP-015 en TOP-016 melden zulke geometrie. `meetkunde.py` was deze ronde niet
+  aangeraakt; de crash is ouder dan deze opdracht.
+- **De consistentie tussen de drie uitvoervormen berustte op iteratievolgorde.** Het
+  rapport en `overzicht_checks` telden `run.outcomes`, niet de meldingenstroom. Vandaag
+  gaf dat dezelfde uitkomst; zodra ronde 2 nulmeting-meldingen toevoegt zouden MD en
+  het dashboard stilzwijgend te laag rapporteren terwijl CSV en `meldingen` dat niet
+  doen. Beide lezen nu per check uit de stroom.
+- **Het richtingspercentage in de synthese is datasetbreed** en stond zonder
+  kanttekening boven een afgebakende lijst — dezelfde fout als "174 deelstelsels". Bij
+  een run met studiegebied staat dat er nu bij.
+- **De systemisch-vlag deelde een afgebakende teller door een datasetbrede noemer** en
+  kon na afbakening feitelijk nooit meer aanslaan. De teller telt nu ook de weggelaten
+  bevindingen mee, zodat de vlag hetzelfde betekent met en zonder studiegebied.
+- **`meldinglocaties.qml` beloofde een filter dat er niet in zat.** De toelichting zei
+  dat systemische meldingen worden weggelaten, maar de stijl was een gecategoriseerde
+  renderer zonder filter. Het is nu een regelgebaseerde renderer die wél filtert, en een
+  test leest de regels na.
+
+Verder is de `beheerobjecttype`-regel uit A3 — die op twee plekken stond, nadat ik hem
+net op één plek had rechtgezet — naar `GwswDataset` verhuisd.
+
+---
+
 ## 5. Afwijkingen van de instructie
 
 | # | Bron | Afwijking | Reden |
@@ -180,13 +231,22 @@ afgebakend te laten zien.
 | 7 | Ontwerp §2.3 | Hash uitgebreid met identificerende detailsleutels | `check + feature + feature_2` botst bij checks die per zijde melden |
 | 8 | Ontwerp §5.2 | `gebied` uit het studiegebiedbestand | Er is geen dekkende buurtenlaag, en die is bij een begrensde export niet nodig |
 | 9 | §A6 | `object2` alleen gevuld bij TOP-005, TOP-006, TOP-010 en TOP-011 | TOP-013 en TOP-019 hebben géén enkele tegenpartij maar een verzameling; die staat in de details, niet in een kolom die één object suggereert |
+| 10 | Ontwerp §3 | `Check.id_sleutels` heeft `("zijde",)` als default | Negen meldingen in vier modules gebruiken `zijde`; een check met een eigen onderscheid declareert dat nog steeds zelf (ATTR-005 doet dat met `kenmerk`) |
+| 11 | Ontwerp §7.3 | Symboolgrootte vast per ernstcategorie, niet afgeleid van `n_fout + n_waarschuwing` | Een data-defined grootte is QGIS-versiegevoelige XML die zonder QGIS in de build niet te verifiëren is; dezelfde afweging als bij het `.qgz`-bestand |
+| 12 | Ontwerp §6.6 | `taal.LIDWOORDEN` bevat twee woorden, niet negen | Alleen woorden die daadwerkelijk in een sjabloon voorkomen; een onbekend woord valt hard om, dus de lijst groeit vanzelf mee |
 
 ---
 
 ## 6. Tests
 
-612 tests, groen; de drie zware De Wolden-tests staan onder de marker `zwaar` en
-draaien niet standaard mee. Ruff (lint en format) is schoon.
+626 tests, groen. De drie zware De Wolden-tests staan onder de marker `zwaar` en
+draaien niet standaard mee; ze zijn apart gedraaid en zijn ook groen (14 minuten).
+Ruff (lint en format) is schoon — nu ook aantoonbaar, want de linter zag de nieuwe
+package eerst helemaal niet.
+
+Twee tests kijken bewust over de hele codebase heen in plaats van naar één module:
+één sweept alle TTL-fixtures op botsende melding-ID's, één controleert dat elk
+bronbestand op schijf ook in git staat. Beide vonden meteen een echt gebrek.
 
 De acht testgroepen uit §10 van het ontwerp zijn alle gedekt: de graaf-regressietest,
 de zes GPKG-tests (a t/m f, inclusief het teruglezen van het geschreven bestand met de
