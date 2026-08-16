@@ -112,6 +112,20 @@ class CheckContext:
         aanwezig = set(self.dataset.nodes) | set(self.dataset.conduits)
         return frozenset(self.unreliable_objects & aanwezig)
 
+    def scope_in_woorden(self) -> str:
+        """Noemt in woorden welk deel van de export deze context ziet.
+
+        Bevindingsteksten citeerden lang "deze dataset". Onder een studiegebied is
+        dat feitelijk onjuist: de check heeft dan alleen de kern plus de
+        contextschil gezien, niet de volledige export. Elke check die die
+        formulering zelf hardcodeert, loopt na de volgende afbakeningswijziging
+        weer uit de pas; deze methode is de ene plek waar de formulering vandaan
+        komt, zodat dat niet meer kan gebeuren.
+        """
+        if self.analyseset is None:
+            return "deze dataset"
+        return "het geanalyseerde deel (kern plus contextschil)"
+
 
 @dataclass(frozen=True)
 class CheckOutcome:
@@ -181,8 +195,9 @@ class CheckRun:
         gedraaid -- ruim genoeg dat de netwerkchecks hetzelfde antwoord geven als
         op de volledige dataset -- en pas hier wordt tot de kern afgebakend. Zo
         ontstaan er geen randeffecten doordat een streng het gebied uit loopt.
-        Checks die over de hele populatie gaan (`Check.volledig_bereik`) zijn
-        sowieso op de volledige export blijven draaien.
+        Checks die over de hele populatie gaan (`Check.volledig_bereik`, of hun
+        ID in `config.studiegebied.volledige_dataset_checks`) zijn sowieso op de
+        volledige export blijven draaien.
         """
         binnen = objecten_in_gebied(self.dataset, area)
         if not binnen:
@@ -245,7 +260,10 @@ class Check(ABC):
     id_sleutels: ClassVar[tuple[str, ...]] = ("zijde",)
     # Checks die over de hele populatie gaan in plaats van over losse objecten
     # (ADM-002: dubbele identificaties kunnen overal in de export zitten). Ze
-    # draaien ook met een studiegebied op de volledige export.
+    # draaien ook met een studiegebied op de volledige export. Een project kan
+    # hetzelfde bereiken zonder de code te wijzigen door het check-ID op te nemen
+    # in `config.studiegebied.volledige_dataset_checks`; `run_checks` telt beide
+    # bronnen mee.
     volledig_bereik: ClassVar[bool] = False
 
     @abstractmethod
@@ -331,10 +349,13 @@ def run_checks(
     if onbekend:
         raise KeyError(f"onbekende check-ID's: {', '.join(sorted(onbekend))}")
 
+    volledige_ids = set(context.config.studiegebied.volledige_dataset_checks)
+
     outcomes = []
     for check_id in gekozen:
         check = REGISTRY[check_id]()
-        gebruikt = context.volledige_context() if check.volledig_bereik else context
+        over_volledige_populatie = check.volledig_bereik or check.id in volledige_ids
+        gebruikt = context.volledige_context() if over_volledige_populatie else context
         outcomes.append(
             CheckOutcome(
                 check_id=check.id,

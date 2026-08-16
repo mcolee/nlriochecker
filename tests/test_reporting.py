@@ -148,7 +148,10 @@ def test_checkrapport_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
         volledige_dataset=dataset,
         analyseset=analyseset,
     )
-    run = run_checks(context, ["NET-001"]).beperk_tot_studiegebied(gebied)
+    # ADM-002 draait mee zodat de zin over checks met een volledig bereik iets te
+    # noemen heeft; die zin wordt sinds de reparatie afgeleid uit de checks die
+    # daadwerkelijk gedraaid hebben, niet meer hardcoded.
+    run = run_checks(context, ["NET-001", "ADM-002"]).beperk_tot_studiegebied(gebied)
 
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")
@@ -158,7 +161,36 @@ def test_checkrapport_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
         f"{len(analyseset.schil)} in de contextschil, van {analyseset.volledig_aantal} "
         "in de export." in tekst
     )
-    assert "ADM-002" in tekst
+    assert (
+        "Checks die over de hele populatie gaan (ADM-002) draaien op de volledige export." in tekst
+    )
+
+
+def test_checkrapport_noemt_ook_een_via_config_aangewezen_check(tmp_path: Path) -> None:
+    """De opsomming moet ADM-002 (klasse-attribuut) en een via de config aangewezen
+    check allebei noemen, gesorteerd, in plaats van alleen "ADM-002" hard te coderen.
+    """
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    gebied = load_study_area(
+        Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
+    )
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    config.studiegebied.volledige_dataset_checks = ["ADM-002", "TOP-001"]
+    analyseset = bouw_analyseset(dataset, gebied, config)
+
+    context = CheckContext(
+        dataset=analyseset.dataset,
+        config=config,
+        volledige_dataset=dataset,
+        analyseset=analyseset,
+    )
+    run = run_checks(context, ["TOP-001", "ADM-002"]).beperk_tot_studiegebied(gebied)
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "(ADM-002, TOP-001)" in tekst
 
 
 def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path: Path) -> None:

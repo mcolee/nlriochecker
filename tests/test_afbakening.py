@@ -158,6 +158,39 @@ def test_een_dataset_brede_check_ziet_de_hele_export() -> None:
     assert per_check["TOP-001"].examined < volledig
 
 
+def test_een_via_config_aangewezen_check_ziet_ook_de_hele_export() -> None:
+    """De configroute moet hetzelfde effect hebben als `Check.volledig_bereik`.
+
+    TOP-001 heeft geen `volledig_bereik` en telt in `examined()` alleen putten met
+    geometrie, niet knopen plus strengen -- daarom wordt hier niet tegen
+    `len(dataset.nodes) + len(dataset.conduits)` vergeleken (zoals bij ADM-002 in
+    `test_een_dataset_brede_check_ziet_de_hele_export`), maar tegen wat TOP-001
+    zelf op de volledige export telt.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    smal = run_checks(
+        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
+        ["TOP-001"],
+    )
+
+    config.studiegebied.volledige_dataset_checks = ["TOP-001"]
+    breed = run_checks(
+        CheckContext(
+            dataset=analyseset.dataset,
+            config=config,
+            volledige_dataset=dataset,
+            analyseset=analyseset,
+        ),
+        ["TOP-001"],
+    )
+    referentie = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-001"])
+
+    assert breed.outcomes[0].examined > smal.outcomes[0].examined
+    assert breed.outcomes[0].examined == referentie.outcomes[0].examined
+
+
 def test_de_run_onthoudt_de_omvang_van_kern_en_schil() -> None:
     dataset, area, config = _opzet()
     analyseset = bouw_analyseset(dataset, area, config)

@@ -87,8 +87,9 @@ def bbb_notitie(context: CheckContext) -> list[str]:
     if not knopen:
         klassen = ", ".join(context.config.klassen.bergbezinkvoorziening) or "geen"
         notities.append(
-            f"Deze dataset bevat geen enkele bergbezinkvoorziening van de geconfigureerde "
-            f"klassen ({klassen}); er is niets getoetst."
+            f"{context.scope_in_woorden().capitalize()} bevat geen enkele "
+            f"bergbezinkvoorziening van de geconfigureerde klassen ({klassen}); er is niets "
+            "getoetst."
         )
     if leidingen:
         notities.append(
@@ -172,9 +173,10 @@ def drempelnotitie(context: CheckContext) -> list[str]:
     drempels = alle_drempels(context)
     if not drempels:
         return [
-            "Deze dataset bevat geen enkel `Overstortdrempel`-object; er is dus geen "
-            "drempelniveau en geen drempelbreedte om op te toetsen. Nul bevindingen "
-            "betekent hier niet dat het in orde is."
+            f"{context.scope_in_woorden().capitalize()} bevat geen enkel "
+            "`Overstortdrempel`-object; er is dus geen drempelniveau en geen "
+            "drempelbreedte om op te toetsen. Nul bevindingen betekent hier niet dat het "
+            "in orde is."
         ]
     zonder_niveau = sum(1 for drempel in drempels if drempel.niveau is None)
     notities = [
@@ -305,9 +307,10 @@ class ExterneOverstortZonderWater(Check):
                 "de GWSW-dataset zelf. EXT-007 doet dezelfde toets op de BGT-waterdelen."
             ]
         return [
-            "Deze dataset bevat geen enkel `Oppervlaktewater`-object; er is niets om de "
-            "afstand tot te meten. EXT-007 doet dezelfde toets op de BGT-waterdelen, maar "
-            "die dekken alleen het studiegebied."
+            f"{context.scope_in_woorden().capitalize()} bevat geen enkel "
+            "`Oppervlaktewater`-object; er is niets om de afstand tot te meten. EXT-007 "
+            "doet dezelfde toets op de BGT-waterdelen, maar die dekken alleen het "
+            "studiegebied."
         ]
 
     def examined(self, context: CheckContext) -> int:
@@ -610,8 +613,9 @@ class InterneOverstortZelfdeStelseltype(Check):
         if not aantal:
             klassen = ", ".join(context.config.klassen.overstortleiding) or "geen"
             return [
-                f"Deze dataset bevat geen enkele overstortleiding van de geconfigureerde "
-                f"klassen ({klassen}); er is niets getoetst."
+                f"{context.scope_in_woorden().capitalize()} bevat geen enkele "
+                f"overstortleiding van de geconfigureerde klassen ({klassen}); er is niets "
+                "getoetst."
             ]
         return [
             f"{aantal} overstortleidingen getoetst. Een overstort tussen compartimenten "

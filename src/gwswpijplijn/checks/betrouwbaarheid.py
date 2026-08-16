@@ -194,6 +194,10 @@ class SystematischAfgerondeHoogtewaarden(Check):
         regels = [
             "De bevinding hangt aan een vertegenwoordigend object; het gaat om de reeks als "
             "geheel, niet om dat ene object.",
+            f"Gemeten over {context.scope_in_woorden()}: BTR-006 heeft geen "
+            "`volledig_bereik`, want het representatieve object zou anders uit de kern "
+            "kunnen wegvallen en de bevinding met een studiegebied ongemerkt uit het "
+            "rapport laten verdwijnen.",
         ]
         for naam, waarden, _ in self._reeksen(context):
             op_raster = sum(1 for waarde in waarden if _op_raster(waarde, raster))

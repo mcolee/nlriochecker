@@ -95,9 +95,9 @@ def _ontbreekt(
         return []
     if zonder == len(objecten):
         return [
-            f"Geen enkele van de {len(objecten)} {soort} heeft een {kenmerk}. Deze check "
-            "heeft daardoor niets kunnen toetsen; nul bevindingen betekent hier niet dat "
-            "het in orde is."
+            f"Geen enkele van de {len(objecten)} {soort} in {context.scope_in_woorden()} "
+            f"heeft een {kenmerk}. Deze check heeft daardoor niets kunnen toetsen; nul "
+            "bevindingen betekent hier niet dat het in orde is."
         ]
     return [f"{zonder} van de {len(objecten)} {soort} hebben geen {kenmerk} en zijn overgeslagen."]
 
@@ -816,8 +816,9 @@ class ZWaardeWijktAf(_StrengCheck):
             return []
         if plat == len(strengen):
             return [
-                "Geen enkele strenggeometrie draagt een z-waarde (srsDimension 2). Deze "
-                "check heeft daardoor niets kunnen vergelijken."
+                f"Geen enkele strenggeometrie in {context.scope_in_woorden()} draagt een "
+                "z-waarde (srsDimension 2). Deze check heeft daardoor niets kunnen "
+                "vergelijken."
             ]
         return [f"{plat} van de {len(strengen)} strengen hebben een geometrie zonder z-waarde."]
 

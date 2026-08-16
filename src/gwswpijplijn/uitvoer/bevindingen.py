@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from gwswpijplijn.checks import CheckRun, Severity
+from gwswpijplijn.checks import REGISTRY, CheckRun, Severity
 from gwswpijplijn.taal import getal, vorm
 from gwswpijplijn.uitvoer.melding import Melding, bouw_meldingen
 from gwswpijplijn.uitvoer.synthese import rode_draad
@@ -184,13 +184,19 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
 
     if run.analyseset is not None:
         stel = run.analyseset
-        lines += [
+        zin = (
             f"Analyseset: {getal(len(stel.kern), 'object', 'objecten')} in de kern, "
             f"{len(stel.schil)} in de contextschil, van {stel.volledig_aantal} in de export. "
             "De checks redeneren over kern en schil samen; gerapporteerd wordt alleen de "
-            "kern. Checks die over de hele populatie gaan (ADM-002) draaien op de volledige "
-            "export.",
-        ]
+            "kern."
+        )
+        populatiechecks = _volledige_populatie_check_ids(run)
+        if populatiechecks:
+            zin += (
+                f" Checks die over de hele populatie gaan ({', '.join(populatiechecks)}) "
+                "draaien op de volledige export."
+            )
+        lines += [zin]
         if stel.strengen_zonder_netwerkverband:
             aantal = stel.strengen_zonder_netwerkverband
             lines += [
@@ -285,6 +291,23 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
 
     lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
     return "\n".join(lines) + "\n"
+
+
+def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
+    """De check-ID's die altijd op de volledige export draaien, gesorteerd.
+
+    Dat zijn checks met `Check.volledig_bereik` en checks die alleen via
+    `config.studiegebied.volledige_dataset_checks` zijn aangewezen (zie
+    `checks.base.run_checks`). Hardcoderen van een naam hier -- zoals eerder
+    alleen "ADM-002" -- laat een via de config toegevoegde check onvermeld.
+    """
+    geconfigureerd = set(run.config.studiegebied.volledige_dataset_checks) if run.config else set()
+    ids = {
+        outcome.check_id
+        for outcome in run.outcomes
+        if REGISTRY[outcome.check_id].volledig_bereik or outcome.check_id in geconfigureerd
+    }
+    return sorted(ids)
 
 
 def _karakteristiek_section(run: CheckRun) -> list[str]:
