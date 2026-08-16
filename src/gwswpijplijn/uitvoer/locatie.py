@@ -26,8 +26,8 @@ def foutlocatie(finding: Finding, dataset: GwswDataset) -> Point | None:
     if eigen is not None:
         return _punt(eigen)
 
-    # Een object dat niet uit de GWSW-dataset komt (een BGT-putdeksel zonder put,
-    # een BAG-verblijfsobject zonder riolering) draagt zijn coordinaat zelf.
+    # Een object dat niet uit de GWSW-dataset komt (bijvoorbeeld een BGT-putdeksel
+    # zonder put, EXT-003) draagt zijn coordinaat zelf.
     if finding.location is not None:
         return _punt(finding.location)
 

@@ -7,7 +7,7 @@ Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen
 
 We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis/.
 
-## Domeinregels (hard, uit het checkregister v0.7)
+## Domeinregels (hard, uit het checkregister v0.8)
 - De dataset moet ALTIJD aan alle conformiteitsklassen (CFK's) getoetst zijn: Hyd, MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke foutmelding. De lijst staat in checks.toml, niet in de code.
 - Typeringspoort: de SHACL-meting benoemt via de vorm `CfkTypes_typ` welke KLASSEN binnen een CFK te globaal zijn (niet welke objecten). De instanties volgen uit de OroX-dataset. Zonder dataset is er wel een klassenlijst maar geen score; verzin er dan geen.
 - Alle drempelwaarden (toleranties, min/max-waarden, bufferafstanden) zijn configureerbaar per project via een configbestand (TOML). Geen hardcoded drempels.
@@ -59,6 +59,8 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - De geparseerde dataset wordt gecachet (`~/.cache/gwswpijplijn`, `--geen-cache` om hem
   over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
   `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
+  De cachemap groeit per sleutel (op De Wolden ruim 450 MB); oude sleutels worden niet
+  automatisch opgeruimd.
 - `tests/test_uitvoer_qgis.py` vindt PyQGIS door de systeem-site-packages achter
   deze (van het systeem afgeschermde) venv aan `sys.path` te plakken; zonder QGIS
   op de machine slaat hij gewoon over. Zie de moduledocstring van dat bestand voor

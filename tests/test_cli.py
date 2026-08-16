@@ -129,6 +129,37 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
     assert tabel.empty
 
 
+def test_toets_meldt_bevindingen_die_in_de_schil_wegvallen(tmp_path: Path) -> None:
+    """Put C ligt in de contextschil (binnen de buffer), niet in de kern.
+
+    Anders dan bij `test_toets_met_studiegebied_meldt_wat_wegvalt` ziet TOP-001
+    put C dus wel en meldt hem als losliggend; die bevinding valt pas weg zodra
+    het rapport na de checks tot de kern afgebakend wordt. De teller die dat
+    meldt, is wat de klant vertelt wat hij niet te zien krijgt, en moet hier dus
+    niet op nul blijven staan.
+    """
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "top001_losliggend_in_de_schil.ttl"),
+            "--check",
+            "TOP-001",
+            "--studiegebied",
+            str(GIS_DIR / "rond_put_ab.geojson"),
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "1 bevinding buiten het gebied weggelaten" in resultaat.output
+    tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
+    assert tabel.empty
+
+
 def test_toets_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
     resultaat = CliRunner().invoke(
         main,

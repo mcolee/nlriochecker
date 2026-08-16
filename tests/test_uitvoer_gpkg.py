@@ -415,6 +415,18 @@ def test_mechanische_leidingen_staan_in_een_eigen_laag(tmp_path: Path) -> None:
     assert omschrijvingen == {"Mechanisch riool: niet geanalyseerd"}
 
 
+def test_mechanische_leidingen_staan_gesorteerd_in_de_laag(tmp_path: Path) -> None:
+    """`mechanisch` is een frozenset; ongesorteerd itereren zou de rijvolgorde en
+    daarmee de fid-toekenning tussen twee runs op dezelfde data laten wisselen.
+    """
+    pad = _schrijf(_run("mechanisch_riool_twee.ttl"), tmp_path)
+
+    labels = [rij[0] for rij in _rijen(pad, "select label from mechanisch_riool order by fid")]
+
+    assert labels == sorted(labels)
+    assert len(labels) == 2
+
+
 def test_mechanische_leidingen_staan_niet_meer_bij_de_strengen(tmp_path: Path) -> None:
     pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
 

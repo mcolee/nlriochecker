@@ -431,7 +431,9 @@ def _schrijf_mechanisch(
     run_datum_iso, dataset_versie, _register_versie = metadata
     rijen = []
     grenzen: list[tuple[float, float, float, float]] = []
-    for uri in mechanisch:
+    # Gesorteerd, niet in de willekeurige volgorde van de frozenset: anders
+    # wisselen rijvolgorde en fid-toekenning tussen twee runs op dezelfde data.
+    for uri in sorted(mechanisch):
         if binnen is not None and uri not in binnen:
             continue
         object_ = run.dataset.conduits[uri]

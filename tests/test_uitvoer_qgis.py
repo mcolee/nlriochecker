@@ -116,6 +116,24 @@ def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_g
     } <= labels
 
 
+def _renderer_symbolen(renderer):
+    """De symbolen van een renderer, met regels (rule-based) of zonder (simpel).
+
+    De stapelverspringing van meldinglocaties (`stapel_nr`) zit niet in een
+    filter of regelexpressie, maar als data-defined property op een
+    symboollaag; die moet hier ook uitkomen, anders mist de test precies de
+    plek waar een tikfout markeringen stil op 0,0 laat stapelen.
+    """
+    if hasattr(renderer, "rootRule"):
+        return [
+            regel.symbol() for regel in renderer.rootRule().children() if regel.symbol() is not None
+        ]
+    if hasattr(renderer, "symbol"):
+        symbool = renderer.symbol()
+        return [symbool] if symbool is not None else []
+    return []
+
+
 def test_elke_stijlexpressie_verwijst_naar_bestaande_kolommen(
     qgis_app, geschreven_gpkg: Path
 ) -> None:
@@ -128,6 +146,13 @@ def test_elke_stijlexpressie_verwijst_naar_bestaande_kolommen(
         expressies = [renderer.filter()] if hasattr(renderer, "filter") else []
         if hasattr(renderer, "rootRule"):
             expressies += [regel.filterExpression() for regel in renderer.rootRule().children()]
+        for symbool in _renderer_symbolen(renderer):
+            for symboollaag in symbool.symbolLayers():
+                eigenschappen = symboollaag.dataDefinedProperties()
+                expressies += [
+                    eigenschappen.property(sleutel).expressionString()
+                    for sleutel in eigenschappen.propertyKeys()
+                ]
         for tekst in filter(None, expressies):
             gebruikt = set(qgis_core.QgsExpression(tekst).referencedColumns())
             assert gebruikt <= velden, f"{laag}: {tekst} verwijst naar {gebruikt - velden}"
