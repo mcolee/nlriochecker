@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gwswpijplijn"
+version = "0.1.0"
+description = "Toetsing van de datakwaliteit van vrijvervalriolering op basis van GWSW-nulmeting-detailrapporten"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1",
+    "pandas>=2.2",
+    "pydantic>=2.7",
+]
+
+[project.scripts]
+gwswpijplijn = "gwswpijplijn.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.6",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gwswpijplijn"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "N"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integratie: draait op de volledige De Wolden-bestanden in data/",
+]
