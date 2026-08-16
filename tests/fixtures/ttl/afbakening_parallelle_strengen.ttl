@@ -1,0 +1,72 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie, zodat de fixture zonder de volle ontologie werkt.
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput     rdfs:subClassOf gwsw:Put .
+gwsw:Vuilwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
+gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
+
+# DEFECT die deze fixture blootlegt: M en N liggen allebei ver buiten het studiegebied
+# en de contextbuffer, en zijn met TWEE evenwijdige vuilwaterstrengen verbonden. Alleen
+# via de netwerksamenhang (component vanaf A, dat wel in het gebied ligt) horen ze bij
+# de schil. Een gewone nx.Graph onthoudt van twee kanten tussen hetzelfde knopenpaar
+# alleen de laatst toegevoegde, dus een van de twee strengen valt zonder correctie
+# stilzwijgend buiten de analyseset.
+
+:PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
+    gwsw:hasAspect :PutA_ori .
+:PutA_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutM rdf:type gwsw:Inspectieput ; rdfs:label "M" ;
+    gwsw:hasAspect :PutM_ori .
+:PutM_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1200.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutN rdf:type gwsw:Inspectieput ; rdfs:label "N" ;
+    gwsw:hasAspect :PutN_ori .
+:PutN_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1250.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+# Enkele verbinding tussen de kern (A, binnen het gebied) en het knopenpaar M-N.
+:L_AM rdf:type gwsw:Vuilwaterriool ; rdfs:label "A-M" ;
+    gwsw:hasAspect :L_AM_ori .
+:L_AM_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_AM_b , :L_AM_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1200.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_AM_b rdf:type gwsw:BeginpuntLeiding .
+:L_AM_e rdf:type gwsw:EindpuntLeiding .
+:L_AM_b gwsw:hasConnection :PutA_ori .
+:L_AM_e gwsw:hasConnection :PutM_ori .
+
+# Twee evenwijdige strengen tussen M en N, allebei ver buiten gebied en buffer.
+:L_MN1 rdf:type gwsw:Vuilwaterriool ; rdfs:label "M-N-1" ;
+    gwsw:hasAspect :L_MN1_ori .
+:L_MN1_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_MN1_b , :L_MN1_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1200.0 2000.0 1250.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_MN1_b rdf:type gwsw:BeginpuntLeiding .
+:L_MN1_e rdf:type gwsw:EindpuntLeiding .
+:L_MN1_b gwsw:hasConnection :PutM_ori .
+:L_MN1_e gwsw:hasConnection :PutN_ori .
+
+:L_MN2 rdf:type gwsw:Vuilwaterriool ; rdfs:label "M-N-2" ;
+    gwsw:hasAspect :L_MN2_ori .
+:L_MN2_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_MN2_b , :L_MN2_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1200.0 2000.0 1225.0 2001.0 1250.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_MN2_b rdf:type gwsw:BeginpuntLeiding .
+:L_MN2_e rdf:type gwsw:EindpuntLeiding .
+:L_MN2_b gwsw:hasConnection :PutM_ori .
+:L_MN2_e gwsw:hasConnection :PutN_ori .

@@ -65,9 +65,17 @@ def _component(dataset: GwswDataset, config: CheckConfig, kern: frozenset[str]) 
     Bewust alleen over de vrijvervalleidingen: mechanische leidingen verbinden
     deelgebieden onderling en zouden de schil tot de hele gemeente laten uitdijen,
     terwijl de NET-checks ze niet volgen.
+
+    De graaf dient alleen om de samenhang tussen knopen vast te stellen; welke
+    strengen erbij horen, wordt er los van bijgehouden. Twee evenwijdige strengen
+    tussen hetzelfde knopenpaar veranderen niets aan die samenhang, maar zouden als
+    kantattribuut (`add_edge(..., uri=...)`) elkaar overschrijven en zo een van de
+    twee stilzwijgend uit de analyseset laten vallen -- parallelle strengen zijn in
+    dit domein normaal (zie TOP-013).
     """
     wortels = config.klassen.netwerkknopen
     graaf = nx.Graph()
+    strengen: list[tuple[str, str]] = []
     for wortel in config.klassen.vrijvervalleiding:
         for uri in dataset.of_class(wortel):
             conduit = dataset.conduits.get(uri)
@@ -77,16 +85,19 @@ def _component(dataset: GwswDataset, config: CheckConfig, kern: frozenset[str]) 
             eind = dataset.resolve_network_node(conduit.end_node, wortels)
             if begin is None or eind is None:
                 continue
-            graaf.add_edge(begin, eind, uri=uri)
+            graaf.add_edge(begin, eind)
+            strengen.append((uri, begin))
+
+    componenten = list(nx.connected_components(graaf))
+    component_van = {knoop: index for index, knopen in enumerate(componenten) for knoop in knopen}
+
+    geraakt = {component_van[knoop] for knoop in kern if knoop in component_van}
+    geraakt |= {component_van[begin] for uri, begin in strengen if uri in kern}
 
     gevonden: set[str] = set()
-    for knopen in nx.connected_components(graaf):
-        if not (knopen & kern) and not any(
-            graaf.edges[kant]["uri"] in kern for kant in graaf.subgraph(knopen).edges
-        ):
-            continue
-        gevonden |= knopen
-        gevonden |= {graaf.edges[kant]["uri"] for kant in graaf.subgraph(knopen).edges}
+    for index in geraakt:
+        gevonden |= componenten[index]
+    gevonden |= {uri for uri, begin in strengen if component_van.get(begin) in geraakt}
     return gevonden
 
 

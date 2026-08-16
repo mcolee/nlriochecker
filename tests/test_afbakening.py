@@ -89,3 +89,21 @@ def test_objecten_in_gebied_blijft_importeerbaar_uit_checks() -> None:
     from gwswpijplijn.checks import objecten_in_gebied as via_checks
 
     assert via_checks is objecten_in_gebied
+
+
+def test_evenwijdige_strengen_vallen_geen_van_beide_buiten_de_schil() -> None:
+    """Twee vuilwaterstrengen tussen hetzelfde knopenpaar horen er allebei bij.
+
+    Een gewone nx.Graph onthoudt van twee kanten tussen hetzelfde knopenpaar alleen de
+    laatst toegevoegde; zonder correctie valt een van de twee evenwijdige strengen
+    stilzwijgend buiten de analyseset, terwijl allebei in dezelfde component zitten
+    als de kern (put A).
+    """
+    dataset = load_dataset(TTL_DIR / "afbakening_parallelle_strengen.ttl")
+    area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    assert {"M-N-1", "M-N-2"} <= _labels(dataset, analyseset.schil)
