@@ -518,6 +518,11 @@ def _metadata(run: CheckRun, run_datum: date) -> tuple[str, str, str]:
     )
 
 
+# Op welke afstand twee meldingen als dezelfde plek gelden. Een millimeter: kleiner
+# dan elke echte afstand in een rioolbestand en groter dan het afrondingsverschil
+# tussen twee berekende punten.
+STAPEL_RASTER_M = 0.001
+
 MELDING_KOLOMMEN = [
     _Kolom("melding_id", "text"),
     _Kolom("feature_id", "text"),
@@ -541,10 +546,36 @@ MELDING_KOLOMMEN = [
     _Kolom("dataset_versie", "text"),
     _Kolom("gwsw_uri", "text"),
     _Kolom("gwsw_uri_2", "text"),
+    _Kolom("stapel_aantal", "integer"),
+    _Kolom("stapel_nr", "integer"),
 ]
 
 
-def _melding_rij(melding: Melding) -> tuple:
+def _stapels(meldingen: list[Melding]) -> dict[str, tuple[int, int]]:
+    """Per melding het aantal meldingen op haar plek en haar volgnummer daarin.
+
+    De volgorde is die van de melding-ID en niet die van de lijst, zodat twee runs
+    over dezelfde data dezelfde nummering opleveren en het kaartbeeld niet
+    verspringt.
+    """
+    per_plek: dict[tuple[int, int], list[str]] = defaultdict(list)
+    for melding in sorted(meldingen, key=lambda m: m.melding_id):
+        if melding.foutlocatie is None:
+            continue
+        sleutel = (
+            round(melding.foutlocatie.x / STAPEL_RASTER_M),
+            round(melding.foutlocatie.y / STAPEL_RASTER_M),
+        )
+        per_plek[sleutel].append(melding.melding_id)
+
+    return {
+        melding_id: (len(groep), nummer)
+        for groep in per_plek.values()
+        for nummer, melding_id in enumerate(groep, start=1)
+    }
+
+
+def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
     """Een melding als rij, in de volgorde van MELDING_KOLOMMEN."""
     return (
         melding.melding_id,
@@ -569,6 +600,8 @@ def _melding_rij(melding: Melding) -> tuple:
         melding.dataset,
         melding.object_uri,
         melding.object2_uri,
+        stapel[0],
+        stapel[1],
     )
 
 
@@ -580,11 +613,12 @@ def _schrijf_meldingen(verbinding: sqlite3.Connection, meldingen: list[Melding])
         MELDING_KOLOMMEN,
         "Alle meldingen van deze run, koppelbaar op feature_id.",
     )
+    stapels = _stapels(meldingen)
     velden = ", ".join(f'"{kolom.naam}"' for kolom in MELDING_KOLOMMEN)
     plaatshouders = ", ".join("?" * len(MELDING_KOLOMMEN))
     verbinding.executemany(
         f"insert into meldingen ({velden}) values ({plaatshouders})",
-        [_melding_rij(melding) for melding in meldingen],
+        [_melding_rij(melding, stapels.get(melding.melding_id, (1, 1))) for melding in meldingen],
     )
 
 
@@ -601,10 +635,17 @@ def _schrijf_meldinglocaties(verbinding: sqlite3.Connection, meldingen: list[Mel
         MELDING_KOLOMMEN,
         "Een punt per melding, op de plek waar het probleem zit.",
     )
+    stapels = _stapels(meldingen)
     velden = ", ".join(f'"{kolom.naam}"' for kolom in MELDING_KOLOMMEN)
     plaatshouders = ", ".join("?" * (len(MELDING_KOLOMMEN) + 1))
     met_punt = [melding for melding in meldingen if melding.foutlocatie is not None]
-    rijen = [(_blob(melding.foutlocatie), *_melding_rij(melding)) for melding in met_punt]
+    rijen = [
+        (
+            _blob(melding.foutlocatie),
+            *_melding_rij(melding, stapels.get(melding.melding_id, (1, 1))),
+        )
+        for melding in met_punt
+    ]
     if rijen:
         verbinding.executemany(
             f"insert into meldinglocaties (geom, {velden}) values ({plaatshouders})", rijen

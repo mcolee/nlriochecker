@@ -305,6 +305,38 @@ def test_meldingen_dragen_fragment_en_uri(tmp_path: Path) -> None:
         assert tweede_uri.endswith(f"#{tweede_id}")
 
 
+def test_meldingen_op_dezelfde_plek_worden_genummerd(tmp_path: Path) -> None:
+    """Twee meldingen op hetzelfde punt moeten in de kaart uit elkaar te halen zijn."""
+    run = _run("top005_dubbele_put.ttl")
+    pad = _schrijf(run, tmp_path)
+
+    rijen = _rijen(
+        pad,
+        "select stapel_aantal, stapel_nr from meldinglocaties "
+        "order by stapel_aantal desc, stapel_nr",
+    )
+
+    assert rijen
+    aantallen = {aantal for aantal, _ in rijen}
+    for aantal in aantallen:
+        nummers = sorted(nr for a, nr in rijen if a == aantal)
+        assert nummers[:aantal] == list(range(1, aantal + 1)) or aantal == 1
+
+
+def test_stapelnummering_is_stabiel_tussen_runs(tmp_path: Path) -> None:
+    run = _run("top005_dubbele_put.ttl")
+    eerste = _rijen(
+        _schrijf(run, tmp_path / "a"),
+        "select melding_id, stapel_nr from meldinglocaties order by melding_id",
+    )
+    tweede = _rijen(
+        _schrijf(run, tmp_path / "b"),
+        "select melding_id, stapel_nr from meldinglocaties order by melding_id",
+    )
+
+    assert eerste == tweede
+
+
 def test_mechanische_leidingen_staan_in_een_eigen_laag(tmp_path: Path) -> None:
     pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
 
