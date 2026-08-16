@@ -205,6 +205,23 @@ class NetworkOptions(BaseModel):
     richting: Literal["administratief", "bob"] = "administratief"
 
 
+class StudyAreaOptions(BaseModel):
+    """Hoe de analyse wordt afgebakend als er een studiegebied is opgegeven."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Hoe ver om het gebied heen objecten meedoen die geen netwerkverband met de
+    # kern hebben. Nodig voor TOP-005, TOP-006, TOP-010, TOP-011, TOP-021 en de
+    # EXT-checks, die naar buren kijken zonder de graaf te volgen.
+    context_buffer_m: float = Field(default=50.0, ge=0.0)
+    # Checks die over de hele populatie gaan in plaats van over losse objecten; die
+    # draaien altijd op de volledige export.
+    volledige_dataset_checks: list[str] = Field(default_factory=lambda: ["ADM-002"])
+    # Boven dit aandeel van de dataset levert de afbakening zo weinig op dat de run
+    # dat meldt. Een mededeling, geen fout.
+    component_waarschuwingsdrempel: float = Field(default=0.5, gt=0.0, le=1.0)
+
+
 class NulmetingOptions(BaseModel):
     """Eisen aan de aangeleverde nulmeting."""
 
@@ -304,6 +321,7 @@ class CheckConfig(BaseModel):
     klassen: ClassRoots
     drempels: CheckThresholds = Field(default_factory=CheckThresholds)
     netwerk: NetworkOptions = Field(default_factory=NetworkOptions)
+    studiegebied: StudyAreaOptions = Field(default_factory=StudyAreaOptions)
     nulmeting: NulmetingOptions = Field(default_factory=NulmetingOptions)
     naamgeving: NamingOptions = Field(default_factory=NamingOptions)
     inwinning: InwinningOptions = Field(default_factory=InwinningOptions)

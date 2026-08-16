@@ -1,0 +1,127 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie, zodat de fixture zonder de volle ontologie werkt.
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput     rdfs:subClassOf gwsw:Put .
+gwsw:Vuilwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
+gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding  rdfs:subClassOf gwsw:Leiding .
+gwsw:Rioolgemaal  rdfs:subClassOf gwsw:Gemaal .
+
+# Kern plus contextschil: een streng ABCD-G met het gemaal net buiten de buffer om
+# het studiegebied, en een tweede, losstaand netje ver weg (E-F) dat geen tijdwinst
+# mag kosten door het toch mee te nemen.
+
+:PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
+    gwsw:hasAspect :PutA_ori .
+:PutA_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutB rdf:type gwsw:Inspectieput ; rdfs:label "B" ;
+    gwsw:hasAspect :PutB_ori .
+:PutB_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutC rdf:type gwsw:Inspectieput ; rdfs:label "C" ;
+    gwsw:hasAspect :PutC_ori .
+:PutC_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1100.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutD rdf:type gwsw:Inspectieput ; rdfs:label "D" ;
+    gwsw:hasAspect :PutD_ori .
+:PutD_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1150.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:Gemaal1 rdf:type gwsw:Rioolgemaal ; rdfs:label "G" ;
+    gwsw:hasAspect :Gemaal1_ori .
+:Gemaal1_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1200.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:L_AB rdf:type gwsw:Vuilwaterriool ; rdfs:label "A-B" ;
+    gwsw:hasAspect :L_AB_ori .
+:L_AB_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_AB_b , :L_AB_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_AB_b rdf:type gwsw:BeginpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 10.00 ] .
+:L_AB_e rdf:type gwsw:EindpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.90 ] .
+:L_AB_b gwsw:hasConnection :PutA_ori .
+:L_AB_e gwsw:hasConnection :PutB_ori .
+
+:L_BC rdf:type gwsw:Vuilwaterriool ; rdfs:label "B-C" ;
+    gwsw:hasAspect :L_BC_ori .
+:L_BC_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_BC_b , :L_BC_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1050.0 2000.0 1100.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_BC_b rdf:type gwsw:BeginpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.90 ] .
+:L_BC_e rdf:type gwsw:EindpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.80 ] .
+:L_BC_b gwsw:hasConnection :PutB_ori .
+:L_BC_e gwsw:hasConnection :PutC_ori .
+
+:L_CD rdf:type gwsw:Vuilwaterriool ; rdfs:label "C-D" ;
+    gwsw:hasAspect :L_CD_ori .
+:L_CD_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_CD_b , :L_CD_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1100.0 2000.0 1150.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_CD_b rdf:type gwsw:BeginpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.80 ] .
+:L_CD_e rdf:type gwsw:EindpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.70 ] .
+:L_CD_b gwsw:hasConnection :PutC_ori .
+:L_CD_e gwsw:hasConnection :PutD_ori .
+
+:L_DG rdf:type gwsw:Vuilwaterriool ; rdfs:label "D-G" ;
+    gwsw:hasAspect :L_DG_ori .
+:L_DG_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_DG_b , :L_DG_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1150.0 2000.0 1200.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_DG_b rdf:type gwsw:BeginpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.70 ] .
+:L_DG_e rdf:type gwsw:EindpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.60 ] .
+:L_DG_b gwsw:hasConnection :PutD_ori .
+:L_DG_e gwsw:hasConnection :Gemaal1_ori .
+
+# Losstaand netje, ver weg: geen verbinding met de rest, mag niet meegenomen worden.
+
+:PutE rdf:type gwsw:Inspectieput ; rdfs:label "E" ;
+    gwsw:hasAspect :PutE_ori .
+:PutE_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>5000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutF rdf:type gwsw:Inspectieput ; rdfs:label "F" ;
+    gwsw:hasAspect :PutF_ori .
+:PutF_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>5050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:L_EF rdf:type gwsw:Vuilwaterriool ; rdfs:label "E-F" ;
+    gwsw:hasAspect :L_EF_ori .
+:L_EF_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_EF_b , :L_EF_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">5000.0 2000.0 5050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_EF_b rdf:type gwsw:BeginpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 8.00 ] .
+:L_EF_e rdf:type gwsw:EindpuntLeiding ;
+    gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 7.90 ] .
+:L_EF_b gwsw:hasConnection :PutE_ori .
+:L_EF_e gwsw:hasConnection :PutF_ori .

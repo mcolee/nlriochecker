@@ -10,6 +10,7 @@ from typing import ClassVar
 
 from shapely.geometry import Point
 
+from gwswpijplijn.afbakening import objecten_in_gebied
 from gwswpijplijn.checkconfig import CheckConfig
 from gwswpijplijn.dataset import GwswDataset
 from gwswpijplijn.errors import StudyAreaError
@@ -276,13 +277,6 @@ class SkeletonCheck(Check):
     def examined(self, context: CheckContext) -> int:
         """Een skelet bekijkt niets."""
         return 0
-
-
-def objecten_in_gebied(dataset: GwswDataset, area: StudyArea) -> frozenset[str]:
-    """De URI's van de objecten waarvan de geometrie het studiegebied raakt."""
-    binnen = {uri for uri, node in dataset.nodes.items() if area.bevat(node.point)}
-    binnen |= {uri for uri, conduit in dataset.conduits.items() if area.bevat(conduit.line)}
-    return frozenset(binnen)
 
 
 REGISTRY: dict[str, type[Check]] = {}

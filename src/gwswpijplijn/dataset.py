@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 
@@ -393,6 +394,24 @@ class GwswDataset:
         for klasse in self.closure(root):
             gevonden.extend(self.graph.subjects(RDF.type, URIRef(klasse)))
         return gevonden
+
+    def subset(self, uris: Iterable[str]) -> GwswDataset:
+        """Dezelfde dataset met alleen deze knopen en verbindingen.
+
+        De rdflib-graaf gaat ongewijzigd mee: hij is de bron waaruit de checks hun
+        onderdelen opzoeken, en hem meesnijden zou stilzwijgend gegevens weglaten.
+        Alleen `subjects_of_class()` loopt daardoor nog over de volledige export;
+        dat zijn de drempels in NET-007 en RVZ, en dat staat in het rapport.
+        """
+        behouden = frozenset(uris)
+        return replace(
+            self,
+            nodes={uri: node for uri, node in self.nodes.items() if uri in behouden},
+            conduits={uri: kant for uri, kant in self.conduits.items() if uri in behouden},
+            geometry_errors={
+                uri: fout for uri, fout in self.geometry_errors.items() if uri in behouden
+            },
+        )
 
 
 def _uri(naam: str) -> str:

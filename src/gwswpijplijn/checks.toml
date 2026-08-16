@@ -170,3 +170,11 @@ max_bevindingen_per_check = 0
 systemisch_drempel = 0.80
 # Versie van het checkregister waaraan deze run getoetst is.
 register_versie = "v0.8"
+
+# Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
+# draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de
+# netwerkchecks hun antwoord houden; gerapporteerd wordt alleen de kern.
+[studiegebied]
+context_buffer_m = 50.0
+volledige_dataset_checks = ["ADM-002"]
+component_waarschuwingsdrempel = 0.5
