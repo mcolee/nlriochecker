@@ -97,10 +97,10 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
 @pytest.mark.parametrize(
     ("check_id", "verwacht"),
     [
-        ("EXT-001", ["1"]),
+        ("EXT-001", ["1", "4", "P", "Q"]),
         ("EXT-002", ["2", "3"]),
         ("EXT-003", ["2"]),
-        ("EXT-005", ["C", "E", "F", "L1", "L2"]),
+        ("EXT-005", ["C", "E", "F", "L1", "L2", "P", "Q"]),
         ("EXT-006", ["deksel-los"]),
         ("EXT-007", ["L1"]),
         ("HGT-001", ["B", "E"]),
@@ -139,7 +139,8 @@ def test_buiten_studiegebied_wordt_geteld_in_de_toelichting(
 ) -> None:
     outcome = uitkomst("HGT-001", config, bronnen)
 
-    assert any("Buiten studiegebied: 1 van de 8 putten" in note for note in outcome.notes)
+    # Putten P en Q liggen binnen het fixturegebied; alleen D valt erbuiten.
+    assert any("Buiten studiegebied: 1 van de 10 putten" in note for note in outcome.notes)
 
 
 def test_nodata_cellen_worden_gemeld(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -165,6 +166,20 @@ def test_typeringspoort_haalt_objecten_uit_de_uitslag(
 
     assert outcome.findings == []
     assert any(MARKERING_NIET_TOETSBAAR in note for note in outcome.notes)
+
+
+def test_ext001_benoemt_de_relatie_met_het_bouwwerk(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    outcome = uitkomst("EXT-001", config, bronnen)
+    relaties = {finding.object_label: finding.details["waarde"] for finding in outcome.findings}
+
+    # Streng 1 steekt door de gevel, streng 4 en de twee putten liggen er binnen.
+    assert relaties == {"1": "kruist", "4": "binnen", "P": "binnen", "Q": "binnen"}
+    assert all(
+        finding.details["drempel"] == config.drempels.ext_pand_buffer_m
+        for finding in outcome.findings
+    )
 
 
 def test_ext003_zwijgt_over_een_duiker(config: CheckConfig, bronnen: ExternalData) -> None:

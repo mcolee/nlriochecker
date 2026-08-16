@@ -204,61 +204,96 @@ class _ExterneCheck(Check):
         return len(self.selectie(context).toetsbaar)
 
 
+RELATIE_BINNEN = "binnen"
+RELATIE_KRUIST = "kruist"
+RELATIE_NABIJ = "nabij"
+# De relaties van sterk naar zwak; de sterkste die op een object van toepassing is
+# komt in de melding.
+RELATIE_VOLGORDE = (RELATIE_BINNEN, RELATIE_KRUIST, RELATIE_NABIJ)
+
+
 @register
 class KruisingMetBouwwerk(_ExterneCheck):
-    """EXT-001: een streng die door of vlak langs een pand of bouwwerk loopt."""
+    """EXT-001: een streng of put die in, door of vlak langs een bouwwerk ligt."""
 
     id = "EXT-001"
     title = "Kruising of nabijheid van BGT-panden en overige bouwwerken"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
     rol = "bgt_pand"
-    soort = "vrijvervalstrengen"
+    soort = "vrijvervalstrengen en putten"
 
     def objecten(self, context: CheckContext) -> list:
-        """De vrijvervalstrengen."""
-        return _strengen(context)
+        """De vrijvervalstrengen en de putten; beide horen niet in een pand."""
+        return [*_strengen(context), *_putten(context)]
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Zoekt strengen die een pand of bouwwerk raken of er vlak langs lopen.
+        """Meldt elk object dat binnen, door of vlak langs een bouwwerk ligt.
 
         Panden komen uit de BGT en worden aangevuld met de BAG-panden; die twee
-        overlappen grotendeels maar niet volledig. Overige bouwwerken
-        (`overigbouwwerk`, `gebouwinstallatie`, `kunstwerkdeel_vlak`) tellen mee als
-        aparte laag.
+        overlappen grotendeels maar niet volledig. Overige bouwwerken tellen mee als
+        aparte laag. Een put in een pand is een ander gebrek dan een streng die de
+        gevel raakt, dus staat de relatie in de melding.
         """
         lagen = self.bouwwerklagen(context)
         if not lagen or not self.bruikbaar(context):
             return
         buffer = context.config.drempels.ext_pand_buffer_m
 
-        for conduit in self.selectie(context).toetsbaar:
-            geraakt = self._dichtstbij(conduit, lagen, buffer)
+        for object_ in self.selectie(context).toetsbaar:
+            geometrie = self.geometrie_van(object_)
+            if geometrie is None or geometrie.is_empty:
+                continue
+            geraakt = self._sterkste(geometrie, lagen, buffer)
             if geraakt is None:
                 continue
-            afstand, laag = geraakt
-            hoe = "kruist" if afstand == 0.0 else f"ligt {afstand:.2f} m van"
+            relatie, afstand, laag = geraakt
             yield self.finding(
                 context,
-                conduit.uri,
-                conduit.label,
-                f"Deze streng {hoe} een bouwwerk uit `{laag.source.name}` "
-                f"(laag {laag.layer}); buffer {buffer:g} m.",
+                object_.uri,
+                object_.label,
+                f"Dit object {self._zin(relatie, afstand)} een bouwwerk uit "
+                f"`{laag.source.name}` (laag {laag.layer}); buffer {buffer:g} m.",
+                waarde=relatie,
+                drempel=buffer,
                 afstand_m=round(afstand, 3),
                 bron=laag.source.name,
                 laag=laag.layer,
-                buffer_m=buffer,
             )
 
-    def _dichtstbij(self, conduit: Conduit, lagen, buffer: float):
-        """Het dichtstbijzijnde bouwwerk binnen de buffer, met zijn afstand."""
+    def _sterkste(self, geometrie, lagen, buffer: float):
+        """De zwaarste relatie met een bouwwerk binnen de buffer, met afstand en laag.
+
+        Bij gelijke relatie wint het dichtstbijzijnde bouwwerk; zo hangt de melding
+        niet af van de volgorde waarin de lagen toevallig gelezen zijn.
+        """
         beste = None
         for laag in lagen:
-            for geometrie, _ in laag.nabij(conduit.line, buffer):
-                afstand = conduit.line.distance(geometrie)
-                if afstand <= buffer and (beste is None or afstand < beste[0]):
-                    beste = (afstand, laag)
-        return beste
+            for vorm, _ in laag.nabij(geometrie, buffer):
+                afstand = geometrie.distance(vorm)
+                if afstand > buffer:
+                    continue
+                relatie = self._relatie(geometrie, vorm, afstand)
+                kandidaat = (RELATIE_VOLGORDE.index(relatie), afstand, relatie, laag)
+                if beste is None or kandidaat[:2] < beste[:2]:
+                    beste = kandidaat
+        return None if beste is None else (beste[2], beste[1], beste[3])
+
+    def _relatie(self, geometrie, bouwwerk, afstand: float) -> str:
+        """De relatie tussen object en bouwwerk: binnen, kruist of nabij."""
+        if geometrie.within(bouwwerk):
+            return RELATIE_BINNEN
+        if afstand == 0.0:
+            return RELATIE_KRUIST
+        return RELATIE_NABIJ
+
+    def _zin(self, relatie: str, afstand: float) -> str:
+        """De relatie als leesbare zin voor in de melding."""
+        if relatie == RELATIE_BINNEN:
+            return "ligt volledig binnen"
+        if relatie == RELATIE_KRUIST:
+            return "kruist"
+        return f"ligt {afstand:.2f} m van"
 
     def bouwwerklagen(self, context: CheckContext) -> list:
         """De pand- en bouwwerklagen die deze check gebruikt.

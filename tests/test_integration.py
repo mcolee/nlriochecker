@@ -236,7 +236,9 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     per_check = {outcome.check_id: outcome for outcome in run.outcomes}
 
     # Maar een fractie van de dataset ligt binnen het studiegebied.
-    assert per_check["EXT-001"].examined == 29
+    # 69 = 29 vrijvervalstrengen plus 40 putten binnen het bereik van de externe
+    # bronnen; EXT-001 toetst sinds deze uitbreiding beide soorten objecten.
+    assert per_check["EXT-001"].examined == 69
     assert per_check["HGT-001"].examined == 40
     for outcome in run.outcomes:
         if outcome.check_id.startswith("HGT") or outcome.check_id in {"EXT-001", "EXT-002"}:

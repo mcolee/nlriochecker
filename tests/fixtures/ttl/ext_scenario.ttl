@@ -242,3 +242,28 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :L4_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.35 ] .
 :L4_b gwsw:hasConnection :PutC_ori .
 :L4_e gwsw:hasConnection :PutL2_ori .
+
+# Put P, put Q en streng "4" liggen binnen het BGT-pand (1020, 1998)-(1030, 2002);
+# EXT-001 moet ze als "binnen" melden, in tegenstelling tot streng "1" die de gevel
+# kruist. Ze krijgen geen maaiveldhoogte, BOB of inwinning, zodat ze de HGT- en
+# BTR-tests niet raken.
+:PutP rdf:type gwsw:Inspectieput ; rdfs:label "P" ;
+    gwsw:hasAspect :PutP_ori .
+:PutP_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1022.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:PutQ rdf:type gwsw:Inspectieput ; rdfs:label "Q" ;
+    gwsw:hasAspect :PutQ_ori .
+:PutQ_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1028.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:L5 rdf:type gwsw:GemengdRiool ; rdfs:label "4" ;
+    gwsw:hasAspect :L5_ori .
+:L5_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L5_b , :L5_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1022.0 2000.0 1028.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L5_b rdf:type gwsw:BeginpuntLeiding .
+:L5_e rdf:type gwsw:EindpuntLeiding .
+:L5_b gwsw:hasConnection :PutP_ori .
+:L5_e gwsw:hasConnection :PutQ_ori .

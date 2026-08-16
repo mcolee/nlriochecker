@@ -140,7 +140,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |
 | --- | --- | --- | --- | --- | --- |
-| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken | W | Plausibiliteit | geimplementeerd met test | — |
+| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit | geimplementeerd met test | — |
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit | geimplementeerd met test | — |
 | EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid | geimplementeerd met test | — |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd met test | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |

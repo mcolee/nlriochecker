@@ -158,7 +158,7 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
-| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken | W | Plausibiliteit |
+| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit |
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit |
 | EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit |
