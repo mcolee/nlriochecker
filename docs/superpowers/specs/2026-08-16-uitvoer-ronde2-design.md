@@ -62,7 +62,7 @@ Nieuw: `src/gwswpijplijn/afbakening.py`.
 
 ```
 Analyseset(kern: frozenset[str], schil: frozenset[str], dataset: GwswDataset,
-           component_aandeel: float)
+           volledig_aantal: int)   # plus de properties `alles` en `aandeel`
 ```
 
 `bouw_analyseset(dataset, area, config)` bepaalt:
@@ -126,16 +126,29 @@ Nieuw: `src/gwswpijplijn/cache.py`.
 - Opslag: `~/.cache/gwswpijplijn/<sleutel>.pickle` (XDG-cachemap als die gezet is),
   geschreven via een tijdelijk bestand plus `rename`, zodat een afgebroken run geen halve
   cache achterlaat.
-- Formaat: `pickle` protocol 5 van de `GwswDataset`. Geen extra afhankelijkheid, en
-  shapely-geometrieen picklen rechtstreeks. De cachemap is van de gebruiker zelf; er
-  wordt niets van buiten ingelezen.
+- Formaat: `pickle` protocol 5, in twee bestanden. Gemeten op De Wolden (1.877.729
+  triples): de structuren (knopen, strengen, klassenhierarchie) zijn 31 MB en lezen terug
+  in 1,4 s, de rdflib-graaf is 423 MB en leest terug in 58 s; opnieuw parsen kost 176 tot
+  205 s en de omweg via N-Triples 118 s. De graaf gaat daarom achter een luie
+  plaatsvervanger: hij komt pas van schijf als een check hem aanraakt. Geen extra
+  afhankelijkheid; de cachemap is van de gebruiker zelf.
 - CLI: standaard aan, `--geen-cache` slaat over, `--cache-map` verlegt de locatie. De
   uitvoer meldt welke van de twee wegen gebruikt is en hoe lang die duurde.
 - Een beschadigde of onleesbare cache is geen fout: hij wordt gemeld, genegeerd en
   opnieuw geschreven.
 
-Verwachting: koude run onveranderd (176 s plus wegschrijven), warme run op een dorp
-ongeveer tien seconden.
+Verwachting op grond van die metingen: de koude run blijft ongeveer gelijk (176 s plus
+circa 25 s wegschrijven). Een warme run die de graaf niet nodig heeft -- alleen
+geometrie-, hoogte- en netwerkchecks -- kost seconden. Een warme run met de volledige
+registry raakt de graaf via ADM-007 tot en met ADM-009, NET-007 en de RVZ-checks en komt
+uit op ongeveer een minuut in plaats van vier. De eerdere schatting van tien seconden voor
+een volledige run was te optimistisch: die ging eraan voorbij dat een deel van de checks
+de rdflib-graaf zelf leest.
+
+Wat dit niet oplost en wat een volgende ronde kan oppakken: de graaf pruimen tot de
+triples die de checks werkelijk raken (hasPart, hasConnection, type, label, aspecten), of
+die gegevens in de structuren opnemen zodat de graaf helemaal kan vervallen. Dat is een
+ingreep in vier checkmodules en hoort niet in deze ronde.
 
 ### 4.6 Gevolg voor CLAUDE.md
 
@@ -171,9 +184,9 @@ checks die de nulmeting dekt.
 - Nieuwe featurelaag `mechanisch_riool` (LINESTRING) met een smalle kolomset:
   `feature_id`, `label`, `objecttype`, `gwsw_uri`, `omschrijving`, `gebied`, `run_datum`,
   `dataset_versie`. `omschrijving` bevat "Mechanisch riool: niet geanalyseerd".
-- `strengen` bevat voortaan alleen de vrijvervalleidingen. Verbindingen die in geen van
-  beide lijsten vallen blijven in `strengen` staan met hun eigen `objecttype`; ze
-  verdwijnen niet.
+- `strengen` bevat voortaan alles behalve het mechanische stelsel. Verbindingen die in
+  geen van beide klassenlijsten vallen (LozeLeiding, Drain, Duiker) blijven daar dus staan
+  met hun eigen `objecttype`; ze verdwijnen niet.
 - `gwsw_run` krijgt tellingen per laag, zodat zichtbaar is dat er objecten verhuisd zijn.
 - Stijl: grijs, dun, met de omschrijving als legenda-regel.
 
