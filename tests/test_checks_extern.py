@@ -23,7 +23,7 @@ TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
 SCENARIO = TTL_DIR / "ext_scenario.ttl"
 
-EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-005", "EXT-006", "EXT-007", "EXT-008"]
+EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-005", "EXT-006", "EXT-007"]
 AHN_IDS = ["HGT-001", "HGT-002", "HGT-003"]
 
 pytestmark = pytest.mark.skipif(
@@ -37,9 +37,6 @@ def config() -> CheckConfig:
     """De standaardconfig, afgestemd op het assenstelsel van de fixtures."""
     gekozen = load_check_config()
     gekozen.drempels.rd_y_min = 0.0
-    # Het fixturegebied is 140 bij 40 m; met de standaard 40 m zou elk pand bediend
-    # zijn en zou EXT-008 nooit iets kunnen vinden.
-    gekozen.drempels.ext_riolering_bij_pand_m = 10.0
     return gekozen
 
 
@@ -106,7 +103,6 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
         ("EXT-005", ["C", "E", "F", "L1", "L2"]),
         ("EXT-006", ["deksel-los"]),
         ("EXT-007", ["L1"]),
-        ("EXT-008", ["bag-verweg"]),
         ("HGT-001", ["B", "E"]),
         ("HGT-002", ["C"]),
         ("HGT-003", ["1", "2"]),
@@ -200,23 +196,12 @@ def test_ontbrekende_laag_laat_de_check_overslaan(config: CheckConfig) -> None:
     assert any("laag niet aanwezig in aangeleverde data" in note for note in outcome.notes)
 
 
-def test_ext008_meldt_de_benadering_met_pandgeometrie(
-    config: CheckConfig, bronnen: ExternalData
-) -> None:
-    outcome = uitkomst("EXT-008", config, bronnen)
-    bevinding = outcome.findings[0]
-
-    assert bevinding.details["verblijfsobjecten"] == 4
-    assert "benadering" in bevinding.message
-    assert any("verblijfsobjecten" in note for note in outcome.notes)
-
-
 def test_externe_bevindingen_dragen_een_eigen_locatie(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
-    # EXT-006 en EXT-008 melden objecten die niet uit de GWSW-dataset komen; zonder
-    # eigen coordinaat zouden ze bij de afbakening tot een studiegebied wegvallen.
-    for check_id in ("EXT-006", "EXT-008"):
+    # EXT-006 meldt objecten die niet uit de GWSW-dataset komen; zonder eigen
+    # coordinaat zou het bij de afbakening tot een studiegebied wegvallen.
+    for check_id in ("EXT-006",):
         for bevinding in uitkomst(check_id, config, bronnen).findings:
             assert bevinding.location is not None
 

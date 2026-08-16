@@ -13,8 +13,8 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | NET | 8 | 8 | 0 | 0 | 0 |
 | RVZ | 11 | 9 | 0 | 0 | 2 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
-| EXT | 8 | 8 | 0 | 0 | 0 |
-| **totaal** | **93** | **87** | **0** | **0** | **6** |
+| EXT | 7 | 7 | 0 | 0 | 0 |
+| **totaal** | **92** | **86** | **0** | **0** | **6** |
 
 ## TOP
 
@@ -147,4 +147,3 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid | geimplementeerd met test | — |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid | geimplementeerd met test | — |
 | EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit | geimplementeerd met test | — |
-| EXT-008 | BAG-verblijfsobject zonder riolering binnen X m (dekkingscheck) | W | Compleetheid | geimplementeerd met test | — |

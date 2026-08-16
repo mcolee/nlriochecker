@@ -165,7 +165,6 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid |
 | EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit |
-| EXT-008 | BAG-verblijfsobject zonder riolering binnen X m (dekkingscheck) | W | Compleetheid |
 
 ## Geschrapte checks (gedekt door GWSW-nulmeting)
 
@@ -190,6 +189,7 @@ uitkomst geven. De ID's worden niet hergebruikt.
 
 | ID | Check | Vervallen in | Reden |
 |---|---|---|---|
+| EXT-008 | BAG-verblijfsobject zonder riolering binnen X m (dekkingscheck) | v0.8 | Niet relevant voor deze opdracht: de vraag of elk pand op riolering is aangesloten hoort bij het rioleringsplan, niet bij een datakwaliteitstoets op de bestaande registratie. Bovendien zijn er panden aangeleverd en geen verblijfsobjecten, waardoor de check alleen een benadering kon geven. |
 
 ## Open punten
 

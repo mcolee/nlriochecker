@@ -188,7 +188,6 @@ class CheckThresholds(BaseModel):
     ext_watergang_buffer_m: float = Field(default=1.0, ge=0.0)
     ext_putdeksel_afstand_m: float = Field(default=2.0, gt=0.0)
     ext_lozingspunt_water_afstand_m: float = Field(default=10.0, gt=0.0)
-    ext_riolering_bij_pand_m: float = Field(default=40.0, gt=0.0)
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
 
 

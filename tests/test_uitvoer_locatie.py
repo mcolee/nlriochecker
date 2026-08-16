@@ -69,7 +69,7 @@ def test_melding_op_een_streng_krijgt_het_middelpunt() -> None:
 
 
 def test_extern_object_gebruikt_zijn_eigen_coordinaat() -> None:
-    """EXT-006 en EXT-008 melden objecten die niet in de GWSW-dataset staan."""
+    """EXT-006 meldt objecten die niet in de GWSW-dataset staan."""
     punt = foutlocatie(_bevinding("urn:bgt:deksel-1", location=(1111.0, 2222.0)), _dataset())
 
     assert (punt.x, punt.y) == (1111.0, 2222.0)

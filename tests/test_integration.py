@@ -231,7 +231,7 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
-    ids = ["EXT-001", "EXT-002", "EXT-003", "EXT-007", "EXT-008", "HGT-001", "HGT-002", "HGT-003"]
+    ids = ["EXT-001", "EXT-002", "EXT-003", "EXT-007", "HGT-001", "HGT-002", "HGT-003"]
     run = run_checks(context, ids)
     per_check = {outcome.check_id: outcome for outcome in run.outcomes}
 
