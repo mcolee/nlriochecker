@@ -1,0 +1,20 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie, zodat de fixture zonder de volle ontologie werkt.
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput     rdfs:subClassOf gwsw:Put .
+
+# Een enkele, geheel losstaande put: geen streng, dus geen enkel netwerkverband met
+# wat dan ook. Hij ligt net buiten afbakening_gebied.geojson (990,1990)-(1060,2010),
+# op 5 meter van de rand. Alleen de contextbuffer kan hem in de analyseset trekken;
+# de component kan het niet, want er is geen streng om hem aan vast te maken.
+
+:PutH rdf:type gwsw:Inspectieput ; rdfs:label "H" ;
+    gwsw:hasAspect :PutH_ori .
+:PutH_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1065.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .

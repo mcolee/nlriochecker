@@ -75,13 +75,25 @@ def test_zonder_schil_geeft_net001_een_valse_bevinding() -> None:
 
 
 def test_de_buffer_haalt_ongekoppelde_buren_erbij() -> None:
-    """TOP-005 en de EXT-checks kijken naar nabijheid zonder netwerkverband."""
-    dataset, area, config = _opzet()
+    """TOP-005 en de EXT-checks kijken naar nabijheid zonder netwerkverband.
+
+    Put H heeft geen enkele streng en kan dus nooit via de component meekomen: dit
+    bewijst wat de buffer toevoegt, niet wat de component al zou leveren. Met
+    context_buffer_m = 60 (H ligt 5 meter buiten het gebied) hoort hij erbij, met
+    context_buffer_m = 0 juist niet.
+    """
+    dataset = load_dataset(TTL_DIR / "afbakening_buffer_los_object.ttl")
+    area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+
     config.studiegebied.context_buffer_m = 60.0
+    met_buffer = bouw_analyseset(dataset, area, config)
+    assert "H" in _labels(dataset, met_buffer.alles)
 
-    analyseset = bouw_analyseset(dataset, area, config)
-
-    assert "C" in _labels(dataset, analyseset.alles)
+    config.studiegebied.context_buffer_m = 0.0
+    zonder_buffer = bouw_analyseset(dataset, area, config)
+    assert "H" not in _labels(dataset, zonder_buffer.alles)
 
 
 def test_objecten_in_gebied_blijft_importeerbaar_uit_checks() -> None:
@@ -107,3 +119,21 @@ def test_evenwijdige_strengen_vallen_geen_van_beide_buiten_de_schil() -> None:
     analyseset = bouw_analyseset(dataset, area, config)
 
     assert {"M-N-1", "M-N-2"} <= _labels(dataset, analyseset.schil)
+
+
+def test_streng_met_los_uiteinde_telt_mee_maar_verdwijnt_niet_ongemerkt() -> None:
+    """Een streng die nergens op uitkomt, mag niet zomaar uit beeld verdwijnen.
+
+    _component slaat zo'n streng terecht over (net als `_bouw_netwerk` in
+    checks/netwerk.py, die hem in `unconnected` zet), maar het aantal moet
+    zichtbaar blijven in plaats van stilzwijgend te verdwijnen.
+    """
+    dataset = load_dataset(TTL_DIR / "afbakening_los_uiteinde.ttl")
+    area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    assert analyseset.strengen_zonder_netwerkverband == 1
+    assert analyseset.alles == frozenset()

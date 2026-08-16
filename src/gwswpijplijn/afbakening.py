@@ -26,6 +26,14 @@ class Analyseset:
     schil: frozenset[str]
     dataset: GwswDataset
     volledig_aantal: int
+    # Vrijvervalstrengen die de componentberekening moest overslaan omdat een van
+    # beide uiteinden niet naar een netwerkknoop herleidt (zie `_component`). Ze
+    # kunnen daardoor nooit via de component in de schil belanden, ook niet als hun
+    # wel herleidbare kant in een geraakte component ligt. Hetzelfde als wat
+    # `checks/netwerk.py` als `unconnected` apart houdt; hier alleen het aantal,
+    # zodat het rapport kan zeggen wat er niet meegewogen is in plaats van te
+    # zwijgen.
+    strengen_zonder_netwerkverband: int = 0
 
     @property
     def alles(self) -> frozenset[str]:
@@ -48,7 +56,8 @@ def objecten_in_gebied(dataset: GwswDataset, area: StudyArea) -> frozenset[str]:
 def bouw_analyseset(dataset: GwswDataset, area: StudyArea, config: CheckConfig) -> Analyseset:
     """Bouwt kern en contextschil en levert de uitgedunde dataset."""
     kern = objecten_in_gebied(dataset, area)
-    schil = _component(dataset, config, kern) | _binnen_buffer(dataset, area, config)
+    component, zonder_netwerkverband = _component(dataset, config, kern)
+    schil = component | _binnen_buffer(dataset, area, config)
     schil -= kern
     volledig = len(dataset.nodes) + len(dataset.conduits)
     return Analyseset(
@@ -56,10 +65,13 @@ def bouw_analyseset(dataset: GwswDataset, area: StudyArea, config: CheckConfig) 
         schil=frozenset(schil),
         dataset=dataset.subset(kern | schil),
         volledig_aantal=volledig,
+        strengen_zonder_netwerkverband=zonder_netwerkverband,
     )
 
 
-def _component(dataset: GwswDataset, config: CheckConfig, kern: frozenset[str]) -> set[str]:
+def _component(
+    dataset: GwswDataset, config: CheckConfig, kern: frozenset[str]
+) -> tuple[set[str], int]:
     """De samenhangende vrijvervalcomponenten die de kern raken.
 
     Bewust alleen over de vrijvervalleidingen: mechanische leidingen verbinden
@@ -72,10 +84,19 @@ def _component(dataset: GwswDataset, config: CheckConfig, kern: frozenset[str]) 
     kantattribuut (`add_edge(..., uri=...)`) elkaar overschrijven en zo een van de
     twee stilzwijgend uit de analyseset laten vallen -- parallelle strengen zijn in
     dit domein normaal (zie TOP-013).
+
+    Een streng waarvan een van beide uiteinden niet naar een netwerkknoop herleidt,
+    slaat deze functie over: hij komt in geen enkele component terecht en kan dus
+    nooit via de component in de schil belanden, ook niet als zijn wel herleidbare
+    kant in een geraakte component ligt. Dat is hetzelfde antwoord dat de
+    netwerkchecks zelf geven -- `_bouw_netwerk` in `checks/netwerk.py` zet zulke
+    strengen apart in `unconnected` en houdt ze buiten de graaf -- maar mag niet
+    stilzwijgend gebeuren; het aantal gaat terug naar de aanroeper.
     """
     wortels = config.klassen.netwerkknopen
     graaf = nx.Graph()
     strengen: list[tuple[str, str]] = []
+    zonder_netwerkverband = 0
     for wortel in config.klassen.vrijvervalleiding:
         for uri in dataset.of_class(wortel):
             conduit = dataset.conduits.get(uri)
@@ -84,6 +105,7 @@ def _component(dataset: GwswDataset, config: CheckConfig, kern: frozenset[str]) 
             begin = dataset.resolve_network_node(conduit.start_node, wortels)
             eind = dataset.resolve_network_node(conduit.end_node, wortels)
             if begin is None or eind is None:
+                zonder_netwerkverband += 1
                 continue
             graaf.add_edge(begin, eind)
             strengen.append((uri, begin))
@@ -98,7 +120,7 @@ def _component(dataset: GwswDataset, config: CheckConfig, kern: frozenset[str]) 
     for index in geraakt:
         gevonden |= componenten[index]
     gevonden |= {uri for uri, begin in strengen if component_van.get(begin) in geraakt}
-    return gevonden
+    return gevonden, zonder_netwerkverband
 
 
 def _binnen_buffer(dataset: GwswDataset, area: StudyArea, config: CheckConfig) -> set[str]:

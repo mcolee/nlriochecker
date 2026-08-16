@@ -1,0 +1,36 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie, zodat de fixture zonder de volle ontologie werkt.
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput     rdfs:subClassOf gwsw:Put .
+gwsw:Vuilwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
+gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
+
+# DEFECT die deze fixture blootlegt: het eindpunt van L1 heeft geen enkele
+# gwsw:hasConnection. Zo'n streng kan niet naar een netwerkknoop herleid worden en
+# moet door _component overgeslagen worden (net als _bouw_netwerk in
+# checks/netwerk.py doet), maar dat overslaan hoort geteld te worden. Put P en de
+# streng liggen bewust ver van afbakening_gebied.geojson (990,1990)-(1060,2010),
+# zodat alleen de telling getoetst wordt en niet toevallig ook de geometrie.
+
+:PutP rdf:type gwsw:Inspectieput ; rdfs:label "P" ;
+    gwsw:hasAspect :PutP_ori .
+:PutP_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>2000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:L1 rdf:type gwsw:Vuilwaterriool ; rdfs:label "1" ;
+    gwsw:hasAspect :L1_ori .
+:L1_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L1_b , :L1_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">2000.0 2000.0 2080.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L1_b rdf:type gwsw:BeginpuntLeiding .
+:L1_e rdf:type gwsw:EindpuntLeiding .
+:L1_b gwsw:hasConnection :PutP_ori .
+# L1_e heeft bewust geen hasConnection: het eindpunt komt nergens op uit.
