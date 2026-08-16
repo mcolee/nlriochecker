@@ -9,6 +9,7 @@ import click
 from gwswpijplijn import __version__
 from gwswpijplijn.afbakening import bouw_analyseset
 from gwswpijplijn.analysis import MetingAnalysis, analyze
+from gwswpijplijn.cache import laad_met_cache
 from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import REGISTRY, CheckContext, Severity, run_checks
 from gwswpijplijn.comparison import compare_metingen
@@ -414,6 +415,19 @@ def compare_command(
     is_flag=True,
     help="Sla de GeoPackage-export over; schrijf alleen het rapport en de CSV.",
 )
+@click.option(
+    "--geen-cache",
+    "geen_cache",
+    is_flag=True,
+    help="Lees de dataset opnieuw in plaats van uit de cache; ook geen cache wegschrijven.",
+)
+@click.option(
+    "--cache-map",
+    "cache_dir",
+    default=None,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Waar de geparseerde dataset bewaard wordt; standaard ~/.cache/gwswpijplijn.",
+)
 @_output_option("Map waarin het bevindingenrapport wordt geschreven.")
 def check_command(
     dataset_path: Path,
@@ -426,12 +440,16 @@ def check_command(
     plausibility_path: Path | None,
     bronnen_dir: Path | None,
     geen_gpkg: bool,
+    geen_cache: bool,
+    cache_dir: Path | None,
     output_dir: Path,
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
     try:
         config = load_check_config(project_config_path)
-        dataset = load_dataset(dataset_path, list(ontology_paths))
+        dataset, cache = laad_met_cache(
+            dataset_path, list(ontology_paths), cache_dir, not geen_cache
+        )
         onbetrouwbaar, gate_applied = _typing_gate(shacl_paths, config, dataset)
         bronnen = _externe_bronnen(config, bronnen_dir)
         area = load_study_area(study_path, study_layer) if study_path is not None else None
@@ -458,6 +476,10 @@ def check_command(
     click.echo(
         f"{dataset_path.name}: {len(dataset.nodes)} knooppunten, {len(dataset.conduits)} strengen"
     )
+    herkomst = "uit de cache" if cache.bron == "cache" else "ingelezen"
+    click.echo(f"  Dataset {herkomst} in {cache.seconden:.1f} s.")
+    if cache.melding:
+        click.echo(f"  {cache.melding}")
     if dataset.decode_fallback is not None:
         fallback = dataset.decode_fallback
         click.echo(
