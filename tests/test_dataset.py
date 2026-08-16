@@ -139,3 +139,28 @@ def test_verschil_met_de_structurele_herkenning_wordt_gemeld(juinen: GwswDataset
 
 def test_ontologie_wordt_vastgelegd(juinen: GwswDataset) -> None:
     assert [pad.name for pad in juinen.ontologies] == ["Ontologie_GWSW_Totaal.ttl"]
+
+
+def test_beheerobjecttype_negeert_de_orientatie() -> None:
+    """De soortnaam van een object is zijn eigen type, niet dat van zijn aspect.
+
+    Deze regel wordt zowel door de netwerktoelichting als door de GIS-uitvoer
+    gebruikt; hij hoort op een plek te staan, anders loopt hij bij de volgende
+    wijziging uiteen.
+    """
+    dataset = load_dataset(
+        Path(__file__).parent / "fixtures" / "ttl" / "net001_bouwwerk_eindknoop.ttl"
+    )
+    uri = next(uri for uri, node in dataset.nodes.items() if node.label == "U")
+
+    assert "Bouwwerkorientatie" in {t.rsplit("/", 1)[-1] for t in dataset.types_of(uri)}
+    assert dataset.beheerobjecttype(uri) == "Uitlaatconstructie"
+
+
+def test_beheerobjecttype_valt_terug_op_het_aspect() -> None:
+    """Is er niets anders bekend, dan is het aspecttype beter dan niets."""
+    dataset = load_dataset(
+        Path(__file__).parent / "fixtures" / "ttl" / "net001_bouwwerk_eindknoop.ttl"
+    )
+
+    assert dataset.beheerobjecttype("urn:bestaat-niet") == ""

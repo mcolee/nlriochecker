@@ -129,6 +129,7 @@ class CheckRun:
     # De uitvoerlaag heeft de klassenlijsten en de rapportdrempels nodig; die
     # meegeven is minder broos dan ze langs elke schrijver door te reiken.
     config: CheckConfig | None = None
+    _binnen: frozenset[str] | None = field(default=None, compare=False, repr=False)
 
     @property
     def findings(self) -> list[Finding]:
@@ -138,6 +139,18 @@ class CheckRun:
     def count(self, severity: Severity) -> int:
         """Het aantal bevindingen van een ernstniveau."""
         return sum(1 for finding in self.findings if finding.severity is severity)
+
+    def objecten_binnen(self) -> frozenset[str] | None:
+        """De objecten binnen het studiegebied, of None als er geen gebied is.
+
+        Wordt een keer bepaald: de afbakening en de GIS-export vroegen het allebei,
+        en het is een doorloop over alle put- en strenggeometrieen.
+        """
+        if self.study_area is None:
+            return None
+        if self._binnen is None:
+            object.__setattr__(self, "_binnen", objecten_in_gebied(self.dataset, self.study_area))
+        return self._binnen
 
     def beperk_tot_studiegebied(self, area: StudyArea) -> CheckRun:
         """Geeft een run terug met alleen de bevindingen binnen het gebied.
@@ -162,20 +175,22 @@ class CheckRun:
                 return area.bevat(Point(*finding.location))
             return False
 
-        outcomes = [
-            CheckOutcome(
-                check_id=outcome.check_id,
-                title=outcome.title,
-                severity=outcome.severity,
-                dimension=outcome.dimension,
-                examined=outcome.examined,
-                findings=[f for f in outcome.findings if hoort_erbij(f)],
-                notes=outcome.notes,
-                weggelaten=sum(1 for f in outcome.findings if not hoort_erbij(f)),
-                skeleton=outcome.skeleton,
+        outcomes = []
+        for outcome in self.outcomes:
+            binnen_gebied = [f for f in outcome.findings if hoort_erbij(f)]
+            outcomes.append(
+                CheckOutcome(
+                    check_id=outcome.check_id,
+                    title=outcome.title,
+                    severity=outcome.severity,
+                    dimension=outcome.dimension,
+                    examined=outcome.examined,
+                    findings=binnen_gebied,
+                    notes=outcome.notes,
+                    weggelaten=len(outcome.findings) - len(binnen_gebied),
+                    skeleton=outcome.skeleton,
+                )
             )
-            for outcome in self.outcomes
-        ]
         return CheckRun(
             dataset=self.dataset,
             outcomes=outcomes,
@@ -186,6 +201,7 @@ class CheckRun:
             bronnen=self.bronnen,
             karakteristiek=self.karakteristiek,
             config=self.config,
+            _binnen=binnen,
         )
 
 

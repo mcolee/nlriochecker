@@ -74,7 +74,7 @@ def schrijf_geopackage(
     doel = _doelpad(run, output_dir, run_datum)
     doel.unlink(missing_ok=True)
 
-    binnen = _objecten_in_export(run)
+    binnen = run.objecten_binnen()
     verbinding = sqlite3.connect(doel)
     try:
         _leg_fundament(verbinding)
@@ -102,15 +102,6 @@ def _doelpad(run: CheckRun, output_dir: Path, run_datum: date) -> Path:
             f"{doel}: de uitvoermap is de map met invoerbestanden. Kies een andere uitvoermap."
         )
     return doel
-
-
-def _objecten_in_export(run: CheckRun) -> frozenset[str] | None:
-    """De URI's die binnen de grens vallen, of None als er geen grens is."""
-    if run.study_area is None:
-        return None
-    from gwswpijplijn.checks import objecten_in_gebied
-
-    return objecten_in_gebied(run.dataset, run.study_area)
 
 
 # --------------------------------------------------------------------------- #
@@ -178,20 +169,27 @@ def _maak_attribuuttabel(
 
 
 def _registreer(verbinding: sqlite3.Connection, naam: str, soort: str, omschrijving: str) -> None:
-    """Zet een laag in gpkg_contents."""
+    """Zet een laag in gpkg_contents.
+
+    `last_change` is ISO-8601 met T en Z, en een tabel zonder geometrie krijgt geen
+    srs_id; beide schrijft de GeoPackage-spec zo voor. GDAL is er soepel in, maar
+    strengere validators niet.
+    """
     verbinding.execute(
         "insert into gpkg_contents (table_name, data_type, identifier, description, "
-        "last_change, srs_id) values (?, ?, ?, ?, datetime('now'), ?)",
-        (naam, soort, naam, omschrijving, RD_NEW if soort == "features" else 0),
+        "last_change, srs_id) values (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)",
+        (naam, soort, naam, omschrijving, RD_NEW if soort == "features" else None),
     )
 
 
-def _zet_omhullende(verbinding: sqlite3.Connection, naam: str) -> None:
-    """Vult de bounding box van een featurelaag in gpkg_contents."""
-    grenzen = [
-        _ontleed(blob).bounds
-        for (blob,) in verbinding.execute(f'select geom from "{naam}" where geom is not null')
-    ]
+def _zet_omhullende(
+    verbinding: sqlite3.Connection, naam: str, grenzen: list[tuple[float, float, float, float]]
+) -> None:
+    """Vult de bounding box van een featurelaag in gpkg_contents.
+
+    De grenzen komen van de aanroeper, die de geometrieen toch al in handen had;
+    ze terugvragen uit de database zou tienduizenden blobs opnieuw laten ontleden.
+    """
     if not grenzen:
         return
     verbinding.execute(
@@ -216,19 +214,12 @@ def _blob(geometrie: BaseGeometry) -> bytes:
     return b"GP" + bytes([0, 1]) + struct.pack("<i", RD_NEW) + geometrie.wkb
 
 
-def _ontleed(blob: bytes) -> BaseGeometry:
-    """Leest een GeoPackage-blob terug; gebruikt bij het bepalen van de omhullende."""
-    from gwswpijplijn.studiegebied import _ontleed_gpkg
-
-    return _ontleed_gpkg(blob)
-
-
 # --------------------------------------------------------------------------- #
 # De lagen
 # --------------------------------------------------------------------------- #
 
 
-def _samenvatting_kolommen(run: CheckRun, run_datum: date) -> list[_Kolom]:
+def _samenvatting_kolommen() -> list[_Kolom]:
     """De kolommen van `putten` en `strengen`."""
     return [
         _Kolom("feature_id", "text"),
@@ -257,7 +248,7 @@ def _schrijf_features(
     run_datum: date,
 ) -> None:
     """Schrijft `putten`, `strengen` en `meldinglocaties`."""
-    kolommen = _samenvatting_kolommen(run, run_datum)
+    kolommen = _samenvatting_kolommen()
     _maak_featurelaag(
         verbinding, "putten", "POINT", kolommen, "Knooppunten met een samenvatting per object."
     )
@@ -277,12 +268,14 @@ def _schrijf_features(
         ("strengen", run.dataset.conduits, "line"),
     ):
         rijen = []
+        grenzen: list[tuple[float, float, float, float]] = []
         for uri, object_ in verzameling.items():
             if binnen is not None and uri not in binnen:
                 continue
             geometrie = getattr(object_, geometrie_veld)
             if geometrie is None or geometrie.is_empty:
                 continue
+            grenzen.append(geometrie.bounds)
             rijen.append(
                 (
                     _blob(geometrie),
@@ -295,7 +288,7 @@ def _schrijf_features(
             verbinding.executemany(
                 f'insert into "{laag}" (geom, {velden}) values ({plaatshouders})', rijen
             )
-        _zet_omhullende(verbinding, laag)
+        _zet_omhullende(verbinding, laag, grenzen)
 
     _schrijf_meldinglocaties(verbinding, meldingen)
 
@@ -306,13 +299,14 @@ def _samenvatting(
     object_: object,
     eigen: list[Melding],
     metadata: tuple[str, str, str],
-) -> tuple:
+) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen."""
     niet_systemisch = [melding for melding in eigen if not melding.systemisch]
     fouten = [melding for melding in niet_systemisch if melding.ernst == "F"]
     waarschuwingen = [melding for melding in niet_systemisch if melding.ernst == "W"]
     ernst = "F" if fouten else ("W" if waarschuwingen else "geen")
-    prioriteit = min((melding.prioriteit for melding in eigen), default=3)
+    # Zonder meldingen is er niets te prioriteren; 3 zou als "waarschuwing" lezen.
+    prioriteit = min((melding.prioriteit for melding in eigen), default=None)
     per_categorie = defaultdict(int)
     for melding in eigen:
         per_categorie[melding.categorie] += 1
@@ -320,8 +314,8 @@ def _samenvatting(
     return (
         uri,
         getattr(object_, "label", ""),
-        _objecttype(run, uri),
-        eigen[0].gebied if eigen else _gebied(run),
+        run.dataset.beheerobjecttype(uri),
+        _gebied(run),
         ernst,
         len(fouten),
         len(waarschuwingen),
@@ -332,14 +326,6 @@ def _samenvatting(
         prioriteit,
         *metadata,
     )
-
-
-def _objecttype(run: CheckRun, uri: str) -> str:
-    """De korte naam van het beheerobjecttype, zonder de orientatie-aspecttypen."""
-    node = run.dataset.nodes.get(uri)
-    types = node.types if node is not None and node.types else run.dataset.types_of(uri)
-    namen = sorted(naam.rsplit("/", 1)[-1] for naam in types)
-    return namen[0] if namen else ""
 
 
 def _gebied(run: CheckRun) -> str:
@@ -438,16 +424,15 @@ def _schrijf_meldinglocaties(verbinding: sqlite3.Connection, meldingen: list[Mel
     )
     velden = ", ".join(f'"{kolom.naam}"' for kolom in MELDING_KOLOMMEN)
     plaatshouders = ", ".join("?" * (len(MELDING_KOLOMMEN) + 1))
-    rijen = [
-        (_blob(melding.foutlocatie), *_melding_rij(melding))
-        for melding in meldingen
-        if melding.foutlocatie is not None
-    ]
+    met_punt = [melding for melding in meldingen if melding.foutlocatie is not None]
+    rijen = [(_blob(melding.foutlocatie), *_melding_rij(melding)) for melding in met_punt]
     if rijen:
         verbinding.executemany(
             f"insert into meldinglocaties (geom, {velden}) values ({plaatshouders})", rijen
         )
-    _zet_omhullende(verbinding, "meldinglocaties")
+    _zet_omhullende(
+        verbinding, "meldinglocaties", [melding.foutlocatie.bounds for melding in met_punt]
+    )
 
 
 def _schrijf_overzicht(
@@ -477,9 +462,11 @@ def _schrijf_overzicht(
     )
 
     systemisch = {melding.check_id for melding in meldingen if melding.systemisch}
-    gebieden = defaultdict(set)
+    gebieden: dict[str, set[str]] = defaultdict(set)
+    per_check: dict[str, list[Melding]] = defaultdict(list)
     for melding in meldingen:
         gebieden[melding.check_id].add(melding.gebied)
+        per_check[melding.check_id].append(melding)
 
     rijen = [
         (
@@ -489,9 +476,11 @@ def _schrijf_overzicht(
             outcome.severity.value,
             categorie_van(outcome.check_id),
             outcome.dimension.value,
-            len(outcome.findings),
+            len(per_check.get(outcome.check_id, [])),
             outcome.examined,
-            round(100 * len(outcome.findings) / outcome.examined, 2) if outcome.examined else None,
+            round(100 * len(per_check.get(outcome.check_id, [])) / outcome.examined, 2)
+            if outcome.examined
+            else None,
             int(outcome.check_id in systemisch),
             len({gebied for gebied in gebieden.get(outcome.check_id, set()) if gebied}),
             outcome.skeleton,

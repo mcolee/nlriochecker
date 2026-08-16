@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 
 
@@ -52,9 +52,22 @@ def is_finite(geometry: BaseGeometry | None) -> bool:
 
 
 def _flat_coords(geometry: BaseGeometry):
-    """Alle coordinaatwaarden van een geometrie, plat achter elkaar."""
-    if hasattr(geometry, "coords"):
-        for punt in geometry.coords:
+    """Alle coordinaatwaarden van een geometrie, plat achter elkaar.
+
+    Een vlak heeft geen eigen `coords` maar wel ringen; `hasattr` helpt daar niet,
+    want shapely laat die property een NotImplementedError gooien in plaats van een
+    AttributeError. Vlakken horen niet in een GWSW-export thuis, maar ze komen er
+    voor (zie de fixture top016_ongeldige_geometrie.ttl) en TOP-009 hoort ze te
+    kunnen melden in plaats van erop om te vallen.
+    """
+    if isinstance(geometry, Polygon):
+        yield from _flat_coords(geometry.exterior)
+        for ring in geometry.interiors:
+            yield from _flat_coords(ring)
+        return
+    coords = getattr(geometry, "coords", None)
+    if coords is not None:
+        for punt in coords:
             yield from punt
         return
     for deel in getattr(geometry, "geoms", ()):

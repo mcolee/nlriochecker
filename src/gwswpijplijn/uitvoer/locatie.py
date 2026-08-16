@@ -9,7 +9,8 @@ rest volstaat de geometrie van het object.
 
 from __future__ import annotations
 
-from shapely.geometry import Point
+from shapely.geometry import LinearRing, LineString, Point
+from shapely.geometry.base import BaseGeometry
 
 from gwswpijplijn.checks import Finding
 from gwswpijplijn.dataset import GwswDataset
@@ -36,9 +37,21 @@ def foutlocatie(finding: Finding, dataset: GwswDataset) -> Point | None:
 
     conduit = dataset.conduits.get(finding.object_uri)
     if conduit is not None and conduit.line is not None and not conduit.line.is_empty:
-        return conduit.line.interpolate(0.5, normalized=True)
+        return _middelpunt(conduit.line)
 
     return None
+
+
+def _middelpunt(geometrie: BaseGeometry) -> Point:
+    """Het punt halverwege een lijn, of anders een punt op de geometrie zelf.
+
+    TOP-015 en TOP-016 melden juist objecten met een geometrie die geen nette lijn
+    is -- een vlak, een multipart. `interpolate` weigert die; dan is een
+    representatief punt beter dan geen melding op de kaart.
+    """
+    if isinstance(geometrie, (LineString, LinearRing)):
+        return geometrie.interpolate(0.5, normalized=True)
+    return geometrie.representative_point()
 
 
 def _punt(coordinaat: object) -> Point | None:

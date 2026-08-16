@@ -60,13 +60,21 @@ def _richting(run: CheckRun, meldingen: list[Melding], config: CheckConfig) -> l
         return []
 
     aantal = sum(1 for m in meldingen if m.check_id in geraakt)
+    # Het percentage is over de volledige dataset geteld, het aantal bevindingen niet.
+    # Zonder die zin staat er een datasetbreed getal boven een afgebakende lijst.
+    afbakening = (
+        f" Het percentage is over de volledige dataset geteld, niet over "
+        f"{run.study_area.name}; de bevindingen eronder wel."
+        if run.study_area is not None
+        else ""
+    )
     return [
         f"Bij {stijgend} van de {meetbaar} strengen met bekende BOB's stijgt de bodem in de "
         f"administratieve afvoerrichting ({100 * aandeel:.0f}%). Dat wijst op systematisch "
         f"omgekeerd geregistreerde van-naar-richtingen, en die verklaren vermoedelijk het "
         f"merendeel van de {getal(aantal, 'bevinding', 'bevindingen')} van "
         f"{', '.join(geraakt)} in een keer. Herstel van de registratierichting gaat voor "
-        "het herstellen van de losse bevindingen."
+        f"het herstellen van de losse bevindingen.{afbakening}"
     ]
 
 

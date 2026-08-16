@@ -68,3 +68,18 @@ def test_polygoon_uit_linearring() -> None:
 def test_onbruikbare_geometrie(literal: str, melding: str) -> None:
     with pytest.raises(GeometryError, match=melding):
         parse_gml(literal)
+
+
+def test_is_finite_verdraagt_een_vlak() -> None:
+    """Een put met een vlak als geometrie mag TOP-009 niet laten omvallen.
+
+    `hasattr(polygon, "coords")` roept de property aan, en die gooit bij shapely
+    een NotImplementedError -- geen AttributeError, dus hasattr vangt hem niet op.
+    De fixture top016_ongeldige_geometrie.ttl bevat zo'n vlak.
+    """
+    from shapely.geometry import Polygon
+
+    from gwswpijplijn.checks.meetkunde import is_finite
+
+    assert is_finite(Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])) is True
+    assert is_finite(Polygon([(0, 0), (float("inf"), 0), (1, 1), (0, 1)])) is False

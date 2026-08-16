@@ -299,6 +299,21 @@ class GwswDataset:
             return self.conduits[uri].types
         return frozenset()
 
+    def beheerobjecttype(self, uri: str) -> str:
+        """De korte naam van het beheerobjecttype van een object.
+
+        `types_of()` voegt de typen van de orientatie bij die van het object, en
+        terecht: Lozingspunt en UitlaatPunt staan volgens het GWSW op de orientatie.
+        Voor een soortnaam is dat aspecttype juist het verkeerde antwoord -- een
+        knoop heet Uitlaatconstructie, niet Bouwwerkorientatie. De typen van het
+        object zelf gaan daarom voor; alleen als die ontbreken valt de naam terug
+        op het aspect.
+        """
+        node = self.nodes.get(uri)
+        types = node.types if node is not None and node.types else self.types_of(uri)
+        namen = sorted(naam.rsplit("/", 1)[-1] for naam in types)
+        return namen[0] if namen else ""
+
     def resolve_network_node(self, uri: str | None, roots: list[str]) -> str | None:
         """Herleidt een gekoppeld object naar het knooppunt waar het onderdeel van is.
 

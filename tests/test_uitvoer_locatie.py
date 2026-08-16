@@ -78,3 +78,23 @@ def test_extern_object_gebruikt_zijn_eigen_coordinaat() -> None:
 def test_object_zonder_geometrie_krijgt_geen_punt() -> None:
     """Zwijgen is hier het goede antwoord; de teller elders meldt hoeveel dat er zijn."""
     assert foutlocatie(_bevinding("urn:onbekend"), _dataset()) is None
+
+
+def test_onverwachte_geometrie_levert_toch_een_punt() -> None:
+    """Een streng met een vlak als geometrie mag de uitvoer niet laten omvallen.
+
+    TOP-015 en TOP-016 melden juist zulke geometrie; als de foutlocatie er dan op
+    struikelt, verdwijnt de melding waar hij het hardst nodig is. De fixture
+    top016_ongeldige_geometrie.ttl bevat een object met een vlakgeometrie.
+    """
+    dataset = load_dataset(TTL_DIR / "top016_ongeldige_geometrie.ttl")
+    uri, conduit = next(
+        (uri, conduit)
+        for uri, conduit in dataset.conduits.items()
+        if conduit.line is not None and conduit.line.geom_type != "LineString"
+    )
+
+    punt = foutlocatie(_bevinding(uri), dataset)
+
+    assert punt is not None
+    assert conduit.line.distance(punt) == 0.0

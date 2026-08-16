@@ -135,3 +135,23 @@ def test_meervoud_in_de_slotzin_klopt() -> None:
 
     assert "worden nagelopen" in tekst
     assert "meldingen wordt nagelopen" not in tekst
+
+
+def test_richtingspercentage_zegt_erbij_dat_het_datasetbreed_is() -> None:
+    """Een datasetbreed percentage boven een afgebakende lijst leest misleidend.
+
+    Dit is dezelfde fout die de clusterduiding maakte met "174 deelstelsels".
+    """
+    from gwswpijplijn.studiegebied import load_study_area
+
+    run = _run("net003_tegen_de_richting.ttl")
+    gebied = load_study_area(Path(__file__).parent / "fixtures" / "gis" / "rond_de_fixture.geojson")
+    beperkt = run.beperk_tot_studiegebied(gebied)
+
+    tekst = "\n".join(rode_draad(beperkt, bouw_meldingen(beperkt, RUNDATUM)))
+
+    assert "over de volledige dataset geteld" in tekst
+
+
+def test_zonder_studiegebied_komt_die_kanttekening_niet(tmp_path: Path) -> None:
+    assert "over de volledige dataset geteld" not in _tekst("net003_tegen_de_richting.ttl")

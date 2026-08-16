@@ -292,6 +292,9 @@ class EenhedenfoutBinnenBereik(_StrengCheck):
     title = "Eenhedenfouten die binnen de GWSW-waardebereiken vallen"
     severity = Severity.ERROR
     dimension = Dimension.ACCURACY
+    # Deze check meldt per profielmaat, niet per strengeinde: breedte en hoogte van
+    # dezelfde streng zijn twee bevindingen en horen twee melding-ID's te krijgen.
+    id_sleutels = ("kenmerk",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt maten die zelf geen handelsmaat zijn maar maal tien wel.

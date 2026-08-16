@@ -467,8 +467,14 @@ def _grootste_verschillen(frame: pd.DataFrame, sleutel: str) -> pd.DataFrame:
     return gewijzigd.loc[volgorde].head(TOP_N)[[sleutel, "Eerder", "Later", "Verschil"]]
 
 
+# Het bevindingenrapport is naar uitvoer/bevindingen.py verhuisd, maar blijft hier
+# importeerbaar: bestaande aanroepen en tests hoeven daar niet van te weten.
 __all__ = [
     "FILE_CHECKS_CSV",
     "FILE_CHECKS_MARKDOWN",
     "write_check_report",
+    "write_comparison_reports",
+    "write_coverage_report",
+    "write_markdown",
+    "write_reports",
 ]

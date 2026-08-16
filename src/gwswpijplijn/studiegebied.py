@@ -106,7 +106,9 @@ def _lees_geopackage(path: Path, laag: str | None) -> StudyArea:
         if geometriekolom is None:
             raise StudyAreaError(f"{path}: laag {laag!r} heeft geen geometriekolom.")
 
-        rijen = verbinding.execute(f'select "{geometriekolom[0]}" from "{laag}"').fetchall()
+        rijen = verbinding.execute(
+            f'select "{_escape(geometriekolom[0])}" from "{_escape(laag)}"'
+        ).fetchall()
         geometrieen = [_ontleed_gpkg(blob) for (blob,) in rijen if blob]
         gebied = _gebiedsaanduiding(verbinding, laag)
     except sqlite3.Error as error:
@@ -126,17 +128,27 @@ def _lees_geopackage(path: Path, laag: str | None) -> StudyArea:
     )
 
 
+def _escape(naam: str) -> str:
+    """Maakt een tabel- of kolomnaam veilig voor SQL-interpolatie.
+
+    Een laagnaam komt van de gebruiker (`--studiegebied-laag`) en kan niet als
+    parameter meegegeven worden; verdubbelde aanhalingstekens is de manier die
+    SQLite daarvoor kent.
+    """
+    return naam.replace('"', '""')
+
+
 def _gebiedsaanduiding(verbinding: sqlite3.Connection, laag: str) -> str:
     """De CBS-code en -naam van het gebied, als het bestand ze draagt.
 
     Het Koekangerveld-bestand is een CBS-buurt met `statcode` en `statnaam`. Andere
     gebiedsbestanden hebben die kolommen niet; dan blijft het bij de laagnaam.
     """
-    kolommen = {rij[1] for rij in verbinding.execute(f'pragma table_info("{laag}")')}
+    kolommen = {rij[1] for rij in verbinding.execute(f'pragma table_info("{_escape(laag)}")')}
     if not {"statcode", "statnaam"} <= kolommen:
         return ""
 
-    rij = verbinding.execute(f'select statcode, statnaam from "{laag}" limit 1').fetchone()
+    rij = verbinding.execute(f'select statcode, statnaam from "{_escape(laag)}" limit 1').fetchone()
     if rij is None:
         return ""
     code, naam = (waarde or "" for waarde in rij)

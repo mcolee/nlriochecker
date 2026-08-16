@@ -161,10 +161,17 @@ def _is_systemisch(outcome: CheckOutcome, config: CheckConfig) -> bool:
 
     Zo'n check zegt iets over de export als geheel; hem even zwaar op de kaart
     zetten als een los gebrek maakt het kaartbeeld onbruikbaar.
+
+    De teller is bewust het aantal bevindingen *voor* de afbakening tot een
+    studiegebied (`weggelaten` telt de rest), want `examined` slaat op de volledige
+    dataset. Zonder die correctie zou een tot een buurt afgebakende run de vlag
+    nooit meer laten aanslaan en zou "systemisch" iets anders betekenen naargelang
+    er een studiegebied is opgegeven.
     """
-    if not outcome.examined or not outcome.findings:
+    gevonden = len(outcome.findings) + outcome.weggelaten
+    if not outcome.examined or not gevonden:
         return False
-    return len(outcome.findings) / outcome.examined > config.rapport.systemisch_drempel
+    return gevonden / outcome.examined > config.rapport.systemisch_drempel
 
 
 def _prioriteit(run: CheckRun, finding: Finding, kritiek: set[str]) -> int:

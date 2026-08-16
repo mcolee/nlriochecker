@@ -233,3 +233,21 @@ def test_geschreven_bestand_is_leesbaar_met_de_eigen_lezer(tmp_path: Path) -> No
 
     assert gelezen.feature_count == len(run.dataset.conduits)
     assert not gelezen.geometry.is_empty
+
+
+def test_meldinglocatiestijl_filtert_systemische_meldingen_echt(tmp_path: Path) -> None:
+    """De stijl moet doen wat zijn toelichting belooft.
+
+    Drie meldingtypen slaan op vrijwel elke put aan; die even zwaar tekenen maakt
+    het kaartbeeld onbruikbaar. Ze blijven wel in het bestand staan, maar de
+    default-stijl laat ze weg. Een toelichting die dat belooft terwijl de stijl het
+    niet doet, is erger dan geen toelichting.
+    """
+    pad = _schrijf(_run("schoon.ttl"), tmp_path)
+
+    qml = _rijen(pad, "select styleQML from layer_styles where f_table_name = 'meldinglocaties'")
+    boom = ET.fromstring(qml[0][0])
+
+    filters = [regel.get("filter", "") for regel in boom.iter("rule")]
+    assert filters, "de stijl kent geen regels en kan dus niet filteren"
+    assert all("systemisch" in uitdrukking for uitdrukking in filters)

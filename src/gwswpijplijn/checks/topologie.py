@@ -6,6 +6,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from shapely.geometry import Point
+from shapely.geometry.base import BaseGeometry
+from shapely.ops import nearest_points
 from shapely.strtree import STRtree
 
 from gwswpijplijn.checks.base import (
@@ -120,14 +122,12 @@ def _midden(links: Point, rechts: Point) -> tuple[float, float]:
     return ((links.x + rechts.x) / 2, (links.y + rechts.y) / 2)
 
 
-def _dichtste_midden(links, rechts) -> tuple[float, float] | None:
+def _dichtste_midden(links: BaseGeometry, rechts: BaseGeometry) -> tuple[float, float] | None:
     """Het midden van het stuk waar twee geometrieen elkaar het dichtst naderen.
 
     Bij overlappende of rakende strengen zit het probleem daar, niet in het midden
     van een van beide strengen.
     """
-    from shapely.ops import nearest_points
-
     try:
         eerste, tweede = nearest_points(links, rechts)
     except (ValueError, AttributeError):
@@ -135,7 +135,7 @@ def _dichtste_midden(links, rechts) -> tuple[float, float] | None:
     return _midden(eerste, tweede)
 
 
-def _representatief(geometrie) -> tuple[float, float] | None:
+def _representatief(geometrie: BaseGeometry | None) -> tuple[float, float] | None:
     """Een punt op een snijgeometrie; None als er geen snijding is."""
     if geometrie is None or geometrie.is_empty:
         return None

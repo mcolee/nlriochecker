@@ -9,7 +9,7 @@ from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckContext, CheckRun, run_checks
 from gwswpijplijn.dataset import load_dataset
 from gwswpijplijn.studiegebied import load_study_area
-from gwswpijplijn.uitvoer.melding import bouw_meldingen
+from gwswpijplijn.uitvoer.melding import _is_systemisch, bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -154,3 +154,27 @@ def test_check_boven_de_drempel_heet_systemisch() -> None:
 
     assert meldingen
     assert all(melding.systemisch for melding in meldingen)
+
+
+def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
+    """De vlag telt de bevindingen van de hele dataset tegen de hele populatie.
+
+    Na afbakening tot een studiegebied blijft `examined` datasetbreed terwijl de
+    bevindingen tot het gebied beperkt zijn. Zou de teller meebewegen, dan zou
+    "systemisch" iets anders betekenen naargelang er een gebied is opgegeven -- en
+    daar hangen zowel de kaartstijl als de tellingen op de featurelagen aan.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    config = _config()
+    config.rapport.systemisch_drempel = 0.1
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+    assert all(melding.systemisch for melding in bouw_meldingen(run, RUNDATUM))
+
+    gebied = load_study_area(GIS_DIR / "rond_put_ab.geojson")
+    beperkt = run.beperk_tot_studiegebied(gebied)
+    assert beperkt.findings == []
+
+    # Nul bevindingen binnen het gebied, maar het meldingtype blijft systemisch voor
+    # de dataset als geheel; er is alleen niets meer om te markeren.
+    assert bouw_meldingen(beperkt, RUNDATUM) == []
+    assert _is_systemisch(beperkt.outcomes[0], config)

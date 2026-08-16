@@ -212,8 +212,9 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
     for melding in meldingen:
         per_check[melding.check_id].append(melding)
 
+    lines += _zonder_locatie(meldingen)
     lines += rode_draad(run, meldingen)
-    lines += table(_check_summary(run), "Samenvatting per check")
+    lines += table(_check_summary(run, per_check), "Samenvatting per check")
 
     skeletten = [outcome for outcome in run.outcomes if outcome.skeleton]
     if skeletten:
@@ -227,28 +228,29 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
         ]
 
     for outcome in run.outcomes:
+        eigen = per_check.get(outcome.check_id, [])
         lines += ["", f"## {outcome.check_id} — {outcome.title}", ""]
         markering = f" **Skelet: {outcome.skeleton}.**" if outcome.skeleton else ""
         lines += [
             f"Ernst {outcome.severity.value}, dimensie {outcome.dimension.value}. "
-            f"{getal(len(outcome.findings), 'bevinding', 'bevindingen')} op "
+            f"{getal(len(eigen), 'bevinding', 'bevindingen')} op "
             f"{outcome.examined} bekeken objecten."
             f"{markering}",
         ]
         for note in outcome.notes:
             lines += ["", f"> {note}"]
-        lines += _clusterduiding(per_check.get(outcome.check_id, []))
-        if not outcome.findings:
+        lines += _clusterduiding(eigen)
+        if not eigen:
             lines += ["", "_geen bevindingen_"]
             continue
         lines += [""]
         maximum = _maximum_per_check(run)
-        getoond = outcome.findings if maximum == 0 else outcome.findings[:maximum]
+        getoond = eigen if maximum == 0 else eigen[:maximum]
         lines += table(
             _findings_frame(getoond),
-            f"Bevindingen ({len(outcome.findings)})",
+            f"Bevindingen ({len(eigen)})",
         )
-        weggelaten = len(outcome.findings) - len(getoond)
+        weggelaten = len(eigen) - len(getoond)
         if weggelaten:
             lines += [
                 "",
@@ -386,8 +388,8 @@ def _bronnen_section(run: CheckRun) -> list[str]:
     return [*regels, ""]
 
 
-def _check_summary(run: CheckRun) -> pd.DataFrame:
-    """Een regel per check met de aantallen."""
+def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.DataFrame:
+    """Een regel per check met de aantallen uit de meldingenstroom."""
     return pd.DataFrame(
         [
             {
@@ -396,8 +398,12 @@ def _check_summary(run: CheckRun) -> pd.DataFrame:
                 "Ernst": outcome.severity.value,
                 "Dimensie": outcome.dimension.value,
                 "Bekeken": outcome.examined,
-                "Bevindingen": len(outcome.findings),
-                "Typering onbetrouwbaar": outcome.unreliable_count,
+                "Bevindingen": len(per_check.get(outcome.check_id, [])),
+                "Typering onbetrouwbaar": sum(
+                    1
+                    for melding in per_check.get(outcome.check_id, [])
+                    if not melding.typering_betrouwbaar
+                ),
                 "Skelet": outcome.skeleton or "—",
             }
             for outcome in run.outcomes
@@ -415,16 +421,16 @@ def _check_summary(run: CheckRun) -> pd.DataFrame:
     )
 
 
-def _findings_frame(findings: list) -> pd.DataFrame:
-    """Zet bevindingen om in een tabel voor de Markdown-uitvoer."""
+def _findings_frame(meldingen: list[Melding]) -> pd.DataFrame:
+    """Zet meldingen om in een tabel voor de Markdown-uitvoer."""
     return pd.DataFrame(
         [
             {
-                "Label": finding.object_label or "—",
-                "Melding": finding.message,
-                "Typering": "betrouwbaar" if finding.typing_reliable else "onbetrouwbaar",
+                "Label": melding.object_label or "—",
+                "Melding": melding.boodschap,
+                "Typering": "betrouwbaar" if melding.typering_betrouwbaar else "onbetrouwbaar",
             }
-            for finding in findings
+            for melding in meldingen
         ],
         columns=["Label", "Melding", "Typering"],
     )
@@ -455,4 +461,24 @@ def _clusterduiding(meldingen: list[Melding]) -> list[str]:
         f"> De bevindingen betreffen {getal(len(clusters), 'deelstelsel', 'deelstelsels')} "
         f"({namen}); elke bevinding draagt een cluster-ID, zodat het herstel per deelstelsel "
         "opgepakt kan worden.",
+    ]
+
+
+def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
+    """Meldt hoeveel meldingen geen plek op de kaart kregen.
+
+    De GeoPackage telt ze in `gwsw_run`, maar wie alleen het rapport leest zou
+    denken dat de kaartlaag compleet is. Zwijgen leest hier als "alles staat erop".
+    """
+    zonder = [melding for melding in meldingen if melding.foutlocatie is None]
+    if not zonder:
+        return []
+
+    checks = ", ".join(sorted({melding.check_id for melding in zonder}))
+    return [
+        f"> **{getal(len(zonder), 'melding heeft', 'meldingen hebben')} geen plek op de "
+        f"kaart** gekregen, omdat het object geen bruikbare geometrie heeft ({checks}). "
+        "Ze staan wel in de CSV en in de meldingentabel van de GeoPackage, maar niet in "
+        "de laag `meldinglocaties`.",
+        "",
     ]
