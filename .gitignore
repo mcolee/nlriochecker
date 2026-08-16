@@ -13,4 +13,11 @@ __pycache__/
 uitvoer/
 
 # Invoerdata en referentiedocumenten (groot, niet in versiebeheer)
-data/
+data/*
+# Het checkregister is geen invoerdata maar het functionele contract van deze
+# codebase: register.py, scripts/dekkingsmatrix.py, de testsuite en de
+# registerijking van de dekkingmapping lezen het alle vier. Zonder versiebeheer
+# kan geen enkele geautomatiseerde controle zien dat het is opgeschoven.
+# Een uitzondering werkt alleen als de map zelf niet is uitgesloten; vandaar
+# 'data/*' hierboven in plaats van 'data/'.
+!data/checkregister-*.md
