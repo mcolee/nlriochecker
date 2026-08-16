@@ -26,6 +26,7 @@ from gwswpijplijn.reporting import (
     write_reports,
 )
 from gwswpijplijn.studiegebied import load_study_area
+from gwswpijplijn.uitvoer.taal import getal, vorm
 
 
 class _CliError(click.ClickException):
@@ -458,7 +459,7 @@ def check_command(
         weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
         click.echo(
             f"  Studiegebied {gebied.name} ({gebied.area_ha:.1f} ha): "
-            f"{weggelaten} bevindingen buiten het gebied weggelaten."
+            f"{getal(weggelaten, 'bevinding', 'bevindingen')} buiten het gebied weggelaten."
         )
     if not gate_applied:
         click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
@@ -478,9 +479,10 @@ def check_command(
             if outcome.unreliable_count
             else ""
         )
+        aantal = len(outcome.findings)
         click.echo(
             f"  {outcome.check_id:9s} {outcome.severity.value}  "
-            f"{len(outcome.findings):5d} bevindingen{voorbehoud}"
+            f"{aantal:5d} {vorm(aantal, 'bevinding', 'bevindingen')}{voorbehoud}"
         )
     click.echo(
         f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen"

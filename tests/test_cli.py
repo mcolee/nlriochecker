@@ -96,7 +96,7 @@ def test_toets_schrijft_uitvoer(tmp_path: Path) -> None:
     assert (uitvoer / FILE_CHECKS_MARKDOWN).exists()
     assert (uitvoer / FILE_CHECKS_CSV).exists()
     assert "Geen typeringspoort toegepast" in resultaat.output
-    assert "TOP-001   F      1 bevindingen" in resultaat.output
+    assert "TOP-001   F      1 bevinding" in resultaat.output
 
 
 def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
@@ -110,7 +110,7 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
             "--check",
             "TOP-001",
             "--studiegebied",
-            str(GIS_DIR / "vierkant.gpkg"),
+            str(GIS_DIR / "rond_put_ab.geojson"),
             "--output",
             str(uitvoer),
         ],
@@ -118,7 +118,7 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
 
     assert resultaat.exit_code == 0, resultaat.output
     assert "Studiegebied" in resultaat.output
-    assert "1 bevindingen buiten het gebied weggelaten" in resultaat.output
+    assert "1 bevinding buiten het gebied weggelaten" in resultaat.output
     tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
     assert tabel.empty
 
@@ -284,3 +284,25 @@ def test_analyseer_meldt_de_drift_in_het_rapport(
     tekst = (uitvoer / FILE_MARKDOWN).read_text(encoding="utf-8")
     assert "Dekking vervallen" in tekst
     assert "geverifieerd op checkregister 0.6" in tekst
+
+
+def test_toets_weigert_een_studiegebied_zonder_objecten(tmp_path: Path) -> None:
+    """Een leeg gebied hoort te knallen, niet een leeg rapport op te leveren."""
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "top001_losliggende_put.ttl"),
+            "--check",
+            "TOP-001",
+            "--studiegebied",
+            str(GIS_DIR / "vierkant.gpkg"),
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code != 0
+    assert "geen GWSW-objecten" in resultaat.output
+    assert not (tmp_path / "uitvoer").exists()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -14,7 +15,7 @@ from gwswpijplijn.comparison import compare_metingen
 from gwswpijplijn.config import load_coverage_config
 from gwswpijplijn.coverage import assess_coverage
 from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.errors import PipelineError
+from gwswpijplijn.errors import PipelineError, StudyAreaError
 from gwswpijplijn.meting import laad_nulmeting
 from gwswpijplijn.reporting import (
     FILE_CHECKS_CSV,
@@ -104,7 +105,18 @@ def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
     run = run_checks(context, ["TOP-001"])
     assert len(run.findings) == 1
 
-    gebied_pad = Path(__file__).parent / "fixtures" / "gis" / "vierkant.gpkg"
+    # Een gebied rond put A en B, maar niet rond de losliggende put C op (1200, 2500):
+    # er liggen dus wel objecten in, alleen niet het object van de bevinding.
+    gebied_pad = tmp_path / "gebied.geojson"
+    gebied_pad.write_text(
+        json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": [[[990, 1990], [1060, 1990], [1060, 2010], [990, 2010]]],
+            }
+        ),
+        encoding="utf-8",
+    )
     gebied = load_study_area(gebied_pad)
     beperkt = run.beperk_tot_studiegebied(gebied)
 
@@ -116,3 +128,21 @@ def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
     assert "Studiegebied" in tekst
     assert beperkt.findings == []
     assert sum(outcome.weggelaten for outcome in beperkt.outcomes) == 1
+
+
+def test_studiegebied_zonder_enig_object_faalt_hard() -> None:
+    """Een gebied naast het beheergebied levert anders stilzwijgend een leeg rapport.
+
+    Nul bevindingen bij wel aanwezige objecten is een geldige uitkomst; nul objecten
+    is een verkeerde laagkeuze of een verkeerd gebied, en dat hoort te knallen in
+    plaats van als schone data te lezen.
+    """
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    run = run_checks(context, ["TOP-001"])
+
+    # Het vierkant ligt op (0, 0)-(100, 100); de fixture rond (1000, 2000).
+    gebied = load_study_area(Path(__file__).parent / "fixtures" / "gis" / "vierkant.gpkg")
+
+    with pytest.raises(StudyAreaError, match="geen GWSW-objecten"):
+        run.beperk_tot_studiegebied(gebied)

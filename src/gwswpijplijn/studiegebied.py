@@ -30,6 +30,9 @@ class StudyArea:
     geometry: BaseGeometry
     source: Path
     feature_count: int
+    # De gebiedsaanduiding die in de GIS-uitvoer per object komt te staan. Uit de
+    # CBS-attributen als het bestand ze heeft, anders de laagnaam.
+    gebied: str = ""
 
     @property
     def area_ha(self) -> float:
@@ -105,6 +108,7 @@ def _lees_geopackage(path: Path, laag: str | None) -> StudyArea:
 
         rijen = verbinding.execute(f'select "{geometriekolom[0]}" from "{laag}"').fetchall()
         geometrieen = [_ontleed_gpkg(blob) for (blob,) in rijen if blob]
+        gebied = _gebiedsaanduiding(verbinding, laag)
     except sqlite3.Error as error:
         raise StudyAreaError(f"{path}: kan niet gelezen worden ({error}).") from error
     finally:
@@ -118,7 +122,25 @@ def _lees_geopackage(path: Path, laag: str | None) -> StudyArea:
         geometry=unary_union(geometrieen),
         source=path,
         feature_count=len(geometrieen),
+        gebied=gebied or laag,
     )
+
+
+def _gebiedsaanduiding(verbinding: sqlite3.Connection, laag: str) -> str:
+    """De CBS-code en -naam van het gebied, als het bestand ze draagt.
+
+    Het Koekangerveld-bestand is een CBS-buurt met `statcode` en `statnaam`. Andere
+    gebiedsbestanden hebben die kolommen niet; dan blijft het bij de laagnaam.
+    """
+    kolommen = {rij[1] for rij in verbinding.execute(f'pragma table_info("{laag}")')}
+    if not {"statcode", "statnaam"} <= kolommen:
+        return ""
+
+    rij = verbinding.execute(f'select statcode, statnaam from "{laag}" limit 1').fetchone()
+    if rij is None:
+        return ""
+    code, naam = (waarde or "" for waarde in rij)
+    return f"{code} {naam}".strip()
 
 
 def _ontleed_gpkg(blob: bytes) -> BaseGeometry:
@@ -154,6 +176,7 @@ def _lees_geojson(path: Path) -> StudyArea:
         geometry=unary_union(geometrieen),
         source=path,
         feature_count=len(geometrieen),
+        gebied=path.stem,
     )
 
 

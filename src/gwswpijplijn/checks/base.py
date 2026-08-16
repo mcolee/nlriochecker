@@ -12,6 +12,7 @@ from shapely.geometry import Point
 
 from gwswpijplijn.checkconfig import CheckConfig
 from gwswpijplijn.dataset import GwswDataset
+from gwswpijplijn.errors import StudyAreaError
 from gwswpijplijn.externedata import ExternalData
 from gwswpijplijn.karakteristiek import DataCharacteristics, bepaal_karakteristiek
 from gwswpijplijn.plausibiliteit import PlausibilityTables, load_plausibility
@@ -143,6 +144,12 @@ class CheckRun:
         geen randeffecten doordat een streng het gebied uit loopt.
         """
         binnen = objecten_in_gebied(self.dataset, area)
+        if not binnen:
+            raise StudyAreaError(
+                f"studiegebied {area.name!r} ({area.area_ha:.1f} ha) bevat geen GWSW-objecten: "
+                f"geen enkele put en geen enkele streng valt erbinnen. Controleer de laagkeuze "
+                f"en of het gebied binnen het beheergebied van {self.dataset.source.name} ligt."
+            )
 
         def hoort_erbij(finding: Finding) -> bool:
             """Geeft aan of deze bevinding binnen het studiegebied valt."""

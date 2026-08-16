@@ -123,3 +123,52 @@ def test_onbekend_formaat(tmp_path: Path) -> None:
 
     with pytest.raises(StudyAreaError, match="onbekend formaat"):
         load_study_area(pad)
+
+
+def _maak_geopackage_met_attributen(pad: Path, vlak: Polygon, laag: str = "buurt") -> Path:
+    """Een GeoPackage met de CBS-attributen die het Koekangerveld-bestand ook heeft."""
+    con = sqlite3.connect(pad)
+    con.execute("PRAGMA application_id = 0x47504B47")
+    con.execute(
+        "create table gpkg_contents (table_name text, data_type text, identifier text, "
+        "srs_id integer)"
+    )
+    con.execute(
+        "create table gpkg_geometry_columns (table_name text, column_name text, "
+        "geometry_type_name text, srs_id integer)"
+    )
+    con.execute(
+        f'create table "{laag}" (fid integer primary key, geom blob, statcode text, statnaam text)'
+    )
+    con.execute("insert into gpkg_contents values (?, 'features', ?, 28992)", (laag, laag))
+    con.execute("insert into gpkg_geometry_columns values (?, 'geom', 'POLYGON', 28992)", (laag,))
+    kop = b"GP" + bytes([0, 0]) + struct.pack("<i", 28992)
+    con.execute(
+        f'insert into "{laag}" (geom, statcode, statnaam) values (?, ?, ?)',
+        (kop + vlak.wkb, "BU16901203", "Koekangerveld"),
+    )
+    con.commit()
+    con.close()
+    return pad
+
+
+def test_gebiedsnaam_komt_uit_de_cbs_attributen(tmp_path: Path) -> None:
+    """De GIS-uitvoer noemt per object het gebied; dat staat in het gebiedsbestand zelf.
+
+    Een aparte buurtenlaag voor het hele beheergebied is er niet, en is bij een tot
+    het gebied begrensde export ook niet nodig.
+    """
+    pad = _maak_geopackage_met_attributen(
+        tmp_path / "buurt.gpkg", Polygon([(0, 0), (10, 0), (10, 10), (0, 10)])
+    )
+
+    gebied = load_study_area(pad)
+
+    assert gebied.gebied == "BU16901203 Koekangerveld"
+
+
+def test_gebiedsnaam_valt_terug_op_de_laagnaam(tmp_path: Path) -> None:
+    """Niet elk gebiedsbestand is een CBS-buurt."""
+    pad = _maak_geopackage(tmp_path / "vlak.gpkg", Polygon([(0, 0), (10, 0), (10, 10), (0, 10)]))
+
+    assert load_study_area(pad).gebied == "gebied"
