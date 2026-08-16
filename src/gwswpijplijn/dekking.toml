@@ -1,0 +1,94 @@
+# Mapping van meldingtypen uit de GWSW-nulmeting-detailrapporten op de dekkingclaims
+# van de geschrapte checks uit het checkregister.
+#
+# De veldwaarden 'onderwerp' en 'claim' zijn letterlijk overgenomen uit de tabel
+# "Geschrapte checks" van het checkregister, zodat dit bestand auditeerbaar blijft
+# tegen die versie. Pas de patronen aan per project; niets is hardcoded in de code.
+
+checkregister_versie = "0.7"
+bron = "data/checkregister-gwsw-nulmeting-v0_7.md"
+
+[drempels]
+# Onder deze typeringsscore verklaart de nulmeting haar eigen vervolgvalidaties
+# onbetrouwbaar; dekkingclaims op die CFK krijgen dan een voorbehoud.
+typeringsscore_minimum = 95.0
+
+[[check]]
+id = "ADM-001"
+onderwerp = "Streng verwijst naar niet-bestaande begin- of eindput"
+claim = """Generieke melding gerefereerd object onbekend (CFK-onafhankelijk); \
+verplichte aanwezigheid van de koppeling alleen via Hyd (hasConnection Knooppunt \
+exact=1); Mds eist slechts max=1"""
+vereiste_cfk = ["Hyd"]
+bewijs = [
+  { melding = "Ontbrekende relatie [hasConnection]", aspect = ["Knooppunt"] },
+  { melding_prefix = "Gerefereerd object onbekend" },
+]
+tegenbewijs = []
+
+[[check]]
+id = "ADM-004"
+onderwerp = "Verplichte GWSW-MdS-attributen niet gevuld"
+claim = """Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, \
+lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, \
+maaiveldhoogte); Hyd aanvullend inclusief BOB's en afmetingen exact=1"""
+vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+bewijs = [
+  { melding = "Ontbrekende relatie [hasAspect]", aspect = [
+    "Materiaal leiding",
+    "Vorm leiding",
+    "Lengte leiding",
+    "Breedte leiding",
+    "Hoogte leiding",
+    "Putdekselniveau",
+    "Maaiveldhoogte",
+    "B.o.b. beginpunt leiding",
+    "B.o.b. eindpunt leiding",
+  ] },
+]
+tegenbewijs = []
+
+[[check]]
+id = "ADM-005"
+onderwerp = "Attribuutwaarden buiten de GWSW-domeinlijsten"
+claim = "Beide CFK's: collectietoetsing hasReference"
+vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+bewijs = [
+  { melding = "Collectie-item onbekend" },
+]
+# Deze melding zegt dat een collectie in deze CFK juist niet getoetst wordt; dat is
+# een gat in de dekking waar ADM-005 op leunt.
+tegenbewijs = [
+  { melding_prefix = "Collectie ontbreekt in deze CFK" },
+]
+
+[[check]]
+id = "ATTR-011"
+onderwerp = "Absurde lengtewaarde boven harde bovengrens"
+claim = """Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype \
+Dt_LengteLeiding)"""
+vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+bewijs = [
+  { melding = "Waarde te groot", aspect = ["Lengte leiding (datatype)"] },
+]
+tegenbewijs = []
+
+[[check]]
+id = "RVZ-002"
+onderwerp = "Overstort zonder geregistreerde drempelhoogte"
+claim = "Beide CFK's: Drempelniveau exact=1 (Mds) / min=1 (Hyd)"
+vereiste_cfk = ["Mds", "MdsPlan", "Hyd"]
+bewijs = [
+  { melding = "Ontbrekende relatie [hasAspect]", aspect = ["Drempelniveau"] },
+]
+tegenbewijs = []
+
+[[check]]
+id = "RVZ-003"
+onderwerp = "Overstort zonder geregistreerde drempelbreedte"
+claim = "Alleen Hyd: Drempelbreedte exact=1; Mds staat ontbreken toe (max=1, geen min-eis)"
+vereiste_cfk = ["Hyd"]
+bewijs = [
+  { melding = "Ontbrekende relatie [hasAspect]", aspect = ["Drempelbreedte"] },
+]
+tegenbewijs = []
