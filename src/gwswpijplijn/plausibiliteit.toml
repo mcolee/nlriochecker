@@ -1,0 +1,178 @@
+# Plausibiliteitstabellen voor de ATTR-checks.
+#
+# Deze tabellen zijn vakinhoudelijke aannames, geen harde GWSW-regels: ze zeggen
+# wat je in een Nederlandse vrijvervalriolering *verwacht*, niet wat er moet. Ze
+# horen daarom per project herzien te worden. De materiaalnamen zijn de korte
+# GWSW-begrippen uit de domeinlijst MateriaalLeidingColl; de vormnamen die uit
+# VormLeidingColl.
+#
+# Een materiaal dat hier niet in staat wordt niet getoetst; de betreffende check
+# meldt in haar toelichting hoeveel strengen daardoor buiten beeld bleven.
+
+bron = "Werkafspraak project nlriochecker, fase 4; te herzien per gemeente."
+
+# ATTR-005: eenhedenfouten binnen bereik. Een breedte- of hoogtemaat die zelf geen
+# handelsmaat is maar maal tien wel, is vrijwel zeker in centimeters genoteerd.
+standaarddiameters_mm = [
+  63, 75, 80, 90, 100, 110, 125, 150, 160, 200, 250, 300, 315, 400, 500, 600,
+  700, 800, 900, 1000, 1100, 1200, 1250, 1400, 1500, 1600, 1800, 2000, 2500, 3000,
+]
+
+# ATTR-001: diameter past niet bij materiaal (F, Plausibiliteit).
+# Ondergrenzen volgen de kleinst gangbare handelsmaat, bovengrenzen de grootste
+# maat die in een gemeentelijk vrijvervalstelsel nog voorkomt.
+
+[[materiaal_diameter]]
+materiaal = "Beton"
+minimum_mm = 200
+maximum_mm = 3000
+toelichting = "Ongewapend beton begint bij 200 mm; daaronder wordt PVC toegepast."
+
+[[materiaal_diameter]]
+materiaal = "GewapendBeton"
+minimum_mm = 400
+maximum_mm = 3000
+toelichting = "Wapening wordt pas vanaf de zwaardere maten toegepast."
+
+[[materiaal_diameter]]
+materiaal = "PVC"
+minimum_mm = 100
+maximum_mm = 800
+toelichting = "Boven 800 mm is PVC in de vrijverval niet gangbaar."
+
+[[materiaal_diameter]]
+materiaal = "PE"
+minimum_mm = 40
+maximum_mm = 1200
+
+[[materiaal_diameter]]
+materiaal = "Polypropyleen"
+minimum_mm = 100
+maximum_mm = 1200
+
+[[materiaal_diameter]]
+materiaal = "Gres"
+minimum_mm = 100
+maximum_mm = 1000
+toelichting = "Gres is een oud materiaal met beperkte maatvoering."
+
+[[materiaal_diameter]]
+materiaal = "Metselwerk"
+minimum_mm = 300
+maximum_mm = 4000
+toelichting = "Gemetselde riolen zijn per definitie groot en handgemaakt."
+
+[[materiaal_diameter]]
+materiaal = "Asbestcement"
+minimum_mm = 100
+maximum_mm = 1000
+
+[[materiaal_diameter]]
+materiaal = "Gietijzer"
+minimum_mm = 80
+maximum_mm = 1000
+
+[[materiaal_diameter]]
+materiaal = "Staal"
+minimum_mm = 80
+maximum_mm = 2000
+
+# ATTR-003: materiaal past niet bij aanlegjaar (W, Plausibiliteit).
+# Het register noemt PVC voor 1955 en PE voor 1970 als voorbeeld.
+
+[[materiaal_aanlegjaar]]
+materiaal = "PVC"
+vanaf_jaar = 1955
+toelichting = "PVC-rioolbuis is in Nederland pas na 1955 toegepast."
+
+[[materiaal_aanlegjaar]]
+materiaal = "PE"
+vanaf_jaar = 1970
+
+[[materiaal_aanlegjaar]]
+materiaal = "Polypropyleen"
+vanaf_jaar = 1975
+
+[[materiaal_aanlegjaar]]
+materiaal = "GewapendBeton"
+vanaf_jaar = 1920
+
+[[materiaal_aanlegjaar]]
+materiaal = "Asbestcement"
+vanaf_jaar = 1930
+tot_jaar = 1993
+toelichting = "Asbestcement is sinds 1993 in Nederland verboden."
+
+[[materiaal_aanlegjaar]]
+materiaal = "Metselwerk"
+tot_jaar = 1960
+toelichting = "Na 1960 is er in Nederland geen riool meer gemetseld."
+
+# ATTR-012: materiaal past niet bij profielvorm (W, Plausibiliteit).
+# Het register noemt metselwerk met rond profiel als voorbeeld.
+
+[[materiaal_vorm]]
+materiaal = "Metselwerk"
+toegestane_vormen = ["Eivormig", "Muilprofiel", "Heul", "Rechthoekig", "Ovaal"]
+toelichting = "Gemetselde riolen zijn ei-, muil- of heulprofiel, niet rond."
+
+[[materiaal_vorm]]
+materiaal = "PVC"
+toegestane_vormen = ["Rond"]
+toelichting = "PVC-rioolbuis wordt alleen rond geleverd."
+
+[[materiaal_vorm]]
+materiaal = "PE"
+toegestane_vormen = ["Rond"]
+
+[[materiaal_vorm]]
+materiaal = "Polypropyleen"
+toegestane_vormen = ["Rond"]
+
+[[materiaal_vorm]]
+materiaal = "Gres"
+toegestane_vormen = ["Rond", "Eivormig"]
+
+# ATTR-010: leidingmateriaal beton of metselwerk terwijl het putmateriaal daar
+# niet bij past (W, Plausibiliteit).
+
+[[leiding_put_materiaal]]
+leidingmateriaal = "Beton"
+verwachte_putmaterialen = ["Beton", "GewapendBeton", "Metselwerk", "Kunststof", "PVC", "PE"]
+
+[[leiding_put_materiaal]]
+leidingmateriaal = "GewapendBeton"
+verwachte_putmaterialen = ["Beton", "GewapendBeton", "Metselwerk"]
+
+[[leiding_put_materiaal]]
+leidingmateriaal = "Metselwerk"
+verwachte_putmaterialen = ["Metselwerk", "Beton", "GewapendBeton"]
+toelichting = "Een gemetselde streng op een kunststof put is bouwhistorisch onmogelijk."
+
+# ATTR-004: vorm versus afmetingen (F, Consistentie). Een regel zegt wat er bij
+# een profielvorm over breedte en hoogte moet gelden. De aanwezigheid van beide
+# maten dwingt het MDSTOP-deelmodel al af; deze tabel gaat over hun onderlinge
+# verhouding, en die toetst geen van beide conformiteitsklassen.
+
+[[vorm_afmeting]]
+vorm = "Rond"
+breedte_gelijk_hoogte = true
+toelichting = "Bij een rond profiel zijn breedte en hoogte per definitie gelijk."
+
+[[vorm_afmeting]]
+vorm = "Eivormig"
+hoogte_groter_dan_breedte = true
+toelichting = "Een eiprofiel staat rechtop: de hoogte is groter dan de breedte."
+
+[[vorm_afmeting]]
+vorm = "Muilprofiel"
+hoogte_kleiner_dan_breedte = true
+toelichting = "Een muilprofiel is breder dan hoog."
+
+[[vorm_afmeting]]
+vorm = "Rechthoekig"
+toelichting = "Rechthoekig legt geen verhouding vast; alleen beide maten zijn nodig."
+
+[[vorm_afmeting]]
+vorm = "Heul"
+toelichting = "Een heulprofiel legt geen vaste verhouding vast."

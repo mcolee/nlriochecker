@@ -1,5 +1,6 @@
 """Checks uit het checkregister die de GWSW-nulmeting niet dekt."""
 
+from gwswpijplijn.checks import attributen as _attributen  # noqa: F401  (vult de registry)
 from gwswpijplijn.checks import netwerk as _netwerk  # noqa: F401  (vult de registry)
 from gwswpijplijn.checks import topologie as _topologie  # noqa: F401  (vult de registry)
 from gwswpijplijn.checks.base import (
@@ -11,6 +12,7 @@ from gwswpijplijn.checks.base import (
     Dimension,
     Finding,
     Severity,
+    SkeletonCheck,
     objecten_in_gebied,
     register,
     run_checks,
@@ -25,6 +27,7 @@ __all__ = [
     "Dimension",
     "Finding",
     "Severity",
+    "SkeletonCheck",
     "objecten_in_gebied",
     "register",
     "run_checks",

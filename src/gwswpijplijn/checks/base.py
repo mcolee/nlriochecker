@@ -10,6 +10,8 @@ from typing import ClassVar
 
 from gwswpijplijn.checkconfig import CheckConfig
 from gwswpijplijn.dataset import GwswDataset
+from gwswpijplijn.externedata import ExternalData
+from gwswpijplijn.plausibiliteit import PlausibilityTables, load_plausibility
 from gwswpijplijn.studiegebied import StudyArea
 
 
@@ -54,6 +56,8 @@ class CheckContext:
     dataset: GwswDataset
     config: CheckConfig
     unreliable_objects: frozenset[str] = frozenset()
+    plausibiliteit: PlausibilityTables = field(default_factory=load_plausibility)
+    bronnen: ExternalData | None = None
     _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     def cached(self, sleutel: str, bouw: Callable[[], object]) -> object:

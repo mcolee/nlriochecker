@@ -37,6 +37,65 @@ hemelwater = ["Hemelwaterriool"]
 infiltratie = ["Infiltratieriool"]
 drempel = ["Overstortdrempel"]
 
+# TOP-019: een pseudo-knoop is een knoop *zonder* functie. In een rioolstelsel zit
+# op vrijwel elke knik een put, en een put is een functie (toegang, onderhoud).
+# Alleen deze klassen knopen twee strengen aan elkaar zonder zelf iets te doen.
+# Staat de lijst leeg, dan draait TOP-019 niet en zegt dat in het rapport.
+functieloze_knoop = ["LozePut", "BlindePut", "Ontstoppingsstuk", "Verbindingsstuk"]
+
+# RVZ: hoe randvoorzieningen in de export verschijnen. Empirisch vastgesteld op de
+# De Wolden-export: overstorten staan er als Overstortput met een Overstortleiding
+# eraan; losse Overstortdrempel-objecten met Drempelniveau komen er niet in voor.
+# Zie docs/beslislog.md.
+overstortput = ["Overstortput", "Stuwput"]
+overstortleiding = ["Overstortleiding"]
+bergbezinkvoorziening = ["Bergbezinkbassin", "Bergingsbassin", "Bezinkbassin", "Bergbezinkleiding"]
+ledigingsvoorziening = ["Ledigingsvoorziening"]
+oppervlaktewater = ["Oppervlaktewater"]
+# HGT-009 en HGT-016: constructies die een BOB-sprong verklaren.
+valconstructie = ["Valput", "Zandvangput"]
+
+# NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen. Anders dan
+# de rollen hierboven (die zeggen welk eindpunt een streng moet bereiken) deelt
+# deze tabel het net in soorten in, om buurstrengen te kunnen vergelijken.
+[klassen.stelseltypen]
+gemengd = ["GemengdRiool"]
+vuilwater = ["Vuilwaterriool"]
+hemelwater = ["Hemelwaterriool"]
+infiltratie = ["Infiltratieriool"]
+drainage = ["Drain"]
+overstort = ["Overstortleiding"]
+transport = ["Duiker"]
+
+# ADM-007: welk puttype welke aansluiting nodig heeft in het netwerk. Een lege
+# lijst laat de check niets toetsen; regels zijn projectafspraken.
+[[puttyperegels]]
+puttype = "Overstortput"
+vereist_een_van = ["Overstortleiding", "Overstortdrempel"]
+toelichting = "Een overstortput hoort een overstortleiding of -drempel te hebben."
+
+[[puttyperegels]]
+puttype = "Lozingsput"
+vereist_een_van = ["VrijvervalRioolleiding", "Duiker"]
+toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben."
+
+[naamgeving]
+# ADM-003: de naamgevingsconventie is projectafhankelijk. Zonder patroon draait de
+# check niet; een verzonnen conventie zou elke dataset afkeuren.
+# putpatroon = "^[A-Z]{2}[0-9]{4}$"
+# strengpatroon = "^[0-9]{6}-[0-9]{6}-[0-9]+$"
+
+[bronnen]
+# Blok C: de aangeleverde externe bronnen. Ze dekken alleen het studiegebied
+# Koekangerveld; objecten daarbuiten krijgen geen EXT-uitslag maar de status
+# "buiten studiegebied".
+map = "data/gis"
+bgt = "BGT.gpkg"
+bag_pand = "bag_pand_koekangerveld.gpkg"
+nwb_wegvakken = "nwb_wegvakken_koekangerveld.gpkg"
+studiegebied = "cbs_buurt_koekangerveld_studiegebied.gpkg"
+ahn_dtm = "ahn5_dtm_koekangerveld.tif"
+
 [drempels]
 # TOP-004: hoe ver een strengeindpunt van zijn put mag liggen.
 snapping_tolerantie_m = 0.10

@@ -458,3 +458,294 @@ class ItStelselZonderDrempel(Check):
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""
         return len(_netwerk(context).conduits)
+
+
+def _stelseltype(context: CheckContext, conduit: Conduit) -> str | None:
+    """Het stelseltype van een streng volgens de projectconfig."""
+    return context.config.klassen.stelseltype(conduit.types, context.dataset.closure)
+
+
+@register
+class OrientatieTegenAfvoerrichting(Check):
+    """NET-003: de administratieve richting loopt tegen het bodemverval in."""
+
+    id = "NET-003"
+    title = "Strengorientatie tegen de afvoerrichting in"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Toetst of de bodem daalt van de administratieve begin- naar de eindput.
+
+        Vrijverval stroomt naar beneden. Stijgt de BOB in de van-naar-richting met
+        meer dan de drempel voor licht tegenverhang, dan wijst dat op een omgekeerd
+        geregistreerde streng. HGT-005 en HGT-006 melden hetzelfde verschijnsel als
+        hoogteprobleem; NET-003 leest het als richtingsprobleem, en het register
+        kent beide.
+        """
+        drempel = context.config.drempels.tegenverhang_licht_m
+
+        for conduit in _netwerk(context).conduits:
+            if conduit.bob_start is None or conduit.bob_end is None:
+                continue
+            stijging = conduit.bob_end - conduit.bob_start
+            if stijging <= drempel:
+                continue
+            yield self.finding(
+                context,
+                conduit.uri,
+                conduit.label,
+                f"De bodem stijgt {stijging:.3f} m van begin- naar eindpunt "
+                f"(BOB {conduit.bob_start:.3f} naar {conduit.bob_end:.3f} m NAP); "
+                "de streng lijkt omgekeerd geregistreerd.",
+                bob_begin=conduit.bob_start,
+                bob_eind=conduit.bob_end,
+                stijging_m=round(stijging, 3),
+                drempel_m=drempel,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt hoeveel strengen door ontbrekende BOB's buiten beeld bleven."""
+        netwerk = _netwerk(context)
+        zonder = sum(
+            1
+            for conduit in netwerk.conduits
+            if conduit.bob_start is None or conduit.bob_end is None
+        )
+        notities = _netwerk_notities(context)
+        if zonder:
+            notities.append(
+                f"{zonder} van de {len(netwerk.conduits)} strengen in de graaf missen een "
+                "BOB aan begin- of eindpunt; die konden niet op richting getoetst worden."
+            )
+        return notities
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal strengen in de graaf met beide BOB's."""
+        return sum(
+            1
+            for conduit in _netwerk(context).conduits
+            if conduit.bob_start is not None and conduit.bob_end is not None
+        )
+
+
+@register
+class StelseltypeWijktAfVanBuren(Check):
+    """NET-005: een streng met een ander stelseltype dan al haar buren."""
+
+    id = "NET-005"
+    title = "Stelseltype streng wijkt af van boven- en benedenstroomse buren"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Zoekt strengen die als enige van hun soort tussen andere soorten liggen.
+
+        Een enkele hemelwaterstreng midden in een gemengd tracee is vrijwel altijd
+        een typeringsfout. De check slaat alleen aan als de streng aan beide zijden
+        buren heeft en geen van die buren hetzelfde stelseltype heeft; een streng
+        aan de rand van een stelsel is namelijk terecht anders dan haar buur.
+        """
+        netwerk = _netwerk(context)
+        dataset = context.dataset
+        wortels = context.config.klassen.netwerkknopen
+
+        soorten = {conduit.uri: _stelseltype(context, conduit) for conduit in netwerk.conduits}
+        per_knoop: dict[str, list[Conduit]] = {}
+        for conduit in netwerk.conduits:
+            for uri in (
+                dataset.resolve_network_node(conduit.start_node, wortels),
+                dataset.resolve_network_node(conduit.end_node, wortels),
+            ):
+                if uri is not None:
+                    per_knoop.setdefault(uri, []).append(conduit)
+
+        for conduit in netwerk.conduits:
+            eigen = soorten[conduit.uri]
+            if eigen is None:
+                continue
+            begin = dataset.resolve_network_node(conduit.start_node, wortels)
+            eind = dataset.resolve_network_node(conduit.end_node, wortels)
+            bovenstrooms = self._buren(per_knoop, begin, conduit.uri, soorten)
+            benedenstrooms = self._buren(per_knoop, eind, conduit.uri, soorten)
+            # Het register vraagt om afwijking van *boven- en* benedenstroomse
+            # buren. Een streng aan het uiteinde van een stelsel heeft er maar aan
+            # een kant; die is niet afwijkend maar simpelweg de laatste van haar
+            # soort, en hoort hier niet te verschijnen.
+            if not bovenstrooms or not benedenstrooms:
+                continue
+            buursoorten = bovenstrooms | benedenstrooms
+            if eigen in buursoorten:
+                continue
+            aantal = sum(
+                1
+                for uri in (begin, eind)
+                for buur in per_knoop.get(uri, [])
+                if buur.uri != conduit.uri
+            )
+            yield self.finding(
+                context,
+                conduit.uri,
+                conduit.label,
+                f"Is van stelseltype {eigen!r} terwijl alle {aantal} buurstrengen "
+                f"van type {', '.join(sorted(buursoorten))} zijn.",
+                stelseltype=eigen,
+                buurtypen=sorted(buursoorten),
+            )
+
+    def _buren(
+        self,
+        per_knoop: dict[str, list[Conduit]],
+        knoop: str | None,
+        eigen_uri: str,
+        soorten: dict[str, str | None],
+    ) -> set[str]:
+        """De stelseltypen van de andere strengen op deze knoop."""
+        if knoop is None:
+            return set()
+        return {
+            soorten[buur.uri]
+            for buur in per_knoop.get(knoop, [])
+            if buur.uri != eigen_uri and soorten[buur.uri] is not None
+        }
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt hoeveel strengen geen herkenbaar stelseltype hebben."""
+        return _stelseltype_notities(context) + _netwerk_notities(context)
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal strengen in de graaf."""
+        return len(_netwerk(context).conduits)
+
+
+@register
+class KoppelingTussenStelseltypen(Check):
+    """NET-006: een knoop waar verschillende stelseltypen samenkomen."""
+
+    id = "NET-006"
+    title = "Koppelingen tussen verschillende stelseltypen"
+    severity = Severity.WARNING
+    dimension = Dimension.PLAUSIBILITY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke knoop waarop strengen van meer dan een stelseltype uitkomen.
+
+        Zulke koppelingen bestaan legitiem — een overstort of een aansluiting van
+        hemelwater op een gemengd stelsel — maar ze horen bewust te zijn. De
+        bevinding staat op de knoop, want daar zit de koppeling.
+        """
+        netwerk = _netwerk(context)
+        dataset = context.dataset
+        wortels = context.config.klassen.netwerkknopen
+
+        per_knoop: dict[str, dict[str, list[str]]] = {}
+        for conduit in netwerk.conduits:
+            soort = _stelseltype(context, conduit)
+            if soort is None:
+                continue
+            for uri in (
+                dataset.resolve_network_node(conduit.start_node, wortels),
+                dataset.resolve_network_node(conduit.end_node, wortels),
+            ):
+                if uri is not None:
+                    per_knoop.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
+
+        for uri, soorten in sorted(per_knoop.items()):
+            if len(soorten) < 2:
+                continue
+            node = dataset.nodes.get(uri)
+            omschrijving = "; ".join(
+                f"{soort}: {', '.join(sorted(labels))}" for soort, labels in sorted(soorten.items())
+            )
+            yield self.finding(
+                context,
+                uri,
+                node.label if node is not None else uri,
+                f"Hier komen {len(soorten)} stelseltypen samen ({omschrijving}).",
+                stelseltypen=sorted(soorten),
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt hoeveel strengen geen herkenbaar stelseltype hebben."""
+        return _stelseltype_notities(context)
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal knopen in de graaf."""
+        return _netwerk(context).graph.number_of_nodes()
+
+
+@register
+class VeelLozingspuntenInDeelstelsel(Check):
+    """NET-008: opvallend veel lozingspunten in een klein deelstelsel."""
+
+    id = "NET-008"
+    title = "Opvallend veel lozingspunten binnen een klein deelstelsel"
+    severity = Severity.WARNING
+    dimension = Dimension.PLAUSIBILITY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Telt de lozingspunten per samenhangend deel van het netwerk.
+
+        Veel uitlaten op weinig putten wijst zelden op veel lozingen en meestal op
+        een deelstelsel dat in stukken uiteengevallen is of op uitlaten die als
+        gewone put opgevoerd hadden moeten worden.
+        """
+        netwerk = _netwerk(context)
+        drempels = context.config.drempels
+        endpoints = _eindpunten(context, "lozings_eindpunt")
+        if not endpoints:
+            return
+
+        for deel in nx.weakly_connected_components(netwerk.graph):
+            lozingen = sorted(deel & endpoints)
+            if len(deel) > drempels.klein_deelstelsel_knopen:
+                continue
+            if len(lozingen) <= drempels.lozingspunten_per_deelstelsel:
+                continue
+            labels = [self._label(context, uri) for uri in lozingen]
+            for uri in lozingen:
+                yield self.finding(
+                    context,
+                    uri,
+                    self._label(context, uri),
+                    f"Een van {len(lozingen)} lozingspunten in een deelstelsel van "
+                    f"{len(deel)} knopen (maximaal {drempels.lozingspunten_per_deelstelsel} "
+                    f"bij ten hoogste {drempels.klein_deelstelsel_knopen} knopen): "
+                    f"{', '.join(labels)}.",
+                    knopen_in_deelstelsel=len(deel),
+                    lozingspunten=len(lozingen),
+                )
+
+    def _label(self, context: CheckContext, uri: str) -> str:
+        """Het label van een knoop, of de URI als dat er niet is."""
+        node = context.dataset.nodes.get(uri)
+        return node.label if node is not None and node.label else uri
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt wat er buiten de graaf viel."""
+        return _netwerk_notities(context, "lozings_eindpunt")
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal knopen in de graaf."""
+        return _netwerk(context).graph.number_of_nodes()
+
+
+def _stelseltype_notities(context: CheckContext) -> list[str]:
+    """Meldt hoe de stelseltypen ingedeeld zijn en wat er niet in past."""
+    klassen = context.config.klassen.stelseltypen
+    if not klassen:
+        return [
+            "Er zijn geen stelseltypen geconfigureerd (`klassen.stelseltypen`); deze check "
+            "kon daardoor niets vergelijken."
+        ]
+    netwerk = _netwerk(context)
+    zonder = [
+        conduit.label for conduit in netwerk.conduits if _stelseltype(context, conduit) is None
+    ]
+    notities = [f"Stelseltypen uit de config: {', '.join(sorted(klassen))}."]
+    if zonder:
+        notities.append(
+            f"{len(zonder)} van de {len(netwerk.conduits)} strengen in de graaf vallen onder "
+            "geen enkel geconfigureerd stelseltype en doen niet mee."
+        )
+    return notities

@@ -143,6 +143,7 @@ class Node(_MetAspecten):
     aspects: tuple[Aspect, ...] = ()
     maaiveld_aspect: Aspect | None = None
     deksel_aspect: Aspect | None = None
+    multipart: bool = False
 
     @property
     def maaiveld(self) -> float | None:
@@ -693,6 +694,7 @@ def _read_nodes(
     for orientation in bron:
         point, z_waarden = _geometry(graph, orientation, KLASSE_PUNT, errors)
         maaiveld = _maaiveld_aspect(graph, orientation)
+        multipart = _is_multipart(graph, orientation, KLASSE_PUNT)
         for subject in graph.subjects(HAS_ASPECT, orientation):
             uri = str(subject)
             if uri in nodes:
@@ -709,6 +711,7 @@ def _read_nodes(
                 aspects=_read_aspects(graph, subject),
                 maaiveld_aspect=maaiveld,
                 deksel_aspect=_deksel_aspect(graph, subject, deksel_klassen),
+                multipart=multipart,
             )
 
     return nodes
