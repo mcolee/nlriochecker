@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from gwswpijplijn.uitvoer.taal import getal, met_lidwoord, vorm
+from gwswpijplijn.taal import getal, met_lidwoord, vorm
 
 
 def test_getal_gebruikt_enkelvoud_bij_een():

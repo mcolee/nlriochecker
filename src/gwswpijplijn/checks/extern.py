@@ -29,7 +29,7 @@ from gwswpijplijn.checks.base import (
 )
 from gwswpijplijn.checks.verbanden import objecten_van_klassen, verbonden_knopen
 from gwswpijplijn.dataset import Conduit, Node
-from gwswpijplijn.uitvoer.taal import getal, met_lidwoord
+from gwswpijplijn.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
 MARKERING_NIET_TOETSBAAR = "niet betrouwbaar toetsbaar"

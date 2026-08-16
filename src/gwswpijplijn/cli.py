@@ -20,13 +20,13 @@ from gwswpijplijn.meting import laad_nulmeting
 from gwswpijplijn.plausibiliteit import load_plausibility
 from gwswpijplijn.register import Register, default_register_path, load_register
 from gwswpijplijn.reporting import (
-    write_check_report,
     write_comparison_reports,
     write_coverage_report,
     write_reports,
 )
 from gwswpijplijn.studiegebied import load_study_area
-from gwswpijplijn.uitvoer.taal import getal, vorm
+from gwswpijplijn.taal import getal, vorm
+from gwswpijplijn.uitvoer import schrijf_uitvoer
 
 
 class _CliError(click.ClickException):
@@ -407,6 +407,12 @@ def compare_command(
 @_projectconfig_option()
 @_plausibiliteit_option()
 @_bronnen_option()
+@click.option(
+    "--geen-gpkg",
+    "geen_gpkg",
+    is_flag=True,
+    help="Sla de GeoPackage-export over; schrijf alleen het rapport en de CSV.",
+)
 @_output_option("Map waarin het bevindingenrapport wordt geschreven.")
 def check_command(
     dataset_path: Path,
@@ -418,6 +424,7 @@ def check_command(
     project_config_path: Path | None,
     plausibility_path: Path | None,
     bronnen_dir: Path | None,
+    geen_gpkg: bool,
     output_dir: Path,
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
@@ -436,7 +443,7 @@ def check_command(
         run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
         if study_path is not None:
             run = run.beperk_tot_studiegebied(load_study_area(study_path, study_layer))
-        markdown_path, csv_path = write_check_report(run, output_dir)
+        uitvoer = schrijf_uitvoer(run, output_dir, met_geopackage=not geen_gpkg)
     except PipelineError as error:
         raise _CliError(str(error)) from error
     except KeyError as error:
@@ -487,8 +494,10 @@ def check_command(
     click.echo(
         f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen"
     )
-    click.echo(f"Geschreven: {markdown_path}")
-    click.echo(f"Geschreven: {csv_path}")
+    click.echo(f"Geschreven: {uitvoer.markdown}")
+    click.echo(f"Geschreven: {uitvoer.csv}")
+    if uitvoer.geopackage is not None:
+        click.echo(f"Geschreven: {uitvoer.geopackage}")
 
 
 def _externe_bronnen(config, bronnen_dir: Path | None):

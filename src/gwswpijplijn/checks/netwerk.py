@@ -17,7 +17,7 @@ from gwswpijplijn.checks.base import (
 )
 from gwswpijplijn.checks.verbanden import deelstelsel_ids
 from gwswpijplijn.dataset import HAS_PART, Conduit
-from gwswpijplijn.uitvoer.taal import getal, vorm
+from gwswpijplijn.taal import getal, vorm
 
 
 @dataclass(frozen=True)

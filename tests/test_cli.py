@@ -306,3 +306,91 @@ def test_toets_weigert_een_studiegebied_zonder_objecten(tmp_path: Path) -> None:
     assert resultaat.exit_code != 0
     assert "geen GWSW-objecten" in resultaat.output
     assert not (tmp_path / "uitvoer").exists()
+
+
+def test_toets_schrijft_ook_een_geopackage(tmp_path: Path) -> None:
+    """De GIS-uitvoer hoort bij de standaardoplevering van een toets."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "top001_losliggende_put.ttl"),
+            "--check",
+            "TOP-001",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    gepakt = list(uitvoer.glob("dq_*.gpkg"))
+    assert len(gepakt) == 1
+    assert gepakt[0].name in resultaat.output
+
+
+def test_geen_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "top001_losliggende_put.ttl"),
+            "--check",
+            "TOP-001",
+            "--geen-gpkg",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert list(uitvoer.glob("*.gpkg")) == []
+    assert (uitvoer / FILE_CHECKS_CSV).exists()
+
+
+def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
+    """De drie uitvoervormen komen uit dezelfde meldingenstroom; dat hoort te blijken."""
+    import sqlite3
+
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "hgt004_bob_boven_deksel.ttl"),
+            "--output",
+            str(uitvoer),
+        ],
+    )
+    assert resultaat.exit_code == 0, resultaat.output
+
+    tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
+    per_check_csv = tabel["Check"].value_counts().to_dict()
+
+    gpkg = next(uitvoer.glob("dq_*.gpkg"))
+    con = sqlite3.connect(f"file:{gpkg}?mode=ro", uri=True)
+    try:
+        per_check_gpkg = dict(
+            con.execute("select check_id, count(*) from meldingen group by check_id")
+        )
+        overzicht = dict(
+            con.execute(
+                "select check_id, aantal_meldingen from overzicht_checks where aantal_meldingen > 0"
+            )
+        )
+    finally:
+        con.close()
+
+    tekst = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+
+    assert per_check_csv == per_check_gpkg
+    assert per_check_csv == overzicht
+    for check_id, aantal in per_check_csv.items():
+        kop = f"## {check_id} — "
+        assert kop in tekst
+        staart = tekst.split(kop, 1)[1]
+        assert f"Bevindingen ({aantal})" in staart.split("\n## ", 1)[0]
