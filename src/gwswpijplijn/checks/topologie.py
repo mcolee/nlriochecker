@@ -44,6 +44,11 @@ class _Topologie:
 
 
 def _topologie(context: CheckContext) -> _Topologie:
+    """Bouwt de puttenindex en de strengenlijst, of geeft de eerder gebouwde terug."""
+    return context.cached("topologie", lambda: _bouw_topologie(context))
+
+
+def _bouw_topologie(context: CheckContext) -> _Topologie:
     """Bouwt de puttenindex en de lijst met strengen die geometrie hebben."""
     dataset = context.dataset
     wortels = context.config.klassen.netwerkknopen

@@ -505,6 +505,15 @@ def _render_checks(run: CheckRun) -> str:
             "maar zijn niet betrouwbaar te duiden.",
             "",
         ]
+        buiten = run.unreliable_labels - run.unreliable_labels_in_dataset
+        if buiten:
+            lines += [
+                f"> Van de {run.unreliable_labels} objecten die de nulmeting te globaal "
+                f"getypeerd noemt, komen er {run.unreliable_labels_in_dataset} in deze dataset "
+                f"voor; {buiten} niet. De detailrapporten en de OroX-export zijn losse "
+                "bestanden en hoeven niet uit dezelfde momentopname te komen.",
+                "",
+            ]
     else:
         lines += [
             "> **Let op:** er is geen typeringspoort toegepast. Zonder de nulmeting-"

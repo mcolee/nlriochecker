@@ -20,7 +20,10 @@ class ClassRoots(BaseModel):
 
     put: list[str] = Field(min_length=1)
     vrijvervalleiding: list[str] = Field(min_length=1)
-    netwerk_eindpunt: list[str] = Field(default_factory=list)
+    # NET-001 en NET-002 vragen elk om een ander soort eindpunt; een vuilwaterstreng
+    # die alleen een uitlaat bereikt is niet in orde.
+    afvoer_eindpunt: list[str] = Field(default_factory=list)
+    lozings_eindpunt: list[str] = Field(default_factory=list)
     vuilwater: list[str] = Field(default_factory=list)
     hemelwater: list[str] = Field(default_factory=list)
     infiltratie: list[str] = Field(default_factory=list)
@@ -29,7 +32,7 @@ class ClassRoots(BaseModel):
     @property
     def netwerkknopen(self) -> list[str]:
         """De klassen die als knooppunt in de netwerkgraaf meetellen."""
-        return [*self.put, *self.netwerk_eindpunt]
+        return [*self.put, *self.afvoer_eindpunt, *self.lozings_eindpunt]
 
 
 class CheckThresholds(BaseModel):

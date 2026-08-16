@@ -86,7 +86,7 @@ def test_eindpuntklassen_komen_uit_de_config(tmp_path: Path) -> None:
     zonder_gemaal = tmp_path / "zonder.toml"
     zonder_gemaal.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
-        "netwerk_eindpunt = ['Lozingspunt']\nvuilwater = ['GemengdRiool']\n",
+        "lozings_eindpunt = ['Lozingspunt']\nvuilwater = ['GemengdRiool']\n",
         encoding="utf-8",
     )
 
@@ -100,3 +100,15 @@ def test_eindpuntklassen_komen_uit_de_config(tmp_path: Path) -> None:
 
     assert sorted(finding.object_label for finding in gevonden.findings) == ["1"]
     assert any("buiten de netwerkanalyse" in notitie for notitie in gevonden.notes)
+
+
+def test_lozingspunt_telt_niet_als_afvoerpad_voor_vuilwater() -> None:
+    """Een gemengde streng die alleen een lozingsput bereikt is niet in orde.
+
+    NET-001 vraagt een gemaal of overnamepunt, NET-002 een lozingspunt. Met een
+    gedeelde eindpuntlijst zou de gemengde streng ten onrechte goedgekeurd worden.
+    """
+    bestand = "net001_alleen_lozingspunt.ttl"
+
+    assert _labels(bestand, "NET-001") == ["1"]
+    assert _labels(bestand, "NET-002") == []

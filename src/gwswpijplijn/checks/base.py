@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import ClassVar
@@ -53,10 +53,33 @@ class CheckContext:
     dataset: GwswDataset
     config: CheckConfig
     unreliable_labels: frozenset[str] = frozenset()
+    _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
+
+    def cached(self, sleutel: str, bouw: Callable[[], object]) -> object:
+        """Bouwt een afgeleide structuur een keer per context en hergebruikt die.
+
+        De topologie-index en de netwerkgraaf worden door meerdere checks en door
+        `examined()` en `notes()` opgevraagd. Op een dataset met tienduizenden
+        objecten is telkens opnieuw opbouwen merkbaar duur.
+        """
+        if sleutel not in self._cache:
+            self._cache[sleutel] = bouw()
+        return self._cache[sleutel]
 
     def is_reliable(self, label: str) -> bool:
         """Geeft aan of de typering van dit object betrouwbaar genoeg is."""
         return label not in self.unreliable_labels
+
+    def matched_labels(self) -> frozenset[str]:
+        """De onbetrouwbare labels die daadwerkelijk in de dataset voorkomen.
+
+        De detailrapporten en de OroX-export zijn losse bestanden; labels die de
+        nulmeting noemt hoeven niet allemaal in de dataset te staan. Dat verschil
+        hoort zichtbaar te zijn, anders lijkt de typeringspoort vollediger dan hij is.
+        """
+        aanwezig = {item.label for item in self.dataset.nodes.values()}
+        aanwezig |= {item.label for item in self.dataset.conduits.values()}
+        return frozenset(self.unreliable_labels & aanwezig)
 
 
 @dataclass(frozen=True)
@@ -84,6 +107,8 @@ class CheckRun:
     dataset: GwswDataset
     outcomes: list[CheckOutcome]
     typing_gate_applied: bool
+    unreliable_labels: int = 0
+    unreliable_labels_in_dataset: int = 0
 
     @property
     def findings(self) -> list[Finding]:
@@ -178,4 +203,6 @@ def run_checks(
         dataset=context.dataset,
         outcomes=outcomes,
         typing_gate_applied=typing_gate_applied,
+        unreliable_labels=len(context.unreliable_labels),
+        unreliable_labels_in_dataset=len(context.matched_labels()),
     )

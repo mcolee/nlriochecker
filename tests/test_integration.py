@@ -193,9 +193,12 @@ def test_zelfvergelijking_van_het_volledige_paar(pair: ReportPair) -> None:
     assert not comparison.coverage_changes["Gewijzigd"].any()
 
 
-ORox_DE_WOLDEN = DATA_DIR / "dewolden_orox.ttl"
+OROX_DE_WOLDEN = DATA_DIR / "dewolden_orox.ttl"
 VOORBEELD_TTL = DATA_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
+# Het Mds-deelmodel volstaat voor het kleine voorbeeld en scheelt laadtijd;
+# de volledige dataset krijgt de totaal-ontologie, want die dekt alle klassen.
 ONTOLOGIE_TTL = DATA_DIR / "Ontologie_GWSW_Mds.ttl"
+ONTOLOGIE_TOTAAL = DATA_DIR / "Ontologie_GWSW_Totaal.ttl"
 
 
 @pytest.mark.skipif(
@@ -214,12 +217,13 @@ def test_alle_checks_draaien_op_het_voorbeeld(tmp_path: Path) -> None:
     assert "geen typeringspoort" in markdown_path.read_text(encoding="utf-8").lower()
 
 
+@pytest.mark.zwaar
 @pytest.mark.skipif(
-    not (ORox_DE_WOLDEN.exists() and ONTOLOGIE_TTL.exists()),
+    not (OROX_DE_WOLDEN.exists() and ONTOLOGIE_TOTAAL.exists()),
     reason="de De Wolden-OroX staat nog niet in data/",
 )
 def test_checks_op_de_wolden_met_typeringspoort(pair: ReportPair, tmp_path: Path) -> None:
-    dataset = load_dataset(ORox_DE_WOLDEN, [ONTOLOGIE_TTL])
+    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
     onbetrouwbaar = frozenset(
         naam
         for analysis in (pair.mds, pair.hyd)

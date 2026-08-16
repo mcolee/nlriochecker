@@ -29,11 +29,15 @@ class _Netwerk:
 
     graph: nx.DiGraph
     conduits: list[Conduit]
-    endpoints: set[str]
     unconnected: list[Conduit]
 
 
 def _netwerk(context: CheckContext) -> _Netwerk:
+    """Geeft de netwerkgraaf; die wordt per context een keer gebouwd."""
+    return context.cached("netwerk", lambda: _bouw_netwerk(context))
+
+
+def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     """Bouwt de gerichte graaf: knoop is put of eindpunt, kant is streng."""
     dataset = context.dataset
     wortels = context.config.klassen.netwerkknopen
@@ -59,33 +63,38 @@ def _netwerk(context: CheckContext) -> _Netwerk:
         graph.add_edge(begin, eind, uri=conduit.uri, label=conduit.label)
         aangesloten.append(conduit)
 
-    endpoints = {
+    return _Netwerk(graph=graph, conduits=aangesloten, unconnected=los)
+
+
+def _eindpunten(context: CheckContext, rol: str) -> set[str]:
+    """De knopen in de graaf die als eindpunt van deze soort afvoer gelden."""
+    netwerk = _netwerk(context)
+    dataset = context.dataset
+    return {
         uri
-        for wortel in context.config.klassen.netwerk_eindpunt
+        for wortel in getattr(context.config.klassen, rol)
         for uri in dataset.of_class(wortel)
-        if uri in graph
+        if uri in netwerk.graph
     }
 
-    return _Netwerk(graph=graph, conduits=aangesloten, endpoints=endpoints, unconnected=los)
 
-
-def _bereikbaar_vanaf(netwerk: _Netwerk) -> set[str]:
-    """De knopen die stroomafwaarts een eindpunt bereiken.
+def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
+    """De knopen die stroomafwaarts een van deze eindpunten bereiken.
 
     Een omgekeerde doorloop vanaf alle eindpunten tegelijk, in plaats van per
     streng een pad zoeken; dat laatste wordt kwadratisch op een echt stelsel.
     """
-    if not netwerk.endpoints:
+    if not endpoints:
         return set()
     omgekeerd = netwerk.graph.reverse(copy=False)
     bereikt: set[str] = set()
-    for endpoint in netwerk.endpoints:
+    for endpoint in endpoints:
         if endpoint in omgekeerd:
             bereikt |= nx.descendants(omgekeerd, endpoint) | {endpoint}
     return bereikt
 
 
-def _netwerk_notities(context: CheckContext) -> list[str]:
+def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str]:
     """Beschrijft welke objecten niet in de netwerkanalyse konden meedoen."""
     netwerk = _netwerk(context)
     notities = []
@@ -95,10 +104,11 @@ def _netwerk_notities(context: CheckContext) -> list[str]:
             f"{len(netwerk.unconnected)} vrijvervalstrengen hebben geen herleidbare "
             f"put aan beide zijden en vallen buiten de netwerkanalyse: {labels}."
         )
-    if not netwerk.endpoints:
+    if rol is not None and not _eindpunten(context, rol):
+        klassen = ", ".join(getattr(context.config.klassen, rol)) or "geen geconfigureerd"
         notities.append(
-            "De graaf bevat geen enkel eindpunt (gemaal, lozingspunt of uitlaat); "
-            "alle bereikbaarheidschecks slaan daardoor op elke streng aan."
+            f"De graaf bevat geen enkel eindpunt van het gevraagde soort ({klassen}); "
+            "deze check slaat daardoor op elke streng aan."
         )
     return notities
 
@@ -107,12 +117,14 @@ class _ZonderAfvoerpad(Check):
     """Gedeelde basis voor de bereikbaarheidschecks."""
 
     stelselrol: str
+    eindpuntrol: str
     doel: str
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen van dit stelseltype zonder pad naar een eindpunt."""
         netwerk = _netwerk(context)
-        bereikt = _bereikbaar_vanaf(netwerk)
+        endpoints = _eindpunten(context, self.eindpuntrol)
+        bereikt = _bereikbaar_vanaf(netwerk, endpoints)
         dataset = context.dataset
         wortels = context.config.klassen.netwerkknopen
         soorten = getattr(context.config.klassen, self.stelselrol)
@@ -121,7 +133,7 @@ class _ZonderAfvoerpad(Check):
             uri for wortel in soorten for uri in dataset.of_class(wortel) if uri in dataset.conduits
         }
 
-        geen_eindpunten = not netwerk.endpoints
+        geen_eindpunten = not endpoints
         staart = (
             " De graaf bevat geen enkel bereikbaar eindpunt van dit type, dus geldt dit "
             "voor elke streng."
@@ -145,7 +157,7 @@ class _ZonderAfvoerpad(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt wat er buiten de graaf viel; dat mag niet stilzwijgend verdwijnen."""
-        return _netwerk_notities(context)
+        return _netwerk_notities(context, self.eindpuntrol)
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""
@@ -161,6 +173,7 @@ class VuilwaterZonderAfvoerpad(_ZonderAfvoerpad):
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
     stelselrol = "vuilwater"
+    eindpuntrol = "afvoer_eindpunt"
     doel = "een gemaal of overnamepunt"
 
 
@@ -173,6 +186,7 @@ class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
     stelselrol = "hemelwater"
+    eindpuntrol = "lozings_eindpunt"
     doel = "een lozingspunt of overnamepunt"
 
 

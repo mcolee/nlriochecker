@@ -8,10 +8,14 @@
 [klassen]
 put = ["Put"]
 vrijvervalleiding = ["VrijvervalRioolleiding"]
-# 'Overnamepunt' bestaat niet als klasse in de GWSW-ontologie (Mds noch Hyd);
-# dit is open punt 6 uit het checkregister. Gemalen, lozingspunten en uitlaten
-# tellen als eindpunt van de afvoer.
-netwerk_eindpunt = ["Gemaal", "Lozingspunt", "Uitlaat"]
+# NET-001 en NET-002 vragen om verschillende eindpunten. 'Overnamepunt' bestaat
+# niet als klasse in de GWSW-ontologie; dat is open punt 6 uit het checkregister.
+afvoer_eindpunt = ["Gemaal"]
+# Geverifieerd tegen de De Wolden-dataset: die gebruikt Lozingsput en
+# Uitlaatconstructie. Let op dat Lozingsput volgens de ontologie een Rioolput is
+# en Uitlaatconstructie een Bouwwerk; geen van beide valt onder Lozingspunt, dus
+# de subklasse-afsluiting daarop vangt ze niet.
+lozings_eindpunt = ["Lozingspunt", "Uitlaat", "Lozingsput", "Uitlaatconstructie"]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]

@@ -38,6 +38,9 @@ select = ["E", "F", "I", "UP", "B", "N"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# De zware tests draaien niet mee in de standaardrun; met `pytest -m zwaar` wel.
+addopts = "-m 'not zwaar'"
 markers = [
     "integratie: draait op de volledige De Wolden-bestanden in data/",
+    "zwaar: laadt de volledige OroX-dataset (ruim 3 minuten en circa 3 GB geheugen)",
 ]

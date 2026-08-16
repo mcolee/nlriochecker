@@ -16,6 +16,10 @@ from gwswpijplijn.geometry import GeometryError, parse_gml, parse_gml_z
 
 GWSW = "http://data.gwsw.nl/1.6/totaal/"
 
+# Turtle moet volgens de spec UTF-8 zijn. Sommige exports (BrutIS) schrijven een
+# handvol bytes in een MS-DOS-codering; cp850 is de gangbare Nederlandse variant.
+FALLBACK_ENCODING = "cp850"
+
 HAS_ASPECT = URIRef(f"{GWSW}hasAspect")
 HAS_PART = URIRef(f"{GWSW}hasPart")
 HAS_CONNECTION = URIRef(f"{GWSW}hasConnection")
@@ -57,6 +61,16 @@ class Conduit:
 
 
 @dataclass(frozen=True)
+class DecodeFallback:
+    """Vastlegging dat een bestand niet als UTF-8 gelezen kon worden."""
+
+    path: Path
+    encoding: str
+    byte_count: int
+    samples: list[str]
+
+
+@dataclass(frozen=True)
 class GwswDataset:
     """De ingelezen dataset met de knooppunten, strengen en de klassenhierarchie."""
 
@@ -66,6 +80,7 @@ class GwswDataset:
     conduits: dict[str, Conduit]
     subclasses: dict[str, frozenset[str]]
     geometry_errors: dict[str, str] = field(default_factory=dict)
+    decode_fallback: DecodeFallback | None = None
 
     def is_a(self, uri: str, root: str) -> bool:
         """Geeft aan of het object van het type `root` of een subklasse daarvan is."""
@@ -128,14 +143,18 @@ def _uri(naam: str) -> str:
     return naam if naam.startswith("http") else f"{GWSW}{naam}"
 
 
-def load_dataset(dataset_path: Path, ontology_paths: list[Path] | None = None) -> GwswDataset:
+def load_dataset(
+    dataset_path: Path,
+    ontology_paths: list[Path] | None = None,
+    fallback_encoding: str = FALLBACK_ENCODING,
+) -> GwswDataset:
     """Leest de OroX-dataset en de ontologie(en) en bouwt het domeinmodel op."""
     dataset_path = Path(dataset_path)
-    graph = _parse(dataset_path)
+    graph, fallback = _parse(dataset_path, fallback_encoding)
 
     ontology = Graph()
     for pad in ontology_paths or []:
-        ontology += _parse(Path(pad))
+        ontology += _parse(Path(pad), fallback_encoding)[0]
 
     subclasses = _subclass_closure(ontology or graph)
     geometry_errors: dict[str, str] = {}
@@ -155,6 +174,7 @@ def load_dataset(dataset_path: Path, ontology_paths: list[Path] | None = None) -
         conduits=conduits,
         subclasses=subclasses,
         geometry_errors=geometry_errors,
+        decode_fallback=fallback,
     )
 
 
@@ -175,17 +195,69 @@ def _quiet_rdflib():
         logger.setLevel(oud)
 
 
-def _parse(path: Path) -> Graph:
-    """Leest een enkel TTL-bestand in."""
+def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | None]:
+    """Leest een enkel TTL-bestand in, desnoods via een terugvalcodering."""
+    try:
+        rauw = path.read_bytes()
+    except OSError as error:
+        raise DatasetError(f"{path}: bestand kan niet gelezen worden ({error}).") from error
+
+    tekst, fallback = _decode(path, rauw, fallback_encoding)
+
     graph = Graph()
     try:
         with _quiet_rdflib():
-            graph.parse(path, format="turtle")
-    except OSError as error:
-        raise DatasetError(f"{path}: bestand kan niet gelezen worden ({error}).") from error
+            graph.parse(data=tekst, format="turtle")
     except Exception as error:  # rdflib gooit uiteenlopende parsefouten
         raise DatasetError(f"{path}: geen geldige Turtle ({error}).") from error
-    return graph
+    return graph, fallback
+
+
+def _decode(path: Path, rauw: bytes, fallback_encoding: str) -> tuple[str, DecodeFallback | None]:
+    """Decodeert de inhoud als UTF-8, of anders met de terugvalcodering.
+
+    Turtle hoort UTF-8 te zijn, maar niet elke exporttool houdt zich daaraan. Wijkt
+    een bestand af, dan wordt dat vastgelegd en gerapporteerd; stilzwijgend
+    vervangen van tekens zou de inhoud ongemerkt veranderen.
+    """
+    try:
+        return rauw.decode("utf-8"), None
+    except UnicodeDecodeError as error:
+        # De uitzondering bestaat niet meer buiten dit blok; leg de feiten nu vast.
+        eerste_byte, eerste_positie = rauw[error.start], error.start
+
+    try:
+        tekst = rauw.decode(fallback_encoding)
+    except (UnicodeDecodeError, LookupError) as fout:
+        raise DatasetError(
+            f"{path}: geen geldige UTF-8 (byte {eerste_byte:#04x} op positie "
+            f"{eerste_positie}) en ook niet te lezen als {fallback_encoding} ({fout})."
+        ) from fout
+
+    afwijkend = [byte for byte in rauw if byte > 0x7F]
+    return tekst, DecodeFallback(
+        path=path,
+        encoding=fallback_encoding,
+        byte_count=len(afwijkend),
+        samples=_fallback_samples(rauw, fallback_encoding),
+    )
+
+
+def _fallback_samples(rauw: bytes, encoding: str, limiet: int = 5) -> list[str]:
+    """De regels waarin de niet-ASCII-bytes staan, ter controle door de gebruiker."""
+    voorbeelden: list[str] = []
+    for index, byte in enumerate(rauw):
+        if byte <= 0x7F:
+            continue
+        start = rauw.rfind(b"\n", 0, index) + 1
+        eind = rauw.find(b"\n", index)
+        regel = rauw[start : eind if eind != -1 else len(rauw)]
+        tekst = regel.decode(encoding, "replace").strip()
+        if tekst not in voorbeelden:
+            voorbeelden.append(tekst)
+        if len(voorbeelden) >= limiet:
+            break
+    return voorbeelden
 
 
 def _subclass_closure(graph: Graph) -> dict[str, frozenset[str]]:
