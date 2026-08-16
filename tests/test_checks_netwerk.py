@@ -254,7 +254,13 @@ def test_net001_draagt_het_deelstelsel_id_van_zijn_streng() -> None:
     assert bevinding.details["cluster_id"] == verwacht
 
 
-def test_net001_vat_de_clusters_samen_in_de_toelichting() -> None:
+def test_net001_laat_de_clusterduiding_aan_het_rapport() -> None:
+    """De check kent de afbakening niet, dus telt hij de deelstelsels niet zelf.
+
+    Zou hij dat wel doen, dan meldde een tot een buurt afgebakend rapport het
+    aantal deelstelsels van de hele dataset -- op De Wolden 174 bij 24 bevindingen.
+    """
     outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
 
-    assert any("1 deelstelsel" in note for note in outcome.notes)
+    assert not any("deelstelsel" in note for note in outcome.notes)
+    assert all(f.details["cluster_id"] for f in outcome.findings)

@@ -254,3 +254,26 @@ def test_rapport_zonder_rode_draad_heeft_geen_lege_kop(tmp_path: Path) -> None:
     markdown_path, _ = write_check_report(run, tmp_path)
 
     assert "Rode draad" not in markdown_path.read_text(encoding="utf-8")
+
+
+def test_clusterduiding_telt_de_getoonde_bevindingen(tmp_path: Path) -> None:
+    """De duiding hoort te slaan op wat in het rapport staat, niet op de hele dataset.
+
+    Dataset-breed liggen er twee losse deelstelsels; het studiegebied dekt er een.
+    Een telling over de volledige dataset zou hier 2 melden bij 1 bevinding -- op De
+    Wolden werd dat "174 deelstelsels" bij 24 bevindingen.
+    """
+    run = _checkrun("net001_twee_losse_deelstelsels.ttl", "NET-001")
+    assert len(run.findings) == 2
+
+    gebied = load_study_area(
+        Path(__file__).parent / "fixtures" / "gis" / "rond_deelstelsel_cd.geojson"
+    )
+    beperkt = run.beperk_tot_studiegebied(gebied)
+    assert len(beperkt.findings) == 1
+
+    markdown_path, _ = write_check_report(beperkt, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "betreffen 1 deelstelsel (ds-C)" in tekst
+    assert "2 deelstelsels" not in tekst

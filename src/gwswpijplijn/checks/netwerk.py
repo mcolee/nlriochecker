@@ -314,17 +314,14 @@ class _ZonderAfvoerpad(Check):
         return gevonden, not endpoints
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt wat er buiten de graaf viel; dat mag niet stilzwijgend verdwijnen."""
-        notities = _netwerk_notities(context, self.eindpuntrol)
-        onbereikbaar, _ = self._onbereikbaar(context)
-        if onbereikbaar:
-            clusters = {cluster for _, cluster in onbereikbaar if cluster}
-            notities.append(
-                f"De bevindingen betreffen {getal(len(clusters), 'deelstelsel', 'deelstelsels')}; "
-                "elke bevinding draagt een cluster-ID, zodat het herstel per deelstelsel "
-                "opgepakt kan worden."
-            )
-        return notities
+        """Meldt wat er buiten de graaf viel; dat mag niet stilzwijgend verdwijnen.
+
+        De clusterduiding staat bewust niet hier maar in het rapport: een check
+        draait op de volledige dataset, terwijl het rapport tot het studiegebied
+        afgebakend kan zijn. Hier geteld zou de duiding het aantal deelstelsels van
+        de hele dataset melden bij de bevindingen van een enkele buurt.
+        """
+        return _netwerk_notities(context, self.eindpuntrol)
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""

@@ -8,7 +8,7 @@ from pathlib import Path
 from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckContext, CheckRun, run_checks
 from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.uitvoer.melding import bouw_meldingen
+from gwswpijplijn.uitvoer.melding import Melding, bouw_meldingen
 from gwswpijplijn.uitvoer.synthese import rode_draad
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -75,3 +75,63 @@ def test_gedeeld_deelstelsel_tussen_net_en_rvz_wordt_benoemd() -> None:
 
     assert "deelstelsel" in tekst
     assert "RVZ-006" in tekst
+
+
+def _melding(object_label: str, check_id: str) -> Melding:
+    """Een kale melding, genoeg voor de synthese."""
+    return Melding(
+        melding_id=f"{object_label}-{check_id}",
+        check_id=check_id,
+        categorie=check_id.split("-")[0],
+        bron="register",
+        ernst="F",
+        dimensie="Consistentie",
+        object_uri=f"urn:{object_label}",
+        object_label=object_label,
+        object2_uri="",
+        object2_label="",
+        boodschap="",
+        waarde="",
+        drempel="",
+        typering_betrouwbaar=True,
+        cluster_id="",
+        scope="geen_studiegebied",
+        gebied="",
+        prioriteit=2,
+        systemisch=False,
+        foutlocatie=None,
+        run_datum="2026-08-16",
+        dataset="x.ttl",
+    )
+
+
+def test_lijst_met_verdachte_objecten_wordt_afgekapt() -> None:
+    """Zeventien objecten uitschrijven maakt de synthese onleesbaar.
+
+    Op De Wolden droegen 17 objecten meldingen uit drie of meer checks; die alle
+    in een zin noemen verdrinkt de boodschap.
+    """
+    meldingen = [
+        _melding(f"streng-{nummer}", check)
+        for nummer in range(8)
+        for check in ("NET-001", "HGT-006", "TOP-010")
+    ]
+
+    tekst = "\n".join(rode_draad(_run("schoon.ttl"), meldingen))
+
+    assert "8 objecten dragen" in tekst
+    assert "en 3 andere" in tekst
+    assert "streng-7" not in tekst
+
+
+def test_meervoud_in_de_slotzin_klopt() -> None:
+    meldingen = [
+        _melding(f"streng-{nummer}", check)
+        for nummer in range(2)
+        for check in ("NET-001", "HGT-006", "TOP-010")
+    ]
+
+    tekst = "\n".join(rode_draad(_run("schoon.ttl"), meldingen))
+
+    assert "worden nagelopen" in tekst
+    assert "meldingen wordt nagelopen" not in tekst
