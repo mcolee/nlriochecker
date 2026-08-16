@@ -15,6 +15,7 @@ from gwswpijplijn.config import load_coverage_config
 from gwswpijplijn.coverage import assess_coverage
 from gwswpijplijn.dataset import GwswDataset, load_dataset
 from gwswpijplijn.errors import PipelineError
+from gwswpijplijn.externedata import load_external_data
 from gwswpijplijn.meting import laad_nulmeting
 from gwswpijplijn.plausibiliteit import load_plausibility
 from gwswpijplijn.reporting import (
@@ -147,6 +148,20 @@ def _plausibiliteit_option():
         help=(
             "Plausibiliteitstabellen (TOML) voor de ATTR-checks; standaard de "
             "meegeleverde plausibiliteit.toml."
+        ),
+    )
+
+
+def _bronnen_option():
+    """Bouwt de optie voor de map met externe geodata."""
+    return click.option(
+        "--bronnen",
+        "bronnen_dir",
+        default=None,
+        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        help=(
+            "Map met de externe geodata (BGT, BAG, NWB, studiegebied, AHN). Zonder deze "
+            "optie draaien de EXT-checks en HGT-001 t/m HGT-003 niet en melden ze dat."
         ),
     )
 
@@ -328,6 +343,7 @@ def compare_command(
 @_studiegebied_options()
 @_projectconfig_option()
 @_plausibiliteit_option()
+@_bronnen_option()
 @_output_option("Map waarin het bevindingenrapport wordt geschreven.")
 def check_command(
     dataset_path: Path,
@@ -338,6 +354,7 @@ def check_command(
     study_layer: str | None,
     project_config_path: Path | None,
     plausibility_path: Path | None,
+    bronnen_dir: Path | None,
     output_dir: Path,
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
@@ -345,11 +362,13 @@ def check_command(
         config = load_check_config(project_config_path)
         dataset = load_dataset(dataset_path, list(ontology_paths))
         onbetrouwbaar, gate_applied = _typing_gate(shacl_paths, config, dataset)
+        bronnen = _externe_bronnen(config, bronnen_dir)
         context = CheckContext(
             dataset=dataset,
             config=config,
             unreliable_objects=onbetrouwbaar,
             plausibiliteit=load_plausibility(plausibility_path),
+            bronnen=bronnen,
         )
         run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
         if study_path is not None:
@@ -381,6 +400,16 @@ def check_command(
         )
     if not gate_applied:
         click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
+    if bronnen is None:
+        click.echo("  Geen externe bronnen geladen (--bronnen niet opgegeven).")
+    else:
+        click.echo(
+            f"  Externe bronnen: {len(bronnen.layers)} lagen"
+            f"{', hoogteraster' if bronnen.raster is not None else ''}"
+            f", bereik {bronnen.extent_name or 'onbekend'}."
+        )
+        for ontbreekt in bronnen.missing:
+            click.echo(f"    Niet aanwezig: {ontbreekt}")
     for outcome in run.outcomes:
         voorbehoud = (
             f", {outcome.unreliable_count} met typeringsvoorbehoud"
@@ -396,6 +425,19 @@ def check_command(
     )
     click.echo(f"Geschreven: {markdown_path}")
     click.echo(f"Geschreven: {csv_path}")
+
+
+def _externe_bronnen(config, bronnen_dir: Path | None):
+    """Leest de externe geodata als er een bronmap opgegeven is.
+
+    De aangeleverde bronnen dekken maar een deel van het beheergebied; ze worden
+    daarom alleen geladen als de gebruiker er expliciet om vraagt, en de EXT-checks
+    melden zelf wanneer ze niets konden toetsen.
+    """
+    if bronnen_dir is None:
+        return None
+    bronnen = config.bronnen.model_copy(update={"map": "."})
+    return load_external_data(bronnen, bronnen_dir)
 
 
 def _typing_gate(

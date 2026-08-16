@@ -9,12 +9,12 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | TOP | 21 | 21 | 0 | 0 | 0 |
 | ADM | 9 | 6 | 0 | 0 | 3 |
 | ATTR | 12 | 11 | 0 | 0 | 1 |
-| HGT | 18 | 15 | 3 | 0 | 0 |
+| HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 8 | 8 | 0 | 0 | 0 |
 | RVZ | 11 | 9 | 0 | 0 | 2 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
-| EXT | 8 | 0 | 8 | 0 | 0 |
-| **totaal** | **93** | **76** | **11** | **0** | **6** |
+| EXT | 8 | 8 | 0 | 0 | 0 |
+| **totaal** | **93** | **87** | **0** | **0** | **6** |
 
 ## TOP
 
@@ -77,9 +77,9 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |
 | --- | --- | --- | --- | --- | --- |
-| HGT-001 | Dekselhoogte wijkt af van AHN: meer dan 5 cm | W | Nauwkeurigheid | geimplementeerd zonder test | — |
-| HGT-002 | Dekselhoogte wijkt af van AHN: meer dan 25 cm | F | Nauwkeurigheid | geimplementeerd zonder test | — |
-| HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 3 m eronder) | F | Plausibiliteit | geimplementeerd zonder test | — |
+| HGT-001 | Dekselhoogte wijkt af van AHN: meer dan 5 cm | W | Nauwkeurigheid | geimplementeerd met test | — |
+| HGT-002 | Dekselhoogte wijkt af van AHN: meer dan 25 cm | F | Nauwkeurigheid | geimplementeerd met test | — |
+| HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 3 m eronder) | F | Plausibiliteit | geimplementeerd met test | — |
 | HGT-004 | BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem | F | Consistentie | geimplementeerd met test | — |
 | HGT-005 | Tegenverhang bij vrijverval: licht (onder drempel) | W | Plausibiliteit | geimplementeerd met test | — |
 | HGT-006 | Tegenverhang bij vrijverval: fors (boven drempel) | F | Plausibiliteit | geimplementeerd met test | — |
@@ -140,11 +140,11 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |
 | --- | --- | --- | --- | --- | --- |
-| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken | W | Plausibiliteit | geimplementeerd zonder test | — |
-| EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit | geimplementeerd zonder test | — |
-| EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid | geimplementeerd zonder test | — |
-| EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd zonder test | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |
-| EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid | geimplementeerd zonder test | — |
-| EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid | geimplementeerd zonder test | — |
-| EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit | geimplementeerd zonder test | — |
-| EXT-008 | BAG-verblijfsobject zonder riolering binnen X m (dekkingscheck) | W | Compleetheid | geimplementeerd zonder test | — |
+| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken | W | Plausibiliteit | geimplementeerd met test | — |
+| EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit | geimplementeerd met test | — |
+| EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid | geimplementeerd met test | — |
+| EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd met test | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |
+| EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid | geimplementeerd met test | — |
+| EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid | geimplementeerd met test | — |
+| EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit | geimplementeerd met test | — |
+| EXT-008 | BAG-verblijfsobject zonder riolering binnen X m (dekkingscheck) | W | Compleetheid | geimplementeerd met test | — |

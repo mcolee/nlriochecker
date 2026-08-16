@@ -85,24 +85,33 @@ def _bereiknotities(context: CheckContext, selectie: _Selectie, soort: str) -> l
             "Er zijn geen externe bronnen geladen (`--bronnen`); deze check heeft niets "
             "kunnen toetsen."
         ]
+    if context.bronnen.extent is None:
+        return [
+            "Er is geen begrenzingspolygoon geladen. Zonder begrenzing is niet vast te "
+            "stellen waar de externe bronnen wel en niet dekken, en mag geen enkele "
+            "EXT-check een uitslag geven; er is dus niets getoetst."
+        ]
     notities = [
-        f"{len(selectie.toetsbaar)} van de {selectie.totaal} {soort} zijn getoetst.",
+        f"Getoetst: {len(selectie.toetsbaar)} van de {selectie.totaal} {soort}.",
     ]
     if selectie.buiten_gebied:
+        gebied = context.bronnen.extent_name or "het bereik van de externe bronnen"
         notities.append(
-            f"{selectie.buiten_gebied} {soort} liggen buiten het studiegebied "
-            f"{context.bronnen.extent_name or 'van de externe bronnen'} en krijgen de status "
-            "*buiten studiegebied*: de aangeleverde bronnen dekken daar niets, dus is het "
-            "ontbreken van een tegenhanger geen bevinding."
+            f"Buiten studiegebied: {selectie.buiten_gebied} van de {selectie.totaal} {soort} "
+            f"liggen buiten {gebied} en krijgen geen uitslag. De aangeleverde bronnen dekken "
+            "daar niets, dus het ontbreken van een tegenhanger is er geen bevinding."
         )
     if selectie.onbetrouwbaar:
         notities.append(
-            f"{selectie.onbetrouwbaar} {soort} krijgen de markering "
-            f"*{MARKERING_NIET_TOETSBAAR}*: de nulmeting noemt hun klasse te globaal en "
-            "verklaart haar eigen vervolgvalidaties daarop onbetrouwbaar."
+            f"Markering *{MARKERING_NIET_TOETSBAAR}*: {selectie.onbetrouwbaar} van de "
+            f"{selectie.totaal} {soort} krijgen geen uitslag omdat de nulmeting hun klasse "
+            "te globaal noemt en haar eigen vervolgvalidaties daarop onbetrouwbaar verklaart."
         )
     if selectie.zonder_geometrie:
-        notities.append(f"{selectie.zonder_geometrie} {soort} hebben geen bruikbare geometrie.")
+        notities.append(
+            f"Zonder bruikbare geometrie: {selectie.zonder_geometrie} van de "
+            f"{selectie.totaal} {soort}."
+        )
     return notities
 
 
@@ -141,8 +150,17 @@ class _ExterneCheck(Check):
         raise NotImplementedError
 
     def geometrie_van(self, object_):
-        """De geometrie waarmee dit object in het platte vlak ligt."""
-        return getattr(object_, "line", None) or getattr(object_, "point", None)
+        """De geometrie waarmee dit object in het platte vlak ligt.
+
+        Een streng heeft een lijn, een knoop een punt; welke van de twee het is
+        wordt hier expliciet uitgezocht in plaats van op de waarheidswaarde van een
+        shapely-geometrie te leunen.
+        """
+        for naam in ("line", "point"):
+            geometrie = getattr(object_, naam, None)
+            if geometrie is not None and not geometrie.is_empty:
+                return geometrie
+        return None
 
     def selectie(self, context: CheckContext) -> _Selectie:
         """De toetsbare objecten, een keer per context bepaald."""
@@ -170,8 +188,20 @@ class _ExterneCheck(Check):
             )
         return notities
 
+    def bruikbaar(self, context: CheckContext) -> bool:
+        """Geeft aan of deze check de bronnen heeft die zij nodig heeft."""
+        if context.bronnen is None or context.bronnen.extent is None:
+            return False
+        return not self.rol or self.laag(context) is not None
+
     def examined(self, context: CheckContext) -> int:
-        """Het aantal objecten dat werkelijk getoetst is."""
+        """Het aantal objecten dat werkelijk getoetst is.
+
+        Ontbreekt een benodigde bron, dan is er niets bekeken; een getal neerzetten
+        zou suggereren dat de check gedraaid heeft.
+        """
+        if not self.bruikbaar(context):
+            return 0
         return len(self.selectie(context).toetsbaar)
 
 
@@ -198,13 +228,8 @@ class KruisingMetBouwwerk(_ExterneCheck):
         (`overigbouwwerk`, `gebouwinstallatie`, `kunstwerkdeel_vlak`) tellen mee als
         aparte laag.
         """
-        lagen = [
-            laag
-            for rol in ("bgt_pand", "bag_pand", "bgt_bouwwerk")
-            for laag in [context.bronnen.layer(rol) if context.bronnen else None]
-            if laag is not None
-        ]
-        if not lagen:
+        lagen = self.bouwwerklagen(context)
+        if not lagen or not self.bruikbaar(context):
             return
         buffer = context.config.drempels.ext_pand_buffer_m
 
@@ -236,21 +261,39 @@ class KruisingMetBouwwerk(_ExterneCheck):
                     beste = (afstand, laag)
         return beste
 
-    def notes(self, context: CheckContext) -> list[str]:
-        """Meldt welke pandbronnen gebruikt zijn."""
+    def bouwwerklagen(self, context: CheckContext) -> list:
+        """De pand- en bouwwerklagen die deze check gebruikt.
+
+        EXT-001 leunt op drie rollen tegelijk; als er ook maar een van aanwezig is
+        kan de check draaien. De basisklasse kijkt naar een enkele rol en zou hier
+        het verkeerde antwoord geven.
+        """
         if context.bronnen is None:
-            return super().notes(context)
-        gebruikt = [
-            f"{rol} ({len(laag)})"
+            return []
+        return [
+            laag
             for rol in ("bgt_pand", "bag_pand", "bgt_bouwwerk")
             for laag in [context.bronnen.layer(rol)]
             if laag is not None
         ]
+
+    def bruikbaar(self, context: CheckContext) -> bool:
+        """Een van de drie pand- of bouwwerklagen volstaat."""
+        if context.bronnen is None or context.bronnen.extent is None:
+            return False
+        return bool(self.bouwwerklagen(context))
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt welke pandbronnen gebruikt zijn."""
+        if context.bronnen is None or context.bronnen.extent is None:
+            return _bereiknotities(context, self.selectie(context), self.soort)
+        gebruikt = self.bouwwerklagen(context)
         if not gebruikt:
             return [context.bronnen.ontbreekt("bgt_pand")]
+        omschrijving = ", ".join(f"{laag.role} ({len(laag)})" for laag in gebruikt)
         return [
             *_bereiknotities(context, self.selectie(context), self.soort),
-            f"Getoetst tegen: {', '.join(gebruikt)}.",
+            f"Getoetst tegen: {omschrijving}.",
         ]
 
 
@@ -436,6 +479,8 @@ class BgtDekselZonderPut(_ExterneCheck):
         afstand = context.config.drempels.ext_putdeksel_afstand_m
         putten = [node.point for node in self.selectie(context).toetsbaar]
         if not putten:
+            # Zonder putten binnen het gebied zou elk deksel als bevinding gelden;
+            # dat zegt niets over de beheerdata. `notes()` meldt de reden.
             return
 
         from shapely.strtree import STRtree
@@ -459,10 +504,30 @@ class BgtDekselZonderPut(_ExterneCheck):
                 bron=laag.source.name,
             )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt de bron en of er wel putten in het gebied liggen."""
+        notities = [
+            "De bevindingen hangen aan BGT-deksels, niet aan GWSW-objecten; de putten "
+            "hieronder vormen de vergelijkingsbasis.",
+            *super().notes(context),
+        ]
+        if (
+            context.bronnen is not None
+            and self.laag(context) is not None
+            and not self.selectie(context).toetsbaar
+        ):
+            notities.append(
+                "Er ligt geen enkele put van deze dataset binnen het studiegebied; elk "
+                "BGT-deksel zou dan als bevinding gelden. De check is daarom niet uitgevoerd."
+            )
+        return notities
+
     def examined(self, context: CheckContext) -> int:
-        """Het aantal BGT-putdeksels."""
+        """Het aantal BGT-putdeksels dat werkelijk vergeleken is."""
         laag = self.laag(context)
-        return len(laag) if laag is not None else 0
+        if laag is None or not self.selectie(context).toetsbaar:
+            return 0
+        return len(laag)
 
 
 @register
@@ -531,6 +596,8 @@ class PandZonderRiolering(_ExterneCheck):
         afstand = context.config.drempels.ext_riolering_bij_pand_m
         riolering = [self.geometrie_van(object_) for object_ in self.selectie(context).toetsbaar]
         if not riolering:
+            # Zonder riolering binnen het gebied zou elk pand als bevinding gelden;
+            # dat zegt niets over de dekking. `notes()` meldt de reden.
             return
 
         from shapely.strtree import STRtree
@@ -561,17 +628,25 @@ class PandZonderRiolering(_ExterneCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Legt de benadering met pandgeometrie expliciet vast."""
-        return [
+        notities = [
             *super().notes(context),
             "Het register vraagt om verblijfsobjecten; die zijn niet aangeleverd. Deze check "
             "gebruikt de BAG-pandgeometrie als benadering. Een pand met meerdere "
             "verblijfsobjecten telt daardoor als een; het aantal staat wel in de melding.",
         ]
+        if self.laag(context) is not None and not self.selectie(context).toetsbaar:
+            notities.append(
+                "Er ligt geen enkele streng of put van deze dataset binnen het studiegebied; "
+                "elk pand zou dan als onbediend gelden. De check is daarom niet uitgevoerd."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal BAG-panden."""
+        """Het aantal BAG-panden dat werkelijk vergeleken is."""
         laag = self.laag(context)
-        return len(laag) if laag is not None else 0
+        if laag is None or not self.selectie(context).toetsbaar:
+            return 0
+        return len(laag)
 
 
 class _AhnCheck(_ExterneCheck):
@@ -587,6 +662,12 @@ class _AhnCheck(_ExterneCheck):
         """Het hoogteraster, of None."""
         return context.bronnen.raster if context.bronnen is not None else None
 
+    def bruikbaar(self, context: CheckContext) -> bool:
+        """Deze checks hebben geen vectorlaag nodig maar wel het hoogteraster."""
+        if context.bronnen is None or context.bronnen.extent is None:
+            return False
+        return self.raster(context) is not None
+
     def monsters(self, context: CheckContext):
         """Levert per toetsbare put het maaiveld uit de dataset en uit het AHN."""
         raster = self.raster(context)
@@ -600,7 +681,7 @@ class _AhnCheck(_ExterneCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt het bereik en of het raster aanwezig was."""
-        if context.bronnen is None:
+        if context.bronnen is None or context.bronnen.extent is None:
             return _bereiknotities(context, self.selectie(context), self.soort)
         raster = self.raster(context)
         if raster is None:

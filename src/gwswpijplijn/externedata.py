@@ -228,6 +228,14 @@ def _lees_rol(
         return None
 
     beschikbaar = _laagnamen(pad)
+    if not laagnamen and len(beschikbaar) > 1:
+        # Een bestand met meerdere lagen zonder rolconfiguratie: gokken welke laag
+        # bedoeld is levert stille onzin op (de eerste BGT-laag is `bak`).
+        ontbrekend.append(
+            f"{rol} ({pad.name} heeft {len(beschikbaar)} lagen en er is geen laagnaam "
+            f"geconfigureerd voor deze rol)"
+        )
+        return None
     gekozen = laagnamen or beschikbaar[:1]
     bestaan = [naam for naam in gekozen if naam in beschikbaar]
     if not bestaan:

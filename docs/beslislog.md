@@ -246,3 +246,128 @@ maar er is in deze dataset geen enkele SHACL-vorm en geen enkel object dat ze ra
 **Gevolg voor ADM-007.** 181 van de 273 overstort- en lozingsputten hebben geen
 overstortleiding of -drempel. Dat is geen 181 losse gebreken maar een systematisch
 registratiepatroon: er zijn 218 overstortputten tegenover 68 overstortleidingen.
+
+## Blok C — externe bronnen
+
+### BC-1 De externe bronnen worden alleen geladen als je erom vraagt
+
+**Wat.** De EXT-checks en HGT-001 t/m HGT-003 draaien alleen met `--bronnen PAD`.
+Zonder die optie melden ze "er zijn geen externe bronnen geladen" en toetsen ze
+niets; `examined` staat dan op nul.
+
+**Waarom.** De bronnen dekken 43 ha van een gemeente die er duizenden beslaat. Ze
+stilzwijgend meeladen zou betekenen dat een gewone run 99% van de objecten als
+"buiten studiegebied" afdoet zonder dat de gebruiker daarom gevraagd heeft. Nu is
+het een bewuste keuze, en het rapport zegt welke kant het op is.
+
+**Alternatieven.** Altijd laden op basis van `[bronnen]` in de config (verworpen:
+maakt elke run trager en het rapport misleidender).
+
+### BC-2 Buiten het studiegebied is geen uitslag, geen bevinding
+
+**Wat.** Elke EXT- en AHN-check filtert eerst op de begrenzingspolygoon uit
+`data/gis/cbs_buurt_koekangerveld_studiegebied.gpkg`. Objecten daarbuiten krijgen de
+status *buiten studiegebied* en worden geteld in de toelichting.
+
+**Waarom.** Dit is de harde regel uit de opdracht, en hij is ook inhoudelijk juist:
+een put zonder BGT-deksel binnen 2 m is buiten Koekangerveld geen gebrek maar een
+gevolg van ontbrekende brondata. Op De Wolden gaat het om 17.574 van de 17.603
+strengen en 22.323 van de 22.363 putten; zonder deze regel zou de engine
+tienduizenden valse bevindingen produceren.
+
+**Let op.** Dit is iets anders dan `--studiegebied`. Die optie bakent de
+*rapportage* af nadat alle checks op de volledige dataset gedraaid zijn (fase 2).
+De bronbegrenzing hier bakent de *toetsing* van de externe checks af, omdat de bron
+zelf niet verder reikt.
+
+### BC-3 De typeringspoort haalt objecten uit de EXT-uitslag, niet alleen uit de vlag
+
+**Wat.** Bij de EXT- en AHN-checks krijgt een te globaal getypeerd object geen
+uitslag maar de markering *niet betrouwbaar toetsbaar*, geteld in de toelichting.
+Bij de interne checks (TOP, NET, ATTR, HGT-004 e.v., RVZ, ADM, BTR) blijft de
+bestaande werkwijze uit fase 3: de bevinding blijft staan met de vlag
+`TyperingBetrouwbaar = False`, en het rapport legt uit wat dat betekent.
+
+**Waarom.** De opdracht vraagt de markering "in plaats van een check-uitslag" voor
+blok C. Voor de interne checks zou hetzelfde doen betekenen dat een bestaande,
+geteste en in het rapport toegelichte uitkomst uit fase 3 verandert, met andere
+cijfers als gevolg. Het onderscheid staat in de moduledocstring van `extern.py`.
+
+**Alternatieven.** Overal objecten uit de uitslag halen (verworpen: verandert de
+uitkomsten van fase 3 zonder dat daarom gevraagd is; wel een kandidaat voor een
+volgende fase, dan als expliciete keuze in de config).
+
+### BC-4 Het hoogteraster wordt nooit geherprojecteerd
+
+**Wat.** Vectorlagen met een correct gedefinieerd afwijkend CRS worden naar
+EPSG:28992 omgezet en dat wordt vastgelegd. Een raster met een ander CRS levert een
+fout op met het verzoek het in RD aan te leveren.
+
+**Waarom.** Een raster herprojecteren betekent resamplen: de hoogtewaarden
+verschuiven en worden geïnterpoleerd. HGT-001 en HGT-002 toetsen op 5 en 25 cm; een
+resample-artefact van enkele centimeters zou de uitkomst bepalen. Beter weigeren dan
+stilzwijgend nauwkeurigheid verliezen.
+
+### BC-5 Een bron zonder CRS wordt geweigerd
+
+**Wat.** Een laag zonder gedefinieerd coordinaatstelsel levert een fout op in plaats
+van de aanname dat het RD is.
+
+**Waarom.** De GWSW-data staat in RD; een bron zonder CRS *lijkt* daar dan op te
+passen ook als hij dat niet doet. Een stille misinterpretatie zou alle
+afstandstoetsen onzin maken zonder dat iemand het merkt.
+
+### BC-6 EXT-005 en EXT-006 zijn gebouwd maar draaien niet op deze data
+
+**Empirische bevinding.** `BGT.gpkg` bevat de laag `put` wel, maar met nul features.
+Dat is de BGT-laag met de putdeksels.
+
+**Wat.** Beide checks zijn volledig geïmplementeerd en getest op miniatuurbronnen,
+maar melden op de aangeleverde data *laag niet aanwezig in aangeleverde data* en
+worden overgeslagen, met `examined = 0`. Ze draaien zonder wijziging zodra er een
+BGT-export met gevulde `put`-laag komt.
+
+**Alternatieven.** Ze als skelet opnemen (verworpen: ze zijn wel implementeerbaar,
+alleen de data ontbreekt; dat is een ander soort gat en hoort ook anders te lezen).
+
+### BC-7 EXT-008 gebruikt panden waar het register verblijfsobjecten vraagt
+
+**Wat.** Er zijn 166 BAG-*panden* aangeleverd en geen verblijfsobjecten. De check
+gebruikt de pandgeometrie en zet `aantal_verblijfsobjecten` in elke melding.
+
+**Waarom.** Dit is de enige beschikbare benadering, en de opdracht schrijft hem
+voor. Een pand met vijf verblijfsobjecten telt daardoor als een; die vertekening
+staat in de melding zelf en in de toelichting van de check, zodat hij niet uit het
+rapport kan wegvallen.
+
+### BC-8 EXT-006 en EXT-008 melden objecten die niet in de GWSW-dataset staan
+
+**Wat.** `Finding` heeft een veld `location` gekregen: een RD-coordinaat. De
+afbakening tot een studiegebied gebruikt dat coordinaat wanneer de bevinding geen
+dataset-URI heeft.
+
+**Waarom.** Een BGT-deksel zonder put en een BAG-pand zonder riolering zijn
+bevindingen *over* de beheerdata, maar hangen aan een extern object. Zonder eigen
+coordinaat zouden ze bij `--studiegebied` als "buiten het gebied" wegvallen — precies
+de bevindingen die er dan wel horen te staan.
+
+### BC-9 Met de NWB is niets gebouwd
+
+**Wat.** De 13 NWB-wegvakken zijn ingelezen (rol `nwb_wegvak`) maar voeden geen
+enkele check. Het voorstel staat in `docs/nwb-voorstel.md`.
+
+**Waarom.** Geen enkele check uit het register is aan deze bron gekoppeld, en de
+opdracht vraagt er expliciet om er niets mee te implementeren. De sterkste kandidaat
+is BTR-005 (weging naar wegfunctie), maar die staat als skelet omdat er geen
+inspectiegegevens zijn.
+
+### BC-10 De GIS-fixtures worden gegenereerd, niet met de hand gemaakt
+
+**Wat.** `scripts/maak_gis_fixtures.py` schrijft `tests/fixtures/gis/ext` met
+dezelfde laagnamen en attribuutnamen als de echte bronnen, in het lokale
+assenstelsel van de TTL-fixtures.
+
+**Waarom.** De echte bronnen zijn 24 MB en liggen in Koekangerveld; unit tests
+moeten klein en snel zijn. Het raster wordt als eerste geschreven, voor geopandas
+geladen is: rasterio en pyogrio brengen elk hun eigen GDAL mee, en die twee in een
+proces door elkaar gebruiken bij het schrijven leverde een crash op.

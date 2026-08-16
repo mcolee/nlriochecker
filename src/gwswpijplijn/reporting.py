@@ -451,6 +451,8 @@ def _check_findings_table(run: CheckRun) -> pd.DataFrame:
             "Object": finding.object_uri,
             "Melding": finding.message,
             "TyperingBetrouwbaar": finding.typing_reliable,
+            "X": finding.location[0] if finding.location else None,
+            "Y": finding.location[1] if finding.location else None,
         }
         for finding in run.findings
     ]
@@ -464,6 +466,8 @@ def _check_findings_table(run: CheckRun) -> pd.DataFrame:
             "Object",
             "Melding",
             "TyperingBetrouwbaar",
+            "X",
+            "Y",
         ],
     )
 
@@ -532,6 +536,8 @@ def _render_checks(run: CheckRun) -> str:
             "",
         ]
 
+    lines += _bronnen_section(run)
+
     if run.dataset.ontologies:
         namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)
         lines += [f"Klassenhierarchie uit {namen}.", ""]
@@ -563,11 +569,24 @@ def _render_checks(run: CheckRun) -> str:
 
     lines += _table(_check_summary(run), "Samenvatting per check")
 
+    skeletten = [outcome for outcome in run.outcomes if outcome.skeleton]
+    if skeletten:
+        lines += [
+            "",
+            f"**{len(skeletten)} check{'s zijn' if len(skeletten) > 1 else ' is'} skelet** en "
+            "levert per definitie geen uitslag: "
+            + ", ".join(f"{outcome.check_id} ({outcome.skeleton})" for outcome in skeletten)
+            + ". De reden staat bij de check zelf.",
+            "",
+        ]
+
     for outcome in run.outcomes:
         lines += ["", f"## {outcome.check_id} — {outcome.title}", ""]
+        markering = f" **Skelet: {outcome.skeleton}.**" if outcome.skeleton else ""
         lines += [
             f"Ernst {outcome.severity.value}, dimensie {outcome.dimension.value}. "
-            f"{len(outcome.findings)} bevindingen op {outcome.examined} bekeken objecten.",
+            f"{len(outcome.findings)} bevindingen op {outcome.examined} bekeken objecten."
+            f"{markering}",
         ]
         for note in outcome.notes:
             lines += ["", f"> {note}"]
@@ -584,6 +603,58 @@ def _render_checks(run: CheckRun) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _bronnen_section(run: CheckRun) -> list[str]:
+    """Beschrijft de externe bronnen, hun bereik en wat er niet bij zat.
+
+    Zonder deze sectie zou een lezer van het rapport niet kunnen zien waarom de
+    EXT-checks weinig of niets gevonden hebben; die informatie stond alleen op de
+    opdrachtregel.
+    """
+    bronnen = run.bronnen
+    if bronnen is None:
+        return [
+            "> **Externe bronnen:** geen geladen. De EXT-checks en HGT-001 t/m HGT-003 "
+            "hebben daardoor niets kunnen toetsen; geef `--bronnen` op voor een volledig "
+            "beeld.",
+            "",
+        ]
+
+    regels = ["**Externe bronnen**", ""]
+    if bronnen.extent is None:
+        regels += [
+            "> Er is geen begrenzingspolygoon geladen. Zonder begrenzing mag geen enkele "
+            "EXT-check een uitslag geven; ze zijn alle overgeslagen.",
+            "",
+        ]
+    lagen = pd.DataFrame(
+        [
+            {
+                "Rol": laag.role,
+                "Bestand": laag.source.name,
+                "Laag": laag.layer,
+                "Features": len(laag),
+                "CRS": laag.crs,
+                "Geherprojecteerd uit": laag.reprojected_from or "—",
+            }
+            for laag in bronnen.layers.values()
+        ],
+        columns=["Rol", "Bestand", "Laag", "Features", "CRS", "Geherprojecteerd uit"],
+    )
+    regels += _table(lagen, "Ingelezen lagen")
+    if bronnen.raster is not None:
+        regels += ["", f"Hoogteraster: `{bronnen.raster.source.name}` ({bronnen.raster.crs})."]
+    if bronnen.missing:
+        regels += [
+            "",
+            "> **Niet aangeleverd of leeg:** " + "; ".join(bronnen.missing) + ". De checks "
+            "die deze bronnen nodig hebben zijn overgeslagen; nul bevindingen betekent daar "
+            "niet dat het in orde is.",
+        ]
+    for note in bronnen.notes:
+        regels += ["", f"> {note}"]
+    return [*regels, ""]
+
+
 def _check_summary(run: CheckRun) -> pd.DataFrame:
     """Een regel per check met de aantallen."""
     return pd.DataFrame(
@@ -596,6 +667,7 @@ def _check_summary(run: CheckRun) -> pd.DataFrame:
                 "Bekeken": outcome.examined,
                 "Bevindingen": len(outcome.findings),
                 "Typering onbetrouwbaar": outcome.unreliable_count,
+                "Skelet": outcome.skeleton or "—",
             }
             for outcome in run.outcomes
         ],
@@ -607,6 +679,7 @@ def _check_summary(run: CheckRun) -> pd.DataFrame:
             "Bekeken",
             "Bevindingen",
             "Typering onbetrouwbaar",
+            "Skelet",
         ],
     )
 

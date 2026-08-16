@@ -1017,6 +1017,48 @@ FIXTURES["btr006_afgeronde_bobs.ttl"] = (
 )
 
 
+# --- EXT en AHN ------------------------------------------------------------
+#
+# Deze fixture hoort bij tests/fixtures/gis/ext (zie scripts/maak_gis_fixtures.py).
+# Het studiegebied loopt van (980, 1980) tot (1120, 2020) en het hoogteraster staat
+# overal op 10,00 m NAP, met een nodata-vlek rond (1040, 2010).
+
+EXT_A = (1000.0, 2000.0)
+EXT_B = (1050.0, 2000.0)
+EXT_C = (1090.0, 2000.0)
+EXT_D = (2000.0, 2000.0)
+EXT_E = (1000.0, 2010.0)
+EXT_F = (1040.0, 2010.0)
+
+FIXTURES["ext_scenario.ttl"] = (
+    "meerdere; deze fixture voedt de EXT- en AHN-checks tegelijk, zie de tests",
+    # Put A: maaiveld en deksel gelijk aan het AHN.
+    hoogteput("PutA", "A", EXT_A, mv=10.00, dek=10.00)
+    # Put B: 0,10 m afwijking van het AHN, dus HGT-001.
+    + hoogteput("PutB", "B", EXT_B, mv=10.10, dek=10.10)
+    # Put C: 0,50 m afwijking, dus HGT-002; en geen BGT-deksel in de buurt.
+    + hoogteput("PutC", "C", EXT_C, mv=10.50, dek=10.50)
+    # Put D ligt buiten het studiegebied en mag geen enkele uitslag krijgen.
+    + hoogteput("PutD", "D", EXT_D, mv=99.00, dek=99.00)
+    # Put F ligt op de nodata-vlek van het raster.
+    + hoogteput("PutE", "E", EXT_E, mv=10.00, dek=10.00)
+    + hoogteput("PutF", "F", EXT_F, mv=12.00, dek=12.00)
+    # Lozingsput ver van het water; Lozingsput vlakbij water-1.
+    + put("PutL1", "L1", 1005.0, 1990.0, klasse="Lozingsput")
+    + put("PutL2", "L2", 1072.0, 2008.0, klasse="Lozingsput")
+    # Streng 1 loopt door pand-1 heen: EXT-001.
+    + hoogteleiding("L1", "1", [EXT_A, EXT_B], "PutA", "PutB", bob=(11.00, 9.50))
+    # Streng 2 kruist water-1 en is geen duiker: EXT-002 en EXT-003.
+    + hoogteleiding("L2", "2", [EXT_B, EXT_C], "PutB", "PutC", bob=(9.50, 6.30))
+    # Streng 3 is een duiker die water-2 kruist: wel EXT-002, geen EXT-003.
+    + hoogteleiding("L3", "3", [EXT_E, EXT_F], "PutE", "PutF", bob=(9.60, 9.55)).replace(
+        "gwsw:GemengdRiool", "gwsw:Duiker"
+    )
+    # Streng 4 verbindt de lozingsputten met het net.
+    + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35)),
+)
+
+
 def main() -> None:
     DOEL.mkdir(parents=True, exist_ok=True)
     for naam, (defect, inhoud) in FIXTURES.items():

@@ -1,0 +1,231 @@
+"""Tests voor de EXT-checks en de AHN-hoogtechecks op miniatuurbronnen.
+
+De fixtures onder `tests/fixtures/gis/ext` hebben dezelfde structuur als de echte
+bronnen in `data/gis` (dezelfde laagnamen, dezelfde attribuutnamen, EPSG:28992),
+maar dan in het lokale assenstelsel van de TTL-fixtures. Ze worden gemaakt met
+`scripts/maak_gis_fixtures.py`; het hoogteraster staat overal op 10,00 m NAP met
+een nodata-vlek rond (1040, 2010).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from gwswpijplijn.checkconfig import CheckConfig, load_check_config
+from gwswpijplijn.checks import CheckContext, CheckOutcome, run_checks
+from gwswpijplijn.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
+from gwswpijplijn.dataset import load_dataset
+from gwswpijplijn.externedata import ExternalData, load_external_data
+
+TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
+GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
+SCENARIO = TTL_DIR / "ext_scenario.ttl"
+
+EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-005", "EXT-006", "EXT-007", "EXT-008"]
+AHN_IDS = ["HGT-001", "HGT-002", "HGT-003"]
+
+pytestmark = pytest.mark.skipif(
+    not (GIS_DIR / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+
+
+@pytest.fixture
+def config() -> CheckConfig:
+    """De standaardconfig, afgestemd op het assenstelsel van de fixtures."""
+    gekozen = load_check_config()
+    gekozen.drempels.rd_y_min = 0.0
+    # Het fixturegebied is 140 bij 40 m; met de standaard 40 m zou elk pand bediend
+    # zijn en zou EXT-008 nooit iets kunnen vinden.
+    gekozen.drempels.ext_riolering_bij_pand_m = 10.0
+    return gekozen
+
+
+@pytest.fixture(scope="session")
+def bronnen() -> ExternalData:
+    """De miniatuurbronnen uit tests/fixtures/gis/ext."""
+    basis = load_check_config().bronnen
+    aangepast = basis.model_copy(
+        update={
+            "map": ".",
+            "bgt": "bgt.gpkg",
+            "bag_pand": "bag_pand.gpkg",
+            "nwb_wegvakken": "nwb_wegvakken.gpkg",
+            "studiegebied": "studiegebied.gpkg",
+            "ahn_dtm": "ahn.tif",
+        }
+    )
+    return load_external_data(aangepast, GIS_DIR)
+
+
+def uitkomst(
+    check_id: str,
+    config: CheckConfig,
+    bronnen: ExternalData | None,
+    bestand: Path = SCENARIO,
+) -> CheckOutcome:
+    """Draait een enkele check op de scenariofixture."""
+    dataset = load_dataset(bestand)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+    return run_checks(context, [check_id]).outcomes[0]
+
+
+def labels(outcome: CheckOutcome) -> list[str]:
+    """De labels van de gevonden objecten, gesorteerd."""
+    return sorted(finding.object_label for finding in outcome.findings)
+
+
+def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
+    assert bronnen.extent is not None
+    assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
+        "bgt_pand": 1,
+        "bgt_water": 2,
+        "bgt_putdeksel": 3,
+        "bgt_bouwwerk": 1,
+        "bag_pand": 2,
+        "nwb_wegvak": 1,
+    }
+    assert all(laag.crs == "EPSG:28992" for laag in bronnen.layers.values())
+    assert all(laag.reprojected_from is None for laag in bronnen.layers.values())
+    assert bronnen.raster is not None
+    assert bronnen.raster.sample(1000.0, 2000.0) == pytest.approx(10.0)
+    # De nodata-vlek levert geen hoogte op in plaats van de sentinelwaarde.
+    assert bronnen.raster.sample(1040.0, 2010.0) is None
+    # Buiten het raster is er niets te bemonsteren.
+    assert bronnen.raster.sample(5000.0, 5000.0) is None
+
+
+@pytest.mark.parametrize(
+    ("check_id", "verwacht"),
+    [
+        ("EXT-001", ["1"]),
+        ("EXT-002", ["2", "3"]),
+        ("EXT-003", ["2"]),
+        ("EXT-005", ["C", "E", "F", "L1", "L2"]),
+        ("EXT-006", ["deksel-los"]),
+        ("EXT-007", ["L1"]),
+        ("EXT-008", ["bag-verweg"]),
+        ("HGT-001", ["B"]),
+        ("HGT-002", ["C"]),
+        ("HGT-003", ["1", "2"]),
+    ],
+)
+def test_defect_wordt_gevonden(
+    check_id: str, verwacht: list[str], config: CheckConfig, bronnen: ExternalData
+) -> None:
+    assert labels(uitkomst(check_id, config, bronnen)) == verwacht
+
+
+@pytest.mark.parametrize("check_id", [*EXT_IDS, *AHN_IDS])
+def test_zonder_bronnen_wordt_er_niets_getoetst(check_id: str, config: CheckConfig) -> None:
+    outcome = uitkomst(check_id, config, None)
+
+    assert outcome.findings == []
+    assert outcome.examined == 0
+    assert any("geen externe bronnen" in note for note in outcome.notes)
+
+
+@pytest.mark.parametrize("check_id", [*EXT_IDS, *AHN_IDS])
+def test_objecten_buiten_het_studiegebied_krijgen_geen_uitslag(
+    check_id: str, config: CheckConfig, bronnen: ExternalData
+) -> None:
+    # Put D ligt op (2000, 2000), ruim buiten het fixturegebied. Hij mag nergens
+    # als bevinding opduiken, ook al wijkt zijn maaiveld 89 m van het AHN af.
+    outcome = uitkomst(check_id, config, bronnen)
+
+    assert "D" not in labels(outcome)
+
+
+def test_buiten_studiegebied_wordt_geteld_in_de_toelichting(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    outcome = uitkomst("HGT-001", config, bronnen)
+
+    assert any("Buiten studiegebied: 1 van de 8 putten" in note for note in outcome.notes)
+
+
+def test_nodata_cellen_worden_gemeld(config: CheckConfig, bronnen: ExternalData) -> None:
+    # Put F ligt op de nodata-vlek; zonder rasterwaarde is er niets te vergelijken.
+    outcome = uitkomst("HGT-001", config, bronnen)
+
+    assert "F" not in labels(outcome)
+    assert any("nodata" in note for note in outcome.notes)
+
+
+def test_typeringspoort_haalt_objecten_uit_de_uitslag(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    dataset = load_dataset(SCENARIO)
+    verdacht = next(uri for uri, node in dataset.nodes.items() if node.label == "C")
+    context = CheckContext(
+        dataset=dataset,
+        config=config,
+        bronnen=bronnen,
+        unreliable_objects=frozenset({verdacht}),
+    )
+    outcome = run_checks(context, ["HGT-002"]).outcomes[0]
+
+    assert outcome.findings == []
+    assert any(MARKERING_NIET_TOETSBAAR in note for note in outcome.notes)
+
+
+def test_ext003_zwijgt_over_een_duiker(config: CheckConfig, bronnen: ExternalData) -> None:
+    # Streng 3 is een duiker en kruist water-2; EXT-002 meldt hem wel, EXT-003 niet.
+    assert "3" in labels(uitkomst("EXT-002", config, bronnen))
+    assert "3" not in labels(uitkomst("EXT-003", config, bronnen))
+
+
+def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: ExternalData) -> None:
+    outcome = uitkomst("EXT-004", config, bronnen)
+
+    assert outcome.findings == []
+    assert outcome.skeleton == MARKERING_BUITEN_SCOPE
+    assert any("BRK" in note for note in outcome.notes)
+
+
+def test_ontbrekende_laag_laat_de_check_overslaan(config: CheckConfig) -> None:
+    # Zonder BGT-bestand is er geen putdeksellaag; EXT-005 hoort dat te melden in
+    # plaats van elke put als dekselloos te bestempelen.
+    basis = load_check_config().bronnen
+    zonder_bgt = basis.model_copy(
+        update={"map": ".", "bgt": None, "studiegebied": "studiegebied.gpkg", "ahn_dtm": "ahn.tif"}
+    )
+    bronnen = load_external_data(zonder_bgt, GIS_DIR)
+    outcome = uitkomst("EXT-005", config, bronnen)
+
+    assert outcome.findings == []
+    assert outcome.examined == 0
+    assert any("laag niet aanwezig in aangeleverde data" in note for note in outcome.notes)
+
+
+def test_ext008_meldt_de_benadering_met_pandgeometrie(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    outcome = uitkomst("EXT-008", config, bronnen)
+    bevinding = outcome.findings[0]
+
+    assert bevinding.details["verblijfsobjecten"] == 4
+    assert "benadering" in bevinding.message
+    assert any("verblijfsobjecten" in note for note in outcome.notes)
+
+
+def test_externe_bevindingen_dragen_een_eigen_locatie(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    # EXT-006 en EXT-008 melden objecten die niet uit de GWSW-dataset komen; zonder
+    # eigen coordinaat zouden ze bij de afbakening tot een studiegebied wegvallen.
+    for check_id in ("EXT-006", "EXT-008"):
+        for bevinding in uitkomst(check_id, config, bronnen).findings:
+            assert bevinding.location is not None
+
+
+def test_hgt003_meldt_beide_richtingen(config: CheckConfig, bronnen: ExternalData) -> None:
+    meldingen = {
+        bevinding.object_label: bevinding.message
+        for bevinding in uitkomst("HGT-003", config, bronnen).findings
+    }
+
+    assert "boven het AHN-maaiveld" in meldingen["1"]
+    assert "onder het AHN-maaiveld" in meldingen["2"]

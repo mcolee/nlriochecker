@@ -122,6 +122,7 @@ class CheckRun:
     unreliable_labels: int = 0
     unreliable_labels_in_dataset: int = 0
     study_area: StudyArea | None = None
+    bronnen: ExternalData | None = None
 
     @property
     def findings(self) -> list[Finding]:
@@ -170,6 +171,7 @@ class CheckRun:
             unreliable_labels=self.unreliable_labels,
             unreliable_labels_in_dataset=self.unreliable_labels_in_dataset,
             study_area=area,
+            bronnen=self.bronnen,
         )
 
 
@@ -293,4 +295,5 @@ def run_checks(
         typing_gate_applied=typing_gate_applied,
         unreliable_labels=len(context.unreliable_objects),
         unreliable_labels_in_dataset=len(context.matched_objects()),
+        bronnen=context.bronnen,
     )

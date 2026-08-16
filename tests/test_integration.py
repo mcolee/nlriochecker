@@ -178,3 +178,74 @@ def test_studiegebied_koekangerveld(tmp_path: Path) -> None:
     tekst = markdown_path.read_text(encoding="utf-8")
     assert "Studiegebied" in tekst
     assert "buiten het gebied" in tekst
+
+
+AHN_TIF = GIS_DIR / "ahn5_dtm_koekangerveld.tif"
+
+
+def _koekangerveld_bronnen():
+    """Leest de echte externe bronnen uit data/gis."""
+    from gwswpijplijn.externedata import load_external_data
+
+    basis = load_check_config().bronnen
+    return load_external_data(basis.model_copy(update={"map": "."}), GIS_DIR)
+
+
+@pytest.mark.skipif(not AHN_TIF.exists(), reason="de externe bronnen staan niet in data/gis/")
+def test_externe_bronnen_van_koekangerveld() -> None:
+    """Legt de inventarisatie uit docs/gis-inventarisatie.md vast."""
+    bronnen = _koekangerveld_bronnen()
+
+    assert bronnen.extent is not None
+    assert bronnen.extent.area / 10_000 == pytest.approx(43.2, abs=0.5)
+    assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
+        "bgt_pand": 199,
+        "bgt_water": 327,
+        "bgt_bouwwerk": 52,
+        "bag_pand": 166,
+        "nwb_wegvak": 13,
+    }
+    # De BGT-laag `put` bestaat wel maar is leeg; EXT-005 en EXT-006 worden daarom
+    # overgeslagen in plaats van elke put als dekselloos te melden.
+    assert bronnen.layer("bgt_putdeksel") is None
+    assert any("bgt_putdeksel" in ontbreekt for ontbreekt in bronnen.missing)
+    # Alles staat al in RD New; er is niets geherprojecteerd.
+    assert all(laag.reprojected_from is None for laag in bronnen.layers.values())
+    assert bronnen.raster is not None
+    assert bronnen.raster.crs == "EPSG:28992"
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DE_WOLDEN.exists() and AHN_TIF.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden-OroX of de externe bronnen staan niet in data/",
+)
+def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
+    """De EXT- en AHN-checks draaien op de Koekangerveld-uitsnede.
+
+    De GWSW-dataset beslaat de hele gemeente en de bronnen alleen deze kern; het
+    overgrote deel van de objecten hoort daarom de status *buiten studiegebied* te
+    krijgen en geen uitslag.
+    """
+    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    context = CheckContext(
+        dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
+    )
+    ids = ["EXT-001", "EXT-002", "EXT-003", "EXT-007", "EXT-008", "HGT-001", "HGT-002", "HGT-003"]
+    run = run_checks(context, ids)
+    per_check = {outcome.check_id: outcome for outcome in run.outcomes}
+
+    # Maar een fractie van de dataset ligt binnen het studiegebied.
+    assert per_check["EXT-001"].examined == 29
+    assert per_check["HGT-001"].examined == 40
+    for outcome in run.outcomes:
+        if outcome.check_id.startswith("HGT") or outcome.check_id in {"EXT-001", "EXT-002"}:
+            assert any("Buiten studiegebied" in note for note in outcome.notes)
+
+    # Geen enkele put wijkt meer dan 25 cm van het AHN5 af, 15 wel meer dan 5 cm.
+    assert len(per_check["HGT-002"].findings) == 0
+    assert len(per_check["HGT-001"].findings) == 15
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+    assert "Buiten studiegebied" in tekst
