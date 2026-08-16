@@ -78,6 +78,7 @@ def test_lagen_staan_in_gpkg_contents(tmp_path: Path) -> None:
     assert soorten["putten"] == "features"
     assert soorten["strengen"] == "features"
     assert soorten["meldinglocaties"] == "features"
+    assert soorten["mechanisch_riool"] == "features"
     assert soorten["meldingen"] == "attributes"
     assert soorten["overzicht_checks"] == "attributes"
     assert soorten["gwsw_run"] == "attributes"
@@ -174,7 +175,12 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
         pad, "select f_table_name, styleQML, useAsDefault from layer_styles order by f_table_name"
     )
 
-    assert [naam for naam, _, _ in stijlen] == ["meldinglocaties", "putten", "strengen"]
+    assert [naam for naam, _, _ in stijlen] == [
+        "mechanisch_riool",
+        "meldinglocaties",
+        "putten",
+        "strengen",
+    ]
     for _, qml, standaard in stijlen:
         assert standaard == 1
         ET.fromstring(qml)
@@ -297,6 +303,34 @@ def test_meldingen_dragen_fragment_en_uri(tmp_path: Path) -> None:
         assert uri.endswith(f"#{feature_id}")
         assert "#" not in tweede_id
         assert tweede_uri.endswith(f"#{tweede_id}")
+
+
+def test_mechanische_leidingen_staan_in_een_eigen_laag(tmp_path: Path) -> None:
+    pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
+
+    soorten = [rij[0] for rij in _rijen(pad, "select objecttype from mechanisch_riool")]
+    omschrijvingen = {rij[0] for rij in _rijen(pad, "select omschrijving from mechanisch_riool")}
+
+    assert soorten == ["Persleiding"]
+    assert omschrijvingen == {"Mechanisch riool: niet geanalyseerd"}
+
+
+def test_mechanische_leidingen_staan_niet_meer_bij_de_strengen(tmp_path: Path) -> None:
+    pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
+
+    soorten = {rij[0] for rij in _rijen(pad, "select objecttype from strengen")}
+
+    assert "Persleiding" not in soorten
+
+
+def test_runmetadata_telt_de_lagen(tmp_path: Path) -> None:
+    pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
+
+    ((putten, strengen, mechanisch),) = _rijen(
+        pad, "select n_putten, n_strengen, n_mechanisch from gwsw_run"
+    )
+
+    assert (putten, strengen, mechanisch) == (4, 1, 1)
 
 
 def test_featurelagen_dragen_het_stelseltype(tmp_path: Path) -> None:

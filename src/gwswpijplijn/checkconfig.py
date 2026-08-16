@@ -25,6 +25,8 @@ class ClassRoots(BaseModel):
     # TOP-001 vraagt of er *enige* streng aansluit, niet of er een vrijvervalstreng
     # aansluit; een put aan een persleiding is niet losliggend.
     streng: list[str] = Field(default_factory=lambda: ["Leiding"])
+    # Mechanisch riool: buiten scope voor de checks, wel zichtbaar in de GIS-uitvoer.
+    mechanisch: list[str] = Field(default_factory=list)
     # NET-001 en NET-002 vragen elk om een ander soort eindpunt; een vuilwaterstreng
     # die alleen een uitlaat bereikt is niet in orde.
     afvoer_eindpunt: list[str] = Field(default_factory=list)

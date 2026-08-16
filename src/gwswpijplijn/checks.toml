@@ -11,6 +11,11 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
+# Mechanisch riool valt buiten scope (zie het checkregister). Deze klassen komen
+# niet in de analyse maar wel in de GIS-uitvoer, in een eigen grijze laag; een leeg
+# kaartbeeld daar zou anders als "geen gebreken" lezen. De namen zijn geverifieerd
+# tegen de export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
+mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. 'Overnamepunt' bestaat
 # niet als klasse in de GWSW-ontologie; dat is open punt 6 uit het checkregister.
 # Pompunit staat erbij omdat een vrijvervalstreng die op een drukrioleringspomp

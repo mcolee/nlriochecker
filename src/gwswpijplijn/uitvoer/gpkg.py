@@ -26,7 +26,7 @@ from pathlib import Path
 
 from shapely.geometry.base import BaseGeometry
 
-from gwswpijplijn.checkconfig import load_check_config
+from gwswpijplijn.checkconfig import CheckConfig, load_check_config
 from gwswpijplijn.checks import CheckRun, Severity
 from gwswpijplijn.errors import PipelineError
 from gwswpijplijn.uitvoer.identiteit import kort
@@ -42,7 +42,9 @@ USER_VERSION = 10300
 
 CATEGORIEEN = ("TOP", "ADM", "ATTR", "HGT", "NET", "RVZ", "BTR", "EXT", "NULMETING")
 
-FEATURELAGEN = ("putten", "strengen", "meldinglocaties")
+FEATURELAGEN = ("putten", "strengen", "meldinglocaties", "mechanisch_riool")
+
+MECHANISCH_OMSCHRIJVING = "Mechanisch riool: niet geanalyseerd"
 
 RD_WKT = (
     'PROJCS["Amersfoort / RD New",GEOGCS["Amersfoort",DATUM["Amersfoort",'
@@ -61,6 +63,19 @@ class _Kolom:
 
     naam: str
     type: str
+
+
+@dataclass(frozen=True)
+class _LaagTellingen:
+    """Het aantal objecten dat daadwerkelijk in elke featurelaag terechtkwam.
+
+    Voor de runmetadata: niet het aantal in de dataset, maar wat er na het
+    studiegebied en het ontbreken van geometrie echt is weggeschreven.
+    """
+
+    putten: int
+    strengen: int
+    mechanisch: int
 
 
 def schrijf_geopackage(
@@ -83,10 +98,10 @@ def schrijf_geopackage(
     verbinding = sqlite3.connect(doel)
     try:
         _leg_fundament(verbinding)
-        _schrijf_features(verbinding, run, meldingen, binnen, run_datum)
+        tellingen = _schrijf_features(verbinding, run, meldingen, binnen, run_datum)
         _schrijf_meldingen(verbinding, meldingen)
         _schrijf_overzicht(verbinding, run, meldingen)
-        _schrijf_runmetadata(verbinding, run, meldingen, run_datum)
+        _schrijf_runmetadata(verbinding, run, meldingen, run_datum, tellingen)
         _schrijf_stijlen(verbinding)
         verbinding.commit()
     finally:
@@ -247,14 +262,28 @@ def _samenvatting_kolommen() -> list[_Kolom]:
     ]
 
 
+def _mechanische_uris(run: CheckRun, config: CheckConfig) -> frozenset[str]:
+    """De verbindingen die tot het mechanische stelsel horen.
+
+    Ze doen niet mee aan de checks en horen dus niet tussen de strengen te staan,
+    waar 'geen melding' ten onrechte als 'getoetst en in orde' leest.
+    """
+    return frozenset(
+        uri
+        for wortel in config.klassen.mechanisch
+        for uri in run.dataset.of_class(wortel)
+        if uri in run.dataset.conduits
+    )
+
+
 def _schrijf_features(
     verbinding: sqlite3.Connection,
     run: CheckRun,
     meldingen: list[Melding],
     binnen: frozenset[str] | None,
     run_datum: date,
-) -> None:
-    """Schrijft `putten`, `strengen` en `meldinglocaties`."""
+) -> _LaagTellingen:
+    """Schrijft `putten`, `strengen`, `mechanisch_riool` en `meldinglocaties`."""
     kolommen = _samenvatting_kolommen()
     _maak_featurelaag(
         verbinding, "putten", "POINT", kolommen, "Knooppunten met een samenvatting per object."
@@ -270,10 +299,17 @@ def _schrijf_features(
     per_object = _meldingen_per_object(meldingen)
     metadata = _metadata(run, run_datum)
     stelsels = _stelseltypen(run)
+    config = run.config if run.config is not None else load_check_config()
+    mechanisch = _mechanische_uris(run, config)
 
+    tellingen: dict[str, int] = {}
     for laag, verzameling, geometrie_veld in (
         ("putten", run.dataset.nodes, "point"),
-        ("strengen", run.dataset.conduits, "line"),
+        (
+            "strengen",
+            {uri: c for uri, c in run.dataset.conduits.items() if uri not in mechanisch},
+            "line",
+        ),
     ):
         rijen = []
         grenzen: list[tuple[float, float, float, float]] = []
@@ -304,8 +340,86 @@ def _schrijf_features(
                 f'insert into "{laag}" (geom, {velden}) values ({plaatshouders})', rijen
             )
         _zet_omhullende(verbinding, laag, grenzen)
+        tellingen[laag] = len(rijen)
 
+    tellingen["mechanisch"] = _schrijf_mechanisch(verbinding, run, binnen, mechanisch, metadata)
     _schrijf_meldinglocaties(verbinding, meldingen)
+
+    return _LaagTellingen(
+        putten=tellingen["putten"],
+        strengen=tellingen["strengen"],
+        mechanisch=tellingen["mechanisch"],
+    )
+
+
+def _mechanisch_kolommen() -> list[_Kolom]:
+    """De smalle kolomset van de laag `mechanisch_riool`."""
+    return [
+        _Kolom("feature_id", "text"),
+        _Kolom("label", "text"),
+        _Kolom("objecttype", "text"),
+        _Kolom("omschrijving", "text"),
+        _Kolom("gebied", "text"),
+        _Kolom("run_datum", "text"),
+        _Kolom("dataset_versie", "text"),
+        _Kolom("gwsw_uri", "text"),
+    ]
+
+
+def _schrijf_mechanisch(
+    verbinding: sqlite3.Connection,
+    run: CheckRun,
+    binnen: frozenset[str] | None,
+    mechanisch: frozenset[str],
+    metadata: tuple[str, str, str],
+) -> int:
+    """Schrijft de laag `mechanisch_riool` en geeft het aantal weggeschreven objecten terug.
+
+    Mechanisch riool valt buiten scope voor de checks (zie het checkregister), maar
+    hoort wel in het kaartbeeld: een lege laag zou als 'geen mechanisch riool
+    aanwezig' lezen, en dat is niet wat er onderzocht is.
+    """
+    kolommen = _mechanisch_kolommen()
+    _maak_featurelaag(
+        verbinding,
+        "mechanisch_riool",
+        "LINESTRING",
+        kolommen,
+        "Mechanisch riool (druk-, pers- en vacuumleidingen): niet getoetst.",
+    )
+
+    run_datum_iso, dataset_versie, _register_versie = metadata
+    rijen = []
+    grenzen: list[tuple[float, float, float, float]] = []
+    for uri in mechanisch:
+        if binnen is not None and uri not in binnen:
+            continue
+        object_ = run.dataset.conduits[uri]
+        geometrie = object_.line
+        if geometrie is None or geometrie.is_empty:
+            continue
+        grenzen.append(geometrie.bounds)
+        rijen.append(
+            (
+                _blob(geometrie),
+                kort(uri),
+                getattr(object_, "label", ""),
+                run.dataset.beheerobjecttype(uri),
+                MECHANISCH_OMSCHRIJVING,
+                _gebied(run),
+                run_datum_iso,
+                dataset_versie,
+                uri,
+            )
+        )
+    if rijen:
+        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
+        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
+        verbinding.executemany(
+            f'insert into "mechanisch_riool" (geom, {velden}) values ({plaatshouders})', rijen
+        )
+    _zet_omhullende(verbinding, "mechanisch_riool", grenzen)
+    return len(rijen)
 
 
 def _samenvatting(
@@ -521,6 +635,7 @@ def _schrijf_runmetadata(
     run: CheckRun,
     meldingen: list[Melding],
     run_datum: date,
+    tellingen: _LaagTellingen,
 ) -> None:
     """Schrijft een enkele rij met alles wat het bestand herleidbaar maakt."""
     kolommen = [
@@ -539,6 +654,9 @@ def _schrijf_runmetadata(
         _Kolom("grens_oppervlak_ha", "real"),
         _Kolom("grens_vlakken", "integer"),
         _Kolom("gebied", "text"),
+        _Kolom("n_putten", "integer"),
+        _Kolom("n_strengen", "integer"),
+        _Kolom("n_mechanisch", "integer"),
     ]
     _maak_attribuuttabel(verbinding, "gwsw_run", kolommen, "Herkomst en bereik van deze run.")
 
@@ -565,6 +683,9 @@ def _schrijf_runmetadata(
             round(gebied.area_ha, 2) if gebied is not None else None,
             gebied.feature_count if gebied is not None else None,
             _gebied(run),
+            tellingen.putten,
+            tellingen.strengen,
+            tellingen.mechanisch,
         ),
     )
 

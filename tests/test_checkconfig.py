@@ -19,6 +19,17 @@ def test_standaardconfig_laadt() -> None:
     assert config.drempels.dubbele_put_tolerantie_m == 0.30
 
 
+def test_mechanisch_riool_is_geconfigureerd() -> None:
+    """Persleiding, drukleiding en vacuumleiding vallen buiten scope voor de checks.
+
+    Ze moeten wel als klassenlijst beschikbaar zijn zodat de GIS-uitvoer ze in een
+    eigen laag kan zetten in plaats van tussen de getoetste strengen.
+    """
+    config = load_check_config()
+
+    assert config.klassen.mechanisch == ["Persleiding", "Drukleiding", "Vacuumleiding"]
+
+
 def test_netwerkknopen_bundelen_putten_en_eindpunten() -> None:
     knopen = load_check_config().klassen.netwerkknopen
 
