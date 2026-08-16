@@ -12,12 +12,13 @@ from gwswpijplijn.checkconfig import load_check_config
 from gwswpijplijn.checks import REGISTRY, CheckContext, Severity, run_checks
 from gwswpijplijn.comparison import compare_metingen
 from gwswpijplijn.config import load_coverage_config
-from gwswpijplijn.coverage import assess_coverage
+from gwswpijplijn.coverage import assess_coverage, verify_register
 from gwswpijplijn.dataset import GwswDataset, load_dataset
 from gwswpijplijn.errors import PipelineError
 from gwswpijplijn.externedata import load_external_data
 from gwswpijplijn.meting import laad_nulmeting
 from gwswpijplijn.plausibiliteit import load_plausibility
+from gwswpijplijn.register import Register, default_register_path, load_register
 from gwswpijplijn.reporting import (
     write_check_report,
     write_comparison_reports,
@@ -129,6 +130,32 @@ def _studiegebied_options():
     return versier
 
 
+def _checkregister_option():
+    """Bouwt de optie voor het checkregister waartegen de mapping geijkt wordt."""
+    return click.option(
+        "--checkregister",
+        "register_path",
+        type=RAPPORT_TYPE,
+        help=(
+            "Checkregister (Markdown) om de dekkingmapping tegen te ijken. Zonder deze "
+            "optie wordt het register uit data/ gebruikt als dat er staat."
+        ),
+    )
+
+
+def _laad_register(register_path: Path | None) -> Register | None:
+    """Leest het checkregister; zonder pad de kopie in data/ als die er staat.
+
+    Ontbreekt het register, dan wordt de ijking overgeslagen en meldt het rapport
+    dat. Stil doorgaan zou een dekking suggereren die niemand vergeleken heeft.
+    """
+    if register_path is None:
+        register_path = default_register_path()
+        if not register_path.exists():
+            return None
+    return load_register(register_path)
+
+
 def _projectconfig_option():
     """Bouwt de optie voor de projectconfiguratie."""
     return click.option(
@@ -196,6 +223,7 @@ def _echo_meting(analyse: MetingAnalysis, dataset: GwswDataset | None) -> None:
 @_dataset_options()
 @_projectconfig_option()
 @_config_option()
+@_checkregister_option()
 @_output_option("Map waarin de samenvatting en de geaggregeerde CSV worden geschreven.")
 def analyze_command(
     shacl_paths: tuple[Path, ...],
@@ -203,6 +231,7 @@ def analyze_command(
     ontology_paths: tuple[Path, ...],
     project_config_path: Path | None,
     config_path: Path | None,
+    register_path: Path | None,
     output_dir: Path,
 ) -> None:
     """Analyseert een SHACL-nulmeting en schrijft samenvatting en aggregaties weg."""
@@ -210,7 +239,10 @@ def analyze_command(
         _, _, analyse, dataset = _laad_meting(
             shacl_paths, project_config_path, dataset_path, ontology_paths
         )
-        coverage = assess_coverage(analyse, load_coverage_config(config_path))
+        config = load_coverage_config(config_path)
+        register = _laad_register(register_path)
+        verify_register(config, register, eisen=True)
+        coverage = assess_coverage(analyse, config, register)
         markdown_path, csv_path = write_reports(analyse, output_dir, coverage)
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -228,6 +260,7 @@ def analyze_command(
 @_dataset_options()
 @_projectconfig_option()
 @_config_option()
+@_checkregister_option()
 @_output_option("Map waarin het dekkingrapport wordt geschreven.")
 def coverage_command(
     shacl_paths: tuple[Path, ...],
@@ -235,6 +268,7 @@ def coverage_command(
     ontology_paths: tuple[Path, ...],
     project_config_path: Path | None,
     config_path: Path | None,
+    register_path: Path | None,
     output_dir: Path,
 ) -> None:
     """Toetst of de nulmeting de geschrapte checks in deze dataset daadwerkelijk raakt."""
@@ -242,7 +276,12 @@ def coverage_command(
         _, _, analyse, _ = _laad_meting(
             shacl_paths, project_config_path, dataset_path, ontology_paths
         )
-        result = assess_coverage(analyse, load_coverage_config(config_path))
+        config = load_coverage_config(config_path)
+        register = _laad_register(register_path)
+        # Loopt de mapping uit de pas met het register, dan zegt de rest van dit
+        # rapport niets meer; dan is stoppen eerlijker dan een dekking tonen.
+        verify_register(config, register, eisen=True)
+        result = assess_coverage(analyse, config, register)
         markdown_path, csv_path = write_coverage_report(result, output_dir)
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -251,10 +290,23 @@ def coverage_command(
         f"Dataset {result.dataset}, checkregister {result.config.checkregister_versie}: "
         f"{len(result.checks)} geschrapte checks getoetst"
     )
+    if register is None:
+        click.echo("  Geen checkregister gevonden; de mapping is er niet tegen geijkt.")
     for check in result.checks:
         gevonden = ", ".join(check.evidence_cfks) or "geen bewijs"
         voorbehoud = "" if check.typing_reliable else "  [typeringsvoorbehoud]"
         click.echo(f"  {check.mapping.id:9s} {check.verdict.value:14s} {gevonden}{voorbehoud}")
+    for afwijking in result.discrepanties:
+        click.echo(
+            f"  Let op: {afwijking.check_id} steunt op {afwijking.patroon}, die wel in "
+            f"{', '.join(afwijking.met_meldingen)} meldingen geeft en niet in "
+            f"{', '.join(afwijking.zonder_meldingen)}."
+        )
+    if result.vervallen:
+        click.echo(
+            f"  Dekking niet aangetoond voor: {', '.join(result.vervallen)}. "
+            "Die checks zitten niet in de engine."
+        )
     click.echo(f"Geschreven: {markdown_path}")
     click.echo(f"Geschreven: {csv_path}")
 

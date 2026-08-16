@@ -27,3 +27,7 @@ class DatasetError(PipelineError):
 
 class StudyAreaError(PipelineError):
     """Het studiegebied ontbreekt, is onleesbaar of staat in een ander stelsel."""
+
+
+class CoverageError(PipelineError):
+    """De dekkingmapping loopt uit de pas met het checkregister."""

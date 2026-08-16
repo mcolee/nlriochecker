@@ -115,7 +115,9 @@ def _render_markdown(analyse: MetingAnalysis, coverage: CoverageResult | None = 
 
     if coverage is not None:
         lines += ["", "## Dekking van de geschrapte checks", ""]
+        lines += _register_section(coverage)
         lines += _coverage_section(coverage)
+        lines += _discrepancy_section(coverage)
 
     for cfk in meting.cfks:
         deel = analyse.per_cfk[cfk]
@@ -238,7 +240,9 @@ def _render_coverage(result: CoverageResult) -> str:
         f"typeringsdrempel {result.config.drempels.typeringsscore_minimum:.1f}%.",
         "",
     ]
+    lines += _register_section(result)
     lines += _coverage_section(result)
+    lines += _discrepancy_section(result)
 
     for check in result.checks:
         lines += ["", f"## {check.mapping.id} — {check.mapping.onderwerp}", ""]
@@ -265,6 +269,61 @@ def _render_coverage(result: CoverageResult) -> str:
             ]
 
     return "\n".join(lines) + "\n"
+
+
+def _register_section(result: CoverageResult) -> list[str]:
+    """Meldt of de dekkingmapping nog bij het checkregister past.
+
+    Zonder deze regel leest het rapport als een geverifieerde dekking, ook wanneer
+    het register intussen is opgeschoven en niemand de mapping heeft bijgewerkt.
+    """
+    controle = result.registercontrole
+    if controle is None or not controle.uitgevoerd:
+        return [
+            "> **Niet gecontroleerd:** de dekkingmapping is niet tegen het checkregister "
+            "gelegd (geen register meegegeven). Of de mapping nog bij de registerversie "
+            "past waarop de schrapronde geverifieerd is, staat hier dus niet vast.",
+            "",
+        ]
+    if controle.klopt:
+        return [
+            f"De dekkingmapping past bij `{controle.register}` (versie "
+            f"{controle.register_versie}): elke geschrapte check heeft een sentinel en "
+            "omgekeerd.",
+            "",
+        ]
+    regels = "".join(f"\n> - {regel}" for regel in controle.toelichting())
+    return [
+        f"> **Dekking vervallen:** de mapping loopt uit de pas met `{controle.register}`.{regels}",
+        ">",
+        "> Zolang dit niet is opgelost, is de dekking van de geschrapte checks niet "
+        "aangetoond. Die checks zitten niet in de engine, dus er kijkt niets anders naar.",
+        "",
+    ]
+
+
+def _discrepancy_section(result: CoverageResult) -> list[str]:
+    """Meldt bewijsvormen die niet in alle vereiste CFK's meldingen opleveren."""
+    if not result.discrepanties:
+        return []
+    lines = [
+        "",
+        "### Vormen die niet in alle vereiste CFK's vuren",
+        "",
+        "Alle CFK's toetsen hetzelfde RDF-bestand. Vuurt een vorm in de ene wel en in de "
+        'andere niet, dan verschilt de vormverzameling en rust een claim "beide CFK\'s" '
+        "in werkelijkheid op een deel ervan.",
+        "",
+        "| Check | Vorm | Wel meldingen | Geen meldingen |",
+        "| --- | --- | --- | --- |",
+    ]
+    for afwijking in result.discrepanties:
+        lines.append(
+            f"| {afwijking.check_id} | `{afwijking.patroon}` | "
+            f"{', '.join(afwijking.met_meldingen)} | "
+            f"{', '.join(afwijking.zonder_meldingen)} |"
+        )
+    return lines
 
 
 def _coverage_section(result: CoverageResult) -> list[str]:
