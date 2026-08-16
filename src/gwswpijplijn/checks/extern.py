@@ -18,8 +18,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from shapely.geometry import Point
-
 from gwswpijplijn.checks.base import (
     Check,
     CheckContext,
@@ -827,8 +825,3 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
                 f"het AHN-maaiveld bij put {node.label!r}, meer dan {diepte:g} m."
             )
         return None
-
-
-def _punt(x: float, y: float) -> Point:
-    """Een RD-punt; los gehouden zodat de checks er dezelfde constructor voor gebruiken."""
-    return Point(x, y)

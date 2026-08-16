@@ -88,6 +88,7 @@ def _dataset_options():
     """Bouwt de opties voor de OroX-dataset en de ontologie."""
 
     def versier(functie):
+        """Hangt de dataset- en ontologieopties aan een commando."""
         functie = click.option(
             "--ontologie",
             "ontology_paths",
@@ -110,6 +111,7 @@ def _studiegebied_options():
     """Bouwt de opties voor de afbakening tot een studiegebied."""
 
     def versier(functie):
+        """Hangt de studiegebiedopties aan een commando."""
         functie = click.option(
             "--studiegebied-laag",
             "study_layer",
