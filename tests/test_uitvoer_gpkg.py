@@ -374,3 +374,21 @@ def test_omgekeerd_getekende_streng_meet_het_verval_langs_de_lijn(tmp_path: Path
     # getekend; langs de lijn stijgt de bodem dus.
     assert richting == "tegen"
     assert verval == pytest.approx(-0.50)
+
+
+def test_onbepaalbare_tekenrichting_geeft_onbekend_geen_administratief_terugvalteken(
+    tmp_path: Path,
+) -> None:
+    """Zonder bekende tekenrichting mag de kolom niet alsnog mee/tegen suggereren.
+
+    De streng heeft dezelfde put aan begin- en eindpunt: er is geen van-naar-richting
+    om de getekende lijn tegen af te zetten. Beide BOB's zijn wel ingevuld en
+    verschillend (bob_verval is dus niet None of nul); de reden dat de kolom
+    `onbekend` moet zijn ligt in de tekenrichting, niet in de BOB's.
+    """
+    pad = _schrijf(_run("richting_niet_bepaalbaar_met_bob.ttl"), tmp_path)
+
+    ((richting, verval),) = _rijen(pad, "select richting_bob, bob_verval_m from strengen")
+
+    assert richting == "onbekend"
+    assert verval is None

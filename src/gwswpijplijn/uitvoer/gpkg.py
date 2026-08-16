@@ -251,12 +251,23 @@ def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple
     kaart volgt de getekende lijn. Loopt de lijn andersom dan de administratie, dan
     keert het teken om -- anders zou de kaart het tegenovergestelde tonen van wat er
     staat.
+
+    Is de tekenrichting niet te bepalen (`richting_van_geometrie` geeft None: geen
+    lijngeometrie, geen herleidbare putten, of dezelfde put aan beide zijden), dan is
+    er geen richting om het administratieve verval tegen te spiegelen. Dan valt
+    stilzwijgend terugvallen op het administratieve teken *niet* terug op iets
+    juists: de kolom staat gedocumenteerd als het verval langs de getekende lijn, en
+    zonder bekende tekenrichting is er geen waarde die dat eerlijk uitdrukt. De rij
+    krijgt dan `onbekend` met een lege waarde, net als bij een ontbrekend of nul
+    BOB-verval.
     """
     verval = conduit.bob_verval
     if verval is None or verval == 0.0:
         return RICHTING_ONBEKEND, verval
     uitslag = run.dataset.richting_van_geometrie(conduit, config.klassen.netwerkknopen)
-    langs_lijn = -verval if (uitslag is not None and uitslag[0]) else verval
+    if uitslag is None:
+        return RICHTING_ONBEKEND, None
+    langs_lijn = -verval if uitslag[0] else verval
     return (RICHTING_MEE if langs_lijn > 0 else RICHTING_TEGEN), langs_lijn
 
 

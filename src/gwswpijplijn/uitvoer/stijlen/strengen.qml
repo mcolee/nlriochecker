@@ -14,7 +14,7 @@
       <rule key="{aa000000-0000-4000-8000-000000000003}" filter="&quot;ergste_ernst&quot; = 'geen'" symbol="2" label="Geen melding"/>
       <rule key="{aa000000-0000-4000-8000-000000000004}" filter="&quot;richting_bob&quot; = 'mee'" symbol="3" label="BOB volgt de lijnrichting"/>
       <rule key="{aa000000-0000-4000-8000-000000000005}" filter="&quot;richting_bob&quot; = 'tegen'" symbol="4" label="BOB tegen de lijnrichting in"/>
-      <rule key="{aa000000-0000-4000-8000-000000000006}" filter="&quot;richting_bob&quot; = 'onbekend'" symbol="5" label="BOB onbekend of vlak"/>
+      <rule key="{aa000000-0000-4000-8000-000000000006}" filter="&quot;richting_bob&quot; = 'onbekend'" symbol="5" label="BOB-richting niet te bepalen"/>
     </rules>
     <symbols>
       <symbol type="line" name="0" alpha="1"><layer class="SimpleLine"><prop k="line_color" v="203,24,29,255"/><prop k="line_width" v="0.9"/></layer></symbol>
