@@ -101,6 +101,18 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     return bereikt
 
 
+def _bob_tegen_de_richting(netwerk: _Netwerk) -> tuple[int, int]:
+    """Telt de strengen waarvan de BOB stijgt in de aangenomen afvoerrichting."""
+    tegendraads = meetbaar = 0
+    for conduit in netwerk.conduits:
+        if conduit.bob_start is None or conduit.bob_end is None:
+            continue
+        meetbaar += 1
+        if conduit.bob_start < conduit.bob_end:
+            tegendraads += 1
+    return tegendraads, meetbaar
+
+
 def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str]:
     """Beschrijft welke objecten niet in de netwerkanalyse konden meedoen."""
     netwerk = _netwerk(context)
@@ -111,6 +123,16 @@ def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str
             f"{len(netwerk.unconnected)} vrijvervalstrengen hebben geen herleidbare "
             f"put aan beide zijden en vallen buiten de netwerkanalyse: {labels}."
         )
+    tegendraads, meetbaar = _bob_tegen_de_richting(netwerk)
+    if meetbaar and tegendraads:
+        notities.append(
+            f"De analyse neemt aan dat de administratieve begin-naar-eindrichting de "
+            f"afvoerrichting is. Bij {tegendraads} van de {meetbaar} strengen met bekende "
+            f"BOB's stijgt de bodem juist in die richting "
+            f"({100 * tegendraads / meetbaar:.0f}%). NET-003 toetst dat later expliciet; "
+            "tot die tijd verdienen de bereikbaarheidsuitkomsten een slag om de arm."
+        )
+
     if rol is not None and not _eindpunten(context, rol):
         klassen = ", ".join(getattr(context.config.klassen, rol)) or "geen geconfigureerd"
         notities.append(

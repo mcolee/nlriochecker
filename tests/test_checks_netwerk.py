@@ -113,3 +113,24 @@ def test_lozingspunt_telt_niet_als_afvoerpad_voor_vuilwater() -> None:
 
     assert _labels(bestand, "NET-001") == ["1"]
     assert _labels(bestand, "NET-002") == []
+
+
+def test_notitie_meldt_strengen_die_tegen_de_bob_in_lopen(tmp_path: Path) -> None:
+    """De richtingsaanname is een aanname; hij hoort meetbaar in het rapport."""
+    bron = (TTL_DIR / "net_schoon.ttl").read_text(encoding="utf-8")
+    # Geef streng "1" een stijgende BOB in de aangenomen afvoerrichting.
+    bron += (
+        "\n:L1_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 10.0 ] .\n"
+        ":L1_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 11.0 ] .\n"
+        ":L2_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 11.0 ] .\n"
+        ":L2_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 10.0 ] .\n"
+    )
+    pad = tmp_path / "bob.ttl"
+    pad.write_text(bron, encoding="utf-8")
+
+    dataset = load_dataset(pad)
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    outcome = run_checks(context, ["NET-001"]).outcomes[0]
+
+    assert any("stijgt de bodem juist in die richting" in n for n in outcome.notes)
+    assert any("1 van de 2" in n for n in outcome.notes)
