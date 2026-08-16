@@ -596,6 +596,7 @@ def _render_checks(run: CheckRun) -> str:
         ]
 
     lines += _bronnen_section(run)
+    lines += _karakteristiek_section(run)
 
     if run.dataset.ontologies:
         namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)
@@ -660,6 +661,70 @@ def _render_checks(run: CheckRun) -> str:
 
     lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
     return "\n".join(lines) + "\n"
+
+
+def _karakteristiek_section(run: CheckRun) -> list[str]:
+    """Beschrijft eigenschappen van de dataset die de bevindingen kleuren.
+
+    Geen bevindingen: datums die allemaal op 1 januari vallen en registraties die
+    expliciet "niet achterhaald" zeggen, zijn niet per object te herstellen. Ze
+    bepalen wel hoe de rest van dit rapport gelezen moet worden, en ze staan hier
+    daarom als samenvattende regel in plaats van als duizenden meldingen.
+    """
+    karakteristiek = run.karakteristiek
+    if karakteristiek is None or (not karakteristiek.datums and not karakteristiek.inwinning):
+        return []
+
+    lines = ["**Datakarakteristieken**", ""]
+
+    if karakteristiek.datums:
+        lines += [
+            "| Datumkenmerk | Waarden | Op 1 januari | Precisie |",
+            "| --- | ---: | ---: | --- |",
+        ]
+        for precisie in karakteristiek.datums:
+            lines.append(
+                f"| {precisie.kenmerk} | {precisie.aantal} | {precisie.op_jaargrens} "
+                f"({precisie.aandeel:.1f}%) | "
+                f"{'jaar' if precisie.jaarprecisie else 'dag'} |"
+            )
+        jaar = karakteristiek.jaarprecisie
+        if jaar:
+            namen = ", ".join(precisie.kenmerk for precisie in jaar)
+            lines += [
+                "",
+                f"> Elke waarde van {namen} valt op 1 januari: alleen het jaartal draagt "
+                "informatie. Leeftijden en tijdsverschillen uit deze dataset gelden dus op "
+                "jaarniveau; een uitkomst op dagniveau zou een precisie suggereren die de "
+                "bron niet heeft.",
+            ]
+        lines += [""]
+
+    if karakteristiek.inwinning:
+        lines += [
+            "| Hoogtekenmerk | Waarden | Met inwinningswijze | Waarvan expliciet onbekend |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+        for vulling in karakteristiek.inwinning:
+            onbekend = (
+                f"{vulling.onbekend} ({vulling.onbekend_aandeel:.1f}%)"
+                if vulling.met_wijze
+                else "—"
+            )
+            lines.append(
+                f"| {vulling.kenmerk} | {vulling.aantal} | {vulling.met_wijze} | {onbekend} |"
+            )
+        if karakteristiek.onbekend_totaal:
+            lines += [
+                "",
+                f"> {karakteristiek.onbekend_totaal} registraties zeggen expliciet dat de "
+                "inwinning niet te achterhalen is. Die passeren elke kardinaliteits- en "
+                "collectietoets van de nulmeting, maar dragen geen informatie: een "
+                "compleetheidscijfer dat ze meetelt leest te rooskleurig.",
+            ]
+        lines += [""]
+
+    return lines
 
 
 def _bronnen_section(run: CheckRun) -> list[str]:

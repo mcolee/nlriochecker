@@ -13,6 +13,7 @@ from shapely.geometry import Point
 from gwswpijplijn.checkconfig import CheckConfig
 from gwswpijplijn.dataset import GwswDataset
 from gwswpijplijn.externedata import ExternalData
+from gwswpijplijn.karakteristiek import DataCharacteristics, bepaal_karakteristiek
 from gwswpijplijn.plausibiliteit import PlausibilityTables, load_plausibility
 from gwswpijplijn.studiegebied import StudyArea
 
@@ -123,6 +124,7 @@ class CheckRun:
     unreliable_labels_in_dataset: int = 0
     study_area: StudyArea | None = None
     bronnen: ExternalData | None = None
+    karakteristiek: DataCharacteristics | None = None
 
     @property
     def findings(self) -> list[Finding]:
@@ -172,6 +174,7 @@ class CheckRun:
             unreliable_labels_in_dataset=self.unreliable_labels_in_dataset,
             study_area=area,
             bronnen=self.bronnen,
+            karakteristiek=self.karakteristiek,
         )
 
 
@@ -296,4 +299,5 @@ def run_checks(
         unreliable_labels=len(context.unreliable_objects),
         unreliable_labels_in_dataset=len(context.matched_objects()),
         bronnen=context.bronnen,
+        karakteristiek=bepaal_karakteristiek(context.dataset, context.config),
     )

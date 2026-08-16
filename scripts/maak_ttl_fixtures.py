@@ -1048,6 +1048,33 @@ EXT_D = (2000.0, 2000.0)
 EXT_E = (1000.0, 2010.0)
 EXT_F = (1040.0, 2010.0)
 
+# Datakarakteristieken: jaarprecisie van de datums en expliciete onbekend-waarden.
+# Vier strengen met een begindatum, waarvan drie op 1 januari; vier putten met een
+# maaiveldhoogte, waarvan twee met een inwinningswijze en een daarvan NietAchterhaald.
+_KAR_PUNTEN = [(1000.0 + 40.0 * i, 2000.0) for i in range(5)]
+
+FIXTURES["karakteristiek_datums.ttl"] = (
+    "geen; deze fixture legt eigenschappen van de dataset vast, geen defect",
+    hoogteput("KarA", "A", _KAR_PUNTEN[0], mv_wijze="AHN2")
+    + hoogteput("KarB", "B", _KAR_PUNTEN[1], mv_wijze="NietAchterhaald")
+    + hoogteput("KarC", "C", _KAR_PUNTEN[2])
+    + hoogteput("KarD", "D", _KAR_PUNTEN[3])
+    + hoogteput("KarE", "E", _KAR_PUNTEN[4])
+    + hoogteleiding(
+        "KarL1", "1", _KAR_PUNTEN[0:2], "KarA", "KarB", bob=(9.5, 9.4), Begindatum="1975-01-01"
+    )
+    + hoogteleiding(
+        "KarL2", "2", _KAR_PUNTEN[1:3], "KarB", "KarC", bob=(9.4, 9.3), Begindatum="1980-01-01"
+    )
+    + hoogteleiding(
+        "KarL3", "3", _KAR_PUNTEN[2:4], "KarC", "KarD", bob=(9.3, 9.2), Begindatum="1992-01-01"
+    )
+    # Deze ene valt niet op 1 januari, dus de precisie is niet gemaskeerd.
+    + hoogteleiding(
+        "KarL4", "4", _KAR_PUNTEN[3:5], "KarD", "KarE", bob=(9.2, 9.1), Begindatum="2003-07-04"
+    ),
+)
+
 FIXTURES["ext_scenario.ttl"] = (
     "meerdere; deze fixture voedt de EXT- en AHN-checks tegelijk, zie de tests",
     # Put A: maaiveld en deksel gelijk aan het AHN.

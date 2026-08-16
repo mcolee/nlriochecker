@@ -1,0 +1,212 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie, zodat de fixture zonder de volle ontologie werkt.
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:LozePut rdfs:subClassOf gwsw:Rioolput .
+gwsw:Lozingsput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Overstortput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput rdfs:subClassOf gwsw:Put .
+gwsw:Putorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Compartimentorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Bouwwerkorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Leidingorientatie rdfs:subClassOf gwsw:Verbinding .
+gwsw:GemengdRiool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Hemelwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Vuilwaterriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Overstortleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
+gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
+gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
+gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
+gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
+
+# DEFECT: geen; deze fixture legt eigenschappen van de dataset vast, geen defect
+
+:KarA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
+    gwsw:hasAspect :KarA_ori .
+:KarA gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+:KarA_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:KarA_ori gwsw:hasConnection :KarA_maa .
+:KarA_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] ;
+    gwsw:hasAspect :KarA_maa_pun .
+:KarA_maa_pun rdf:type gwsw:Punt ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>0.0 0.0</gml:pos></gml:Point>"^^geo:gmlLiteral ;
+    gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+        gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:AHN2 ] ] .
+
+:KarA gwsw:hasPart :KarA_dek .
+:KarA_dek rdf:type gwsw:Putdeksel ;
+    gwsw:hasAspect :KarA_dek_ori .
+:KarA_dek_ori rdf:type gwsw:Dekselorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
+:KarB rdf:type gwsw:Inspectieput ; rdfs:label "B" ;
+    gwsw:hasAspect :KarB_ori .
+:KarB gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+:KarB_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1040.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:KarB_ori gwsw:hasConnection :KarB_maa .
+:KarB_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] ;
+    gwsw:hasAspect :KarB_maa_pun .
+:KarB_maa_pun rdf:type gwsw:Punt ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>0.0 0.0</gml:pos></gml:Point>"^^geo:gmlLiteral ;
+    gwsw:hasAspect [ rdf:type gwsw:Inwinning ;
+        gwsw:hasAspect [ rdf:type gwsw:WijzeVanInwinning ; gwsw:hasReference gwsw:NietAchterhaald ] ] .
+
+:KarB gwsw:hasPart :KarB_dek .
+:KarB_dek rdf:type gwsw:Putdeksel ;
+    gwsw:hasAspect :KarB_dek_ori .
+:KarB_dek_ori rdf:type gwsw:Dekselorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
+:KarC rdf:type gwsw:Inspectieput ; rdfs:label "C" ;
+    gwsw:hasAspect :KarC_ori .
+:KarC gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+:KarC_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1080.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:KarC_ori gwsw:hasConnection :KarC_maa .
+:KarC_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] .
+
+:KarC gwsw:hasPart :KarC_dek .
+:KarC_dek rdf:type gwsw:Putdeksel ;
+    gwsw:hasAspect :KarC_dek_ori .
+:KarC_dek_ori rdf:type gwsw:Dekselorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
+:KarD rdf:type gwsw:Inspectieput ; rdfs:label "D" ;
+    gwsw:hasAspect :KarD_ori .
+:KarD gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+:KarD_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1120.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:KarD_ori gwsw:hasConnection :KarD_maa .
+:KarD_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] .
+
+:KarD gwsw:hasPart :KarD_dek .
+:KarD_dek rdf:type gwsw:Putdeksel ;
+    gwsw:hasAspect :KarD_dek_ori .
+:KarD_dek_ori rdf:type gwsw:Dekselorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
+:KarE rdf:type gwsw:Inspectieput ; rdfs:label "E" ;
+    gwsw:hasAspect :KarE_ori .
+:KarE gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+:KarE_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1160.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:KarE_ori gwsw:hasConnection :KarE_maa .
+:KarE_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] .
+
+:KarE gwsw:hasPart :KarE_dek .
+:KarE_dek rdf:type gwsw:Putdeksel ;
+    gwsw:hasAspect :KarE_dek_ori .
+:KarE_dek_ori rdf:type gwsw:Dekselorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
+:KarL1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
+    gwsw:hasAspect :KarL1_ori .
+:KarL1 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] ,
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1975-01-01"^^xsd:date ] .
+:KarL1_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :KarL1_b , :KarL1_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1040.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:KarL1_b rdf:type gwsw:BeginpuntLeiding .
+:KarL1_e rdf:type gwsw:EindpuntLeiding .
+:KarL1_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.5 ] .
+:KarL1_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.4 ] .
+:KarL1_b gwsw:hasConnection :KarA_ori .
+:KarL1_e gwsw:hasConnection :KarB_ori .
+:KarL2 rdf:type gwsw:GemengdRiool ; rdfs:label "2" ;
+    gwsw:hasAspect :KarL2_ori .
+:KarL2 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] ,
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date ] .
+:KarL2_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :KarL2_b , :KarL2_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1040.0 2000.0 1080.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:KarL2_b rdf:type gwsw:BeginpuntLeiding .
+:KarL2_e rdf:type gwsw:EindpuntLeiding .
+:KarL2_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.4 ] .
+:KarL2_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.3 ] .
+:KarL2_b gwsw:hasConnection :KarB_ori .
+:KarL2_e gwsw:hasConnection :KarC_ori .
+:KarL3 rdf:type gwsw:GemengdRiool ; rdfs:label "3" ;
+    gwsw:hasAspect :KarL3_ori .
+:KarL3 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] ,
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1992-01-01"^^xsd:date ] .
+:KarL3_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :KarL3_b , :KarL3_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1080.0 2000.0 1120.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:KarL3_b rdf:type gwsw:BeginpuntLeiding .
+:KarL3_e rdf:type gwsw:EindpuntLeiding .
+:KarL3_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.3 ] .
+:KarL3_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.2 ] .
+:KarL3_b gwsw:hasConnection :KarC_ori .
+:KarL3_e gwsw:hasConnection :KarD_ori .
+:KarL4 rdf:type gwsw:GemengdRiool ; rdfs:label "4" ;
+    gwsw:hasAspect :KarL4_ori .
+:KarL4 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] ,
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "2003-07-04"^^xsd:date ] .
+:KarL4_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :KarL4_b , :KarL4_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1120.0 2000.0 1160.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:KarL4_b rdf:type gwsw:BeginpuntLeiding .
+:KarL4_e rdf:type gwsw:EindpuntLeiding .
+:KarL4_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.2 ] .
+:KarL4_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.1 ] .
+:KarL4_b gwsw:hasConnection :KarD_ori .
+:KarL4_e gwsw:hasConnection :KarE_ori .
