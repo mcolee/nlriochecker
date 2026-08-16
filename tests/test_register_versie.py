@@ -8,7 +8,7 @@ getoetst is.
 
 from __future__ import annotations
 
-from gwswpijplijn.checkconfig import load_check_config
+from gwswpijplijn.checkconfig import ReportOptions, load_check_config
 from gwswpijplijn.config import load_coverage_config
 from gwswpijplijn.register import default_register_path, load_register
 
@@ -32,3 +32,11 @@ def test_dekkingmapping_wijst_naar_dezelfde_versie() -> None:
 
 def test_checkconfig_rapporteert_dezelfde_versie() -> None:
     assert load_check_config().rapport.register_versie == f"v{VERWACHTE_VERSIE}"
+
+
+def test_reportoptions_default_wijst_naar_dezelfde_versie() -> None:
+    """Een projectconfig die `register_versie` weglaat valt terug op deze default;
+    die moet dus ook meelopen, anders rapporteert zo'n config stilzwijgend een
+    verouderde versie (ook in de GIS-uitvoer).
+    """
+    assert ReportOptions().register_versie == f"v{VERWACHTE_VERSIE}"
