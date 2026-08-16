@@ -30,6 +30,7 @@ class _Netwerk:
     graph: nx.DiGraph
     conduits: list[Conduit]
     unconnected: list[Conduit]
+    reversed_count: int = 0
 
 
 def _netwerk(context: CheckContext) -> _Netwerk:
@@ -51,19 +52,31 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
         }.values()
     )
 
+    op_bob = context.config.netwerk.richting == "bob"
     graph = nx.DiGraph()
     aangesloten: list[Conduit] = []
     los: list[Conduit] = []
+    omgedraaid = 0
     for conduit in conduits:
         begin = dataset.resolve_network_node(conduit.start_node, wortels)
         eind = dataset.resolve_network_node(conduit.end_node, wortels)
         if begin is None or eind is None:
             los.append(conduit)
             continue
+        if op_bob and _stijgt(conduit):
+            begin, eind = eind, begin
+            omgedraaid += 1
         graph.add_edge(begin, eind, uri=conduit.uri, label=conduit.label)
         aangesloten.append(conduit)
 
-    return _Netwerk(graph=graph, conduits=aangesloten, unconnected=los)
+    return _Netwerk(graph=graph, conduits=aangesloten, unconnected=los, reversed_count=omgedraaid)
+
+
+def _stijgt(conduit: Conduit) -> bool:
+    """Geeft aan of de bodem stijgt van begin- naar eindpunt."""
+    if conduit.bob_start is None or conduit.bob_end is None:
+        return False
+    return conduit.bob_start < conduit.bob_end
 
 
 def _eindpunten(context: CheckContext, rol: str) -> set[str]:
@@ -101,6 +114,29 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     return bereikt
 
 
+def _richtingsverlies(context: CheckContext, netwerk: _Netwerk, rol: str | None) -> tuple[int, int]:
+    """Splitst de onbereikbare knopen in twee oorzaken.
+
+    Een knoop kan een eindpunt missen omdat zijn netwerkdeel er geen bevat, of omdat
+    het eindpunt er wel is maar niet in de gevolgde richting ligt. Dat onderscheid
+    bepaalt of je naar ontbrekende objecten of naar verkeerde richtingen moet kijken.
+    """
+    if rol is None:
+        return 0, 0
+
+    endpoints = _eindpunten(context, rol)
+    bereikt = _bereikbaar_vanaf(netwerk, endpoints)
+
+    zonder = met = 0
+    for deel in nx.weakly_connected_components(netwerk.graph):
+        onbereikt = len(deel - bereikt)
+        if deel & endpoints:
+            met += onbereikt
+        else:
+            zonder += onbereikt
+    return zonder, met
+
+
 def _bob_tegen_de_richting(netwerk: _Netwerk) -> tuple[int, int]:
     """Telt de strengen waarvan de BOB stijgt in de aangenomen afvoerrichting."""
     tegendraads = meetbaar = 0
@@ -123,6 +159,26 @@ def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str
             f"{len(netwerk.unconnected)} vrijvervalstrengen hebben geen herleidbare "
             f"put aan beide zijden en vallen buiten de netwerkanalyse: {labels}."
         )
+    if netwerk.reversed_count:
+        notities.append(
+            f"De richting is uit het bodemverloop afgeleid; {netwerk.reversed_count} "
+            "strengen zijn daarbij omgedraaid ten opzichte van de administratieve "
+            "van-naar-richting."
+        )
+
+    zonder, in_deel_met_eindpunt = _richtingsverlies(context, netwerk, rol)
+    if in_deel_met_eindpunt:
+        notities.append(
+            f"{in_deel_met_eindpunt} knopen liggen in een netwerkdeel dat wel een eindpunt "
+            "bevat, maar bereiken dat eindpunt niet als de richting gevolgd wordt. Zoveel "
+            "knopen wijzen op een systematisch verkeerd gerichte administratie, niet op "
+            "evenzoveel losse gebreken."
+        )
+    if zonder:
+        notities.append(
+            f"{zonder} knopen liggen in een netwerkdeel zonder enig eindpunt van dit soort."
+        )
+
     tegendraads, meetbaar = _bob_tegen_de_richting(netwerk)
     if meetbaar and tegendraads:
         notities.append(

@@ -11,8 +11,10 @@ from gwswpijplijn.dataset import GwswDataset, load_dataset
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 TTL_DIR = FIXTURE_DIR / "ttl"
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
-VOORBEELD_TTL = DATA_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
-ONTOLOGIE_TTL = DATA_DIR / "Ontologie_GWSW_Mds.ttl"
+OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
+ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
+VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
+ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Mds.ttl"
 
 
 @pytest.fixture

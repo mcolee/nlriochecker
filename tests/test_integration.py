@@ -193,12 +193,14 @@ def test_zelfvergelijking_van_het_volledige_paar(pair: ReportPair) -> None:
     assert not comparison.coverage_changes["Gewijzigd"].any()
 
 
-OROX_DE_WOLDEN = DATA_DIR / "dewolden_orox.ttl"
-VOORBEELD_TTL = DATA_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
+OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
+ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
+OROX_DE_WOLDEN = OROX_DIR / "dewolden_orox.ttl"
+VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
 # Het Mds-deelmodel volstaat voor het kleine voorbeeld en scheelt laadtijd;
 # de volledige dataset krijgt de totaal-ontologie, want die dekt alle klassen.
-ONTOLOGIE_TTL = DATA_DIR / "Ontologie_GWSW_Mds.ttl"
-ONTOLOGIE_TOTAAL = DATA_DIR / "Ontologie_GWSW_Totaal.ttl"
+ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Mds.ttl"
+ONTOLOGIE_TOTAAL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
 
 
 @pytest.mark.skipif(

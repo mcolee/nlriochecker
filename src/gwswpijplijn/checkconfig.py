@@ -5,6 +5,7 @@ from __future__ import annotations
 import tomllib
 from importlib import resources
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -47,6 +48,18 @@ class CheckThresholds(BaseModel):
     dubbele_put_tolerantie_m: float = Field(default=0.30, gt=0.0)
 
 
+class NetworkOptions(BaseModel):
+    """Keuzes voor de netwerkanalyse."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 'administratief' volgt de van-naar-richting uit het GWSW-model, zoals het
+    # register bedoelt; NET-003 toetst juist of die richting klopt. 'bob' leidt de
+    # richting af uit het bodemverloop en valt terug op de administratieve richting
+    # als een BOB ontbreekt of beide gelijk zijn.
+    richting: Literal["administratief", "bob"] = "administratief"
+
+
 class CheckConfig(BaseModel):
     """De volledige projectconfiguratie van de check-engine."""
 
@@ -54,6 +67,7 @@ class CheckConfig(BaseModel):
 
     klassen: ClassRoots
     drempels: CheckThresholds = Field(default_factory=CheckThresholds)
+    netwerk: NetworkOptions = Field(default_factory=NetworkOptions)
 
 
 def default_check_config_path() -> Path:

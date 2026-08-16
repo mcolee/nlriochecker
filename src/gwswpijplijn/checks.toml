@@ -37,3 +37,11 @@ drempel = ["Overstortdrempel"]
 snapping_tolerantie_m = 0.10
 # TOP-005: binnen deze afstand gelden twee putten als dubbel.
 dubbele_put_tolerantie_m = 0.30
+
+[netwerk]
+# Hoe de afvoerrichting van een vrijvervalstreng bepaald wordt.
+#   administratief - de van-naar-richting uit het GWSW-model (standaard; dat is wat
+#                    het register bedoelt, en NET-003 toetst of die richting klopt)
+#   bob            - afgeleid uit het bodemverloop, met terugval op de
+#                    administratieve richting bij ontbrekende of gelijke BOB's
+richting = "administratief"
