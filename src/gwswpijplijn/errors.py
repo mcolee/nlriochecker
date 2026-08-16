@@ -1,13 +1,13 @@
 """Uitzonderingen van de pijplijn."""
 
 
-class GwswPijplijnFout(Exception):
+class PipelineError(Exception):
     """Basisfout van de pijplijn; de CLI vertaalt deze naar een nette melding."""
 
 
-class RapportFormaatFout(GwswPijplijnFout):
+class ReportFormatError(PipelineError):
     """Een detailrapport heeft niet het verwachte formaat."""
 
 
-class RapportPaarFout(GwswPijplijnFout):
+class ReportPairError(PipelineError):
     """Het aangeboden rapportenpaar voldoet niet aan de harde eisen."""

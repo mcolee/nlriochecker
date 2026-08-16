@@ -6,28 +6,28 @@ from pathlib import Path
 
 import pytest
 
-FIXTUREMAP = Path(__file__).parent / "fixtures"
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
 def mini_mds() -> Path:
     """Pad naar het kleine MdsPlan-uittreksel."""
-    return FIXTUREMAP / "mini_mdsplan.csv"
+    return FIXTURE_DIR / "mini_mdsplan.csv"
 
 
 @pytest.fixture
 def mini_hyd() -> Path:
     """Pad naar het kleine Hyd-uittreksel."""
-    return FIXTUREMAP / "mini_hyd.csv"
+    return FIXTURE_DIR / "mini_hyd.csv"
 
 
 @pytest.fixture
-def mini_hyd_andere_dataset() -> Path:
+def mini_hyd_other_dataset() -> Path:
     """Hyd-uittreksel met een afwijkende datasetnaam in de titelregel."""
-    return FIXTUREMAP / "mini_hyd_andere_dataset.csv"
+    return FIXTURE_DIR / "mini_hyd_other_dataset.csv"
 
 
 @pytest.fixture
-def mini_kapot() -> Path:
+def mini_broken() -> Path:
     """Uittreksel met een onherkenbare titelregel."""
-    return FIXTUREMAP / "mini_kapot.csv"
+    return FIXTURE_DIR / "mini_broken.csv"

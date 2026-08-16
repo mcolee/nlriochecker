@@ -11,3 +11,6 @@ __pycache__/
 
 # Uitvoer van de pijplijn
 uitvoer/
+
+# Invoerdata en referentiedocumenten (groot, niet in versiebeheer)
+data/

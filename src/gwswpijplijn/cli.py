@@ -7,12 +7,12 @@ from pathlib import Path
 import click
 
 from gwswpijplijn import __version__
-from gwswpijplijn.fouten import GwswPijplijnFout
-from gwswpijplijn.paar import laad_paar
-from gwswpijplijn.rapportage import schrijf_rapportage
+from gwswpijplijn.errors import PipelineError
+from gwswpijplijn.pair import load_pair
+from gwswpijplijn.reporting import write_reports
 
 
-class _PijplijnFout(click.ClickException):
+class _CliError(click.ClickException):
     """ClickException met een Nederlandse aanhef."""
 
     def show(self, file: object | None = None) -> None:
@@ -26,44 +26,44 @@ def main() -> None:
     """Toetst de datakwaliteit van vrijvervalriolering (GWSW-nulmeting)."""
 
 
-@main.command()
+@main.command("analyseer")
 @click.option(
     "--mds",
-    "mds_pad",
+    "mds_path",
     required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Detailrapport getoetst aan CFK Mds of MdsPlan.",
 )
 @click.option(
     "--hyd",
-    "hyd_pad",
+    "hyd_path",
     required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Detailrapport getoetst aan CFK Hyd.",
 )
 @click.option(
     "--output",
-    "uitvoermap",
+    "output_dir",
     default=Path("uitvoer"),
     show_default=True,
     type=click.Path(file_okay=False, path_type=Path),
     help="Map waarin de samenvatting en de geaggregeerde CSV worden geschreven.",
 )
-def analyseer(mds_pad: Path, hyd_pad: Path, uitvoermap: Path) -> None:
+def analyze(mds_path: Path, hyd_path: Path, output_dir: Path) -> None:
     """Analyseert een rapportenpaar en schrijft samenvatting en aggregaties weg."""
     try:
-        paar = laad_paar(mds_pad, hyd_pad)
-        markdown_pad, csv_pad = schrijf_rapportage(paar, uitvoermap)
-    except GwswPijplijnFout as fout:
-        raise _PijplijnFout(str(fout)) from fout
+        pair = load_pair(mds_path, hyd_path)
+        markdown_path, csv_path = write_reports(pair, output_dir)
+    except PipelineError as error:
+        raise _CliError(str(error)) from error
 
-    click.echo(f"Dataset {paar.dataset}: {paar.mds.rapport.cfk} + {paar.hyd.rapport.cfk}")
-    for analyse in (paar.mds, paar.hyd):
-        poort = analyse.typeringspoort
+    click.echo(f"Dataset {pair.dataset}: {pair.mds.report.cfk} + {pair.hyd.report.cfk}")
+    for analysis in (pair.mds, pair.hyd):
+        gate = analysis.typing_gate
         click.echo(
-            f"  {analyse.rapport.cfk}: {analyse.totaal_aantal} meldingen, "
-            f"typeringsscore {poort.score:.1f}% "
-            f"({poort.aantal_te_globaal} van {poort.aantal_benoemde_objecten} objecten te globaal)"
+            f"  {analysis.report.cfk}: {analysis.total_count} meldingen, "
+            f"typeringsscore {gate.score:.1f}% "
+            f"({gate.too_generic_count} van {gate.named_object_count} objecten te globaal)"
         )
-    click.echo(f"Geschreven: {markdown_pad}")
-    click.echo(f"Geschreven: {csv_pad}")
+    click.echo(f"Geschreven: {markdown_path}")
+    click.echo(f"Geschreven: {csv_path}")

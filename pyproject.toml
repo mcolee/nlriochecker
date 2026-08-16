@@ -32,8 +32,6 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "N"]
-# N818 verwacht het achtervoegsel "Error"; dit project gebruikt het Nederlandse "Fout".
-ignore = ["N818"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
