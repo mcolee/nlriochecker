@@ -14,7 +14,9 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
 ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
-ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Mds.ttl"
+# De deelmodellen Mds en Hyd zijn filters op het totaalmodel; alleen de
+# totaal-ontologie kent alle Knooppunt- en Verbinding-klassen.
+ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
 
 
 @pytest.fixture

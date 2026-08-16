@@ -534,6 +534,28 @@ def _render_checks(run: CheckRun) -> str:
         lines += [f"> - `{sample}`" for sample in fallback.samples]
         lines += [""]
 
+    if run.dataset.ontologies:
+        namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)
+        lines += [f"Klassenhierarchie uit {namen}.", ""]
+    else:
+        lines += [
+            "> **Let op:** er is geen ontologie geladen. Knooppunten en verbindingen zijn "
+            "dan aan hun geometrie herkend in plaats van aan hun GWSW-type, en "
+            "klassenwortels dekken hun subklassen niet.",
+            "",
+        ]
+
+    if run.dataset.structural_diff:
+        onderdelen = ", ".join(
+            f"{sleutel.replace('_', ' ')}: {waarde}"
+            for sleutel, waarde in sorted(run.dataset.structural_diff.items())
+        )
+        lines += [
+            f"> De GWSW-definitie en de herkenning op geometrie wijken af ({onderdelen}). "
+            "Dat is geen fout, maar het laat zien hoezeer de dataset op geometrie leunt.",
+            "",
+        ]
+
     if run.dataset.geometry_errors:
         lines += [
             f"> {len(run.dataset.geometry_errors)} objecten hebben een onleesbare geometrie "

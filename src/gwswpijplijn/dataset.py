@@ -27,8 +27,18 @@ HAS_VALUE = URIRef(f"{GWSW}hasValue")
 
 KLASSE_PUNT = URIRef(f"{GWSW}Punt")
 KLASSE_LIJN = URIRef(f"{GWSW}Lijn")
-KLASSE_BEGINPUNT = URIRef(f"{GWSW}BeginpuntLeiding")
-KLASSE_EINDPUNT = URIRef(f"{GWSW}EindpuntLeiding")
+# Het GWSW kent drie soorten verbindingen, elk met een eigen begin- en eindvertex.
+# Alle zes zijn subklassen van gwsw:Vertex.
+KLASSEN_BEGINPUNT = tuple(
+    URIRef(f"{GWSW}{naam}")
+    for naam in ("BeginpuntLeiding", "BeginpuntOnderdeel", "BeginpuntAfvoerrelatie")
+)
+KLASSEN_EINDPUNT = tuple(
+    URIRef(f"{GWSW}{naam}")
+    for naam in ("EindpuntLeiding", "EindpuntOnderdeel", "EindpuntAfvoerrelatie")
+)
+KLASSE_BEGINPUNT = KLASSEN_BEGINPUNT[0]
+KLASSE_EINDPUNT = KLASSEN_EINDPUNT[0]
 KLASSE_BOB_BEGIN = URIRef(f"{GWSW}BobBeginpuntLeiding")
 KLASSE_BOB_EIND = URIRef(f"{GWSW}BobEindpuntLeiding")
 
@@ -41,6 +51,7 @@ class Node:
     label: str
     types: frozenset[str]
     orientation: str | None
+    orientation_types: frozenset[str]
     point: Point | None
     z: float | None
     parent: str | None
@@ -81,6 +92,8 @@ class GwswDataset:
     subclasses: dict[str, frozenset[str]]
     geometry_errors: dict[str, str] = field(default_factory=dict)
     decode_fallback: DecodeFallback | None = None
+    ontologies: tuple[Path, ...] = ()
+    structural_diff: dict[str, int] = field(default_factory=dict)
 
     def is_a(self, uri: str, root: str) -> bool:
         """Geeft aan of het object van het type `root` of een subklasse daarvan is."""
@@ -88,9 +101,16 @@ class GwswDataset:
         return bool(object_types & self.closure(root))
 
     def types_of(self, uri: str) -> frozenset[str]:
-        """De rdf:type-waarden van een object; objecten hebben er vaak meerdere."""
+        """De typen van een object, inclusief die van zijn orientatie.
+
+        Het GWSW legt de topologische rol bij de orientatie: klassen als
+        Lozingspunt, Overnamepunt en UitlaatPunt zijn subklassen van Knooppunt en
+        staan dus op de orientatie, niet op de put of het bouwwerk zelf. Wie op
+        zulke klassen wil selecteren, moet ze hier terugvinden.
+        """
         if uri in self.nodes:
-            return self.nodes[uri].types
+            node = self.nodes[uri]
+            return node.types | node.orientation_types
         if uri in self.conduits:
             return self.conduits[uri].types
         return frozenset()
@@ -120,11 +140,7 @@ class GwswDataset:
     def of_class(self, root: str) -> list[str]:
         """De URI's van alle knooppunten en strengen van dit type."""
         gesloten = self.closure(root)
-        return [
-            uri
-            for uri, item in (*self.nodes.items(), *self.conduits.items())
-            if item.types & gesloten
-        ]
+        return [uri for uri in (*self.nodes, *self.conduits) if self.types_of(uri) & gesloten]
 
     def subjects_of_class(self, root: str) -> list[RdfNode]:
         """Alle objecten van dit type in de graaf, ook zonder eigen geometrie.
@@ -158,8 +174,10 @@ def load_dataset(
 
     subclasses = _subclass_closure(ontology or graph)
     geometry_errors: dict[str, str] = {}
-    nodes = _read_nodes(graph, geometry_errors)
-    conduits = _read_conduits(graph, nodes, geometry_errors)
+    knooppunt = _bruikbare_afsluiting(subclasses, "Knooppunt")
+    verbinding = _bruikbare_afsluiting(subclasses, "Verbinding")
+    nodes = _read_nodes(graph, geometry_errors, knooppunt)
+    conduits = _read_conduits(graph, nodes, geometry_errors, verbinding)
 
     if not nodes and not conduits:
         raise DatasetError(
@@ -167,7 +185,7 @@ def load_dataset(
             f"GWSW-OroX-dataset?"
         )
 
-    return GwswDataset(
+    dataset = GwswDataset(
         source=dataset_path,
         graph=graph,
         nodes=nodes,
@@ -175,7 +193,11 @@ def load_dataset(
         subclasses=subclasses,
         geometry_errors=geometry_errors,
         decode_fallback=fallback,
+        ontologies=tuple(Path(pad) for pad in ontology_paths or []),
     )
+    if knooppunt or verbinding:
+        dataset.structural_diff.update(_structural_diff(graph, nodes, conduits))
+    return dataset
 
 
 @contextmanager
@@ -193,6 +215,49 @@ def _quiet_rdflib():
         yield
     finally:
         logger.setLevel(oud)
+
+
+def _bruikbare_afsluiting(
+    subclasses: dict[str, frozenset[str]], wortel: str
+) -> frozenset[str] | None:
+    """De subklasse-afsluiting van een wortel, of None als de ontologie ontbreekt."""
+    afsluiting = subclasses.get(_uri(wortel))
+    return afsluiting if afsluiting and len(afsluiting) > 1 else None
+
+
+def _structural_diff(
+    graph: Graph, nodes: dict[str, Node], conduits: dict[str, Conduit]
+) -> dict[str, int]:
+    """Vergelijkt de ontologische uitkomst met de structurele herkenning.
+
+    Zonder ontologie herkent de lader knopen aan een puntgeometrie en verbindingen
+    aan hun begin- en eindvertex. Die aanname is niet altijd waar: een knooppunt mag
+    best geen geometrie hebben. Het verschil tussen beide manieren is een maat voor
+    hoeveel de dataset op geometrie leunt, en hoort in het rapport te staan.
+    """
+    structureel_knopen = {
+        str(subject)
+        for orientation in _orientations_with(graph, KLASSE_PUNT)
+        for subject in graph.subjects(HAS_ASPECT, orientation)
+    }
+    structureel_strengen = {
+        str(subject)
+        for orientation in _leiding_orientations(graph)
+        for subject in graph.subjects(HAS_ASPECT, orientation)
+    }
+
+    verschillen: dict[str, int] = {}
+    for rol, ontologisch, structureel in (
+        ("knooppunten", set(nodes), structureel_knopen),
+        ("strengen", set(conduits), structureel_strengen),
+    ):
+        zonder_geometrie = len(ontologisch - structureel)
+        geen_knoop = len(structureel - ontologisch)
+        if zonder_geometrie:
+            verschillen[f"{rol}_zonder_geometrie"] = zonder_geometrie
+        if geen_knoop:
+            verschillen[f"{rol}_wel_geometrie_geen_rol"] = geen_knoop
+    return verschillen
 
 
 def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | None]:
@@ -308,11 +373,24 @@ def _geometry(graph: Graph, orientation: RdfNode, klasse: URIRef, errors: dict[s
     return None, []
 
 
-def _read_nodes(graph: Graph, errors: dict[str, str]) -> dict[str, Node]:
-    """Leest alle objecten met een orientatie die een gwsw:Punt draagt."""
+def _read_nodes(
+    graph: Graph, errors: dict[str, str], knooppunt_klassen: frozenset[str] | None = None
+) -> dict[str, Node]:
+    """Leest de knooppunten van het netwerk.
+
+    Het GWSW definieert een knoop als een object met een orientatie van het type
+    Knooppunt. Is de ontologie beschikbaar, dan wordt die definitie gevolgd; anders
+    valt de lader terug op de structurele herkenning (een orientatie met een
+    puntgeometrie), zodat een dataset ook zonder ontologie leesbaar blijft.
+    """
     nodes: dict[str, Node] = {}
 
-    for orientation in _orientations_with(graph, KLASSE_PUNT):
+    if knooppunt_klassen:
+        bron = _orientations_of_class(graph, knooppunt_klassen)
+    else:
+        bron = _orientations_with(graph, KLASSE_PUNT)
+
+    for orientation in bron:
         point, z_waarden = _geometry(graph, orientation, KLASSE_PUNT, errors)
         for subject in graph.subjects(HAS_ASPECT, orientation):
             uri = str(subject)
@@ -323,6 +401,7 @@ def _read_nodes(graph: Graph, errors: dict[str, str]) -> dict[str, Node]:
                 label=_label(graph, subject),
                 types=_types(graph, subject),
                 orientation=str(orientation),
+                orientation_types=_types(graph, orientation),
                 point=point,
                 z=z_waarden[0] if z_waarden else None,
                 parent=_parent(graph, subject),
@@ -339,6 +418,16 @@ def _parent(graph: Graph, subject: RdfNode) -> str | None:
     return None
 
 
+def _orientations_of_class(graph: Graph, klassen: frozenset[str]):
+    """De orientaties waarvan het type in deze verzameling klassen valt."""
+    gezien = set()
+    for klasse in klassen:
+        for orientation in graph.subjects(RDF.type, URIRef(klasse)):
+            if orientation not in gezien:
+                gezien.add(orientation)
+                yield orientation
+
+
 def _orientations_with(graph: Graph, klasse: URIRef):
     """De orientaties die via hasAspect een geometrie van dit type dragen."""
     gezien = set()
@@ -350,18 +439,31 @@ def _orientations_with(graph: Graph, klasse: URIRef):
 
 
 def _read_conduits(
-    graph: Graph, nodes: dict[str, Node], errors: dict[str, str]
+    graph: Graph,
+    nodes: dict[str, Node],
+    errors: dict[str, str],
+    verbinding_klassen: frozenset[str] | None = None,
 ) -> dict[str, Conduit]:
-    """Leest alle strengen met hun geometrie, koppelingen en BOB's."""
+    """Leest de verbindingen: leidingen en andere kanten van het netwerk.
+
+    Net als bij de knopen geldt de ontologische definitie (een orientatie van het
+    type Verbinding) zodra de ontologie beschikbaar is, met terugval op de
+    structurele herkenning via begin- en eindvertices.
+    """
     orientation_to_node = {
         node.orientation: uri for uri, node in nodes.items() if node.orientation is not None
     }
     conduits: dict[str, Conduit] = {}
 
-    for orientation in _leiding_orientations(graph):
+    bron = (
+        _orientations_of_class(graph, verbinding_klassen)
+        if verbinding_klassen
+        else _leiding_orientations(graph)
+    )
+    for orientation in bron:
         line, _ = _geometry(graph, orientation, KLASSE_LIJN, errors)
-        begin = _endpoint(graph, orientation, KLASSE_BEGINPUNT)
-        eind = _endpoint(graph, orientation, KLASSE_EINDPUNT)
+        begin = _endpoint(graph, orientation, KLASSEN_BEGINPUNT)
+        eind = _endpoint(graph, orientation, KLASSEN_EINDPUNT)
 
         for subject in graph.subjects(HAS_ASPECT, orientation):
             uri = str(subject)
@@ -384,7 +486,7 @@ def _read_conduits(
 def _leiding_orientations(graph: Graph):
     """De orientaties die een begin- of eindpunt van een leiding bevatten."""
     gezien = set()
-    for klasse in (KLASSE_BEGINPUNT, KLASSE_EINDPUNT):
+    for klasse in (*KLASSEN_BEGINPUNT, *KLASSEN_EINDPUNT):
         for endpoint in graph.subjects(RDF.type, klasse):
             for orientation in graph.subjects(HAS_PART, endpoint):
                 if orientation not in gezien:
@@ -392,10 +494,10 @@ def _leiding_orientations(graph: Graph):
                     yield orientation
 
 
-def _endpoint(graph: Graph, orientation: RdfNode, klasse: URIRef) -> RdfNode | None:
-    """Het begin- of eindpunt van een leidingorientatie."""
+def _endpoint(graph: Graph, orientation: RdfNode, klassen: tuple[URIRef, ...]) -> RdfNode | None:
+    """Het begin- of eindpunt van een verbinding, van welke soort dan ook."""
     for part in graph.objects(orientation, HAS_PART):
-        if (part, RDF.type, klasse) in graph:
+        if any((part, RDF.type, klasse) in graph for klasse in klassen):
             return part
     return None
 
@@ -405,16 +507,24 @@ def _connected_node(
 ) -> str | None:
     """Herleidt de hasConnection van een strengeindpunt naar de put erachter.
 
-    De koppeling wijst naar de putorientatie, niet naar de put zelf; die extra
-    stap wordt hier gezet.
+    Twee dingen die uit de GWSW-documentatie volgen. De koppeling wijst naar de
+    putorientatie, niet naar de put zelf; die extra stap wordt hier gezet. En
+    gwsw:hasConnection is een owl:SymmetricProperty zonder inverse, dus de
+    tripel mag ook andersom geschreven zijn; beide richtingen tellen.
     """
     if endpoint is None:
         return None
-    for target in graph.objects(endpoint, HAS_CONNECTION):
+    for target in _connections(graph, endpoint):
         node_uri = orientation_to_node.get(str(target))
         if node_uri is not None:
             return node_uri
     return None
+
+
+def _connections(graph: Graph, subject: RdfNode):
+    """De hasConnection-buren van een object, in beide schrijfrichtingen."""
+    yield from graph.objects(subject, HAS_CONNECTION)
+    yield from graph.subjects(HAS_CONNECTION, subject)
 
 
 def _bob(graph: Graph, endpoint: RdfNode | None, klasse: URIRef) -> float | None:

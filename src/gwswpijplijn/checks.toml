@@ -18,11 +18,16 @@ streng = ["Leiding"]
 # register over spreekt. Zonder deze regel geldt heel de drukriolering van De
 # Wolden als onbereikbaar.
 afvoer_eindpunt = ["Gemaal", "Pompunit"]
-# Geverifieerd tegen de De Wolden-dataset: die gebruikt Lozingsput en
-# Uitlaatconstructie. Let op dat Lozingsput volgens de ontologie een Rioolput is
-# en Uitlaatconstructie een Bouwwerk; geen van beide valt onder Lozingspunt, dus
-# de subklasse-afsluiting daarop vangt ze niet.
-lozings_eindpunt = ["Lozingspunt", "Uitlaat", "Lozingsput", "Uitlaatconstructie"]
+# Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
+# staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
+# (een Bouwwerk) fysieke objecten zijn. De Wolden gebruikt alleen die laatste twee.
+lozings_eindpunt = [
+  "Lozingspunt",
+  "UitlaatPunt",
+  "Uitlaat",
+  "Lozingsput",
+  "Uitlaatconstructie",
+]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]

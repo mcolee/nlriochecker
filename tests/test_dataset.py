@@ -14,8 +14,10 @@ NETWERKWORTELS = ["Put", "Gemaal", "Lozingspunt"]
 
 
 def test_voorbeeld_levert_strengen_en_knooppunten(juinen: GwswDataset) -> None:
-    # Het meegeleverde voorbeeld bevat negentien leidingen.
-    assert len(juinen.conduits) == 19
+    # Negentien leidingen plus zes onderdeelverbindingen; het GWSW rekent beide
+    # tot de verbindingen van het netwerk.
+    assert len(juinen.conduits) == 25
+    assert len(juinen.of_class("VrijvervalRioolleiding")) == 11
     assert len(juinen.of_class("Put")) == 10
     assert juinen.of_class("Gemaal") == [f"{JUINEN}Rioolgemaal_3"]
 
@@ -54,12 +56,17 @@ def test_koppeling_aan_compartiment_wordt_naar_de_put_herleid(juinen: GwswDatase
     )
 
 
-def test_ontbrekende_koppeling_blijft_leeg(juinen: GwswDataset) -> None:
-    # Leiding "5" heeft geen hasConnection op haar eindpunten.
+def test_koppeling_aan_een_compartiment_zonder_geometrie(juinen: GwswDataset) -> None:
+    """Een knooppunt hoeft geen puntgeometrie te hebben om een knoop te zijn.
+
+    Leiding "5" koppelt aan twee compartimenten waarvan de orientatie geen Punt
+    draagt. Wie knopen aan hun geometrie herkent, mist die koppeling.
+    """
     streng = juinen.conduits[f"{JUINEN}GemengdRiool_98"]
 
-    assert streng.start_node is None
-    assert streng.end_node is None
+    assert streng.start_node == f"{JUINEN}Compartiment_42"
+    assert streng.end_node == f"{JUINEN}Compartiment_60"
+    assert juinen.nodes[streng.start_node].point is None
 
 
 def test_onleesbaar_bestand_geeft_dataseterror(tmp_path: Path) -> None:
@@ -81,3 +88,54 @@ def test_dataset_zonder_objecten_geeft_dataseterror(tmp_path: Path) -> None:
 
     with pytest.raises(DatasetError, match="geen knooppunten of strengen"):
         load_dataset(leeg)
+
+
+def test_hasconnection_is_symmetrisch(tmp_path: Path) -> None:
+    """gwsw:hasConnection is een owl:SymmetricProperty en heeft geen inverse.
+
+    Een export die de tripel omgekeerd schrijft is even geldig; de lader moet
+    beide richtingen herkennen.
+    """
+    bron = (Path(__file__).parent / "fixtures" / "ttl" / "schoon.ttl").read_text(encoding="utf-8")
+    omgekeerd = bron.replace(
+        ":L1_b gwsw:hasConnection :PutA_ori .", ":PutA_ori gwsw:hasConnection :L1_b ."
+    )
+    assert omgekeerd != bron, "de fixture bevat de verwachte koppeling niet"
+    pad = tmp_path / "omgekeerd.ttl"
+    pad.write_text(omgekeerd, encoding="utf-8")
+
+    dataset = load_dataset(pad)
+    streng = next(iter(dataset.conduits.values()))
+
+    assert streng.start_node is not None
+    assert streng.start_node.endswith("PutA")
+
+
+def test_orientatietypen_zijn_selecteerbaar(tmp_path: Path) -> None:
+    """Knooppunt-klassen als Lozingspunt staan op de orientatie, niet op het object."""
+    bron = (Path(__file__).parent / "fixtures" / "ttl" / "schoon.ttl").read_text(encoding="utf-8")
+    bron += "\n:PutB_ori rdf:type gwsw:Lozingspunt .\n"
+    pad = tmp_path / "lozingspunt.ttl"
+    pad.write_text(bron, encoding="utf-8")
+
+    dataset = load_dataset(pad)
+    lozingspunten = dataset.of_class("Lozingspunt")
+
+    assert [uri.rsplit("#", 1)[-1] for uri in lozingspunten] == ["PutB"]
+
+
+def test_verschil_met_de_structurele_herkenning_wordt_gemeld(juinen: GwswDataset) -> None:
+    """Zonder ontologie zou de lader knopen aan hun geometrie herkennen.
+
+    Dat wijkt af van de GWSW-definitie: vijf compartimenten zijn wel knooppunt maar
+    hebben geen punt, en een putdeksel en een ontluchter hebben wel een punt maar
+    zijn geen knooppunt. Dat verschil hoort meetbaar te zijn.
+    """
+    assert juinen.structural_diff == {
+        "knooppunten_zonder_geometrie": 5,
+        "knooppunten_wel_geometrie_geen_rol": 2,
+    }
+
+
+def test_ontologie_wordt_vastgelegd(juinen: GwswDataset) -> None:
+    assert [pad.name for pad in juinen.ontologies] == ["Ontologie_GWSW_Totaal.ttl"]
