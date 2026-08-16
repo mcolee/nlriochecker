@@ -114,6 +114,44 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     return bereikt
 
 
+def _eindknoop_notitie(context: CheckContext, netwerk: _Netwerk, rol: str) -> list[str]:
+    """Beschrijft waar het vrijverval op uitkomt en wat daarvan als uitstroom telt.
+
+    Een streng zonder afvoerpad is zelden een los gebrek: het netwerk watert af op
+    een beperkt aantal eindknopen, en als die niet als uitstroompunt herkend worden
+    slaat de check aan op alles wat erachter ligt. Deze telling maakt zichtbaar of
+    het om ontbrekende uitstroomobjecten gaat.
+    """
+    sinks = [uri for uri in netwerk.graph if netwerk.graph.out_degree(uri) == 0]
+    if not sinks:
+        return []
+
+    endpoints = _eindpunten(context, rol)
+    doodlopend = [uri for uri in sinks if uri not in endpoints]
+    if not doodlopend:
+        return []
+
+    tellen: dict[str, int] = {}
+    for uri in doodlopend:
+        soort = _soort(context, uri)
+        tellen[soort] = tellen.get(soort, 0) + 1
+    top = ", ".join(
+        f"{soort} {aantal}"
+        for soort, aantal in sorted(tellen.items(), key=lambda paar: -paar[1])[:5]
+    )
+    return [
+        f"Het vrijverval watert af op {len(sinks)} eindknopen; {len(sinks) - len(doodlopend)} "
+        f"daarvan gelden als uitstroompunt van dit soort. De overige {len(doodlopend)} lopen "
+        f"dood ({top}). Alles wat daarachter ligt telt daardoor als zonder afvoerpad."
+    ]
+
+
+def _soort(context: CheckContext, uri: str) -> str:
+    """De korte naam van het eerste type van een object."""
+    types = sorted(t.rsplit("/", 1)[-1] for t in context.dataset.types_of(uri))
+    return types[0] if types else "onbekend"
+
+
 def _richtingsverlies(context: CheckContext, netwerk: _Netwerk, rol: str | None) -> tuple[int, int]:
     """Splitst de onbereikbare knopen in twee oorzaken.
 
@@ -165,6 +203,9 @@ def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str
             "strengen zijn daarbij omgedraaid ten opzichte van de administratieve "
             "van-naar-richting."
         )
+
+    if rol is not None:
+        notities.extend(_eindknoop_notitie(context, netwerk, rol))
 
     zonder, in_deel_met_eindpunt = _richtingsverlies(context, netwerk, rol)
     if in_deel_met_eindpunt:

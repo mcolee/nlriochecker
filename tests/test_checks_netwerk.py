@@ -134,3 +134,49 @@ def test_notitie_meldt_strengen_die_tegen_de_bob_in_lopen(tmp_path: Path) -> Non
 
     assert any("stijgt de bodem juist in die richting" in n for n in outcome.notes)
     assert any("1 van de 2" in n for n in outcome.notes)
+
+
+def test_notitie_telt_doodlopende_eindknopen() -> None:
+    """Zonder deze telling lijkt elke onbereikbare streng een los gebrek.
+
+    In het losse deelstelsel watert alles af op put 'D', en die is geen
+    uitstroompunt; dat is de oorzaak van de bevinding, niet de streng zelf.
+    """
+    outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
+
+    notitie = next(n for n in outcome.notes if "watert af op" in n)
+    assert "lopen dood" in notitie
+    assert "Inspectieput" in notitie
+
+
+def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> None:
+    """De richtingskeuze uit de config moet daadwerkelijk doorwerken."""
+    bron = (TTL_DIR / "net_schoon.ttl").read_text(encoding="utf-8")
+    # Streng "1" is administratief A -> B, maar de bodem loopt van B naar A.
+    bron += (
+        "\n:L1_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 10.0 ] .\n"
+        ":L1_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 11.0 ] .\n"
+    )
+    pad = tmp_path / "bob.ttl"
+    pad.write_text(bron, encoding="utf-8")
+
+    op_bob = tmp_path / "bob.toml"
+    op_bob.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Gemaal']\nvuilwater = ['GemengdRiool']\n"
+        "[netwerk]\nrichting = 'bob'\n",
+        encoding="utf-8",
+    )
+
+    # Administratief bereikt alles het gemaal; op de bodem gedraaid loopt streng "1"
+    # de verkeerde kant op en raakt put A het gemaal niet meer.
+    assert _labels_op(pad, "NET-001", None) == []
+    assert _labels_op(pad, "NET-001", load_check_config(op_bob)) == ["1"]
+
+
+def _labels_op(pad: Path, check_id: str, config: CheckConfig | None) -> list[str]:
+    """Draait een check op een pad buiten de fixturemap."""
+    dataset = load_dataset(pad)
+    context = CheckContext(dataset=dataset, config=config or load_check_config())
+    outcome = run_checks(context, [check_id]).outcomes[0]
+    return sorted(finding.object_label for finding in outcome.findings)
