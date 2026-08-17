@@ -20,8 +20,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   aankomen.
 - CI (`.github/workflows/toets.yml`): ruff, mypy en pytest op elke push naar `main` of
   `dev` en op elke pull request naar `main`. De run valt als er nog meer tests overgeslagen
-  worden dan de 32 die een schone kloon sowieso overslaat -- een fixturemap die niet
-  meekomt leest anders als "alles groen".
+  worden dan de runner sowieso overslaat -- een fixturemap die niet meekomt leest anders
+  als "alles groen".
 - Mypy als poort, met een configuratie in `pyproject.toml`; de codebase is schoon.
 - Dit wijzigingslog.
 

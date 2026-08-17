@@ -525,15 +525,19 @@ die met `.discard(None)` werd opgeschoond in plaats van meteen goed opgebouwd. G
 
 **De ondergrens op geslaagde tests.** `data/` staat buiten versiebeheer: de OroX-export en
 de GIS-bronnen beslaan gigabytes. Een schone kloon slaat de tests die erop leunen dus over
-en leest groen. Gemeten: met de volledige `data/` slagen er 707, met alleen de twee
-getrackte checkregisters 675 (32 overgeslagen), en zonder `data/` 490 met drie fouten. CI
-zet daarom `NLRIOCHECKER_MIN_GESLAAGD=650`; `tests/conftest.py` laat de run vallen als er
+en leest groen. Gemeten bij het inrichten: met de volledige `data/` en PyQGIS erbij slagen
+er lokaal 711; zonder `data/` zakt dat naar 490 met drie fouten. De eerste groene CI-run gaf
+673 geslaagd en 33 overgeslagen -- die runner mist zowel de niet-getrackte data als PyQGIS.
+CI zet daarom `NLRIOCHECKER_MIN_GESLAAGD=650`; `tests/conftest.py` laat de run vallen als er
 minder slagen.
 
-Wees precies over wat die grens doet: hij merkt een ontbrekende `data/` *niet* op, want 675
+Wees precies over wat die grens doet: hij merkt een ontbrekende `data/` *niet* op, want 673
 ligt er ruim boven -- dat is de normale toestand in CI. Hij vangt het wegvallen van meer dan
-die bekende 32 overslagen, bijvoorbeeld een fixturemap die niet meekomt of een importfout
-die een heel testbestand laat overslaan. Zonder grens zou zoiets als "alles groen" lezen.
+die bekende overslagen, bijvoorbeeld een fixturemap die niet meekomt of een importfout die
+een heel testbestand laat overslaan. Zonder grens zou zoiets als "alles groen" lezen.
+
+Deze aantallen verouderen bij elke nieuwe test. Ze staan hier als ijkpunt, niet als
+contract; de grens hoort onder het CI-aantal te blijven en mag meegroeien.
 
 **Wat er niet onder valt.** Mypy kijkt naar `src/nlriochecker`, niet naar `scripts/` en
 `tests/`; daar staan samen nog negentien meldingen. En `disallow_untyped_defs` staat uit:

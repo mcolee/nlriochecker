@@ -40,9 +40,10 @@ gecontroleerd.
 
 **CI.** `.github/workflows/toets.yml` draait ruff, mypy en pytest op elke push naar `main`
 of `dev` en op elke pull request naar `main`. Zie BO-5 voor de ondergrens op het aantal
-geslaagde tests. Let op wat die grens wel en niet doet: een schone kloon zonder de
-niet-getrackte delen van `data/` haalt hem ruim (675 van de 707), dus die situatie vangt
-hij niet. Hij vangt het wegvallen van meer dan de bekende 32 overslagen.
+geslaagde tests. Let op wat die grens wel en niet doet: de runner zonder de niet-getrackte
+delen van `data/` en zonder PyQGIS haalt hem ruim (673 geslaagd, 33 overgeslagen, tegen 711
+lokaal met alles erbij), dus die situatie vangt hij niet. Hij vangt het wegvallen van meer
+dan die bekende overslagen. De eerste run was groen in 35 seconden.
 
 **Mypy.** Van 55 fouten in dertien bestanden naar nul. Drieentwintig kwamen uit een enkele
 oorzaak: `CheckContext.cached()` gaf `object` terug. De rest waren versmallingsgrenzen en
