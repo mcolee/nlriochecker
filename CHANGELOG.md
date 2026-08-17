@@ -32,6 +32,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 - `scripts/uitgave.py` toetst nu ook met mypy en onderhoudt dit wijzigingslog.
 - Werkafspraak: werk staat op `dev`, `main` draagt alleen uitgebrachte versies.
 
+### Gerepareerd
+
+- NET-004 wees per run een andere streng aan. `nx.find_cycle` zonder `source` begint bij
+  de eerste knoop in invoegvolgorde, en die volgt uit de hashseed; twee runs op dezelfde
+  data toonden daardoor een verschil dat er niet was. De kringloop start nu bij de
+  kleinste URI van het samenhangende deel.
+
 ### Verwijderd
 
 - De afhankelijkheid `pyproj`; die werd nergens geimporteerd en komt zo nodig via

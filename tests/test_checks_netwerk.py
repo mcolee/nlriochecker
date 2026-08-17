@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import networkx as nx
 import pytest
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
-from nlriochecker.checks.netwerk import _netwerk
+from nlriochecker.checks.netwerk import KringloopInNetwerk, _netwerk
 from nlriochecker.checks.verbanden import deelstelsel_ids
 from nlriochecker.dataset import load_dataset
 
@@ -54,7 +55,29 @@ def test_net004_vindt_de_kringloop() -> None:
     # kringloop: dat laatste groeit exponentieel op een echt stelsel.
     assert len(bevindingen) == 1
     assert bevindingen[0].details["putten_in_deel"] == 3
-    assert set(bevindingen[0].details["voorbeeldkring"]) == {"C", "D", "E"}
+    # Op volgorde, niet als verzameling: de kring hoort niet per run te verspringen.
+    assert bevindingen[0].details["voorbeeldkring"] == ["C", "D", "E"]
+
+
+def test_net004_voorbeeldkring_hangt_niet_van_de_knoopvolgorde_af() -> None:
+    """Dezelfde kringloop moet dezelfde melding opleveren, hoe de graaf ook gevuld is.
+
+    `nx.find_cycle` zonder `source` begint bij de eerste knoop in invoegvolgorde, en
+    die volgt uit een `set` uit `strongly_connected_components` -- dus uit de hashseed.
+    Zonder vast beginpunt wijst NET-004 per run een andere streng aan, en dan toont
+    `vergelijk` verschillen tussen twee runs op dezelfde data die er niet zijn.
+    """
+    check = KringloopInNetwerk()
+    kanten = [("c", "a"), ("a", "b"), ("b", "c")]
+    volgordes = (kanten, list(reversed(kanten)), [kanten[1], kanten[2], kanten[0]])
+
+    kringen = set()
+    for volgorde in volgordes:
+        graaf = nx.DiGraph()
+        graaf.add_edges_from(volgorde)
+        kringen.add(tuple(check._voorbeeldkring(graaf)))
+
+    assert kringen == {("a", "b", "c")}
 
 
 def test_net007_vindt_it_zonder_drempel() -> None:

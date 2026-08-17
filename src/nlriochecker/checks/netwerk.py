@@ -390,9 +390,17 @@ class KringloopInNetwerk(Check):
         return netwerk.graph.has_edge(knoop, knoop)
 
     def _voorbeeldkring(self, subgraaf) -> list[str]:
-        """Een kringloop uit dit deel, als illustratie in de melding."""
+        """Een kringloop uit dit deel, als illustratie in de melding.
+
+        Met een vast beginpunt, want zonder `source` begint `find_cycle` bij de eerste
+        knoop in invoegvolgorde. Die volgt uit de `set` die
+        `strongly_connected_components` oplevert en dus uit de hashseed: dezelfde data
+        zou per run een andere streng aanwijzen, en `vergelijk` zou daar een verschil
+        in zien dat er niet is. Elk knooppunt van een sterk samenhangend deel ligt op
+        een kringloop, dus de kleinste URI voldoet als startpunt.
+        """
         try:
-            kanten = nx.find_cycle(subgraaf)
+            kanten = nx.find_cycle(subgraaf, source=min(subgraaf))
         except nx.NetworkXNoCycle:
             return sorted(subgraaf)[:1]
         return [begin for begin, _, *_ in kanten]
