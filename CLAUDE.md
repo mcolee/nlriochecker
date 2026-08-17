@@ -57,6 +57,9 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
   Schrijf het nummer nergens een tweede keer op. Uitbrengen doe je met
   `uv run python scripts/uitgave.py patch|minor|major`, dat bumpt, toetst, commit en
   `vX.Y.Z` tagt; pushen blijft handwerk. Zie `docs/versionering.md`.
+- De licentie is EUPL-1.2 (copyleft, en 'toegang tot de wezenlijke functionaliteit'
+  telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
+  zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
 - Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML

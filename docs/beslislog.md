@@ -427,3 +427,35 @@ nummer bevat (verworpen: tussen tags in levert dat `0.2.1.dev4+g1a2b3c`, en zond
 `.git` helemaal geen versie). Het nummer op beide plekken laten met alleen een test
 erop (verworpen: bewaakt de drift wel, maar lost hem niet op). Automatisch taggen bij
 elke commit (verworpen: niet elke commit is een uitgave).
+
+### BO-3 De licentie is EUPL-1.2
+
+**Wat.** Het werk staat onder de European Union Public Licence v1.2. `LICENSE` bevat de
+Engelse tekst zoals GitHub die herkent, `pyproject.toml` draagt de SPDX-expressie
+`EUPL-1.2`, en de README draagt de notitie `Licensed under the EUPL` die artikel 1 van de
+licentie zelf voorschrijft.
+
+**Waarom.** Doel is dat wie dit verbetert die verbetering ook deelt. De afhankelijkheden
+dwingen niets af: alle 28 pakketten zijn permissief (BSD, MIT, Apache, MPL-2.0, PSF), en
+de copyleft die er is — GEOS en libquadmath onder LGPL-2.1, libgfortran onder GPL-3 met
+de GCC-uitzondering — zit in de wheels van shapely, rasterio en numpy, die wij niet
+verspreiden maar als afhankelijkheid declareren. Deze package bevat zelf geen enkel
+binair bestand. De keuze was dus vrij.
+
+De EUPL boven de GPL omdat het een publieke-sectorlicentie is, rechtsgeldig in het
+Nederlands, en omdat artikel 1 "Distribution or Communication" definieert als mede
+`providing access to its essential functionalities` — draaien als dienst telt daarmee als
+verspreiding, waar de GPL daarvoor de AGPL nodig zou hebben. De Appendix noemt GPL v2 en
+v3, AGPL v3, LGPL, MPL v2, EPL en CeCILL als verenigbare licenties, dus de keuze sluit
+niemand buiten.
+
+**Let op bij bundelen.** Zodra er een gebundelde distributie komt (PyInstaller, een
+image met de wheels erin) verspreiden we GEOS wel, en gelden de LGPL-2.1-verplichtingen:
+licentietekst meeleveren en de bibliotheek vervangbaar houden. Een los `.so` voldoet aan
+dat laatste.
+
+**Alternatieven.** MIT (verworpen: een leverancier mag dit dan in een gesloten product
+bouwen zonder iets terug te geven, en dat is precies wat we niet willen). GPL-3.0-or-later
+(verworpen: dekt draaien-als-dienst niet, en is niet in het Nederlands rechtsgeldig).
+AGPL-3.0 (verworpen: dekt hetzelfde als de EUPL hier, maar zonder de publieke-sector- en
+taalvoordelen).

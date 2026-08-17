@@ -45,3 +45,16 @@ uv run ruff check
 
 Een nieuwe versie uitbrengen gaat met `uv run python scripts/uitgave.py patch|minor|major`.
 Zie [docs/versionering.md](docs/versionering.md).
+
+## Licentie
+
+Copyright © 2026 Martin Colee
+
+Licensed under the EUPL
+
+Dit werk valt onder de [European Union Public Licence v1.2](LICENSE) (EUPL-1.2). Dat is
+een copyleft-licentie: verspreid je een aangepaste versie, of geef je anderen toegang tot
+de wezenlijke functionaliteit ervan — ook online, als dienst — dan gaat dat onder dezelfde
+licentie, met de broncode erbij. De EUPL is in 23 talen rechtsgeldig; de
+[Nederlandse tekst](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12) telt
+even zwaar als de Engelse hierboven.

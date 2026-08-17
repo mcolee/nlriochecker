@@ -7,6 +7,8 @@ name = "nlriochecker"
 version = "0.1.0"
 description = "Python package die helpt met het analyseren en rapporteren over (mogelijke-) fouten in GWSW-OroX (TTL) bestanden. Maakt gebruik van GWSW nulmeting maar biedt ook aanvullende checks."
 readme = "README.md"
+license = "EUPL-1.2"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1",
