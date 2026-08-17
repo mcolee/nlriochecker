@@ -435,6 +435,14 @@ Engelse tekst zoals GitHub die herkent, `pyproject.toml` draagt de SPDX-expressi
 `EUPL-1.2`, en de README draagt de notitie `Licensed under the EUPL` die artikel 1 van de
 licentie zelf voorschrijft.
 
+**Het checkregister hoort erbij.** `data/checkregister-gwsw-nulmeting-v0_8.md` is eigen
+werk van de auteur, geen overname uit een externe bron. Er rust dus geen vreemd
+auteursrecht op en het valt onder dezelfde EUPL-1.2 als de code. Het register verwijst
+wel naar de GWSW-ontologie en naar de SHACL-vormen van apps.gwsw.nl, maar dat zijn
+verwijzingen, geen overgenomen tekst; de formulering van elke check is van de auteur.
+Dat betekent ook dat het register vrij te wijzigen is: geen externe partij hoeft ermee
+in te stemmen.
+
 **Waarom.** Doel is dat wie dit verbetert die verbetering ook deelt. De afhankelijkheden
 dwingen niets af: alle 28 pakketten zijn permissief (BSD, MIT, Apache, MPL-2.0, PSF), en
 de copyleft die er is — GEOS en libquadmath onder LGPL-2.1, libgfortran onder GPL-3 met
@@ -459,3 +467,38 @@ bouwen zonder iets terug te geven, en dat is precies wat we niet willen). GPL-3.
 (verworpen: dekt draaien-als-dienst niet, en is niet in het Nederlands rechtsgeldig).
 AGPL-3.0 (verworpen: dekt hetzelfde als de EUPL hier, maar zonder de publieke-sector- en
 taalvoordelen).
+
+### BO-4 Elk uitvoerbestand draagt de package en versie die het schreef
+
+**Wat.** Elk bestand dat deze package oplevert noemt zijn herkomst: `nlriochecker <versie>`.
+Markdown krijgt een cursieve regel direct onder de titel, elke CSV de kolom `Gereedschap`
+op elke rij, en de GeoPackage het veld `gereedschap` in de tabel `gwsw_run`. De string
+komt uit `uitvoer/herkomst.py` en leest het nummer via `__version__`, dus uit de
+packagemetadata; hij staat nergens een tweede keer opgeschreven (zie BO-2).
+
+**Waarom.** De checks veranderen tussen versies. Een bevindingenlijst die een half jaar
+later opduikt is zonder versienummer niet te herleiden tot de logica die hem opleverde:
+of een object toen niet gemeld werd omdat het goed was, of omdat de check nog niet
+bestond, is dan niet meer vast te stellen. Dat is precies de vraag die een nulmeting
+over tijd moet kunnen beantwoorden. De drie uitvoervormen zeggen het met dezelfde string
+uit dezelfde functie, zodat ze niet uit elkaar kunnen lopen — dezelfde reden waarom ze
+al uit een enkele meldingenstroom komen.
+
+**Waarom een kolom en geen commentaarregel in de CSV.** Een `#`-regel bovenaan is
+compacter, maar breekt elke lezer die hem niet verwacht, en `comment="#"` is hier
+bovendien de verkeerde oplossing: de kolommen `ObjectURI` en `Object2URI` bevatten
+GWSW-URI's van de vorm `http://sparql.gwsw.nl/dewolden#knp3437`, en pandas kapt met die
+optie elke regel af vanaf het eerste `#`. Dat zou stilzwijgend alle URI's halveren. Een
+kolom kost herhaling, maar houdt het archief leesbaar voor pandas, Excel en QGIS zonder
+extra opties, zoals `bevindingen.csv` al doet met `RunDatum` en `Dataset`. De vier andere
+CSV's droegen nog geen runmetadata; voor hen is dit de eerste zo'n kolom.
+
+**De grens.** Een CSV zonder rijen krijgt wel de kolomkop maar geen enkele waarde, en
+noemt de versie dus niet. Dat is inherent aan een kolom en niet met een kolom te
+repareren. Het raakt alleen een toets die niets vond; het Markdown-rapport ernaast draagt
+de herkomst dan wel, want die staat in de kop en niet in de rijen.
+
+**Alternatieven.** Een los `herkomst.json` in de uitvoermap (verworpen: raakt los van de
+CSV zodra iemand alleen die CSV doorstuurt, en dan is de herkomst weg). De versie alleen
+in de GeoPackage (verworpen: dan draagt juist het bestand dat het vaakst wordt
+doorgestuurd, de CSV, hem niet).

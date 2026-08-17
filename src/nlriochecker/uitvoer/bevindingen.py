@@ -14,6 +14,7 @@ import pandas as pd
 
 from nlriochecker.checks import REGISTRY, CheckRun, Severity
 from nlriochecker.taal import getal, vorm
+from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
 from nlriochecker.uitvoer.synthese import rode_draad
 from nlriochecker.uitvoer.tabel import prepare, table
@@ -28,6 +29,8 @@ MAX_CLUSTERS_IN_DUIDING = 5
 # plaats; hernoemen zou bestaande verwerking breken zonder dat er iets tegenover
 # staat. `Object` draagt sinds v0.8 alleen nog het fragment; de volledige URI staat
 # in `ObjectURI`. De nieuwe volgen dezelfde stijl; de GeoPackage gebruikt snake_case.
+# `Gereedschap` staat hier niet bij: die zet `uitvoer.herkomst.schrijf_csv` achteraan,
+# in elke CSV van deze package tegelijk.
 CSV_KOLOMMEN = [
     "Check",
     "Ernst",
@@ -69,14 +72,19 @@ def write_check_report(
     GeoPackage aantoonbaar dezelfde verzameling weg.
     """
     output_dir = prepare(output_dir)
+    run_datum = run_datum or date.today()
     if meldingen is None:
-        meldingen = bouw_meldingen(run, run_datum or date.today())
+        meldingen = bouw_meldingen(run, run_datum)
 
-    markdown_path = Path(output_dir) / FILE_CHECKS_MARKDOWN
-    markdown_path.write_text(_render_checks(run, meldingen), encoding="utf-8")
+    markdown_path = schrijf_markdown(
+        Path(output_dir) / FILE_CHECKS_MARKDOWN,
+        f"# Checkbevindingen {run.dataset.source.name}",
+        _render_checks(run, meldingen),
+        run_datum,
+    )
 
     csv_path = Path(output_dir) / FILE_CHECKS_CSV
-    meldingen_tabel(meldingen).to_csv(csv_path, sep=";", index=False, encoding="utf-8")
+    schrijf_csv(meldingen_tabel(meldingen), csv_path)
 
     return markdown_path, csv_path
 
@@ -116,12 +124,10 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=CSV_KOLOMMEN)
 
 
-def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
-    """Stelt het bevindingenrapport samen."""
+def _render_checks(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+    """Stelt de romp van het bevindingenrapport samen; de kop komt uit `schrijf_markdown`."""
     onbetrouwbaar = sum(outcome.unreliable_count for outcome in run.outcomes)
     lines = [
-        f"# Checkbevindingen {run.dataset.source.name}",
-        "",
         f"Bron: `{run.dataset.source}` — {len(run.dataset.nodes)} knooppunten, "
         f"{len(run.dataset.conduits)} strengen.",
         "",
@@ -290,7 +296,7 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> str:
             ]
 
     lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:

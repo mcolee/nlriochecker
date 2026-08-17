@@ -30,6 +30,7 @@ from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.dataset import Conduit
 from nlriochecker.errors import PipelineError
+from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
 from nlriochecker.uitvoer.melding import Melding, categorie_van
 from nlriochecker.uitvoer.tabel import prepare
@@ -726,6 +727,7 @@ def _schrijf_runmetadata(
 ) -> None:
     """Schrijft een enkele rij met alles wat het bestand herleidbaar maakt."""
     kolommen = [
+        _Kolom(VELD_GEREEDSCHAP, "text"),
         _Kolom("dataset", "text"),
         _Kolom("run_datum", "text"),
         _Kolom("register_versie", "text"),
@@ -759,6 +761,7 @@ def _schrijf_runmetadata(
     verbinding.execute(
         f"insert into gwsw_run ({velden}) values ({plaatshouders})",
         (
+            gereedschap(),
             run.dataset.source.name,
             run_datum.isoformat(),
             config.rapport.register_versie,
@@ -814,8 +817,8 @@ def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
             "insert into layer_styles (f_table_catalog, f_table_schema, f_table_name, "
             "f_geometry_column, styleName, styleQML, styleSLD, useAsDefault, description, "
             "owner, ui, update_time) values ('', '', ?, 'geom', ?, ?, '', 1, ?, "
-            "'nlriochecker', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
-            (laag, f"{laag} (datakwaliteit)", qml, f"Standaardstijl voor {laag}."),
+            "?, '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+            (laag, f"{laag} (datakwaliteit)", qml, f"Standaardstijl voor {laag}.", PAKKET),
         )
 
 

@@ -35,6 +35,11 @@ de trend. Elk subcommando kent `--help`.
 daarnaast een GeoPackage met de bevindingen op locatie (`--geen-gpkg` slaat die over).
 `--output` staat standaard op `uitvoer/`. Invoerbestanden worden nooit overschreven.
 
+Elk geschreven bestand noemt waarmee het gemaakt is: de Markdown-rapporten in een regel
+onder de titel, de CSV's in de kolom `Gereedschap`, de GeoPackage in het veld
+`gereedschap` van de tabel `gwsw_run`. Een rapport is daarmee altijd te herleiden tot
+de versie die het opleverde.
+
 ## Ontwikkelen
 
 ```bash

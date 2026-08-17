@@ -49,6 +49,13 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - Rapportage-output: Markdown, CSV en een GeoPackage naar een output-map; nooit invoerbestanden
   overschrijven. Alle drie komen uit dezelfde meldingenstroom (`uitvoer/melding.py`); een
   schrijver die zelf een `Finding` interpreteert laat de drie uit elkaar lopen.
+- Elk uitvoerbestand draagt zijn herkomst: pakketnaam plus versie, uit
+  `uitvoer/herkomst.py`. Dat is de enige schrijver in `src/`: `schrijf_markdown` zet de
+  titel en de herkomstregel erboven, `schrijf_csv` de kolom `Gereedschap` achteraan, en
+  de GeoPackage krijgt het veld `gereedschap` in `gwsw_run`. Roep nooit zelf `to_csv` of
+  `write_text` aan -- de sweep in `tests/test_uitvoer_herkomst.py` verbiedt een tweede
+  schrijver in `src/`, en die is de waarborg dat de drie uitvoervormen niet uit elkaar
+  lopen.
 - De uitvoermap heet `uitvoer/` en staat in `.gitignore` — met een leidende slash, anders
   sluit die regel ook `src/nlriochecker/uitvoer/` uit en verdwijnt de package stilzwijgend
   uit de repository (en uit het zicht van ruff).
@@ -75,6 +82,11 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
   hoe dat pad afgeleid wordt en `GWSW_QGIS_SITE_PACKAGES` om het te overschrijven.
 
 ## Werkwijze
+- Werk op `dev`, niet op `main`. Elke wijziging gaat naar `dev`; `main` draagt alleen
+  uitgebrachte, getagde versies. Pas als de auteur zegt dat het een nieuwe versie is,
+  merge je `dev` in `main` en draai je daar `scripts/uitgave.py` -- in die volgorde,
+  want het script eist `main` (`TAKVOORWAARDE`) en breekt af op elke andere tak. Zet
+  `dev` daarna weer gelijk aan `main`, anders mist hij de bumpcommit.
 - Kleine stappen, na elke werkende stap een git-commit met een duidelijke boodschap.
 - Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_8.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
 - Voer na elke wijziging pytest en ruff uit voordat je afrondt.
