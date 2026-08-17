@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gwswpijplijn.afbakening import bouw_analyseset, objecten_in_gebied
-from gwswpijplijn.checkconfig import load_check_config
-from gwswpijplijn.checks import CheckContext, run_checks
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.studiegebied import load_study_area
+from nlriochecker.afbakening import bouw_analyseset, objecten_in_gebied
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.dataset import load_dataset
+from nlriochecker.studiegebied import load_study_area
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -122,7 +122,7 @@ def test_streng_via_compartiment_zonder_geometrie_houdt_haar_netwerkverband() ->
 
 def test_objecten_in_gebied_blijft_importeerbaar_uit_checks() -> None:
     """De functie is verhuisd; bestaande importen mogen niet breken."""
-    from gwswpijplijn.checks import objecten_in_gebied as via_checks
+    from nlriochecker.checks import objecten_in_gebied as via_checks
 
     assert via_checks is objecten_in_gebied
 

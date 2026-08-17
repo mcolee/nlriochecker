@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 from click.testing import CliRunner
 
-from gwswpijplijn.cli import main
-from gwswpijplijn.register import default_register_path
-from gwswpijplijn.reporting import (
+from nlriochecker.cli import main
+from nlriochecker.register import default_register_path
+from nlriochecker.reporting import (
     FILE_CHECKS_CSV,
     FILE_CHECKS_MARKDOWN,
     FILE_COMPARISON_MARKDOWN,

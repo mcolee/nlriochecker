@@ -5,12 +5,12 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from gwswpijplijn.checkconfig import CheckConfig, load_check_config
-from gwswpijplijn.checks import CheckContext, CheckRun, run_checks
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.studiegebied import load_study_area
-from gwswpijplijn.uitvoer.identiteit import melding_id
-from gwswpijplijn.uitvoer.melding import _is_systemisch, bouw_meldingen
+from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checks import CheckContext, CheckRun, run_checks
+from nlriochecker.dataset import load_dataset
+from nlriochecker.studiegebied import load_study_area
+from nlriochecker.uitvoer.identiteit import melding_id
+from nlriochecker.uitvoer.melding import _is_systemisch, bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"

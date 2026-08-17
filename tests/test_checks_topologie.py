@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.checkconfig import CheckConfig, load_check_config
-from gwswpijplijn.checks import CheckContext, Finding, run_checks
-from gwswpijplijn.dataset import GwswDataset, load_dataset
+from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checks import CheckContext, Finding, run_checks
+from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 

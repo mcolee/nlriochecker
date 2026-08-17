@@ -58,7 +58,7 @@ nieuwe `mechanisch_riool`.
 
 ### 4.1 De analyseset
 
-Nieuw: `src/gwswpijplijn/afbakening.py`.
+Nieuw: `src/nlriochecker/afbakening.py`.
 
 ```
 Analyseset(kern: frozenset[str], schil: frozenset[str], dataset: GwswDataset,
@@ -117,13 +117,13 @@ staan en draait na de checks.
 
 ### 4.5 Datasetcache
 
-Nieuw: `src/gwswpijplijn/cache.py`.
+Nieuw: `src/nlriochecker/cache.py`.
 
 - Sleutel: sha256 over (a) inhoudshash van het datasetbestand, (b) inhoudshash van elk
   ontologiebestand, (c) de broncode van `dataset.py` en `geometry.py`, (d) de versies van
   rdflib en shapely. (c) en (d) voorkomen dat een wijziging in de lader stilzwijgend op
   een oude cache blijft draaien; dat is het enige echte risico van deze constructie.
-- Opslag: `~/.cache/gwswpijplijn/<sleutel>.pickle` (XDG-cachemap als die gezet is),
+- Opslag: `~/.cache/nlriochecker/<sleutel>.pickle` (XDG-cachemap als die gezet is),
   geschreven via een tijdelijk bestand plus `rename`, zodat een afgebroken run geen halve
   cache achterlaat.
 - Formaat: `pickle` protocol 5, in twee bestanden. Gemeten op De Wolden (1.877.729

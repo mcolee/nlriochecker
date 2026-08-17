@@ -8,9 +8,9 @@ getoetst is.
 
 from __future__ import annotations
 
-from gwswpijplijn.checkconfig import ReportOptions, load_check_config
-from gwswpijplijn.config import load_coverage_config
-from gwswpijplijn.register import default_register_path, load_register
+from nlriochecker.checkconfig import ReportOptions, load_check_config
+from nlriochecker.config import load_coverage_config
+from nlriochecker.register import default_register_path, load_register
 
 VERWACHTE_VERSIE = "0.8"
 

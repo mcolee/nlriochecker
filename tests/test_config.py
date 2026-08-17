@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.config import default_config_path, load_coverage_config
-from gwswpijplijn.errors import ConfigError
+from nlriochecker.config import default_config_path, load_coverage_config
+from nlriochecker.errors import ConfigError
 
 REGISTER_IDS = {"ADM-001", "ADM-004", "ADM-005", "ATTR-011", "RVZ-002", "RVZ-003"}
 

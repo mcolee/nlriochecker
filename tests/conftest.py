@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.dataset import GwswDataset, load_dataset
+from nlriochecker.dataset import GwswDataset, load_dataset
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 TTL_DIR = FIXTURE_DIR / "ttl"

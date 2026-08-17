@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.checkconfig import CheckConfig, load_check_config
-from gwswpijplijn.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
-from gwswpijplijn.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.externedata import ExternalData, load_external_data
+from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
+from nlriochecker.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
+from nlriochecker.dataset import load_dataset
+from nlriochecker.externedata import ExternalData, load_external_data
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"

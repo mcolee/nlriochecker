@@ -58,11 +58,11 @@ _voeg_systeem_pyqgis_toe()
 
 qgis_core = pytest.importorskip("qgis.core", reason="PyQGIS is hier niet geinstalleerd")
 
-from gwswpijplijn.checkconfig import load_check_config  # noqa: E402
-from gwswpijplijn.checks import CheckContext, run_checks  # noqa: E402
-from gwswpijplijn.dataset import load_dataset  # noqa: E402
-from gwswpijplijn.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
-from gwswpijplijn.uitvoer.melding import bouw_meldingen  # noqa: E402
+from nlriochecker.checkconfig import load_check_config  # noqa: E402
+from nlriochecker.checks import CheckContext, run_checks  # noqa: E402
+from nlriochecker.dataset import load_dataset  # noqa: E402
+from nlriochecker.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
+from nlriochecker.uitvoer.melding import bouw_meldingen  # noqa: E402
 
 pytestmark = pytest.mark.qgis
 

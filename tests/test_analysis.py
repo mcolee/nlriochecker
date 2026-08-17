@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gwswpijplijn.analysis import analyze, analyze_report
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.meting import laad_nulmeting
-from gwswpijplijn.shaclrapport import lees_shacl_rapport
+from nlriochecker.analysis import analyze, analyze_report
+from nlriochecker.dataset import load_dataset
+from nlriochecker.meting import laad_nulmeting
+from nlriochecker.shaclrapport import lees_shacl_rapport
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"

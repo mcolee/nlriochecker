@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.afbakening import bouw_analyseset
-from gwswpijplijn.checkconfig import CheckConfig, load_check_config
-from gwswpijplijn.checks import CheckContext, CheckRun, run_checks
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.studiegebied import load_study_area
-from gwswpijplijn.uitvoer.gpkg import RD_NEW, schrijf_geopackage
-from gwswpijplijn.uitvoer.melding import bouw_meldingen
+from nlriochecker.afbakening import bouw_analyseset
+from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checks import CheckContext, CheckRun, run_checks
+from nlriochecker.dataset import load_dataset
+from nlriochecker.studiegebied import load_study_area
+from nlriochecker.uitvoer.gpkg import RD_NEW, schrijf_geopackage
+from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -87,7 +87,7 @@ def test_lagen_staan_in_gpkg_contents(tmp_path: Path) -> None:
 
 def test_putten_en_strengen_dragen_leesbare_geometrie(tmp_path: Path) -> None:
     """De schrijfkant moet leveren wat de leeskant in studiegebied.py verwacht."""
-    from gwswpijplijn.studiegebied import _ontleed_gpkg
+    from nlriochecker.studiegebied import _ontleed_gpkg
 
     run = _run("schoon.ttl")
     pad = _schrijf(run, tmp_path)
@@ -347,8 +347,8 @@ def test_meldingen_op_dezelfde_plek_worden_genummerd(tmp_path: Path) -> None:
     """
     from collections import defaultdict
 
-    from gwswpijplijn.studiegebied import _ontleed_gpkg
-    from gwswpijplijn.uitvoer.gpkg import STAPEL_RASTER_M
+    from nlriochecker.studiegebied import _ontleed_gpkg
+    from nlriochecker.uitvoer.gpkg import STAPEL_RASTER_M
 
     run = _run("top005_dubbele_put.ttl")
     pad = _schrijf(run, tmp_path)

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.checkconfig import default_check_config_path, load_check_config
-from gwswpijplijn.errors import ConfigError
+from nlriochecker.checkconfig import default_check_config_path, load_check_config
+from nlriochecker.errors import ConfigError
 
 
 def test_standaardconfig_laadt() -> None:

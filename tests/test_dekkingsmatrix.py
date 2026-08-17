@@ -48,6 +48,6 @@ def test_geen_check_zonder_registerregel() -> None:
     register = module.load_register(module.default_register_path())
     bekend = {entry.check_id for entry in register.entries}
 
-    from gwswpijplijn.checks import REGISTRY
+    from nlriochecker.checks import REGISTRY
 
     assert set(REGISTRY) - bekend == set()

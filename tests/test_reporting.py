@@ -10,17 +10,17 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gwswpijplijn.afbakening import bouw_analyseset
-from gwswpijplijn.analysis import analyze
-from gwswpijplijn.checkconfig import load_check_config
-from gwswpijplijn.checks import CheckContext, run_checks
-from gwswpijplijn.comparison import compare_metingen
-from gwswpijplijn.config import load_coverage_config
-from gwswpijplijn.coverage import assess_coverage
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.errors import PipelineError, StudyAreaError
-from gwswpijplijn.meting import laad_nulmeting
-from gwswpijplijn.reporting import (
+from nlriochecker.afbakening import bouw_analyseset
+from nlriochecker.analysis import analyze
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.comparison import compare_metingen
+from nlriochecker.config import load_coverage_config
+from nlriochecker.coverage import assess_coverage
+from nlriochecker.dataset import load_dataset
+from nlriochecker.errors import PipelineError, StudyAreaError
+from nlriochecker.meting import laad_nulmeting
+from nlriochecker.reporting import (
     FILE_CHECKS_CSV,
     FILE_CHECKS_MARKDOWN,
     FILE_COMPARISON_MARKDOWN,
@@ -33,7 +33,7 @@ from gwswpijplijn.reporting import (
     write_coverage_report,
     write_reports,
 )
-from gwswpijplijn.studiegebied import load_study_area
+from nlriochecker.studiegebied import load_study_area
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -391,7 +391,7 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     niet doen. Deze test geeft een halve stroom mee en eist dat het rapport die
     volgt.
     """
-    from gwswpijplijn.uitvoer.melding import bouw_meldingen
+    from nlriochecker.uitvoer.melding import bouw_meldingen
 
     run = _checkrun("top013_parallel.ttl", "TOP-013")
     volledig = bouw_meldingen(run, date(2026, 8, 16))
@@ -416,7 +416,7 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
     """
     import dataclasses
 
-    from gwswpijplijn.uitvoer.melding import bouw_meldingen
+    from nlriochecker.uitvoer.melding import bouw_meldingen
 
     run = _checkrun("top013_parallel.ttl", "TOP-013")
     meldingen = bouw_meldingen(run, date(2026, 8, 16))

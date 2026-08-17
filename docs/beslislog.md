@@ -8,7 +8,7 @@ overweging en de verworpen alternatieven erbij.
 ### B0-1 De dekkingsmatrix wordt gegenereerd, niet bijgehouden
 
 **Wat.** `docs/dekkingsmatrix.md` wordt geschreven door `scripts/dekkingsmatrix.py`,
-dat het checkregister parst (`src/gwswpijplijn/register.py`), de registry van de
+dat het checkregister parst (`src/nlriochecker/register.py`), de registry van de
 engine uitleest en de testsuite op check-ID's doorzoekt.
 
 **Waarom.** Een met de hand bijgehouden matrix is na twee wijzigingen onbetrouwbaar,
@@ -116,7 +116,7 @@ standaardwaarden wel degelijk het echte RD-bereik afdwingen.
 
 ### BA-1 De plausibiliteitstabellen staan in een eigen configbestand
 
-**Wat.** `src/gwswpijplijn/plausibiliteit.toml` bevat materiaal-versus-diameter,
+**Wat.** `src/nlriochecker/plausibiliteit.toml` bevat materiaal-versus-diameter,
 materiaal-versus-aanlegjaar, materiaal-versus-profielvorm, leidingmateriaal-versus-
 putmateriaal, vorm-versus-afmetingen en de lijst met handelsmaten. Te laden met
 `--plausibiliteit`.
@@ -371,3 +371,35 @@ assenstelsel van de TTL-fixtures.
 moeten klein en snel zijn. Het raster wordt als eerste geschreven, voor geopandas
 geladen is: rasterio en pyogrio brengen elk hun eigen GDAL mee, en die twee in een
 proces door elkaar gebruiken bij het schrijven leverde een crash op.
+
+## Onderhoud
+
+### BO-1 Hernoemd naar nlriochecker; de historische documenten zijn meeverhuisd
+
+**Wat.** De package, de distributienaam, het CLI-commando en de cachemap heten
+`nlriochecker` in plaats van `gwswpijplijn`. De verslagen, specs en plannen onder
+`docs/` zijn meegehernoemd, ook waar ze een gebeurtenis uit het verleden beschrijven.
+De oude cachemap (`~/.cache/gwswpijplijn`, 434 MB) is verwijderd, niet gemigreerd.
+
+**Waarom.** De repository, het product en de package heetten drie verschillende dingen.
+De documenten zijn meegegaan omdat elk pad erin verwijst naar een bestand dat je moet
+kunnen openen; een verslag dat naar `src/gwswpijplijn/uitvoer/` wijst is voor een lezer
+van vandaag onbruikbaar. De prijs is dat een zin als die in
+`docs/ronde1-gpkg-en-rapport-verslag.md` over commit `2ff975b` nu een naam gebruikt die
+op dat moment nog niet bestond. Deze entry is de plek waar dat staat opgeschreven: waar
+in de documenten `nlriochecker` staat naast een commit van voor deze wijziging, heette
+het toen `gwswpijplijn`.
+
+Migreren van de cache had gekund, maar heeft geen zin: de cachesleutel bevat de broncode
+van de lader, dus die was door de hernoeming toch al ongeldig. Bovendien verwijzen de
+oude pickles naar het modulepad `gwswpijplijn.dataset` en zouden ze bij het uitpakken
+alsnog omvallen. De eerste `toets` na deze wijziging leest de dataset dus opnieuw in
+(ruim drie minuten); dat is verwacht gedrag, geen regressie.
+
+**Gevolg voor de uitvoer.** `layer_styles.owner` in de GeoPackage bevat voortaan
+`nlriochecker`. GeoPackages van voor en na deze commit verschillen daarmee in dat veld;
+QGIS trekt zich er niets van aan.
+
+**Alternatieven.** Alleen de code hernoemen en de documenten met rust laten (verworpen:
+levert dode paden op in stukken die juist als naslag dienen). Het commando
+`gwswpijplijn` laten heten (verworpen: dan blijven er twee namen in omloop).

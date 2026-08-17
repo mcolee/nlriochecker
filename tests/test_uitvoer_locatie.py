@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gwswpijplijn.checks import Dimension, Finding, Severity
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.uitvoer.locatie import foutlocatie
+from nlriochecker.checks import Dimension, Finding, Severity
+from nlriochecker.dataset import load_dataset
+from nlriochecker.uitvoer.locatie import foutlocatie
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 

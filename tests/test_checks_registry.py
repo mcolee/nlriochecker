@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.checks import REGISTRY, Dimension, Severity
+from nlriochecker.checks import REGISTRY, Dimension, Severity
 
 REGISTER = Path(__file__).resolve().parents[1] / "data" / "checkregister-gwsw-nulmeting-v0_8.md"
 RIJ_PATROON = re.compile(

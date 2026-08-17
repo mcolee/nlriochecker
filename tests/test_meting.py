@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.errors import NulmetingError
-from gwswpijplijn.meting import laad_nulmeting
+from nlriochecker.errors import NulmetingError
+from nlriochecker.meting import laad_nulmeting
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 

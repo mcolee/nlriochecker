@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gwswpijplijn.checkconfig import CheckConfig, load_check_config
-from gwswpijplijn.checks import CheckContext, run_checks
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.karakteristiek import bepaal_karakteristiek
-from gwswpijplijn.reporting import write_check_report
+from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.dataset import load_dataset
+from nlriochecker.karakteristiek import bepaal_karakteristiek
+from nlriochecker.reporting import write_check_report
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 FIXTURE = TTL_DIR / "karakteristiek_datums.ttl"

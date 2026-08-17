@@ -8,8 +8,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gwswpijplijn.errors import ReportFormatError
-from gwswpijplijn.shaclrapport import KOLOMMEN, lees_shacl_rapport
+from nlriochecker.errors import ReportFormatError
+from nlriochecker.shaclrapport import KOLOMMEN, lees_shacl_rapport
 
 SHACL_DIR = Path(__file__).parent / "fixtures" / "shacl"
 

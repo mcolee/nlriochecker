@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.dataset import GwswDataset, load_dataset
-from gwswpijplijn.errors import DatasetError
+from nlriochecker.dataset import GwswDataset, load_dataset
+from nlriochecker.errors import DatasetError
 
 JUINEN = "http://sparql.gwsw.nl/repositories/Juinen#"
 NETWERKWORTELS = ["Put", "Gemaal", "Lozingspunt"]
@@ -185,7 +185,7 @@ def test_bob_verval_ontbreekt_zonder_beide_bobs(juinen) -> None:
 
 
 def test_richting_van_geometrie_ziet_een_omgekeerd_getekende_lijn() -> None:
-    from gwswpijplijn.checkconfig import load_check_config
+    from nlriochecker.checkconfig import load_check_config
 
     dataset = load_dataset(TTL_DIR / "top020_omgekeerd_getekend.ttl")
     wortels = load_check_config().klassen.netwerkknopen

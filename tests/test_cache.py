@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.cache import BESTAND_GRAAF, cachesleutel, laad_met_cache
-from gwswpijplijn.dataset import load_dataset
+from nlriochecker.cache import BESTAND_GRAAF, cachesleutel, laad_met_cache
+from nlriochecker.dataset import load_dataset
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 VOORBEELD = DATA / "gwsw_orox_ttl" / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
@@ -48,7 +48,7 @@ def test_de_graaf_werkt_ook_uit_de_cache(tmp_path: Path) -> None:
 
 def test_de_sleutel_verandert_mee_met_de_lader(tmp_path: Path, monkeypatch) -> None:
     eerste = cachesleutel(VOORBEELD, [])
-    monkeypatch.setattr("gwswpijplijn.cache.LADER_VERSIE", "gewijzigd")
+    monkeypatch.setattr("nlriochecker.cache.LADER_VERSIE", "gewijzigd")
 
     assert cachesleutel(VOORBEELD, []) != eerste
 
@@ -101,7 +101,7 @@ def test_de_sleutel_verandert_mee_met_de_broncode_van_de_lader(tmp_path: Path, m
     steeds groen laten. Hier wordt in plaats daarvan `dataset_module.__file__`
     naar een gewijzigde kopie verzet, zoals de bron die `cachesleutel` inleest.
     """
-    import gwswpijplijn.cache as cache_module
+    import nlriochecker.cache as cache_module
 
     origineel = Path(cache_module.dataset_module.__file__)
     kopie = tmp_path / origineel.name

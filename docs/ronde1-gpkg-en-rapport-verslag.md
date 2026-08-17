@@ -41,7 +41,7 @@ waarschuwing.
 
 ### A1 — Synthesesectie "Rode draad"
 
-`src/gwswpijplijn/uitvoer/synthese.py`. Drie detecties, elk met een configureerbare
+`src/nlriochecker/uitvoer/synthese.py`. Drie detecties, elk met een configureerbare
 drempel in het nieuwe `[rapport]`-blok van `checks.toml`. Slaat geen enkele detectie
 aan, dan komt de kop er niet.
 
@@ -79,7 +79,7 @@ noemt de maaiveldhoogte.
 
 De top-15-afkap is `rapport.max_bevindingen_per_check` geworden, default 0 =
 onbeperkt; wordt er wel afgekapt, dan staat eronder hoeveel er niet getoond zijn.
-`src/gwswpijplijn/taal.py` doet getal- en lidwoordcongruentie; een onbekend woord
+`src/nlriochecker/taal.py` doet getal- en lidwoordcongruentie; een onbekend woord
 geeft een `KeyError` in plaats van stilzwijgend "de". Dat ruimde vier fouten op:
 "Het maaiveldhoogte", "1 bevindingen" (twee keer in de CLI), "1 eindknopen" en
 "de overige 1 lopen dood".
@@ -96,7 +96,7 @@ externe objecten; de coördinaat van TOP-011 is uit de meldingtekst gehaald.
 
 ### B — GeoPackage
 
-`src/gwswpijplijn/uitvoer/gpkg.py`, met `sqlite3` en `shapely.wkb` — geen nieuwe
+`src/nlriochecker/uitvoer/gpkg.py`, met `sqlite3` en `shapely.wkb` — geen nieuwe
 afhankelijkheid. Zes lagen, EPSG:28992, embedded QGIS-stijlen plus losse QML's.
 `toets` schrijft het bestand standaard mee; `--geen-gpkg` slaat het over.
 
@@ -176,7 +176,7 @@ waardeloos maakte en zes die er echt toe deden.
 
 **De hele `uitvoer/`-package stond niet onder versiebeheer.** `.gitignore` bevatte
 `uitvoer/` zonder leidende slash, bedoeld voor de uitvoermap van de pijplijn. Die regel
-sloot ook `src/gwswpijplijn/uitvoer/` uit. Alle 1652 regels nieuwe code bestonden alleen
+sloot ook `src/nlriochecker/uitvoer/` uit. Alle 1652 regels nieuwe code bestonden alleen
 in mijn werkboom: elke commit vanaf `2ff975b` importeert niet vanaf een schone checkout.
 Tweede gevolg: ruff respecteert `.gitignore`, dus ook de linter had de package nooit
 gezien — het "All checks passed" van twaalf stappen was vals, en er stonden vier

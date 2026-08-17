@@ -42,7 +42,7 @@ verdrievoudigen.
 
 ### 2.2 De oplossing
 
-Nieuw pakket `src/gwswpijplijn/uitvoer/` met daarin `melding.py`:
+Nieuw pakket `src/nlriochecker/uitvoer/` met daarin `melding.py`:
 
 ```python
 @dataclass(frozen=True)
@@ -128,7 +128,7 @@ Publieke namen (`FILE_CHECKS_MARKDOWN`, `FILE_CHECKS_CSV`, `write_check_report`)
 ### 2.6 Modulestructuur
 
 ```
-src/gwswpijplijn/uitvoer/
+src/nlriochecker/uitvoer/
     __init__.py        publieke ingang: schrijf_uitvoer(run, output_dir, opties)
     melding.py         het Melding-record en bouw_meldingen()
     identiteit.py      melding_id-hash

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gwswpijplijn.dataset import load_dataset
+from nlriochecker.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 SCENARIO = TTL_DIR / "ext_scenario.ttl"

@@ -16,10 +16,10 @@
 - Nederlandse docstrings, Engelse code-identifiers, type hints overal.
 - Na elke wijziging: `uv run pytest` en `uv run ruff check` plus `uv run ruff format --check`. Beide groen voordat je commit.
 - Elke taak eindigt met een commit. Commitboodschappen in het Nederlands, in de gebiedende of beschrijvende vorm zoals de bestaande historie (`git log --oneline`).
-- Geen enkele drempelwaarde in de code: alles wat een getal is dat een project mag verleggen, hoort in `src/gwswpijplijn/checks.toml` en in het pydantic-model in `checkconfig.py`.
+- Geen enkele drempelwaarde in de code: alles wat een getal is dat een project mag verleggen, hoort in `src/nlriochecker/checks.toml` en in het pydantic-model in `checkconfig.py`.
 - Check-ID's zijn stabiel; een vervallen ID wordt nooit hergebruikt.
 - Wat een check niet bekeken heeft, hoort in het rapport. Zwijgen leest als "alles gecontroleerd".
-- De uitvoermap `uitvoer/` staat met een leidende slash in `.gitignore`; de package `src/gwswpijplijn/uitvoer/` staat wél onder versiebeheer. Controleer na elke taak die daar bestanden toevoegt met `git status` dat de nieuwe bestanden gezien worden.
+- De uitvoermap `uitvoer/` staat met een leidende slash in `.gitignore`; de package `src/nlriochecker/uitvoer/` staat wél onder versiebeheer. Controleer na elke taak die daar bestanden toevoegt met `git status` dat de nieuwe bestanden gezien worden.
 - Draai zware tests niet standaard mee: `pytest -m "not zwaar"` is de gewone gang; nieuwe zware tests krijgen `@pytest.mark.zwaar`.
 
 ## Bestandsindeling
@@ -27,18 +27,18 @@
 | Bestand | Verantwoordelijkheid | Taak |
 |---|---|---|
 | `data/checkregister-gwsw-nulmeting-v0_8.md` | nieuw; het contract | 1, 2, 3 |
-| `src/gwswpijplijn/uitvoer/gpkg.py` | GeoPackage-schrijver: lagen, kolommen, stijlregistratie | 4, 5, 6, 7, 8, 10 |
-| `src/gwswpijplijn/uitvoer/stijlen/*.qml` | de meegeleverde QGIS-stijlen | 6, 7, 8 |
-| `src/gwswpijplijn/uitvoer/melding.py` | de meldingenstroom; nieuwe velden `object_id`, `object2_id` | 5 |
-| `src/gwswpijplijn/uitvoer/identiteit.py` | melding-ID plus de nieuwe `kort()` | 5 |
-| `src/gwswpijplijn/uitvoer/bevindingen.py` | Markdown en CSV | 5, 10 |
-| `src/gwswpijplijn/checks/extern.py` | EXT-checks | 2, 3 |
-| `src/gwswpijplijn/dataset.py` | `Conduit.bob_verval`, `GwswDataset.richting_van_geometrie()`, `GwswDataset.subset()` | 7, 9 |
-| `src/gwswpijplijn/afbakening.py` | nieuw; kern, contextschil, analyseset | 9 |
-| `src/gwswpijplijn/cache.py` | nieuw; de geparseerde dataset bewaren | 11 |
-| `src/gwswpijplijn/checks/base.py` | `volledig_bereik` op `Check`; `objecten_in_gebied` verhuist | 9, 10 |
-| `src/gwswpijplijn/checkconfig.py` | `klassen.mechanisch`, sectie `[studiegebied]` | 2, 6, 9 |
-| `src/gwswpijplijn/cli.py` | de nieuwe opties en de meldingen op stdout | 10, 11 |
+| `src/nlriochecker/uitvoer/gpkg.py` | GeoPackage-schrijver: lagen, kolommen, stijlregistratie | 4, 5, 6, 7, 8, 10 |
+| `src/nlriochecker/uitvoer/stijlen/*.qml` | de meegeleverde QGIS-stijlen | 6, 7, 8 |
+| `src/nlriochecker/uitvoer/melding.py` | de meldingenstroom; nieuwe velden `object_id`, `object2_id` | 5 |
+| `src/nlriochecker/uitvoer/identiteit.py` | melding-ID plus de nieuwe `kort()` | 5 |
+| `src/nlriochecker/uitvoer/bevindingen.py` | Markdown en CSV | 5, 10 |
+| `src/nlriochecker/checks/extern.py` | EXT-checks | 2, 3 |
+| `src/nlriochecker/dataset.py` | `Conduit.bob_verval`, `GwswDataset.richting_van_geometrie()`, `GwswDataset.subset()` | 7, 9 |
+| `src/nlriochecker/afbakening.py` | nieuw; kern, contextschil, analyseset | 9 |
+| `src/nlriochecker/cache.py` | nieuw; de geparseerde dataset bewaren | 11 |
+| `src/nlriochecker/checks/base.py` | `volledig_bereik` op `Check`; `objecten_in_gebied` verhuist | 9, 10 |
+| `src/nlriochecker/checkconfig.py` | `klassen.mechanisch`, sectie `[studiegebied]` | 2, 6, 9 |
+| `src/nlriochecker/cli.py` | de nieuwe opties en de meldingen op stdout | 10, 11 |
 
 ---
 
@@ -51,9 +51,9 @@ de suite groen blijft en de volgende taken een plek hebben om hun regel aan te p
 **Files:**
 - Create: `data/checkregister-gwsw-nulmeting-v0_8.md` (kopie van v0.7 plus de wijzigingen hieronder)
 - Create: `tests/test_register_versie.py`
-- Modify: `src/gwswpijplijn/register.py` (docstring regel 3, `default_register_path()` regel 148-150)
-- Modify: `src/gwswpijplijn/dekking.toml` (regels 9-10)
-- Modify: `src/gwswpijplijn/checks.toml` (`[rapport] register_versie`)
+- Modify: `src/nlriochecker/register.py` (docstring regel 3, `default_register_path()` regel 148-150)
+- Modify: `src/nlriochecker/dekking.toml` (regels 9-10)
+- Modify: `src/nlriochecker/checks.toml` (`[rapport] register_versie`)
 - Modify: `tests/test_checks_registry.py` (regel 12)
 
 **Interfaces:**
@@ -75,9 +75,9 @@ getoetst is.
 
 from __future__ import annotations
 
-from gwswpijplijn.checkconfig import load_check_config
-from gwswpijplijn.config import load_coverage_config
-from gwswpijplijn.register import default_register_path, load_register
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.config import load_coverage_config
+from nlriochecker.register import default_register_path, load_register
 
 VERWACHTE_VERSIE = "0.8"
 
@@ -187,16 +187,16 @@ veranderd.
 
 - [ ] **Step 7: Zet de vijf verwijzingen om**
 
-In `src/gwswpijplijn/register.py`: vervang in de moduledocstring en in `default_register_path()` `checkregister-gwsw-nulmeting-v0_7.md` door `checkregister-gwsw-nulmeting-v0_8.md`.
+In `src/nlriochecker/register.py`: vervang in de moduledocstring en in `default_register_path()` `checkregister-gwsw-nulmeting-v0_7.md` door `checkregister-gwsw-nulmeting-v0_8.md`.
 
-In `src/gwswpijplijn/dekking.toml`:
+In `src/nlriochecker/dekking.toml`:
 
 ```toml
 checkregister_versie = "0.8"
 bron = "data/checkregister-gwsw-nulmeting-v0_8.md"
 ```
 
-In `src/gwswpijplijn/checks.toml`, onder `[rapport]`:
+In `src/nlriochecker/checks.toml`, onder `[rapport]`:
 
 ```toml
 register_versie = "v0.8"
@@ -216,8 +216,8 @@ Verwacht: PASS. Draai daarna de hele suite: `uv run pytest -m "not zwaar"` — o
 ```bash
 uv run ruff check && uv run ruff format --check
 git add data/checkregister-gwsw-nulmeting-v0_8.md tests/test_register_versie.py \
-        src/gwswpijplijn/register.py src/gwswpijplijn/dekking.toml \
-        src/gwswpijplijn/checks.toml tests/test_checks_registry.py
+        src/nlriochecker/register.py src/nlriochecker/dekking.toml \
+        src/nlriochecker/checks.toml tests/test_checks_registry.py
 git commit -m "Checkregister v0.8: het scopebeleid vastgelegd en de vijf versieverwijzingen omgezet"
 ```
 
@@ -227,8 +227,8 @@ git commit -m "Checkregister v0.8: het scopebeleid vastgelegd en de vijf versiev
 
 **Files:**
 - Modify: `data/checkregister-gwsw-nulmeting-v0_8.md` (EXT-tabel en de tabel met vervallen checks)
-- Modify: `src/gwswpijplijn/checks/extern.py` (klasse `PandZonderRiolering`, regels 569-651)
-- Modify: `src/gwswpijplijn/checkconfig.py` (regel 191, `ext_riolering_bij_pand_m`)
+- Modify: `src/nlriochecker/checks/extern.py` (klasse `PandZonderRiolering`, regels 569-651)
+- Modify: `src/nlriochecker/checkconfig.py` (regel 191, `ext_riolering_bij_pand_m`)
 - Modify: `tests/test_checks_extern.py` (regels 26, 41-42, 109, 206-220)
 - Modify: `tests/test_uitvoer_locatie.py` (regel 72)
 - Modify: `tests/test_integration.py` (regel 234)
@@ -258,7 +258,7 @@ Verwacht: FAIL met "EXT-008 staat niet in het checkregister" — de engine kent 
 
 - [ ] **Step 3: Haal de check uit de engine**
 
-Verwijder in `src/gwswpijplijn/checks/extern.py` de hele klasse `PandZonderRiolering` inclusief de `@register`-decorator. Verwijder in `src/gwswpijplijn/checkconfig.py` de regel:
+Verwijder in `src/nlriochecker/checks/extern.py` de hele klasse `PandZonderRiolering` inclusief de `@register`-decorator. Verwijder in `src/nlriochecker/checkconfig.py` de regel:
 
 ```python
     ext_riolering_bij_pand_m: float = Field(default=40.0, gt=0.0)
@@ -302,7 +302,7 @@ bekeken. Na deze taak draagt elke bevinding een relatie.
 
 **Files:**
 - Modify: `data/checkregister-gwsw-nulmeting-v0_8.md` (EXT-001-rij)
-- Modify: `src/gwswpijplijn/checks/extern.py` (klasse `KruisingMetBouwwerk`, regels 207-295)
+- Modify: `src/nlriochecker/checks/extern.py` (klasse `KruisingMetBouwwerk`, regels 207-295)
 - Modify: `tests/fixtures/ttl/ext_scenario.ttl` (twee putten en een streng erbij)
 - Modify: `tests/test_checks_extern.py` (verwachtingen EXT-001 en EXT-005)
 - Modify: `tests/test_integration.py` (regel 239)
@@ -357,7 +357,7 @@ Verwacht: FAIL — EXT-001 vindt alleen streng "1" en kent geen `waarde`.
 
 - [ ] **Step 4: Herschrijf de check**
 
-Vervang in `src/gwswpijplijn/checks/extern.py` de body van `KruisingMetBouwwerk` (laat
+Vervang in `src/nlriochecker/checks/extern.py` de body van `KruisingMetBouwwerk` (laat
 `bouwwerklagen()`, `bruikbaar()` en `notes()` staan) door:
 
 ```python
@@ -500,7 +500,7 @@ die geldt alleen voor een GeoPackage met een enkele laag en heet dan naar het be
 naar de laag.
 
 **Files:**
-- Modify: `src/gwswpijplijn/uitvoer/gpkg.py` (`_schrijf_stijlen`, regels 555-585, en de aanroep in `schrijf_geopackage` regel 82)
+- Modify: `src/nlriochecker/uitvoer/gpkg.py` (`_schrijf_stijlen`, regels 555-585, en de aanroep in `schrijf_geopackage` regel 82)
 - Modify: `tests/test_uitvoer_gpkg.py` (`test_stijlen_liggen_ook_los_naast_het_bestand`, regel 183)
 
 **Interfaces:**
@@ -550,7 +550,7 @@ Verwacht: FAIL — de tabel staat niet in `gpkg_contents`, het tijdstempel heeft
 
 - [ ] **Step 3: Pas de schrijver aan**
 
-In `src/gwswpijplijn/uitvoer/gpkg.py`:
+In `src/nlriochecker/uitvoer/gpkg.py`:
 
 ```python
 def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
@@ -583,7 +583,7 @@ def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
             "insert into layer_styles (f_table_catalog, f_table_schema, f_table_name, "
             "f_geometry_column, styleName, styleQML, styleSLD, useAsDefault, description, "
             "owner, ui, update_time) values ('', '', ?, 'geom', ?, ?, '', 1, ?, "
-            "'gwswpijplijn', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+            "'nlriochecker', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
             (laag, f"{laag} (datakwaliteit)", qml, f"Standaardstijl voor {laag}."),
         )
 ```
@@ -614,10 +614,10 @@ webadres dat niet bestaat. Het fragment is even uniek en veel bruikbaarder; de v
 URI blijft als eigen kolom staan voor de herleidbaarheid naar de TTL.
 
 **Files:**
-- Modify: `src/gwswpijplijn/uitvoer/identiteit.py` (nieuwe functie `kort`)
-- Modify: `src/gwswpijplijn/uitvoer/melding.py` (`Melding`, `bouw_meldingen`)
-- Modify: `src/gwswpijplijn/uitvoer/gpkg.py` (`_samenvatting_kolommen`, `_samenvatting`, `MELDING_KOLOMMEN`, `_melding_rij`)
-- Modify: `src/gwswpijplijn/uitvoer/bevindingen.py` (`CSV_KOLOMMEN`, `meldingen_tabel`)
+- Modify: `src/nlriochecker/uitvoer/identiteit.py` (nieuwe functie `kort`)
+- Modify: `src/nlriochecker/uitvoer/melding.py` (`Melding`, `bouw_meldingen`)
+- Modify: `src/nlriochecker/uitvoer/gpkg.py` (`_samenvatting_kolommen`, `_samenvatting`, `MELDING_KOLOMMEN`, `_melding_rij`)
+- Modify: `src/nlriochecker/uitvoer/bevindingen.py` (`CSV_KOLOMMEN`, `meldingen_tabel`)
 - Modify: `tests/test_uitvoer_identiteit.py`, `tests/test_uitvoer_gpkg.py`, `tests/test_uitvoer_melding.py`
 
 **Interfaces:**
@@ -629,7 +629,7 @@ URI blijft als eigen kolom staan voor de herleidbaarheid naar de TTL.
 Voeg toe aan `tests/test_uitvoer_identiteit.py`:
 
 ```python
-from gwswpijplijn.uitvoer.identiteit import kort
+from nlriochecker.uitvoer.identiteit import kort
 
 
 def test_kort_geeft_het_fragment_van_een_gwsw_uri() -> None:
@@ -650,7 +650,7 @@ Verwacht: FAIL met ImportError.
 
 - [ ] **Step 3: Schrijf `kort`**
 
-Voeg toe aan `src/gwswpijplijn/uitvoer/identiteit.py`:
+Voeg toe aan `src/nlriochecker/uitvoer/identiteit.py`:
 
 ```python
 def kort(uri: str) -> str:
@@ -721,7 +721,7 @@ def test_de_melding_id_blijft_over_de_volledige_uri_gehasht() -> None:
     )
 ```
 
-(Importeer `melding_id` uit `gwswpijplijn.uitvoer.identiteit` en volg voor `_run` de opzet
+(Importeer `melding_id` uit `nlriochecker.uitvoer.identiteit` en volg voor `_run` de opzet
 van de bestaande tests in dat bestand. Draagt TOP-005 een onderscheidende detailsleutel,
 gebruik die dan als vierde argument in plaats van het lege woordenboek.)
 
@@ -732,7 +732,7 @@ Verwacht: FAIL — de kolom `gwsw_uri` bestaat niet.
 
 - [ ] **Step 7: Zet de velden op de melding**
 
-In `src/gwswpijplijn/uitvoer/melding.py`, in de dataclass `Melding` direct onder `object_uri` respectievelijk `object2_uri`:
+In `src/nlriochecker/uitvoer/melding.py`, in de dataclass `Melding` direct onder `object_uri` respectievelijk `object2_uri`:
 
 ```python
     object_uri: str
@@ -754,13 +754,13 @@ En in `bouw_meldingen`, bij het opbouwen van de `Melding`:
                     object2_label=_tekst(finding.details.get(SLEUTEL_OBJECT2_LABEL)),
 ```
 
-Breid de import bovenin uit: `from gwswpijplijn.uitvoer.identiteit import kort, melding_id`.
+Breid de import bovenin uit: `from nlriochecker.uitvoer.identiteit import kort, melding_id`.
 De hash in `_uniek_id` blijft over `finding.object_uri` gaan; de ID's veranderen dus niet
 ten opzichte van eerdere runs.
 
 - [ ] **Step 8: Zet de kolommen in de GeoPackage**
 
-In `src/gwswpijplijn/uitvoer/gpkg.py`:
+In `src/nlriochecker/uitvoer/gpkg.py`:
 - in `_samenvatting_kolommen()` blijft `_Kolom("feature_id", "text")` vooraan staan; voeg
   achteraan, na `_Kolom("register_versie", "text")`, toe: `_Kolom("gwsw_uri", "text")`.
 - in `_samenvatting()` wordt de eerste waarde `kort(uri)` en komt `uri` als laatste waarde
@@ -770,11 +770,11 @@ In `src/gwswpijplijn/uitvoer/gpkg.py`:
 - in `_melding_rij()` worden de eerste twee objectvelden `melding.object_id` en
   `melding.object2_id`, en komen `melding.object_uri` en `melding.object2_uri` achteraan.
 
-Importeer `kort` uit `gwswpijplijn.uitvoer.identiteit`.
+Importeer `kort` uit `nlriochecker.uitvoer.identiteit`.
 
 - [ ] **Step 9: Zet de kolommen in de CSV**
 
-In `src/gwswpijplijn/uitvoer/bevindingen.py`:
+In `src/nlriochecker/uitvoer/bevindingen.py`:
 - laat `"Object"` en `"Object2"` op hun plaats in `CSV_KOLOMMEN` staan, en voeg achteraan
   `"ObjectURI"` en `"Object2URI"` toe;
 - in `meldingen_tabel()`: `"Object": melding.object_id`, `"Object2": melding.object2_id`,
@@ -807,10 +807,10 @@ die wél getoetst is en in orde bleek. Mechanisch riool valt buiten scope; dat h
 kaartbeeld te staan.
 
 **Files:**
-- Modify: `src/gwswpijplijn/checks.toml` (sectie `[klassen]`)
-- Modify: `src/gwswpijplijn/checkconfig.py` (`ClassRoots`)
-- Modify: `src/gwswpijplijn/uitvoer/gpkg.py` (`FEATURELAGEN`, `_schrijf_features`, `_schrijf_runmetadata`)
-- Create: `src/gwswpijplijn/uitvoer/stijlen/mechanisch_riool.qml`
+- Modify: `src/nlriochecker/checks.toml` (sectie `[klassen]`)
+- Modify: `src/nlriochecker/checkconfig.py` (`ClassRoots`)
+- Modify: `src/nlriochecker/uitvoer/gpkg.py` (`FEATURELAGEN`, `_schrijf_features`, `_schrijf_runmetadata`)
+- Create: `src/nlriochecker/uitvoer/stijlen/mechanisch_riool.qml`
 - Create: `tests/fixtures/ttl/mechanisch_riool.ttl`
 - Modify: `tests/test_uitvoer_gpkg.py`, `tests/test_checkconfig.py`
 
@@ -869,7 +869,7 @@ Verwacht: FAIL — de tabel `mechanisch_riool` bestaat niet.
 
 - [ ] **Step 4: Zet de klassen in de configuratie**
 
-In `src/gwswpijplijn/checks.toml`, onder `[klassen]`, na de regel voor `streng`:
+In `src/nlriochecker/checks.toml`, onder `[klassen]`, na de regel voor `streng`:
 
 ```toml
 # Mechanisch riool valt buiten scope (zie het checkregister). Deze klassen komen
@@ -879,7 +879,7 @@ In `src/gwswpijplijn/checks.toml`, onder `[klassen]`, na de regel voor `streng`:
 mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
 ```
 
-In `src/gwswpijplijn/checkconfig.py`, in `ClassRoots` onder `streng`:
+In `src/nlriochecker/checkconfig.py`, in `ClassRoots` onder `streng`:
 
 ```python
     # Mechanisch riool: buiten scope voor de checks, wel zichtbaar in de GIS-uitvoer.
@@ -888,7 +888,7 @@ In `src/gwswpijplijn/checkconfig.py`, in `ClassRoots` onder `streng`:
 
 - [ ] **Step 5: Splits de lagen in de schrijver**
 
-In `src/gwswpijplijn/uitvoer/gpkg.py`:
+In `src/nlriochecker/uitvoer/gpkg.py`:
 
 ```python
 FEATURELAGEN = ("putten", "strengen", "meldinglocaties", "mechanisch_riool")
@@ -939,7 +939,7 @@ In `_schrijf_runmetadata` komen er drie kolommen bij — `n_putten`, `n_strengen
 
 - [ ] **Step 6: Maak de stijl**
 
-Maak `src/gwswpijplijn/uitvoer/stijlen/mechanisch_riool.qml`:
+Maak `src/nlriochecker/uitvoer/stijlen/mechanisch_riool.qml`:
 
 ```xml
 <!-- Default-stijl voor het mechanische stelsel: grijs en dun, met de reden in de
@@ -985,11 +985,11 @@ pijlen die tegen elkaar in wijzen. Ontbreken de BOB's of zijn ze gelijk, dan é�
 pijl met een eigen legenda-regel.
 
 **Files:**
-- Modify: `src/gwswpijplijn/dataset.py` (`Conduit.bob_verval`, `GwswDataset.richting_van_geometrie`)
-- Modify: `src/gwswpijplijn/checks/topologie.py` (TOP-020 gebruikt de nieuwe methode)
-- Modify: `src/gwswpijplijn/checks/netwerk.py` (`_stijgt` gebruikt `bob_verval`)
-- Modify: `src/gwswpijplijn/uitvoer/gpkg.py` (kolommen `richting_bob`, `bob_verval_m`)
-- Modify: `src/gwswpijplijn/uitvoer/stijlen/strengen.qml`
+- Modify: `src/nlriochecker/dataset.py` (`Conduit.bob_verval`, `GwswDataset.richting_van_geometrie`)
+- Modify: `src/nlriochecker/checks/topologie.py` (TOP-020 gebruikt de nieuwe methode)
+- Modify: `src/nlriochecker/checks/netwerk.py` (`_stijgt` gebruikt `bob_verval`)
+- Modify: `src/nlriochecker/uitvoer/gpkg.py` (kolommen `richting_bob`, `bob_verval_m`)
+- Modify: `src/nlriochecker/uitvoer/stijlen/strengen.qml`
 - Create: `tests/fixtures/ttl/richting_omgekeerd_met_bob.ttl`
 - Modify: `tests/test_dataset.py`, `tests/test_uitvoer_gpkg.py`
 
@@ -1020,7 +1020,7 @@ def test_bob_verval_ontbreekt_zonder_beide_bobs(juinen) -> None:
 
 
 def test_richting_van_geometrie_ziet_een_omgekeerd_getekende_lijn() -> None:
-    from gwswpijplijn.checkconfig import load_check_config
+    from nlriochecker.checkconfig import load_check_config
 
     dataset = load_dataset(TTL_DIR / "top020_omgekeerd_getekend.ttl")
     wortels = load_check_config().klassen.netwerkknopen
@@ -1041,7 +1041,7 @@ Verwacht: FAIL met AttributeError.
 
 - [ ] **Step 3: Zet de twee methoden op de dataset**
 
-In `src/gwswpijplijn/dataset.py`, bij de andere properties van `Conduit`:
+In `src/nlriochecker/dataset.py`, bij de andere properties van `Conduit`:
 
 ```python
     @property
@@ -1090,7 +1090,7 @@ Controleer dat `Point` bovenin `dataset.py` geimporteerd is; zo niet, voeg
 
 - [ ] **Step 4: Laat TOP-020 en NET-003 dezelfde methode gebruiken**
 
-In `src/gwswpijplijn/checks/topologie.py`, in de `run()` van TOP-020: vervang de blokken
+In `src/nlriochecker/checks/topologie.py`, in de `run()` van TOP-020: vervang de blokken
 die begin- en eindput opzoeken en de twee afstandssommen vergelijken door:
 
 ```python
@@ -1104,7 +1104,7 @@ die begin- en eindput opzoeken en de twee afstandssommen vergelijken door:
                 continue
 ```
 
-De rest van de melding blijft ongewijzigd. In `src/gwswpijplijn/checks/netwerk.py` wordt
+De rest van de melding blijft ongewijzigd. In `src/nlriochecker/checks/netwerk.py` wordt
 `_stijgt`:
 
 ```python
@@ -1162,7 +1162,7 @@ wordt door de TOP-020-test gebruikt.
 
 - [ ] **Step 7: Vul de kolommen**
 
-In `src/gwswpijplijn/uitvoer/gpkg.py`:
+In `src/nlriochecker/uitvoer/gpkg.py`:
 
 ```python
 RICHTING_MEE = "mee"
@@ -1193,7 +1193,7 @@ blijven ze leeg (`""` en `None`), voor een streng komen ze uit `_richting_bob`. 
 
 - [ ] **Step 8: Vervang de stijl**
 
-Vervang de inhoud van `src/gwswpijplijn/uitvoer/stijlen/strengen.qml` door onderstaande,
+Vervang de inhoud van `src/nlriochecker/uitvoer/stijlen/strengen.qml` door onderstaande,
 regelgebaseerde stijl. Deze is met PyQGIS gecontroleerd: hij laadt als
 `QgsRuleBasedRenderer` met zes regels, waarvan de richtingregels `MarkerLine`-lagen dragen.
 
@@ -1307,8 +1307,8 @@ exact waar de fout zit; de stijl zet de punten op het scherm uiteen, en de kolom
 ook zonder QGIS dat er meer onder liggen.
 
 **Files:**
-- Modify: `src/gwswpijplijn/uitvoer/gpkg.py` (`MELDING_KOLOMMEN`, `_schrijf_meldinglocaties`)
-- Modify: `src/gwswpijplijn/uitvoer/stijlen/meldinglocaties.qml`
+- Modify: `src/nlriochecker/uitvoer/gpkg.py` (`MELDING_KOLOMMEN`, `_schrijf_meldinglocaties`)
+- Modify: `src/nlriochecker/uitvoer/stijlen/meldinglocaties.qml`
 - Modify: `tests/test_uitvoer_gpkg.py`
 
 **Interfaces:**
@@ -1350,7 +1350,7 @@ Verwacht: FAIL — de kolommen bestaan niet.
 
 - [ ] **Step 3: Tel en nummer de stapels**
 
-In `src/gwswpijplijn/uitvoer/gpkg.py`:
+In `src/nlriochecker/uitvoer/gpkg.py`:
 
 ```python
 # Op welke afstand twee meldingen als dezelfde plek gelden. Een millimeter: kleiner
@@ -1391,7 +1391,7 @@ met `(1, 1)` als terugval voor een melding zonder foutlocatie.
 
 - [ ] **Step 4: Zet de offset in de stijl**
 
-Voeg in `src/gwswpijplijn/uitvoer/stijlen/meldinglocaties.qml` aan beide
+Voeg in `src/nlriochecker/uitvoer/stijlen/meldinglocaties.qml` aan beide
 `SimpleMarker`-lagen dit blok toe, direct na de `<prop>`-regels. De expressie is met
 PyQGIS gecontroleerd: bij `stapel_aantal = 4` levert ze `0,2.6`, `-2.6,0`, `0,-2.6` en
 `2.6,0`.
@@ -1436,18 +1436,18 @@ De kern van de afbakening. Nog zonder aansluiting op de pijplijn: deze taak leve
 bouwsteen en bewijst dat hij de randeffecten wegneemt.
 
 **Files:**
-- Create: `src/gwswpijplijn/afbakening.py`
+- Create: `src/nlriochecker/afbakening.py`
 - Create: `tests/test_afbakening.py`
 - Create: `tests/fixtures/ttl/afbakening_kern_en_schil.ttl`
 - Create: `tests/fixtures/gis/afbakening_gebied.geojson`
-- Modify: `src/gwswpijplijn/dataset.py` (`GwswDataset.subset`)
-- Modify: `src/gwswpijplijn/checkconfig.py` (`StudyAreaOptions`)
-- Modify: `src/gwswpijplijn/checks.toml` (sectie `[studiegebied]`)
-- Modify: `src/gwswpijplijn/checks/base.py` (`objecten_in_gebied` verhuist naar `afbakening.py`)
+- Modify: `src/nlriochecker/dataset.py` (`GwswDataset.subset`)
+- Modify: `src/nlriochecker/checkconfig.py` (`StudyAreaOptions`)
+- Modify: `src/nlriochecker/checks.toml` (sectie `[studiegebied]`)
+- Modify: `src/nlriochecker/checks/base.py` (`objecten_in_gebied` verhuist naar `afbakening.py`)
 
 **Interfaces:**
 - Consumes: `StudyArea.bevat`, `GwswDataset.of_class`, `GwswDataset.resolve_network_node`.
-- Produces: `GwswDataset.subset(uris: Iterable[str]) -> GwswDataset`; `Analyseset(kern, schil, dataset, component_aandeel)`; `bouw_analyseset(dataset, area, config) -> Analyseset`; `objecten_in_gebied(dataset, area) -> frozenset[str]` (verhuisd, blijft importeerbaar uit `gwswpijplijn.checks`).
+- Produces: `GwswDataset.subset(uris: Iterable[str]) -> GwswDataset`; `Analyseset(kern, schil, dataset, component_aandeel)`; `bouw_analyseset(dataset, area, config) -> Analyseset`; `objecten_in_gebied(dataset, area) -> frozenset[str]` (verhuisd, blijft importeerbaar uit `nlriochecker.checks`).
 
 - [ ] **Step 1: Maak de fixtures**
 
@@ -1479,11 +1479,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gwswpijplijn.afbakening import bouw_analyseset, objecten_in_gebied
-from gwswpijplijn.checkconfig import load_check_config
-from gwswpijplijn.checks import CheckContext, run_checks
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.studiegebied import load_study_area
+from nlriochecker.afbakening import bouw_analyseset, objecten_in_gebied
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.dataset import load_dataset
+from nlriochecker.studiegebied import load_study_area
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -1559,7 +1559,7 @@ def test_de_buffer_haalt_ongekoppelde_buren_erbij() -> None:
 
 def test_objecten_in_gebied_blijft_importeerbaar_uit_checks() -> None:
     """De functie is verhuisd; bestaande importen mogen niet breken."""
-    from gwswpijplijn.checks import objecten_in_gebied as via_checks
+    from nlriochecker.checks import objecten_in_gebied as via_checks
 
     assert via_checks is objecten_in_gebied
 ```
@@ -1567,11 +1567,11 @@ def test_objecten_in_gebied_blijft_importeerbaar_uit_checks() -> None:
 - [ ] **Step 3: Draai de tests en zie ze falen**
 
 Run: `uv run pytest tests/test_afbakening.py -v`
-Verwacht: FAIL met ModuleNotFoundError voor `gwswpijplijn.afbakening`.
+Verwacht: FAIL met ModuleNotFoundError voor `nlriochecker.afbakening`.
 
 - [ ] **Step 4: Zet de configuratie neer**
 
-In `src/gwswpijplijn/checkconfig.py`, naast de andere optieklassen:
+In `src/nlriochecker/checkconfig.py`, naast de andere optieklassen:
 
 ```python
 class StudyAreaOptions(BaseModel):
@@ -1593,7 +1593,7 @@ class StudyAreaOptions(BaseModel):
 
 Voeg het veld toe aan `CheckConfig`: `studiegebied: StudyAreaOptions = Field(default_factory=StudyAreaOptions)` (volg de schrijfwijze van de bestaande velden in die klasse).
 
-In `src/gwswpijplijn/checks.toml`, onderaan:
+In `src/nlriochecker/checks.toml`, onderaan:
 
 ```toml
 # Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
@@ -1607,7 +1607,7 @@ component_waarschuwingsdrempel = 0.5
 
 - [ ] **Step 5: Zet `subset` op de dataset**
 
-In `src/gwswpijplijn/dataset.py`, bij de andere methoden van `GwswDataset`:
+In `src/nlriochecker/dataset.py`, bij de andere methoden van `GwswDataset`:
 
 ```python
     def subset(self, uris: Iterable[str]) -> GwswDataset:
@@ -1650,9 +1650,9 @@ from dataclasses import dataclass
 
 import networkx as nx
 
-from gwswpijplijn.checkconfig import CheckConfig
-from gwswpijplijn.dataset import GwswDataset
-from gwswpijplijn.studiegebied import StudyArea
+from nlriochecker.checkconfig import CheckConfig
+from nlriochecker.dataset import GwswDataset
+from nlriochecker.studiegebied import StudyArea
 
 
 @dataclass(frozen=True)
@@ -1750,8 +1750,8 @@ def _binnen_buffer(dataset: GwswDataset, area: StudyArea, config: CheckConfig) -
 
 - [ ] **Step 7: Verhuis `objecten_in_gebied`**
 
-Haal de functie uit `src/gwswpijplijn/checks/base.py` en importeer haar daar voortaan uit
-`gwswpijplijn.afbakening`, zodat `from gwswpijplijn.checks import objecten_in_gebied`
+Haal de functie uit `src/nlriochecker/checks/base.py` en importeer haar daar voortaan uit
+`nlriochecker.afbakening`, zodat `from nlriochecker.checks import objecten_in_gebied`
 blijft werken (`checks/__init__.py` exporteert hem al). Controleer met
 `grep -rn "objecten_in_gebied" src tests` dat alle aanroepers nog dezelfde functie krijgen.
 
@@ -1773,11 +1773,11 @@ git commit -m "Analyseset: de kern plus de contextschil die de netwerkchecks hun
 ### Taak 10: De analyseset in de pijplijn
 
 **Files:**
-- Modify: `src/gwswpijplijn/checks/base.py` (`Check.volledig_bereik`, `CheckContext`, `run_checks`, `CheckRun`)
-- Modify: `src/gwswpijplijn/checks/administratief.py` (ADM-002 krijgt de vlag)
-- Modify: `src/gwswpijplijn/cli.py` (`check_command`)
-- Modify: `src/gwswpijplijn/uitvoer/gpkg.py` (`_schrijf_runmetadata`)
-- Modify: `src/gwswpijplijn/uitvoer/bevindingen.py` (de kop van het rapport)
+- Modify: `src/nlriochecker/checks/base.py` (`Check.volledig_bereik`, `CheckContext`, `run_checks`, `CheckRun`)
+- Modify: `src/nlriochecker/checks/administratief.py` (ADM-002 krijgt de vlag)
+- Modify: `src/nlriochecker/cli.py` (`check_command`)
+- Modify: `src/nlriochecker/uitvoer/gpkg.py` (`_schrijf_runmetadata`)
+- Modify: `src/nlriochecker/uitvoer/bevindingen.py` (de kop van het rapport)
 - Modify: `tests/test_afbakening.py`, `tests/test_cli.py`, `tests/test_reporting.py`
 
 **Interfaces:**
@@ -1849,7 +1849,7 @@ Verwacht: FAIL — `CheckContext` kent `volledige_dataset` en `analyseset` niet.
 
 - [ ] **Step 3: Breid het raamwerk uit**
 
-In `src/gwswpijplijn/checks/base.py`:
+In `src/nlriochecker/checks/base.py`:
 
 ```python
 @dataclass(frozen=True)
@@ -1889,12 +1889,12 @@ else context`, en gebruik `gebruikt` voor `examined()`, `run()` en `notes()`. Ge
 `analyseset=context.analyseset` mee aan de `CheckRun`, en voeg dat veld toe aan de
 dataclass (en aan `beperk_tot_studiegebied`, die de run opnieuw opbouwt).
 
-Zet in `src/gwswpijplijn/checks/administratief.py` op de ADM-002-klasse
+Zet in `src/nlriochecker/checks/administratief.py` op de ADM-002-klasse
 `volledig_bereik = True`, met een regel commentaar waarom.
 
 - [ ] **Step 4: Sluit de CLI aan**
 
-In `src/gwswpijplijn/cli.py`, in `check_command`, vervang het blok rond `run_checks` door:
+In `src/nlriochecker/cli.py`, in `check_command`, vervang het blok rond `run_checks` door:
 
 ```python
         area = load_study_area(study_path, study_layer) if study_path is not None else None
@@ -1978,9 +1978,9 @@ registry raakt de graaf (ADM-007 t/m ADM-009, NET-007, de RVZ-checks) en komt op
 een minuut in plaats van vier.
 
 **Files:**
-- Create: `src/gwswpijplijn/cache.py`
+- Create: `src/nlriochecker/cache.py`
 - Create: `tests/test_cache.py`
-- Modify: `src/gwswpijplijn/cli.py` (`check_command`: opties en melding)
+- Modify: `src/nlriochecker/cli.py` (`check_command`: opties en melding)
 
 **Interfaces:**
 - Consumes: `load_dataset(path, ontologies) -> GwswDataset`.
@@ -2004,8 +2004,8 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.cache import cachesleutel, laad_met_cache
-from gwswpijplijn.dataset import load_dataset
+from nlriochecker.cache import cachesleutel, laad_met_cache
+from nlriochecker.dataset import load_dataset
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 VOORBEELD = DATA / "gwsw_orox_ttl" / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
@@ -2041,7 +2041,7 @@ def test_de_graaf_werkt_ook_uit_de_cache(tmp_path: Path) -> None:
 
 def test_de_sleutel_verandert_mee_met_de_lader(tmp_path: Path, monkeypatch) -> None:
     eerste = cachesleutel(VOORBEELD, [])
-    monkeypatch.setattr("gwswpijplijn.cache.LADER_VERSIE", "gewijzigd")
+    monkeypatch.setattr("nlriochecker.cache.LADER_VERSIE", "gewijzigd")
 
     assert cachesleutel(VOORBEELD, []) != eerste
 
@@ -2097,9 +2097,9 @@ import rdflib
 import shapely
 from rdflib import Graph
 
-from gwswpijplijn import dataset as dataset_module
-from gwswpijplijn import geometry as geometry_module
-from gwswpijplijn.dataset import GwswDataset, load_dataset
+from nlriochecker import dataset as dataset_module
+from nlriochecker import geometry as geometry_module
+from nlriochecker.dataset import GwswDataset, load_dataset
 
 # Losstaand van de bestandshashes, zodat een test hem kan verzetten.
 LADER_VERSIE = "1"
@@ -2180,7 +2180,7 @@ def _bestandshash(pad: Path) -> str:
 def standaard_cachemap() -> Path:
     """De cachemap volgens de XDG-conventie."""
     basis = os.environ.get("XDG_CACHE_HOME")
-    return Path(basis or Path.home() / ".cache") / "gwswpijplijn"
+    return Path(basis or Path.home() / ".cache") / "nlriochecker"
 
 
 def laad_met_cache(
@@ -2238,7 +2238,7 @@ Verwacht: PASS.
 
 - [ ] **Step 5: Sluit de CLI aan**
 
-Voeg aan `check_command` in `src/gwswpijplijn/cli.py` twee opties toe:
+Voeg aan `check_command` in `src/nlriochecker/cli.py` twee opties toe:
 
 ```python
 @click.option(
@@ -2252,7 +2252,7 @@ Voeg aan `check_command` in `src/gwswpijplijn/cli.py` twee opties toe:
     "cache_dir",
     default=None,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Waar de geparseerde dataset bewaard wordt; standaard ~/.cache/gwswpijplijn.",
+    help="Waar de geparseerde dataset bewaard wordt; standaard ~/.cache/nlriochecker.",
 )
 ```
 
@@ -2281,18 +2281,18 @@ Verwacht: PASS.
 - [ ] **Step 7: Meet het effect**
 
 ```bash
-rm -rf ~/.cache/gwswpijplijn
-time uv run gwswpijplijn toets --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+rm -rf ~/.cache/nlriochecker
+time uv run nlriochecker toets --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
   --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
   --studiegebied data/gis/cbs_buurt_koekangerveld_studiegebied.gpkg \
   --bronnen data/gis --output uitvoer/koekangerveld_ronde3
-time uv run gwswpijplijn toets --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+time uv run nlriochecker toets --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
   --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
   --studiegebied data/gis/cbs_buurt_koekangerveld_studiegebied.gpkg \
   --bronnen data/gis --output uitvoer/koekangerveld_ronde3
 ```
 
-Noteer beide tijden en de omvang van de cachemap (`du -sh ~/.cache/gwswpijplijn`) voor het
+Noteer beide tijden en de omvang van de cachemap (`du -sh ~/.cache/nlriochecker`) voor het
 verslag in taak 12. Loopt de warme run niet merkbaar sneller, ga dan niet verder maar zoek
 uit waarom; dat is dan een bevinding, geen tegenvaller om weg te schrijven.
 
@@ -2339,11 +2339,11 @@ import pytest
 
 qgis_core = pytest.importorskip("qgis.core", reason="PyQGIS is hier niet geinstalleerd")
 
-from gwswpijplijn.checkconfig import load_check_config  # noqa: E402
-from gwswpijplijn.checks import CheckContext, run_checks  # noqa: E402
-from gwswpijplijn.dataset import load_dataset  # noqa: E402
-from gwswpijplijn.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
-from gwswpijplijn.uitvoer.melding import bouw_meldingen  # noqa: E402
+from nlriochecker.checkconfig import load_check_config  # noqa: E402
+from nlriochecker.checks import CheckContext, run_checks  # noqa: E402
+from nlriochecker.dataset import load_dataset  # noqa: E402
+from nlriochecker.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
+from nlriochecker.uitvoer.melding import bouw_meldingen  # noqa: E402
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 RUNDATUM = date(2026, 8, 16)
@@ -2471,7 +2471,7 @@ Voeg aan de sectie "Technische afspraken" toe:
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
-- De geparseerde dataset wordt gecachet (`~/.cache/gwswpijplijn`, `--geen-cache` om hem
+- De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
   over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
   `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
 ```

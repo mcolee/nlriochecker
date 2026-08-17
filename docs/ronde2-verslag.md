@@ -129,7 +129,7 @@ bevinding, voor het gebrek in de eerste stabiliteitstest.
 
 ### Taak 9 — De analyseset: kern plus contextschil
 
-Nieuw: `src/gwswpijplijn/afbakening.py`. `bouw_analyseset()` bepaalt de kern
+Nieuw: `src/nlriochecker/afbakening.py`. `bouw_analyseset()` bepaalt de kern
 (objecten die het gebied raken, ongewijzigd van betekenis) plus een contextschil:
 de samenhangende netwerkcomponent die de kern raakt (alleen over de
 vrijvervalleidingen — mechanische leidingen verbinden dorpen onderling en zouden de
@@ -149,10 +149,10 @@ bevinding (de regressie in de wiring).
 
 ### Taak 11 — Datasetcache
 
-Nieuw: `src/gwswpijplijn/cache.py`. Sleutel: sha256 over de inhoud van
+Nieuw: `src/nlriochecker/cache.py`. Sleutel: sha256 over de inhoud van
 dataset- en ontologiebestanden, de broncode van `dataset.py` en `geometry.py`, en
 de rdflib-/shapely-versies — wijzigt de lader, dan is het een andere sleutel.
-Opslag onder `~/.cache/gwswpijplijn/<sleutel>/`, weggeschreven via een tijdelijk
+Opslag onder `~/.cache/nlriochecker/<sleutel>/`, weggeschreven via een tijdelijk
 bestand plus `rename`. De rdflib-graaf (423 MB op De Wolden) gaat achter een luie
 plaatsvervanger (`LuieGraaf`) die pas van schijf leest zodra een check hem
 aanraakt; de structuren (knopen, strengen, klassenhierarchie, 31 MB) worden altijd

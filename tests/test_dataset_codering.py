@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.errors import DatasetError
+from nlriochecker.dataset import load_dataset
+from nlriochecker.errors import DatasetError
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 

@@ -5,11 +5,11 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from gwswpijplijn.checkconfig import CheckConfig, load_check_config
-from gwswpijplijn.checks import CheckContext, CheckRun, run_checks
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.uitvoer.melding import Melding, bouw_meldingen
-from gwswpijplijn.uitvoer.synthese import rode_draad
+from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checks import CheckContext, CheckRun, run_checks
+from nlriochecker.dataset import load_dataset
+from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.synthese import rode_draad
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 RUNDATUM = date(2026, 8, 16)
@@ -144,7 +144,7 @@ def test_richtingspercentage_zegt_erbij_dat_het_datasetbreed_is() -> None:
 
     Dit is dezelfde fout die de clusterduiding maakte met "174 deelstelsels".
     """
-    from gwswpijplijn.studiegebied import load_study_area
+    from nlriochecker.studiegebied import load_study_area
 
     run = _run("net003_tegen_de_richting.ttl")
     gebied = load_study_area(Path(__file__).parent / "fixtures" / "gis" / "rond_de_fixture.geojson")

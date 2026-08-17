@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from shapely.geometry import LineString, Point, Polygon
 
-from gwswpijplijn.geometry import GeometryError, parse_gml, parse_gml_z
+from nlriochecker.geometry import GeometryError, parse_gml, parse_gml_z
 
 PUNT_3D = '<gml:Point xmlns:gml="g"><gml:pos>168462.01 442691.30 22.45</gml:pos></gml:Point>'
 PUNT_2D = '<gml:Point xmlns:gml="g"><gml:pos>168462.51 442691.30</gml:pos></gml:Point>'
@@ -79,7 +79,7 @@ def test_is_finite_verdraagt_een_vlak() -> None:
     """
     from shapely.geometry import Polygon
 
-    from gwswpijplijn.checks.meetkunde import is_finite
+    from nlriochecker.checks.meetkunde import is_finite
 
     assert is_finite(Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])) is True
     assert is_finite(Polygon([(0, 0), (float("inf"), 0), (1, 1), (0, 1)])) is False

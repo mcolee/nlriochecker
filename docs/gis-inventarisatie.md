@@ -125,7 +125,7 @@ studiegebied op een nodata-cel vielen.
 
 ## Configuratie
 
-Welke laag welke rol vervult staat in `src/gwswpijplijn/checks.toml` onder
+Welke laag welke rol vervult staat in `src/nlriochecker/checks.toml` onder
 `[bronnen]`. De laagnamen zijn per project aan te passen; een lege of ontbrekende
 laag laat de bijbehorende checks overslaan met de melding *laag niet aanwezig in
 aangeleverde data*. Alle bufferafstanden staan onder `[drempels]`

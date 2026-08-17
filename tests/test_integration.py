@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.afbakening import bouw_analyseset
-from gwswpijplijn.analysis import analyze
-from gwswpijplijn.checkconfig import load_check_config
-from gwswpijplijn.checks import REGISTRY, CheckContext, run_checks
-from gwswpijplijn.config import load_coverage_config
-from gwswpijplijn.coverage import Verdict, assess_coverage
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.meting import laad_nulmeting
-from gwswpijplijn.reporting import write_check_report, write_reports
-from gwswpijplijn.studiegebied import load_study_area
+from nlriochecker.afbakening import bouw_analyseset
+from nlriochecker.analysis import analyze
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import REGISTRY, CheckContext, run_checks
+from nlriochecker.config import load_coverage_config
+from nlriochecker.coverage import Verdict, assess_coverage
+from nlriochecker.dataset import load_dataset
+from nlriochecker.meting import laad_nulmeting
+from nlriochecker.reporting import write_check_report, write_reports
+from nlriochecker.studiegebied import load_study_area
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 SHACL_DIR = DATA_DIR / "shacl_nulmeting"
@@ -186,7 +186,7 @@ AHN_TIF = GIS_DIR / "ahn5_dtm_koekangerveld.tif"
 
 def _koekangerveld_bronnen():
     """Leest de echte externe bronnen uit data/gis."""
-    from gwswpijplijn.externedata import load_external_data
+    from nlriochecker.externedata import load_external_data
 
     basis = load_check_config().bronnen
     return load_external_data(basis.model_copy(update={"map": "."}), GIS_DIR)

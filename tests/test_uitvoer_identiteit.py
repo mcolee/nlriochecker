@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gwswpijplijn.uitvoer.identiteit import kort, melding_id
+from nlriochecker.uitvoer.identiteit import kort, melding_id
 
 
 def test_id_is_zestien_hextekens() -> None:

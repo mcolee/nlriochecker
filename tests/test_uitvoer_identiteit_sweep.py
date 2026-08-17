@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.checkconfig import load_check_config
-from gwswpijplijn.checks import CheckContext, run_checks
-from gwswpijplijn.dataset import load_dataset
-from gwswpijplijn.uitvoer.melding import bouw_meldingen
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.dataset import load_dataset
+from nlriochecker.uitvoer.melding import bouw_meldingen
 
 WORTEL = Path(__file__).resolve().parent.parent
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -35,7 +35,7 @@ def test_geen_enkele_fixture_levert_een_botsende_melding_id(caplog) -> None:
     config.drempels.rd_y_min = 0.0
 
     botsingen: list[tuple[str, str]] = []
-    with caplog.at_level(logging.WARNING, logger="gwswpijplijn.uitvoer.melding"):
+    with caplog.at_level(logging.WARNING, logger="nlriochecker.uitvoer.melding"):
         for pad in sorted(TTL_DIR.glob("*.ttl")):
             dataset = load_dataset(pad)
             run = run_checks(CheckContext(dataset=dataset, config=config))

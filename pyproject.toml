@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "gwswpijplijn"
+name = "nlriochecker"
 version = "0.1.0"
-description = "Toetsing van de datakwaliteit van vrijvervalriolering op basis van GWSW-nulmeting-detailrapporten"
+description = "Python package die helpt met het analyseren en rapporteren over (mogelijke-) fouten in GWSW-OroX (TTL) bestanden. Maakt gebruik van GWSW nulmeting maar biedt ook aanvullende checks."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-gwswpijplijn = "gwswpijplijn.cli:main"
+nlriochecker = "nlriochecker.cli:main"
 
 [dependency-groups]
 dev = [
@@ -30,7 +30,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/gwswpijplijn"]
+packages = ["src/nlriochecker"]
 
 [tool.ruff]
 line-length = 100

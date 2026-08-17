@@ -41,22 +41,22 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 
 ## Technische afspraken
 - Maak expliciet gebruik van de superpowers en dev-skills skills
-- Python 3.12+, src-layout (src/gwswpijplijn/), pyproject.toml, beheer met uv.
+- Python 3.12+, src-layout (src/nlriochecker/), pyproject.toml, beheer met uv.
 - Afhankelijkheden minimaal houden: pandas, click, pydantic, rdflib, shapely, networkx. Voeg er niets aan toe zonder noodzaak.
 - Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost ruim drie minuten en circa 3 GB).
 - Codekwaliteit: ruff (lint en format), type hints overal, Nederlandse docstrings, Engelse code-identifiers.
-- CLI-ingang: gwswpijplijn (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
+- CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
 - Rapportage-output: Markdown, CSV en een GeoPackage naar een output-map; nooit invoerbestanden
   overschrijven. Alle drie komen uit dezelfde meldingenstroom (`uitvoer/melding.py`); een
   schrijver die zelf een `Finding` interpreteert laat de drie uit elkaar lopen.
 - De uitvoermap heet `uitvoer/` en staat in `.gitignore` — met een leidende slash, anders
-  sluit die regel ook `src/gwswpijplijn/uitvoer/` uit en verdwijnt de package stilzwijgend
+  sluit die regel ook `src/nlriochecker/uitvoer/` uit en verdwijnt de package stilzwijgend
   uit de repository (en uit het zicht van ruff).
 - Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
-- De geparseerde dataset wordt gecachet (`~/.cache/gwswpijplijn`, `--geen-cache` om hem
+- De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
   over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
   `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
   De cachemap groeit per sleutel (op De Wolden ruim 450 MB); oude sleutels worden niet

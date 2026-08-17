@@ -15,9 +15,9 @@ import re
 import sys
 from pathlib import Path
 
-from gwswpijplijn import checks as _checks  # noqa: F401  (vult de registry)
-from gwswpijplijn.checks.base import REGISTRY, SkeletonCheck
-from gwswpijplijn.register import Register, RegisterEntry, default_register_path, load_register
+from nlriochecker import checks as _checks  # noqa: F401  (vult de registry)
+from nlriochecker.checks.base import REGISTRY, SkeletonCheck
+from nlriochecker.register import Register, RegisterEntry, default_register_path, load_register
 
 WORTEL = Path(__file__).resolve().parents[1]
 TESTMAP = WORTEL / "tests"

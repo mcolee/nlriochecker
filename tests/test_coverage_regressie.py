@@ -13,16 +13,16 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.analysis import MetingAnalysis, analyze
-from gwswpijplijn.config import CoverageConfig, load_coverage_config
-from gwswpijplijn.coverage import (
+from nlriochecker.analysis import MetingAnalysis, analyze
+from nlriochecker.config import CoverageConfig, load_coverage_config
+from nlriochecker.coverage import (
     CoverageResult,
     assess_coverage,
     verify_register,
 )
-from gwswpijplijn.errors import CoverageError
-from gwswpijplijn.meting import laad_nulmeting
-from gwswpijplijn.register import default_register_path, load_register
+from nlriochecker.errors import CoverageError
+from nlriochecker.meting import laad_nulmeting
+from nlriochecker.register import default_register_path, load_register
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 

@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from gwswpijplijn.analysis import analyze
-from gwswpijplijn.comparison import ChangeStatus, MetingComparison, compare_metingen
-from gwswpijplijn.config import load_coverage_config
-from gwswpijplijn.errors import ComparisonError
-from gwswpijplijn.meting import laad_nulmeting
+from nlriochecker.analysis import analyze
+from nlriochecker.comparison import ChangeStatus, MetingComparison, compare_metingen
+from nlriochecker.config import load_coverage_config
+from nlriochecker.errors import ComparisonError
+from nlriochecker.meting import laad_nulmeting
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 

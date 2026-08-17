@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 from shapely.geometry import LineString, Point, Polygon, mapping
 
-from gwswpijplijn.errors import StudyAreaError
-from gwswpijplijn.studiegebied import load_study_area
+from nlriochecker.errors import StudyAreaError
+from nlriochecker.studiegebied import load_study_area
 
 
 def _maak_geopackage(pad: Path, vlak: Polygon, srs_id: int = 28992, laag: str = "gebied") -> Path:
