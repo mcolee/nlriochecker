@@ -35,6 +35,15 @@ packages = ["src/nlriochecker"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# Ruff formatteert ook Python-codeblokken in Markdown. Deze twee documenten bevatten
+# met de hand gezette fragmenten die het niet mag aanraken: bij een van beide maakt de
+# voorgestelde herschikking de code aantoonbaar onjuist. Zonder deze uitsluiting zou
+# `ruff format --check .` permanent rood staan en zou de poort in scripts/uitgave.py
+# een andere scope moeten hanteren dan een handmatige run.
+extend-exclude = [
+    "docs/superpowers/plans/2026-08-16-uitvoer-ronde2.md",
+    "docs/superpowers/specs/2026-08-16-gpkg-en-rapport-design.md",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "N"]

@@ -42,3 +42,6 @@ uv sync
 uv run pytest          # zware tests draaien niet mee; `-m zwaar` wel
 uv run ruff check
 ```
+
+Een nieuwe versie uitbrengen gaat met `uv run python scripts/uitgave.py patch|minor|major`.
+Zie [docs/versionering.md](docs/versionering.md).

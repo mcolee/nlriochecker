@@ -403,3 +403,27 @@ QGIS trekt zich er niets van aan.
 **Alternatieven.** Alleen de code hernoemen en de documenten met rust laten (verworpen:
 levert dode paden op in stukken die juist als naslag dienen). Het commando
 `gwswpijplijn` laten heten (verworpen: dan blijven er twee namen in omloop).
+
+### BO-2 Het versienummer staat alleen in pyproject.toml
+
+**Wat.** `version` in `pyproject.toml` is de enige plek waar het nummer staat.
+`nlriochecker.__version__` leest het via `importlib.metadata`; het literal in
+`__init__.py` is weg. `scripts/uitgave.py` bumpt, toetst, commit en tagt `vX.Y.Z`;
+`tests/test_versie.py` bewaakt dat de twee niet uiteenlopen. De semantiek staat in
+`docs/versionering.md`.
+
+**Waarom.** Het nummer stond op twee plekken en was daarmee een kwestie van tijd
+voordat het uiteen zou lopen — hetzelfde argument als bij de gegenereerde
+dekkingsmatrix (B0-1): of één waarheid, of een controle die het afdwingt. Hier kan het
+allebei. De tag volgt het nummer en niet andersom, zodat de versie ook leesbaar is
+zonder git-geschiedenis, en zodat een export zonder `.git` nog een nummer heeft.
+
+Het uitgavescript draait de bump terug als ruff of pytest omvalt. Zonder dat laat een
+mislukte uitgave een opgehoogd nummer achter zonder bijbehorende tag, en dat is precies
+de toestand waarin je niet meer weet wat er uitgebracht is.
+
+**Alternatieven.** `hatch-vcs`, waarbij de tag de waarheid is en `pyproject.toml` geen
+nummer bevat (verworpen: tussen tags in levert dat `0.2.1.dev4+g1a2b3c`, en zonder
+`.git` helemaal geen versie). Het nummer op beide plekken laten met alleen een test
+erop (verworpen: bewaakt de drift wel, maar lost hem niet op). Automatisch taggen bij
+elke commit (verworpen: niet elke commit is een uitgave).

@@ -52,6 +52,11 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - De uitvoermap heet `uitvoer/` en staat in `.gitignore` — met een leidende slash, anders
   sluit die regel ook `src/nlriochecker/uitvoer/` uit en verdwijnt de package stilzwijgend
   uit de repository (en uit het zicht van ruff).
+- Het versienummer staat alleen in `pyproject.toml`; `__version__` leest het via
+  `importlib.metadata` en `tests/test_versie.py` bewaakt dat de twee gelijk blijven.
+  Schrijf het nummer nergens een tweede keer op. Uitbrengen doe je met
+  `uv run python scripts/uitgave.py patch|minor|major`, dat bumpt, toetst, commit en
+  `vX.Y.Z` tagt; pushen blijft handwerk. Zie `docs/versionering.md`.
 - Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
