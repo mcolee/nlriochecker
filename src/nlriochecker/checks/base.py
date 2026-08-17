@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from typing import ClassVar
+from typing import ClassVar, TypeVar, cast
 
 from shapely.geometry import Point
 
@@ -58,6 +58,11 @@ class Finding:
     location: tuple[float, float] | None = None
 
 
+# Het type van een afgeleide structuur in de contextcache: wat `bouw` oplevert,
+# krijgt de beller terug.
+_Afgeleid = TypeVar("_Afgeleid")
+
+
 @dataclass(frozen=True)
 class CheckContext:
     """Alles wat een check nodig heeft om te draaien."""
@@ -80,23 +85,30 @@ class CheckContext:
         volledige export zijn andere structuren dan die van de analyseset, en ze
         door elkaar halen zou de verkeerde antwoorden geven.
         """
-        if self.volledige_dataset is None or self.volledige_dataset is self.dataset:
+        volledig = self.volledige_dataset
+        if volledig is None or volledig is self.dataset:
             return self
         return self.cached(
             "volledige-context",
-            lambda: replace(self, dataset=self.volledige_dataset, _cache={}),
+            lambda: replace(self, dataset=volledig, _cache={}),
         )
 
-    def cached(self, sleutel: str, bouw: Callable[[], object]) -> object:
+    def cached(self, sleutel: str, bouw: Callable[[], _Afgeleid]) -> _Afgeleid:
         """Bouwt een afgeleide structuur een keer per context en hergebruikt die.
 
         De topologie-index en de netwerkgraaf worden door meerdere checks en door
         `examined()` en `notes()` opgevraagd. Op een dataset met tienduizenden
         objecten is telkens opnieuw opbouwen merkbaar duur.
+
+        Het type volgt uit `bouw`, zodat de bellers hun eigen structuur terugkrijgen
+        en niet `object`. De cache zelf bewaart ze door elkaar en kan dat niet
+        vasthouden; die ene `cast` is de prijs. Hij is veilig zolang een sleutel
+        altijd met dezelfde `bouw` gevuld wordt -- de sleutels zijn per module
+        voorvoegsel gescheiden (`rvz:`, `net:`, `top:`).
         """
         if sleutel not in self._cache:
             self._cache[sleutel] = bouw()
-        return self._cache[sleutel]
+        return cast(_Afgeleid, self._cache[sleutel])
 
     def is_reliable(self, uri: str) -> bool:
         """Geeft aan of de typering van dit object betrouwbaar genoeg is.

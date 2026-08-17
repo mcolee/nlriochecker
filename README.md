@@ -46,7 +46,17 @@ de versie die het opleverde.
 uv sync
 uv run pytest          # zware tests draaien niet mee; `-m zwaar` wel
 uv run ruff check
+uv run ruff format --check .
+uv run mypy             # over src/nlriochecker
 ```
+
+Dezelfde vier stappen draaien in CI op elke push naar `main` of `dev`
+(`.github/workflows/toets.yml`) en in `scripts/uitgave.py` bij een uitgave. Een schone
+kloon mist de niet-getrackte delen van `data/`; de tests die daarop leunen slaan dan
+over, en CI bewaakt met `NLRIOCHECKER_MIN_GESLAAGD` dat dat er niet te veel worden.
+
+Wat er per versie veranderde staat in [CHANGELOG.md](CHANGELOG.md); zet nieuwe
+wijzigingen onder `## [Unreleased]`.
 
 Een nieuwe versie uitbrengen gaat met `uv run python scripts/uitgave.py patch|minor|major`.
 Zie [docs/versionering.md](docs/versionering.md).

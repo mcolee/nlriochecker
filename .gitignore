@@ -8,6 +8,12 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.coverage
+# Met een leidende slash, om dezelfde reden als /uitvoer/ hieronder: zonder die
+# slash sluit de regel ook een gelijknamige map dieper in de boom uit.
+/htmlcov/
+/dist/
 
 # Uitvoer van de pijplijn
 /uitvoer/

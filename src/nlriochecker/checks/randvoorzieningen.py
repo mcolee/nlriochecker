@@ -341,11 +341,12 @@ class OverstortOpVerkeerdStelsel(Check):
 
         for node in _overstortputten(context):
             soorten = {
-                klassen.stelseltype(conduit.types, context.dataset.closure)
+                soort
                 for conduit in index.strengen(node.uri)
+                if (soort := klassen.stelseltype(conduit.types, context.dataset.closure))
+                is not None
+                and soort != "overstort"
             }
-            soorten.discard(None)
-            soorten.discard("overstort")
             if not soorten or not soorten <= verdacht:
                 continue
             yield self.finding(
@@ -583,15 +584,15 @@ class InterneOverstortZelfdeStelseltype(Check):
             begin, eind = index.knopen(conduit.uri)
             if begin is None or eind is None:
                 continue
-            soorten = []
+            soorten: list[set[str]] = []
             for knoop in (begin, eind):
                 buren = {
-                    klassen.stelseltype(buur.types, dataset.closure)
+                    soort
                     for buur in index.strengen(knoop)
                     if buur.uri != conduit.uri
+                    and (soort := klassen.stelseltype(buur.types, dataset.closure)) is not None
+                    and soort != "overstort"
                 }
-                buren.discard(None)
-                buren.discard("overstort")
                 soorten.append(buren)
             if not soorten[0] or not soorten[1]:
                 continue

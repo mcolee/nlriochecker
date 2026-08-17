@@ -502,3 +502,73 @@ de herkomst dan wel, want die staat in de kop en niet in de rijen.
 CSV zodra iemand alleen die CSV doorstuurt, en dan is de herkomst weg). De versie alleen
 in de GeoPackage (verworpen: dan draagt juist het bestand dat het vaakst wordt
 doorgestuurd, de CSV, hem niet).
+
+### BO-5 De poort staat in CI, en mypy hoort erbij
+
+**Wat.** `.github/workflows/toets.yml` draait `ruff check`, `ruff format --check`, `mypy`
+en `pytest` op elke push naar `main` of `dev` en op elke pull request.
+`scripts/uitgave.py` draait dezelfde vier bij een uitgave. Mypy staat schoon op
+`src/nlriochecker`, met `ignore_missing_imports` omdat rdflib, shapely, geopandas en
+rasterio geen bruikbare stubs leveren.
+
+**Waarom.** De poort bestond al, maar draaide alleen lokaal en alleen bij een uitgave.
+Alles ertussen leunde erop dat iemand eraan dacht. En de typehints waren nooit
+gecontroleerd: mypy vond er bij de eerste run 55 fouten in dertien bestanden, in code die
+volgens `CLAUDE.md` overal hints hoort te hebben.
+
+Drieentwintig van die 55 kwamen uit een enkele oorzaak: `CheckContext.cached()` gaf
+`object` terug, waardoor elke check die er een structuur uithaalde zijn type kwijtraakte.
+Die functie is generiek gemaakt; de rest bleek versmallingsgrenzen (een geometrie die
+`| None` is terwijl de bouwer er al op gefilterd heeft) en een handvol `set[str | None]`
+die met `.discard(None)` werd opgeschoond in plaats van meteen goed opgebouwd. Geen van de
+55 was een echt defect, maar dat was vooraf niet vast te stellen -- en dat is het punt.
+
+**De ondergrens op geslaagde tests.** `data/` staat buiten versiebeheer: de OroX-export en
+de GIS-bronnen beslaan gigabytes. Een schone kloon slaat de tests die erop leunen dus over
+en leest groen. Gemeten: met de volledige `data/` slagen er 707, met alleen de twee
+getrackte checkregisters 675 (32 overgeslagen), en zonder `data/` 490 met drie fouten. CI
+zet daarom `NLRIOCHECKER_MIN_GESLAAGD=650`; `tests/conftest.py` laat de run vallen als er
+minder slagen.
+
+Wees precies over wat die grens doet: hij merkt een ontbrekende `data/` *niet* op, want 675
+ligt er ruim boven -- dat is de normale toestand in CI. Hij vangt het wegvallen van meer dan
+die bekende 32 overslagen, bijvoorbeeld een fixturemap die niet meekomt of een importfout
+die een heel testbestand laat overslaan. Zonder grens zou zoiets als "alles groen" lezen.
+
+**Wat er niet onder valt.** Mypy kijkt naar `src/nlriochecker`, niet naar `scripts/` en
+`tests/`; daar staan samen nog negentien meldingen. En `disallow_untyped_defs` staat uit:
+met die vlag erbij zijn het 67 meldingen in vijftien bestanden, met `cli.py` (16) en
+`checks/extern.py` (9) voorop, niet de twee bestanden die je zou verwachten. Het annoteren
+van die parameters trekt hun lichamen alsnog de controle in; dat is een eigen ronde waard.
+Wel al schoon: `mypy --check-untyped-defs`, dus de nul is sterker dan alleen de
+geannoteerde functies.
+
+**Alternatieven.** Mypy meteen in strikte modus (verworpen: zie hierboven; een poort die je
+op dag een op 67 meldingen zet, wordt een poort die je uitzet). De data in de repository zetten met git-lfs (verworpen: gigabytes, en
+de brondata is niet van ons om te verspreiden). CI zonder ondergrens (verworpen: dat is
+de gevaarlijkste variant, want hij geeft vertrouwen dat hij niet verdient).
+
+### BO-6 Twee beveiligingsmeldingen die blijven staan
+
+**Wat.** Bandit meldt elf punten op `src/`. Ze blijven alle elf staan, met deze
+onderbouwing; `pip-audit` is schoon.
+
+**B608, zeven keer: SQL uit een f-string.** In `studiegebied.py` en `uitvoer/gpkg.py`
+worden tabel- en kolomnamen geinterpoleerd, want SQLite laat identifiers niet als
+parameter toe. Alle *waarden* gaan wel als parameter mee, en de identifiers gaan door
+`_escape()`, dat aanhalingstekens verdubbelt -- de manier die SQLite daarvoor kent. De
+enige identifier die van buiten komt is de laagnaam uit `--studiegebied-laag`; de rest
+zijn constanten uit onze eigen kolomdefinities.
+
+**B301/B403, drie keer: pickle.** De datasetcache in `~/.cache/nlriochecker` wordt door
+dit gereedschap zelf geschreven en teruggelezen. Wie daar een vijandig bestand kan
+neerzetten, kan ook gewoon code in de venv zetten; de cache voegt geen aanvalsvlak toe dat
+er niet al was. Een rdflib-`Graph` is bovendien niet zonder verlies in een veiliger
+formaat te bewaren, en dat was de hele reden voor de cache. De sleutel bevat de broncode
+van de lader, dus een cache van een andere versie wordt nooit gelezen.
+
+**Waarom niet onderdrukken.** Geen `# nosec` en geen bandit-configuratie: de meldingen
+zijn juist, alleen niet van toepassing. Ze wegdrukken zou de volgende scan schoon laten
+lijken zonder dat iemand de afweging nog ziet. Bandit draait niet in CI; wie hem draait,
+leest dit.
+

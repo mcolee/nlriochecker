@@ -431,8 +431,8 @@ class DiameterverjongingInAfvoerrichting(_KnoopVergelijking):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de grootste aanvoerdiameter met de grootste afvoerdiameter."""
         for node, aanvoer, afvoer in self.paren(context):
-            binnen = [_maat(c) for c in aanvoer if _maat(c) is not None]
-            uit = [_maat(c) for c in afvoer if _maat(c) is not None]
+            binnen = [maat for c in aanvoer if (maat := _maat(c)) is not None]
+            uit = [maat for c in afvoer if (maat := _maat(c)) is not None]
             if not binnen or not uit:
                 continue
             if max(uit) >= max(binnen):

@@ -23,7 +23,8 @@ uv run python scripts/uitgave.py patch|minor|major
 Het script doorloopt:
 
 1. eisen dat je op `main` staat, met een schone werkboom, niet achterlopend op
-   `origin/main` (is de remote onbereikbaar, dan slaat die laatste controle over);
+   `origin/main` (is de remote onbereikbaar, dan slaat die laatste controle over), en
+   dat `CHANGELOG.md` onder `## [Unreleased]` iets te melden heeft;
 2. het volgende nummer berekenen met `uv version --bump --dry-run`, dat niets schrijft,
    en controleren dat de bijbehorende tag nog niet bestaat;
 3. pas dan echt bumpen met `uv version --bump`, wat `pyproject.toml` en `uv.lock` raakt;

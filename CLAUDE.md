@@ -42,9 +42,16 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 ## Technische afspraken
 - Maak expliciet gebruik van de superpowers en dev-skills skills
 - Python 3.12+, src-layout (src/nlriochecker/), pyproject.toml, beheer met uv.
-- Afhankelijkheden minimaal houden: pandas, click, pydantic, rdflib, shapely, networkx. Voeg er niets aan toe zonder noodzaak.
+- Afhankelijkheden minimaal houden: pandas, click, pydantic, rdflib, shapely, networkx,
+  plus geopandas en rasterio voor de EXT-checks op de externe bronnen (`externedata.py`).
+  Voeg er niets aan toe zonder noodzaak; een nieuwe dep moet permissief of
+  EUPL-verenigbaar zijn (BO-3) en hoort in de beslislog.
 - Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost ruim drie minuten en circa 3 GB).
-- Codekwaliteit: ruff (lint en format), type hints overal, Nederlandse docstrings, Engelse code-identifiers.
+- Codekwaliteit: ruff (lint en format), mypy schoon over `src/nlriochecker`
+  (`uv run mypy`; `scripts/` en `tests/` vallen er nog buiten), type hints overal,
+  Nederlandse docstrings, Engelse code-identifiers. De poort staat in
+  `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien hetzelfde.
+  De package levert `py.typed`, dus haar hints komen bij een importeur aan.
 - CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
 - Rapportage-output: Markdown, CSV en een GeoPackage naar een output-map; nooit invoerbestanden
   overschrijven. Alle drie komen uit dezelfde meldingenstroom (`uitvoer/melding.py`); een
@@ -67,7 +74,7 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
 - De licentie is EUPL-1.2 (copyleft, en 'toegang tot de wezenlijke functionaliteit'
   telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
   zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
-- Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
+- Voordat je commit, doe je eerst /superpowers:requesting-code-review, dan /python-library-complete:reviewing-python-libraries, en verbeter je met de uitkomsten van beide testen de codebase. 
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
@@ -89,7 +96,9 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
   `dev` daarna weer gelijk aan `main`, anders mist hij de bumpcommit.
 - Kleine stappen, na elke werkende stap een git-commit met een duidelijke boodschap.
 - Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_8.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
-- Voer na elke wijziging pytest en ruff uit voordat je afrondt.
+- Voer na elke wijziging ruff, mypy en pytest uit voordat je afrondt.
+- Elke noemenswaardige wijziging krijgt een regel onder `## [Unreleased]` in
+  `CHANGELOG.md`. `scripts/uitgave.py` weigert een uitgave met een lege sectie.
 - Geloof onwaarschijnlijke uitkomsten niet. Duizenden bevindingen op een dataset wijzen meestal op een modelleerfout in de engine, niet op duizenden gebreken; zoek de oorzaak voordat je het cijfer rapporteert.
 - Wat een check NIET heeft bekeken hoort in het rapport: objecten buiten de graaf, weggelaten bevindingen, ontbrekende typeringspoort. Stilte leest als "alles gecontroleerd".
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
@@ -73,7 +74,8 @@ class RasterSampler:
     crs: str
     nodata: float | None
     bounds: tuple[float, float, float, float]
-    reader: object = None
+    # Rasterio levert geen typestubs; het lezerobject blijft daarom ongetypeerd.
+    reader: Any = None
 
     def sample(self, x: float, y: float) -> float | None:
         """De rasterwaarde op deze RD-coordinaat, of None buiten het raster."""

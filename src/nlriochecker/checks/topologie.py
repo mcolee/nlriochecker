@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import cast
 
-from shapely.geometry import Point
+from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import nearest_points
 from shapely.strtree import STRtree
@@ -31,6 +32,28 @@ from nlriochecker.checks.meetkunde import (
 from nlriochecker.dataset import Conduit, Node
 
 
+def _punt(node: Node) -> Point:
+    """Het punt van een knoop uit de topologie-index.
+
+    De index bevat alleen knopen met een punt -- `_bouw_topologie` filtert daarop
+    voordat de STRtree gebouwd wordt -- maar aan het type `Node` is dat niet te zien.
+    Deze functie legt die belofte op een plek vast in plaats van op elke gebruikssite.
+    """
+    return cast(Point, node.point)
+
+
+def _lijn(conduit: Conduit) -> LineString:
+    """De hartlijn van een streng uit `_Topologie.lined`.
+
+    Dezelfde belofte als `_punt`: `lined` bevat alleen strengen waarvan
+    `endpoints(conduit.line)` iets opleverde, dus met een geometrie. Dat filter laat
+    strikt genomen ook een andere lijnvormige geometrie dan `LineString` door (zie
+    `coords_of` in `dataset.py`); de cast is een runtime-noop en de gebruikte
+    bewerkingen -- afstand, kruising, snijpunt -- gelden voor elke shapely-geometrie.
+    """
+    return cast(LineString, conduit.line)
+
+
 @dataclass(frozen=True)
 class _Topologie:
     """Hulpstructuur met de putten, hun geometrie en een index erop."""
@@ -51,7 +74,7 @@ class _Topologie:
         kleinste = float("inf")
         for index in kandidaten:
             node = self.nodes[int(index)]
-            afstand = node.point.distance(punt)
+            afstand = _punt(node).distance(punt)
             if afstand <= tolerantie and afstand < kleinste:
                 kleinste = afstand
                 dichtstbij = node
@@ -334,14 +357,15 @@ class DubbelePut(Check):
 
         gemeld: set[tuple[str, str]] = set()
         for node in topologie.nodes:
-            for index in topologie.tree.query(node.point.buffer(tolerantie)):
+            for index in topologie.tree.query(_punt(node).buffer(tolerantie)):
                 ander = topologie.nodes[int(index)]
                 if ander.uri == node.uri:
                     continue
-                afstand = node.point.distance(ander.point)
+                afstand = _punt(node).distance(_punt(ander))
                 if afstand > tolerantie:
                     continue
-                sleutel = tuple(sorted((node.uri, ander.uri)))
+                eerste, tweede = sorted((node.uri, ander.uri))
+                sleutel = (eerste, tweede)
                 if sleutel in gemeld:
                     continue
                 gemeld.add(sleutel)
@@ -638,7 +662,7 @@ class StrengenRakenMetBuffer(Check):
                 if sleutel in gemeld:
                     continue
                 buffer = straal + stralen[ander.uri] + marge
-                afstand = conduit.line.distance(ander.line)
+                afstand = _lijn(conduit).distance(_lijn(ander))
                 if buffer <= 0.0 or afstand > buffer:
                     continue
                 if self._deelt_put(knopen[conduit.uri], knopen[ander.uri]):
@@ -719,10 +743,10 @@ class Hartlijnkruising(Check):
         for conduit in topologie.lined:
             for ander in _buren(topologie, conduit, 0.0):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
-                if sleutel in gemeld or not conduit.line.crosses(ander.line):
+                if sleutel in gemeld or not _lijn(conduit).crosses(_lijn(ander)):
                     continue
                 gemeld.add(sleutel)
-                snijpunt = conduit.line.intersection(ander.line)
+                snijpunt = _lijn(conduit).intersection(_lijn(ander))
                 yield self.finding(
                     context,
                     conduit.uri,
@@ -1166,7 +1190,7 @@ class PutNaastDoorlopendeStreng(Check):
                 continue
             for index in topologie.line_tree.query(node.point.buffer(tolerantie)):
                 conduit = topologie.lined[int(index)]
-                afstand = conduit.line.distance(node.point)
+                afstand = _lijn(conduit).distance(node.point)
                 if afstand > tolerantie:
                     continue
                 uiteinden = _endpoints(conduit)

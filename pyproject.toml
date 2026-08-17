@@ -16,7 +16,6 @@ dependencies = [
     "networkx>=3.3",
     "pandas>=2.2",
     "pydantic>=2.7",
-    "pyproj>=3.7.2",
     "rasterio>=1.5.1",
     "rdflib>=7.0",
     "shapely>=2.0",
@@ -27,6 +26,7 @@ nlriochecker = "nlriochecker.cli:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.11",
     "pytest>=8.2",
     "ruff>=0.6",
 ]
@@ -54,6 +54,13 @@ select = ["E", "F", "I", "UP", "B", "N"]
 # De fixturegenerator bevat GML-literalen die niet af te breken zijn zonder de
 # TTL-uitvoer te veranderen.
 "scripts/maak_ttl_fixtures.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/nlriochecker"]
+# rdflib, shapely, geopandas en rasterio leveren geen bruikbare stubs; zonder deze
+# regel verdrinkt elke echte melding in import-fouten.
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

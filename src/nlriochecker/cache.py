@@ -17,11 +17,12 @@ import os
 import pickle
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, replace
 from functools import partial
 from hashlib import sha256
 from pathlib import Path
+from typing import Any, cast
 
 import rdflib
 import shapely
@@ -93,7 +94,7 @@ class LuieGraaf:
             )
         return self._graaf
 
-    def __getattr__(self, naam: str):
+    def __getattr__(self, naam: str) -> object:
         """Alles wat een graaf kan, kan deze plaatsvervanger ook."""
         return getattr(self._geladen(), naam)
 
@@ -101,11 +102,11 @@ class LuieGraaf:
         """Het aantal triples."""
         return len(self._geladen())
 
-    def __contains__(self, triple) -> bool:
+    def __contains__(self, triple: Any) -> bool:
         """Of een triple in de graaf staat."""
         return triple in self._geladen()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[object]:
         """De triples zelf."""
         return iter(self._geladen())
 
@@ -128,7 +129,8 @@ def cachesleutel(
     haas.update(f"rdflib{rdflib.__version__}shapely{shapely.__version__}".encode())
     haas.update(fallback_encoding.encode("utf-8"))
     for module in (dataset_module, geometry_module):
-        haas.update(Path(module.__file__).read_bytes())
+        # `__file__` is alleen None bij een namespace-pakket; dit zijn gewone modules.
+        haas.update(Path(cast(str, module.__file__)).read_bytes())
     for pad in [Path(dataset_path), *sorted(Path(p) for p in ontology_paths)]:
         haas.update(pad.name.encode("utf-8"))
         haas.update(_bestandshash(pad).encode("utf-8"))
@@ -180,9 +182,10 @@ def laad_met_cache(
             # aanraakt. Is die dan beschadigd, dan herstelt LuieGraaf zichzelf
             # via deze functie in plaats van de hele run te laten crashen.
             herstel = partial(_herlees_graaf, dataset_path, ontology_paths, fallback_encoding)
-            dataset = replace(
-                GwswDataset(graph=Graph(), **velden), graph=LuieGraaf(pad_graaf, herstel)
-            )
+            # `LuieGraaf` is geen Graph-subklasse maar een plaatsvervanger die alles
+            # doorgeeft; het veld verwacht een Graph en krijgt hier zijn gedrag.
+            luie = cast(Graph, LuieGraaf(pad_graaf, herstel))
+            dataset = replace(GwswDataset(graph=Graph(), **velden), graph=luie)
             return dataset, CacheUitslag("cache", sleutel, time.perf_counter() - begin)
 
     dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding)

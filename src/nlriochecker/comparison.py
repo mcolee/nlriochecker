@@ -176,7 +176,7 @@ def _coverage_changes(earlier: CoverageResult, later: CoverageResult) -> pd.Data
                 "Onderwerp": check.mapping.onderwerp,
                 "Eerder": check.verdict.value,
                 "Later": ander.verdict.value if ander else "",
-                "Gewijzigd": bool(ander) and ander.verdict is not check.verdict,
+                "Gewijzigd": ander is not None and ander.verdict is not check.verdict,
             }
         )
     return pd.DataFrame(rijen, columns=["Check", "Onderwerp", "Eerder", "Later", "Gewijzigd"])

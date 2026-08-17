@@ -739,16 +739,17 @@ def _subclass_closure(graph: Graph) -> dict[str, frozenset[str]]:
             kinderen.setdefault(str(ouder), set()).add(str(kind))
 
     afsluiting: dict[str, frozenset[str]] = {}
-    for ouder in kinderen:
-        gezien = {ouder}
-        stapel = [ouder]
+    # Een eigen naam voor de lus: `ouder` hierboven is een rdflib-term, hier een str.
+    for klasse in kinderen:
+        gezien = {klasse}
+        stapel = [klasse]
         while stapel:
             huidig = stapel.pop()
-            for kind in kinderen.get(huidig, ()):
-                if kind not in gezien:
-                    gezien.add(kind)
-                    stapel.append(kind)
-        afsluiting[ouder] = frozenset(gezien)
+            for afstammeling in kinderen.get(huidig, ()):
+                if afstammeling not in gezien:
+                    gezien.add(afstammeling)
+                    stapel.append(afstammeling)
+        afsluiting[klasse] = frozenset(gezien)
     return afsluiting
 
 

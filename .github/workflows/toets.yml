@@ -1,0 +1,48 @@
+name: toets
+
+on:
+  push:
+    branches: [main, dev]
+  # Alleen pull requests naar main; een push naar dev met een open PR zou anders
+  # twee runs starten voor dezelfde commit.
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  toets:
+    runs-on: ubuntu-latest
+    env:
+      # Een schone kloon mist de niet-getrackte delen van data/ (de OroX-export, de
+      # ontologieen, de GIS-bronnen); daar slagen er 675 en slaan er 32 over. Met de
+      # volledige data/ zijn het er 707. Deze grens vangt dus geen ontbrekende data/ --
+      # die haalt hem ruim -- maar wel het wegvallen van meer dan die bekende 32, zoals
+      # een fixturemap die niet meekomt. Zonder grens leest zoiets als "alles groen".
+      # De controle zelf staat in tests/conftest.py.
+      NLRIOCHECKER_MIN_GESLAAGD: "650"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: uv installeren
+        # setup-uv publiceert geen meebewegende major-tag meer; daarom een vast nummer.
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Afhankelijkheden installeren
+        run: uv sync --frozen
+
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (opmaak)
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy
+
+      - name: Pytest
+        run: uv run pytest -q

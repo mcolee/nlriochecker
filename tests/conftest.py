@@ -1,12 +1,19 @@
-"""Gedeelde fixtures voor de testsuite."""
+"""Gedeelde fixtures voor de testsuite, en de waarborg tegen stille overslagen."""
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
 from nlriochecker.dataset import GwswDataset, load_dataset
+
+# Een schone kloon heeft `data/` niet: die map staat buiten versiebeheer omdat de
+# OroX-export en de GIS-bronnen gigabytes beslaan. De tests die erop leunen slaan
+# dan over, en de run blijft groen terwijl er nauwelijks iets getoetst is. Zet deze
+# variabele (CI doet dat) om een ondergrens aan het aantal geslaagde tests te eisen.
+MINIMUM_ENV = "NLRIOCHECKER_MIN_GESLAAGD"
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 TTL_DIR = FIXTURE_DIR / "ttl"
@@ -60,3 +67,44 @@ def shacl_drieluik(
 ) -> list[Path]:
     """De drie SHACL-rapporten die samen een volledige nulmeting vormen."""
     return [mini_hyd_shacl, mini_mdsplan_shacl, mini_mdsproj_shacl]
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Laat de run alsnog vallen als er te weinig tests echt gedraaid hebben.
+
+    Zonder deze controle leest een run met een halve suite als volledig groen. Zonder
+    `MINIMUM_ENV` gebeurt er niets, zodat een lokale run op een deelselectie
+    (`pytest tests/test_dataset.py`) gewoon werkt.
+
+    De grens ligt op wat een schone kloon haalt; hij vangt dus geen ontbrekende `data/`
+    op -- die haalt de grens ruim -- maar wel het wegvallen van meer dan dat.
+    """
+    drempel = os.environ.get(MINIMUM_ENV)
+    if not drempel or session.config.option.collectonly:
+        return
+
+    rapporteur = session.config.pluginmanager.get_plugin("terminalreporter")
+    if rapporteur is None:
+        return
+
+    try:
+        minimum = int(drempel)
+    except ValueError:
+        rapporteur.write_line(
+            f"{MINIMUM_ENV}={drempel!r} is geen getal; grens genegeerd.", red=True
+        )
+        return
+
+    geslaagd = len(rapporteur.stats.get("passed", []))
+    if geslaagd >= minimum:
+        return
+
+    overgeslagen = len(rapporteur.stats.get("skipped", []))
+    rapporteur.write_line(
+        f"{MINIMUM_ENV}={minimum}, maar er slaagden er {geslaagd} "
+        f"({overgeslagen} overgeslagen). Staat data/ op zijn plek?",
+        red=True,
+    )
+    # Een bestaande foutcode is specifieker dan de onze; die blijft staan.
+    if session.exitstatus == 0:
+        session.exitstatus = 1

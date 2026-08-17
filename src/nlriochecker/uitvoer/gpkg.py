@@ -357,7 +357,7 @@ def _schrijf_features(
                 continue
             grenzen.append(geometrie.bounds)
             richting, verval = (
-                _richting_bob(run, object_, config) if laag == "strengen" else ("", None)
+                _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
             )
             rijen.append(
                 (
@@ -482,7 +482,7 @@ def _samenvatting(
     ernst = "F" if fouten else ("W" if waarschuwingen else "geen")
     # Zonder meldingen is er niets te prioriteren; 3 zou als "waarschuwing" lezen.
     prioriteit = min((melding.prioriteit for melding in eigen), default=None)
-    per_categorie = defaultdict(int)
+    per_categorie: defaultdict[str, int] = defaultdict(int)
     for melding in eigen:
         per_categorie[melding.categorie] += 1
 
@@ -654,9 +654,8 @@ def _schrijf_meldinglocaties(verbinding: sqlite3.Connection, meldingen: list[Mel
         verbinding.executemany(
             f"insert into meldinglocaties (geom, {velden}) values ({plaatshouders})", rijen
         )
-    _zet_omhullende(
-        verbinding, "meldinglocaties", [melding.foutlocatie.bounds for melding in met_punt]
-    )
+    omhullenden = [punt.bounds for melding in met_punt if (punt := melding.foutlocatie) is not None]
+    _zet_omhullende(verbinding, "meldinglocaties", omhullenden)
 
 
 def _schrijf_overzicht(

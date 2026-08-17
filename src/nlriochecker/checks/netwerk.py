@@ -299,7 +299,9 @@ class _ZonderAfvoerpad(Check):
                 continue
             begin = dataset.resolve_network_node(conduit.start_node, wortels)
             if begin not in bereikt:
-                gevonden.append((conduit, clusters.get(begin, "")))
+                # Een streng waarvan het beginpunt niet op te lossen is hoort hier
+                # thuis -- onbereikbaar is onbereikbaar -- maar heeft geen cluster.
+                gevonden.append((conduit, clusters.get(begin, "") if begin else ""))
         return gevonden, not endpoints
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -608,6 +610,7 @@ class StelseltypeWijktAfVanBuren(Check):
             aantal = sum(
                 1
                 for uri in (begin, eind)
+                if uri is not None
                 for buur in per_knoop.get(uri, [])
                 if buur.uri != conduit.uri
             )
@@ -632,9 +635,9 @@ class StelseltypeWijktAfVanBuren(Check):
         if knoop is None:
             return set()
         return {
-            soorten[buur.uri]
+            soort
             for buur in per_knoop.get(knoop, [])
-            if buur.uri != eigen_uri and soorten[buur.uri] is not None
+            if buur.uri != eigen_uri and (soort := soorten[buur.uri]) is not None
         }
 
     def notes(self, context: CheckContext) -> list[str]:

@@ -357,8 +357,11 @@ class PutonderdelenZonderVerbinding(Check):
     def _verbonden(self, context: CheckContext, onderdelen: list[str]) -> bool:
         """Geeft aan of er tussen deze onderdelen een verbinding geregistreerd is."""
         dataset = context.dataset
-        orientaties = {dataset.nodes[uri].orientation for uri in onderdelen if uri in dataset.nodes}
-        orientaties.discard(None)
+        orientaties = {
+            orientatie
+            for uri in onderdelen
+            if uri in dataset.nodes and (orientatie := dataset.nodes[uri].orientation) is not None
+        }
         for orientatie in orientaties:
             subject = URIRef(orientatie)
             buren = {str(buur) for buur in dataset.graph.objects(subject, HAS_CONNECTION)}
