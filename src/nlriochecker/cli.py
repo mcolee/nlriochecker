@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -30,6 +32,7 @@ from nlriochecker.reporting import (
 from nlriochecker.studiegebied import load_study_area
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer import schrijf_uitvoer
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 class _CliError(click.ClickException):
@@ -38,6 +41,65 @@ class _CliError(click.ClickException):
     def show(self, file: object | None = None) -> None:
         """Toont de foutmelding op stderr."""
         click.echo(f"Fout: {self.format_message()}", err=True)
+
+
+class _BalkVoortgang:
+    """Voortgang als `click.progressbar`, op stderr.
+
+    De balk gaat naar stderr en niet naar stdout: daar staan de geschreven paden en
+    de tellingen, en wie die doorpipet moet er geen balkresten in krijgen.
+
+    Er komt geen eigen TTY-detectie bij; click zet de balk in een niet-interactieve
+    omgeving zelf uit. Zonder bepaalbaar totaal is er geen balk te tekenen -- dan
+    wordt de fasenaam een keer gemeld, want een balk met een verzonnen lengte zou
+    over de resterende tijd liegen.
+    """
+
+    def __init__(self) -> None:
+        # `click.progressbar` levert een ProgressBar uit een private module; die
+        # importeren om hem te kunnen annoteren zou een privaat pad vastleggen.
+        self._balk: Any | None = None
+        self._stap_label: str | None = None
+
+    def start_fase(self, naam: str, totaal: int | None) -> None:
+        """Opent een balk voor deze fase, of meldt hem als er geen totaal is."""
+        if totaal is None:
+            click.echo(f"{naam}...", err=True)
+            return
+        self._stap_label = None
+        self._balk = click.progressbar(
+            length=totaal,
+            label=naam,
+            file=sys.stderr,
+            item_show_func=lambda _: self._stap_label,
+        )
+        self._balk.__enter__()
+
+    def stap(self, n: int = 1, label: str | None = None) -> None:
+        """Schuift de balk op en zet erachter wat er net klaar is.
+
+        Het staplabel gaat via `item_show_func` en niet door `balk.label` te
+        overschrijven. Click spreekt die functie alleen aan als hij echt een balk
+        tekent; in een niet-interactieve omgeving echoot hij enkel het vaste
+        faselabel, en dan een keer. Zou het faselabel per stap wisselen, dan zette
+        een run met veertig checks veertig regels ruis in een CI-log.
+
+        Dat is ook de reden dat hier niet naar het verborgen-zijn van de balk
+        gekeken wordt: dat attribuut heet per clickversie anders (`hidden` dan wel
+        `is_hidden`), terwijl `item_show_func` gedocumenteerd is.
+        """
+        if self._balk is None:
+            return
+        if label is not None:
+            self._stap_label = label
+        self._balk.update(n)
+
+    def einde_fase(self) -> None:
+        """Sluit de balk van deze fase."""
+        if self._balk is None:
+            return
+        self._balk.__exit__(None, None, None)
+        self._balk = None
 
 
 @click.group()
@@ -498,12 +560,13 @@ def check_command(
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
     try:
+        voortgang: Voortgang = _BalkVoortgang()
         config = load_check_config(project_config_path)
         dataset, cache = laad_met_cache(
-            dataset_path, list(ontology_paths), cache_dir, not geen_cache
+            dataset_path, list(ontology_paths), cache_dir, not geen_cache, voortgang=voortgang
         )
         onbetrouwbaar, gate_applied, meetbereik = _typing_gate(
-            shacl_paths, config, dataset, cfk_keuze
+            shacl_paths, config, dataset, cfk_keuze, voortgang
         )
         bronnen = _externe_bronnen(config, bronnen_dir)
         area = load_study_area(study_path, study_layer) if study_path is not None else None
@@ -517,12 +580,21 @@ def check_command(
             volledige_dataset=dataset,
             analyseset=analyseset,
         )
-        run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
+        run = run_checks(
+            context,
+            list(check_ids) or None,
+            typing_gate_applied=gate_applied,
+            voortgang=voortgang,
+        )
         if area is not None:
             run = run.beperk_tot_studiegebied(area)
         run = replace(run, meetbereik=meetbereik)
         uitvoer = schrijf_uitvoer(
-            run, output_dir, met_geopackage=not geen_gpkg, met_json=not geen_json
+            run,
+            output_dir,
+            met_geopackage=not geen_gpkg,
+            met_json=not geen_json,
+            voortgang=voortgang,
         )
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -619,6 +691,7 @@ def _typing_gate(
     config: CheckConfig,
     dataset: GwswDataset,
     cfk_keuze: tuple[str, ...] = (),
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> tuple[frozenset[str], bool, Meetbereik]:
     """Haalt de te globaal getypeerde objecten uit de nulmeting.
 
@@ -637,7 +710,7 @@ def _typing_gate(
     if not shacl_paths:
         return frozenset(), False, Meetbereik.niet_gemeten(volledig)
 
-    nulmeting = laad_nulmeting(list(shacl_paths), gekozen, volledig)
+    nulmeting = laad_nulmeting(list(shacl_paths), gekozen, volledig, voortgang=voortgang)
     analyse = analyze(nulmeting, dataset)
     objecten: set[str] = set()
     for deel in analyse.per_cfk.values():

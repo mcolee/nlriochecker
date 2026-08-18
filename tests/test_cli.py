@@ -685,3 +685,34 @@ def test_toets_met_geen_json_laat_het_bestand_weg(tmp_path: Path) -> None:
     assert resultaat.exit_code == 0, resultaat.output
     assert not (uitvoer / FILE_CHECKS_JSON).exists()
     assert (uitvoer / FILE_CHECKS_MARKDOWN).exists()
+
+
+def test_toets_draait_met_de_voortgangsbalk(tmp_path: Path) -> None:
+    """Rooktest: de adapter mag de run niet breken, ook niet zonder terminal.
+
+    CliRunner is geen tty; click zet de balk dan zelf uit. Er komt hier geen eigen
+    TTY-toets bij, dus deze test is de enige waarborg dat de adapter in die
+    omgeving niet omvalt -- en dat de balk de uitvoer op stdout niet vervuilt.
+    """
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--geen-cache",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert (uitvoer / FILE_CHECKS_MARKDOWN).exists()
+    assert (uitvoer / FILE_CHECKS_JSON).exists()
+    # stdout houdt de tellingen en de paden; de balk hoort er niet in te staan.
+    assert resultaat.stdout.startswith("schoon.ttl: 2 knooppunten")
+    assert "TTL laden" not in resultaat.stdout
+    # In een niet-interactieve omgeving echoot click per fase een enkele regel op
+    # stderr. Een regel per check zou hier veertig regels ruis geven.
+    assert resultaat.stderr.splitlines() == ["TTL laden", "Checks", "GeoPackage"]
