@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
+from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import load_study_area
 from nlriochecker.uitvoer.gpkg import RD_NEW, schrijf_geopackage
 from nlriochecker.uitvoer.melding import bouw_meldingen
@@ -25,6 +27,7 @@ from nlriochecker.uitvoer.melding import bouw_meldingen
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
 RUNDATUM = date(2026, 8, 16)
+VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 
 
 def _config() -> CheckConfig:
@@ -504,3 +507,28 @@ def test_onbepaalbare_tekenrichting_geeft_onbekend_geen_administratief_terugvalt
 
     assert richting == "onbekend"
     assert verval is None
+
+
+def test_runmetadata_noemt_de_cfk_set_en_of_die_volledig_is(tmp_path: Path) -> None:
+    """De CFK-set hoort bij de run, dus in gwsw_run en niet op elke melding."""
+    run = replace(_run("schoon.ttl"), meetbereik=Meetbereik.van(VEREIST, ["Hyd", "MdsPlan"]))
+
+    pad = _schrijf(run, tmp_path)
+
+    assert _rijen(pad, "select cfk_set, volledig from gwsw_run") == [("Hyd, MdsPlan", 0)]
+
+
+def test_runmetadata_bij_een_volledige_meting(tmp_path: Path) -> None:
+    """Op de volle set getoetst: het veld zegt dat, en noemt alle drie de klassen."""
+    run = replace(_run("schoon.ttl"), meetbereik=Meetbereik.van(VEREIST, VEREIST))
+
+    pad = _schrijf(run, tmp_path)
+
+    assert _rijen(pad, "select cfk_set, volledig from gwsw_run") == [("Hyd, MdsPlan, MdsProj", 1)]
+
+
+def test_runmetadata_zonder_meetbereik_laat_de_velden_leeg(tmp_path: Path) -> None:
+    """Een run zonder nulmeting beweert niet dat hij volledig gemeten is."""
+    pad = _schrijf(_run("schoon.ttl"), tmp_path)
+
+    assert _rijen(pad, "select cfk_set, volledig from gwsw_run") == [("", 0)]

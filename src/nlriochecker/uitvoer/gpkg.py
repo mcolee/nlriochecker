@@ -748,6 +748,8 @@ def _schrijf_runmetadata(
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
+        _Kolom("cfk_set", "text"),
+        _Kolom("volledig", "integer"),
     ]
     _maak_attribuuttabel(verbinding, "gwsw_run", kolommen, "Herkomst en bereik van deze run.")
 
@@ -782,6 +784,8 @@ def _schrijf_runmetadata(
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,
+            run.meetbereik.cfk_tekst if run.meetbereik is not None else "",
+            int(run.meetbereik.volledig) if run.meetbereik is not None else 0,
         ),
     )
 

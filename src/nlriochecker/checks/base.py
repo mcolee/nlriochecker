@@ -16,6 +16,7 @@ from nlriochecker.dataset import GwswDataset
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import ExternalData
 from nlriochecker.karakteristiek import DataCharacteristics, bepaal_karakteristiek
+from nlriochecker.meting import Meetbereik
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import StudyArea
 
@@ -177,6 +178,11 @@ class CheckRun:
     # De kern en de contextschil waarop de checks gedraaid hebben; None zonder
     # studiegebied. De uitvoerlaag meldt hieruit hoe groot elk deel was.
     analyseset: Analyseset | None = None
+    # Tegen welke conformiteitsklassen deze run getoetst is; None betekent: nog niet
+    # vastgesteld. De uitvoerlaag heeft het nodig voor de markering boven het rapport
+    # en voor `gwsw_run`. Het hier meegeven is minder broos dan het langs elke
+    # schrijver doorreiken -- dezelfde reden waarom `config` en `analyseset` hier staan.
+    meetbereik: Meetbereik | None = None
     _binnen: frozenset[str] | None = field(default=None, compare=False, repr=False)
 
     @property
@@ -254,6 +260,7 @@ class CheckRun:
             karakteristiek=self.karakteristiek,
             config=self.config,
             analyseset=self.analyseset,
+            meetbereik=self.meetbereik,
             _binnen=binnen,
         )
 
