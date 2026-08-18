@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +22,28 @@ RD_NEW = 28992
 # GeoPackage Binary: 'GP', versie, vlaggen, srs_id, envelope, dan de WKB.
 GPKG_MAGIC = b"GP"
 GPKG_ENVELOPE_BYTES = {0: 0, 1: 32, 2: 48, 3: 48, 4: 64}
+
+# Alles buiten deze tekens wordt in een mapnaam een underscore: hij moet op elk
+# bestandssysteem te maken zijn en in een pad leesbaar blijven.
+_ONVEILIG = re.compile(r"[^a-z0-9]+")
+
+
+def mapnaam(naam: str) -> str:
+    """Zet een gebiedsnaam om in een veilige mapnaam.
+
+    Diakrieten eraf, lowercase, alles wat geen letter of cijfer is naar een
+    underscore, opeenvolgende underscores samengevoegd. Alleen het bestandssysteem
+    krijgt deze vorm; in de rapporttitels, de kolom `Gebied` en de JSON blijft de
+    originele naam staan.
+    """
+    ontleed = unicodedata.normalize("NFKD", naam)
+    zonder_diakrieten = "".join(teken for teken in ontleed if not unicodedata.combining(teken))
+    veilig = _ONVEILIG.sub("_", zonder_diakrieten.lower()).strip("_")
+    if not veilig:
+        raise StudyAreaError(
+            f"{naam!r} levert geen bruikbare mapnaam op: er blijft na sanering niets over."
+        )
+    return veilig
 
 
 @dataclass(frozen=True)

@@ -236,9 +236,7 @@ def _maak_buurten_gpkg(
     con.execute("insert into gpkg_geometry_columns values (?, 'geom', 'POLYGON', 28992)", (laag,))
     kop = b"GP" + bytes([0, 0]) + struct.pack("<i", 28992)
     for naam, vlak in vlakken:
-        con.execute(
-            f'insert into "{laag}" ("{kolom}", geom) values (?, ?)', (naam, kop + vlak.wkb)
-        )
+        con.execute(f'insert into "{laag}" ("{kolom}", geom) values (?, ?)', (naam, kop + vlak.wkb))
     con.commit()
     con.close()
     return pad
@@ -361,9 +359,7 @@ def test_geojson_met_legacy_crs_wordt_geaccepteerd(tmp_path: Path) -> None:
     }
     pad.write_text(json.dumps(inhoud), encoding="utf-8")
 
-    gebieden = load_studiegebieden(
-        pad, grenzen=RdGrenzen(0.0, 300_000.0, 300_000.0, 620_000.0)
-    )
+    gebieden = load_studiegebieden(pad, grenzen=RdGrenzen(0.0, 300_000.0, 300_000.0, 620_000.0))
 
     assert gebieden.enkel
 
@@ -590,11 +586,15 @@ def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
     gedeeld = basis.volledige_context()
 
     een = CheckContext(
-        dataset=dataset, config=config, volledige_dataset=dataset,
+        dataset=dataset,
+        config=config,
+        volledige_dataset=dataset,
         gedeelde_volledige_context=gedeeld,
     )
     twee = CheckContext(
-        dataset=dataset, config=config, volledige_dataset=dataset,
+        dataset=dataset,
+        config=config,
+        volledige_dataset=dataset,
         gedeelde_volledige_context=gedeeld,
     )
 
@@ -813,8 +813,15 @@ git add -A && git commit -m "De toetsloop draait de checks per studiegebied-feat
 ```python
 def test_json_zonder_gebied_blijft_ongewijzigd(tmp_path: Path) -> None:
     """Een enkelvoudige run moet byte-voor-byte gelijk blijven aan ronde 1."""
-    pad = schrijf_json(tmp_path / "b.json", [], run_datum=date(2026, 1, 1), dataset="d.ttl",
-                       cfk_set=["Hyd"], volledig=True, typeringspoort_toegepast=False)
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        [],
+        run_datum=date(2026, 1, 1),
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=True,
+        typeringspoort_toegepast=False,
+    )
 
     document = json.loads(pad.read_text(encoding="utf-8"))
 
@@ -822,17 +829,31 @@ def test_json_zonder_gebied_blijft_ongewijzigd(tmp_path: Path) -> None:
 
 
 def test_json_van_een_gebied_noemt_het(tmp_path: Path) -> None:
-    pad = schrijf_json(tmp_path / "b.json", [], run_datum=date(2026, 1, 1), dataset="d.ttl",
-                       cfk_set=["Hyd"], volledig=True, typeringspoort_toegepast=False,
-                       gebied="Noord")
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        [],
+        run_datum=date(2026, 1, 1),
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=True,
+        typeringspoort_toegepast=False,
+        gebied="Noord",
+    )
 
     assert json.loads(pad.read_text(encoding="utf-8"))["gebied"] == "Noord"
 
 
 def test_totaal_json_noemt_alle_gebieden(tmp_path: Path) -> None:
-    pad = schrijf_json(tmp_path / "b.json", [], run_datum=date(2026, 1, 1), dataset="d.ttl",
-                       cfk_set=["Hyd"], volledig=True, typeringspoort_toegepast=False,
-                       gebieden=["Noord", "Zuid"])
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        [],
+        run_datum=date(2026, 1, 1),
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=True,
+        typeringspoort_toegepast=False,
+        gebieden=["Noord", "Zuid"],
+    )
 
     document = json.loads(pad.read_text(encoding="utf-8"))
     assert document["gebied"] is None
@@ -934,11 +955,20 @@ git add -A && git commit -m "Uitvoer per gebied in submappen, met een totaalsynt
 
 ```python
 def test_toets_schrijft_per_gebied(tmp_path: Path) -> None:
-    resultaat = CliRunner().invoke(main, [
-        "toets", "--dataset", str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
-        "--studiegebied", str(GIS_DIR / "buurten_twee.gpkg"),
-        "--check", "TOP-001", "--output", str(tmp_path),
-    ])
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            "--studiegebied",
+            str(GIS_DIR / "buurten_twee.gpkg"),
+            "--check",
+            "TOP-001",
+            "--output",
+            str(tmp_path),
+        ],
+    )
 
     assert resultaat.exit_code == 0, resultaat.output
     assert (tmp_path / "noord" / FILE_CHECKS_CSV).exists()
@@ -947,11 +977,22 @@ def test_toets_schrijft_per_gebied(tmp_path: Path) -> None:
 
 
 def test_gebied_selecteert(tmp_path: Path) -> None:
-    resultaat = CliRunner().invoke(main, [
-        "toets", "--dataset", str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
-        "--studiegebied", str(GIS_DIR / "buurten_twee.gpkg"),
-        "--gebied", "Noord", "--check", "TOP-001", "--output", str(tmp_path),
-    ])
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            "--studiegebied",
+            str(GIS_DIR / "buurten_twee.gpkg"),
+            "--gebied",
+            "Noord",
+            "--check",
+            "TOP-001",
+            "--output",
+            str(tmp_path),
+        ],
+    )
 
     assert resultaat.exit_code == 0, resultaat.output
     assert (tmp_path / "noord").exists()
@@ -959,11 +1000,20 @@ def test_gebied_selecteert(tmp_path: Path) -> None:
 
 
 def test_onbekend_gebied_faalt_met_de_namen(tmp_path: Path) -> None:
-    resultaat = CliRunner().invoke(main, [
-        "toets", "--dataset", str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
-        "--studiegebied", str(GIS_DIR / "buurten_twee.gpkg"),
-        "--gebied", "Oost", "--output", str(tmp_path),
-    ])
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            "--studiegebied",
+            str(GIS_DIR / "buurten_twee.gpkg"),
+            "--gebied",
+            "Oost",
+            "--output",
+            str(tmp_path),
+        ],
+    )
 
     assert resultaat.exit_code != 0
     assert "Noord" in resultaat.output and "Zuid" in resultaat.output

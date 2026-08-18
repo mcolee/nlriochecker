@@ -11,7 +11,7 @@ import pytest
 from shapely.geometry import LineString, Point, Polygon, mapping
 
 from nlriochecker.errors import StudyAreaError
-from nlriochecker.studiegebied import load_study_area
+from nlriochecker.studiegebied import load_study_area, mapnaam
 
 
 def _maak_geopackage(pad: Path, vlak: Polygon, srs_id: int = 28992, laag: str = "gebied") -> Path:
@@ -172,3 +172,24 @@ def test_gebiedsnaam_valt_terug_op_de_laagnaam(tmp_path: Path) -> None:
     pad = _maak_geopackage(tmp_path / "vlak.gpkg", Polygon([(0, 0), (10, 0), (10, 10), (0, 10)]))
 
     assert load_study_area(pad).gebied == "gebied"
+
+
+@pytest.mark.parametrize(
+    ("naam", "verwacht"),
+    [
+        ("De Wolden", "de_wolden"),
+        ("Zuidwolde-Noord", "zuidwolde_noord"),
+        ("Échéllé", "echelle"),
+        ("A/B", "a_b"),
+        ("  dubbele   spatie ", "dubbele_spatie"),
+        ("BUURT 01", "buurt_01"),
+    ],
+)
+def test_mapnaam_saneert(naam: str, verwacht: str) -> None:
+    assert mapnaam(naam) == verwacht
+
+
+def test_mapnaam_zonder_bruikbare_tekens_is_een_fout() -> None:
+    """Een naamloze map is geen uitvoer; dan liever een foutmelding met de naam erin."""
+    with pytest.raises(StudyAreaError, match="geen bruikbare mapnaam"):
+        mapnaam("///")

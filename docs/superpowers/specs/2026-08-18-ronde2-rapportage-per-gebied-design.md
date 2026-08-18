@@ -150,16 +150,17 @@ wil, opent de per-gebied-bestanden naast elkaar. Dit staat in de README.
 @dataclass(frozen=True)
 class Studiegebieden:
     """Alle features van een studiegebiedbestand, elk als eigen StudyArea."""
+
     gebieden: tuple[StudyArea, ...]
     source: Path
     laag: str
-    overgeslagen: tuple[str, ...] = ()   # meldingen over niet-polygonen
-    beschikbaar: tuple[str, ...] = ()    # alle namen in het bestand, vóór --gebied
+    overgeslagen: tuple[str, ...] = ()  # meldingen over niet-polygonen
+    beschikbaar: tuple[str, ...] = ()  # alle namen in het bestand, vóór --gebied
 
     @property
-    def enkel(self) -> bool: ...         # precies één feature
+    def enkel(self) -> bool: ...  # precies één feature
     @property
-    def totaal(self) -> StudyArea: ...   # de unie, voor wie het geheel nodig heeft
+    def totaal(self) -> StudyArea: ...  # de unie, voor wie het geheel nodig heeft
     def selecteer(self, namen: Sequence[str]) -> Studiegebieden: ...
 ```
 
@@ -269,7 +270,7 @@ uitvoer/
 ```python
 @dataclass(frozen=True)
 class UitvoerPerGebied:
-    per_gebied: dict[str, Uitvoer]        # originele naam -> geschreven bestanden
+    per_gebied: dict[str, Uitvoer]  # originele naam -> geschreven bestanden
     synthese: Path | None
     totaal_csv: Path | None
     totaal_json: Path | None
