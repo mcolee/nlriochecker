@@ -78,6 +78,13 @@ class CheckContext:
     # `volledig_bereik` heeft de volledige export nodig; die staat hier.
     volledige_dataset: GwswDataset | None = None
     analyseset: Analyseset | None = None
+    # De volledige-export-context van een run over meerdere studiegebieden. Hij hangt
+    # af van de volledige dataset, de config en de onbetrouwbare objecten -- alle drie
+    # gebiedsonafhankelijk -- en mag daarom over gebieden heen gedeeld worden. Zonder
+    # dit veld bouwt elk gebied zijn eigen volledige context met een lege cache, en
+    # draaien de karakteristiek en de checks met `volledig_bereik` per gebied opnieuw
+    # over de hele export.
+    gedeelde_volledige_context: CheckContext | None = field(default=None, compare=False, repr=False)
     _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     def volledige_context(self) -> CheckContext:
@@ -87,6 +94,8 @@ class CheckContext:
         volledige export zijn andere structuren dan die van de analyseset, en ze
         door elkaar halen zou de verkeerde antwoorden geven.
         """
+        if self.gedeelde_volledige_context is not None:
+            return self.gedeelde_volledige_context
         volledig = self.volledige_dataset
         if volledig is None or volledig is self.dataset:
             return self
@@ -359,11 +368,14 @@ def run_checks(
     typing_gate_applied: bool = False,
     *,
     voortgang: Voortgang = NUL_VOORTGANG,
+    fase: str = "Checks",
 ) -> CheckRun:
     """Draait de gevraagde checks; zonder selectie draait de hele registry.
 
     De voortgang meldt per check het ID, zodat zichtbaar is welke check loopt en
-    niet alleen dat er iets loopt. Hij raakt de uitkomst niet.
+    niet alleen dat er iets loopt. Hij raakt de uitkomst niet. `fase` is het label
+    van de voortgangsfase; een run over meerdere gebieden zet de gebiedsnaam erin,
+    zodat zichtbaar blijft welk gebied loopt.
     """
     gekozen = sorted(REGISTRY) if check_ids is None else list(check_ids)
 
@@ -374,7 +386,7 @@ def run_checks(
     volledige_ids = set(context.config.studiegebied.volledige_dataset_checks)
 
     outcomes = []
-    voortgang.start_fase("Checks", len(gekozen))
+    voortgang.start_fase(fase, len(gekozen))
     try:
         for check_id in gekozen:
             check = REGISTRY[check_id]()
@@ -408,7 +420,9 @@ def run_checks(
         unreliable_labels=len(context.unreliable_objects),
         unreliable_labels_in_dataset=len(volledig.matched_objects()),
         bronnen=context.bronnen,
-        karakteristiek=bepaal_karakteristiek(volledig.dataset, context.config),
+        karakteristiek=volledig.cached(
+            "karakteristiek", lambda: bepaal_karakteristiek(volledig.dataset, context.config)
+        ),
         config=context.config,
         analyseset=context.analyseset,
     )

@@ -289,3 +289,33 @@ def test_rvz006_zet_het_zwaartepunt_van_het_deelstelsel_als_foutlocatie() -> Non
 
     assert x == pytest.approx(verwacht_x)
     assert y == pytest.approx(verwacht_y)
+
+
+def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
+    """Anders herrekent elk gebied de karakteristiek van de volledige export.
+
+    De volledige-export-context hangt alleen af van de volledige dataset, de config
+    en de onbetrouwbare objecten; die zijn alle drie gebiedsonafhankelijk, dus mag
+    hij over gebieden heen gedeeld worden.
+    """
+    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    config = load_check_config()
+    gedeeld = CheckContext(
+        dataset=dataset, config=config, volledige_dataset=dataset
+    ).volledige_context()
+
+    eerste = CheckContext(
+        dataset=dataset,
+        config=config,
+        volledige_dataset=dataset,
+        gedeelde_volledige_context=gedeeld,
+    )
+    tweede = CheckContext(
+        dataset=dataset,
+        config=config,
+        volledige_dataset=dataset,
+        gedeelde_volledige_context=gedeeld,
+    )
+
+    assert eerste.volledige_context() is gedeeld
+    assert tweede.volledige_context() is gedeeld

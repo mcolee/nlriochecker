@@ -184,3 +184,18 @@ def test_geen_voortgang_verandert_de_uitvoerbestanden_niet(tmp_path: Path) -> No
     assert zonder.csv.read_text(encoding="utf-8") == met.csv.read_text(encoding="utf-8")
     assert zonder.json is not None and met.json is not None
     assert zonder.json.read_text(encoding="utf-8") == met.json.read_text(encoding="utf-8")
+
+
+def test_checksfase_kan_de_gebiedsnaam_dragen() -> None:
+    """Met meerdere gebieden moet zichtbaar zijn welk gebied loopt."""
+    opnemer = Opnemer()
+    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+
+    run_checks(
+        CheckContext(dataset=dataset, config=load_check_config()),
+        ["TOP-001"],
+        voortgang=opnemer,
+        fase="Checks Noord",
+    )
+
+    assert opnemer.fasen() == [("Checks Noord", 1)]
