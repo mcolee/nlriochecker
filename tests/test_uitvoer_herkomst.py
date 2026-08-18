@@ -149,6 +149,40 @@ def test_schrijf_markdown_zet_de_herkomst_onder_de_titel(tmp_path: Path) -> None
     ]
 
 
+def test_schrijf_markdown_zet_de_markering_onder_de_herkomst(tmp_path: Path) -> None:
+    """De markering staat boven de romp, zodat geen lezer hem kan missen."""
+    pad = schrijf_markdown(
+        tmp_path / "r.md",
+        "# Titel",
+        ["## Kop"],
+        RUNDATUM,
+        markering="**Onvolledige meting:** getoetst op Hyd; MdsPlan ontbreekt.",
+    )
+
+    assert pad.read_text(encoding="utf-8").splitlines() == [
+        "# Titel",
+        "",
+        herkomstregel(RUNDATUM),
+        "",
+        "**Onvolledige meting:** getoetst op Hyd; MdsPlan ontbreekt.",
+        "",
+        "## Kop",
+    ]
+
+
+def test_schrijf_markdown_zonder_markering_blijft_ongewijzigd(tmp_path: Path) -> None:
+    """Zonder markering is de kop exact als voorheen: geen lege regel erbij."""
+    pad = schrijf_markdown(tmp_path / "r.md", "# Titel", ["## Kop"], RUNDATUM)
+
+    assert pad.read_text(encoding="utf-8").splitlines() == [
+        "# Titel",
+        "",
+        herkomstregel(RUNDATUM),
+        "",
+        "## Kop",
+    ]
+
+
 def test_schrijf_csv_zet_de_herkomstkolom_achteraan(tmp_path: Path) -> None:
     """De kolom komt achter de bestaande, zodat kolomvolgorde niet verschuift."""
     pad = schrijf_csv(pd.DataFrame({"Check": ["TOP-001", "NET-004"]}), tmp_path / "t.csv")

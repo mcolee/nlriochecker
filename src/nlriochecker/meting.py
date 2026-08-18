@@ -9,6 +9,7 @@ from pathlib import Path
 
 from nlriochecker.errors import NulmetingError
 from nlriochecker.shaclrapport import ShaclReport, lees_shacl_rapport
+from nlriochecker.taal import vorm
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,26 @@ class Meetbereik:
     def cfk_tekst(self) -> str:
         """De gekozen set als kommagescheiden tekst, voor de GeoPackage."""
         return ", ".join(self.gekozen)
+
+    def markering(self) -> str | None:
+        """De waarschuwingsregel voor de rapporten, of None als er niets te melden is.
+
+        Deze ene plek bepaalt de tekst voor alle uitvoervormen. Zou elke schrijver
+        hem zelf samenstellen, dan zeggen Markdown en JSON op een dag iets anders
+        over dezelfde run.
+        """
+        if self.volledig:
+            return None
+        if not self.gemeten:
+            return (
+                "**Geen nulmeting:** deze run is niet tegen de conformiteitsklassen "
+                "getoetst; de typeringspoort is niet toegepast."
+            )
+        ontbreekt = ", ".join(self.ontbreekt)
+        return (
+            f"**Onvolledige meting:** getoetst op {self.cfk_tekst}; {ontbreekt} "
+            f"{vorm(len(self.ontbreekt), 'ontbreekt', 'ontbreken')}."
+        )
 
 
 @dataclass(frozen=True)

@@ -119,3 +119,32 @@ def test_laad_nulmeting_weigert_een_rapport_voor_een_niet_gekozen_cfk(
     """
     with pytest.raises(NulmetingError, match="MdsProj"):
         laad_nulmeting(shacl_drieluik, ["Hyd", "MdsPlan"], VEREIST)
+
+
+def test_markering_zwijgt_bij_een_volledige_meting() -> None:
+    """Volledig gemeten rapporten blijven byte-voor-byte als voorheen."""
+    assert Meetbereik.van(VEREIST, VEREIST).markering() is None
+
+
+def test_markering_noemt_de_deelset_en_wat_ontbreekt() -> None:
+    """De lezer moet zien waarop wel en waarop niet getoetst is."""
+    regel = Meetbereik.van(VEREIST, ["Hyd", "MdsPlan"]).markering()
+
+    assert regel == "**Onvolledige meting:** getoetst op Hyd, MdsPlan; MdsProj ontbreekt."
+
+
+def test_markering_vervoegt_bij_meer_dan_een_ontbrekende_klasse() -> None:
+    """'MdsPlan, MdsProj ontbreken', niet 'ontbreekt'."""
+    regel = Meetbereik.van(VEREIST, ["Hyd"]).markering()
+
+    assert regel is not None
+    assert regel.endswith("MdsPlan, MdsProj ontbreken.")
+
+
+def test_markering_onderscheidt_een_run_zonder_nulmeting() -> None:
+    """Niet gemeten is een andere boodschap dan een deelset."""
+    regel = Meetbereik.niet_gemeten(VEREIST).markering()
+
+    assert regel is not None
+    assert regel.startswith("**Geen nulmeting:**")
+    assert "typeringspoort" in regel

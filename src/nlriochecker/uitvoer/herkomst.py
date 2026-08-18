@@ -51,13 +51,21 @@ def schrijf_markdown(
     titel: str,
     regels: list[str],
     run_datum: date | None = None,
+    markering: str | None = None,
 ) -> Path:
     """Schrijft een Markdown-rapport als titel, herkomstregel en de meegegeven regels.
 
     De renderers leveren alleen de romp; de kop komt hiervandaan. Zo kan geen
     rapport zonder herkomst het bestand halen doordat een schrijver de kop vergeet.
+
+    `markering` is de plek voor een voorbehoud dat de hele run raakt, zoals een
+    meting op een deelverzameling conformiteitsklassen. Hij staat hier en niet in de
+    romp, zodat geen enkel rapport hem kan overslaan; zonder markering blijft de kop
+    exact zoals hij was.
     """
     kop = [titel, "", herkomstregel(run_datum), ""]
+    if markering:
+        kop += [markering, ""]
     pad.write_text("\n".join([*kop, *regels]) + "\n", encoding="utf-8")
     return pad
 
