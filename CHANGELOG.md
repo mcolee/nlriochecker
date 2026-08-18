@@ -39,6 +39,25 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- `toets` zonder `--shacl` schrijft een extra regel `**Geen nulmeting:** ...` in
+  `bevindingen.md`. Wie rapporten van voor en na deze versie vergelijkt, ziet die regel
+  als verschil.
+- Breuken in de Python-API (0.x, dus zonder deprecatietermijn):
+  - `Nulmeting` kreeg het verplichte veld `meetbereik`; `CoverageResult` kreeg het
+    verplichte veld `meetbereik` **tussen** `checks` en `discrepanties` in, en `Uitvoer`
+    kreeg het verplichte veld `json`. Wie deze dataclasses positioneel construeerde,
+    krijgt bij `CoverageResult` geen `TypeError` maar een stille verschuiving van
+    argumenten. Construeer ze met sleutelwoorden.
+  - `laad_nulmeting` kreeg een derde parameter `volledige_cfk`. Zonder die parameter
+    geldt de meegegeven set als de volledige set, en dan meldt de run "volledig". Een
+    library-gebruiker die op een deelset toetst, moet hem dus meegeven; de CLI doet dat.
+  - `schrijf_uitvoer` kreeg `met_json` en `voortgang`; `load_dataset`, `laad_nulmeting`,
+    `run_checks`, `laad_met_cache` en `schrijf_geopackage` kregen een keyword-only
+    `voortgang`. Die laatste zijn additief.
+  - `CheckRun.meetbereik` is nooit `None`; een run zonder opgegeven bereik draagt
+    `Meetbereik.niet_gemeten(())`.
+- De ondergrens van `click` is naar `>=8.2`: daarvoor mengde `CliRunner` stderr in
+  stdout en bestond `Result.stderr` niet.
 - `vergelijk` weigert twee nulmetingen die op verschillende conformiteitsklassen
   getoetst zijn: een daling in het aantal meldingen die uit een kleinere getoetste set
   komt is geen verbetering. Geen forceer-vlag.

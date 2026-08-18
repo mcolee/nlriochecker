@@ -10,7 +10,7 @@ machinaal verwerkt; `docs/json-schema.md` beschrijft dat contract.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import asdict
+from dataclasses import fields
 from datetime import date
 from pathlib import Path
 
@@ -98,17 +98,23 @@ def write_check_report(
 def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
     """Zet de meldingen om in JSON-klare rijen met dezelfde veldnamen als de dataclass.
 
-    `asdict` in plaats van een lijst veldnamen met de hand: die zou achterlopen
-    zodra `Melding` een veld krijgt, en dan mist de JSON stilzwijgend een gegeven
-    dat de CSV wel heeft.
+    De veldnamen komen uit `fields(Melding)` en niet uit een lijst met de hand: die
+    zou achterlopen zodra `Melding` een veld krijgt, en dan mist de JSON
+    stilzwijgend een gegeven dat de CSV wel heeft.
+
+    Niet `dataclasses.asdict`: die deepcopyt elke waarde, dus op een dataset met
+    tienduizenden meldingen worden er evenzoveel `Point`-kopieen gemaakt die de
+    regel erna weggegooid worden. `Melding` heeft geen geneste dataclasses, dus een
+    ondiepe kopie is hier gelijkwaardig.
 
     Alleen `foutlocatie` wordt omgezet, want een shapely `Point` is niet
     serialiseerbaar. Hij wordt `[x, y]` in EPSG:28992; er wordt niet
     geherprojecteerd, net als in de rest van de uitvoer.
     """
+    namen = [veld.name for veld in fields(Melding)]
     rijen: list[dict[str, object]] = []
     for melding in meldingen:
-        rij: dict[str, object] = asdict(melding)
+        rij: dict[str, object] = {naam: getattr(melding, naam) for naam in namen}
         punt = melding.foutlocatie
         rij["foutlocatie"] = None if punt is None else [punt.x, punt.y]
         rijen.append(rij)

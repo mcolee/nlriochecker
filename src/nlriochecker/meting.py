@@ -30,8 +30,24 @@ class Meetbereik:
 
     @classmethod
     def van(cls, volledige_set: Sequence[str], gekozen: Sequence[str]) -> Meetbereik:
-        """Een gemeten bereik, met beide verzamelingen gesorteerd en ontdubbeld."""
-        return cls(tuple(sorted(set(volledige_set))), tuple(sorted(set(gekozen))), True)
+        """Een gemeten bereik, met beide verzamelingen gesorteerd en ontdubbeld.
+
+        De keuze moet binnen de volle set vallen. Zonder die toets levert een klasse
+        erbuiten een onzinnige markering op -- "getoetst op Extra, Hyd, MdsPlan,
+        MdsProj;  ontbreken." -- met een lege opsomming en de verkeerde vervoeging.
+        De CLI schermt dit af, maar `laad_nulmeting` is publieke API en zijn twee
+        lijsten komen ongecontroleerd binnen.
+        """
+        volledig = tuple(sorted(set(volledige_set)))
+        keuze = tuple(sorted(set(gekozen)))
+        buiten = [cfk for cfk in keuze if cfk not in volledig]
+        if buiten:
+            raise NulmetingError(
+                f"Conformiteitsklasse(n) {', '.join(buiten)} vallen buiten de bekende set "
+                f"{', '.join(volledig) or '(leeg)'}. Vul `vereiste_cfk` in de "
+                f"projectconfiguratie aan of corrigeer de keuze."
+            )
+        return cls(volledig, keuze, True)
 
     @classmethod
     def niet_gemeten(cls, volledige_set: Sequence[str]) -> Meetbereik:

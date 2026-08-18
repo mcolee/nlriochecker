@@ -106,9 +106,13 @@ def schrijf_geopackage(
 
     binnen = run.objecten_binnen()
     # Vier featurelagen, drie attribuuttabellen en de stijltabel; elk een stap.
+    # `connect` staat binnen de try: faalde hij ervoor, dan werd `einde_fase` nooit
+    # geroepen en kreeg de gebruiker na de foutmelding een terminal zonder cursor
+    # terug -- die zet click pas bij het afsluiten van de balk weer aan.
     voortgang.start_fase("GeoPackage", 8)
-    verbinding = sqlite3.connect(doel)
+    verbinding: sqlite3.Connection | None = None
     try:
+        verbinding = sqlite3.connect(doel)
         _leg_fundament(verbinding)
         tellingen = _schrijf_features(verbinding, run, meldingen, binnen, run_datum, voortgang)
         _schrijf_meldingen(verbinding, meldingen)
@@ -121,7 +125,8 @@ def schrijf_geopackage(
         voortgang.stap(label="layer_styles")
         verbinding.commit()
     finally:
-        verbinding.close()
+        if verbinding is not None:
+            verbinding.close()
         voortgang.einde_fase()
     return doel
 

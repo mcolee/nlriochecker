@@ -18,13 +18,18 @@ jobs:
     env:
       # Deze runner mist de niet-getrackte delen van data/ (de OroX-export, de
       # ontologieen, de GIS-bronnen) en PyQGIS; de eerste groene run gaf 673 geslaagd
-      # en 33 overgeslagen. Lokaal met alles erbij zijn het er 711. De grens vangt dus
-      # niet dat data/ ontbreekt -- dat is hier de normale toestand en haalt hem ruim --
-      # maar wel het wegvallen van meer dan die bekende overslagen, zoals een fixturemap
-      # die niet meekomt. Zonder grens leest zoiets als "alles groen". Loopt de suite
-      # door, verhoog de grens dan mee; hij hoort onder het CI-aantal te blijven.
+      # en 33 overgeslagen bij 711 lokaal. De grens vangt dus niet dat data/ ontbreekt
+      # -- dat is hier de normale toestand en haalt hem ruim -- maar wel het wegvallen
+      # van meer dan die bekende overslagen, zoals een fixturemap die niet meekomt.
+      # Zonder grens leest zoiets als "alles groen". Loopt de suite door, verhoog de
+      # grens dan mee; hij hoort onder het CI-aantal te blijven.
       # De controle zelf staat in tests/conftest.py.
-      NLRIOCHECKER_MIN_GESLAAGD: "650"
+      #
+      # Ronde 1 bracht de suite lokaal op 774; de nieuwe tests hangen alleen van
+      # getrackte fixtures af, dus CI komt rond 736 uit. 700 houdt daar marge onder
+      # en is weer een grens die bijt: met 650 zou een regressie die tachtig tests
+      # laat wegvallen er ongezien doorheen zijn gekomen.
+      NLRIOCHECKER_MIN_GESLAAGD: "700"
     steps:
       - uses: actions/checkout@v7
 

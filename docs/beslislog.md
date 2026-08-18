@@ -592,10 +592,21 @@ optioneel gemaakt:
 
 1. De afwijking is **expliciet**. Zonder `--cfk` verandert er niets: alle drie vereist,
    en een ontbrekend rapport faalt. Er is geen configuratie die de standaard verzet.
-2. De afwijking is **zichtbaar in elke uitvoervorm**. Een waarschuwingsregel boven elk
-   Markdown-rapport, `cfk_set` en `volledig` in `gwsw_run` en in de JSON-envelop. De
-   tekst komt uit `Meetbereik.markering()` en niet uit een schrijver, zodat geen twee
-   uitvoervormen iets anders over dezelfde run kunnen zeggen.
+2. De afwijking is **zichtbaar in elke uitvoervorm die hem kan dragen**. Een
+   waarschuwingsregel boven elk Markdown-rapport, `cfk_set` en `volledig` in `gwsw_run`
+   en in de JSON-envelop. De tekst komt uit `Meetbereik.markering()` en niet uit een
+   schrijver, zodat geen twee uitvoervormen iets anders over dezelfde run kunnen zeggen;
+   `tests/test_uitvoer_herkomst.py` legt die overeenstemming vast.
+
+   **De CSV draagt hem bewust niet**, en dat is een erkend gat. De opdracht schrijft
+   voor: geen extra kolom per rij, want de CFK-set hoort bij de run en niet bij de
+   melding. Gevolg: `bevindingen.csv` uit een volle run en uit een `--cfk Hyd`-run
+   verschillen alleen in `TyperingBetrouwbaar`. Wie die twee in Excel naast elkaar legt
+   -- precies de doelgroep van dat bestand -- kan "de typering is verbeterd" lezen
+   terwijl er alleen minder gemeten is. `dekking.csv` en `geaggregeerde_meldingen.csv`
+   ontsnappen hieraan omdat zij een `CFK`-kolom per rij dragen. Een kolom `CfkSet` plus
+   `Volledig` in `bevindingen.csv` zou het dichten; dat is een wijziging van het
+   uitvoerformaat en daarmee een aparte beslissing.
 
 Daarbij hoort dat een rapport voor een niet-gekozen klasse een fout is en geen stille
 overslag: wie op Hyd toetst en per ongeluk alle drie de bestanden meegeeft, moet dat

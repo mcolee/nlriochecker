@@ -72,8 +72,13 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 ## Domeinregels (hard, uit het checkregister v0.8)
 - Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
   MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
-  foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk` en wordt in
-  alle vier de uitvoervormen gemarkeerd; zonder die optie verandert er niets. Een
+  foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk`; zonder die
+  optie verandert er niets. De afwijking staat in het Markdown-rapport (een regel onder
+  de herkomst), in `gwsw_run` van de GeoPackage (`cfk_set`, `volledig`) en in de
+  JSON-envelop. NIET in de CSV: de CFK-set hoort bij de run en niet bij de melding, dus
+  hij wordt geen kolom op elke rij. Gevolg dat je moet kennen: twee `bevindingen.csv`
+  uit een volle en een deelrun zijn aan het bestand zelf niet te onderscheiden; lees ze
+  naast het rapport of de JSON. Een
   rapport voor een niet-gekozen CFK is een fout, geen stille overslag, en `vergelijk`
   weigert twee meetmomenten met ongelijke sets. Een `toets` zonder `--shacl` is een
   eigen toestand ("niet gemeten"), los van volledig en van deelset. De drie toestanden
@@ -83,7 +88,7 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - Typeringspoort: de SHACL-meting benoemt via de vorm `CfkTypes_typ` welke KLASSEN binnen een CFK te globaal zijn (niet welke objecten). De instanties volgen uit de OroX-dataset. Zonder dataset is er wel een klassenlijst maar geen score; verzin er dan geen.
 - Alle drempelwaarden (toleranties, min/max-waarden, bufferafstanden) zijn configureerbaar per project via een configbestand (TOML). Geen hardcoded drempels.
 - Check-ID's uit het checkregister (TOP-001 enz.) zijn stabiel; vervallen ID's worden nooit hergebruikt.
-- Ernstniveaus: F = fout, W = waarschuwing. Elke check heeft een dimensietag (Consistentie, Compleetheid, Plausibiliteit, Actualiteit, Traceerbaarheid, Precisie). In de SHACL-rapporten komt de ernst uit de kolom Severity: Violation = F, Warning = W.
+- Ernstniveaus: F = fout, W = waarschuwing. Elke check heeft een dimensietag (Consistentie, Compleetheid, Plausibiliteit, Actualiteit, Traceerbaarheid, Precisie, Nauwkeurigheid, Compliance; de enum `Dimension` is de bron). In de SHACL-rapporten komt de ernst uit de kolom Severity: Violation = F, Warning = W.
 
 ## Feiten over de invoerbestanden (geverifieerd)
 

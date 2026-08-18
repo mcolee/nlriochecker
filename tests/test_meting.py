@@ -148,3 +148,14 @@ def test_markering_onderscheidt_een_run_zonder_nulmeting() -> None:
     assert regel is not None
     assert regel.startswith("**Geen nulmeting:**")
     assert "typeringspoort" in regel
+
+
+def test_meetbereik_weigert_een_keuze_buiten_de_volle_set() -> None:
+    """Zonder deze toets levert het een zin met een lege opsomming op.
+
+    `Meetbereik.van(VEREIST, [*VEREIST, "Extra"])` gaf eerder "getoetst op Extra,
+    Hyd, MdsPlan, MdsProj;  ontbreken." -- niets ontbrak, maar de zin beweerde van
+    wel. De CLI schermt dit af; `laad_nulmeting` is publieke API en doet dat niet.
+    """
+    with pytest.raises(NulmetingError, match="Extra"):
+        Meetbereik.van(VEREIST, [*VEREIST, "Extra"])

@@ -47,10 +47,14 @@ De optie staat op `analyseer`, `dekking`, `toets` en `vergelijk`, mag meermaals 
 accepteert alleen klassen uit `vereiste_cfk` in de projectconfiguratie. Een rapport voor
 een klasse buiten de keuze is een fout, geen stille overslag.
 
-Elke afwijking van de volle set wordt luid gemarkeerd: een waarschuwingsregel boven elk
+Elke afwijking van de volle set wordt gemarkeerd: een waarschuwingsregel boven elk
 Markdown-rapport, en de velden `cfk_set` en `volledig` in de tabel `gwsw_run` van de
 GeoPackage en in de JSON-envelop. `vergelijk` weigert twee meetmomenten met ongelijke
 sets, want een daling die uit een kleinere getoetste set komt is geen verbetering.
+
+`bevindingen.csv` draagt de markering **niet**: de CFK-set hoort bij de run en niet bij
+elke melding. Twee CSV's uit een volle en een deelrun zijn daardoor aan het bestand zelf
+niet te onderscheiden. Lees zo'n CSV naast het rapport of de JSON van dezelfde run.
 
 Een `toets` zonder `--shacl` meldt dat er niet tegen de conformiteitsklassen gemeten is.
 Dat is een eigen toestand, los van "volledig" en van "deelset".

@@ -37,6 +37,7 @@ def schrijf_uitvoer(
     run: CheckRun,
     output_dir: Path,
     run_datum: date | None = None,
+    *,
     met_geopackage: bool = True,
     met_json: bool = True,
     voortgang: Voortgang = NUL_VOORTGANG,

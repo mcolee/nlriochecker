@@ -28,12 +28,18 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
   blijft daar klein genoeg voor.
 - De meldingen staan gesorteerd op `melding_id`. Twee runs op dezelfde data met
   dezelfde `run_datum` leveren daarom een byte-identiek bestand, en twee
-  meetmomenten zijn met een gewone diff te vergelijken.
+  meetmomenten zijn met een gewone diff te vergelijken. Zie de kanttekening bij
+  `melding_id` over botsende ID's.
+- Ongeldige getallen worden geweigerd (`allow_nan=False`). Een NaN-coördinaat zou als
+  `[NaN, 1.0]` in het bestand komen, wat geen geldige JSON is; dan faalt de run liever
+  luid dan dat er een onleesbaar contract wegschrijft.
 - Coördinaten staan in EPSG:28992 (RD New). Er wordt niet geherprojecteerd, net als
   in de rest van de uitvoer.
 - Het bestand komt uit dezelfde `list[Melding]` als de Markdown, de CSV en de
   GeoPackage. Er is geen pad waarlangs de JSON-schrijver zelf een `Finding`
-  interpreteert, dus de vier uitvoervormen kunnen niet uit elkaar lopen.
+  interpreteert, en `tests/test_uitvoer_herkomst.py` legt vast dat de uitvoervormen
+  hetzelfde over de CFK-set zeggen. Eén verschil is bewust: de CSV draagt de CFK-set
+  niet, want die hoort bij de run en niet bij de melding.
 
 ## Volledig voorbeeld
 
@@ -45,6 +51,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
   "dataset": "hgt004_bob_boven_deksel.ttl",
   "cfk_set": ["Hyd"],
   "volledig": false,
+  "typeringspoort_toegepast": true,
   "aantal_meldingen": 1,
   "meldingen": [
     {
@@ -87,6 +94,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `dataset` | string | Bestandsnaam van de getoetste OroX-export. |
 | `cfk_set` | array van string | De conformiteitsklassen waarop getoetst is, gesorteerd. Leeg als er geen nulmeting is meegegeven. |
 | `volledig` | boolean | Waar als `cfk_set` gelijk is aan de volledige set uit `checks.toml`. Onwaar bij een deelset én bij een run zonder nulmeting. |
+| `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
 | `aantal_meldingen` | integer | Het aantal elementen in `meldingen`. Redundant, maar zo kan een afnemer een afgekapt bestand herkennen. |
 | `meldingen` | array van object | De meldingen, gesorteerd op `melding_id`. |
 
@@ -100,6 +108,19 @@ wel, in de regel onder de herkomstregel.
 `volledig: true` betekent níét dat de dataset in orde is — alleen dat er tegen alle
 conformiteitsklassen gemeten is die de projectconfiguratie eist.
 
+### Over `typering_betrouwbaar`
+
+Elke melding draagt `typering_betrouwbaar`. Dat veld is onwaar als de SHACL-nulmeting
+het object te globaal getypeerd noemt — maar die verzameling is leeg als er geen
+nulmeting is meegegeven. Zonder `--shacl` staat er dus overal `true`, en dat betekent
+"niet weerlegd", niet "gemeten".
+
+Lees daarom altijd eerst `typeringspoort_toegepast`. Is die onwaar, dan zegt
+`typering_betrouwbaar` niets en hoort een afnemer er geen gewicht aan te geven. De twee
+velden zijn met opzet gescheiden: het alternatief was `typering_betrouwbaar` op `null`
+zetten, en dan zou het per melding herhaald worden terwijl het een eigenschap van de
+run is.
+
 ## Een melding
 
 Alle velden van de dataclass `Melding` (`src/nlriochecker/uitvoer/melding.py`), met
@@ -109,7 +130,7 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 
 | Veld | Type | Betekenis |
 |---|---|---|
-| `melding_id` | string | Stabiele identiteit van deze melding: dezelfde check op hetzelfde object geeft hetzelfde ID, ook tussen runs. De sorteersleutel van het bestand. |
+| `melding_id` | string | Identiteit van deze melding: dezelfde check op hetzelfde object geeft hetzelfde ID, ook tussen runs. De sorteersleutel van het bestand. Eén uitzondering: botsen twee meldingen binnen één check op dezelfde ID, dan krijgt de tweede een volgnummer (`…-2`) dat tussen runs kan verschuiven. Dat is een gebrek in de `id_sleutels` van die check en het wordt als waarschuwing gelogd; zolang het optreedt is het bestand op dat punt niet diffbaar. |
 | `check_id` | string | Check-ID uit het checkregister, bijvoorbeeld `TOP-009`. ID's zijn stabiel en worden nooit hergebruikt. |
 | `categorie` | string | Het voorvoegsel van het check-ID: `TOP`, `NET`, `HGT`, `ATTR`, `ADM`, `RVZ`, `BTR`, `EXT`. |
 | `bron` | string | Waar de melding uit komt. `register` voor de eigen check-engine. |
@@ -157,6 +178,10 @@ versie 1.x.
 `schema_versie` staat los van het versienummer van de package. Een afnemer pint
 hierop en niet op de packageversie: de checks mogen veranderen zonder dat het formaat
 dat doet.
+
+Het tweede nummer telt op bij een achterwaarts verenigbare toevoeging: `"1.0"` wordt
+`"1.1"` zodra er een optioneel veld bij komt. Pin daarom op het **hoofdnummer**
+(`schema_versie.split(".")[0] == "1"`), niet op de volledige string.
 
 **Binnen een hoofdversie mag:**
 
