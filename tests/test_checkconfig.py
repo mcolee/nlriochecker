@@ -41,6 +41,7 @@ def test_eigen_config_vervangt_de_drempels(tmp_path: Path) -> None:
     eigen = tmp_path / "eigen.toml"
     eigen.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
         "[drempels]\nsnapping_tolerantie_m = 0.5\n",
         encoding="utf-8",
     )
@@ -71,6 +72,24 @@ def test_ongeldige_config(tmp_path: Path, inhoud: str, melding: str) -> None:
 
     with pytest.raises(ConfigError, match=melding):
         load_check_config(stuk)
+
+
+def test_config_zonder_nulmetingsectie_faalt(tmp_path: Path) -> None:
+    """De CFK-lijst hoort in checks.toml te staan, niet als default in Python.
+
+    Zonder deze eis valt een projectconfig die de sectie mist stilzwijgend terug op
+    drie klassen, en dan staat de lijst tweemaal opgeschreven. Dat is te meer een
+    probleem sinds `--cfk` diezelfde lijst als toegestane waarden gebruikt: een
+    project met andere conformiteitsklassen zou er dan de verkeerde geaccepteerd
+    zien.
+    """
+    basis = default_check_config_path().read_text(encoding="utf-8")
+    zonder = basis.replace('vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]', "")
+    pad = tmp_path / "zonder_nulmeting.toml"
+    pad.write_text(zonder, encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="vereiste_cfk"):
+        load_check_config(pad)
 
 
 def test_ontbrekend_bestand(tmp_path: Path) -> None:

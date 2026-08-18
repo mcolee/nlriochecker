@@ -72,6 +72,7 @@ def test_drempel_uit_de_config_bepaalt_de_uitkomst(tmp_path: Path) -> None:
     ruim = tmp_path / "ruim.toml"
     ruim.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
         "[drempels]\nsnapping_tolerantie_m = 1.0\n",
         encoding="utf-8",
     )
@@ -88,6 +89,7 @@ def test_dubbele_put_drempel_uit_de_config(tmp_path: Path) -> None:
     streng = tmp_path / "streng.toml"
     streng.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
         "[drempels]\ndubbele_put_tolerantie_m = 0.05\n",
         encoding="utf-8",
     )

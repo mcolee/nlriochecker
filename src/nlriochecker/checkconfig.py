@@ -228,8 +228,12 @@ class NulmetingOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Het checkregister eist dat de dataset aan alle conformiteitsklassen getoetst is;
-    # welke dat zijn, hangt af van wat de GWSW-server aanbiedt.
-    vereiste_cfk: list[str] = Field(default=["Hyd", "MdsPlan", "MdsProj"], min_length=1)
+    # welke dat zijn, hangt af van wat de GWSW-server aanbiedt. Bewust zonder default:
+    # de lijst hoort in checks.toml te staan en nergens anders. Een default hier zou
+    # hem een tweede keer opschrijven en een config die de sectie mist onzichtbaar
+    # laten terugvallen -- wat sinds `--cfk` zwaarder weegt, want deze lijst bepaalt
+    # ook welke klassen die optie accepteert.
+    vereiste_cfk: list[str] = Field(min_length=1)
 
 
 class InwinningOptions(BaseModel):
@@ -322,7 +326,7 @@ class CheckConfig(BaseModel):
     drempels: CheckThresholds = Field(default_factory=CheckThresholds)
     netwerk: NetworkOptions = Field(default_factory=NetworkOptions)
     studiegebied: StudyAreaOptions = Field(default_factory=StudyAreaOptions)
-    nulmeting: NulmetingOptions = Field(default_factory=NulmetingOptions)
+    nulmeting: NulmetingOptions
     naamgeving: NamingOptions = Field(default_factory=NamingOptions)
     inwinning: InwinningOptions = Field(default_factory=InwinningOptions)
     puttyperegels: list[PutTypeRule] = Field(default_factory=list)

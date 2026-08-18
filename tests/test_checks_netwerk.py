@@ -112,7 +112,8 @@ def test_eindpuntklassen_komen_uit_de_config(tmp_path: Path) -> None:
     zonder_gemaal = tmp_path / "zonder.toml"
     zonder_gemaal.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
-        "lozings_eindpunt = ['Lozingspunt']\nvuilwater = ['GemengdRiool']\n",
+        "lozings_eindpunt = ['Lozingspunt']\nvuilwater = ['GemengdRiool']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
         encoding="utf-8",
     )
 
@@ -189,6 +190,7 @@ def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> Non
     op_bob.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
         "afvoer_eindpunt = ['Gemaal']\nvuilwater = ['GemengdRiool']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
         "[netwerk]\nrichting = 'bob'\n",
         encoding="utf-8",
     )
