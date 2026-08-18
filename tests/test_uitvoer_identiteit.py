@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+
 from nlriochecker.uitvoer.identiteit import kort, melding_id
 
 
@@ -57,3 +59,17 @@ def test_kort_laat_een_uri_zonder_fragment_ongemoeid() -> None:
     """De EXT-checks melden objecten uit BGT en BAG; die hebben geen dataset-URI."""
     assert kort("bgt:put/deksel-los") == "bgt:put/deksel-los"
     assert kort("") == ""
+
+
+def test_id_hangt_niet_van_het_gebied_af() -> None:
+    """Hetzelfde defect in twee buurten moet een en dezelfde ID krijgen.
+
+    Bij rapportage per studiegebied-feature telt een object op de grens in elk
+    rakend gebied mee. Zat het gebied in de ID, dan zou de totaalsynthese datzelfde
+    defect als twee verschillende meldingen tellen en zou een trendvergelijking
+    tussen een gebiedsrun en een volledige run nergens op uitkomen.
+    """
+    parameters = inspect.signature(melding_id).parameters
+
+    assert "gebied" not in parameters
+    assert list(parameters) == ["check_id", "object_uri", "object2_uri", "sleutels"]

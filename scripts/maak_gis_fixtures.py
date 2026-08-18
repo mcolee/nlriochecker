@@ -163,29 +163,6 @@ def _schrijf_buurten(gpd) -> None:
         )
 
 
-def schrijf_buurtenraster(pad: Path, aantal: int, laag: str = "buurten") -> Path:
-    """Schrijft een GeoPackage met `aantal` aaneengesloten kunstmatige buurten.
-
-    Voor de schaaltest: de 80-buurtencasus die het masterdocument als
-    referentiegeval noemt. De vakken liggen op een rij langs de fixturestrengen,
-    zodat elke buurt objecten ziet.
-    """
-    import geopandas as gpd
-
-    links, onder, _, boven = 990.0, 1990.0, 0.0, 2010.0
-    breedte = 20.0
-    vakken = [
-        box(links + index * breedte, onder, links + (index + 1) * breedte, boven)
-        for index in range(aantal)
-    ]
-    frame = gpd.GeoDataFrame(
-        {"naam_gebied": [f"Buurt {index + 1:03d}" for index in range(aantal)]},
-        geometry=vakken,
-    )
-    frame.set_crs(RD, allow_override=True).to_file(pad, layer=laag, driver="GPKG")
-    return pad
-
-
 def _schrijf_raster(pad: Path) -> None:
     """Schrijft een vlak hoogteraster van 10,00 m NAP met een nodata-vlek.
 

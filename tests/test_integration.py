@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import csv
+import logging
+import time
+from datetime import date
 from pathlib import Path
 
 import pytest
 
+from gpkghelper import schrijf_buurten, schrijf_buurtenraster
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
 from nlriochecker.checkconfig import load_check_config
@@ -14,9 +18,11 @@ from nlriochecker.checks import REGISTRY, CheckContext, run_checks
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import Verdict, assess_coverage
 from nlriochecker.dataset import load_dataset
-from nlriochecker.meting import laad_nulmeting
+from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.reporting import write_check_report, write_reports
-from nlriochecker.studiegebied import load_study_area
+from nlriochecker.studiegebied import load_studiegebieden, load_study_area
+from nlriochecker.toetsloop import toets_gebieden
+from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 SHACL_DIR = DATA_DIR / "shacl_nulmeting"
@@ -31,6 +37,7 @@ ONTOLOGIE_TOTAAL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
 STUDIEGEBIED = GIS_DIR / "cbs_buurt_koekangerveld_studiegebied.gpkg"
 
 SHACL_PADEN = sorted(SHACL_DIR.glob("*.csv"))
+RUNDATUM = date(2026, 8, 18)
 
 pytestmark = pytest.mark.integratie
 
@@ -280,3 +287,104 @@ def test_afbakening_op_koekangerveld_verandert_de_bevindingen_niet() -> None:
 
     assert sleutel(afgebakend) == sleutel(volledig)
     assert len(analyseset.alles) < len(dataset.nodes) + len(dataset.conduits)
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DE_WOLDEN.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden-OroX of het studiegebied staat niet in data/",
+)
+def test_twee_buurten_op_de_wolden(tmp_path: Path) -> None:
+    """Rapportage per gebied op de echte data, met de equivalentie-eis erbij.
+
+    Het gebiedsbestand wordt uit de Koekangerveld-buurt afgeleid: de westelijke en
+    de oostelijke helft, elk als eigen feature. Per helft moeten de meldingen
+    gelijk zijn aan die van een losse run op alleen die helft.
+    """
+    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    config = load_check_config()
+    ids = ["NET-001", "TOP-001", "TOP-005"]
+    west, oost = _helften(load_study_area(STUDIEGEBIED).geometry)
+
+    samen = schrijf_buurten(tmp_path / "twee.gpkg", [("West", west), ("Oost", oost)])
+    los = schrijf_buurten(tmp_path / "west.gpkg", [("West", west)])
+
+    beide = toets_gebieden(
+        dataset,
+        load_studiegebieden(samen),
+        config,
+        check_ids=ids,
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    alleen = toets_gebieden(
+        dataset,
+        load_studiegebieden(los),
+        config,
+        check_ids=ids,
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+
+    uitvoer = schrijf_uitvoer_gebieden(beide, tmp_path / "uit", RUNDATUM)
+
+    def sleutel(gebiedsrun):
+        return sorted((f.check_id, f.object_uri) for f in gebiedsrun.run.findings)
+
+    assert [run.naam for run in beide] == ["West", "Oost"]
+    assert sleutel(beide[0]) == sleutel(alleen[0])
+    assert (tmp_path / "uit" / "west" / "bevindingen.md").exists()
+    assert (tmp_path / "uit" / "oost" / "bevindingen.md").exists()
+    assert uitvoer.synthese is not None and uitvoer.synthese.exists()
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DE_WOLDEN.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden-OroX of het studiegebied staat niet in data/",
+)
+def test_schaal_tachtig_buurten(tmp_path: Path) -> None:
+    """De referentiecasus telt 80+ buurten; die run moet doorlopen.
+
+    Geen tijdslimiet in de test -- die zou op een trage machine willekeurig falen --
+    maar de duur wordt wel gelogd, zodat de meting op deze casus mogelijk blijft.
+    Dat is de meting waarop het uitstel van de lokaal/contextueel-optimalisatie
+    wacht (zie de beslislog).
+    """
+    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    bestand = schrijf_buurtenraster(
+        tmp_path / "tachtig.gpkg", 80, load_study_area(STUDIEGEBIED).geometry.bounds
+    )
+    gebieden = load_studiegebieden(bestand)
+
+    begin = time.monotonic()
+    runs = toets_gebieden(
+        dataset,
+        gebieden,
+        load_check_config(),
+        check_ids=["TOP-001"],
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    uitvoer = schrijf_uitvoer_gebieden(
+        runs, tmp_path / "uit", RUNDATUM, met_geopackage=False, beschikbaar=gebieden.beschikbaar
+    )
+    duur = time.monotonic() - begin
+    logging.getLogger(__name__).warning("80 buurten in %.1f s", duur)
+
+    assert len(runs) == 80
+    assert len(uitvoer.per_gebied) == 80
+    assert sorted(pad.name for pad in (tmp_path / "uit").iterdir())[:2] == [
+        "buurt_001",
+        "buurt_002",
+    ]
+    assert uitvoer.synthese is not None and uitvoer.synthese.exists()
+
+
+def _helften(vlak):
+    """Splitst een vlak in een westelijke en een oostelijke helft."""
+    from shapely.geometry import box
+
+    x_min, y_min, x_max, y_max = vlak.bounds
+    midden = (x_min + x_max) / 2
+    return (
+        vlak.intersection(box(x_min, y_min, midden, y_max)),
+        vlak.intersection(box(midden, y_min, x_max, y_max)),
+    )

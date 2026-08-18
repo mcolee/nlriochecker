@@ -92,6 +92,8 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `gereedschap` | string | Pakketnaam plus versie die het bestand schreef, bijvoorbeeld `nlriochecker 0.2.0`. Dezelfde string die de Markdown onder de titel zet en de GeoPackage in `gwsw_run` draagt. |
 | `run_datum` | string | De datum van de run, ISO-8601 (`JJJJ-MM-DD`). |
 | `dataset` | string | Bestandsnaam van de getoetste OroX-export. |
+| `gebied` | string of `null` | *Optioneel.* De originele `naam_gebied` van het gebied waarover dit bestand gaat. Staat alleen in de uitvoer van een run over meerdere studiegebied-features: per gebied de eigen naam, in `totaal/bevindingen.json` `null`. Een run zonder studiegebied of met een bestand met een enkele feature draagt het veld niet. |
+| `gebieden` | array van string | *Optioneel.* Alleen in `totaal/bevindingen.json`: de gebieden waarover de synthese gaat, in de volgorde van het gebiedsbestand. Bij een selectie met `--gebied` staan alleen de gekozen gebieden erin; hoeveel het bestand er telde, staat in `totaal/synthese.md`. |
 | `cfk_set` | array van string | De conformiteitsklassen waarop getoetst is, gesorteerd. Leeg als er geen nulmeting is meegegeven. |
 | `volledig` | boolean | Waar als `cfk_set` gelijk is aan de volledige set uit `checks.toml`. Onwaar bij een deelset én bij een run zonder nulmeting. |
 | `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
@@ -107,6 +109,22 @@ wel, in de regel onder de herkomstregel.
 
 `volledig: true` betekent níét dat de dataset in orde is — alleen dat er tegen alle
 conformiteitsklassen gemeten is die de projectconfiguratie eist.
+
+### Over `gebied` en `gebieden`
+
+Beide velden zijn optioneel en kwamen erbij zonder de schemaversie te verhogen: een
+afnemer die ze niet kent, leest de bestanden zoals voorheen. Wie ze wel leest, moet ze
+als optioneel behandelen -- ze ontbreken bij elke run die niet over meerdere
+studiegebied-features gaat.
+
+`totaal/bevindingen.json` bevat de **unieke** meldingen over alle gebieden, ontdubbeld
+op `melding_id`. Een object dat meerdere gebieden raakt levert per gebied een melding op
+met hetzelfde `melding_id`; in de totaal-JSON staat die een keer, met het `gebied` van
+het eerste voorkomen bij oplopende gebiedsnaam. De aantallen per gebied staan in
+`totaal/synthese.md`.
+
+De geometrieen van de gebieden gaan niet mee in de JSON; die staan in het
+studiegebiedbestand dat de run meekreeg.
 
 ### Over `typering_betrouwbaar`
 

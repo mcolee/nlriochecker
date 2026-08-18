@@ -13,6 +13,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- Rapportage per studiegebied-feature. Bevat het studiegebiedbestand meer dan een vlak,
+  dan schrijft `toets` per gebied een submap met alle vier de uitvoervormen, plus een
+  `totaal/` met de synthese en de unieke meldingen over alle gebieden. De meldingen van
+  een gebied zijn gelijk aan die van een losse run met alleen dat gebied; daar staat een
+  test op. Met `--gebied` beperk je de run tot een of meer gebieden.
+- Strenge validatie van het studiegebiedbestand, altijd voordat de dataset geladen wordt:
+  alleen Polygon en MultiPolygon (overgeslagen typen worden geteld en gemeld), vanaf twee
+  vlakken een verplichte, gevulde, unieke kolom `naam_gebied` waarvan de gesaneerde
+  mapnamen niet mogen botsen, en voor GeoJSON een toets op het coordinaatstelsel: een
+  legacy `crs`-member met EPSG:28992, of alle coordinaten binnen de RD-grenzen uit
+  `[drempels]`.
+- De JSON-envelop kan `gebied` en `gebieden` dragen. Achterwaarts verenigbaar binnen
+  schemaversie 1.0: een run zonder studiegebieden schrijft de velden niet.
 - `--cfk` op `analyseer`, `dekking`, `toets` en `vergelijk`: toetsen op een
   deelverzameling conformiteitsklassen. Standaard blijven alle drie vereist; elke
   afwijking staat als waarschuwingsregel boven elk rapport en in de GeoPackage
@@ -39,6 +52,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- Een studiegebiedbestand met meerdere vlakken zonder kolom `naam_gebied` is voortaan een
+  fout in plaats van een stilzwijgende samenvoeging tot een gebied. Datzelfde geldt voor
+  niet-vlakken: die werden ingelezen en tellen nu niet meer mee.
+- Breuken in de Python-API (0.x, dus zonder deprecatietermijn):
+  - `load_study_area` levert nog steeds een `StudyArea` (de unie van alle vlakken), maar
+    valideert nu als hierboven. `load_studiegebieden` levert de gebieden per feature.
+  - `bouw_analyseset` kreeg een keyword-only `gedeeld`, `run_checks` een keyword-only
+    `fase`, `CheckContext` het veld `gedeelde_volledige_context` en `schrijf_uitvoer` de
+    keywords `gebied` en `meldingen`. Alle vier additief.
 - `toets` zonder `--shacl` schrijft een extra regel `**Geen nulmeting:** ...` in
   `bevindingen.md`. Wie rapporten van voor en na deze versie vergelijkt, ziet die regel
   als verschil.

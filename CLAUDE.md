@@ -114,6 +114,20 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   precies zo groot dat NET-001 en NET-002 geen valse bevindingen geven. Zonder
   studiegebied draait alles op de volledige dataset. Meld altijd hoeveel bevindingen
   buiten het gebied vielen en hoe groot kern, schil en export zijn.
+- Bevat het bestand meer dan een feature, dan rapporteert `toets` per feature: een submap
+  per gebied (de gesaneerde `naam_gebied`) plus `totaal/` met de synthese en de unieke
+  meldingen. Bij een enkele feature verandert er niets. De harde eis is equivalentie: de
+  meldingen van een gebied zijn gelijk aan die van een losse run met alleen dat gebied.
+  De loop staat in `toetsloop.py`, de gedeelde structuren in `afbakening.GedeeldeIndex`;
+  wat wel en niet gedeeld mag worden staat in BO-12 van de beslislog.
+- Validatie van het gebiedsbestand hoort in `studiegebied.py` en nergens anders: alleen
+  Polygon en MultiPolygon (GeometryCollection wordt niet uitgepakt, overgeslagen typen
+  worden gemeld), en vanaf twee features een verplichte, gevulde, unieke kolom
+  `naam_gebied` waarvan de gesaneerde mapnamen niet botsen. Een GeoJSON zonder legacy
+  `crs`-member wordt tegen de RD-grenzen uit `[drempels]` gehouden -- geen tweede plek
+  met die waarden.
+- Een object dat meerdere gebieden raakt telt in elk rakend gebied mee; er wordt niet
+  ontdubbeld. `melding_id` mag daarom het gebied niet bevatten. Zie BO-11.
 
 ## Technische afspraken
 - Maak expliciet gebruik van de superpowers en dev-skills skills

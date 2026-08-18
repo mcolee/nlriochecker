@@ -688,3 +688,99 @@ verplicht zonder default, dus dit volgt een bestaand patroon. Vijf minimale test
 die een geslaagde load verwachten dragen de sectie nu; de vier ongeldige-configgevallen
 hadden hem niet nodig, want pydantic rapporteert alle fouten en die tests zoeken een
 substring.
+
+### BO-11 Een object op een gebiedsgrens telt in elk rakend gebied mee
+
+**Wat.** Rapporteert `toets` per studiegebied-feature, dan wordt er tussen gebieden niet
+ontdubbeld. `StudyArea.bevat` gebruikt `intersects`, dus een streng die de grens tussen
+twee buurten kruist verschijnt in de uitvoer van allebei. De totaalsynthese telt de
+unieke meldingen en zegt er expliciet bij hoeveel er in meer dan een gebied voorkomen.
+
+**Waarom.** Elk gebied moet zijn eigen volledige werkelijkheid tonen: wie het rapport van
+een buurt leest, ziet alle bevindingen die die buurt raken, ook die op de rand. Het
+alternatief -- elk object aan precies een gebied toewijzen -- vraagt een regel (het gebied
+waarin het zwaartepunt ligt? het eerste gebied in het bestand?) die op de grens altijd
+willekeurig is, en dan mist een van de twee buurten een bevinding die er wel degelijk
+ligt. Dat is de duurdere fout.
+
+**Wat dat vraagt.** `melding_id` mag het gebied niet bevatten, anders is hetzelfde defect
+in twee buurten niet als een defect te herkennen en telt de synthese het dubbel.
+`uitvoer/identiteit.py` bouwt de ID uit check, objecten en detailsleutels; het gebied zit
+er niet in en `tests/test_uitvoer_identiteit.py` legt dat vast op de handtekening, zodat
+het er niet ongemerkt bij komt.
+
+**Gevolg dat je moet kennen.** De som van de meldingen per gebied is hoger dan het aantal
+unieke meldingen. `totaal/synthese.md` noemt beide getallen en het verschil;
+`totaal/bevindingen.csv` en `totaal/bevindingen.json` bevatten de unieke meldingen,
+waarbij een grensmelding het gebied van zijn eerste voorkomen bij oplopende gebiedsnaam
+draagt.
+
+### BO-12 Hybride uitvoeringsmodel: een keer laden, per gebied toetsen
+
+**Wat.** `toetsloop.toets_gebieden` laadt niets zelf. De dataset en de ontologie worden
+een keer geladen, daarna bouwt de loop per gebied een eigen analyseset met de bestaande
+`bouw_analyseset`. Twee structuren worden over de gebieden heen gedeeld: de ruimtelijke
+index (`shapely.STRtree`) over alle objectgeometrieen, en de samenhangende
+vrijvervalcomponenten van het volledige net (`GedeeldeIndex`). Daarnaast wordt de
+volledige-export-`CheckContext` een keer gebouwd en aan elke gebiedscontext meegegeven.
+
+**Waarom.** Het laden van de De Wolden-export kost ruim drie minuten en circa 3 GB; de
+referentiecasus telt 80+ buurten. Tachtig keer laden is uitgesloten, en tachtig keer de
+componentgraaf en de datakarakteristiek van de volledige export herrekenen ook.
+
+**De harde eis eronder.** De meldingen per gebied moeten gelijk zijn aan die van een
+losse run met alleen dat gebied. Elke optimalisatie is daarop getoetst:
+
+- De STRtree levert alleen *kandidaten* op omhullende; het oordeel blijft `area.bevat`.
+  Een omhullende-query is per constructie een superset van de snijdende geometrieen, dus
+  de uitkomst kan niet verschillen -- ook niet bij de ongeldige geometrieen die deze
+  datasets bevatten (TOP-016), waar een voorbereid predicaat anders zou kunnen beslissen
+  dan `intersects` zelf.
+- De componentstructuur werd al over de volledige dataset berekend; alleen de vraag welke
+  component de kern raakt hangt van het gebied af, en die blijft per gebied.
+- De gedeelde volledige-export-context hangt af van de volledige dataset, de config en de
+  onbetrouwbare objecten. Alle drie zijn gebiedsonafhankelijk. Wat aan de uitgedunde
+  dataset van een gebied hangt -- de topologie-index, de netwerkgraaf -- wordt nooit
+  gedeeld; elke gebiedscontext krijgt een lege cache.
+
+`tests/test_toetsloop.py` toetst de equivalentie per gebied, en
+`tests/test_afbakening.py` de gedeelde index tegen de directe route.
+
+### BO-13 De CRS-heuristiek voor GeoJSON, en waarom de fixtures hun stelsel noemen
+
+**Wat.** Een GeoPackage draagt zijn `srs_id` en wordt daarop getoetst. GeoJSON kent
+formeel alleen WGS84 (RFC 7946), dus daar geldt: een legacy `crs`-member die EPSG:28992
+noemt is afdoende, en anders moeten alle coordinaten binnen de RD-grenzen vallen. Die
+grenzen komen uit `[drempels] rd_x_min` en verder in de projectconfiguratie -- dezelfde
+waarden die TOP-009 gebruikt, geen tweede plek. Wie `load_studiegebieden` zonder grenzen
+aanroept, krijgt de heuristiek niet: zonder grenzen is er geen oordeel te vellen, en een
+verzonnen grens is erger dan geen.
+
+**Waarom een harde fout.** Een studiegebiedbestand in WGS84 snijdt niets uit de
+RD-dataset. Zonder deze toets levert dat geen foutmelding maar een leeg gebied, en dat
+leest als "geen bevindingen".
+
+**De fixtures.** Elke GeoJSON-fixture in deze repository ligt op lokale coordinaten rond
+(1000, 2000) -- ver buiten de RD-grenzen, net als de TTL-fixtures, die datzelfde
+assenstelsel voor RD laten doorgaan. Ze hebben daarom de `crs`-member gekregen die de
+heuristiek accepteert. Dat is een wijziging in de fixturebestanden en niet in de tests:
+geen enkele testregel is ervoor aangepast, en de fixtures zeggen nu expliciet wat ze
+altijd al beweerden.
+
+### BO-14 De lokaal/contextueel-optimalisatie is uitgesteld, niet vergeten
+
+**Wat.** Lokale checks (attributen, hoogten) geven voor hetzelfde object dezelfde
+bevinding, ongeacht welke subset eromheen zit. Ze zouden bij een run over tachtig buurten
+een keer over de unie kunnen draaien in plaats van tachtig keer per gebied. Dat is
+bewust *niet* gebouwd.
+
+**Waarom niet.** Het vraagt een classificatie lokaal/contextueel per check, en een fout
+in die classificatie breekt de equivalentiegarantie uit BO-12 stilzwijgend: een check die
+ten onrechte als lokaal geldt, mist de context van het gebied en meldt te veel of te
+weinig, zonder dat iets afwijkt behalve de uitkomst. De winst is bovendien onbekend
+zolang er niet gemeten is.
+
+**Waar de meting vandaan komt.** De voortgangsfasen dragen de gebiedsnaam (`Checks
+<naam>`), en `tests/test_integration.py::test_schaal_tachtig_buurten` logt de duur van een
+80-buurtenrun. Pas als die meting laat zien dat de checkfase de post is die telt, is deze
+optimalisatie de moeite en het risico waard.

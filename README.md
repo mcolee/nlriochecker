@@ -59,6 +59,68 @@ niet te onderscheiden. Lees zo'n CSV naast het rapport of de JSON van dezelfde r
 Een `toets` zonder `--shacl` meldt dat er niet tegen de conformiteitsklassen gemeten is.
 Dat is een eigen toestand, los van "volledig" en van "deelset".
 
+### Rapporteren per gebied
+
+Met `--studiegebied` wordt de rapportage tot dat gebied beperkt. Bevat het bestand meer
+dan een feature, dan rapporteert `toets` per feature:
+
+```bash
+nlriochecker toets \
+  --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+  --studiegebied data/gis/buurten.gpkg \
+  --output uitvoer
+```
+
+```
+uitvoer/
+  koekangerveld/     bevindingen.md, bevindingen.csv, bevindingen.json, dq_*.gpkg
+  zuidwolde_noord/   idem
+  totaal/            synthese.md, bevindingen.csv, bevindingen.json
+```
+
+De mapnaam is de gesaneerde `naam_gebied`: diakrieten eraf, lowercase, alles wat geen
+letter of cijfer is naar een underscore. In de rapporten, de kolom `Gebied` en de JSON
+blijft de originele naam staan.
+
+Met `--gebied` beperk je de run tot een of meer gebieden (meermaals opgeefbaar, exacte
+naam). Het volledige bestand wordt altijd eerst gevalideerd: een deelrun mag een defect
+in een ander gebied niet maskeren. De synthese vermeldt dat het een selectie was en
+hoeveel gebieden het bestand telde.
+
+De dataset wordt ook bij tachtig gebieden precies een keer geladen, en per gebied wordt
+een eigen kern, contextschil en uitgedunde dataset gebouwd. De meldingen van een gebied
+zijn daardoor gelijk aan die van een losse run met alleen dat gebied; daar staat een
+test op.
+
+Een object dat meerdere gebieden raakt telt in elk rakend gebied mee -- elk gebied ziet
+zijn eigen volledige werkelijkheid. Er wordt niet ontdubbeld. De totaalsynthese telt de
+unieke meldingen en zegt hoeveel er in meer dan een gebied voorkomen, zodat de som der
+delen verklaarbaar afwijkt van het totaal. In `totaal/` staat geen GeoPackage: de
+featurelagen zijn per gebied afgebakend, en een unie ervan zou grensobjecten dubbel
+bevatten of ze stilzwijgend ontdubbelen.
+
+`analyseer`, `dekking` en `vergelijk` werken op de SHACL-rapporten en kennen geen
+studiegebied. Wil je twee meetmomenten per gebied vergelijken, richt `vergelijk` dan op
+de uitvoer van een gebied tegelijk: map tegen map.
+
+#### Eisen aan het studiegebiedbestand
+
+GeoPackage of GeoJSON in EPSG:28992. De GeoPackage moet `srs_id = 28992` dragen; voor
+GeoJSON, dat formeel alleen WGS84 kent, geldt een legacy `crs`-member die EPSG:28992
+noemt, en anders moeten alle coordinaten binnen de RD-grenzen uit de projectconfiguratie
+(`[drempels] rd_x_min` en verder) vallen. Buiten bereik is een harde fout met de melding
+dat het bestand vermoedelijk in WGS84 staat.
+
+Alleen `Polygon` en `MultiPolygon` worden geladen; een `GeometryCollection` wordt niet
+uitgepakt. Overgeslagen typen worden geteld en gemeld -- in het logboek en in de
+synthese. Blijft er geen enkel vlak over, dan faalt de run.
+
+Vanaf twee features is een kolom of property `naam_gebied` verplicht: aanwezig, per
+feature gevuld en uniek, en twee namen mogen niet dezelfde mapnaam opleveren. Bij een
+enkele feature verandert er niets ten opzichte van eerdere versies; een aanwezige
+`naam_gebied` wordt dan wel de gebiedsaanduiding, anders blijft de terugval op
+`statcode`/`statnaam` of de laagnaam gelden.
+
 ### Uitvoer
 
 `analyseer`, `dekking` en `vergelijk` schrijven Markdown en CSV. `toets` schrijft
