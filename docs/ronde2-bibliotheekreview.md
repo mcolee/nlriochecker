@@ -44,6 +44,12 @@ BO-6 van de beslislog; deze ronde voegt geen nieuw aanvalsvlak toe. De enige nie
 f-string-query (`select * from "<laag>"` in `_lees_geopackage`) vervangt een bestaande en
 loopt door hetzelfde `_escape()`.
 
+## Schaalmeting
+
+`test_schaal_tachtig_buurten` op de volledige De Wolden-export: 80 gebieden in 2,7 s
+(TOP-001 als enige check), tegen ruim twee en een halve minuut voor het laden van de
+dataset. Zie BO-14 voor wat dat wel en niet zegt.
+
 ## Aanbevelingen
 
 1. **Dekking van `externedata.py` (81%)** is de laagste van de package; dat is de module

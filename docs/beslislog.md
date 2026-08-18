@@ -785,6 +785,15 @@ zolang er niet gemeten is.
 80-buurtenrun. Pas als die meting laat zien dat de checkfase de post is die telt, is deze
 optimalisatie de moeite en het risico waard.
 
+**Eerste meting (18 augustus 2026).** Op de volledige De Wolden-export, met de
+Koekangerveld-omhullende in 80 stroken en TOP-001 als enige check: **2,7 seconden** voor
+alle tachtig gebieden samen, tegen ruim twee en een halve minuut voor het inlezen van de
+dataset. De post die telt is dus het laden, en dat gebeurt al maar een keer. Deze meting
+is niet het hele verhaal -- met de volle checkset en echte buurten (groter, meer objecten
+per gebied) loopt de checkfase op -- maar ze laat wel zien dat er op dit moment geen
+aanleiding is om de equivalentiegarantie op het spel te zetten. Herhaal de meting op een
+echt 80-buurtenbestand met alle checks voordat je BO-14 heroverweegt.
+
 ### BO-15 Een gebied zonder GWSW-objecten stopt een meervoudige run niet
 
 **Wat.** Bij een run over meerdere studiegebied-features levert een gebied zonder enkele
