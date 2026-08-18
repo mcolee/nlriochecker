@@ -11,12 +11,19 @@ dat er niets te zeggen valt, terwijl er niets *gemeten* is.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
+from collections.abc import Sequence
+
+import pandas as pd
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import CheckRun
+from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.melding import Melding
+from nlriochecker.uitvoer.tabel import table
+
+ERNST_FOUT = Severity.ERROR.value
+ERNST_WAARSCHUWING = Severity.WARNING.value
 
 # De checks die samen op een verkeerd geregistreerde afvoerrichting wijzen.
 RICHTINGSCHECKS = ("NET-001", "NET-003", "NET-004", "HGT-005", "HGT-006")
@@ -149,3 +156,100 @@ def _gedeelde_deelstelsels(meldingen: list[Melding]) -> list[str]:
         "topologisch een eiland zonder externe overstort of bergbezinkvoorziening. Dat is "
         "een gebrek van het deelstelsel als geheel, niet van de losse strengen erin."
     ]
+
+
+def totaalsynthese(
+    gebieden: Sequence[tuple[str, float, int, list[Melding]]],
+    beschikbaar: Sequence[str],
+    overgeslagen: Sequence[str],
+) -> list[str]:
+    """Stelt de romp van de totaalsynthese over meerdere studiegebieden samen.
+
+    Per gebied de omvang en de meldingen, en daarboven het totaal over alle
+    gebieden. Objecten op een gebiedsgrens tellen in elk rakend gebied mee (zie
+    `StudyArea.bevat`); daarom is de som der delen hoger dan het aantal unieke
+    meldingen, en zegt deze sectie precies hoeveel dat verschil is. Zonder die zin
+    leest een lezer die de kolommen optelt een verschil dat er niet is.
+
+    De meegegeven tupels zijn (naam, oppervlak in ha, weggelaten bevindingen,
+    meldingen). Ze komen uit de al gebouwde meldingenstroom; hier wordt geen enkele
+    `Finding` opnieuw geinterpreteerd.
+    """
+    per_gebied = pd.DataFrame(
+        [
+            {
+                "Gebied": naam,
+                "Oppervlak (ha)": round(oppervlak, 1),
+                "Meldingen": len(meldingen),
+                "Fouten": sum(1 for melding in meldingen if melding.ernst == ERNST_FOUT),
+                "Waarschuwingen": sum(
+                    1 for melding in meldingen if melding.ernst == ERNST_WAARSCHUWING
+                ),
+                "Buiten het gebied": weggelaten,
+            }
+            for naam, oppervlak, weggelaten, meldingen in gebieden
+        ]
+    )
+
+    alle_ids = [melding.melding_id for _, _, _, meldingen in gebieden for melding in meldingen]
+    uniek = set(alle_ids)
+    meervoudig = sum(1 for aantal in Counter(alle_ids).values() if aantal > 1)
+
+    regels = [
+        f"Deze synthese beslaat {getal(len(gebieden), 'gebied', 'gebieden')} "
+        f"({', '.join(naam for naam, _, _, _ in gebieden)}).",
+        "",
+    ]
+    if len(beschikbaar) > len(gebieden):
+        regels += [
+            f"> **Selectie:** het studiegebiedbestand telt {len(beschikbaar)} gebieden; "
+            f"met `--gebied` zijn er {len(gebieden)} getoetst. Over de overige "
+            f"{len(beschikbaar) - len(gebieden)} zegt dit rapport niets.",
+            "",
+        ]
+    if overgeslagen:
+        regels += [f"> **Overgeslagen in het gebiedsbestand:** {'; '.join(overgeslagen)}.", ""]
+
+    regels += [
+        f"{len(uniek)} unieke meldingen over alle gebieden samen, waarvan "
+        f"{getal(meervoudig, 'melding voorkomt', 'meldingen voorkomen')} in meer dan een "
+        f"gebied. Objecten op een gebiedsgrens tellen in elk rakend gebied mee: elk gebied "
+        f"ziet zijn eigen volledige werkelijkheid. Daarom is de som van de kolom Meldingen "
+        f"({len(alle_ids)}) hoger dan het aantal unieke meldingen; er is niet ontdubbeld "
+        f"tussen gebieden.",
+        "",
+        *table(per_gebied, "Per gebied"),
+        "",
+        *table(_per_gebied_en_check(gebieden), "Meldingen per gebied en check"),
+        "",
+        "De bestanden per gebied staan in de submappen; `bevindingen.csv` en "
+        "`bevindingen.json` hiernaast bevatten de unieke meldingen over alle gebieden, "
+        "waarbij een melding uit meerdere gebieden het gebied van zijn eerste voorkomen "
+        "draagt.",
+    ]
+    return regels
+
+
+def _per_gebied_en_check(
+    gebieden: Sequence[tuple[str, float, int, list[Melding]]],
+) -> pd.DataFrame:
+    """Telt per gebied per check de meldingen en de fouten."""
+    rijen = [
+        {
+            "Gebied": naam,
+            "Check": check_id,
+            "Ernst": meldingen_van_check[0].ernst,
+            "Meldingen": len(meldingen_van_check),
+        }
+        for naam, _, _, meldingen in gebieden
+        for check_id, meldingen_van_check in sorted(_per_check(meldingen).items())
+    ]
+    return pd.DataFrame(rijen, columns=["Gebied", "Check", "Ernst", "Meldingen"])
+
+
+def _per_check(meldingen: list[Melding]) -> dict[str, list[Melding]]:
+    """Groepeert de meldingen van een gebied per check."""
+    gegroepeerd: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        gegroepeerd[melding.check_id].append(melding)
+    return gegroepeerd

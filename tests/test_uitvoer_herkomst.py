@@ -564,3 +564,39 @@ def test_een_run_zonder_meetbereik_zwijgt_nergens(toets: CheckRun, tmp_path: Pat
     document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
     assert document["cfk_set"] == [] and document["volledig"] is False
     assert document["typeringspoort_toegepast"] is False
+
+
+def _envelop(pad: Path, **extra: object) -> dict[str, object]:
+    """Schrijft een minimale JSON en leest de envelop terug."""
+    geschreven = schrijf_json(
+        pad,
+        [],
+        run_datum=RUNDATUM,
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=True,
+        typeringspoort_toegepast=False,
+        **extra,  # type: ignore[arg-type]
+    )
+    document: dict[str, object] = json.loads(geschreven.read_text(encoding="utf-8"))
+    return document
+
+
+def test_json_zonder_gebied_noemt_er_geen(tmp_path: Path) -> None:
+    """Een run zonder studiegebieden blijft byte-voor-byte wat hij was."""
+    document = _envelop(tmp_path / "b.json")
+
+    assert "gebied" not in document
+    assert "gebieden" not in document
+
+
+def test_json_van_een_gebied_noemt_het(tmp_path: Path) -> None:
+    assert _envelop(tmp_path / "b.json", gebied="Noord")["gebied"] == "Noord"
+
+
+def test_totaal_json_noemt_alle_gebieden(tmp_path: Path) -> None:
+    """De totaalsynthese hoort bij geen enkel gebied en bij ze allemaal."""
+    document = _envelop(tmp_path / "b.json", gebieden=["Noord", "Zuid"])
+
+    assert document["gebied"] is None
+    assert document["gebieden"] == ["Noord", "Zuid"]

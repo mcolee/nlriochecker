@@ -139,8 +139,14 @@ class Studiegebieden:
 
     @property
     def enkel(self) -> bool:
-        """Geeft aan of het bestand precies een gebied bevat."""
-        return len(self.gebieden) == 1
+        """Geeft aan of het *bestand* precies een gebied bevat.
+
+        Bewust over het bestand en niet over de selectie: een run met `--gebied` op
+        een van tachtig buurten hoort dezelfde submap-en-synthesestructuur te
+        krijgen als een run over alle tachtig. Anders zou de uitvoervorm van een
+        gebied afhangen van hoeveel andere gebieden er toevallig meedraaiden.
+        """
+        return len(self.beschikbaar or self.gebieden) == 1
 
     @property
     def totaal(self) -> StudyArea:
@@ -150,7 +156,7 @@ class Studiegebieden:
         alleen de omhullende van het bestand nodig heeft (`externedata`) heeft hier
         genoeg aan.
         """
-        if self.enkel:
+        if len(self.gebieden) == 1:
             return self.gebieden[0]
         return StudyArea(
             name=_naam(self.source, self.laag),

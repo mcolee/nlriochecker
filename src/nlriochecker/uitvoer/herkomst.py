@@ -109,6 +109,8 @@ def schrijf_json(
     cfk_set: list[str],
     volledig: bool,
     typeringspoort_toegepast: bool,
+    gebied: str | None = None,
+    gebieden: list[str] | None = None,
 ) -> Path:
     """Schrijft de meldingenstroom als JSON, met een envelop die de run beschrijft.
 
@@ -130,12 +132,26 @@ def schrijf_json(
     `allow_nan=False`: een NaN-coordinaat zou als `[NaN, 1.0]` in het bestand komen,
     wat geen geldige JSON is en door een strikte parser geweigerd wordt. Luid falen is
     beter dan stil een onleesbaar contract wegschrijven.
+
+    `gebied` en `gebieden` horen bij de rapportage per studiegebied-feature: de JSON
+    van een gebied noemt zijn eigen naam, die van de totaalsynthese `gebied: null`
+    plus de lijst gebieden waarover hij gaat. Een run zonder gebieden krijgt geen van
+    beide velden, zodat zo'n bestand byte-voor-byte blijft zoals het was; een afnemer
+    die de velden leest, moet ze dus als optioneel behandelen (zie
+    `docs/json-schema.md`).
     """
-    document = {
+    document: dict[str, object] = {
         "schema_versie": SCHEMA_VERSIE,
         "gereedschap": gereedschap(),
         "run_datum": run_datum.isoformat(),
         "dataset": dataset,
+    }
+    if gebieden is not None:
+        document["gebied"] = None
+        document["gebieden"] = list(gebieden)
+    elif gebied is not None:
+        document["gebied"] = gebied
+    document |= {
         "cfk_set": list(cfk_set),
         "volledig": volledig,
         "typeringspoort_toegepast": typeringspoort_toegepast,

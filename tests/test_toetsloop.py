@@ -7,6 +7,7 @@ Zonder die eigenschap is rapportage per gebied niet te vertrouwen.
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from nlriochecker.errors import StudyAreaError
 from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
+from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -123,3 +125,91 @@ def test_onbekend_gebied_faalt_met_de_beschikbare_namen() -> None:
 
     with pytest.raises(StudyAreaError, match="Noord, Zuid"):
         gebieden.selecteer(["Oost"])
+
+
+def _schrijf(bestand: str, doel: Path, ttl: str = "hgt010_diameterverjonging.ttl"):
+    """Draait de toetsloop en schrijft de uitvoer weg."""
+    gebieden = load_studiegebieden(GIS_DIR / bestand)
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / ttl),
+        gebieden,
+        _config(),
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    return runs, schrijf_uitvoer_gebieden(
+        runs, doel, RUNDATUM, beschikbaar=gebieden.beschikbaar, overgeslagen=gebieden.overgeslagen
+    )
+
+
+def test_twee_gebieden_leveren_twee_submappen_en_een_totaal(tmp_path: Path) -> None:
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path)
+
+    assert (tmp_path / "noord" / "bevindingen.md").exists()
+    assert (tmp_path / "zuid" / "bevindingen.md").exists()
+    assert (tmp_path / "totaal" / "synthese.md").exists()
+    assert (tmp_path / "totaal" / "bevindingen.csv").exists()
+    assert uitvoer.totaal_json is not None
+    assert set(uitvoer.per_gebied) == {"Noord", "Zuid"}
+
+
+def test_een_gebied_schrijft_zonder_submap(tmp_path: Path) -> None:
+    _, uitvoer = _schrijf("buurt_noord.gpkg", tmp_path)
+
+    assert (tmp_path / "bevindingen.md").exists()
+    assert not (tmp_path / "noord").exists()
+    assert uitvoer.synthese is None
+
+
+def test_per_gebied_json_noemt_het_gebied(tmp_path: Path) -> None:
+    _schrijf("buurten_twee.gpkg", tmp_path)
+
+    document = json.loads((tmp_path / "noord" / "bevindingen.json").read_text(encoding="utf-8"))
+
+    assert document["gebied"] == "Noord"
+
+
+def test_totaal_json_noemt_alle_gebieden(tmp_path: Path) -> None:
+    _schrijf("buurten_twee.gpkg", tmp_path)
+
+    document = json.loads((tmp_path / "totaal" / "bevindingen.json").read_text(encoding="utf-8"))
+
+    assert document["gebied"] is None
+    assert document["gebieden"] == ["Noord", "Zuid"]
+
+
+def test_json_van_een_enkel_gebied_draagt_geen_gebiedsveld(tmp_path: Path) -> None:
+    """Een run op een enkelvoudig bestand blijft precies wat hij was."""
+    _schrijf("buurt_noord.gpkg", tmp_path)
+
+    document = json.loads((tmp_path / "bevindingen.json").read_text(encoding="utf-8"))
+
+    assert "gebied" not in document
+
+
+def test_synthese_telt_unieke_en_meervoudige_meldingen(tmp_path: Path) -> None:
+    """Streng B-C raakt beide buurten: twee meldingen, een uniek defect."""
+    runs, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path)
+    assert uitvoer.synthese is not None
+
+    tekst = uitvoer.synthese.read_text(encoding="utf-8")
+    totaal = json.loads((tmp_path / "totaal" / "bevindingen.json").read_text(encoding="utf-8"))
+
+    per_gebied = sum(len(bouw_meldingen(run.run, RUNDATUM)) for run in runs)
+    assert "in meer dan een gebied" in tekst
+    assert totaal["aantal_meldingen"] < per_gebied
+
+
+def test_synthese_vermeldt_een_selectie(tmp_path: Path) -> None:
+    gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
+    keuze = gebieden.selecteer(["Noord"])
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        keuze,
+        _config(),
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+
+    uitvoer = schrijf_uitvoer_gebieden(runs, tmp_path, RUNDATUM, beschikbaar=keuze.beschikbaar)
+
+    assert uitvoer.synthese is not None
+    assert "Selectie" in uitvoer.synthese.read_text(encoding="utf-8")
