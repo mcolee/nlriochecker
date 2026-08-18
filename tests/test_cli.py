@@ -451,3 +451,195 @@ def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
         assert kop in tekst
         staart = tekst.split(kop, 1)[1]
         assert f"Bevindingen ({aantal})" in staart.split("\n## ", 1)[0]
+
+
+def test_toets_met_cfk_deelset_markeert_het_rapport(tmp_path: Path, mini_hyd_shacl: Path) -> None:
+    """Een deelsetrun zegt het in het rapport, niet alleen op de opdrachtregel."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--shacl",
+            str(mini_hyd_shacl),
+            "--cfk",
+            "Hyd",
+            "--geen-cache",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    tekst = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert "**Onvolledige meting:** getoetst op Hyd;" in tekst
+    assert "MdsPlan, MdsProj ontbreken" in tekst
+
+
+def test_toets_zonder_shacl_meldt_dat_er_niet_gemeten_is(tmp_path: Path) -> None:
+    """Stilte mag niet lezen als 'alles gecontroleerd'."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--geen-cache",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    tekst = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert "**Geen nulmeting:**" in tekst
+
+
+def test_cfk_met_onbekende_waarde_somt_de_toegestane_op(
+    tmp_path: Path, shacl_drieluik: list[Path]
+) -> None:
+    """Een typefout hoort de lijst te tonen in plaats van stil een lege set te maken."""
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "analyseer",
+            *_shacl_args(shacl_drieluik),
+            "--cfk",
+            "Hydro",
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code != 0
+    assert "Hydro" in resultaat.output
+    assert "Hyd, MdsPlan, MdsProj" in resultaat.output
+
+
+def test_cfk_deelset_weigert_een_rapport_buiten_de_keuze(
+    tmp_path: Path, shacl_drieluik: list[Path]
+) -> None:
+    """Alle drie meegeven bij --cfk Hyd is een fout, geen stille overslag."""
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "analyseer",
+            *_shacl_args(shacl_drieluik),
+            "--cfk",
+            "Hyd",
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code != 0
+    assert "MdsPlan" in resultaat.output
+
+
+def test_analyseer_zonder_cfk_gedraagt_zich_als_voorheen(
+    tmp_path: Path, shacl_drieluik: list[Path]
+) -> None:
+    """De standaardrun verandert niet: geen markering, alle drie vereist."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main, ["analyseer", *_shacl_args(shacl_drieluik), "--output", str(uitvoer)]
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    tekst = (uitvoer / FILE_MARKDOWN).read_text(encoding="utf-8")
+    assert "Onvolledige meting" not in tekst
+    assert "Geen nulmeting" not in tekst
+
+
+def test_dekking_met_cfk_deelset(tmp_path: Path, mini_hyd_shacl: Path) -> None:
+    """Ook `dekking` accepteert een deelset en markeert zijn rapport."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "dekking",
+            "--shacl",
+            str(mini_hyd_shacl),
+            "--cfk",
+            "Hyd",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "**Onvolledige meting:**" in (uitvoer / FILE_COVERAGE_MARKDOWN).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_vergelijk_met_cfk_deelset(tmp_path: Path, mini_hyd_shacl: Path) -> None:
+    """`vergelijk` heeft de vlag nodig; zonder hem eist hij alle drie de klassen."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "vergelijk",
+            "--eerder",
+            str(mini_hyd_shacl),
+            "--later",
+            str(mini_hyd_shacl),
+            "--cfk",
+            "Hyd",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "**Onvolledige meting:**" in (uitvoer / FILE_COMPARISON_MARKDOWN).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_cfk_typefout_valt_ook_op_zonder_shacl(tmp_path: Path) -> None:
+    """De keuze wordt getoetst voordat blijkt dat er niets te meten valt.
+
+    Zonder deze toets accepteert juist de aanroepvorm die niets met de vlag doet
+    hem stilzwijgend, en denkt de gebruiker dat hij op Hydro getoetst heeft.
+    """
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--cfk",
+            "Hydro",
+            "--geen-cache",
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code != 0
+    assert "Hydro" in resultaat.output
+    assert "Hyd, MdsPlan, MdsProj" in resultaat.output
+
+
+def test_cfk_zonder_shacl_meldt_dat_de_vlag_niets_doet(tmp_path: Path) -> None:
+    """Een vlag die geen effect heeft hoort dat te zeggen."""
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--cfk",
+            "Hyd",
+            "--geen-cache",
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "--cfk doet niets zonder --shacl" in resultaat.output

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import click
@@ -10,7 +11,7 @@ from nlriochecker import __version__
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import MetingAnalysis, analyze
 from nlriochecker.cache import laad_met_cache
-from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, Severity, run_checks
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import CoverageConfig, load_coverage_config
@@ -18,7 +19,7 @@ from nlriochecker.coverage import assess_coverage, verify_register
 from nlriochecker.dataset import GwswDataset, load_dataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import load_external_data
-from nlriochecker.meting import laad_nulmeting
+from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.register import Register, default_register_path, load_register
 from nlriochecker.reporting import (
@@ -164,6 +165,39 @@ def _laad_register(register_path: Path | None, config: CoverageConfig) -> Regist
     return load_register(register_path)
 
 
+def _cfk_option():
+    """Bouwt de optie voor een deelverzameling conformiteitsklassen."""
+    return click.option(
+        "--cfk",
+        "cfk_keuze",
+        multiple=True,
+        help=(
+            "Conformiteitsklasse om op te toetsen; meermaals toegestaan. Zonder deze optie "
+            "gelden alle klassen uit de projectconfiguratie en is een ontbrekend rapport een "
+            "fout. Een deelset wordt in alle uitvoervormen gemarkeerd."
+        ),
+    )
+
+
+def _gekozen_cfk(cfk_keuze: tuple[str, ...], config: CheckConfig) -> list[str]:
+    """Toetst de opgegeven conformiteitsklassen tegen de projectconfiguratie.
+
+    Geen `click.Choice`: de toegestane waarden staan pas vast nadat
+    `--projectconfig` gelezen is, en `click.Choice` moet ze al kennen op het moment
+    dat het commando opgebouwd wordt.
+    """
+    volledig = config.nulmeting.vereiste_cfk
+    if not cfk_keuze:
+        return list(volledig)
+    onbekend = sorted({keuze for keuze in cfk_keuze if keuze not in volledig})
+    if onbekend:
+        raise _CliError(
+            f"Onbekende conformiteitsklasse(n): {', '.join(onbekend)}. "
+            f"Toegestaan: {', '.join(volledig)}."
+        )
+    return sorted(set(cfk_keuze))
+
+
 def _projectconfig_option():
     """Bouwt de optie voor de projectconfiguratie."""
     return click.option(
@@ -203,10 +237,11 @@ def _bronnen_option():
     )
 
 
-def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths):
+def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze=()):
     """Leest de nulmeting en optioneel de dataset, en analyseert ze."""
     project = load_check_config(project_config_path)
-    nulmeting = laad_nulmeting(list(shacl_paths), project.nulmeting.vereiste_cfk)
+    gekozen = _gekozen_cfk(cfk_keuze, project)
+    nulmeting = laad_nulmeting(list(shacl_paths), gekozen, project.nulmeting.vereiste_cfk)
     dataset = load_dataset(dataset_path, list(ontology_paths)) if dataset_path is not None else None
     return project, nulmeting, analyze(nulmeting, dataset), dataset
 
@@ -229,6 +264,7 @@ def _echo_meting(analyse: MetingAnalysis, dataset: GwswDataset | None) -> None:
 @main.command("analyseer")
 @_shacl_option()
 @_dataset_options()
+@_cfk_option()
 @_projectconfig_option()
 @_config_option()
 @_checkregister_option()
@@ -237,6 +273,7 @@ def analyze_command(
     shacl_paths: tuple[Path, ...],
     dataset_path: Path | None,
     ontology_paths: tuple[Path, ...],
+    cfk_keuze: tuple[str, ...],
     project_config_path: Path | None,
     config_path: Path | None,
     register_path: Path | None,
@@ -245,7 +282,7 @@ def analyze_command(
     """Analyseert een SHACL-nulmeting en schrijft samenvatting en aggregaties weg."""
     try:
         _, _, analyse, dataset = _laad_meting(
-            shacl_paths, project_config_path, dataset_path, ontology_paths
+            shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze
         )
         config = load_coverage_config(config_path)
         register = _laad_register(register_path, config)
@@ -269,6 +306,7 @@ def analyze_command(
 @main.command("dekking")
 @_shacl_option()
 @_dataset_options()
+@_cfk_option()
 @_projectconfig_option()
 @_config_option()
 @_checkregister_option()
@@ -277,6 +315,7 @@ def coverage_command(
     shacl_paths: tuple[Path, ...],
     dataset_path: Path | None,
     ontology_paths: tuple[Path, ...],
+    cfk_keuze: tuple[str, ...],
     project_config_path: Path | None,
     config_path: Path | None,
     register_path: Path | None,
@@ -285,7 +324,7 @@ def coverage_command(
     """Toetst of de nulmeting de geschrapte checks in deze dataset daadwerkelijk raakt."""
     try:
         _, _, analyse, _ = _laad_meting(
-            shacl_paths, project_config_path, dataset_path, ontology_paths
+            shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze
         )
         config = load_coverage_config(config_path)
         register = _laad_register(register_path, config)
@@ -339,12 +378,14 @@ def coverage_command(
     type=RAPPORT_TYPE,
     help="SHACL-rapport van het tweede meetmoment; meermaals toegestaan.",
 )
+@_cfk_option()
 @_projectconfig_option()
 @_config_option()
 @_output_option("Map waarin de vergelijking wordt geschreven.")
 def compare_command(
     earlier_paths: tuple[Path, ...],
     later_paths: tuple[Path, ...],
+    cfk_keuze: tuple[str, ...],
     project_config_path: Path | None,
     config_path: Path | None,
     output_dir: Path,
@@ -352,8 +393,10 @@ def compare_command(
     """Zet twee nulmetingen van dezelfde dataset naast elkaar voor trendbewaking."""
     try:
         project = load_check_config(project_config_path)
-        eerder = analyze(laad_nulmeting(list(earlier_paths), project.nulmeting.vereiste_cfk))
-        later = analyze(laad_nulmeting(list(later_paths), project.nulmeting.vereiste_cfk))
+        volledig = project.nulmeting.vereiste_cfk
+        gekozen = _gekozen_cfk(cfk_keuze, project)
+        eerder = analyze(laad_nulmeting(list(earlier_paths), gekozen, volledig))
+        later = analyze(laad_nulmeting(list(later_paths), gekozen, volledig))
         comparison = compare_metingen(eerder, later, load_coverage_config(config_path))
         markdown_path, csv_path, objects_path = write_comparison_reports(comparison, output_dir)
     except PipelineError as error:
@@ -409,6 +452,7 @@ def compare_command(
 @_projectconfig_option()
 @_plausibiliteit_option()
 @_bronnen_option()
+@_cfk_option()
 @click.option(
     "--geen-gpkg",
     "geen_gpkg",
@@ -439,6 +483,7 @@ def check_command(
     project_config_path: Path | None,
     plausibility_path: Path | None,
     bronnen_dir: Path | None,
+    cfk_keuze: tuple[str, ...],
     geen_gpkg: bool,
     geen_cache: bool,
     cache_dir: Path | None,
@@ -450,7 +495,9 @@ def check_command(
         dataset, cache = laad_met_cache(
             dataset_path, list(ontology_paths), cache_dir, not geen_cache
         )
-        onbetrouwbaar, gate_applied = _typing_gate(shacl_paths, config, dataset)
+        onbetrouwbaar, gate_applied, meetbereik = _typing_gate(
+            shacl_paths, config, dataset, cfk_keuze
+        )
         bronnen = _externe_bronnen(config, bronnen_dir)
         area = load_study_area(study_path, study_layer) if study_path is not None else None
         analyseset = bouw_analyseset(dataset, area, config) if area is not None else None
@@ -466,6 +513,7 @@ def check_command(
         run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
         if area is not None:
             run = run.beperk_tot_studiegebied(area)
+        run = replace(run, meetbereik=meetbereik)
         uitvoer = schrijf_uitvoer(run, output_dir, met_geopackage=not geen_gpkg)
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -508,6 +556,10 @@ def check_command(
             )
     if not gate_applied:
         click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
+        if cfk_keuze:
+            click.echo("  Let op: --cfk doet niets zonder --shacl; er is niets gemeten.")
+    elif not meetbereik.volledig:
+        click.echo(f"  {meetbereik.markering()}")
     if bronnen is None:
         click.echo("  Geen externe bronnen geladen (--bronnen niet opgegeven).")
     else:
@@ -552,19 +604,31 @@ def _externe_bronnen(config, bronnen_dir: Path | None):
 
 
 def _typing_gate(
-    shacl_paths: tuple[Path, ...], config, dataset: GwswDataset
-) -> tuple[frozenset[str], bool]:
+    shacl_paths: tuple[Path, ...],
+    config: CheckConfig,
+    dataset: GwswDataset,
+    cfk_keuze: tuple[str, ...] = (),
+) -> tuple[frozenset[str], bool, Meetbereik]:
     """Haalt de te globaal getypeerde objecten uit de nulmeting.
 
     De SHACL-meting noemt de te globale klassen; de instanties komen uit de dataset.
     Dat geeft een exacte verzameling in plaats van een labellijst.
-    """
-    if not shacl_paths:
-        return frozenset(), False
 
-    nulmeting = laad_nulmeting(list(shacl_paths), config.nulmeting.vereiste_cfk)
+    Zonder `--shacl` is er geen meting. Het meetbereik zegt dat dan expliciet, in
+    plaats van de vereiste set te noemen alsof die gehaald is -- stilte over een
+    niet-uitgevoerde meting leest als "alles gecontroleerd".
+    """
+    volledig = config.nulmeting.vereiste_cfk
+    # Eerst toetsen, dan pas beslissen of er iets te meten valt: een typefout in
+    # --cfk moet ook opvallen bij een run zonder --shacl, waar de vlag geen effect
+    # heeft. Anders accepteert juist de aanroepvorm die er niets mee doet hem stil.
+    gekozen = _gekozen_cfk(cfk_keuze, config)
+    if not shacl_paths:
+        return frozenset(), False, Meetbereik.niet_gemeten(volledig)
+
+    nulmeting = laad_nulmeting(list(shacl_paths), gekozen, volledig)
     analyse = analyze(nulmeting, dataset)
     objecten: set[str] = set()
     for deel in analyse.per_cfk.values():
         objecten.update(deel.typing_gate.objects)
-    return frozenset(objecten), True
+    return frozenset(objecten), True, nulmeting.meetbereik
