@@ -20,7 +20,7 @@ from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik
-from nlriochecker.studiegebied import load_study_area
+from nlriochecker.studiegebied import _lees_geopackage, load_study_area
 from nlriochecker.uitvoer.gpkg import RD_NEW, schrijf_geopackage
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
@@ -286,16 +286,18 @@ def test_export_overschrijft_geen_invoerbestand(tmp_path: Path) -> None:
 def test_geschreven_bestand_is_leesbaar_met_de_eigen_lezer(tmp_path: Path) -> None:
     """De lees- en schrijfkant houden elkaar zo in de gaten.
 
-    `load_study_area` is de productiecode die GeoPackages leest; kan die de
-    geschreven strengenlaag terugvinden, dan klopt het formaat.
+    `_lees_geopackage` is de productiecode die GeoPackages leest; vindt die de
+    geschreven strengenlaag terug, dan klopt het formaat. Niet via
+    `load_study_area`: die accepteert sinds de rapportage per gebied alleen nog
+    vlakken, en een strengenlaag is er geen.
     """
     run = _run("schoon.ttl")
     pad = _schrijf(run, tmp_path)
 
-    gelezen = load_study_area(pad, "strengen")
+    gelezen = _lees_geopackage(pad, "strengen")
 
-    assert gelezen.feature_count == len(run.dataset.conduits)
-    assert not gelezen.geometry.is_empty
+    assert len(gelezen.features) == len(run.dataset.conduits)
+    assert all(not geometrie.is_empty for geometrie, _ in gelezen.features)
 
 
 def test_meldinglocatiestijl_filtert_systemische_meldingen_echt(tmp_path: Path) -> None:

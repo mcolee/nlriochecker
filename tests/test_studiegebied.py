@@ -11,7 +11,12 @@ import pytest
 from shapely.geometry import LineString, Point, Polygon, mapping
 
 from nlriochecker.errors import StudyAreaError
-from nlriochecker.studiegebied import load_study_area, mapnaam
+from nlriochecker.studiegebied import (
+    RdGrenzen,
+    load_studiegebieden,
+    load_study_area,
+    mapnaam,
+)
 
 
 def _maak_geopackage(pad: Path, vlak: Polygon, srs_id: int = 28992, laag: str = "gebied") -> Path:
@@ -193,3 +198,202 @@ def test_mapnaam_zonder_bruikbare_tekens_is_een_fout() -> None:
     """Een naamloze map is geen uitvoer; dan liever een foutmelding met de naam erin."""
     with pytest.raises(StudyAreaError, match="geen bruikbare mapnaam"):
         mapnaam("///")
+
+
+def _maak_buurten_gpkg(
+    pad: Path,
+    vlakken: list[tuple[str, Polygon]],
+    laag: str = "buurten",
+    kolom: str = "naam_gebied",
+) -> Path:
+    """Schrijft een GeoPackage met meerdere buurten en een naamkolom."""
+    con = sqlite3.connect(pad)
+    con.execute("PRAGMA application_id = 0x47504B47")
+    con.execute(
+        "create table gpkg_contents (table_name text, data_type text, identifier text, "
+        "srs_id integer)"
+    )
+    con.execute(
+        "create table gpkg_geometry_columns (table_name text, column_name text, "
+        "geometry_type_name text, srs_id integer)"
+    )
+    con.execute(f'create table "{laag}" (fid integer primary key, "{kolom}" text, geom blob)')
+    con.execute("insert into gpkg_contents values (?, 'features', ?, 28992)", (laag, laag))
+    con.execute("insert into gpkg_geometry_columns values (?, 'geom', 'POLYGON', 28992)", (laag,))
+    kop = b"GP" + bytes([0, 0]) + struct.pack("<i", 28992)
+    for naam, vlak in vlakken:
+        con.execute(f'insert into "{laag}" ("{kolom}", geom) values (?, ?)', (naam, kop + vlak.wkb))
+    con.commit()
+    con.close()
+    return pad
+
+
+def _schrijf_geojson(pad: Path, inhoud: dict[str, object]) -> Path:
+    """Schrijft een GeoJSON-bestand."""
+    pad.write_text(json.dumps(inhoud), encoding="utf-8")
+    return pad
+
+
+NOORD = Polygon([(0, 100), (100, 100), (100, 200), (0, 200)])
+ZUID = Polygon([(0, 0), (100, 0), (100, 100), (0, 100)])
+RD_GRENZEN = RdGrenzen(0.0, 300_000.0, 300_000.0, 620_000.0)
+
+
+def test_twee_features_leveren_twee_gebieden(tmp_path: Path) -> None:
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("Zuid", ZUID)])
+
+    gebieden = load_studiegebieden(pad)
+
+    assert [gebied.gebied for gebied in gebieden.gebieden] == ["Noord", "Zuid"]
+    assert [gebied.name for gebied in gebieden.gebieden] == ["Noord", "Zuid"]
+    assert not gebieden.enkel
+    assert gebieden.totaal.area_ha == pytest.approx(2.0)
+    assert gebieden.totaal.feature_count == 2
+
+
+def test_een_feature_houdt_het_bestaande_gedrag(tmp_path: Path) -> None:
+    pad = _maak_geopackage(tmp_path / "vlak.gpkg", VIERKANT)
+
+    gebieden = load_studiegebieden(pad)
+
+    assert gebieden.enkel
+    assert gebieden.gebieden[0].name == "vlak:gebied"
+    assert gebieden.gebieden[0].gebied == "gebied"
+
+
+def test_naam_gebied_bij_een_feature_wint_van_de_terugval(tmp_path: Path) -> None:
+    pad = _maak_buurten_gpkg(tmp_path / "een.gpkg", [("Koekangerveld", VIERKANT)])
+
+    assert load_studiegebieden(pad).gebieden[0].gebied == "Koekangerveld"
+
+
+def test_naam_gebied_ontbreekt_bij_meerdere_features(tmp_path: Path) -> None:
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("Zuid", ZUID)], kolom="naam")
+
+    with pytest.raises(StudyAreaError, match="naam_gebied"):
+        load_studiegebieden(pad)
+
+
+def test_lege_naam_noemt_de_rij(tmp_path: Path) -> None:
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("   ", ZUID)])
+
+    with pytest.raises(StudyAreaError, match="rij 2"):
+        load_studiegebieden(pad)
+
+
+def test_dubbele_naam_is_een_fout(tmp_path: Path) -> None:
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("Noord", ZUID)])
+
+    with pytest.raises(StudyAreaError, match="Noord"):
+        load_studiegebieden(pad)
+
+
+def test_botsende_mapnamen_zijn_een_fout(tmp_path: Path) -> None:
+    """Twee namen die dezelfde map opleveren zouden elkaars uitvoer overschrijven."""
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("De Wolden", NOORD), ("de-wolden", ZUID)])
+
+    with pytest.raises(StudyAreaError, match="dezelfde mapnaam"):
+        load_studiegebieden(pad)
+
+
+def test_niet_polygonen_worden_gemeld_en_overgeslagen(tmp_path: Path) -> None:
+    pad = _schrijf_geojson(
+        tmp_path / "gemengd.geojson",
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "properties": {}, "geometry": mapping(VIERKANT)},
+                {"type": "Feature", "properties": {}, "geometry": mapping(Point(10, 10))},
+            ],
+        },
+    )
+
+    gebieden = load_studiegebieden(pad)
+
+    assert gebieden.enkel
+    assert any("Point" in melding for melding in gebieden.overgeslagen)
+
+
+def test_geometrycollection_wordt_niet_uitgepakt(tmp_path: Path) -> None:
+    """Uitpakken zou stilzwijgend vlakken toevoegen die de gebruiker niet aanleverde."""
+    pad = _schrijf_geojson(
+        tmp_path / "collectie.geojson",
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "properties": {}, "geometry": mapping(VIERKANT)},
+                {
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": {
+                        "type": "GeometryCollection",
+                        "geometries": [mapping(VIERKANT)],
+                    },
+                },
+            ],
+        },
+    )
+
+    gebieden = load_studiegebieden(pad)
+
+    assert gebieden.enkel
+    assert any("GeometryCollection" in melding for melding in gebieden.overgeslagen)
+
+
+def test_alleen_niet_polygonen_is_een_fout(tmp_path: Path) -> None:
+    pad = _schrijf_geojson(
+        tmp_path / "punten.geojson",
+        {
+            "type": "FeatureCollection",
+            "features": [{"type": "Feature", "properties": {}, "geometry": mapping(Point(10, 10))}],
+        },
+    )
+
+    with pytest.raises(StudyAreaError, match="geen enkel vlak"):
+        load_studiegebieden(pad)
+
+
+def test_geojson_buiten_de_rd_bounds(tmp_path: Path) -> None:
+    pad = _schrijf_geojson(
+        tmp_path / "wgs84.geojson",
+        mapping(Polygon([(6.4, 52.7), (6.5, 52.7), (6.5, 52.8), (6.4, 52.8)])),
+    )
+
+    with pytest.raises(StudyAreaError, match="WGS84"):
+        load_studiegebieden(pad, grenzen=RD_GRENZEN)
+
+
+def test_geojson_met_legacy_crs_wordt_geaccepteerd(tmp_path: Path) -> None:
+    """Een bestand dat zelf 28992 noemt hoeft niet binnen de bounds te liggen."""
+    pad = _schrijf_geojson(
+        tmp_path / "lokaal.geojson",
+        {
+            **mapping(VIERKANT),
+            "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::28992"}},
+        },
+    )
+
+    assert load_studiegebieden(pad, grenzen=RD_GRENZEN).enkel
+
+
+def test_geojson_zonder_grenzen_wordt_niet_getoetst(tmp_path: Path) -> None:
+    """Wie de grenzen niet meegeeft, krijgt geen verzonnen oordeel over het stelsel."""
+    pad = _schrijf_geojson(tmp_path / "lokaal.geojson", mapping(VIERKANT))
+
+    assert load_studiegebieden(pad).enkel
+
+
+def test_selecteer_kiest_gebieden(tmp_path: Path) -> None:
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("Zuid", ZUID)])
+
+    keuze = load_studiegebieden(pad).selecteer(["Zuid"])
+
+    assert [gebied.gebied for gebied in keuze.gebieden] == ["Zuid"]
+    assert keuze.beschikbaar == ("Noord", "Zuid")
+
+
+def test_selecteer_onbekende_naam_noemt_de_beschikbare(tmp_path: Path) -> None:
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("Zuid", ZUID)])
+
+    with pytest.raises(StudyAreaError, match="Noord, Zuid"):
+        load_studiegebieden(pad).selecteer(["Oost"])
