@@ -10,6 +10,7 @@ from pathlib import Path
 from nlriochecker.errors import NulmetingError
 from nlriochecker.shaclrapport import ShaclReport, lees_shacl_rapport
 from nlriochecker.taal import vorm
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,8 @@ def laad_nulmeting(
     paden: list[Path],
     vereiste_cfk: list[str],
     volledige_cfk: list[str] | None = None,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> Nulmeting:
     """Leest de SHACL-rapporten en toetst de harde eisen.
 
@@ -122,15 +125,20 @@ def laad_nulmeting(
         raise NulmetingError("Geef minstens een SHACL-rapport op.")
 
     rapporten: dict[str, ShaclReport] = {}
-    for pad in paden:
-        rapport = lees_shacl_rapport(Path(pad))
-        eerder = rapporten.get(rapport.cfk)
-        if eerder is not None:
-            raise NulmetingError(
-                f"Twee rapporten voor CFK {rapport.cfk!r}: {eerder.source_file} en "
-                f"{rapport.source_file}. Geef er per conformiteitsklasse een."
-            )
-        rapporten[rapport.cfk] = rapport
+    voortgang.start_fase("SHACL-rapporten", len(paden))
+    try:
+        for pad in paden:
+            rapport = lees_shacl_rapport(Path(pad))
+            eerder = rapporten.get(rapport.cfk)
+            if eerder is not None:
+                raise NulmetingError(
+                    f"Twee rapporten voor CFK {rapport.cfk!r}: {eerder.source_file} en "
+                    f"{rapport.source_file}. Geef er per conformiteitsklasse een."
+                )
+            rapporten[rapport.cfk] = rapport
+            voortgang.stap(label=Path(pad).name)
+    finally:
+        voortgang.einde_fase()
 
     overtollig = sorted(cfk for cfk in rapporten if cfk not in vereiste_cfk)
     if overtollig:

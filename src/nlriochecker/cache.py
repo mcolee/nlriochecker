@@ -31,6 +31,7 @@ from rdflib import Graph
 from nlriochecker import dataset as dataset_module
 from nlriochecker import geometry as geometry_module
 from nlriochecker.dataset import FALLBACK_ENCODING, GwswDataset, load_dataset
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 logger = logging.getLogger(__name__)
 
@@ -158,11 +159,18 @@ def laad_met_cache(
     cache_dir: Path | None = None,
     gebruik_cache: bool = True,
     fallback_encoding: str = FALLBACK_ENCODING,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> tuple[GwswDataset, CacheUitslag]:
-    """Leest de dataset uit de cache, of leest hem in en legt hem weg."""
+    """Leest de dataset uit de cache, of leest hem in en legt hem weg.
+
+    Bij een cachetreffer wordt er niets geparseerd en start er dus geen laadfase:
+    een balk die in nul seconden vol schiet zou suggereren dat het inlezen snel was
+    in plaats van overgeslagen. De laadfase komt uit `load_dataset` zelf.
+    """
     begin = time.perf_counter()
     if not gebruik_cache:
-        dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding)
+        dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding, voortgang=voortgang)
         return dataset, CacheUitslag("bestand", "", time.perf_counter() - begin)
 
     sleutel = cachesleutel(dataset_path, ontology_paths, fallback_encoding)
@@ -188,7 +196,7 @@ def laad_met_cache(
             dataset = replace(GwswDataset(graph=Graph(), **velden), graph=luie)
             return dataset, CacheUitslag("cache", sleutel, time.perf_counter() - begin)
 
-    dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding)
+    dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding, voortgang=voortgang)
     _schrijf(map_, dataset)
     return dataset, CacheUitslag("bestand", sleutel, time.perf_counter() - begin, melding)
 

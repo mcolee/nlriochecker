@@ -34,6 +34,7 @@ from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
 from nlriochecker.uitvoer.melding import Melding, categorie_van
 from nlriochecker.uitvoer.tabel import prepare
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 # De GWSW-coordinaten staan in Rijksdriehoek; herprojecteren doen we niet.
 RD_NEW = 28992
@@ -89,6 +90,8 @@ def schrijf_geopackage(
     meldingen: list[Melding],
     output_dir: Path,
     run_datum: date,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> Path:
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
 
@@ -102,17 +105,24 @@ def schrijf_geopackage(
     doel.unlink(missing_ok=True)
 
     binnen = run.objecten_binnen()
+    # Vier featurelagen, drie attribuuttabellen en de stijltabel; elk een stap.
+    voortgang.start_fase("GeoPackage", 8)
     verbinding = sqlite3.connect(doel)
     try:
         _leg_fundament(verbinding)
-        tellingen = _schrijf_features(verbinding, run, meldingen, binnen, run_datum)
+        tellingen = _schrijf_features(verbinding, run, meldingen, binnen, run_datum, voortgang)
         _schrijf_meldingen(verbinding, meldingen)
+        voortgang.stap(label="meldingen")
         _schrijf_overzicht(verbinding, run, meldingen)
+        voortgang.stap(label="overzicht_checks")
         _schrijf_runmetadata(verbinding, run, meldingen, run_datum, tellingen)
+        voortgang.stap(label="gwsw_run")
         _schrijf_stijlen(verbinding)
+        voortgang.stap(label="layer_styles")
         verbinding.commit()
     finally:
         verbinding.close()
+        voortgang.einde_fase()
     return doel
 
 
@@ -318,6 +328,7 @@ def _schrijf_features(
     meldingen: list[Melding],
     binnen: frozenset[str] | None,
     run_datum: date,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> _LaagTellingen:
     """Schrijft `putten`, `strengen`, `mechanisch_riool` en `meldinglocaties`."""
     kolommen = _samenvatting_kolommen()
@@ -382,9 +393,12 @@ def _schrijf_features(
             )
         _zet_omhullende(verbinding, laag, grenzen)
         tellingen[laag] = len(rijen)
+        voortgang.stap(label=laag)
 
     tellingen["mechanisch"] = _schrijf_mechanisch(verbinding, run, binnen, mechanisch, metadata)
+    voortgang.stap(label="mechanisch_riool")
     _schrijf_meldinglocaties(verbinding, meldingen)
+    voortgang.stap(label="meldinglocaties")
 
     return _LaagTellingen(
         putten=tellingen["putten"],

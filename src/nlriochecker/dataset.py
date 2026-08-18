@@ -21,6 +21,7 @@ from nlriochecker.geometry import (
     parse_gml,
     parse_gml_z,
 )
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 GWSW = "http://data.gwsw.nl/1.6/totaal/"
 
@@ -569,14 +570,27 @@ def load_dataset(
     dataset_path: Path,
     ontology_paths: list[Path] | None = None,
     fallback_encoding: str = FALLBACK_ENCODING,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> GwswDataset:
-    """Leest de OroX-dataset en de ontologie(en) en bouwt het domeinmodel op."""
-    dataset_path = Path(dataset_path)
-    graph, fallback = _parse(dataset_path, fallback_encoding)
+    """Leest de OroX-dataset en de ontologie(en) en bouwt het domeinmodel op.
 
-    ontology = Graph()
-    for pad in ontology_paths or []:
-        ontology += _parse(Path(pad), fallback_encoding)[0]
+    De voortgang gaat per bestand. rdflib geeft geen tussenstand binnen een bestand,
+    en juist het parsen van de dataset is de lange stap; er wordt daarom geen
+    percentage getoond dat er niet is.
+    """
+    dataset_path = Path(dataset_path)
+    voortgang.start_fase("TTL laden", 1 + len(ontology_paths or []))
+    try:
+        graph, fallback = _parse(dataset_path, fallback_encoding)
+        voortgang.stap(label=dataset_path.name)
+
+        ontology = Graph()
+        for pad in ontology_paths or []:
+            ontology += _parse(Path(pad), fallback_encoding)[0]
+            voortgang.stap(label=Path(pad).name)
+    finally:
+        voortgang.einde_fase()
 
     subclasses = _subclass_closure(ontology or graph)
     geometry_errors: dict[str, str] = {}

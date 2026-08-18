@@ -19,6 +19,7 @@ from nlriochecker.karakteristiek import DataCharacteristics, bepaal_karakteristi
 from nlriochecker.meting import Meetbereik
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import StudyArea
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 class Severity(StrEnum):
@@ -360,8 +361,14 @@ def run_checks(
     context: CheckContext,
     check_ids: list[str] | None = None,
     typing_gate_applied: bool = False,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> CheckRun:
-    """Draait de gevraagde checks; zonder selectie draait de hele registry."""
+    """Draait de gevraagde checks; zonder selectie draait de hele registry.
+
+    De voortgang meldt per check het ID, zodat zichtbaar is welke check loopt en
+    niet alleen dat er iets loopt. Hij raakt de uitkomst niet.
+    """
     gekozen = sorted(REGISTRY) if check_ids is None else list(check_ids)
 
     onbekend = [check_id for check_id in gekozen if check_id not in REGISTRY]
@@ -371,22 +378,27 @@ def run_checks(
     volledige_ids = set(context.config.studiegebied.volledige_dataset_checks)
 
     outcomes = []
-    for check_id in gekozen:
-        check = REGISTRY[check_id]()
-        over_volledige_populatie = check.volledig_bereik or check.id in volledige_ids
-        gebruikt = context.volledige_context() if over_volledige_populatie else context
-        outcomes.append(
-            CheckOutcome(
-                check_id=check.id,
-                title=check.title,
-                severity=check.severity,
-                dimension=check.dimension,
-                examined=check.examined(gebruikt),
-                findings=list(check.run(gebruikt)),
-                notes=check.notes(gebruikt),
-                skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
+    voortgang.start_fase("Checks", len(gekozen))
+    try:
+        for check_id in gekozen:
+            check = REGISTRY[check_id]()
+            over_volledige_populatie = check.volledig_bereik or check.id in volledige_ids
+            gebruikt = context.volledige_context() if over_volledige_populatie else context
+            outcomes.append(
+                CheckOutcome(
+                    check_id=check.id,
+                    title=check.title,
+                    severity=check.severity,
+                    dimension=check.dimension,
+                    examined=check.examined(gebruikt),
+                    findings=list(check.run(gebruikt)),
+                    notes=check.notes(gebruikt),
+                    skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
+                )
             )
-        )
+            voortgang.stap(label=check.id)
+    finally:
+        voortgang.einde_fase()
 
     # De datakarakteristiek en de telling van onbetrouwbaar getypeerde objecten
     # gaan altijd over de volledige export, ook met een studiegebied: het rapport

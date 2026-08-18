@@ -20,6 +20,7 @@ from nlriochecker.uitvoer.bevindingen import (
 from nlriochecker.uitvoer.gpkg import schrijf_geopackage
 from nlriochecker.uitvoer.herkomst import schrijf_json
 from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ def schrijf_uitvoer(
     run_datum: date | None = None,
     met_geopackage: bool = True,
     met_json: bool = True,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> Uitvoer:
     """Schrijft rapport, archief, GIS-uitvoer en JSON uit dezelfde meldingenstroom.
 
@@ -49,7 +51,9 @@ def schrijf_uitvoer(
 
     markdown, csv = write_check_report(run, output_dir, run_datum, meldingen)
     geopackage = (
-        schrijf_geopackage(run, meldingen, output_dir, run_datum) if met_geopackage else None
+        schrijf_geopackage(run, meldingen, output_dir, run_datum, voortgang=voortgang)
+        if met_geopackage
+        else None
     )
     bereik = run.meetbereik
     json_pad = (
