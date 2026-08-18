@@ -37,13 +37,20 @@ packages = ["src/nlriochecker"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
-# Ruff formatteert ook Python-codeblokken in Markdown. Deze twee documenten bevatten
-# met de hand gezette fragmenten die het niet mag aanraken: bij een van beide maakt de
-# voorgestelde herschikking de code aantoonbaar onjuist. Zonder deze uitsluiting zou
-# `ruff format --check .` permanent rood staan en zou de poort in scripts/uitgave.py
-# een andere scope moeten hanteren dan een handmatige run.
+# Ruff formatteert ook Python-codeblokken in Markdown. Deze documenten bevatten met de
+# hand gezette fragmenten die het niet mag aanraken: de voorgestelde herschikking maakt
+# de code aantoonbaar onjuist. Een fragment dat een paar regels uit een langere lijst
+# citeert eindigt op een komma, en daar maakt de formatter een tuple van -- zo wordt
+# `_Kolom("cfk_set", "text"),` tot `(_Kolom("cfk_set", "text"),)`. Zonder deze
+# uitsluiting zou `ruff format --check .` permanent rood staan en zou de poort in
+# scripts/uitgave.py een andere scope moeten hanteren dan een handmatige run.
+#
+# Ontwerpdocumenten met alleen volledige, zelfstandige codeblokken horen hier NIET in;
+# die blijven meeformatteren. Zet een document hier pas bij als je hebt vastgesteld dat
+# de herschikking een fragment stukmaakt.
 extend-exclude = [
     "docs/superpowers/plans/2026-08-16-uitvoer-ronde2.md",
+    "docs/superpowers/plans/2026-08-18-ronde1-cfk-json-voortgang.md",
     "docs/superpowers/specs/2026-08-16-gpkg-en-rapport-design.md",
 ]
 
