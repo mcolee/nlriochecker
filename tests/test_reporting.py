@@ -435,3 +435,45 @@ def test_rapport_zwijgt_als_elke_melding_een_plek_heeft(tmp_path: Path) -> None:
     markdown_path, _ = write_check_report(run, tmp_path, date(2026, 8, 16))
 
     assert "geen plek op de kaart" not in markdown_path.read_text(encoding="utf-8")
+
+
+def test_samenvatting_markeert_een_deelmeting(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Een deelset staat boven het rapport, niet ergens in een voetnoot."""
+    analyse = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+
+    markdown_path, _ = write_reports(analyse, tmp_path)
+
+    regels = markdown_path.read_text(encoding="utf-8").splitlines()
+    assert regels[4].startswith("**Onvolledige meting:**")
+    assert "MdsPlan, MdsProj ontbreken" in regels[4]
+
+
+def test_samenvatting_van_een_volledige_meting_draagt_geen_markering(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Zonder deelset blijft het rapport byte-voor-byte als voorheen."""
+    analyse = analyze(laad_nulmeting(shacl_drieluik, VEREIST))
+
+    markdown_path, _ = write_reports(analyse, tmp_path)
+
+    assert "Onvolledige meting" not in markdown_path.read_text(encoding="utf-8")
+
+
+def test_dekkingrapport_markeert_een_deelmeting(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Ook de dekkinganalyse zegt op hoeveel klassen zij steunt."""
+    analyse = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+    coverage = assess_coverage(analyse, load_coverage_config())
+
+    markdown_path, _ = write_coverage_report(coverage, tmp_path)
+
+    assert "**Onvolledige meting:**" in markdown_path.read_text(encoding="utf-8")
+
+
+def test_vergelijkingsrapport_markeert_een_deelmeting(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Een trend over een deelset is een trend over minder dan de norm."""
+    analyse = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+    vergelijking = compare_metingen(analyse, analyse, load_coverage_config())
+
+    markdown_path, _, _ = write_comparison_reports(vergelijking, tmp_path)
+
+    assert "**Onvolledige meting:**" in markdown_path.read_text(encoding="utf-8")

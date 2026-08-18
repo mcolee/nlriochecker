@@ -52,7 +52,12 @@ def write_markdown(
     """Schrijft de samenvatting als Markdown en geeft het geschreven pad terug."""
     target = _check_target(Path(output_dir) / FILE_MARKDOWN, analyse)
     titel = f"# Nulmeting-samenvatting {analyse.meting.dataset_file}"
-    return schrijf_markdown(target, titel, _render_markdown(analyse, coverage))
+    return schrijf_markdown(
+        target,
+        titel,
+        _render_markdown(analyse, coverage),
+        markering=analyse.meting.meetbereik.markering(),
+    )
 
 
 def write_csv(analyse: MetingAnalysis, output_dir: Path) -> Path:
@@ -159,6 +164,7 @@ def write_coverage_report(result: CoverageResult, output_dir: Path) -> tuple[Pat
         Path(output_dir) / FILE_COVERAGE_MARKDOWN,
         f"# Dekkinganalyse {result.dataset}",
         _render_coverage(result),
+        markering=result.meetbereik.markering(),
     )
 
     csv_path = Path(output_dir) / FILE_COVERAGE_CSV
@@ -365,6 +371,9 @@ def write_comparison_reports(
         Path(output_dir) / FILE_COMPARISON_MARKDOWN,
         f"# Trendvergelijking {comparison.dataset_file}",
         _render_comparison(comparison),
+        # De twee meetbereiken zijn gelijk: `compare_metingen` weigert ongelijke
+        # sets. Het latere meetmoment staat hier dus voor beide.
+        markering=comparison.later.meting.meetbereik.markering(),
     )
 
     csv_path = Path(output_dir) / FILE_COMPARISON_CSV
