@@ -111,3 +111,28 @@ def test_verschillende_datasets(shacl_drieluik: list[Path], tmp_path: Path) -> N
 
     with pytest.raises(ComparisonError, match="verschillende datasets"):
         compare_metingen(eerder, later, load_coverage_config())
+
+
+def test_vergelijk_weigert_ongelijke_cfk_sets(
+    shacl_drieluik: list[Path], mini_hyd_shacl: Path
+) -> None:
+    """Een daling die uit een kleinere getoetste set komt is geen verbetering.
+
+    Zonder deze weigering leest een trendrapport als vooruitgang terwijl er alleen
+    minder gemeten is.
+    """
+    eerder = analyze(laad_nulmeting(shacl_drieluik, VEREIST))
+    later = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+
+    with pytest.raises(ComparisonError, match="Hyd, MdsPlan, MdsProj"):
+        compare_metingen(eerder, later, load_coverage_config())
+
+
+def test_vergelijk_slaagt_bij_gelijke_deelsets(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Twee deelmetingen op dezelfde set zijn wel te vergelijken."""
+    eerder = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+    later = analyze(laad_nulmeting(_later([mini_hyd_shacl], tmp_path), ["Hyd"], VEREIST))
+
+    vergelijking = compare_metingen(eerder, later, load_coverage_config())
+
+    assert [item.cfk for item in vergelijking.per_cfk] == ["Hyd"]
