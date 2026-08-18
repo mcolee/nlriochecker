@@ -5,19 +5,22 @@ package die het maakte. Zonder die vermelding is een rapport dat een half jaar
 later opduikt niet meer te plaatsen: de checks veranderen, en een bevindingenlijst
 zonder versie is niet te herleiden tot de logica die hem opleverde.
 
-De drie uitvoervormen zeggen het met dezelfde string uit dezelfde bron, elk in de
+De vier uitvoervormen zeggen het met dezelfde string uit dezelfde bron, elk in de
 vorm die zijn formaat verdraagt: een regel onder de titel in Markdown, een kolom
-op elke rij in de CSV, een veld in `gwsw_run` in de GeoPackage. Naam en versie
-komen uit de packagemetadata; ze staan nergens een tweede keer opgeschreven.
+op elke rij in de CSV, een veld in `gwsw_run` in de GeoPackage, een veld in de
+envelop van de JSON. Naam en versie komen uit de packagemetadata; ze staan nergens
+een tweede keer opgeschreven.
 
-`schrijf_csv` en `schrijf_markdown` zijn de enige schrijvers van deze package.
-Wie hier langsgaat draagt zijn herkomst; wie zelf `to_csv` of `write_text`
-aanroept niet, en dat merkt niemand. `tests/test_uitvoer_herkomst.py` bewaakt dat
-er in `src/` geen tweede schrijver bijkomt.
+`schrijf_markdown`, `schrijf_csv` en `schrijf_json` zijn de enige schrijvers van
+deze package. Wie hier langsgaat draagt zijn herkomst; wie zelf `to_csv`,
+`write_text` of `json.dump` aanroept niet, en dat merkt niemand.
+`tests/test_uitvoer_herkomst.py` bewaakt dat er in `src/` geen tweede schrijver
+bijkomt.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -34,6 +37,11 @@ PAKKET = __name__.split(".", 1)[0]
 # kolommen; de waarde erin is dezelfde.
 KOLOM_GEREEDSCHAP = "Gereedschap"
 VELD_GEREEDSCHAP = "gereedschap"
+
+# De versie van het JSON-contract, los van het versienummer van deze package. Een
+# afnemer pint hierop, niet op de packageversie: de checks mogen veranderen zonder
+# dat het formaat dat doet. Zie `docs/json-schema.md` voor de versioneringsregel.
+SCHEMA_VERSIE = "1.0"
 
 
 def gereedschap() -> str:
@@ -89,4 +97,39 @@ def schrijf_csv(tabel: pd.DataFrame, pad: Path) -> Path:
     tabel.assign(**{KOLOM_GEREEDSCHAP: gereedschap()}).to_csv(
         pad, sep=";", index=False, encoding="utf-8"
     )
+    return pad
+
+
+def schrijf_json(
+    pad: Path,
+    meldingen: list[dict[str, object]],
+    *,
+    run_datum: date,
+    dataset: str,
+    cfk_set: list[str],
+    volledig: bool,
+) -> Path:
+    """Schrijft de meldingenstroom als JSON, met een envelop die de run beschrijft.
+
+    Bedoeld als stabiel contract voor een afnemer die er mutatievoorstellen uit
+    afleidt. De meldingen komen kant-en-klaar binnen via `meldingen_json`; deze
+    functie interpreteert geen enkel veld, precies zoals `schrijf_csv` een
+    kant-en-klare tabel krijgt. Zo kan de JSON niet uit de pas lopen met de andere
+    drie uitvoervormen.
+
+    De sortering op `melding_id` maakt twee runs op dezelfde data diffbaar; zonder
+    haar is elke trendvergelijking tussen twee bestanden ruis. Zie
+    `docs/json-schema.md` voor de veldbeschrijvingen en de versioneringsregel.
+    """
+    document = {
+        "schema_versie": SCHEMA_VERSIE,
+        "gereedschap": gereedschap(),
+        "run_datum": run_datum.isoformat(),
+        "dataset": dataset,
+        "cfk_set": list(cfk_set),
+        "volledig": volledig,
+        "aantal_meldingen": len(meldingen),
+        "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),
+    }
+    pad.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return pad

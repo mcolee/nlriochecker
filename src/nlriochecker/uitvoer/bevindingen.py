@@ -1,12 +1,16 @@
-"""Het bevindingenrapport: Markdown voor de lezer, CSV als volledig archief.
+"""Het bevindingenrapport: Markdown voor de lezer, CSV en JSON als archief.
 
-Beide worden uit dezelfde meldingenstroom (`uitvoer.melding`) opgebouwd, zodat ze
-niet uit elkaar kunnen lopen -- en met de GeoPackage-export evenmin.
+Alle drie worden uit dezelfde meldingenstroom (`uitvoer.melding`) opgebouwd, zodat
+ze niet uit elkaar kunnen lopen -- en met de GeoPackage-export evenmin.
+
+De CSV is er voor Excel en QGIS, de JSON voor een afnemer die de bevindingen
+machinaal verwerkt; `docs/json-schema.md` beschrijft dat contract.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
@@ -21,6 +25,7 @@ from nlriochecker.uitvoer.tabel import prepare, table
 
 FILE_CHECKS_MARKDOWN = "bevindingen.md"
 FILE_CHECKS_CSV = "bevindingen.csv"
+FILE_CHECKS_JSON = "bevindingen.json"
 
 # Zoveel deelstelsel-ID's noemt de clusterduiding er hooguit bij naam.
 MAX_CLUSTERS_IN_DUIDING = 5
@@ -88,6 +93,26 @@ def write_check_report(
     schrijf_csv(meldingen_tabel(meldingen), csv_path)
 
     return markdown_path, csv_path
+
+
+def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
+    """Zet de meldingen om in JSON-klare rijen met dezelfde veldnamen als de dataclass.
+
+    `asdict` in plaats van een lijst veldnamen met de hand: die zou achterlopen
+    zodra `Melding` een veld krijgt, en dan mist de JSON stilzwijgend een gegeven
+    dat de CSV wel heeft.
+
+    Alleen `foutlocatie` wordt omgezet, want een shapely `Point` is niet
+    serialiseerbaar. Hij wordt `[x, y]` in EPSG:28992; er wordt niet
+    geherprojecteerd, net als in de rest van de uitvoer.
+    """
+    rijen: list[dict[str, object]] = []
+    for melding in meldingen:
+        rij: dict[str, object] = asdict(melding)
+        punt = melding.foutlocatie
+        rij["foutlocatie"] = None if punt is None else [punt.x, punt.y]
+        rijen.append(rij)
+    return rijen
 
 
 def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:

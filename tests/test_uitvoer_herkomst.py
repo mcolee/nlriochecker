@@ -12,7 +12,9 @@ nieuw rapport dat zijn eigen `to_csv` aanroept nooit zien.
 
 from __future__ import annotations
 
+import json
 import sqlite3
+from dataclasses import fields
 from datetime import date
 from pathlib import Path
 
@@ -41,15 +43,22 @@ from nlriochecker.reporting import (
     write_reports,
 )
 from nlriochecker.uitvoer import schrijf_uitvoer
-from nlriochecker.uitvoer.bevindingen import FILE_CHECKS_CSV, FILE_CHECKS_MARKDOWN
+from nlriochecker.uitvoer.bevindingen import (
+    FILE_CHECKS_CSV,
+    FILE_CHECKS_MARKDOWN,
+    meldingen_json,
+)
 from nlriochecker.uitvoer.herkomst import (
     KOLOM_GEREEDSCHAP,
     PAKKET,
+    SCHEMA_VERSIE,
     gereedschap,
     herkomstregel,
     schrijf_csv,
+    schrijf_json,
     schrijf_markdown,
 )
+from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
 
 BRON = Path(__file__).resolve().parents[1] / "src"
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -57,8 +66,10 @@ VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 RUNDATUM = date(2026, 8, 17)
 
 # De schrijvers die de herkomst zouden omzeilen als een module ze rechtstreeks
-# aanriep in plaats van via `uitvoer.herkomst`.
-DIRECTE_SCHRIJVERS = (".to_csv(", ".write_text(")
+# aanriep in plaats van via `uitvoer.herkomst`. `json.dump` staat erbij sinds de
+# JSON-export: een tweede JSON-schrijver zou een envelop zonder herkomst en zonder
+# schemaversie kunnen wegzetten, en geen test op de bestaande bestanden zou dat zien.
+DIRECTE_SCHRIJVERS = (".to_csv(", ".write_text(", "json.dump")
 
 MARKDOWN_BESTANDEN = {
     FILE_MARKDOWN,
@@ -282,3 +293,102 @@ def test_geen_enkele_module_schrijft_buiten_herkomst_om() -> None:
     )
 
     assert overtreders == []
+
+
+def test_meldingen_json_spiegelt_de_dataclass(toets: CheckRun) -> None:
+    """Elk veld van Melding komt in de JSON terug, met dezelfde naam.
+
+    De rijen komen uit `dataclasses.asdict` en niet uit een lijst met de hand
+    opgeschreven veldnamen: die zou stilzwijgend achterlopen zodra Melding een veld
+    krijgt, en dan mist de JSON een gegeven dat de CSV wel heeft.
+    """
+    rijen = meldingen_json(bouw_meldingen(toets, RUNDATUM))
+
+    assert rijen
+    assert {veld.name for veld in fields(Melding)} == set(rijen[0])
+
+
+def test_meldingen_json_zet_de_foutlocatie_als_coordinatenpaar(toets: CheckRun) -> None:
+    """[x, y] in EPSG:28992, of null; er wordt niet geherprojecteerd."""
+    meldingen = bouw_meldingen(toets, RUNDATUM)
+
+    rijen = meldingen_json(meldingen)
+
+    for melding, rij in zip(meldingen, rijen, strict=True):
+        if melding.foutlocatie is None:
+            assert rij["foutlocatie"] is None
+        else:
+            assert rij["foutlocatie"] == [melding.foutlocatie.x, melding.foutlocatie.y]
+
+
+def test_meldingen_json_is_serialiseerbaar(toets: CheckRun) -> None:
+    """Een shapely Point overleeft json.dumps niet; daarom wordt hij omgezet."""
+    rijen = meldingen_json(bouw_meldingen(toets, RUNDATUM))
+
+    json.dumps(rijen)
+
+
+def test_schrijf_json_draagt_de_envelop(tmp_path: Path) -> None:
+    """Herkomst, schemaversie en CFK-set horen bij de run, niet bij een melding."""
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        [{"melding_id": "b"}, {"melding_id": "a"}],
+        run_datum=RUNDATUM,
+        dataset="dewolden.ttl",
+        cfk_set=["Hyd", "MdsPlan"],
+        volledig=False,
+    )
+
+    document = json.loads(pad.read_text(encoding="utf-8"))
+    assert document["schema_versie"] == SCHEMA_VERSIE == "1.0"
+    assert document["gereedschap"] == gereedschap()
+    assert document["run_datum"] == "2026-08-17"
+    assert document["dataset"] == "dewolden.ttl"
+    assert document["cfk_set"] == ["Hyd", "MdsPlan"]
+    assert document["volledig"] is False
+    assert document["aantal_meldingen"] == 2
+
+
+def test_schrijf_json_sorteert_op_melding_id(tmp_path: Path) -> None:
+    """Twee runs op dezelfde data geven een diffbaar bestand."""
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        [{"melding_id": "b"}, {"melding_id": "a"}],
+        run_datum=RUNDATUM,
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=False,
+    )
+
+    document = json.loads(pad.read_text(encoding="utf-8"))
+    assert [rij["melding_id"] for rij in document["meldingen"]] == ["a", "b"]
+
+
+def test_schrijf_json_reserveert_voorstel_zonder_het_te_schrijven(tmp_path: Path) -> None:
+    """Fase B is buiten scope; een altijd-null veld zou een belofte zijn."""
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        [{"melding_id": "a"}],
+        run_datum=RUNDATUM,
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=False,
+    )
+
+    assert "voorstel" not in pad.read_text(encoding="utf-8")
+
+
+def test_schrijf_json_is_leesbaar_utf8(tmp_path: Path) -> None:
+    """Geen ontsnapte codepunten en twee spaties inspringen, voor inspectie met het oog."""
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        [{"melding_id": "a", "object_label": "Rioolstraat Zuidwolde een"}],
+        run_datum=RUNDATUM,
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=False,
+    )
+
+    tekst = pad.read_text(encoding="utf-8")
+    assert '\n  "schema_versie"' in tekst
+    assert tekst.endswith("\n")
