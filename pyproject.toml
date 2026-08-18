@@ -11,7 +11,9 @@ license = "EUPL-1.2"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.1",
+    # 8.2 en hoger: daarvoor mengde CliRunner stderr in stdout en bestond
+    # `Result.stderr` niet, waar tests/test_cli.py op steunt.
+    "click>=8.2",
     "geopandas>=1.1.4",
     "networkx>=3.3",
     "pandas>=2.2",

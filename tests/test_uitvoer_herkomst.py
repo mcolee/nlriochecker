@@ -13,8 +13,9 @@ nieuw rapport dat zijn eigen `to_csv` aanroept nooit zien.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
-from dataclasses import fields
+from dataclasses import fields, replace
 from datetime import date
 from pathlib import Path
 
@@ -29,7 +30,7 @@ from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import assess_coverage
 from nlriochecker.dataset import load_dataset
-from nlriochecker.meting import laad_nulmeting
+from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.reporting import (
     FILE_COMPARISON_CSV,
     FILE_COMPARISON_MARKDOWN,
@@ -66,11 +67,41 @@ TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 RUNDATUM = date(2026, 8, 17)
 
-# De schrijvers die de herkomst zouden omzeilen als een module ze rechtstreeks
-# aanriep in plaats van via `uitvoer.herkomst`. `json.dump` staat erbij sinds de
-# JSON-export: een tweede JSON-schrijver zou een envelop zonder herkomst en zonder
-# schemaversie kunnen wegzetten, en geen test op de bestaande bestanden zou dat zien.
-DIRECTE_SCHRIJVERS = (".to_csv(", ".write_text(", "json.dump")
+# Aanroepen waarmee een module een bestand kan wegzetten zonder langs
+# `uitvoer.herkomst` te gaan. Een eerdere versie was een lijst van drie substrings;
+# een probe met `pad.open("w")`, `write_bytes` en `DataFrame.to_json` liep daar
+# dwars doorheen.
+#
+# Patronen in plaats van substrings, om twee redenen. Het Nederlandse `knopen(`
+# eindigt op `open(`, dus een kale substring vlagt de halve check-engine. En
+# `pad.open("rb")` is lezen: alleen een modus met w, a of x telt als schrijven.
+DIRECTE_SCHRIJVERS = (
+    r"\.to_(csv|json|excel|parquet)\(",
+    r"\.write_(text|bytes)\(",
+    # `pad.open("w")` en `open(pad, "w")`. De modus moet op zijn eigen plek staan;
+    # anders telt `path.open(encoding=..., newline="")` als schrijven.
+    r"\bopen\(\s*[\"'][^\"']*[wax]",
+    r"\bopen\([^,)]+,\s*[\"'][^\"']*[wax]",
+    r"\bjson\.dump",
+    r"\bpickle\.dump",
+    r"\bshutil\.(copy|move)",
+    r"\bos\.write\b",
+)
+
+# Modules die wel zelf een bestand mogen schrijven, met de reden erbij. Een
+# allowlist naast de patronen: bij alleen een verbodslijst is de volgende
+# ontsnappingsroute altijd een die niemand bedacht had.
+MAG_ZELF_SCHRIJVEN = {
+    # De enige herkomstdragende schrijver; hierom draait de hele regel.
+    "nlriochecker/uitvoer/herkomst.py",
+    # De GeoPackage is een sqlite-bestand; dat gaat niet door een tekstschrijver
+    # heen. Hij draagt zijn herkomst in het veld `gereedschap` van `gwsw_run`, en
+    # `test_geopackage_runtabel_noemt_het_gereedschap` bewaakt dat.
+    "nlriochecker/uitvoer/gpkg.py",
+    # Schrijft de datasetcache, geen uitvoer voor een lezer. De cachesleutel draagt
+    # de broncode van de lader, dus een cache van een andere versie wordt genegeerd.
+    "nlriochecker/cache.py",
+}
 
 MARKDOWN_BESTANDEN = {
     FILE_MARKDOWN,
@@ -283,14 +314,20 @@ def test_geen_enkele_module_schrijft_buiten_herkomst_om() -> None:
     """`herkomst.py` is de enige schrijver in `src/`.
 
     Dit is de waarborg waar de andere tests op leunen: een nieuw rapport dat zelf
-    `to_csv` of `write_text` aanroept draagt geen herkomst, en geen enkele test op
-    de bestaande bestanden zou dat opmerken.
+    een bestand wegzet draagt geen herkomst, en geen enkele test op de bestaande
+    bestanden zou dat opmerken.
+
+    De vrijstelling gaat op het volledige pad en niet op de bestandsnaam: met een
+    naamvergelijking zou een nieuwe `uitvoer/ext/herkomst.py` zichzelf vrijstellen.
+    Wie hier een module aan `MAG_ZELF_SCHRIJVEN` toevoegt, schrijft de reden erbij.
     """
     overtreders = sorted(
         pad.relative_to(BRON).as_posix()
         for pad in BRON.rglob("*.py")
-        if pad.name != "herkomst.py"
-        and any(aanroep in pad.read_text(encoding="utf-8") for aanroep in DIRECTE_SCHRIJVERS)
+        if pad.relative_to(BRON).as_posix() not in MAG_ZELF_SCHRIJVEN
+        and any(
+            re.search(patroon, pad.read_text(encoding="utf-8")) for patroon in DIRECTE_SCHRIJVERS
+        )
     )
 
     assert overtreders == []
@@ -338,6 +375,7 @@ def test_schrijf_json_draagt_de_envelop(tmp_path: Path) -> None:
         dataset="dewolden.ttl",
         cfk_set=["Hyd", "MdsPlan"],
         volledig=False,
+        typeringspoort_toegepast=False,
     )
 
     document = json.loads(pad.read_text(encoding="utf-8"))
@@ -347,6 +385,7 @@ def test_schrijf_json_draagt_de_envelop(tmp_path: Path) -> None:
     assert document["dataset"] == "dewolden.ttl"
     assert document["cfk_set"] == ["Hyd", "MdsPlan"]
     assert document["volledig"] is False
+    assert document["typeringspoort_toegepast"] is False
     assert document["aantal_meldingen"] == 2
 
 
@@ -359,38 +398,42 @@ def test_schrijf_json_sorteert_op_melding_id(tmp_path: Path) -> None:
         dataset="d.ttl",
         cfk_set=["Hyd"],
         volledig=False,
+        typeringspoort_toegepast=False,
     )
 
     document = json.loads(pad.read_text(encoding="utf-8"))
     assert [rij["melding_id"] for rij in document["meldingen"]] == ["a", "b"]
 
 
-def test_schrijf_json_reserveert_voorstel_zonder_het_te_schrijven(tmp_path: Path) -> None:
-    """Fase B is buiten scope; een altijd-null veld zou een belofte zijn."""
-    pad = schrijf_json(
-        tmp_path / "b.json",
-        [{"melding_id": "a"}],
-        run_datum=RUNDATUM,
-        dataset="d.ttl",
-        cfk_set=["Hyd"],
-        volledig=False,
-    )
+def test_voorstel_is_gereserveerd_en_wordt_niet_geschreven(toets: CheckRun) -> None:
+    """Fase B is buiten scope; een altijd-null veld zou een belofte zijn.
 
-    assert "voorstel" not in pad.read_text(encoding="utf-8")
+    Toetst de echte route. Een eerdere versie voerde een handgemaakte dict in en
+    kon daardoor per constructie niet falen: kreeg `Melding` morgen een veld
+    `voorstel`, dan bleef hij groen terwijl het contract stil gebroken was.
+    """
+    rijen = meldingen_json(bouw_meldingen(toets, RUNDATUM))
+
+    assert "voorstel" not in {veld.name for veld in fields(Melding)}
+    assert all("voorstel" not in rij for rij in rijen)
 
 
 def test_schrijf_json_is_leesbaar_utf8(tmp_path: Path) -> None:
     """Geen ontsnapte codepunten en twee spaties inspringen, voor inspectie met het oog."""
     pad = schrijf_json(
         tmp_path / "b.json",
-        [{"melding_id": "a", "object_label": "Rioolstraat Zuidwolde een"}],
+        [{"melding_id": "a", "object_label": "Ruinerwold \u00e9\u00e9n, Dwingelo\u00f6"}],
         run_datum=RUNDATUM,
         dataset="d.ttl",
         cfk_set=["Hyd"],
         volledig=False,
+        typeringspoort_toegepast=False,
     )
 
     tekst = pad.read_text(encoding="utf-8")
+    # Niet-ASCII staat er als teken, niet als \uXXXX-ontsnapping.
+    assert "Ruinerwold \u00e9\u00e9n, Dwingelo\u00f6" in tekst
+    assert "\\u00e9" not in tekst
     assert '\n  "schema_versie"' in tekst
     assert tekst.endswith("\n")
 
@@ -462,3 +505,62 @@ def test_json_schemadocument_noemt_de_geschreven_schemaversie() -> None:
     )
 
     assert f'"schema_versie": "{SCHEMA_VERSIE}"' in doc
+
+
+def test_alle_uitvoervormen_zeggen_hetzelfde_over_de_cfk_set(
+    toets: CheckRun, tmp_path: Path
+) -> None:
+    """De assertie waar het hele ontwerp op rust.
+
+    Markdown, GeoPackage en JSON leiden hun CFK-uitspraak alle drie uit hetzelfde
+    `Meetbereik` af. Zou een van hen zijn eigen conclusie trekken, dan staat hier
+    een verschil. De CSV doet bewust niet mee: de CFK-set hoort bij de run en niet
+    bij de melding, dus hij staat in de envelop en in `gwsw_run` (zie BO-7).
+    """
+    run = replace(toets, meetbereik=Meetbereik.van(VEREIST, ["Hyd", "MdsPlan"]))
+
+    uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM)
+
+    assert uitvoer.json is not None and uitvoer.geopackage is not None
+    markdown = uitvoer.markdown.read_text(encoding="utf-8")
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    verbinding = sqlite3.connect(f"file:{uitvoer.geopackage}?mode=ro", uri=True)
+    try:
+        ((cfk_set, volledig),) = verbinding.execute("select cfk_set, volledig from gwsw_run")
+    finally:
+        verbinding.close()
+
+    assert "**Onvolledige meting:** getoetst op Hyd, MdsPlan;" in markdown
+    assert document["cfk_set"] == ["Hyd", "MdsPlan"] and document["volledig"] is False
+    assert (cfk_set, volledig) == ("Hyd, MdsPlan", 0)
+
+
+def test_alle_uitvoervormen_zwijgen_bij_een_volledige_meting(
+    toets: CheckRun, tmp_path: Path
+) -> None:
+    """De keerzijde: op de volle set getoetst zegt geen van hen iets over een gebrek."""
+    run = replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST))
+
+    uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM)
+
+    assert uitvoer.json is not None and uitvoer.geopackage is not None
+    assert "Onvolledige meting" not in uitvoer.markdown.read_text(encoding="utf-8")
+    assert "Geen nulmeting" not in uitvoer.markdown.read_text(encoding="utf-8")
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    assert document["cfk_set"] == VEREIST and document["volledig"] is True
+
+
+def test_een_run_zonder_meetbereik_zwijgt_nergens(toets: CheckRun, tmp_path: Path) -> None:
+    """Zonder opgegeven bereik melden alle drie 'niet gemeten', niemand zwijgt.
+
+    Dit was het gat: `meetbereik` mocht None zijn, en dan zette de Markdown geen
+    markering terwijl de JSON `volledig: false` beweerde en de GeoPackage `("", 0)`.
+    Drie uitvoervormen zeiden "niet volledig gemeten" en de vierde zweeg.
+    """
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM)
+
+    assert uitvoer.json is not None and uitvoer.geopackage is not None
+    assert "**Geen nulmeting:**" in uitvoer.markdown.read_text(encoding="utf-8")
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    assert document["cfk_set"] == [] and document["volledig"] is False
+    assert document["typeringspoort_toegepast"] is False

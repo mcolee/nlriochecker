@@ -86,7 +86,7 @@ def write_check_report(
         f"# Checkbevindingen {run.dataset.source.name}",
         _render_checks(run, meldingen),
         run_datum,
-        markering=run.meetbereik.markering() if run.meetbereik is not None else None,
+        markering=run.meetbereik.markering(),
     )
 
     csv_path = Path(output_dir) / FILE_CHECKS_CSV

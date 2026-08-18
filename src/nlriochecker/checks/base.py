@@ -179,11 +179,17 @@ class CheckRun:
     # De kern en de contextschil waarop de checks gedraaid hebben; None zonder
     # studiegebied. De uitvoerlaag meldt hieruit hoe groot elk deel was.
     analyseset: Analyseset | None = None
-    # Tegen welke conformiteitsklassen deze run getoetst is; None betekent: nog niet
-    # vastgesteld. De uitvoerlaag heeft het nodig voor de markering boven het rapport
-    # en voor `gwsw_run`. Het hier meegeven is minder broos dan het langs elke
-    # schrijver doorreiken -- dezelfde reden waarom `config` en `analyseset` hier staan.
-    meetbereik: Meetbereik | None = None
+    # Tegen welke conformiteitsklassen deze run getoetst is. De uitvoerlaag heeft het
+    # nodig voor de markering boven het rapport, voor `gwsw_run` en voor de
+    # JSON-envelop; het hier meegeven is minder broos dan het langs elke schrijver
+    # doorreiken -- dezelfde reden waarom `config` en `analyseset` hier staan.
+    #
+    # Nooit None. Een run die zijn bereik niet kreeg is er een zonder nulmeting, en
+    # dat is een toestand die `Meetbereik` al kent. Zou `None` toegestaan zijn, dan
+    # moest elke schrijver dat vierde geval zelf duiden, en dan zeggen ze er
+    # verschillende dingen over -- Markdown zweeg terwijl de JSON `volledig: false`
+    # beweerde.
+    meetbereik: Meetbereik = field(default_factory=lambda: Meetbereik.niet_gemeten(()))
     _binnen: frozenset[str] | None = field(default=None, compare=False, repr=False)
 
     @property
@@ -250,20 +256,10 @@ class CheckRun:
                     skeleton=outcome.skeleton,
                 )
             )
-        return CheckRun(
-            dataset=self.dataset,
-            outcomes=outcomes,
-            typing_gate_applied=self.typing_gate_applied,
-            unreliable_labels=self.unreliable_labels,
-            unreliable_labels_in_dataset=self.unreliable_labels_in_dataset,
-            study_area=area,
-            bronnen=self.bronnen,
-            karakteristiek=self.karakteristiek,
-            config=self.config,
-            analyseset=self.analyseset,
-            meetbereik=self.meetbereik,
-            _binnen=binnen,
-        )
+        # `replace` in plaats van elk veld opsommen: die opsomming vergat bij elke
+        # uitbreiding een veld, en dan valt het stil weg op precies de runs met een
+        # studiegebied.
+        return replace(self, outcomes=outcomes, study_area=area, _binnen=binnen)
 
 
 class Check(ABC):

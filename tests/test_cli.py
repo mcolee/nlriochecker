@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import io
+import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from click.testing import CliRunner
 
-from nlriochecker.cli import main
+from nlriochecker.cli import _BalkVoortgang, main
 from nlriochecker.register import default_register_path
 from nlriochecker.reporting import (
     FILE_CHECKS_CSV,
@@ -716,3 +718,50 @@ def test_toets_draait_met_de_voortgangsbalk(tmp_path: Path) -> None:
     # In een niet-interactieve omgeving echoot click per fase een enkele regel op
     # stderr. Een regel per check zou hier veertig regels ruis geven.
     assert resultaat.stderr.splitlines() == ["TTL laden", "Checks", "GeoPackage"]
+
+
+class _StukkeStroom(io.TextIOBase):
+    """Een stroom die bij elke schrijfactie afbreekt, zoals een gesloten pijp."""
+
+    def write(self, s: str) -> int:
+        """Gooit altijd, net als schrijven naar een pijp zonder lezer."""
+        raise BrokenPipeError(32, "Broken pipe")
+
+    def isatty(self) -> bool:
+        """Geen terminal; click zet de balk dan in verborgen modus."""
+        return False
+
+
+def test_balkvoortgang_laat_geen_schrijffout_ontsnappen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Voortgang is weergave en mag een run nooit om zeep helpen.
+
+    `nlriochecker toets ... 2>&1 | head -1` laat de lezer van stderr wegvallen.
+    Zonder afscherming sloeg de BrokenPipeError dwars door `run_checks` heen:
+    exitcode 1 en geen enkel uitvoerbestand -- op De Wolden ruim drie minuten
+    laadwerk kwijt omdat een balk niet getekend kon worden.
+
+    Getoetst op de adapter zelf en niet via een pijplijn: of een echte pijp op tijd
+    afbreekt hangt van buffergroottes en timing af, en zo'n test zou de invariant
+    soms wel en soms niet bewaken.
+    """
+    monkeypatch.setattr(sys, "stderr", _StukkeStroom())
+    voortgang = _BalkVoortgang()
+
+    voortgang.start_fase("Checks", 3)
+    voortgang.stap(label="TOP-001")
+    voortgang.stap(label="TOP-002")
+    voortgang.einde_fase()
+
+
+def test_balkvoortgang_verdraagt_opeenvolgende_fasen() -> None:
+    """Een tweede fase sluit de eerste; einde_fase zonder start is stil."""
+    voortgang = _BalkVoortgang()
+
+    voortgang.start_fase("TTL laden", 1)
+    voortgang.stap(label="schoon.ttl")
+    voortgang.start_fase("Checks", 2)
+    voortgang.stap(label="TOP-001")
+    voortgang.einde_fase()
+    voortgang.einde_fase()

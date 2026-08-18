@@ -798,8 +798,8 @@ def _schrijf_runmetadata(
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,
-            run.meetbereik.cfk_tekst if run.meetbereik is not None else "",
-            int(run.meetbereik.volledig) if run.meetbereik is not None else 0,
+            run.meetbereik.cfk_tekst,
+            int(run.meetbereik.volledig),
         ),
     )
 

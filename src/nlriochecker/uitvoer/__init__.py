@@ -55,17 +55,15 @@ def schrijf_uitvoer(
         if met_geopackage
         else None
     )
-    bereik = run.meetbereik
     json_pad = (
         schrijf_json(
             Path(output_dir) / FILE_CHECKS_JSON,
             meldingen_json(meldingen),
             run_datum=run_datum,
             dataset=run.dataset.source.name,
-            # Zonder meetbereik is er niets vastgesteld; dan een lege set en niet
-            # volledig, want "volledig" zou hier een bewering zijn die niemand deed.
-            cfk_set=list(bereik.gekozen) if bereik is not None else [],
-            volledig=bereik.volledig if bereik is not None else False,
+            cfk_set=list(run.meetbereik.gekozen),
+            volledig=run.meetbereik.volledig,
+            typeringspoort_toegepast=run.typing_gate_applied,
         )
         if met_json
         else None

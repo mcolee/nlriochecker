@@ -108,6 +108,7 @@ def schrijf_json(
     dataset: str,
     cfk_set: list[str],
     volledig: bool,
+    typeringspoort_toegepast: bool,
 ) -> Path:
     """Schrijft de meldingenstroom als JSON, met een envelop die de run beschrijft.
 
@@ -120,6 +121,15 @@ def schrijf_json(
     De sortering op `melding_id` maakt twee runs op dezelfde data diffbaar; zonder
     haar is elke trendvergelijking tussen twee bestanden ruis. Zie
     `docs/json-schema.md` voor de veldbeschrijvingen en de versioneringsregel.
+
+    `typeringspoort_toegepast` staat in de envelop omdat elke melding anders
+    `typering_betrouwbaar: true` draagt, ook als de poort nooit gedraaid heeft: zonder
+    nulmeting is er niets wat een object onbetrouwbaar kan verklaren. Een afnemer die
+    dat veld meeweegt, moet kunnen zien of het gemeten is of alleen niet weerlegd.
+
+    `allow_nan=False`: een NaN-coordinaat zou als `[NaN, 1.0]` in het bestand komen,
+    wat geen geldige JSON is en door een strikte parser geweigerd wordt. Luid falen is
+    beter dan stil een onleesbaar contract wegschrijven.
     """
     document = {
         "schema_versie": SCHEMA_VERSIE,
@@ -128,8 +138,10 @@ def schrijf_json(
         "dataset": dataset,
         "cfk_set": list(cfk_set),
         "volledig": volledig,
+        "typeringspoort_toegepast": typeringspoort_toegepast,
         "aantal_meldingen": len(meldingen),
         "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),
     }
-    pad.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tekst = json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False)
+    pad.write_text(tekst + "\n", encoding="utf-8")
     return pad

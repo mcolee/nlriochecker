@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -53,27 +54,45 @@ class _BalkVoortgang:
     omgeving zelf uit. Zonder bepaalbaar totaal is er geen balk te tekenen -- dan
     wordt de fasenaam een keer gemeld, want een balk met een verzonnen lengte zou
     over de resterende tijd liegen.
+
+    Elke schrijfactie is afgeschermd met `suppress(OSError)`. Voortgang is weergave
+    en mag een run nooit laten mislukken: valt de lezer van stderr weg
+    (`nlriochecker toets ... 2>&1 | head`), dan gooit de balk een
+    `BrokenPipeError`, en die zou dwars door `run_checks` heen slaan en de hele run
+    afbreken zonder een enkel uitvoerbestand -- op een echte dataset ruim drie
+    minuten laadwerk kwijt omdat een balk niet getekend kon worden. Alleen `OSError`
+    wordt gedempt; een fout in onze eigen boekhouding hoort gewoon om te vallen.
     """
 
     def __init__(self) -> None:
         # `click.progressbar` levert een ProgressBar uit een private module; die
         # importeren om hem te kunnen annoteren zou een privaat pad vastleggen.
-        self._balk: Any | None = None
+        # `Optional[Any]` collapst naar `Any`; die `| None` zou nauwkeurigheid
+        # suggereren die mypy hier niet levert.
+        self._balk: Any = None
         self._stap_label: str | None = None
 
     def start_fase(self, naam: str, totaal: int | None) -> None:
         """Opent een balk voor deze fase, of meldt hem als er geen totaal is."""
-        if totaal is None:
-            click.echo(f"{naam}...", err=True)
-            return
+        # Een fase die nog openstaat hoort eerst dicht; anders wordt zijn balk
+        # overschreven en nooit afgesloten.
+        self.einde_fase()
         self._stap_label = None
-        self._balk = click.progressbar(
+        if totaal is None:
+            with suppress(OSError):
+                click.echo(f"{naam}...", err=True)
+            return
+        # `click.progressbar` is generiek in het itemtype; zonder items kan mypy
+        # dat niet afleiden.
+        balk: Any = click.progressbar(
             length=totaal,
             label=naam,
             file=sys.stderr,
             item_show_func=lambda _: self._stap_label,
         )
-        self._balk.__enter__()
+        with suppress(OSError):
+            balk.__enter__()
+            self._balk = balk
 
     def stap(self, n: int = 1, label: str | None = None) -> None:
         """Schuift de balk op en zet erachter wat er net klaar is.
@@ -88,18 +107,25 @@ class _BalkVoortgang:
         gekeken wordt: dat attribuut heet per clickversie anders (`hidden` dan wel
         `is_hidden`), terwijl `item_show_func` gedocumenteerd is.
         """
-        if self._balk is None:
-            return
         if label is not None:
             self._stap_label = label
-        self._balk.update(n)
-
-    def einde_fase(self) -> None:
-        """Sluit de balk van deze fase."""
         if self._balk is None:
             return
-        self._balk.__exit__(None, None, None)
+        with suppress(OSError):
+            self._balk.update(n)
+
+    def einde_fase(self) -> None:
+        """Sluit de balk van deze fase.
+
+        `_balk` gaat eerst op None: gooit `__exit__` alsnog, dan blijft er geen
+        halfdode balk staan die de volgende fase overschrijft.
+        """
+        balk: Any = self._balk
         self._balk = None
+        if balk is None:
+            return
+        with suppress(OSError):
+            balk.__exit__(None, None, None)
 
 
 @click.group()
@@ -562,6 +588,10 @@ def check_command(
     try:
         voortgang: Voortgang = _BalkVoortgang()
         config = load_check_config(project_config_path)
+        # Toets de keuze voordat de dataset geladen wordt. Op De Wolden kost dat
+        # laden ruim drie minuten; een typefout in --cfk hoort niet pas daarna te
+        # melden dat de run zinloos was.
+        _gekozen_cfk(cfk_keuze, config)
         dataset, cache = laad_met_cache(
             dataset_path, list(ontology_paths), cache_dir, not geen_cache, voortgang=voortgang
         )
@@ -580,12 +610,19 @@ def check_command(
             volledige_dataset=dataset,
             analyseset=analyseset,
         )
-        run = run_checks(
-            context,
-            list(check_ids) or None,
-            typing_gate_applied=gate_applied,
-            voortgang=voortgang,
-        )
+        try:
+            run = run_checks(
+                context,
+                list(check_ids) or None,
+                typing_gate_applied=gate_applied,
+                voortgang=voortgang,
+            )
+        except KeyError as error:
+            # Alleen de opzoeking in REGISTRY levert een KeyError op. Het blok
+            # hieronder vangen zou ook een indexeerfout uit de schrijvers als
+            # "onbekende check" laten lezen.
+            bekend = ", ".join(sorted(REGISTRY))
+            raise _CliError(f"{error.args[0]}. Bekende checks: {bekend}.") from error
         if area is not None:
             run = run.beperk_tot_studiegebied(area)
         run = replace(run, meetbereik=meetbereik)
@@ -598,9 +635,6 @@ def check_command(
         )
     except PipelineError as error:
         raise _CliError(str(error)) from error
-    except KeyError as error:
-        bekend = ", ".join(sorted(REGISTRY))
-        raise _CliError(f"{error.args[0]}. Bekende checks: {bekend}.") from error
 
     click.echo(
         f"{dataset_path.name}: {len(dataset.nodes)} knooppunten, {len(dataset.conduits)} strengen"
