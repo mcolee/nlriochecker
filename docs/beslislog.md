@@ -576,3 +576,104 @@ zijn juist, alleen niet van toepassing. Ze wegdrukken zou de volgende scan schoo
 lijken zonder dat iemand de afweging nog ziet. Bandit draait niet in CI; wie hem draait,
 leest dit.
 
+
+### BO-7 De CFK-eis is versoepeld, maar elke afwijking is luid
+
+**Wat.** Het checkregister v0.8 eist dat de dataset aan alle conformiteitsklassen
+getoetst is: Hyd, MdsPlan en MdsProj. `--cfk` laat een run op een deelverzameling toe.
+
+**Waarom.** De harde eis is goed voor een oplevering, maar hij blokkeert werk dat er
+onderweg wel is: een tussentijdse meting waarbij nog niet alle drie de rapporten
+getrokken zijn, of een gerichte controle op een enkele klasse. Zonder uitweg gaan
+mensen om de pijplijn heen werken, en dan is er geen markering meer.
+
+**De voorwaarde.** De versoepeling geldt alleen onder twee eisen, en die zijn niet
+optioneel gemaakt:
+
+1. De afwijking is **expliciet**. Zonder `--cfk` verandert er niets: alle drie vereist,
+   en een ontbrekend rapport faalt. Er is geen configuratie die de standaard verzet.
+2. De afwijking is **zichtbaar in elke uitvoervorm**. Een waarschuwingsregel boven elk
+   Markdown-rapport, `cfk_set` en `volledig` in `gwsw_run` en in de JSON-envelop. De
+   tekst komt uit `Meetbereik.markering()` en niet uit een schrijver, zodat geen twee
+   uitvoervormen iets anders over dezelfde run kunnen zeggen.
+
+Daarbij hoort dat een rapport voor een niet-gekozen klasse een fout is en geen stille
+overslag: wie op Hyd toetst en per ongeluk alle drie de bestanden meegeeft, moet dat
+horen. Anders meldt de markering "MdsProj ontbreekt" terwijl het bestand er lag.
+
+**Een derde toestand.** `toets` kan zonder `--shacl` draaien; dan is er geen meting.
+Dat is niet hetzelfde als een deelset, want een deelset beweert dat er iets gemeten is.
+`Meetbereik` kent daarom drie toestanden en de markering drie teksten. Dat volgt de
+werkafspraak dat wat een check niet bekeken heeft in het rapport hoort: stilte leest als
+"alles gecontroleerd".
+
+**Geen forceer-vlag bij `vergelijk`.** Twee meetmomenten met ongelijke CFK-sets worden
+geweigerd. Een daling in het aantal meldingen die uit een kleinere getoetste set komt is
+geen verbetering, en een trendrapport dat hem als vooruitgang toont is onjuist, niet
+onzeker. Wie beide momenten wil vergelijken, toetst ze op dezelfde set.
+
+### BO-8 Het JSON-schema is een contract met een eigen versienummer
+
+**Wat.** `toets` schrijft `bevindingen.json`: de volledige meldingenstroom met een
+envelop. `schema_versie` begint op `"1.0"` en staat los van het versienummer van de
+package. Het contract staat in `docs/json-schema.md`.
+
+**Waarom een eigen nummer.** De afnemer is een nog te bouwen package die er
+Kikker/BrutIS-mutaties uit afleidt. Die pint op het formaat, niet op onze checks. Elke
+patchuitgave van `nlriochecker` verandert bevindingen; het formaat hoeft daar niet in mee
+te gaan. Zouden ze samenvallen, dan zegt een versiebump niets meer over of de afnemer
+werk heeft.
+
+**De regel.** Nieuwe optionele velden mogen binnen een hoofdversie. Een verwijderd of
+hernoemd veld, een gewijzigd type, een gewijzigde betekenis of een andere structuur
+verhoogt het hoofdnummer. Een afnemer op `1.x` mag onbekende velden negeren en mag niet
+aannemen dat `2.0` leesbaar blijft.
+
+**Fase B is buiten scope.** Het veld `voorstel` (veld, huidige waarde, voorgestelde
+waarde per melding) is gereserveerd en gedocumenteerd, maar wordt **niet geschreven** --
+ook niet als `null`. Het importformaat van Kikker en BrutIS is nog niet gespecificeerd,
+en een altijd-lege sleutel zou een belofte zijn die het schema nog niet waarmaakt.
+Toevoegen kan later binnen 1.x.
+
+**Twee drifttests.** `docs/json-schema.md` is een tweede plek waar de veldnamen staan, en
+een afnemer programmeert daartegen. Twee tests houden het document aan de code vast: elk
+veld van `Melding` moet erin beschreven zijn, en het voorbeeld moet de geschreven
+`SCHEMA_VERSIE` noemen. Zonder die tests wordt het contract stil onvolledig zodra
+`Melding` een veld krijgt -- en dat valt niemand op, want het bestand zelf klopt wel.
+
+### BO-9 `analyseer` schrijft geen JSON
+
+**Wat.** De opdracht noemde `toets` én `analyseer` als schrijvers van de JSON-export.
+Alleen `toets` doet het.
+
+**Waarom.** Diezelfde opdracht eist dat de inhoud uitsluitend uit de meldingenstroom
+komt en dat er geen pad bestaat waarlangs een schrijver zelf een `Finding` interpreteert.
+Op `analyseer` zijn die twee eisen niet tegelijk waar te maken: dat commando analyseert
+SHACL-nulmetingrapporten en kent geen `CheckRun`, dus geen `Melding`.
+
+**De afgewogen alternatieven.** Een tweede schema voor `analyseer` zou een tweede
+contract met een eigen versielijn zijn, terwijl het doel juist één stabiel contract is.
+Dezelfde envelop met een lege meldingenlijst zou "nul meldingen" zeggen terwijl de
+nulmeting er duizenden telt -- een bestand dat aantoonbaar het verkeerde beweert.
+
+**Gevolg.** `--geen-json` staat alleen op `toets`. Wie de SHACL-analyse machineleesbaar
+wil, heeft `geaggregeerde_meldingen.csv`.
+
+### BO-10 `[nulmeting] vereiste_cfk` is verplicht geworden
+
+**Wat.** `NulmetingOptions.vereiste_cfk` had een pydantic-default
+`["Hyd", "MdsPlan", "MdsProj"]`, en `CheckConfig.nulmeting` een `default_factory`. Beide
+zijn verwijderd; een projectconfig zonder de sectie faalt nu met een `ConfigError`.
+
+**Waarom.** De domeinregel is dat de lijst in `checks.toml` staat en niet in de code. Die
+default schreef hem een tweede keer op, en een config die de sectie miste viel er
+onzichtbaar op terug. Sinds `--cfk` weegt dat zwaarder: diezelfde lijst bepaalt nu ook
+welke klassen die optie accepteert. Een project waarvan de GWSW-server andere klassen
+aanbiedt, zou met een onvolledige config stilzwijgend de verkeerde geaccepteerd zien.
+
+**Waarom dit veilig kon.** Niemand construeert `CheckConfig` of `NulmetingOptions`
+rechtstreeks; alles loopt via `load_check_config()`. `klassen: ClassRoots` was al
+verplicht zonder default, dus dit volgt een bestaand patroon. Vijf minimale testconfigs
+die een geslaagde load verwachten dragen de sectie nu; de vier ongeldige-configgevallen
+hadden hem niet nodig, want pydantic rapporteert alle fouten en die tests zoeken een
+substring.

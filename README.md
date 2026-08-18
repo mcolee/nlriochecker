@@ -31,14 +31,56 @@ Verder: `nlriochecker dekking` toetst de nulmeting tegen het checkregister, en
 `nlriochecker vergelijk --eerder ... --later ...` zet twee meetmomenten naast elkaar voor
 de trend. Elk subcommando kent `--help`.
 
-`analyseer`, `dekking` en `vergelijk` schrijven Markdown en CSV; `toets` schrijft
-daarnaast een GeoPackage met de bevindingen op locatie (`--geen-gpkg` slaat die over).
-`--output` staat standaard op `uitvoer/`. Invoerbestanden worden nooit overschreven.
+### Toetsen op een deelverzameling conformiteitsklassen
 
-Elk geschreven bestand noemt waarmee het gemaakt is: de Markdown-rapporten in een regel
-onder de titel, de CSV's in de kolom `Gereedschap`, de GeoPackage in het veld
-`gereedschap` van de tabel `gwsw_run`. Een rapport is daarmee altijd te herleiden tot
-de versie die het opleverde.
+Standaard moet de dataset aan alle drie de klassen getoetst zijn en faalt de pijplijn bij
+een ontbrekend rapport. Met `--cfk` kies je expliciet een deelset:
+
+```bash
+nlriochecker analyseer \
+  --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv \
+  --cfk Hyd \
+  --output uitvoer
+```
+
+De optie staat op `analyseer`, `dekking`, `toets` en `vergelijk`, mag meermaals mee, en
+accepteert alleen klassen uit `vereiste_cfk` in de projectconfiguratie. Een rapport voor
+een klasse buiten de keuze is een fout, geen stille overslag.
+
+Elke afwijking van de volle set wordt luid gemarkeerd: een waarschuwingsregel boven elk
+Markdown-rapport, en de velden `cfk_set` en `volledig` in de tabel `gwsw_run` van de
+GeoPackage en in de JSON-envelop. `vergelijk` weigert twee meetmomenten met ongelijke
+sets, want een daling die uit een kleinere getoetste set komt is geen verbetering.
+
+Een `toets` zonder `--shacl` meldt dat er niet tegen de conformiteitsklassen gemeten is.
+Dat is een eigen toestand, los van "volledig" en van "deelset".
+
+### Uitvoer
+
+`analyseer`, `dekking` en `vergelijk` schrijven Markdown en CSV. `toets` schrijft
+daarnaast een GeoPackage met de bevindingen op locatie (`--geen-gpkg` slaat die over) en
+`bevindingen.json` met de volledige meldingenstroom (`--geen-json` slaat die over). Dat
+JSON-bestand is een geversioneerd contract voor machinale verwerking; zie
+[docs/json-schema.md](docs/json-schema.md). `--output` staat standaard op `uitvoer/`.
+Invoerbestanden worden nooit overschreven.
+
+Alle vier de uitvoervormen komen uit dezelfde meldingenstroom, dus ze kunnen niet uit
+elkaar lopen. Elk geschreven bestand noemt waarmee het gemaakt is: de Markdown-rapporten
+in een regel onder de titel, de CSV's in de kolom `Gereedschap`, de GeoPackage in het
+veld `gereedschap` van de tabel `gwsw_run`, de JSON in het enveloppeveld `gereedschap`.
+Een rapport is daarmee altijd te herleiden tot de versie die het opleverde.
+
+### Voortgang
+
+`toets` toont bij de zware stappen een voortgangsbalk: het inlezen van de TTL's, het
+inlezen van de SHACL-rapporten, het draaien van de checks (met het lopende check-ID) en
+het wegschrijven van de GeoPackage. De balk gaat naar stderr, zodat de tellingen en de
+geschreven paden op stdout schoon blijven voor wie de uitvoer doorpipet; buiten een
+terminal valt hij terug op een enkele regel per fase.
+
+Wie de package als library gebruikt, geeft een eigen implementatie van het protocol in
+`nlriochecker.voortgang` mee. Zonder argument gebeurt er niets: voortgang is weergave en
+raakt de uitkomst van een run nergens.
 
 ## Ontwikkelen
 

@@ -13,6 +13,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- `--cfk` op `analyseer`, `dekking`, `toets` en `vergelijk`: toetsen op een
+  deelverzameling conformiteitsklassen. Standaard blijven alle drie vereist; elke
+  afwijking staat als waarschuwingsregel boven elk rapport en in de GeoPackage
+  (`cfk_set`, `volledig`). Een run zonder `--shacl` meldt dat er niet gemeten is --
+  dat is iets anders dan een deelset, en iets anders dan volledig.
+- Een JSON-export van de meldingenstroom (`bevindingen.json`), met een envelop en een
+  eigen `schema_versie` los van het packagenummer; uit te zetten met `--geen-json`.
+  Het contract staat in [docs/json-schema.md](docs/json-schema.md).
+- Zichtbare voortgang bij het inlezen van de TTL's, het inlezen van de
+  SHACL-rapporten, het draaien van de checks en het wegschrijven van de GeoPackage.
+  Als library via het protocol in `voortgang.py`, op de opdrachtregel als balk op
+  stderr. Geen nieuwe afhankelijkheid.
 - Elk uitvoerbestand noemt de package en versie die het schreef: de Markdown-rapporten
   in een regel onder de titel, de CSV's in de kolom `Gereedschap`, de GeoPackage in het
   veld `gereedschap` van `gwsw_run`.
@@ -27,6 +39,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- `vergelijk` weigert twee nulmetingen die op verschillende conformiteitsklassen
+  getoetst zijn: een daling in het aantal meldingen die uit een kleinere getoetste set
+  komt is geen verbetering. Geen forceer-vlag.
+- Een SHACL-rapport voor een conformiteitsklasse buiten de gekozen set is een fout in
+  plaats van een stille overslag.
+- `[nulmeting] vereiste_cfk` is verplicht in de projectconfiguratie. De lijst stond ook
+  als default in `checkconfig.py`; een config die de sectie miste viel daar
+  stilzwijgend op terug, en sinds `--cfk` bepaalt diezelfde lijst ook welke klassen die
+  optie accepteert.
 - `CheckContext.cached()` is generiek geworden: bellers krijgen hun eigen structuur terug
   in plaats van `object`. Dat haalde in een keer 23 typefouten weg.
 - `scripts/uitgave.py` toetst nu ook met mypy en onderhoudt dit wijzigingslog.

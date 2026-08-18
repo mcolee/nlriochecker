@@ -7,8 +7,79 @@ Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen
 
 We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis/.
 
+## Gouden regels van Karpathy
+
+Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+1. Think Before Coding
+
+Don't assume. Don't hide confusion. Surface tradeoffs.
+
+Before implementing:
+
+    State your assumptions explicitly. If uncertain, ask.
+    If multiple interpretations exist, present them - don't pick silently.
+    If a simpler approach exists, say so. Push back when warranted.
+    If something is unclear, stop. Name what's confusing. Ask.
+
+2. Simplicity First
+
+Minimum code that solves the problem. Nothing speculative.
+
+    No features beyond what was asked.
+    No abstractions for single-use code.
+    No "flexibility" or "configurability" that wasn't requested.
+    No error handling for impossible scenarios.
+    If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+3. Surgical Changes
+
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code:
+
+    Don't "improve" adjacent code, comments, or formatting.
+    Don't refactor things that aren't broken.
+    Match existing style, even if you'd do it differently.
+    If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+    Remove imports/variables/functions that YOUR changes made unused.
+    Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+4. Goal-Driven Execution
+
+Define success criteria. Loop until verified.
+
+Transform tasks into verifiable goals:
+
+    "Add validation" → "Write tests for invalid inputs, then make them pass"
+    "Fix the bug" → "Write a test that reproduces it, then make it pass"
+    "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
 ## Domeinregels (hard, uit het checkregister v0.8)
-- De dataset moet ALTIJD aan alle conformiteitsklassen (CFK's) getoetst zijn: Hyd, MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke foutmelding. De lijst staat in checks.toml, niet in de code.
+- Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
+  MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
+  foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk` en wordt in
+  alle vier de uitvoervormen gemarkeerd; zonder die optie verandert er niets. Een
+  rapport voor een niet-gekozen CFK is een fout, geen stille overslag, en `vergelijk`
+  weigert twee meetmomenten met ongelijke sets. Een `toets` zonder `--shacl` is een
+  eigen toestand ("niet gemeten"), los van volledig en van deelset. De drie toestanden
+  en hun markeringstekst komen uit `Meetbereik` in `meting.py`, nergens anders. De lijst
+  staat in `checks.toml` en is daar verplicht -- geen default in Python. Zie BO-7 in de
+  beslislog.
 - Typeringspoort: de SHACL-meting benoemt via de vorm `CfkTypes_typ` welke KLASSEN binnen een CFK te globaal zijn (niet welke objecten). De instanties volgen uit de OroX-dataset. Zonder dataset is er wel een klassenlijst maar geen score; verzin er dan geen.
 - Alle drempelwaarden (toleranties, min/max-waarden, bufferafstanden) zijn configureerbaar per project via een configbestand (TOML). Geen hardcoded drempels.
 - Check-ID's uit het checkregister (TOP-001 enz.) zijn stabiel; vervallen ID's worden nooit hergebruikt.
@@ -53,16 +124,21 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
   `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien hetzelfde.
   De package levert `py.typed`, dus haar hints komen bij een importeur aan.
 - CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
-- Rapportage-output: Markdown, CSV en een GeoPackage naar een output-map; nooit invoerbestanden
-  overschrijven. Alle drie komen uit dezelfde meldingenstroom (`uitvoer/melding.py`); een
-  schrijver die zelf een `Finding` interpreteert laat de drie uit elkaar lopen.
+- Rapportage-output: Markdown, CSV, een GeoPackage en JSON naar een output-map; nooit
+  invoerbestanden overschrijven. Alle vier komen uit dezelfde meldingenstroom
+  (`uitvoer/melding.py`); een schrijver die zelf een `Finding` interpreteert laat ze uit
+  elkaar lopen. `bevindingen.json` is een geversioneerd contract met een eigen
+  `schema_versie`, los van het packagenummer; het staat beschreven in
+  `docs/json-schema.md` en twee drifttests houden dat document aan `Melding` vast. Het
+  veld `voorstel` is daarin gereserveerd voor een latere fase en wordt niet geschreven.
 - Elk uitvoerbestand draagt zijn herkomst: pakketnaam plus versie, uit
   `uitvoer/herkomst.py`. Dat is de enige schrijver in `src/`: `schrijf_markdown` zet de
-  titel en de herkomstregel erboven, `schrijf_csv` de kolom `Gereedschap` achteraan, en
-  de GeoPackage krijgt het veld `gereedschap` in `gwsw_run`. Roep nooit zelf `to_csv` of
-  `write_text` aan -- de sweep in `tests/test_uitvoer_herkomst.py` verbiedt een tweede
-  schrijver in `src/`, en die is de waarborg dat de drie uitvoervormen niet uit elkaar
-  lopen.
+  titel en de herkomstregel erboven (plus een optionele runbrede markering),
+  `schrijf_csv` de kolom `Gereedschap` achteraan, `schrijf_json` het enveloppeveld
+  `gereedschap`, en de GeoPackage krijgt het veld `gereedschap` in `gwsw_run`. Roep nooit
+  zelf `to_csv`, `write_text` of `json.dump` aan -- de sweep in
+  `tests/test_uitvoer_herkomst.py` verbiedt een tweede schrijver in `src/`, en die is de
+  waarborg dat de vier uitvoervormen niet uit elkaar lopen.
 - De uitvoermap heet `uitvoer/` en staat in `.gitignore` — met een leidende slash, anders
   sluit die regel ook `src/nlriochecker/uitvoer/` uit en verdwijnt de package stilzwijgend
   uit de repository (en uit het zicht van ruff).
@@ -75,6 +151,14 @@ We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 
   telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
   zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
 - Voordat je commit, doe je eerst /superpowers:requesting-code-review, dan /python-library-complete:reviewing-python-libraries, en verbeter je met de uitkomsten van beide testen de codebase. 
+- Voortgang bij de zware stappen loopt via het protocol in `voortgang.py`, met
+  `NUL_VOORTGANG` als standaardwaarde. Geinstrumenteerd zijn `load_dataset`,
+  `laad_nulmeting`, `run_checks` en `schrijf_geopackage`; bij een cachetreffer start er
+  geen laadfase, want er wordt niets geparseerd. Voortgang is weergave: geen check leest
+  er state uit en geen aanroep mag de uitkomst van een run raken. De CLI-adapter staat
+  in `cli.py`, schrijft naar stderr en zet het staplabel via `item_show_func` -- niet
+  door `balk.label` te overschrijven, want dan echoot click in een niet-interactieve
+  omgeving een regel per stap.
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
