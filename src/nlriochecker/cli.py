@@ -460,6 +460,12 @@ def compare_command(
     help="Sla de GeoPackage-export over; schrijf alleen het rapport en de CSV.",
 )
 @click.option(
+    "--geen-json",
+    "geen_json",
+    is_flag=True,
+    help="Sla de JSON-export over; schrijf alleen het rapport, de CSV en de GeoPackage.",
+)
+@click.option(
     "--geen-cache",
     "geen_cache",
     is_flag=True,
@@ -485,6 +491,7 @@ def check_command(
     bronnen_dir: Path | None,
     cfk_keuze: tuple[str, ...],
     geen_gpkg: bool,
+    geen_json: bool,
     geen_cache: bool,
     cache_dir: Path | None,
     output_dir: Path,
@@ -514,7 +521,9 @@ def check_command(
         if area is not None:
             run = run.beperk_tot_studiegebied(area)
         run = replace(run, meetbereik=meetbereik)
-        uitvoer = schrijf_uitvoer(run, output_dir, met_geopackage=not geen_gpkg)
+        uitvoer = schrijf_uitvoer(
+            run, output_dir, met_geopackage=not geen_gpkg, met_json=not geen_json
+        )
     except PipelineError as error:
         raise _CliError(str(error)) from error
     except KeyError as error:
@@ -588,6 +597,8 @@ def check_command(
     click.echo(f"Geschreven: {uitvoer.csv}")
     if uitvoer.geopackage is not None:
         click.echo(f"Geschreven: {uitvoer.geopackage}")
+    if uitvoer.json is not None:
+        click.echo(f"Geschreven: {uitvoer.json}")
 
 
 def _externe_bronnen(config, bronnen_dir: Path | None):

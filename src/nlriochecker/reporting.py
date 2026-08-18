@@ -12,6 +12,7 @@ from nlriochecker.coverage import CheckEvidence, CoverageResult
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
+    FILE_CHECKS_JSON,
     FILE_CHECKS_MARKDOWN,
     write_check_report,
 )
@@ -481,6 +482,7 @@ def _grootste_verschillen(frame: pd.DataFrame, sleutel: str) -> pd.DataFrame:
 # importeerbaar: bestaande aanroepen en tests hoeven daar niet van te weten.
 __all__ = [
     "FILE_CHECKS_CSV",
+    "FILE_CHECKS_JSON",
     "FILE_CHECKS_MARKDOWN",
     "write_check_report",
     "write_comparison_reports",

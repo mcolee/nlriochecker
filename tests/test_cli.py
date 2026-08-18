@@ -12,6 +12,7 @@ from nlriochecker.cli import main
 from nlriochecker.register import default_register_path
 from nlriochecker.reporting import (
     FILE_CHECKS_CSV,
+    FILE_CHECKS_JSON,
     FILE_CHECKS_MARKDOWN,
     FILE_COMPARISON_MARKDOWN,
     FILE_COVERAGE_CSV,
@@ -643,3 +644,44 @@ def test_cfk_zonder_shacl_meldt_dat_de_vlag_niets_doet(tmp_path: Path) -> None:
 
     assert resultaat.exit_code == 0, resultaat.output
     assert "--cfk doet niets zonder --shacl" in resultaat.output
+
+
+def test_toets_schrijft_de_json_standaard_mee(tmp_path: Path) -> None:
+    """Symmetrie met de GeoPackage: standaard erbij, uit te zetten met een vlag."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--geen-cache",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert (uitvoer / FILE_CHECKS_JSON).exists()
+    assert str(uitvoer / FILE_CHECKS_JSON) in resultaat.output
+
+
+def test_toets_met_geen_json_laat_het_bestand_weg(tmp_path: Path) -> None:
+    """De vlag doet wat hij zegt."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--geen-cache",
+            "--geen-json",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert not (uitvoer / FILE_CHECKS_JSON).exists()
+    assert (uitvoer / FILE_CHECKS_MARKDOWN).exists()

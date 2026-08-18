@@ -45,6 +45,7 @@ from nlriochecker.reporting import (
 from nlriochecker.uitvoer import schrijf_uitvoer
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
+    FILE_CHECKS_JSON,
     FILE_CHECKS_MARKDOWN,
     meldingen_json,
 )
@@ -392,3 +393,72 @@ def test_schrijf_json_is_leesbaar_utf8(tmp_path: Path) -> None:
     tekst = pad.read_text(encoding="utf-8")
     assert '\n  "schema_versie"' in tekst
     assert tekst.endswith("\n")
+
+
+def test_schrijf_uitvoer_levert_de_json_uit_dezelfde_meldingenstroom(
+    toets: CheckRun, tmp_path: Path
+) -> None:
+    """De vier uitvoervormen tellen hetzelfde aantal meldingen.
+
+    Dit is de eigenschap waar de single-writer-regel voor bestaat: liepen ze uit
+    elkaar, dan zou hier een verschil staan.
+    """
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM)
+
+    assert uitvoer.json is not None
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    csv = pd.read_csv(tmp_path / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
+    assert document["aantal_meldingen"] == len(document["meldingen"]) == len(csv)
+
+
+def test_twee_identieke_runs_geven_een_identiek_json_bestand(
+    toets: CheckRun, tmp_path: Path
+) -> None:
+    """Diffbaar tussen meetmomenten; anders is elke trendvergelijking ruis."""
+    eerste = schrijf_uitvoer(toets, tmp_path / "a", RUNDATUM).json
+    tweede = schrijf_uitvoer(toets, tmp_path / "b", RUNDATUM).json
+
+    assert eerste is not None and tweede is not None
+    assert eerste.read_text(encoding="utf-8") == tweede.read_text(encoding="utf-8")
+
+
+def test_json_zonder_geopackage_blijft_geschreven(toets: CheckRun, tmp_path: Path) -> None:
+    """De twee vlaggen staan los van elkaar."""
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_geopackage=False)
+
+    assert uitvoer.geopackage is None
+    assert uitvoer.json is not None
+
+
+def test_geen_json_laat_het_bestand_weg(toets: CheckRun, tmp_path: Path) -> None:
+    """Wie de JSON niet wil, houdt de andere drie."""
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_json=False)
+
+    assert uitvoer.json is None
+    assert not (tmp_path / FILE_CHECKS_JSON).exists()
+    assert uitvoer.markdown.exists()
+
+
+def test_json_schemadocument_beschrijft_elk_meldingveld() -> None:
+    """`docs/json-schema.md` is een tweede plek waar de veldnamen staan.
+
+    Een afnemer programmeert tegen dat document. Komt er een veld bij `Melding` en
+    blijft de beschrijving achter, dan is het contract stil onvolledig geworden --
+    en dat valt niemand op, want het bestand zelf klopt wel.
+    """
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "json-schema.md").read_text(
+        encoding="utf-8"
+    )
+
+    ontbreekt = [veld.name for veld in fields(Melding) if f"`{veld.name}`" not in doc]
+
+    assert ontbreekt == []
+
+
+def test_json_schemadocument_noemt_de_geschreven_schemaversie() -> None:
+    """De versie in het document en die in de code horen dezelfde te zijn."""
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "json-schema.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert f'"schema_versie": "{SCHEMA_VERSIE}"' in doc
