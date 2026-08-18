@@ -765,3 +765,89 @@ def test_balkvoortgang_verdraagt_opeenvolgende_fasen() -> None:
     voortgang.stap(label="TOP-001")
     voortgang.einde_fase()
     voortgang.einde_fase()
+
+
+def test_toets_schrijft_per_gebied(tmp_path: Path) -> None:
+    """Twee buurten in een bestand: twee submappen plus een totaalsynthese."""
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+            "--studiegebied",
+            str(GIS_DIR / "buurten_twee.gpkg"),
+            "--check",
+            "HGT-010",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert (tmp_path / "noord" / FILE_CHECKS_CSV).exists()
+    assert (tmp_path / "zuid" / FILE_CHECKS_CSV).exists()
+    assert (tmp_path / "totaal" / "synthese.md").exists()
+    assert "Gebied Noord:" in resultaat.output
+
+
+def test_toets_beperkt_zich_tot_het_gekozen_gebied(tmp_path: Path) -> None:
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+            "--studiegebied",
+            str(GIS_DIR / "buurten_twee.gpkg"),
+            "--gebied",
+            "Noord",
+            "--check",
+            "HGT-010",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert (tmp_path / "noord").exists()
+    assert not (tmp_path / "zuid").exists()
+    assert "Selectie" in (tmp_path / "totaal" / "synthese.md").read_text(encoding="utf-8")
+
+
+def test_toets_onbekend_gebied_noemt_de_beschikbare(tmp_path: Path) -> None:
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+            "--studiegebied",
+            str(GIS_DIR / "buurten_twee.gpkg"),
+            "--gebied",
+            "Oost",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert resultaat.exit_code != 0
+    assert "Noord, Zuid" in resultaat.stderr
+
+
+def test_toets_gebied_zonder_studiegebied_faalt(tmp_path: Path) -> None:
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--gebied",
+            "Noord",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert resultaat.exit_code != 0
+    assert "--studiegebied" in resultaat.stderr

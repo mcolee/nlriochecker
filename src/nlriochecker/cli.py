@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import sys
 from contextlib import suppress
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import click
 
 from nlriochecker import __version__
-from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import MetingAnalysis, analyze
 from nlriochecker.cache import laad_met_cache
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import REGISTRY, CheckContext, Severity, run_checks
+from nlriochecker.checks import REGISTRY, Severity
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import CoverageConfig, load_coverage_config
 from nlriochecker.coverage import assess_coverage, verify_register
@@ -30,9 +28,10 @@ from nlriochecker.reporting import (
     write_coverage_report,
     write_reports,
 )
-from nlriochecker.studiegebied import load_study_area
+from nlriochecker.studiegebied import RdGrenzen, Studiegebieden, load_studiegebieden
 from nlriochecker.taal import getal, vorm
-from nlriochecker.uitvoer import schrijf_uitvoer
+from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
+from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
@@ -542,6 +541,15 @@ def compare_command(
 @_bronnen_option()
 @_cfk_option()
 @click.option(
+    "--gebied",
+    "gebied_keuze",
+    multiple=True,
+    help=(
+        "Beperk de run tot deze naam_gebied-waarde uit het studiegebiedbestand; "
+        "meermaals toegestaan. Zonder deze optie draaien alle gebieden."
+    ),
+)
+@click.option(
     "--geen-gpkg",
     "geen_gpkg",
     is_flag=True,
@@ -578,6 +586,7 @@ def check_command(
     plausibility_path: Path | None,
     bronnen_dir: Path | None,
     cfk_keuze: tuple[str, ...],
+    gebied_keuze: tuple[str, ...],
     geen_gpkg: bool,
     geen_json: bool,
     geen_cache: bool,
@@ -588,10 +597,11 @@ def check_command(
     try:
         voortgang: Voortgang = _BalkVoortgang()
         config = load_check_config(project_config_path)
-        # Toets de keuze voordat de dataset geladen wordt. Op De Wolden kost dat
-        # laden ruim drie minuten; een typefout in --cfk hoort niet pas daarna te
-        # melden dat de run zinloos was.
+        # Toets de keuzes voordat de dataset geladen wordt. Op De Wolden kost dat
+        # laden ruim drie minuten; een typefout in --cfk of --gebied hoort niet pas
+        # daarna te melden dat de run zinloos was.
         _gekozen_cfk(cfk_keuze, config)
+        gebieden = _studiegebieden(study_path, study_layer, gebied_keuze, config)
         dataset, cache = laad_met_cache(
             dataset_path, list(ontology_paths), cache_dir, not geen_cache, voortgang=voortgang
         )
@@ -599,22 +609,17 @@ def check_command(
             shacl_paths, config, dataset, cfk_keuze, voortgang
         )
         bronnen = _externe_bronnen(config, bronnen_dir)
-        area = load_study_area(study_path, study_layer) if study_path is not None else None
-        analyseset = bouw_analyseset(dataset, area, config) if area is not None else None
-        context = CheckContext(
-            dataset=analyseset.dataset if analyseset is not None else dataset,
-            config=config,
-            unreliable_objects=onbetrouwbaar,
-            plausibiliteit=load_plausibility(plausibility_path),
-            bronnen=bronnen,
-            volledige_dataset=dataset,
-            analyseset=analyseset,
-        )
         try:
-            run = run_checks(
-                context,
-                list(check_ids) or None,
+            runs = toets_gebieden(
+                dataset,
+                gebieden,
+                config,
+                onbetrouwbaar=onbetrouwbaar,
+                plausibiliteit=load_plausibility(plausibility_path),
+                bronnen=bronnen,
+                check_ids=list(check_ids) or None,
                 typing_gate_applied=gate_applied,
+                meetbereik=meetbereik,
                 voortgang=voortgang,
             )
         except KeyError as error:
@@ -623,15 +628,14 @@ def check_command(
             # "onbekende check" laten lezen.
             bekend = ", ".join(sorted(REGISTRY))
             raise _CliError(f"{error.args[0]}. Bekende checks: {bekend}.") from error
-        if area is not None:
-            run = run.beperk_tot_studiegebied(area)
-        run = replace(run, meetbereik=meetbereik)
-        uitvoer = schrijf_uitvoer(
-            run,
+        uitvoer = schrijf_uitvoer_gebieden(
+            runs,
             output_dir,
             met_geopackage=not geen_gpkg,
             met_json=not geen_json,
             voortgang=voortgang,
+            beschikbaar=gebieden.beschikbaar if gebieden is not None else (),
+            overgeslagen=gebieden.overgeslagen if gebieden is not None else (),
         )
     except PipelineError as error:
         raise _CliError(str(error)) from error
@@ -651,6 +655,41 @@ def check_command(
         )
     if dataset.geometry_errors:
         click.echo(f"  {len(dataset.geometry_errors)} objecten met onleesbare geometrie.")
+    if not gate_applied:
+        click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
+        if cfk_keuze:
+            click.echo("  Let op: --cfk doet niets zonder --shacl; er is niets gemeten.")
+    elif not meetbereik.volledig:
+        click.echo(f"  {meetbereik.markering()}")
+    if bronnen is None:
+        click.echo("  Geen externe bronnen geladen (--bronnen niet opgegeven).")
+    else:
+        click.echo(
+            f"  Externe bronnen: {len(bronnen.layers)} lagen"
+            f"{', hoogteraster' if bronnen.raster is not None else ''}"
+            f", bereik {bronnen.extent_name or 'onbekend'}."
+        )
+        for ontbreekt in bronnen.missing:
+            click.echo(f"    Niet aanwezig: {ontbreekt}")
+    for gebiedsrun in runs:
+        _meld_gebied(gebiedsrun, config, meervoudig=len(runs) > 1)
+
+    # De paden dragen de gesaneerde gebiedsnaam al als submap; die er nog eens bij
+    # zetten zou de lijst alleen langer maken.
+    for geschreven in uitvoer.per_gebied.values():
+        for pad in (geschreven.markdown, geschreven.csv, geschreven.geopackage, geschreven.json):
+            if pad is not None:
+                click.echo(f"Geschreven: {pad}")
+    for pad in (uitvoer.synthese, uitvoer.totaal_csv, uitvoer.totaal_json):
+        if pad is not None:
+            click.echo(f"Geschreven: {pad}")
+
+
+def _meld_gebied(gebiedsrun: GebiedsRun, config: CheckConfig, *, meervoudig: bool) -> None:
+    """Meldt de omvang en de uitslag van een enkele gebiedsrun op het scherm."""
+    run = gebiedsrun.run
+    if meervoudig:
+        click.echo(f"Gebied {gebiedsrun.naam}:")
     if run.study_area is not None:
         gebied = run.study_area
         weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
@@ -669,22 +708,6 @@ def check_command(
                 "  Let op: het net binnen dit gebied hangt met vrijwel de hele export samen; "
                 "de afbakening levert weinig tijdwinst op."
             )
-    if not gate_applied:
-        click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
-        if cfk_keuze:
-            click.echo("  Let op: --cfk doet niets zonder --shacl; er is niets gemeten.")
-    elif not meetbereik.volledig:
-        click.echo(f"  {meetbereik.markering()}")
-    if bronnen is None:
-        click.echo("  Geen externe bronnen geladen (--bronnen niet opgegeven).")
-    else:
-        click.echo(
-            f"  Externe bronnen: {len(bronnen.layers)} lagen"
-            f"{', hoogteraster' if bronnen.raster is not None else ''}"
-            f", bereik {bronnen.extent_name or 'onbekend'}."
-        )
-        for ontbreekt in bronnen.missing:
-            click.echo(f"    Niet aanwezig: {ontbreekt}")
     for outcome in run.outcomes:
         voorbehoud = (
             f", {outcome.unreliable_count} met typeringsvoorbehoud"
@@ -699,12 +722,32 @@ def check_command(
     click.echo(
         f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen"
     )
-    click.echo(f"Geschreven: {uitvoer.markdown}")
-    click.echo(f"Geschreven: {uitvoer.csv}")
-    if uitvoer.geopackage is not None:
-        click.echo(f"Geschreven: {uitvoer.geopackage}")
-    if uitvoer.json is not None:
-        click.echo(f"Geschreven: {uitvoer.json}")
+
+
+def _studiegebieden(
+    study_path: Path | None,
+    study_layer: str | None,
+    gebied_keuze: tuple[str, ...],
+    config: CheckConfig,
+) -> Studiegebieden | None:
+    """Leest en selecteert de studiegebieden, of levert None zonder studiegebied.
+
+    Het volledige bestand wordt altijd eerst gevalideerd en pas daarna geselecteerd:
+    een run met `--gebied` mag een defect in een ander gebied niet maskeren.
+    """
+    if study_path is None:
+        if gebied_keuze:
+            raise _CliError("--gebied werkt alleen samen met --studiegebied.")
+        return None
+    drempels = config.drempels
+    gebieden = load_studiegebieden(
+        study_path,
+        study_layer,
+        grenzen=RdGrenzen(
+            drempels.rd_x_min, drempels.rd_x_max, drempels.rd_y_min, drempels.rd_y_max
+        ),
+    )
+    return gebieden.selecteer(list(gebied_keuze)) if gebied_keuze else gebieden
 
 
 def _externe_bronnen(config, bronnen_dir: Path | None):
