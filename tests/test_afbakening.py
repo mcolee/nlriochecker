@@ -8,7 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from nlriochecker.afbakening import bouw_analyseset, objecten_in_gebied
+from nlriochecker.afbakening import (
+    _component,
+    bouw_analyseset,
+    bouw_gedeelde_index,
+    objecten_in_gebied,
+)
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, run_checks
 from nlriochecker.dataset import load_dataset
@@ -264,3 +269,33 @@ def test_karakteristiek_en_typeringstelling_blijven_over_de_volledige_export() -
     assert (
         met_gebied.unreliable_labels_in_dataset == zonder_gebied.unreliable_labels_in_dataset == 1
     )
+
+
+def test_gedeelde_index_geeft_dezelfde_analyseset() -> None:
+    """De optimalisatie mag geen enkel object toevoegen of weglaten."""
+    dataset, area, config = _opzet()
+
+    zonder = bouw_analyseset(dataset, area, config)
+    met = bouw_analyseset(dataset, area, config, gedeeld=bouw_gedeelde_index(dataset, config))
+
+    assert met.kern == zonder.kern
+    assert met.schil == zonder.schil
+    assert met.strengen_zonder_netwerkverband == zonder.strengen_zonder_netwerkverband
+
+
+def test_componenten_uit_de_gedeelde_index_gelijk_aan_directe_graafanalyse() -> None:
+    """De componentstructuur hangt niet van het gebied af; hoisten mag hem niet raken."""
+    dataset, area, config = _opzet()
+    kern = objecten_in_gebied(dataset, area)
+
+    via_index = bouw_gedeelde_index(dataset, config).component(kern)
+    direct = _component(dataset, config, kern)
+
+    assert via_index == direct
+
+
+def test_index_levert_dezelfde_kern() -> None:
+    dataset, area, config = _opzet()
+    index = bouw_gedeelde_index(dataset, config)
+
+    assert objecten_in_gebied(dataset, area, gedeeld=index) == objecten_in_gebied(dataset, area)
