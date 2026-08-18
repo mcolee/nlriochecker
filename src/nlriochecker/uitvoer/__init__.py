@@ -18,6 +18,7 @@ from datetime import date
 from pathlib import Path
 
 from nlriochecker.checks import CheckRun
+from nlriochecker.studiegebied import MAP_TOTAAL
 from nlriochecker.toetsloop import GebiedsRun
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
@@ -29,14 +30,14 @@ from nlriochecker.uitvoer.bevindingen import (
 from nlriochecker.uitvoer.gpkg import schrijf_geopackage
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_json, schrijf_markdown
 from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
-from nlriochecker.uitvoer.synthese import totaalsynthese
+from nlriochecker.uitvoer.synthese import GebiedsSamenvatting, totaalsynthese
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
-# De naam van de map met de synthese over alle gebieden, naast de submappen per
-# gebied. Een gebied dat zo heet zou ermee botsen; dat is een gebiedsnaam die in
-# Nederland niet voorkomt, en de botsing valt op als de map er al is.
-MAP_TOTAAL = "totaal"
+# De naam van het bestand met de synthese over alle gebieden. De mapnaam ernaast
+# (`MAP_TOTAAL`) staat in `studiegebied.py`, want daar wordt hij als gebiedsnaam
+# geweigerd: een buurt die "Totaal" heet zou anders in deze map schrijven en de
+# synthese overschrijven.
 FILE_SYNTHESE = "synthese.md"
 
 
@@ -72,6 +73,7 @@ def schrijf_uitvoer(
     voortgang: Voortgang = NUL_VOORTGANG,
     gebied: str | None = None,
     meldingen: list[Melding] | None = None,
+    notities: Sequence[str] = (),
 ) -> Uitvoer:
     """Schrijft rapport, archief, GIS-uitvoer en JSON uit dezelfde meldingenstroom.
 
@@ -80,12 +82,13 @@ def schrijf_uitvoer(
 
     `gebied` komt in de JSON-envelop terecht en is alleen gevuld bij een run over
     meerdere studiegebied-features; `meldingen` mag de beller meegeven om dezelfde
-    lijst ook voor de totaalsynthese te gebruiken.
+    lijst ook voor de totaalsynthese te gebruiken. `notities` gaan naar het rapport
+    en melden wat het studiegebiedbestand niet mocht bijdragen.
     """
     run_datum = run_datum or date.today()
     meldingen = meldingen if meldingen is not None else bouw_meldingen(run, run_datum)
 
-    markdown, csv = write_check_report(run, output_dir, run_datum, meldingen)
+    markdown, csv = write_check_report(run, output_dir, run_datum, meldingen, notities)
     geopackage = (
         schrijf_geopackage(run, meldingen, output_dir, run_datum, voortgang=voortgang)
         if met_geopackage
@@ -138,12 +141,13 @@ def schrijf_uitvoer_gebieden(
                     met_geopackage=met_geopackage,
                     met_json=met_json,
                     voortgang=voortgang,
+                    notities=overgeslagen,
                 )
             }
         )
 
     per_gebied: dict[str, Uitvoer] = {}
-    verzameld: list[tuple[str, float, int, list[Melding]]] = []
+    verzameld: list[GebiedsSamenvatting] = []
     for gebiedsrun in runs:
         meldingen = bouw_meldingen(gebiedsrun.run, run_datum)
         per_gebied[gebiedsrun.naam] = schrijf_uitvoer(
@@ -155,10 +159,18 @@ def schrijf_uitvoer_gebieden(
             voortgang=voortgang,
             gebied=gebiedsrun.naam,
             meldingen=meldingen,
+            notities=overgeslagen,
         )
-        oppervlak = gebiedsrun.gebied.area_ha if gebiedsrun.gebied is not None else 0.0
-        weggelaten = sum(outcome.weggelaten for outcome in gebiedsrun.run.outcomes)
-        verzameld.append((gebiedsrun.naam, oppervlak, weggelaten, meldingen))
+        analyseset = gebiedsrun.run.analyseset
+        verzameld.append(
+            GebiedsSamenvatting(
+                naam=gebiedsrun.naam,
+                oppervlak_ha=gebiedsrun.gebied.area_ha if gebiedsrun.gebied is not None else 0.0,
+                weggelaten=sum(outcome.weggelaten for outcome in gebiedsrun.run.outcomes),
+                kern_objecten=len(analyseset.kern) if analyseset is not None else 0,
+                meldingen=meldingen,
+            )
+        )
 
     synthese, totaal_csv, totaal_json = _schrijf_totaal(
         runs, verzameld, output_dir, run_datum, beschikbaar, overgeslagen, met_json
@@ -173,7 +185,7 @@ def schrijf_uitvoer_gebieden(
 
 def _schrijf_totaal(
     runs: Sequence[GebiedsRun],
-    verzameld: Sequence[tuple[str, float, int, list[Melding]]],
+    verzameld: Sequence[GebiedsSamenvatting],
     output_dir: Path,
     run_datum: date,
     beschikbaar: Sequence[str],
@@ -193,8 +205,8 @@ def _schrijf_totaal(
     # melding uit meerdere gebieden meekrijgt, hangt dan niet van de volgorde in het
     # gebiedsbestand af.
     uniek: dict[str, Melding] = {}
-    for _, _, _, meldingen in sorted(verzameld, key=lambda deel: deel[0]):
-        for melding in meldingen:
+    for deel in sorted(verzameld, key=lambda deel: deel.naam):
+        for melding in deel.meldingen:
             uniek.setdefault(melding.melding_id, melding)
     unieke = list(uniek.values())
 

@@ -671,8 +671,13 @@ def check_command(
         )
         for ontbreekt in bronnen.missing:
             click.echo(f"    Niet aanwezig: {ontbreekt}")
-    for gebiedsrun in runs:
-        _meld_gebied(gebiedsrun, config, meervoudig=len(runs) > 1)
+    if len(runs) == 1:
+        _meld_gebied(runs[0], config)
+    else:
+        # Bij tachtig buurten zou een blok per gebied duizenden regels opleveren; de
+        # tellingen per check staan in totaal/synthese.md.
+        for gebiedsrun in runs:
+            _meld_gebied_kort(gebiedsrun)
 
     # De paden dragen de gesaneerde gebiedsnaam al als submap; die er nog eens bij
     # zetten zou de lijst alleen langer maken.
@@ -685,11 +690,22 @@ def check_command(
             click.echo(f"Geschreven: {pad}")
 
 
-def _meld_gebied(gebiedsrun: GebiedsRun, config: CheckConfig, *, meervoudig: bool) -> None:
+def _meld_gebied_kort(gebiedsrun: GebiedsRun) -> None:
+    """Vat een gebiedsrun samen in een regel; het detail staat in de synthese."""
+    run = gebiedsrun.run
+    kern = len(run.analyseset.kern) if run.analyseset is not None else 0
+    weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
+    leeg = " -- geen objecten in dit gebied, niets getoetst" if not kern else ""
+    click.echo(
+        f"  Gebied {gebiedsrun.naam}: {getal(kern, 'object', 'objecten')} in de kern, "
+        f"{run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen, "
+        f"{weggelaten} buiten het gebied weggelaten{leeg}."
+    )
+
+
+def _meld_gebied(gebiedsrun: GebiedsRun, config: CheckConfig) -> None:
     """Meldt de omvang en de uitslag van een enkele gebiedsrun op het scherm."""
     run = gebiedsrun.run
-    if meervoudig:
-        click.echo(f"Gebied {gebiedsrun.naam}:")
     if run.study_area is not None:
         gebied = run.study_area
         weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)

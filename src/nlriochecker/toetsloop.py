@@ -91,6 +91,8 @@ def toets_gebieden(
         ]
 
     gedeeld = bouw_gedeelde_index(dataset, config)
+    # Bewust zonder analyseset: deze context ziet de volledige export, en een check
+    # die zijn bereik in woorden noemt hoort dat te zeggen. Zie de CHANGELOG.
     volledig = basis.volledige_context()
     return [
         _per_gebied(
@@ -136,7 +138,10 @@ def _per_gebied(
     run = _draai(context, check_ids, typing_gate_applied, meetbereik, voortgang, fase)
     return GebiedsRun(
         gebied=area,
-        run=run.beperk_tot_studiegebied(area),
+        # `analyseset.kern` is per constructie wat `beperk_tot_studiegebied` zelf zou
+        # uitrekenen; hem meegeven scheelt per gebied een doorloop over alle
+        # geometrieen, en dat is bij tachtig buurten de post die telt.
+        run=run.beperk_tot_studiegebied(area, analyseset.kern, leeg_toegestaan=met_submap),
         map=mapnaam(naam) if met_submap else "",
     )
 

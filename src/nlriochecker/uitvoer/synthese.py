@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import pandas as pd
 
@@ -24,6 +25,22 @@ from nlriochecker.uitvoer.tabel import table
 
 ERNST_FOUT = Severity.ERROR.value
 ERNST_WAARSCHUWING = Severity.WARNING.value
+
+
+@dataclass(frozen=True)
+class GebiedsSamenvatting:
+    """Wat de totaalsynthese van een enkel gebied nodig heeft.
+
+    De meldingen komen kant-en-klaar uit de meldingenstroom; deze module
+    interpreteert geen enkele `Finding` opnieuw.
+    """
+
+    naam: str
+    oppervlak_ha: float
+    weggelaten: int
+    kern_objecten: int
+    meldingen: list[Melding]
+
 
 # De checks die samen op een verkeerd geregistreerde afvoerrichting wijzen.
 RICHTINGSCHECKS = ("NET-001", "NET-003", "NET-004", "HGT-005", "HGT-006")
@@ -159,7 +176,7 @@ def _gedeelde_deelstelsels(meldingen: list[Melding]) -> list[str]:
 
 
 def totaalsynthese(
-    gebieden: Sequence[tuple[str, float, int, list[Melding]]],
+    gebieden: Sequence[GebiedsSamenvatting],
     beschikbaar: Sequence[str],
     overgeslagen: Sequence[str],
 ) -> list[str]:
@@ -170,34 +187,31 @@ def totaalsynthese(
     `StudyArea.bevat`); daarom is de som der delen hoger dan het aantal unieke
     meldingen, en zegt deze sectie precies hoeveel dat verschil is. Zonder die zin
     leest een lezer die de kolommen optelt een verschil dat er niet is.
-
-    De meegegeven tupels zijn (naam, oppervlak in ha, weggelaten bevindingen,
-    meldingen). Ze komen uit de al gebouwde meldingenstroom; hier wordt geen enkele
-    `Finding` opnieuw geinterpreteerd.
     """
     per_gebied = pd.DataFrame(
         [
             {
-                "Gebied": naam,
-                "Oppervlak (ha)": round(oppervlak, 1),
-                "Meldingen": len(meldingen),
-                "Fouten": sum(1 for melding in meldingen if melding.ernst == ERNST_FOUT),
+                "Gebied": deel.naam,
+                "Oppervlak (ha)": round(deel.oppervlak_ha, 1),
+                "Objecten in de kern": deel.kern_objecten,
+                "Meldingen": len(deel.meldingen),
+                "Fouten": sum(1 for melding in deel.meldingen if melding.ernst == ERNST_FOUT),
                 "Waarschuwingen": sum(
-                    1 for melding in meldingen if melding.ernst == ERNST_WAARSCHUWING
+                    1 for melding in deel.meldingen if melding.ernst == ERNST_WAARSCHUWING
                 ),
-                "Buiten het gebied": weggelaten,
+                "Buiten het gebied": deel.weggelaten,
             }
-            for naam, oppervlak, weggelaten, meldingen in gebieden
+            for deel in gebieden
         ]
     )
 
-    alle_ids = [melding.melding_id for _, _, _, meldingen in gebieden for melding in meldingen]
+    alle_ids = [melding.melding_id for deel in gebieden for melding in deel.meldingen]
     uniek = set(alle_ids)
     meervoudig = sum(1 for aantal in Counter(alle_ids).values() if aantal > 1)
 
     regels = [
         f"Deze synthese beslaat {getal(len(gebieden), 'gebied', 'gebieden')} "
-        f"({', '.join(naam for naam, _, _, _ in gebieden)}).",
+        f"({', '.join(deel.naam for deel in gebieden)}).",
         "",
     ]
     if len(beschikbaar) > len(gebieden):
@@ -209,6 +223,15 @@ def totaalsynthese(
         ]
     if overgeslagen:
         regels += [f"> **Overgeslagen in het gebiedsbestand:** {'; '.join(overgeslagen)}.", ""]
+
+    leeg = [deel.naam for deel in gebieden if deel.kern_objecten == 0]
+    if leeg:
+        regels += [
+            f"> **{getal(len(leeg), 'gebied bevat', 'gebieden bevatten')} geen enkel "
+            f"GWSW-object** ({', '.join(leeg)}). Daar is niets getoetst; nul bevindingen "
+            "betekent er dus niet dat het in orde is.",
+            "",
+        ]
 
     regels += [
         f"{len(uniek)} unieke meldingen over alle gebieden samen, waarvan "
@@ -230,19 +253,17 @@ def totaalsynthese(
     return regels
 
 
-def _per_gebied_en_check(
-    gebieden: Sequence[tuple[str, float, int, list[Melding]]],
-) -> pd.DataFrame:
+def _per_gebied_en_check(gebieden: Sequence[GebiedsSamenvatting]) -> pd.DataFrame:
     """Telt per gebied per check de meldingen en de fouten."""
     rijen = [
         {
-            "Gebied": naam,
+            "Gebied": deel.naam,
             "Check": check_id,
             "Ernst": meldingen_van_check[0].ernst,
             "Meldingen": len(meldingen_van_check),
         }
-        for naam, _, _, meldingen in gebieden
-        for check_id, meldingen_van_check in sorted(_per_check(meldingen).items())
+        for deel in gebieden
+        for check_id, meldingen_van_check in sorted(_per_check(deel.meldingen).items())
     ]
     return pd.DataFrame(rijen, columns=["Gebied", "Check", "Ernst", "Meldingen"])
 

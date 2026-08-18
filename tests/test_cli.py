@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import io
+import json
 import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from click.testing import CliRunner
+from shapely.geometry import box, mapping
 
 from nlriochecker.cli import _BalkVoortgang, main
 from nlriochecker.register import default_register_path
@@ -851,3 +853,47 @@ def test_toets_gebied_zonder_studiegebied_faalt(tmp_path: Path) -> None:
 
     assert resultaat.exit_code != 0
     assert "--studiegebied" in resultaat.stderr
+
+
+def test_gebiedsvalidatie_gaat_vooraf_aan_het_laden(tmp_path: Path, monkeypatch) -> None:
+    """Op De Wolden kost laden ruim drie minuten; een defect gebiedsbestand hoort
+    dat niet af te wachten."""
+
+    def val(*args, **kwargs):
+        raise AssertionError("de dataset werd geladen voordat het gebiedsbestand getoetst was")
+
+    monkeypatch.setattr("nlriochecker.cli.laad_met_cache", val)
+    kapot = tmp_path / "kapot.geojson"
+    kapot.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:28992"}},
+                "features": [
+                    {"type": "Feature", "properties": {}, "geometry": mapping(box(0, 0, 10, 10))},
+                    {
+                        "type": "Feature",
+                        "properties": {},
+                        "geometry": mapping(box(20, 20, 30, 30)),
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--studiegebied",
+            str(kapot),
+            "--output",
+            str(tmp_path / "uit"),
+        ],
+    )
+
+    assert resultaat.exit_code != 0
+    assert "naam_gebied" in resultaat.stderr

@@ -10,6 +10,7 @@ machinaal verwerkt; `docs/json-schema.md` beschrijft dat contract.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import fields
 from datetime import date
 from pathlib import Path
@@ -70,11 +71,16 @@ def write_check_report(
     output_dir: Path,
     run_datum: date | None = None,
     meldingen: list[Melding] | None = None,
+    notities: Sequence[str] = (),
 ) -> tuple[Path, Path]:
     """Schrijft de bevindingen van de check-engine als Markdown en CSV.
 
     De beller mag de meldingenlijst meegeven; dan schrijven Markdown, CSV en de
     GeoPackage aantoonbaar dezelfde verzameling weg.
+
+    `notities` zijn opmerkingen over de invoer die de run zelf niet kent, zoals de
+    geometrieen die het studiegebiedbestand niet mocht bijdragen. Ze horen in het
+    rapport: wat niet bekeken is, mag niet alleen in het logboek staan.
     """
     output_dir = prepare(output_dir)
     run_datum = run_datum or date.today()
@@ -84,7 +90,7 @@ def write_check_report(
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
         f"# Checkbevindingen {run.dataset.source.name}",
-        _render_checks(run, meldingen),
+        _render_checks(run, meldingen, notities),
         run_datum,
         markering=run.meetbereik.markering(),
     )
@@ -156,7 +162,9 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=CSV_KOLOMMEN)
 
 
-def _render_checks(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+def _render_checks(
+    run: CheckRun, meldingen: list[Melding], notities: Sequence[str] = ()
+) -> list[str]:
     """Stelt de romp van het bevindingenrapport samen; de kop komt uit `schrijf_markdown`."""
     onbetrouwbaar = sum(outcome.unreliable_count for outcome in run.outcomes)
     lines = [
@@ -204,6 +212,9 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         lines += [f"> - `{sample}`" for sample in fallback.samples]
         lines += [""]
 
+    for notitie in notities:
+        lines += [f"> **Studiegebiedbestand:** {notitie}", ""]
+
     if run.study_area is not None:
         gebied = run.study_area
         weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
@@ -219,6 +230,17 @@ def _render_checks(run: CheckRun, meldingen: list[Melding]) -> list[str]:
             "de dataset.",
             "",
         ]
+        if run.analyseset is not None and not run.analyseset.kern:
+            # Nul bevindingen op een leeg gebied leest als "hier is alles in orde".
+            # Bij rapportage over meerdere gebieden is zo'n gebied normaal (water,
+            # natuur, bedrijventerrein) en mag het de andere niet meeslepen, maar het
+            # moet wel in zijn eigen rapport staan.
+            lines += [
+                "> **Geen objecten in dit gebied:** geen enkele put en geen enkele streng "
+                "valt erbinnen. Er is hier dus niets getoetst; dat een leeg gebied geen "
+                "bevindingen oplevert, zegt niets over de kwaliteit ervan.",
+                "",
+            ]
 
     if run.analyseset is not None:
         stel = run.analyseset

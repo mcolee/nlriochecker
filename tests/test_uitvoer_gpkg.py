@@ -297,7 +297,7 @@ def test_geschreven_bestand_is_leesbaar_met_de_eigen_lezer(tmp_path: Path) -> No
     gelezen = _lees_geopackage(pad, "strengen")
 
     assert len(gelezen.features) == len(run.dataset.conduits)
-    assert all(not geometrie.is_empty for geometrie, _ in gelezen.features)
+    assert all(not vlak.geometrie.is_empty for vlak in gelezen.features)
 
 
 def test_meldinglocatiestijl_filtert_systemische_meldingen_echt(tmp_path: Path) -> None:

@@ -12,7 +12,9 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from shapely.geometry import Point, box, mapping
 
+from gpkghelper import schrijf_buurten
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import StudyAreaError
@@ -20,7 +22,7 @@ from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
 from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
-from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -34,12 +36,20 @@ def _config() -> CheckConfig:
     return config
 
 
-def _sleutels(gebiedsrun: GebiedsRun) -> set[tuple[str, str, str]]:
-    """De meldingen van een run, herleid tot wat ze identificeert."""
-    return {
-        (melding.melding_id, melding.check_id, melding.object_uri)
-        for melding in bouw_meldingen(gebiedsrun.run, RUNDATUM)
-    }
+def _sleutels(gebiedsrun: GebiedsRun) -> list[Melding]:
+    """Alle meldingen van een run, op ID gesorteerd.
+
+    Bewust de volledige `Melding` en niet een handvol velden: de equivalentie-eis
+    zegt *identiek*, en een projectie op ID en check zou een verschil in boodschap,
+    waarde of locatie niet zien -- precies het soort verschil dat een gedeelde
+    structuur zou kunnen veroorzaken.
+    """
+    return sorted(bouw_meldingen(gebiedsrun.run, RUNDATUM), key=lambda m: m.melding_id)
+
+
+def _uitslagen(gebiedsrun: GebiedsRun) -> list[tuple[str, int, int, tuple[str, ...]]]:
+    """Per check wat er bekeken, weggelaten en toegelicht is."""
+    return [(o.check_id, o.examined, o.weggelaten, tuple(o.notes)) for o in gebiedsrun.run.outcomes]
 
 
 def _draai(bestand: str | None, ttl: str = "afbakening_kern_en_schil.ttl") -> list[GebiedsRun]:
@@ -62,6 +72,7 @@ def test_per_gebied_gelijk_aan_een_losse_run() -> None:
     noord = next(run for run in samen if run.naam == "Noord")
 
     assert _sleutels(noord) == _sleutels(los[0])
+    assert _uitslagen(noord) == _uitslagen(los[0])
 
 
 def test_ook_het_tweede_gebied_is_equivalent() -> None:
@@ -71,6 +82,7 @@ def test_ook_het_tweede_gebied_is_equivalent() -> None:
     zuid = next(run for run in samen if run.naam == "Zuid")
 
     assert _sleutels(zuid) == _sleutels(los[0])
+    assert _uitslagen(zuid) == _uitslagen(los[0])
 
 
 def test_de_analysesets_verschillen_per_gebied() -> None:
@@ -113,8 +125,8 @@ def test_grensobject_verschijnt_in_beide_gebieden_met_hetzelfde_id() -> None:
     """
     noord, zuid = _draai("buurten_twee.gpkg", "hgt010_diameterverjonging.ttl")
 
-    gedeeld = {sleutel[0] for sleutel in _sleutels(noord)} & {
-        sleutel[0] for sleutel in _sleutels(zuid)
+    gedeeld = {melding.melding_id for melding in _sleutels(noord)} & {
+        melding.melding_id for melding in _sleutels(zuid)
     }
 
     assert gedeeld
@@ -213,3 +225,93 @@ def test_synthese_vermeldt_een_selectie(tmp_path: Path) -> None:
 
     assert uitvoer.synthese is not None
     assert "Selectie" in uitvoer.synthese.read_text(encoding="utf-8")
+
+
+def _met_leeg_gebied(pad: Path) -> Path:
+    """Een gebiedsbestand met een gevulde buurt en een lege ernaast."""
+    return schrijf_buurten(
+        pad,
+        [("Noord", box(990, 1990, 1060, 2010)), ("Leeg", box(5000, 5000, 5100, 5100))],
+    )
+
+
+def test_een_leeg_gebied_sloopt_de_run_niet(tmp_path: Path) -> None:
+    """Een buurt zonder riolering (water, natuur) is normaal en mag geen fout zijn."""
+    gebieden = load_studiegebieden(_met_leeg_gebied(tmp_path / "b.gpkg"))
+
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        gebieden,
+        _config(),
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+
+    leeg = next(run for run in runs if run.naam == "Leeg")
+    assert leeg.run.analyseset is not None
+    assert not leeg.run.analyseset.kern
+    assert not leeg.run.findings
+
+
+def test_een_leeg_gebied_wordt_luid_gemeld(tmp_path: Path) -> None:
+    """Nul bevindingen op een leeg gebied leest anders als 'hier is alles in orde'."""
+    gebieden = load_studiegebieden(_met_leeg_gebied(tmp_path / "b.gpkg"))
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        gebieden,
+        _config(),
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+
+    uitvoer = schrijf_uitvoer_gebieden(runs, tmp_path / "uit", RUNDATUM)
+
+    assert uitvoer.synthese is not None
+    assert "geen enkel GWSW-object" in uitvoer.synthese.read_text(encoding="utf-8")
+    rapport = (tmp_path / "uit" / "leeg" / "bevindingen.md").read_text(encoding="utf-8")
+    assert "Geen objecten in dit gebied" in rapport
+
+
+def test_een_leeg_enkel_gebied_blijft_een_harde_fout(tmp_path: Path) -> None:
+    """Bij een run op een enkel gebied is een leeg gebied bijna altijd de verkeerde laag."""
+    bestand = schrijf_buurten(tmp_path / "een.gpkg", [("Leeg", box(5000, 5000, 5100, 5100))])
+
+    with pytest.raises(StudyAreaError, match="geen GWSW-objecten"):
+        toets_gebieden(
+            load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+            load_studiegebieden(bestand),
+            _config(),
+            meetbereik=Meetbereik.niet_gemeten(()),
+        )
+
+
+def test_overgeslagen_geometrieen_staan_in_het_rapport(tmp_path: Path) -> None:
+    """Ook bij een enkel gebied, waar er geen synthese is om het in te zetten."""
+    pad = tmp_path / "gemengd.geojson"
+    pad.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:28992"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {},
+                        "geometry": mapping(box(990, 1990, 1060, 2010)),
+                    },
+                    {"type": "Feature", "properties": {}, "geometry": mapping(Point(1000, 2000))},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    gebieden = load_studiegebieden(pad)
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        gebieden,
+        _config(),
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+
+    schrijf_uitvoer_gebieden(runs, tmp_path / "uit", RUNDATUM, overgeslagen=gebieden.overgeslagen)
+
+    rapport = (tmp_path / "uit" / "bevindingen.md").read_text(encoding="utf-8")
+    assert "Studiegebiedbestand" in rapport and "Point" in rapport

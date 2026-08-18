@@ -557,7 +557,7 @@ de gevaarlijkste variant, want hij geeft vertrouwen dat hij niet verdient).
 **Wat.** Bandit meldt elf punten op `src/`. Ze blijven alle elf staan, met deze
 onderbouwing; `pip-audit` is schoon.
 
-**B608, zeven keer: SQL uit een f-string.** In `studiegebied.py` en `uitvoer/gpkg.py`
+**B608, acht keer: SQL uit een f-string.** In `studiegebied.py` en `uitvoer/gpkg.py`
 worden tabel- en kolomnamen geinterpoleerd, want SQLite laat identifiers niet als
 parameter toe. Alle *waarden* gaan wel als parameter mee, en de identifiers gaan door
 `_escape()`, dat aanhalingstekens verdubbelt -- de manier die SQLite daarvoor kent. De
@@ -784,3 +784,35 @@ zolang er niet gemeten is.
 <naam>`), en `tests/test_integration.py::test_schaal_tachtig_buurten` logt de duur van een
 80-buurtenrun. Pas als die meting laat zien dat de checkfase de post is die telt, is deze
 optimalisatie de moeite en het risico waard.
+
+### BO-15 Een gebied zonder GWSW-objecten stopt een meervoudige run niet
+
+**Wat.** Bij een run over meerdere studiegebied-features levert een gebied zonder enkele
+put en zonder enkele streng een gewone uitvoer op met nul bevindingen, met een expliciete
+regel in zijn eigen rapport ("Geen objecten in dit gebied") en een vermelding in de
+totaalsynthese. Bij een run op een enkel gebied blijft het een harde fout, met dezelfde
+melding als voorheen. `CheckRun.beperk_tot_studiegebied` heeft daarvoor het keyword
+`leeg_toegestaan`; de toetsloop zet het alleen bij meerdere gebieden.
+
+**Waarom.** Een CBS-buurtenbestand van een plattelandsgemeente bevat betrouwbaar buurten
+zonder vrijvervalriolering: water, natuur, een bedrijventerrein op eigen beheer. De
+schaaltest op 80 gegenereerde buurten liep hier ook op vast. Een hele run van uren laten
+sneuvelen op de eerste zo'n buurt maakt de functie onbruikbaar voor precies het geval
+waarvoor hij gebouwd is. Bij een enkel gebied is een leeg gebied juist bijna altijd een
+verkeerd bestand of een verkeerde laagkeuze, en daar blijft de fout dus staan.
+
+**Waarom niet stil.** Nul bevindingen leest als "hier is alles in orde". Daarom staat het
+in het rapport van het gebied zelf en in de synthese, in de geest van de regel dat wat
+niet bekeken is in het rapport hoort.
+
+### BO-16 De mapnaam `totaal` is gereserveerd
+
+**Wat.** Een gebiedsnaam die na sanering `totaal` oplevert, is een harde fout bij het
+lezen van het gebiedsbestand.
+
+**Waarom.** `totaal/` is de submap met de synthese en de unieke meldingen. Een buurt die
+"Totaal" heet zou erin schrijven, waarna de synthesestap de CSV en de JSON van die buurt
+overschrijft en er een map achterblijft die er compleet uitziet. Dat is stille corruptie;
+de bestaande botsingscontrole tussen twee gebiedsnamen zag hem niet, want de tweede naam
+is geen gebied. De constante staat in `studiegebied.py` en de uitvoerlaag leest hem daar,
+zodat de reservering en het gebruik niet uit elkaar kunnen lopen.

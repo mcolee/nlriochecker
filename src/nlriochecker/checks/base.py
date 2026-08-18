@@ -222,7 +222,13 @@ class CheckRun:
             object.__setattr__(self, "_binnen", objecten_in_gebied(self.dataset, self.study_area))
         return self._binnen
 
-    def beperk_tot_studiegebied(self, area: StudyArea) -> CheckRun:
+    def beperk_tot_studiegebied(
+        self,
+        area: StudyArea,
+        binnen: frozenset[str] | None = None,
+        *,
+        leeg_toegestaan: bool = False,
+    ) -> CheckRun:
         """Geeft een run terug met alleen de bevindingen binnen het gebied.
 
         Met een studiegebied zijn de checks al op de kern plus de contextschil
@@ -232,9 +238,22 @@ class CheckRun:
         Checks die over de hele populatie gaan (`Check.volledig_bereik`, of hun
         ID in `config.studiegebied.volledige_dataset_checks`) zijn sowieso op de
         volledige export blijven draaien.
+
+        `binnen` mag de beller meegeven als hij de kern al kent. Dat is precies
+        `Analyseset.kern`: die is de verzameling objecten van de *volledige* export
+        die het gebied raken, de schil is er per constructie van losgetrokken, en de
+        uitgedunde dataset is kern plus schil. Opnieuw over alle geometrieen lopen
+        levert dus dezelfde verzameling, tegen de prijs van een volledige doorloop
+        per gebied.
+
+        `leeg_toegestaan` is voor de rapportage over meerdere gebieden: een buurt
+        zonder riolering (water, natuur, bedrijventerrein) is daar een normaal
+        gegeven en mag de andere gebieden niet meeslepen. Bij een run op een enkel
+        gebied blijft het een harde fout, want daar is het bijna altijd een verkeerd
+        bestand of een verkeerde laagkeuze.
         """
-        binnen = objecten_in_gebied(self.dataset, area)
-        if not binnen:
+        binnen = objecten_in_gebied(self.dataset, area) if binnen is None else binnen
+        if not binnen and not leeg_toegestaan:
             raise StudyAreaError(
                 f"studiegebied {area.name!r} ({area.area_ha:.1f} ha) bevat geen GWSW-objecten: "
                 f"geen enkele put en geen enkele streng valt erbinnen. Controleer de laagkeuze "

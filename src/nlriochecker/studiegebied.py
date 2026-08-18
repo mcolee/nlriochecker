@@ -49,6 +49,12 @@ KOLOM_NAAM = "naam_gebied"
 # dan zouden er vlakken meedoen die de gebruiker niet als gebied aanleverde.
 VLAKTYPEN = frozenset({"Polygon", "MultiPolygon"})
 
+# De submap waarin de synthese over alle gebieden komt te staan. Een gebied dat na
+# sanering zo heet zou erin schrijven en de synthese overschrijven; daarom is de naam
+# gereserveerd. De uitvoerlaag leest hem hier, zodat de reservering en het gebruik niet
+# uit elkaar kunnen lopen.
+MAP_TOTAAL = "totaal"
+
 # Meer namen dan dit in een foutmelding opsommen leest niet meer; dan het aantal
 # plus de dichtstbijzijnde suggesties.
 MAX_NAMEN_IN_MELDING = 10
@@ -136,6 +142,10 @@ class Studiegebieden:
     # De terugval-gebiedsaanduiding van het bestand als geheel (CBS-attributen of
     # laagnaam), voor `totaal` bij meerdere features.
     aanduiding: str = ""
+    # Of de gebiedsnamen uit de kolom `naam_gebied` komen. Zo niet, dan is de naam een
+    # terugval (CBS-aanduiding of laagnaam) en is selecteren erop misleidend: de
+    # gebruiker zou op een laagnaam matchen en denken dat hij een gebied koos.
+    namen_uit_kolom: bool = False
 
     @property
     def enkel(self) -> bool:
@@ -177,6 +187,12 @@ class Studiegebieden:
         """
         if not namen:
             return self
+        if not self.namen_uit_kolom:
+            raise StudyAreaError(
+                f"{self.source}: selecteren op gebied vereist een kolom {KOLOM_NAAM!r} in het "
+                f"studiegebiedbestand; die heeft dit bestand niet. Zonder die kolom is er maar "
+                f"een gebied en valt er niets te kiezen."
+            )
         aanwezig = {gebied.gebied: gebied for gebied in self.gebieden}
         onbekend = [naam for naam in namen if naam not in aanwezig]
         if onbekend:
@@ -185,7 +201,10 @@ class Studiegebieden:
                 f"{'komen' if len(onbekend) > 1 else 'komt'} niet in het bestand voor. "
                 f"{self._namenhulp(onbekend)}"
             )
-        gekozen = tuple(aanwezig[naam] for naam in dict.fromkeys(namen))
+        # In de volgorde van het bestand, niet die van de opdrachtregel: de synthese
+        # en de JSON noemen de gebieden dan in dezelfde volgorde als een volle run.
+        gevraagd = set(namen)
+        gekozen = tuple(gebied for gebied in self.gebieden if gebied.gebied in gevraagd)
         return Studiegebieden(
             gebieden=gekozen,
             source=self.source,
@@ -211,10 +230,19 @@ class Studiegebieden:
 
 
 @dataclass(frozen=True)
+class _Vlak:
+    """Een gelezen feature, met het rijnummer dat de gebruiker in zijn bestand ziet."""
+
+    rij: int
+    geometrie: BaseGeometry
+    attributen: dict[str, object]
+
+
+@dataclass(frozen=True)
 class _Ruw:
     """Wat een formaatlezer oplevert, voor de gedeelde validatie eroverheen."""
 
-    features: list[tuple[BaseGeometry, dict[str, object]]]
+    features: list[_Vlak]
     laag: str
     aanduiding: str
 
@@ -266,12 +294,12 @@ def _bouw_gebieden(path: Path, ruw: _Ruw) -> Studiegebieden:
 
     gebieden: tuple[StudyArea, ...]
     if len(vlakken) == 1:
-        geometrie, attributen = vlakken[0]
-        naam = _naamwaarde(attributen)
+        naam = _naamwaarde(vlakken[0].attributen)
+        uit_kolom = bool(naam)
         gebieden = (
             StudyArea(
                 name=_naam(path, ruw.laag),
-                geometry=geometrie,
+                geometry=vlakken[0].geometrie,
                 source=path,
                 feature_count=1,
                 gebied=naam or ruw.aanduiding or ruw.laag,
@@ -279,15 +307,16 @@ def _bouw_gebieden(path: Path, ruw: _Ruw) -> Studiegebieden:
         )
     else:
         namen = _gebiedsnamen(path, ruw.laag, vlakken)
+        uit_kolom = True
         gebieden = tuple(
             StudyArea(
                 name=naam,
-                geometry=geometrie,
+                geometry=vlak.geometrie,
                 source=path,
                 feature_count=1,
                 gebied=naam,
             )
-            for naam, (geometrie, _) in zip(namen, vlakken, strict=True)
+            for naam, vlak in zip(namen, vlakken, strict=True)
         )
 
     for melding in overgeslagen:
@@ -300,18 +329,15 @@ def _bouw_gebieden(path: Path, ruw: _Ruw) -> Studiegebieden:
         overgeslagen=overgeslagen,
         beschikbaar=tuple(gebied.gebied for gebied in gebieden),
         aanduiding=ruw.aanduiding,
+        namen_uit_kolom=uit_kolom,
     )
 
 
-def _gebiedsnamen(
-    path: Path, laag: str, vlakken: Sequence[tuple[BaseGeometry, dict[str, object]]]
-) -> list[str]:
+def _gebiedsnamen(path: Path, laag: str, vlakken: Sequence[_Vlak]) -> list[str]:
     """De gebiedsnamen van een bestand met meer dan een feature, streng getoetst."""
-    ontbreekt = [
-        index for index, (_, attributen) in enumerate(vlakken) if KOLOM_NAAM not in attributen
-    ]
+    ontbreekt = [vlak for vlak in vlakken if KOLOM_NAAM not in vlak.attributen]
     if ontbreekt:
-        kolommen = sorted({sleutel for _, attributen in vlakken for sleutel in attributen})
+        kolommen = sorted({sleutel for vlak in vlakken for sleutel in vlak.attributen})
         raise StudyAreaError(
             f"{path}: laag {laag!r} telt {len(vlakken)} vlakken en heeft daarom een "
             f"kolom {KOLOM_NAAM!r} nodig om ze uit elkaar te houden. Gevonden: "
@@ -319,11 +345,11 @@ def _gebiedsnamen(
         )
 
     namen: list[str] = []
-    for index, (_, attributen) in enumerate(vlakken, start=1):
-        naam = _naamwaarde(attributen)
+    for vlak in vlakken:
+        naam = _naamwaarde(vlak.attributen)
         if not naam:
             raise StudyAreaError(
-                f"{path}: laag {laag!r} heeft in rij {index} een lege {KOLOM_NAAM}. "
+                f"{path}: laag {laag!r} heeft in rij {vlak.rij} een lege {KOLOM_NAAM}. "
                 f"Elk gebied moet een naam hebben; die wordt de submap en de kolom Gebied."
             )
         namen.append(naam)
@@ -338,6 +364,11 @@ def _gebiedsnamen(
     per_mapnaam: dict[str, str] = {}
     for naam in namen:
         veilig = mapnaam(naam)
+        if veilig == MAP_TOTAAL:
+            raise StudyAreaError(
+                f"{path}: {naam!r} levert de mapnaam {MAP_TOTAAL!r} op, en die is voor de "
+                f"synthese over alle gebieden gereserveerd. Hernoem het gebied."
+            )
         eerder = per_mapnaam.get(veilig)
         if eerder is not None:
             raise StudyAreaError(
@@ -359,16 +390,16 @@ def _opsomming(namen: Sequence[str]) -> str:
     return ", ".join(repr(naam) for naam in namen)
 
 
-def _filter_vlakken(
-    features: list[tuple[BaseGeometry, dict[str, object]]],
-) -> tuple[list[tuple[BaseGeometry, dict[str, object]]], tuple[str, ...]]:
+def _filter_vlakken(features: list[_Vlak]) -> tuple[list[_Vlak], tuple[str, ...]]:
     """Houdt alleen de vlakken over en meldt wat er afvalt.
 
     Nooit stilzwijgend: een gebiedsbestand waarin per ongeluk de puntenlaag zit,
     moet dat zeggen in plaats van een half gebied te rapporteren.
     """
-    vlakken = [paar for paar in features if paar[0].geom_type in VLAKTYPEN]
-    overige = Counter(paar[0].geom_type for paar in features if paar[0].geom_type not in VLAKTYPEN)
+    vlakken = [vlak for vlak in features if vlak.geometrie.geom_type in VLAKTYPEN]
+    overige = Counter(
+        vlak.geometrie.geom_type for vlak in features if vlak.geometrie.geom_type not in VLAKTYPEN
+    )
     overgeslagen = tuple(
         f"{aantal} object(en) van het type {soort} overgeslagen: geen vlak"
         for soort, aantal in sorted(overige.items())
@@ -419,8 +450,8 @@ def _lees_geopackage(path: Path, laag: str | None) -> _Ruw:
         cursor = verbinding.execute(f'select * from "{_escape(laag)}"')
         kolommen = [beschrijving[0] for beschrijving in cursor.description]
         geometrie_index = kolommen.index(geometriekolom[0])
-        features: list[tuple[BaseGeometry, dict[str, object]]] = []
-        for rij in cursor.fetchall():
+        features: list[_Vlak] = []
+        for rijnummer, rij in enumerate(cursor.fetchall(), start=1):
             blob = rij[geometrie_index]
             if not blob:
                 continue
@@ -429,7 +460,7 @@ def _lees_geopackage(path: Path, laag: str | None) -> _Ruw:
                 for index, (naam, waarde) in enumerate(zip(kolommen, rij, strict=True))
                 if index != geometrie_index
             }
-            features.append((_ontleed_gpkg(blob), attributen))
+            features.append(_Vlak(rijnummer, _ontleed_gpkg(blob), attributen))
         aanduiding = _gebiedsaanduiding(verbinding, laag)
     except sqlite3.Error as error:
         raise StudyAreaError(f"{path}: kan niet gelezen worden ({error}).") from error
@@ -494,12 +525,18 @@ def _lees_geojson(path: Path, grenzen: RdGrenzen | None) -> _Ruw:
         raise StudyAreaError(f"{path}: geen leesbare GeoJSON ({error}).") from error
 
     features = inhoud.get("features") if inhoud.get("type") == "FeatureCollection" else [inhoud]
-    gelezen: list[tuple[BaseGeometry, dict[str, object]]] = []
-    for feature in features or []:
+    gelezen: list[_Vlak] = []
+    zonder_geometrie = 0
+    for rijnummer, feature in enumerate(features or [], start=1):
         geometrie = feature.get("geometry") if "geometry" in feature else feature
-        if geometrie:
-            eigenschappen = feature.get("properties") or {}
-            gelezen.append((shape(geometrie), dict(eigenschappen)))
+        if not geometrie:
+            # Een feature met `"geometry": null` is geldige GeoJSON en komt uit
+            # exports voor die alleen attributen dragen. Hij telt niet mee, maar
+            # verdwijnt ook niet stilzwijgend.
+            zonder_geometrie += 1
+            continue
+        eigenschappen = feature.get("properties") or {}
+        gelezen.append(_Vlak(rijnummer, shape(geometrie), dict(eigenschappen)))
 
     if not gelezen:
         raise StudyAreaError(f"{path}: bevat geen geometrieen.")
@@ -507,7 +544,10 @@ def _lees_geojson(path: Path, grenzen: RdGrenzen | None) -> _Ruw:
     if not _noemt_rd(inhoud) and grenzen is not None:
         _toets_rd_bereik(path, gelezen, grenzen)
 
-    return _Ruw(features=gelezen, laag=path.stem, aanduiding=path.stem)
+    ruw = _Ruw(features=gelezen, laag=path.stem, aanduiding=path.stem)
+    if zonder_geometrie:
+        logger.warning("%s: %d feature(s) zonder geometrie overgeslagen", path, zonder_geometrie)
+    return ruw
 
 
 def _noemt_rd(inhoud: dict[str, object]) -> bool:
@@ -520,11 +560,9 @@ def _noemt_rd(inhoud: dict[str, object]) -> bool:
     return str(RD_NEW) in str(naam)
 
 
-def _toets_rd_bereik(
-    path: Path, features: Sequence[tuple[BaseGeometry, dict[str, object]]], grenzen: RdGrenzen
-) -> None:
+def _toets_rd_bereik(path: Path, features: Sequence[_Vlak], grenzen: RdGrenzen) -> None:
     """Toetst of alle coordinaten binnen de RD-omhullende vallen."""
-    omhullende = unary_union([geometrie for geometrie, _ in features]).bounds
+    omhullende = unary_union([vlak.geometrie for vlak in features]).bounds
     x_min, y_min, x_max, y_max = omhullende
     binnen = (
         grenzen.x_min <= x_min

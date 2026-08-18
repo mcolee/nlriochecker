@@ -224,6 +224,10 @@ def _component(
 
     De weg zonder gedeelde index: bouwt de structuur en selecteert er meteen uit.
     `GedeeldeIndex.component` doet met dezelfde structuur alleen de selectie.
+
+    In `src/` roept niets deze functie meer aan -- `bouw_analyseset` gaat altijd via
+    de index. Hij staat er als referentie-implementatie voor de equivalentietest in
+    `tests/test_afbakening.py`, die de gehoiste route ertegen afzet.
     """
     return _selecteer_component(*_componentstructuur(dataset, config), kern)
 

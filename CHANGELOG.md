@@ -24,6 +24,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   mapnamen niet mogen botsen, en voor GeoJSON een toets op het coordinaatstelsel: een
   legacy `crs`-member met EPSG:28992, of alle coordinaten binnen de RD-grenzen uit
   `[drempels]`.
+- Een gebied zonder GWSW-objecten stopt een run over meerdere gebieden niet meer, maar
+  levert een eigen rapport met nul bevindingen en een expliciete melding -- in dat rapport
+  en in de synthese. Bij een run op een enkel gebied blijft het een harde fout.
 - De JSON-envelop kan `gebied` en `gebieden` dragen. Achterwaarts verenigbaar binnen
   schemaversie 1.0: een run zonder studiegebieden schrijft de velden niet.
 - `--cfk` op `analyseer`, `dekking`, `toets` en `vergelijk`: toetsen op een
@@ -59,8 +62,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   - `load_study_area` levert nog steeds een `StudyArea` (de unie van alle vlakken), maar
     valideert nu als hierboven. `load_studiegebieden` levert de gebieden per feature.
   - `bouw_analyseset` kreeg een keyword-only `gedeeld`, `run_checks` een keyword-only
-    `fase`, `CheckContext` het veld `gedeelde_volledige_context` en `schrijf_uitvoer` de
-    keywords `gebied` en `meldingen`. Alle vier additief.
+    `fase`, `CheckContext` het veld `gedeelde_volledige_context`, `schrijf_uitvoer` de
+    keywords `gebied`, `meldingen` en `notities`, `write_check_report` de parameter
+    `notities` en `beperk_tot_studiegebied` de parameters `binnen` en `leeg_toegestaan`.
+    Alle additief.
+  - `CheckContext.volledige_context()` draagt geen `analyseset` meer. Checks die op de
+    volledige export draaien (`volledige_dataset_checks`) noemen hun bereik daardoor
+    "deze dataset" in plaats van "het geanalyseerde deel"; dat laatste was onjuist, want
+    ze zien de hele export. Raakt alleen projecten die zelf checks aan die lijst
+    toevoegen; de standaard (ADM-002) noemt zijn bereik niet.
 - `toets` zonder `--shacl` schrijft een extra regel `**Geen nulmeting:** ...` in
   `bevindingen.md`. Wie rapporten van voor en na deze versie vergelijkt, ziet die regel
   als verschil.

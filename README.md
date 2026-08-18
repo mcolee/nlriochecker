@@ -92,6 +92,12 @@ een eigen kern, contextschil en uitgedunde dataset gebouwd. De meldingen van een
 zijn daardoor gelijk aan die van een losse run met alleen dat gebied; daar staat een
 test op.
 
+Een gebied zonder GWSW-objecten -- water, natuur, een bedrijventerrein op eigen beheer --
+stopt een meervoudige run niet: het krijgt een eigen rapport met nul bevindingen en een
+expliciete regel dat er niets te toetsen viel, en de synthese noemt het apart. Bij een run
+op een enkel gebied blijft dat een harde fout, want daar is het bijna altijd een verkeerd
+bestand of een verkeerde laag.
+
 Een object dat meerdere gebieden raakt telt in elk rakend gebied mee -- elk gebied ziet
 zijn eigen volledige werkelijkheid. Er wordt niet ontdubbeld. De totaalsynthese telt de
 unieke meldingen en zegt hoeveel er in meer dan een gebied voorkomen, zodat de som der
@@ -116,7 +122,8 @@ uitgepakt. Overgeslagen typen worden geteld en gemeld -- in het logboek en in de
 synthese. Blijft er geen enkel vlak over, dan faalt de run.
 
 Vanaf twee features is een kolom of property `naam_gebied` verplicht: aanwezig, per
-feature gevuld en uniek, en twee namen mogen niet dezelfde mapnaam opleveren. Bij een
+feature gevuld en uniek, en twee namen mogen niet dezelfde mapnaam opleveren. De mapnaam
+`totaal` is gereserveerd voor de synthese en dus als gebiedsnaam verboden. Bij een
 enkele feature verandert er niets ten opzichte van eerdere versies; een aanwezige
 `naam_gebied` wordt dan wel de gebiedsaanduiding, anders blijft de terugval op
 `statcode`/`statnaam` of de laagnaam gelden.

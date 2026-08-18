@@ -8,7 +8,7 @@ import struct
 from pathlib import Path
 
 import pytest
-from shapely.geometry import LineString, Point, Polygon, mapping
+from shapely.geometry import LineString, Point, Polygon, box, mapping
 
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.studiegebied import (
@@ -397,3 +397,72 @@ def test_selecteer_onbekende_naam_noemt_de_beschikbare(tmp_path: Path) -> None:
 
     with pytest.raises(StudyAreaError, match="Noord, Zuid"):
         load_studiegebieden(pad).selecteer(["Oost"])
+
+
+def test_gereserveerde_mapnaam_is_een_fout(tmp_path: Path) -> None:
+    """`totaal/` is van de synthese; een gebied dat zo heet zou die overschrijven."""
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Totaal", NOORD), ("Zuid", ZUID)])
+
+    with pytest.raises(StudyAreaError, match="gereserveerd"):
+        load_studiegebieden(pad)
+
+
+def test_selecteren_zonder_naamkolom_legt_uit_waarom_niet(tmp_path: Path) -> None:
+    """Anders zou --gebied op de laagnaam matchen en lijken te werken."""
+    pad = _maak_geopackage(tmp_path / "vlak.gpkg", VIERKANT)
+
+    with pytest.raises(StudyAreaError, match="naam_gebied"):
+        load_studiegebieden(pad).selecteer(["gebied"])
+
+
+def test_selectie_houdt_de_volgorde_van_het_bestand(tmp_path: Path) -> None:
+    """De synthese en de JSON noemen de gebieden dan zoals een volle run dat doet."""
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("Zuid", ZUID)])
+
+    keuze = load_studiegebieden(pad).selecteer(["Zuid", "Noord"])
+
+    assert [gebied.gebied for gebied in keuze.gebieden] == ["Noord", "Zuid"]
+
+
+def test_veel_gebieden_leveren_suggesties_in_plaats_van_een_lijst(tmp_path: Path) -> None:
+    """Twaalf namen opsommen leest niet; de dichtstbijzijnde treffer wel."""
+    vlakken = [
+        (f"Buurt {index:02d}", box(index * 10, 0, index * 10 + 5, 10)) for index in range(12)
+    ]
+    pad = _maak_buurten_gpkg(tmp_path / "veel.gpkg", vlakken)
+
+    with pytest.raises(StudyAreaError, match="Bedoelde je: Buurt 03"):
+        load_studiegebieden(pad).selecteer(["Buurt 3"])
+
+
+def test_rijnummer_telt_de_rijen_van_het_bestand(tmp_path: Path) -> None:
+    """Met overgeslagen geometrieen ertussen moet het rijnummer nog kloppen."""
+    pad = _schrijf_geojson(
+        tmp_path / "gemengd.geojson",
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "properties": {"naam_gebied": "A"}, "geometry": mapping(NOORD)},
+                {"type": "Feature", "properties": {}, "geometry": mapping(Point(10, 10))},
+                {"type": "Feature", "properties": {"naam_gebied": " "}, "geometry": mapping(ZUID)},
+            ],
+        },
+    )
+
+    with pytest.raises(StudyAreaError, match="rij 3"):
+        load_studiegebieden(pad)
+
+
+def test_feature_zonder_geometrie_wordt_overgeslagen(tmp_path: Path) -> None:
+    pad = _schrijf_geojson(
+        tmp_path / "leeg.geojson",
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "properties": {}, "geometry": None},
+                {"type": "Feature", "properties": {}, "geometry": mapping(VIERKANT)},
+            ],
+        },
+    )
+
+    assert load_studiegebieden(pad).enkel
