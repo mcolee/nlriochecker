@@ -13,6 +13,43 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **GWSW-conforme symbologie voor `putten` en `strengen`, met de kleur uitsluitend uit
+  `status`.** Het symbool zegt wat voor object het is -- de indeling komt uit de
+  PDOK-SLD's in `data/gwsw_opmaak/` -- en de kleur zegt hoe het ervoor staat:
+  `#b2182b` rood, `#e08214` oranje, `#4d9221` groen, `#9e9e9e` grijs. Rood is duidelijk
+  donkerder dan groen, dus ze blijven ook in grijstinten en bij deuteranopie uit elkaar
+  te houden. De richtingpijl van een streng is er nog een in plaats van twee: `tegen`
+  krijgt een enkele rode pijl die 180 graden gedraaid is en dus in de
+  BOB-vervalrichting wijst -- waar het water werkelijk heen loopt. De logica erachter
+  (`_richting_bob`) is ongewijzigd.
+
+  De SVG's waar de SLD's naar verwijzen staan op `data.gwsw.nl` en zijn niet
+  meegeleverd; elk symbool is daarom hertekend als eenvoudige QGIS-marker in de
+  GWSW-vorm, met in de tabel de SLD-regel die hij vervangt. Elk objecttype uit de
+  De Wolden-export en uit het Juinen-voorbeeld heeft een eigen regel met een eigen
+  legendalabel; wat niet in de tabel staat krijgt een expliciet vangnetsymbool
+  gelabeld "objecttype niet in de symbolentabel". De filters vergelijken
+  hoofdletterongevoelig, want de export schrijft `DwaPerceelaansluitleiding` waar de
+  SLD `DWAPerceelaansluitleiding` noemt.
+
+  De twee QML's worden opgebouwd uit een tabel in
+  `src/nlriochecker/uitvoer/stijlen/symbolen.py` in plaats van als bestand
+  meegeleverd: de regelstructuur objecttype x status levert 56 respectievelijk 68
+  bladregels op, en die met de hand in XML onderhouden zou de typenlijst op twee
+  plekken zetten. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven
+  onveranderde bestanden. Zie BO-30 (issue #14).
+
+- **Hoverpopups (QGIS Map Tips) op beide objectlagen.** De QML draagt een
+  `<mapTip enabled="1">` met een stijlblok, een vaste breedte van 300 px en één
+  expressie: `[% "popup_html" %]`. De inhoud komt uit de voorgebakken kolom van issue
+  #13, dus er is geen live join of relation nodig -- die zouden niet meereizen in
+  `layer_styles`. Het stijlblok staat een keer in de QML en niet in elke rij; per rij
+  herhaald zou het de GeoPackage tientallen megabytes groter maken. Geen webfont en
+  geen afbeelding-URL. `styleCategories` noemt `MapTips` expliciet, anders leest QGIS
+  het element niet terug uit `layer_styles` en blijft de popup leeg zonder foutmelding.
+  **Let op:** map tips verschijnen alleen als "Show Map Tips" in de QGIS-werkbalk
+  aanstaat (issue #15).
+
 - **De GeoPackage heeft nog twee objectlagen: `putten` en `strengen`.**
   `meldinglocaties` vervalt als featurelaag en `mechanisch_riool` gaat op in de
   lijnenlaag. Elk object draagt twee nieuwe kolommen: `status` met precies vier

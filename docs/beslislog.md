@@ -1558,3 +1558,62 @@ betekenden: het aantal rijen dat er werkelijk in staat. Doordat de lijnenlaag nu
 mechanisch riool en de contextschil bevat, zijn dat er meer dan voorheen; `n_mechanisch`
 telt hoeveel van die lijnen mechanisch zijn. Er komt geen kolom bij: wie het per status
 wil weten, telt `select status, count(*) from strengen group by status`.
+
+### BO-30 De symbologie wordt opgebouwd, en de SVG's van de SLD's blijven buiten beeld
+
+**Context.** Issue #14 vraagt GWSW-conforme symbolen waarvan alleen de kleur de
+analysestatus draagt, met regelstructuur objecttype x status. Issue #15 vraagt een maptip
+in dezelfde bestanden. De symbolen zouden uit de PDOK-SLD's in `data/gwsw_opmaak/` komen.
+
+**De SVG's zijn er niet.** Die SLD's verwijzen hun beeld als `ExternalGraphic` naar
+`https://data.gwsw.nl/img/*.svg`; de bestanden zelf zijn niet meegeleverd. Ophalen zou dit
+pakket van een netwerkbron afhankelijk maken en symbolen van een derde in onze uitvoer
+bakken, en een QML in `layer_styles` moet zelfstandig reizen. Het issue voorziet dit geval
+en schrijft de uitweg voor: hertekenen als eenvoudige marker in de GWSW-vorm. De SLD's
+blijven wel de bron voor de *indeling* -- welk type welk symbool krijgt en welke typen er
+een delen -- en elke regel in `stijlen/symbolen.py` noemt de SLD-regel die hij vervangt.
+
+**De QML's worden opgebouwd in plaats van geschreven.** Objecttype x status levert op de
+De Wolden-export 56 bladregels voor de putten en 68 voor de strengen op, elk met een eigen
+symbool: samen ruim vijftienhonderd regels XML. Met de hand onderhouden zou de typenlijst
+op twee plekken zetten, en een tikfout in een markernaam trekt de kaart stil leeg -- QGIS
+maakt van een onbekende vorm zonder morren een cirkel. De tabel plus een opbouwer staat in
+`src/nlriochecker/uitvoer/stijlen/symbolen.py`, dus de stijlen blijven waar het issue ze
+wil hebben. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven onveranderde
+bestanden.
+
+De waarborg is de PyQGIS-test: hij laadt de GeoPackage in een echte QGIS, past de
+default-stijl toe, en laat QGIS de markervorm van elk symbool terugcoderen om hem met de
+tabel te vergelijken. Dat vangt precies de fout die een blik op het scherm mist.
+
+**Kleur is van de status, en de legenda zegt wat groen betekent.** Het GWSW en de
+PDOK-SLD onderscheiden leidingsoorten met kleur; die is hier aan de status vergeven. Voor
+verbindingen blijft dus alleen lijndikte en streepjespatroon over, en daarmee zijn zestien
+typen niet uit elkaar te houden. Elk type houdt wel zijn eigen regel met zijn eigen
+legendalabel -- de legenda blijft volledig -- maar verwante typen delen een lijnstijl,
+zodat het kaartbeeld de families toont: vrijverval, mechanisch, aansluiting, drain, duiker,
+berging, loos. De legenda van groen zegt "geen eigen gebrek" en niet "in orde", want een
+object waarvan alle meldingen systemisch zijn is groen (BO-29).
+
+**Hoofdletterongevoelig filteren.** De De Wolden-export schrijft
+`DwaPerceelaansluitleiding` waar de PDOK-SLD `DWAPerceelaansluitleiding` noemt.
+Hoofdlettergevoelig filteren zou zulke objecten stil in het vangnet laten vallen, dus de
+filters vergelijken op `lower("objecttype")`.
+
+**De maptip is een expressie van een regel.** `[% "popup_html" %]`, met daaromheen een
+stijlblok en een `<div style="width:300px">`. De vaste breedte houdt het popupframe stil in
+plaats van bij elk object te herschalen. Het stijlblok staat in de QML en niet in de kolom:
+per rij herhaald zou het op De Wolden tientallen megabytes aan de GeoPackage toevoegen
+zonder dat er iets bij komt. Geen live joins of relations -- die reizen niet mee in
+`layer_styles` -- en geen webfont of afbeelding-URL.
+
+`styleCategories` moet `MapTips` expliciet noemen. Staat er alleen `Symbology`, dan leest
+QGIS het `mapTip`-element niet terug uit `layer_styles`, blijft de popup leeg, en meldt
+niets. Dat is met PyQGIS vastgesteld op deze uitvoer.
+
+**De handmatige QGIS-controle is vervangen door de PyQGIS-test.** Die laadt de stijl
+echt, controleert dat elke regel een symbool heeft, dat elke expressie naar een bestaande
+kolom verwijst, dat de markervormen zijn wat de tabel zegt, en dat de maptipexpressie op
+een echte feature HTML oplevert in plaats van een letterlijke `[% ... %]`. Dat toetst
+harder dan een blik op het scherm; wat het niet toetst is of het er goed uitziet, en dat
+blijft aan de gebruiker.

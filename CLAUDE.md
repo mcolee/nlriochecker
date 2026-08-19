@@ -208,6 +208,13 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
+- De stijlen van `putten` en `strengen` worden opgebouwd uit de tabel in
+  `uitvoer/stijlen/symbolen.py` (regelstructuur objecttype x status, ruim honderd
+  bladregels); `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven bestanden. Het
+  symbool volgt het GWSW-objecttype, de kleur uitsluitend de kolom `status`. De maptip
+  is een expressie van een regel op `popup_html`; het stijlblok staat in de QML en niet
+  in elke rij. `styleCategories` moet `MapTips` noemen, anders leest QGIS het element
+  niet terug. Zie BO-30.
 - De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
   over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
   `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.

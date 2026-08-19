@@ -194,6 +194,30 @@ en niet minder. Kruisingen mét geregistreerde zinker of duiker (EXT-002) blijve
 buiten, en bij rapportage per gebied bevat elk gebied alleen zijn eigen treffers. De
 lagen bestaan altijd, ook leeg.
 
+#### Wat je in QGIS ziet
+
+De GeoPackage brengt haar eigen opmaak mee (tabel `layer_styles`), dus openen volstaat.
+Het symbool zegt wat voor GWSW-object het is -- de indeling komt uit de PDOK-SLD's -- en
+de kleur zegt uitsluitend hoe het ervoor staat: rood bij een fout, oranje bij alleen
+waarschuwingen, groen als er geen eigen gebrek is, grijs als er niet beoordeeld is. Rood
+is duidelijk donkerder dan groen, zodat de twee ook in grijstinten en bij kleurenblindheid
+uit elkaar te houden zijn. Een objecttype dat de symbolentabel niet kent krijgt een
+vangnetsymbool met het legendalabel "objecttype niet in de symbolentabel"; er is geen
+stille default.
+
+Een streng draagt daarbovenop een richtingpijl: groen als het BOB-verval met de getekende
+lijn meeloopt, **rood en omgekeerd** als het daar tegenin loopt -- de pijl wijst dan waar
+het water werkelijk heen loopt -- en grijs als de richting niet te bepalen is.
+
+Hoveren over een object toont een popup met het label, het GWSW-type, de status en tot
+vijf meldingen, elk met ernst-symbool, check-ID, boodschap en herkomst (`nulmeting ·
+MdsPlan` of `eigen check`). Bij een streng staan ook het stelsel, de lengte en de
+BOB-richtingsregel erin; bij een grijs object waarom het niet beoordeeld is.
+
+> **Zet "Show Map Tips" aan.** QGIS toont map tips alleen als die knop in de werkbalk
+> ingedrukt is (View → Show Map Tips, of het icoon met de gele tooltip). Staat hij uit,
+> dan gebeurt er bij hoveren niets -- en dat leest als kapot terwijl het een instelling is.
+
 Alle vier de uitvoervormen komen uit dezelfde meldingenstroom, dus ze kunnen niet uit
 elkaar lopen. Elk geschreven bestand noemt waarmee het gemaakt is: de Markdown-rapporten
 in een regel onder de titel, de CSV's in de kolom `Gereedschap`, de GeoPackage in het
