@@ -1112,7 +1112,19 @@ FIXTURES["ext_scenario.ttl"] = (
         "gwsw:GemengdRiool", "gwsw:Duiker"
     )
     # Streng 4 verbindt de lozingsputten met het net.
-    + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35)),
+    + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35))
+    + "\n"
+    # Put P, put Q en streng "4" liggen binnen het BGT-pand; EXT-001 moet ze als
+    # "binnen" melden, in tegenstelling tot streng "1" die de gevel kruist. Ze
+    # krijgen geen maaiveldhoogte, BOB of inwinning, zodat ze de HGT- en BTR-tests
+    # niet raken -- vandaar `put`/`leiding` en niet `hoogteput`/`hoogteleiding`.
+    + '# Put P, put Q en streng "4" liggen binnen het BGT-pand (1020, 1998)-(1030, 2002);\n'
+    + '# EXT-001 moet ze als "binnen" melden, in tegenstelling tot streng "1" die de gevel\n'
+    + "# kruist. Ze krijgen geen maaiveldhoogte, BOB of inwinning, zodat ze de HGT- en\n"
+    + "# BTR-tests niet raken.\n"
+    + put("PutP", "P", 1022.0, 2000.0)
+    + put("PutQ", "Q", 1028.0, 2000.0)
+    + leiding("L5", "4", [(1022.0, 2000.0), (1028.0, 2000.0)], "PutP", "PutQ"),
 )
 
 
@@ -1199,11 +1211,20 @@ FIXTURES["geometriefout.ttl"] = (
 )
 
 
+def render(defect: str, inhoud: str) -> str:
+    """De volledige tekst van een fixture: de prelude, de DEFECT-regel en de inhoud.
+
+    Staat apart van `main` zodat `tests/test_ttl_fixtures.py` dezelfde regel gebruikt
+    om te bewaken dat de bestanden op schijf nog bij dit script passen. Zou de test
+    de opmaak overschrijven, dan bewaakte hij zijn eigen kopie.
+    """
+    return f"{PRELUDE}\n# DEFECT: {defect}\n\n{inhoud}"
+
+
 def main() -> None:
     DOEL.mkdir(parents=True, exist_ok=True)
     for naam, (defect, inhoud) in FIXTURES.items():
-        tekst = f"{PRELUDE}\n# DEFECT: {defect}\n\n{inhoud}"
-        (DOEL / naam).write_text(tekst, encoding="utf-8")
+        (DOEL / naam).write_text(render(defect, inhoud), encoding="utf-8")
         print(naam)
 
 
