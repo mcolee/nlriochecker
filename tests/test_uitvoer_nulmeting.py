@@ -129,13 +129,32 @@ def test_het_rapport_noemt_de_nulmeting_en_wat_er_niet_op_de_kaart_kwam(tmp_path
     assert "2 overtredingen kwamen nergens op uit" in tekst
 
 
-def test_zonder_nulmeting_verandert_het_rapport_niet(tmp_path: Path) -> None:
-    """Een run zonder `--shacl` schrijft geen nulmetingblok."""
-    run = replace(_run(), nulbevindingen=())
+def test_zonder_nulmeting_schrijft_het_rapport_geen_nulmetingblok(tmp_path: Path) -> None:
+    """Een run zonder `--shacl` is niet gemeten, en zegt dan ook niets over de meting."""
+    run = replace(
+        _run(),
+        nulbevindingen=(),
+        meetbereik=Meetbereik.niet_gemeten(CFKS),
+        typing_gate_applied=False,
+    )
 
     uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)
     tekst = uitvoer.markdown.read_text(encoding="utf-8")
     tabel = pd.read_csv(tmp_path / FILE_CHECKS_CSV, sep=";", keep_default_na=False)
 
-    assert "uit de GWSW-nulmeting" not in tekst
+    assert "**GWSW-nulmeting**" not in tekst
+    assert "SHACL-nulmeting" not in tekst
     assert list(tabel["Bron"]) == [] or set(tabel["Bron"]) == {"register"}
+
+
+def test_een_gemeten_run_zonder_overtredingen_zegt_dat_met_zoveel_woorden(
+    tmp_path: Path,
+) -> None:
+    """Nul overtredingen is een uitslag; hem verzwijgen leest als 'niet gemeten'."""
+    run = replace(_run(), nulbevindingen=())
+
+    uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)
+    tekst = uitvoer.markdown.read_text(encoding="utf-8")
+
+    assert "**GWSW-nulmeting**" in tekst
+    assert "0 overtredingen uit de SHACL-nulmeting" in tekst

@@ -96,7 +96,7 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
         systemisch = _is_systemisch(outcome, config)
         sleutels = _id_sleutels(outcome.check_id)
         for finding in outcome.findings:
-            kenmerk = _uniek_id(finding, sleutels, gebruikte_ids)
+            kenmerk = _uniek_id_van_finding(finding, sleutels, gebruikte_ids)
             gebruikte_ids.add(kenmerk)
             meldingen.append(
                 Melding(
@@ -153,20 +153,16 @@ def _nulmeldingen(
     studiegebied toe te wijzen. Hem het gebied van de run geven zou beweren dat hij
     daarbinnen ligt, en dat is niet gemeten.
     """
+    from nlriochecker.uitvoer.locatie import objectlocatie
+
     meldingen = []
     for bevinding in run.nulbevindingen:
         kenmerk = _uniek_id(
-            Finding(
-                check_id=bevinding.check_id,
-                severity=Severity(bevinding.ernst),
-                dimension=DIMENSIE_NULMETING,
-                object_uri=bevinding.object_uri,
-                object_label=bevinding.object_label,
-                message=bevinding.boodschap,
-                typing_reliable=True,
-                details={"focusnode": bevinding.focus_node, "boodschap": bevinding.boodschap},
-            ),
-            ("focusnode", "boodschap"),
+            bevinding.check_id,
+            bevinding.object_uri,
+            "",
+            {"focusnode": bevinding.focus_node, "boodschap": bevinding.boodschap},
+            bevinding.focus_node,
             gebruikte_ids,
         )
         gebruikte_ids.add(kenmerk)
@@ -193,7 +189,11 @@ def _nulmeldingen(
                 gebied=gebied if bevinding.herleid else "",
                 prioriteit=_nulprioriteit(run, bevinding, kritiek),
                 systemisch=bevinding.systemisch,
-                foutlocatie=_nullocatie(run, bevinding),
+                # Een bevinding die nergens op uitkwam heeft geen object en dus geen
+                # plek op de kaart.
+                foutlocatie=(
+                    objectlocatie(run.dataset, bevinding.object_uri) if bevinding.herleid else None
+                ),
                 run_datum=run_datum.isoformat(),
                 dataset=run.dataset.source.name,
                 cfk=bevinding.cfk,
@@ -211,26 +211,6 @@ def _nulprioriteit(run: CheckRun, bevinding: Nulbevinding, kritiek: set[str]) ->
     return 2
 
 
-def _nullocatie(run: CheckRun, bevinding: Nulbevinding) -> Point | None:
-    """De plek van een nulmetingmelding: die van het object waar hij op uitkwam."""
-    from nlriochecker.uitvoer.locatie import foutlocatie
-
-    if not bevinding.herleid:
-        return None
-    return foutlocatie(
-        Finding(
-            check_id=bevinding.check_id,
-            severity=Severity(bevinding.ernst),
-            dimension=DIMENSIE_NULMETING,
-            object_uri=bevinding.object_uri,
-            object_label=bevinding.object_label,
-            message=bevinding.boodschap,
-            typing_reliable=True,
-        ),
-        run.dataset,
-    )
-
-
 def categorie_van(check_id: str) -> str:
     """De categorie van een check-ID: TOP-011 wordt TOP."""
     return check_id.split("-", 1)[0]
@@ -242,24 +222,38 @@ def _id_sleutels(check_id: str) -> tuple[str, ...]:
     return check.id_sleutels if check is not None else ()
 
 
-def _uniek_id(finding: Finding, sleutels: tuple[str, ...], gebruikt: set[str]) -> str:
-    """De melding-ID, met een volgnummer als vangnet bij een botsing.
-
-    Botst er iets, dan ontbreekt er een identificerende sleutel bij die check. Dat
-    hoort op te vallen: zwijgend twee meldingen tot een laten versmelten kost een
-    gebrek.
-    """
+def _uniek_id_van_finding(finding: Finding, sleutels: tuple[str, ...], gebruikt: set[str]) -> str:
+    """De melding-ID van een checkbevinding, met haar eigen onderscheidende sleutels."""
     onderscheid = {
         sleutel: _tekst(finding.details.get(sleutel))
         for sleutel in sleutels
         if sleutel in finding.details
     }
-    kenmerk = melding_id(
+    return _uniek_id(
         finding.check_id,
         finding.object_uri,
         _tekst(finding.details.get(SLEUTEL_OBJECT2_URI)),
         onderscheid,
+        finding.object_label or finding.object_uri,
+        gebruikt,
     )
+
+
+def _uniek_id(
+    check_id: str,
+    object_uri: str,
+    object2_uri: str,
+    onderscheid: dict[str, str],
+    aanduiding: str,
+    gebruikt: set[str],
+) -> str:
+    """De melding-ID, met een volgnummer als vangnet bij een botsing.
+
+    Botst er iets, dan ontbreekt er een onderscheidende sleutel: bij een eigen check
+    de `id_sleutels`, bij de nulmeting de focusnode en de boodschap. Dat hoort op te
+    vallen: zwijgend twee meldingen tot een laten versmelten kost een gebrek.
+    """
+    kenmerk = melding_id(check_id, object_uri, object2_uri, onderscheid)
     if kenmerk not in gebruikt:
         return kenmerk
 
@@ -267,10 +261,12 @@ def _uniek_id(finding: Finding, sleutels: tuple[str, ...], gebruikt: set[str]) -
     while f"{kenmerk}-{volgnummer}" in gebruikt:
         volgnummer += 1
     logger.warning(
-        "%s levert twee meldingen met dezelfde ID op object %s; vul id_sleutels aan. "
-        "De tweede krijgt volgnummer %d, wat tussen runs kan verschuiven.",
-        finding.check_id,
-        finding.object_label or finding.object_uri,
+        "%s levert twee meldingen met dezelfde ID op %s; de onderscheidende sleutels "
+        "(%s) volstaan daar niet. De tweede krijgt volgnummer %d, wat tussen runs kan "
+        "verschuiven.",
+        check_id,
+        aanduiding,
+        ", ".join(sorted(onderscheid)) or "geen",
         volgnummer,
     )
     return f"{kenmerk}-{volgnummer}"

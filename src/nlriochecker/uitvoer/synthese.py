@@ -21,7 +21,7 @@ from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.selectie import vrijvervalrioolleidingen
 from nlriochecker.taal import getal, vorm
-from nlriochecker.uitvoer.melding import Melding
+from nlriochecker.uitvoer.melding import BRON_REGISTER, Melding
 from nlriochecker.uitvoer.tabel import table
 
 ERNST_FOUT = Severity.ERROR.value
@@ -120,11 +120,27 @@ def _bodemverloop(run: CheckRun, config: CheckConfig) -> tuple[int, int]:
 
 
 def _multi_melding(meldingen: list[Melding], config: CheckConfig) -> list[str]:
-    """Benoemt objecten waar meerdere checks op struikelen als een vermoedelijke fout."""
+    """Benoemt objecten waar meerdere checks op struikelen als een vermoedelijke fout.
+
+    Alleen meldingen uit het checkregister tellen mee. De redenering -- "meerdere
+    onafhankelijke checks over hetzelfde object wijzen op een enkele verdachte
+    waarde" -- gaat niet op voor de nulmeting: haar vormen zijn niet onafhankelijk
+    maar per kenmerk gesplitst, dus `Put_HoogtePut_card`,
+    `Rioolput_Maaiveldschematisering_card` en `Rioolput_BergendOppervlak_card` slaan
+    per constructie samen aan. Op De Wolden dragen 23.296 van de 32.389 focusnodes
+    drie of meer verschillende vormen; die alle als "verdacht object" aanwijzen maakt
+    van deze sectie ruis en geeft advies dat nergens toe leidt.
+
+    Meldingen zonder object doen ook niet mee: die zouden anders samen in een
+    naamloze emmer belanden en als een verdacht object gepresenteerd worden, met het
+    label van de laatste die erin viel.
+    """
     drempel = config.rapport.multi_melding_checks
     per_object: dict[str, set[str]] = defaultdict(set)
     labels: dict[str, str] = {}
     for melding in meldingen:
+        if melding.bron != BRON_REGISTER or not melding.object_uri:
+            continue
         per_object[melding.object_uri].add(melding.check_id)
         labels[melding.object_uri] = melding.object_label or melding.object_uri
 

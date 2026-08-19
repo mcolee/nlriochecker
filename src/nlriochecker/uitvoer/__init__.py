@@ -166,7 +166,7 @@ def schrijf_uitvoer_gebieden(
             GebiedsSamenvatting(
                 naam=gebiedsrun.naam,
                 oppervlak_ha=gebiedsrun.gebied.area_ha if gebiedsrun.gebied is not None else 0.0,
-                weggelaten=sum(outcome.weggelaten for outcome in gebiedsrun.run.outcomes),
+                weggelaten=gebiedsrun.run.weggelaten,
                 kern_objecten=len(analyseset.kern) if analyseset is not None else 0,
                 meldingen=meldingen,
             )

@@ -833,7 +833,6 @@ MELDING_KOLOMMEN = [
     _Kolom("label", "text"),
     _Kolom("check_id", "text"),
     _Kolom("bron", "text"),
-    _Kolom("cfk", "text"),
     _Kolom("ernst", "text"),
     _Kolom("categorie", "text"),
     _Kolom("dimensie", "text"),
@@ -859,6 +858,9 @@ MELDING_KOLOMMEN = [
     # te zetten is.
     _Kolom("x", "real"),
     _Kolom("y", "real"),
+    # Achteraan, net als de kolom `CFK` in de CSV: bestaande kolommen houden hun
+    # plaats, zodat een lezer die op positie werkt niet omvalt.
+    _Kolom("cfk", "text"),
 ]
 
 
@@ -895,7 +897,6 @@ def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
         melding.object_label,
         melding.check_id,
         melding.bron,
-        ", ".join(melding.cfk),
         melding.ernst,
         melding.categorie,
         melding.dimensie,
@@ -916,6 +917,7 @@ def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
         stapel[1],
         melding.foutlocatie.x if melding.foutlocatie is not None else None,
         melding.foutlocatie.y if melding.foutlocatie is not None else None,
+        ", ".join(melding.cfk),
     )
 
 
@@ -1057,8 +1059,12 @@ def _schrijf_runmetadata(
             f"{fallback.encoding} ({fallback.byte_count} bytes)" if fallback else "",
             len(meldingen),
             sum(1 for melding in meldingen if melding.foutlocatie is None),
-            run.count(Severity.ERROR),
-            run.count(Severity.WARNING),
+            # Uit de meldingenstroom en niet uit `run.count`: die telt alleen de
+            # bevindingen van de eigen checks, terwijl `meldingen_totaal` erboven de
+            # nulmeting meetelt. Bleven ze uit elkaar lopen, dan zou een lezer van
+            # deze tabel een onverklaard verschil van tienduizenden zien.
+            sum(1 for melding in meldingen if melding.ernst == Severity.ERROR.value),
+            sum(1 for melding in meldingen if melding.ernst == Severity.WARNING.value),
             gebied.source.name if gebied is not None else "",
             gebied.name if gebied is not None else "",
             round(gebied.area_ha, 2) if gebied is not None else None,

@@ -157,3 +157,72 @@ def test_richtingspercentage_zegt_erbij_dat_het_datasetbreed_is() -> None:
 
 def test_zonder_studiegebied_komt_die_kanttekening_niet(tmp_path: Path) -> None:
     assert "over de volledige dataset geteld" not in _tekst("net003_tegen_de_richting.ttl")
+
+
+class TestRodeDraadEnDeNulmeting:
+    """De rode draad redeneert over eigen checks, niet over SHACL-vormen."""
+
+    def test_nulmetingmeldingen_maken_geen_verdacht_object(self) -> None:
+        """Drie SHACL-vormen op een put zijn geen drie onafhankelijke checks.
+
+        Op De Wolden dragen 23.296 focusnodes drie of meer vormen; zouden die
+        meetellen, dan wijst deze sectie vrijwel elke put aan als verdacht.
+        """
+        from nlriochecker.uitvoer.melding import BRON_NULMETING
+        from nlriochecker.uitvoer.synthese import _multi_melding
+
+        meldingen = [
+            _nulmelding(f"NULMETING-Vorm_{n}_card", "http://example.org/toets#PutA", BRON_NULMETING)
+            for n in range(1, 6)
+        ]
+
+        assert _multi_melding(meldingen, load_check_config()) == []
+
+    def test_meldingen_zonder_object_belanden_niet_in_een_naamloze_emmer(self) -> None:
+        """Anders staan ze samen als een verdacht object in het rapport."""
+        from nlriochecker.uitvoer.synthese import _multi_melding
+
+        meldingen = [_nulmelding(f"TOP-{n:03d}", "") for n in range(1, 6)]
+
+        assert _multi_melding(meldingen, load_check_config()) == []
+
+    def test_eigen_checks_op_hetzelfde_object_blijven_wel_opvallen(self) -> None:
+        from nlriochecker.uitvoer.synthese import _multi_melding
+
+        meldingen = [
+            _nulmelding(f"TOP-{n:03d}", "http://example.org/toets#PutA") for n in range(1, 6)
+        ]
+
+        regels = _multi_melding(meldingen, load_check_config())
+
+        assert regels and "verschillende checks" in regels[0]
+
+
+def _nulmelding(check_id: str, object_uri: str, bron: str = "register") -> Melding:
+    """Een melding met alleen de velden die de rode draad leest."""
+    return Melding(
+        melding_id=check_id + object_uri,
+        check_id=check_id,
+        categorie=check_id.split("-", 1)[0],
+        bron=bron,
+        ernst="F",
+        dimensie="Consistentie",
+        object_uri=object_uri,
+        object_id="PutA",
+        object_label="A",
+        object2_uri="",
+        object2_id="",
+        object2_label="",
+        boodschap="iets",
+        waarde="",
+        drempel="",
+        typering_betrouwbaar=True,
+        cluster_id="",
+        scope="geen_studiegebied",
+        gebied="",
+        prioriteit=2,
+        systemisch=False,
+        foutlocatie=None,
+        run_datum="2026-08-19",
+        dataset="toets.ttl",
+    )

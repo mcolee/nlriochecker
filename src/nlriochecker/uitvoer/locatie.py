@@ -31,11 +31,20 @@ def foutlocatie(finding: Finding, dataset: GwswDataset) -> Point | None:
     if finding.location is not None:
         return _punt(finding.location)
 
-    node = dataset.nodes.get(finding.object_uri)
+    return objectlocatie(dataset, finding.object_uri)
+
+
+def objectlocatie(dataset: GwswDataset, uri: str) -> Point | None:
+    """De plek van een object zelf: zijn punt, of het midden van zijn lijn.
+
+    Los van `Finding`, want de overtredingen uit de SHACL-nulmeting hebben er geen
+    en hoeven er ook geen te verzinnen om op de kaart te komen.
+    """
+    node = dataset.nodes.get(uri)
     if node is not None and node.point is not None:
         return node.point
 
-    conduit = dataset.conduits.get(finding.object_uri)
+    conduit = dataset.conduits.get(uri)
     if conduit is not None and conduit.line is not None and not conduit.line.is_empty:
         return _middelpunt(conduit.line)
 

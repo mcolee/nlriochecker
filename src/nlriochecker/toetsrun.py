@@ -27,7 +27,7 @@ from pathlib import Path
 from nlriochecker.analysis import analyze
 from nlriochecker.cache import CacheUitslag, laad_met_cache
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import REGISTRY, Severity
+from nlriochecker.checks import REGISTRY, CheckRun, Severity
 from nlriochecker.dataset import GwswDataset, markeer_vulwaarden
 from nlriochecker.errors import OpdrachtError
 from nlriochecker.externedata import Dekkingseis, ExternalData, load_external_data
@@ -334,11 +334,12 @@ def _gebied_kort(gebiedsrun: GebiedsRun) -> str:
     """Vat een gebiedsrun samen in een regel; het detail staat in de synthese."""
     run = gebiedsrun.run
     kern = len(run.analyseset.kern) if run.analyseset is not None else 0
-    weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
+    weggelaten = run.weggelaten
     leeg = " -- geen objecten in dit gebied, niets getoetst" if not kern else ""
     return (
         f"  Gebied {gebiedsrun.naam}: {getal(kern, 'object', 'objecten')} in de kern, "
-        f"{run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen, "
+        f"{run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen "
+        f"uit de eigen checks{_nulmetingtelling(run)}, "
         f"{weggelaten} buiten het gebied weggelaten{leeg}."
     )
 
@@ -349,7 +350,7 @@ def _gebied_uitgebreid(gebiedsrun: GebiedsRun, config: CheckConfig) -> list[str]
     regels = []
     if run.study_area is not None:
         gebied = run.study_area
-        weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
+        weggelaten = run.weggelaten
         regels.append(
             f"  Studiegebied {gebied.name} ({gebied.area_ha:.1f} ha): "
             f"{getal(weggelaten, 'bevinding', 'bevindingen')} buiten het gebied weggelaten."
@@ -377,6 +378,23 @@ def _gebied_uitgebreid(gebiedsrun: GebiedsRun, config: CheckConfig) -> list[str]
             f"{aantal:5d} {vorm(aantal, 'bevinding', 'bevindingen')}{voorbehoud}"
         )
     regels.append(
-        f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen"
+        f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} "
+        f"waarschuwingen uit de eigen checks{_nulmetingtelling(run)}"
     )
     return regels
+
+
+def _nulmetingtelling(run: CheckRun) -> str:
+    """De overtredingen uit de nulmeting, als er gemeten is.
+
+    De tellingen van de checks en die van de nulmeting staan apart. Ze optellen zou
+    twee ongelijksoortige dingen op een hoop gooien, en ze verzwijgen zou een regel
+    "120 fouten" opleveren naast een CSV met er tienduizenden.
+    """
+    if not run.nulbevindingen:
+        return ""
+    fouten = sum(1 for bevinding in run.nulbevindingen if bevinding.ernst == Severity.ERROR.value)
+    return (
+        f"; {len(run.nulbevindingen)} overtredingen uit de nulmeting "
+        f"({fouten} fouten, {len(run.nulbevindingen) - fouten} waarschuwingen)"
+    )

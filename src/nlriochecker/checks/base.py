@@ -222,6 +222,11 @@ class CheckRun:
     # meldingen van naast die van de checks, zodat de vier uitvoervormen ook hiervoor
     # uit een stroom komen. Zie `nulbevinding.py` en BO-28.
     nulbevindingen: tuple[Nulbevinding, ...] = ()
+    # Hoeveel nulmetingbevindingen de afbakening tot het studiegebied weggelaten
+    # heeft. Het tegenhangertje van `CheckOutcome.weggelaten`, en om dezelfde reden:
+    # een rapport dat wel afbakent maar niet zegt hoeveel er buiten viel, leest als
+    # "dit is alles".
+    nulbevindingen_weggelaten: int = 0
     # Het trefferregister van de context waarop deze run gedraaid heeft; de
     # GeoPackage-schrijver joint de meldingen erop om de lagen met externe objecten te
     # vullen. Zie `checks/treffers.py`.
@@ -234,8 +239,24 @@ class CheckRun:
         return [finding for outcome in self.outcomes for finding in outcome.findings]
 
     def count(self, severity: Severity) -> int:
-        """Het aantal bevindingen van een ernstniveau."""
+        """Het aantal bevindingen van een ernstniveau.
+
+        Alleen de bevindingen van de eigen checks; de overtredingen uit de nulmeting
+        staan in `nulbevindingen` en worden pas in `bouw_meldingen` meldingen. Wie
+        het totaal wil, telt over de meldingenstroom.
+        """
         return sum(1 for finding in self.findings if finding.severity is severity)
+
+    @property
+    def weggelaten(self) -> int:
+        """Alles wat de afbakening tot het studiegebied heeft weggelaten.
+
+        De bevindingen van de checks plus de overtredingen uit de nulmeting. Een
+        rapport dat afbakent maar niet zegt hoeveel er buiten viel, leest als "dit is
+        alles"; deze eigenschap is de ene plek waar dat getal vandaan komt, zodat de
+        opdrachtregel, het rapport en de synthese er niet drie kunnen noemen.
+        """
+        return sum(outcome.weggelaten for outcome in self.outcomes) + self.nulbevindingen_weggelaten
 
     def objecten_binnen(self) -> frozenset[str] | None:
         """De objecten binnen het studiegebied, of None als er geen gebied is.
@@ -314,14 +335,14 @@ class CheckRun:
         # `replace` in plaats van elk veld opsommen: die opsomming vergat bij elke
         # uitbreiding een veld, en dan valt het stil weg op precies de runs met een
         # studiegebied.
+        nulbevindingen = tuple(
+            bevinding for bevinding in self.nulbevindingen if _nul_hoort_erbij(bevinding, binnen)
+        )
         return replace(
             self,
             outcomes=outcomes,
-            nulbevindingen=tuple(
-                bevinding
-                for bevinding in self.nulbevindingen
-                if _nul_hoort_erbij(bevinding, binnen)
-            ),
+            nulbevindingen=nulbevindingen,
+            nulbevindingen_weggelaten=len(self.nulbevindingen) - len(nulbevindingen),
             study_area=area,
             _binnen=binnen,
         )

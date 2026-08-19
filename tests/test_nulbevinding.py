@@ -175,3 +175,18 @@ def test_een_leidingeinde_herleidt_naar_zijn_streng_en_niet_naar_de_put(
     bevinding = _een(bevindingen, "BeginpuntLeiding_Knooppunt_card", "L1_b")
 
     assert bevinding.object_uri in joinset.conduits
+
+
+def test_hasconnection_wordt_in_beide_schrijfrichtingen_gelezen(
+    bevindingen: list[Nulbevinding], joinset: GwswDataset
+) -> None:
+    """`hasConnection` is symmetrisch en zonder inverse.
+
+    Welke van de twee objecten subject is, is een keuze van de exporteur. Alleen de
+    ene richting lezen zou op een andere export stil meldingen van de kaart laten
+    vallen.
+    """
+    bevinding = _een(bevindingen, "Maaiveldorientatie_Putorientatie_card", "PutD_ori_maa")
+
+    assert bevinding.object_uri in joinset.nodes
+    assert bevinding.object_label == "D"

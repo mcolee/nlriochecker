@@ -69,3 +69,14 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :L1_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.5 ] .
 :L1_b gwsw:hasConnection :PutA_ori .
 :L1_e gwsw:hasConnection :PutC_ori .
+
+# PutD draagt haar maaiveldorientatie in de andere schrijfrichting: hasConnection is
+# een symmetrische eigenschap zonder inverse, dus welke van de twee subject is, is een
+# keuze van de exporteur.
+:PutD rdf:type gwsw:Inspectieput ; rdfs:label "D" ;
+    gwsw:hasAspect :PutD_ori .
+:PutD_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1200.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:PutD_ori_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasConnection :PutD_ori .

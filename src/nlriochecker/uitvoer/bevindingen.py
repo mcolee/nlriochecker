@@ -222,7 +222,7 @@ def _render_checks(
 
     if run.study_area is not None:
         gebied = run.study_area
-        weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
+        weggelaten = run.weggelaten
         lines += [
             f"**Studiegebied:** {gebied.name} ({gebied.area_ha:.1f} ha, "
             f"{gebied.feature_count} vlak(ken), bron `{gebied.source.name}`).",
@@ -361,19 +361,19 @@ def _render_checks(
 def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     """Wat de GWSW SHACL-nulmeting bijdroeg, en wat er niet van op de kaart kwam.
 
-    Deze sectie staat er alleen als er gemeten is. De aantallen komen uit de
-    meldingenstroom en niet uit de rapporten zelf: wat hier staat is precies wat er
-    in de CSV, de GeoPackage en de JSON terechtkomt, ook na afbakening tot een
-    studiegebied.
+    Deze sectie staat er alleen als er gemeten is. Nul overtredingen is dan een
+    uitslag en geen reden om te zwijgen. De aantallen komen uit de meldingenstroom en
+    niet uit de rapporten zelf: wat hier staat is precies wat er in de CSV, de
+    GeoPackage en de JSON terechtkomt, ook na afbakening tot een studiegebied.
 
     De tellingen per conformiteitsklasse tellen een melding bij elke klasse die hem
     noemt. Dat is met opzet: de klassen zijn geen partitie van de meldingen, en de
     som over de kolom is dus hoger dan het totaal.
     """
-    uit_nulmeting = [melding for melding in meldingen if melding.bron == BRON_NULMETING]
     if not run.meetbereik.gemeten:
         return []
 
+    uit_nulmeting = [melding for melding in meldingen if melding.bron == BRON_NULMETING]
     fouten = sum(1 for melding in uit_nulmeting if melding.ernst == Severity.ERROR.value)
     systemisch = sum(1 for melding in uit_nulmeting if melding.systemisch)
     regels = [
@@ -390,26 +390,41 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     for melding in uit_nulmeting:
         for cfk in melding.cfk:
             per_cfk[cfk] += 1
-    regels += ["| Conformiteitsklasse | Overtredingen |", "| --- | ---: |"]
-    regels += [f"| {cfk} | {per_cfk.get(cfk, 0)} |" for cfk in run.meetbereik.gekozen]
+    regels += table(
+        pd.DataFrame(
+            [
+                {"Conformiteitsklasse": cfk, "Overtredingen": per_cfk.get(cfk, 0)}
+                for cfk in run.meetbereik.gekozen
+            ],
+            columns=["Conformiteitsklasse", "Overtredingen"],
+        ),
+        "Overtredingen per conformiteitsklasse",
+    )
 
-    zonder_object = {melding.melding_id for melding in uit_nulmeting if not melding.object_uri}
-    zonder_plek = [
-        melding for melding in uit_nulmeting if melding.object_uri and melding.foutlocatie is None
-    ]
+    zonder_object = sum(1 for melding in uit_nulmeting if not melding.object_uri)
+    zonder_plek = sum(
+        1 for melding in uit_nulmeting if melding.object_uri and melding.foutlocatie is None
+    )
     regels += [
         "",
-        f"> **{getal(len(zonder_object), 'overtreding kwam', 'overtredingen kwamen')} "
-        f"nergens op uit** en {vorm(len(zonder_object), 'staat', 'staan')} dus niet op de "
+        f"> **{getal(zonder_object, 'overtreding kwam', 'overtredingen kwamen')} "
+        f"nergens op uit** en {vorm(zonder_object, 'staat', 'staan')} dus niet op de "
         "kaart: de focusnode is een klassenaam uit `CfkTypes_typ`, of een stelsel dat geen "
         "knoop of streng is. Ze staan wel in dit rapport en in de meldingentabel, met een "
         "leeg gebied -- ze zijn aan geen enkel studiegebied toe te wijzen.",
         "",
-        f"> **{getal(len(zonder_plek), 'overtreding staat', 'overtredingen staan')} op een "
-        f"object zonder bruikbare geometrie** en {vorm(len(zonder_plek), 'kreeg', 'kregen')} "
+        f"> **{getal(zonder_plek, 'overtreding staat', 'overtredingen staan')} op een "
+        f"object zonder bruikbare geometrie** en {vorm(zonder_plek, 'kreeg', 'kregen')} "
         "daarom geen plek op de kaart.",
         "",
     ]
+    if run.nulbevindingen_weggelaten:
+        buiten = getal(run.nulbevindingen_weggelaten, "overtreding viel", "overtredingen vielen")
+        regels += [
+            f"> **{buiten} buiten dit gebied** en staat hier niet in. Ze horen bij objecten "
+            "elders in de export; dit rapport zegt niets over die.",
+            "",
+        ]
     return regels
 
 

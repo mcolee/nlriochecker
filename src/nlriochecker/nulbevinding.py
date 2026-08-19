@@ -34,6 +34,7 @@ is opgegeven.
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -41,6 +42,8 @@ from rdflib import URIRef
 
 from nlriochecker.dataset import GWSW, GwswDataset
 from nlriochecker.meting import Nulmeting
+
+logger = logging.getLogger(__name__)
 
 # Het voorvoegsel van elk check-ID uit de nulmeting; ook de categorie, want die is
 # het deel van het ID voor het eerste koppelteken (`melding.categorie_van`).
@@ -111,7 +114,7 @@ def bouw_nulbevindingen(
     for (vorm, focus, boodschap), gegevens in sorted(ruw.items()):
         ernst_rauw, waarde, objecttype, label, cfks = gegevens
         uri = joiner.herleid(focus)
-        object_ = dataset.nodes.get(uri) or dataset.conduits.get(uri) if uri else None
+        object_ = (dataset.nodes.get(uri) or dataset.conduits.get(uri)) if uri else None
         eigen_label = object_.label if object_ is not None else ""
         bevindingen.append(
             Nulbevinding(
@@ -143,11 +146,12 @@ _Gegevens = tuple[str, str, str, str, set[str]]
 def _ontdubbel(nulmeting: Nulmeting) -> dict[tuple[str, str, str], _Gegevens]:
     """Groepeert de meldingen van alle rapporten op (vorm, focusnode, boodschap).
 
-    De eerste CFK op alfabet levert de ernst, de waarde, het objecttype en het label;
-    die zijn per definitie gelijk zodra de boodschap dat is. Zouden ze afwijken, dan
-    is dat een verschil dat de sleutel niet ziet, en dan is de eerste net zo goed als
-    de laatste -- maar dan wel altijd dezelfde, zodat de uitkomst niet van de
-    bestandsvolgorde afhangt.
+    De eerste CFK op alfabet levert de ernst, de waarde, het objecttype en het label.
+    Op de drie meegeleverde De Wolden-rapporten zijn die over alle 105.963 sleutels
+    gelijk, en dat is ook wat je verwacht zodra de boodschap gelijk is. Maar niets
+    dwingt het af, dus wijken ze toch af, dan wordt dat gelogd in plaats van
+    stilzwijgend de eerste te nemen -- zwijgen zou hier betekenen dat een CFK een
+    overtreding zwaarder noemt dan een andere en dat niemand het merkt.
     """
     verzameld: dict[tuple[str, str, str], _Gegevens] = {}
     for cfk in nulmeting.cfks:
@@ -168,8 +172,30 @@ def _ontdubbel(nulmeting: Nulmeting) -> dict[tuple[str, str, str], _Gegevens]:
             if bestaand is None:
                 verzameld[sleutel] = (ernst, waarde, objecttype, label, {cfk})
             else:
+                _meld_afwijking(sleutel, bestaand, (ernst, waarde, objecttype, label), cfk)
                 bestaand[4].add(cfk)
     return verzameld
+
+
+def _meld_afwijking(
+    sleutel: tuple[str, str, str],
+    bestaand: _Gegevens,
+    nieuw: tuple[str, str, str, str],
+    cfk: str,
+) -> None:
+    """Logt dat twee CFK-rapporten dezelfde overtreding verschillend beschrijven."""
+    if bestaand[:4] == nieuw:
+        return
+    vorm, focus, _boodschap = sleutel
+    logger.warning(
+        "%s op %s wordt door %s anders beschreven dan door de eerdere klasse(n) "
+        "(%s tegen %s); de eerste op alfabet telt.",
+        vorm,
+        focus,
+        cfk,
+        nieuw,
+        bestaand[:4],
+    )
 
 
 def _tellingen(ruw: dict[tuple[str, str, str], _Gegevens]) -> dict[tuple[str, str], int]:
@@ -177,7 +203,7 @@ def _tellingen(ruw: dict[tuple[str, str, str], _Gegevens]) -> dict[tuple[str, st
     per_groep: dict[tuple[str, str], int] = defaultdict(int)
     for (vorm, _focus, _boodschap), gegevens in ruw.items():
         per_groep[(vorm, gegevens[2])] += 1
-    return per_groep
+    return dict(per_groep)
 
 
 def _systemisch(
@@ -193,7 +219,7 @@ def _systemisch(
     noemer = instanties.get(objecttype)
     if noemer is None or noemer == 0:
         return False
-    return tellingen[(vorm, objecttype)] / noemer > drempel
+    return tellingen.get((vorm, objecttype), 0) / noemer > drempel
 
 
 class _Joiner:
@@ -246,51 +272,71 @@ class _Joiner:
         return gevonden
 
     def _omhoog(self, focus: str) -> str:
-        """Loopt via inkomende kanten omhoog tot een knoop of streng."""
-        huidig = f"{self._basis}{focus}"
-        gezien: set[str] = set()
+        """Loopt in de breedte omhoog tot de eerste knoop of streng.
+
+        In de breedte en niet langs een enkel pad: een onderdeel kan meer dan een
+        houder hebben, en de eerste die rdflib oplevert hoeft niet de houder te zijn
+        die op een object uitkomt. Een enkelpadswandeling zou dan leeg teruggeven
+        terwijl er wel degelijk een object boven hangt -- en welke houder "de eerste"
+        is, hangt af van de opslagvolgorde van rdflib en is dus niet stabiel tussen
+        versies of tussen twee keer inlezen.
+
+        Bij gelijke diepte wint de kleinste URI. Dat is willekeurig maar
+        deterministisch, en dat is wat telt: twee runs op dezelfde bestanden moeten
+        dezelfde meldingen opleveren.
+        """
+        start = f"{self._basis}{focus}"
+        if start in self._objecten:
+            return start
+        gezien = {start}
+        laag = [start]
         for stap in range(MAX_DIEPTE):
-            if huidig in self._objecten:
-                return huidig
-            gezien.add(huidig)
-            ouder = self._ouder(huidig, gezien, met_verbinding=stap == 0)
-            if ouder is None:
+            volgende: set[str] = set()
+            for uri in laag:
+                volgende |= self._ouders(uri, met_verbinding=stap == 0) - gezien
+            if not volgende:
                 return ""
-            huidig = ouder
+            gevonden = sorted(volgende & self._objecten)
+            if gevonden:
+                return gevonden[0]
+            gezien |= volgende
+            laag = sorted(volgende)
         return ""
 
-    def _ouder(self, uri: str, gezien: set[str], *, met_verbinding: bool) -> str | None:
-        """Het object dat dit object bevat, van sterk naar zwak verband.
+    def _ouders(self, uri: str, *, met_verbinding: bool) -> set[str]:
+        """De objecten die dit object bevatten, van sterk naar zwak verband.
 
         `hasPart` en `hasAspect` zijn insluitingen: wat eraan hangt hoort echt bij de
-        houder. `hasConnection` is dat niet -- het is een symmetrische
-        netwerkverbinding -- en wordt daarom alleen bij de eerste stap geprobeerd, en
-        pas als de twee andere niets opleveren.
+        houder. Levert een van beide iets op, dan is dat het antwoord en komt
+        `hasConnection` er niet meer aan te pas.
 
-        Die twee beperkingen samen zijn precies wat het veilig maakt. Een
-        `Maaiveldorientatie` hangt in de De Wolden-export via `hasConnection` onder
-        haar putorientatie en heeft verder geen houder; die wordt zo alsnog aan zijn
-        put toegewezen (1.605 overtredingen). Een `BeginpuntLeiding` heeft ook een
-        `hasConnection`, naar de put aan die kant, maar heeft daarnaast een
-        `hasPart`-houder in zijn leidingorientatie -- en die gaat voor, dus zijn
-        melding landt op de streng en niet op de verkeerde soort object. En doordat de
-        verbinding alleen in de eerste stap meedoet, kan de wandeling daarna niet
-        zijwaarts het netwerk in lopen.
+        `hasConnection` is geen insluiting maar een symmetrische netwerkverbinding.
+        Hij doet daarom alleen mee bij de eerste stap en alleen als laatste. Die twee
+        beperkingen samen zijn wat het veilig maakt: een `Maaiveldorientatie` hangt in
+        de De Wolden-export via `hasConnection` onder haar putorientatie en heeft
+        verder geen houder, dus die wordt zo alsnog aan zijn put toegewezen (1.605
+        overtredingen). Een `BeginpuntLeiding` heeft ook een `hasConnection`, naar de
+        put aan die kant, maar heeft daarnaast een `hasPart`-houder in zijn
+        leidingorientatie -- en die gaat voor, dus zijn melding landt op de streng en
+        niet op de verkeerde soort object. En doordat de verbinding alleen in de
+        eerste stap meedoet, kan de wandeling daarna niet zijwaarts het netwerk in
+        lopen.
+
+        Beide schrijfrichtingen van `hasConnection` worden gelezen. Het GWSW noemt hem
+        een `owl:SymmetricProperty` zonder inverse, dus welke van de twee objecten
+        subject is, is een keuze van de exporteur. De De Wolden-export schrijft
+        `:knp1_put gwsw:hasConnection :knp1_put_maa`; een export die het andersom doet
+        zou anders stil 1.605 meldingen van de kaart laten vallen.
         """
-        predicaten = (
-            (HAS_PART, HAS_ASPECT, HAS_CONNECTION)
-            if met_verbinding
-            else (
-                HAS_PART,
-                HAS_ASPECT,
-            )
-        )
-        for predicaat in predicaten:
-            for houder in self._dataset.graph.subjects(predicaat, URIRef(uri)):
-                tekst = str(houder)
-                if tekst not in gezien:
-                    return tekst
-        return None
+        knoop = URIRef(uri)
+        graaf = self._dataset.graph
+        insluitend = {str(houder) for houder in graaf.subjects(HAS_PART, knoop)}
+        insluitend |= {str(houder) for houder in graaf.subjects(HAS_ASPECT, knoop)}
+        if insluitend or not met_verbinding:
+            return insluitend
+        verbonden = {str(ander) for ander in graaf.subjects(HAS_CONNECTION, knoop)}
+        verbonden |= {str(ander) for ander in graaf.objects(knoop, HAS_CONNECTION)}
+        return verbonden
 
 
 def _basis(objecten: frozenset[str]) -> str:
