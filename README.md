@@ -165,7 +165,27 @@ JSON-bestand is een geversioneerd contract voor machinale verwerking; zie
 [docs/json-schema.md](docs/json-schema.md). `--output` staat standaard op `uitvoer/`.
 Invoerbestanden worden nooit overschreven.
 
-De GeoPackage bevat naast de riolering twee lagen met de externe objecten waarnaar de
+De GeoPackage heeft twee objectlagen: `putten` (punt) en `strengen` (lijn), met de
+gebreken *op* het object. Elk object draagt een kolom `status` met precies vier waarden --
+`rood` bij een fout, `oranje` bij alleen waarschuwingen, `groen` als er geen eigen gebrek
+is, `grijs` als er niet beoordeeld is -- en een kolom `popup_html` met de voorgebakken
+hoverpopup. Mechanisch riool staat tussen de strengen met status `grijs`: het objecttype
+klopt, alleen is er niets getoetst. Met een studiegebied staat de contextschil er ook
+grijs bij, zodat de kaart niet bij de gebiedsgrens ophoudt alsof daar niets ligt. De
+popup zegt per grijs object waarom.
+
+`status` telt systemische meldingen niet mee, net als `ergste_ernst`, `n_fout` en
+`n_waarschuwing`. Een object waarvan álle meldingen systemisch zijn is dus groen; dat
+betekent "geen gebrek dat dit object van zijn buren onderscheidt", niet "in orde". De
+kolom `n_systemisch` en de popup zeggen het er allebei bij.
+
+Er is geen laag `meldinglocaties` meer. Alle meldingen staan in de tabel `meldingen`,
+joinbaar op `feature_id`, met de foutlocatie in de kolommen `x` en `y`. Wat daarmee van de
+kaart verdween is de exacte plek van een melding op een lijn -- het snijpunt van een
+kruising, het midden van een streng -- en het naloopwerk zonder joins; wie de punten terug
+wil, maakt er in QGIS een geometriegenerator van.
+
+Daarnaast bevat de GeoPackage twee lagen met de externe objecten waarnaar de
 EXT-checks verwijzen: `bouwwerken` (elk BGT-pand, BAG-pand of overig bouwwerk waarover
 EXT-001 meldt, rood omlijnd) en `waterdelen_zonder_zinker` (elk BGT-waterdeel waarover
 EXT-003 meldt, blauw omlijnd). Beide lagen worden uitsluitend gevuld vanuit de

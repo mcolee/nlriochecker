@@ -11,6 +11,42 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gewijzigd
+
+- **De GeoPackage heeft nog twee objectlagen: `putten` en `strengen`.**
+  `meldinglocaties` vervalt als featurelaag en `mechanisch_riool` gaat op in de
+  lijnenlaag. Elk object draagt twee nieuwe kolommen: `status` met precies vier
+  waarden (`rood` bij een fout, `oranje` bij alleen waarschuwingen, `groen` bij geen
+  eigen gebrek, `grijs` als er niet beoordeeld is) en `popup_html` met een
+  voorgebakken hoverpopup. Mechanisch riool houdt zijn GWSW-objecttype maar krijgt
+  status `grijs`, en met een studiegebied komt de contextschil er ook grijs bij: wat
+  de checks wel zagen maar niet beoordeelden, hoort zichtbaar te zijn. De popup zegt
+  per grijs object waarom.
+
+  **Bewust verlies:** de exacte foutlocatie op een lijn -- het snijpunt van een
+  kruising, het midden van een streng -- en het naloopwerk in een kaal GIS-pakket
+  zonder joins verdwijnen van de kaart. De meldingen zelf blijven volledig in de tabel
+  `meldingen`, joinbaar op `feature_id`, en die tabel draagt nu de kolommen `x` en `y`
+  met diezelfde foutlocatie -- anders zou hij stilzwijgend uit de GeoPackage
+  verdwijnen. Objectloze meldingen (dataset-breed, EXT-verwijzingen zonder rioolobject,
+  de onherleide focusnodes van de nulmeting) stonden ook voorheen niet op de kaart en
+  blijven in rapport en meldingentabel staan. Zie BO-29 (issue #13).
+
+- `status` telt systemische meldingen niet mee, net als `ergste_ernst`, `n_fout` en
+  `n_waarschuwing` al deden. Op De Wolden draagt de nulmeting 68.882 systemische
+  meldingen op 105.963; zouden die meetellen, dan is vrijwel elke put rood. Gevolg: een
+  object waarvan alle meldingen systemisch zijn krijgt `groen`, wat hier "geen gebrek
+  dat dit object van zijn buren onderscheidt" betekent en niet "in orde". De kolom
+  `n_systemisch` en de popup zeggen het er allebei bij.
+
+- De opdrachtregel noemt de tellingen van de eigen checks en die van de nulmeting
+  apart, `gwsw_run` telt `fouten` en `waarschuwingen` uit de meldingenstroom (zodat ze
+  niet met `meldingen_totaal` uit de pas lopen), en de rode draad in het rapport
+  redeneert alleen nog over meldingen uit het checkregister -- de SHACL-vormen zijn per
+  kenmerk gesplitst en slaan per constructie samen aan, dus "meerdere checks op
+  hetzelfde object" zegt daar niets. Het rapport meldt voortaan ook hoeveel
+  nulmetingovertredingen buiten het studiegebied vielen.
+
 ### Toegevoegd
 
 - De SHACL-nulmetingovertredingen komen als meldingen in alle vier de uitvoervormen

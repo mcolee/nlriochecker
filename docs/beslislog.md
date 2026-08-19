@@ -1478,7 +1478,83 @@ van over een los gebrek. De noemer van die vlag is het aantal instanties van het
 objecttype uit `type=`, geteld over de volledige export en niet over een studiegebied --
 anders zou "systemisch" iets anders betekenen naargelang er een gebied is opgegeven.
 
+**Wat de tweede bron elders brak, en hoe het gerepareerd is.** `bouw_meldingen` heeft meer
+afnemers dan de vier schrijvers, en die waren op een enkele bron gebouwd. Drie plekken
+moesten mee:
+
+- `synthese._multi_melding` ("dit object draagt meldingen uit drie of meer verschillende
+  checks, zoek een enkele verdachte waarde") telt voortaan alleen meldingen uit het
+  register. De redenering gaat niet op voor de nulmeting: haar vormen zijn niet
+  onafhankelijk maar per kenmerk gesplitst, dus `Put_HoogtePut_card`,
+  `Rioolput_Maaiveldschematisering_card` en `Rioolput_BergendOppervlak_card` slaan per
+  constructie samen aan. Op De Wolden dragen 23.296 van de 32.389 focusnodes drie of meer
+  vormen; die alle als verdacht aanwijzen maakt van die sectie ruis met een advies dat
+  nergens toe leidt. Meldingen zonder object doen ook niet mee -- die belandden samen in
+  een naamloze emmer en verschenen als een verdacht object met het label van de laatste.
+- `gwsw_run` telt `fouten` en `waarschuwingen` voortaan uit de meldingenstroom in plaats
+  van uit `CheckRun.count`, want `meldingen_totaal` deed dat al. Ze liepen anders met de
+  hele nulmeting uit elkaar.
+- De opdrachtregel zegt "fouten uit de eigen checks" en noemt de overtredingen uit de
+  nulmeting apart. Optellen zou twee ongelijksoortige tellingen op een hoop gooien;
+  verzwijgen zou een regel "120 fouten" opleveren naast een CSV met er tienduizenden.
+
+En `CheckRun.weggelaten` telt sindsdien ook de nulbevindingen die de afbakening tot een
+studiegebied wegliet. Het is nu de ene plek waar dat getal vandaan komt, zodat de
+opdrachtregel, het rapport en de synthese er niet drie kunnen noemen.
+
 **Het contract.** `cfk` is een achterwaarts verenigbare toevoeging, dus `schema_versie`
 gaat van `1.0` naar `1.1` en niet naar `2.0`. `docs/json-schema.md` beschrijft het veld en
 de nulmetingmeldingen; de twee drifttests bewaken dat het document de velden en de versie
 blijft noemen.
+
+### BO-29 Twee objectlagen met een status, en wat daarvoor van de kaart verdwijnt
+
+**Context.** De GeoPackage had zes featurelagen, waarvan drie over dezelfde riolering
+gingen: `putten`, `strengen`, `mechanisch_riool` en daarnaast `meldinglocaties` met een
+punt per melding. Voor de eindgebruiker in QGIS moeten dat twee objectlagen worden, met de
+gebreken *op* het object (issue #13).
+
+**Besluit.** `putten` (punt) en `strengen` (lijn) blijven over. Elk object draagt `status`
+-- vier waarden waar de symbologie op filtert -- en `popup_html`, de voorgebakken
+hoverpopup. `mechanisch_riool` gaat op in de lijnenlaag met status `grijs`;
+`meldinglocaties` vervalt.
+
+**De contextschil komt erbij, grijs.** Het issue noemt bij `grijs` letterlijk "object in de
+schil (niet de kern)", en dat kan alleen als de schil ook in de laag staat. Hem weglaten
+laat de kaart bij de gebiedsgrens ophouden alsof daar niets ligt. De schil komt uit
+`run.analyseset` en niet uit "alles wat niet in de kern ligt": een run die met
+`beperk_tot_studiegebied` op de volledige export is afgebakend heeft geen analyseset, en
+dan hoort het bestand bij de grens op te houden zoals het altijd deed -- anders zou een
+toets op een buurt de hele export als grijze achtergrond meesturen.
+
+**`status` telt systemische meldingen niet mee.** Dit is de scherpste keuze van dit issue.
+Op De Wolden draagt de nulmeting 68.882 systemische meldingen op 105.963; zouden die
+meetellen, dan is vrijwel elke put rood en zegt de kaart niets meer. De bestaande kolommen
+`ergste_ernst`, `n_fout` en `n_waarschuwing` doen het al zo, en om precies deze reden.
+Gevolg dat je moet kennen: een object waarvan *alle* meldingen systemisch zijn krijgt
+`groen`. Dat betekent hier "geen gebrek dat dit object van zijn buren onderscheidt", niet
+"in orde". Twee dingen vangen dat op: `n_systemisch` blijft gevuld, en `popup_html` noemt
+de systemische meldingen met zoveel woorden.
+
+**Verworpen: een vijfde status.** Het issue vraagt precies vier waarden, en elke waarde
+erbij is een regel erbij in elke QML. De reden waarom een object grijs is -- mechanisch
+riool of contextschil -- staat daarom in de popup en niet in een eigen kolom.
+
+**Bewust verlies.** Met `meldinglocaties` verdwijnen twee dingen van de kaart: de exacte
+foutlocatie op een lijn (het snijpunt van een kruising, het midden van een streng) en het
+naloopwerk in een kaal GIS-pakket zonder joins. De meldingen blijven volledig in de tabel
+`meldingen`, en die tabel kreeg de kolommen `x` en `y` met diezelfde foutlocatie -- anders
+zou hij stilzwijgend uit de GeoPackage verdwijnen terwijl de CSV en de JSON hem wel
+dragen. Wie de punten terug wil, maakt er in QGIS een geometriegenerator van.
+
+**`popup_html` is een fragment, geen document.** Geen `<style>`-blok en geen vaste breedte:
+die staan een keer in de maptip van de QML (issue #15). Op De Wolden zou een stijlblok per
+rij de GeoPackage tientallen megabytes groter maken zonder dat er iets bij komt. De inhoud
+wordt geescaped -- labels en boodschappen komen uit de brondata en mogen de popup niet
+kunnen breken.
+
+**De tellingen in `gwsw_run`.** `n_putten` en `n_strengen` betekenen wat ze altijd
+betekenden: het aantal rijen dat er werkelijk in staat. Doordat de lijnenlaag nu ook
+mechanisch riool en de contextschil bevat, zijn dat er meer dan voorheen; `n_mechanisch`
+telt hoeveel van die lijnen mechanisch zijn. Er komt geen kolom bij: wie het per status
+wil weten, telt `select status, count(*) from strengen group by status`.

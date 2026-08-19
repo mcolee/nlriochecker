@@ -185,6 +185,14 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   in `cli.py`, schrijft naar stderr en zet het staplabel via `item_show_func` -- niet
   door `balk.label` te overschrijven, want dan echoot click in een niet-interactieve
   omgeving een regel per stap.
+- De GeoPackage draagt twee objectlagen: `putten` (punt) en `strengen` (lijn), met de
+  gebreken op het object. Elk object heeft `status` (precies vier waarden: rood, oranje,
+  groen, grijs) en `popup_html` (een voorgebakken fragment, zonder stijlblok -- dat
+  staat een keer in de maptip). Mechanisch riool staat grijs tussen de strengen en de
+  contextschil komt grijs mee; de popup zegt waarom. `status` telt systemische
+  meldingen niet mee, net als `ergste_ernst`. `meldinglocaties` bestaat niet meer; de
+  tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. Beide kolommen
+  komen uit `uitvoer/objectkaart.py` en nergens anders. Zie BO-29.
 - De GeoPackage draagt naast de rioleringslagen `bouwwerken` (EXT-001) en
   `waterdelen_zonder_zinker` (EXT-003): de externe objecten waarnaar de meldingen van
   díé uitvoer verwijzen, gejoind op het trefferregister (`checks/treffers.py`) via

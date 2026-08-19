@@ -59,7 +59,21 @@ die CLAUDE.md voorschrijft ("loop via hasPart omhoog tot een put"). Gemeten kost
 
 De rem staat op zes stappen: de langste keten in de export is drie
 (`beginpunt → orientatie → streng`), en zonder rem zou een cyclus in de brondata de
-run laten hangen.
+run laten hangen. Die zes is geen projectdrempel maar een eigenschap van het
+GWSW-model, en staat daarom in de code en niet in `checks.toml`: een beheerder die
+hem zou verzetten, verandert niets aan zijn oordeel over de data.
+
+De wandeling gaat **in de breedte**, niet langs een enkel pad. Een onderdeel kan meer
+dan een houder hebben, en de eerste die rdflib oplevert hoeft niet de houder te zijn
+die op een object uitkomt; bovendien hangt "de eerste" af van de opslagvolgorde van
+rdflib en is dus niet stabiel tussen versies of tussen twee keer inlezen. Bij gelijke
+diepte wint de kleinste URI -- willekeurig, maar deterministisch, en dat is wat telt.
+
+Beide schrijfrichtingen van `hasConnection` worden gelezen. Het GWSW noemt hem een
+`owl:SymmetricProperty` zonder inverse, dus welke van de twee objecten subject is, is
+een keuze van de exporteur. De De Wolden-export schrijft `:knp1_put hasConnection
+:knp1_put_maa`; alleen die richting lezen zou op een export die het andersom doet stil
+1.605 meldingen van de kaart laten vallen.
 
 **Aanvulling na meting: ook `hasConnection`, maar alleen als eerste stap.** Met alleen
 `hasPart` en `hasAspect` bleven er 2.183 overtredingen zonder object, waarvan 1.605 op
@@ -131,6 +145,27 @@ haalt hem van de kaart.
 De teller telt over de **volledige export**, vóór afbakening tot een studiegebied —
 dezelfde keuze als bij de eigen checks, en om dezelfde reden: anders betekent
 "systemisch" iets anders naargelang er een gebied is opgegeven.
+
+Twee dingen die je van deze noemer moet weten, en die de implementatie bewust anders
+doet dan "`dataset.of_class`" hierboven suggereert:
+
+- De telling gaat over de **korte typenaam uit `types_of`**, niet over
+  `of_class(root)` met haar subklassensluiting. Dat is een kwestie van kosten en van
+  betekenis: `of_class` zou per voorkomend type een doorloop over alle 47 duizend
+  objecten kosten, en een vorm die naar `Inspectieput` verwijst hoort ook tegen de
+  inspectieputten afgezet te worden en niet tegen alle rioolputten.
+- Het objecttype komt uit het **SHACL-rapport**, niet van het object waar de melding
+  na de opgaande join op landt. Gevolg: de 1.605 `Maaiveldorientatie`-overtredingen
+  die met de `hasConnection`-stap netjes op hun put belanden, kunnen nooit systemisch
+  heten -- `Maaiveldorientatie` is geen knoop- of strengtype, dus er is geen noemer.
+  Praktisch maakt dat niets uit (1.605 op ruim 19 duizend putten is 8%, ver onder de
+  drempel), maar het is een asymmetrie die je moet kennen: de join loopt omhoog, de
+  noemer niet.
+
+De teller telt **overtredingen**, niet objecten. Een vorm die op beide eindpunten van
+dezelfde streng aanslaat telt daar dus twee keer. Dat maakt de vlag iets gretiger dan
+een telling per object zou zijn; voor de vormen die de drempel halen (kardinaliteit op
+vrijwel elke put) maakt het geen verschil.
 
 ### K6. Waar de bevindingen in de code stromen
 
