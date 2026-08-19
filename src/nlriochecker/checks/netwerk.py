@@ -15,6 +15,7 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
+from nlriochecker.checks.selectie import infiltratieleidingen, vrijvervalrioolleidingen
 from nlriochecker.checks.verbanden import deelstelsel_ids
 from nlriochecker.dataset import HAS_PART, Conduit
 from nlriochecker.taal import getal, vorm
@@ -45,14 +46,7 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     dataset = context.dataset
     wortels = context.config.klassen.netwerkknopen
 
-    conduits = list(
-        {
-            uri: dataset.conduits[uri]
-            for wortel in context.config.klassen.vrijvervalleiding
-            for uri in dataset.of_class(wortel)
-            if uri in dataset.conduits
-        }.values()
-    )
+    conduits = vrijvervalrioolleidingen(context)
 
     op_bob = context.config.netwerk.richting == "bob"
     graph = nx.DiGraph()
@@ -446,12 +440,7 @@ class ItStelselZonderDrempel(Check):
         dataset = context.dataset
         wortels = context.config.klassen.netwerkknopen
 
-        infiltratie = {
-            uri
-            for wortel in context.config.klassen.infiltratie
-            for uri in dataset.of_class(wortel)
-            if uri in dataset.conduits
-        }
+        infiltratie = {conduit.uri for conduit in infiltratieleidingen(context)}
         if not infiltratie:
             return
 

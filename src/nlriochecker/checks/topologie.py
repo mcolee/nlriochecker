@@ -29,6 +29,12 @@ from nlriochecker.checks.meetkunde import (
     overlap_length,
     vertex_angles,
 )
+from nlriochecker.checks.selectie import (
+    functieloze_knopen,
+    leidingen,
+    netwerkknopen,
+    vrijvervalrioolleidingen,
+)
 from nlriochecker.dataset import Conduit, Node
 
 
@@ -88,41 +94,22 @@ def _topologie(context: CheckContext) -> _Topologie:
 
 def _bouw_topologie(context: CheckContext) -> _Topologie:
     """Bouwt de puttenindex en de lijst met strengen die geometrie hebben."""
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
+    # De selectie ontdubbelt al, dus hier blijft alleen het filter over dat bij deze
+    # structuur hoort en niet bij de rol: een knoop zonder punt kan niet in de index.
+    knopen = [node for node in netwerkknopen(context) if node.point is not None]
+    tree = STRtree([node.point for node in knopen]) if knopen else None
 
-    nodes = [
-        dataset.nodes[uri]
-        for wortel in wortels
-        for uri in dataset.of_class(wortel)
-        if uri in dataset.nodes and dataset.nodes[uri].point is not None
-    ]
-    uniek = list({node.uri: node for node in nodes}.values())
-    tree = STRtree([node.point for node in uniek]) if uniek else None
-
-    alle = _conduits(context, context.config.klassen.streng)
+    alle = leidingen(context)
     met_lijn = [conduit for conduit in alle if endpoints(conduit.line) is not None]
 
     return _Topologie(
-        nodes=uniek,
+        nodes=knopen,
         tree=tree,
-        conduits=_conduits(context, context.config.klassen.vrijvervalleiding),
+        conduits=vrijvervalrioolleidingen(context),
         all_conduits=alle,
         lined=met_lijn,
         line_tree=STRtree([conduit.line for conduit in met_lijn]) if met_lijn else None,
     )
-
-
-def _conduits(context: CheckContext, wortels: list[str]) -> list[Conduit]:
-    """De unieke strengen van deze klassen."""
-    dataset = context.dataset
-    gevonden = {
-        uri: dataset.conduits[uri]
-        for wortel in wortels
-        for uri in dataset.of_class(wortel)
-        if uri in dataset.conduits
-    }
-    return list(gevonden.values())
 
 
 def _endpoints(conduit: Conduit) -> tuple[Point, Point] | None:
@@ -1044,14 +1031,11 @@ class PseudoKnoop(Check):
         een put, en die put *is* een functie. Elke doorgaande put als pseudo-knoop
         melden zou tienduizenden bevindingen opleveren die geen gebrek zijn.
         """
-        klassen = context.config.klassen.functieloze_knoop
-        if not klassen:
+        if not context.config.klassen.functieloze_knoop:
             return
 
         dataset = context.dataset
-        functieloos = {
-            uri for wortel in klassen for uri in dataset.of_class(wortel) if uri in dataset.nodes
-        }
+        functieloos = {node.uri for node in functieloze_knopen(context)}
         if not functieloos:
             return
 
@@ -1105,11 +1089,7 @@ class PseudoKnoop(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen van de geconfigureerde functieloze klassen."""
-        klassen = context.config.klassen.functieloze_knoop
-        dataset = context.dataset
-        return len(
-            {uri for wortel in klassen for uri in dataset.of_class(wortel) if uri in dataset.nodes}
-        )
+        return len(functieloze_knopen(context))
 
 
 @register

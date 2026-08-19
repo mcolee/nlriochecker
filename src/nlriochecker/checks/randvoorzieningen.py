@@ -28,6 +28,7 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import (
     bergbezinkleidingen,
     bergbezinkvoorzieningen,
+    oppervlaktewaterobjecten,
     overstortleidingen,
     overstortputten,
 )
@@ -668,16 +669,15 @@ def _watergeometrieen(context: CheckContext) -> list:
 
 
 def _bouw_watergeometrieen(context: CheckContext) -> list:
-    """Verzamelt punt- en lijngeometrie van alle oppervlaktewaterobjecten."""
-    dataset = context.dataset
+    """Verzamelt punt- en lijngeometrie van alle oppervlaktewaterobjecten.
+
+    De selectie levert de objecten van de klasse, ook die zonder geometrie; het
+    filteren hoort hier, want een object zonder punt of lijn kan deze structuur niet
+    gebruiken.
+    """
     gevonden = []
-    for wortel in context.config.klassen.oppervlaktewater:
-        for uri in dataset.of_class(wortel):
-            node = dataset.nodes.get(uri)
-            if node is not None and node.point is not None:
-                gevonden.append(node.point)
-                continue
-            conduit = dataset.conduits.get(uri)
-            if conduit is not None and conduit.line is not None:
-                gevonden.append(conduit.line)
+    for object_ in oppervlaktewaterobjecten(context):
+        meetkunde = object_.point if isinstance(object_, Node) else object_.line
+        if meetkunde is not None:
+            gevonden.append(meetkunde)
     return gevonden

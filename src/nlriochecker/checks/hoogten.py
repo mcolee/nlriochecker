@@ -23,7 +23,12 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.selectie import netwerkknopen, vrijvervalrioolleidingen
+from nlriochecker.checks.selectie import (
+    netwerkknopen,
+    valconstructies,
+    vrijvervalrioolleidingen,
+    vuilwaterleidingen,
+)
 from nlriochecker.checks.verbanden import aansluitingen, verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
 
@@ -275,14 +280,8 @@ class OnvoldoendeVerhang(_StrengCheck):
         omhoog, dan is dat tegenverhang en melden HGT-005 en HGT-006 dat; hier nog
         eens meetellen zou dezelfde streng dubbel laten opduiken.
         """
-        dataset = context.dataset
         drempel = context.config.drempels.minimaal_verhang_promille / 1000.0
-        soorten = {
-            uri
-            for wortel in context.config.klassen.vuilwater
-            for uri in dataset.of_class(wortel)
-            if uri in dataset.conduits
-        }
+        soorten = {conduit.uri for conduit in vuilwaterleidingen(context)}
 
         for conduit in vrijvervalrioolleidingen(context):
             if conduit.uri not in soorten:
@@ -371,10 +370,10 @@ class BobSprongZonderValput(_KnoopVergelijking):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de BOB van aanvoer en afvoer op elke put."""
         drempel = context.config.drempels.bob_sprong_m
-        valconstructies = _valconstructies(context)
+        valput_uris = {node.uri for node in valconstructies(context)}
 
         for node, aanvoer, afvoer in self.paren(context):
-            if node.uri in valconstructies:
+            if node.uri in valput_uris:
                 continue
             binnen = [c.bob_end for c in aanvoer if c.bob_end is not None]
             uit = [c.bob_start for c in afvoer if c.bob_start is not None]
@@ -719,12 +718,12 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen die hoog in de put binnenkomen zonder verklaring."""
         drempel = context.config.drempels.bob_sprong_m
-        valconstructies = _valconstructies(context)
+        valput_uris = {node.uri for node in valconstructies(context)}
 
         for uiteinde in _uiteinden(context):
             node = uiteinde.node
             bodem = node.bodem
-            if uiteinde.bob is None or bodem is None or node.uri in valconstructies:
+            if uiteinde.bob is None or bodem is None or node.uri in valput_uris:
                 continue
             verschil = uiteinde.bob - bodem
             if verschil <= drempel:
@@ -844,17 +843,6 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
                 bron=_bovenkant_bron(uiteinde.node),
                 put=uiteinde.node.label,
             )
-
-
-def _valconstructies(context: CheckContext) -> set[str]:
-    """De knopen die als val- of zandvangconstructie geregistreerd staan."""
-    dataset = context.dataset
-    return {
-        uri
-        for wortel in context.config.klassen.valconstructie
-        for uri in dataset.of_class(wortel)
-        if uri in dataset.nodes
-    }
 
 
 def _maat(conduit: Conduit) -> float | None:
