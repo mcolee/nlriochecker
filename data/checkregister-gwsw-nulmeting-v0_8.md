@@ -202,7 +202,7 @@ uitkomst geven. De ID's worden niet hergebruikt.
 7. Afgehandeld: schrapronde uitgevoerd en geactualiseerd naar toetsbasis Mds, zie tabel Geschrapte checks. Afwijkingen ten opzichte van de oorspronkelijke verwachting: ADM-002 en ADM-003 blijven staan (duplicaat-ID's smelten in RDF geruisloos samen respectievelijk geen patroontoetsing), ADM-008/009 blijven staan (in de nulmeting-beschrijving expliciet aangemerkt als externe validatie), ATTR-011 en RVZ-003 zijn juist wel geschrapt. In het proces borgen dat beide nulmeting-rapporten (Mds en Hyd) beschikbaar zijn en dat de typeringsscore als voorwaarde geldt.
 8. Afgehandeld voor de inwinningswijze; open voor de rest. De eerste run op De Wolden (2026-08-16) laat zien dat BTR-001 t/m BTR-005 op deze export inderdaad vrijwel alleen ontbreken-meldingen opleveren: er is geen enkele `DatumInwinning` en geen `Grondwaterniveau`, en de wijze hangt aan de puntgeometrie in plaats van aan het kenmerk (zie de inleiding van BTR). Ze blijven skelet. Een voorgestelde uitbreiding BTR-008 (inwinningswijze past niet bij het kenmerk) is afgewezen, zie de BTR-inleiding. Twee andere kandidaten, placeholder-datums en expliciete onbekend-waarden, zijn afgewezen als check en opgenomen als datakarakteristieken in de kop van het bevindingenrapport: ze slaan op vrijwel de hele dataset aan en leveren per object geen handeling op, maar bepalen wel op welke precisie leeftijden gelden en hoe rooskleurig een compleetheidscijfer leest.
 9. Uit het onderzoeksrapport zijn de geometrie- en hoogtechecks verwerkt (N2 t/m N5, N7, N17 t/m N22, als TOP-015 t/m TOP-021, ATTR-011/012, HGT-016 t/m HGT-018). N1 (BOB onder putbodem) was al gedekt door HGT-004. Het restant is verplaatst naar de issuetracker: [#9 Resterende checks uit het onderzoeksrapport](https://github.com/mcolee/nlriochecker/issues/9).
-10. Deels afgehandeld (2026-08-16). Wat een regressietoets per run kan bewaken, wordt nu bewaakt; zie de voorwaarden bij Geschrapte checks. Wat niet kan: de rapportkoppen van de GWSW-server bevatten geen CFK-versie of filternaam, dus of de meting nog op deelmodel v1.6 en de filters collectie_MDSTOP_v16 en collectie_HYDTOP5_v16 draait, is niet uit de rapporten af te leiden en blijft handwerk. Het restant is verplaatst naar de issuetracker: [#10 Dekkinganalyse hertoetsen aan een echt Mds-nulmetingrapport](https://github.com/mcolee/nlriochecker/issues/10).
+10. Deels afgehandeld (2026-08-16). Wat een regressietoets per run kan bewaken, wordt nu bewaakt; zie de voorwaarden bij Geschrapte checks. Wat niet kan: de rapportkoppen van de GWSW-server bevatten geen CFK-versie of filternaam, dus of de meting nog op deelmodel v1.6 en de filters collectie_MDSTOP_v16 en collectie_HYDTOP5_v16 draait, is niet uit de rapporten af te leiden en blijft handwerk. Het restant wordt niet opgepakt (besloten 2026-08-19; het issue ervoor is gesloten). Dat restant was: (a) verifieren aan een echt Mds-nulmetingrapport of de someValuesFrom-eisen uit de Top-laag (waaronder HoogteLeiding, hasValidity-codering 1t 3t) daadwerkelijk als melding verschijnen, wat de NB-noot bij ATTR-004 raakt; en (b) een hernieuwde dekkinganalyse op Mds, die extra schrapkandidaten zou kunnen opleveren. (c) blijft staan als vaststelling: geen enkele geschrapte check hoeft terug, want Mds eist meer dan MdsPlan en niet minder.
 
 11. Verplaatst naar de issuetracker: [#7 Twee dekkingclaims schrijven eisen aan de verkeerde conformiteitsklasse toe](https://github.com/mcolee/nlriochecker/issues/7).
 
@@ -213,12 +213,12 @@ uitkomst geven. De ID's worden niet hergebruikt.
 ## Versiehistorie
 
 Versie 0.8, addendum (2026-08-19): geen checks toegevoegd, geschrapt of van ernst of
-dimensie veranderd; het contract is ongewijzigd. De open punten 1, 9, 11 en 13 en het
-restant van punt 10 zijn verplaatst naar de issuetracker op GitHub en vervangen door een
-verwijzing; de nummering is bewust ongemoeid gelaten, omdat `checks.toml` en twee modules
-naar punt 6 en punt 8 bij nummer verwijzen. De punten 2, 3 en 6 zijn als afgehandeld
-gemarkeerd, elk met de plek in de configuratie of de code waar de afhandeling te
-controleren is.
+dimensie veranderd; het contract is ongewijzigd. Wel opgeschoond in de open punten: 1, 9,
+11 en 13 zijn verplaatst naar de issuetracker op GitHub en vervangen door een verwijzing;
+2, 3 en 6 staan als afgehandeld gemarkeerd, elk met de plek in de configuratie of de code
+waar dat te controleren is; en van punt 10 wordt het restant niet opgepakt, wat er met de
+inhoud bij staat. De nummering is bewust ongemoeid gelaten, omdat `checks.toml` en twee
+modules naar punt 6 en punt 8 bij nummer verwijzen.
 
 Versie 0.8 (2026-08-16): EXT-008 vervallen (BAG-verblijfsobjecten zijn voor deze opdracht
 niet relevant; het ID wordt niet hergebruikt). EXT-001 uitgebreid van strengen naar

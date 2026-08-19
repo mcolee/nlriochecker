@@ -95,15 +95,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 ### Gewijzigd
 
 - Openstaand werk staat voortaan als GitHub-issue op `mcolee/nlriochecker` en niet meer in
-  `CLAUDE.md` of in de open punten van het checkregister. De punten 1, 9, 11 en 13 en het
-  restant van punt 10 van het register zijn issues #5 tot en met #10 geworden en dragen nu
-  een verwijzing; de nummering is ongemoeid gelaten, omdat `checks.toml` en twee modules
-  naar punt 6 en punt 8 bij nummer verwijzen. De punten 2 (drempelwaarden), 3 (ADM-003 als
-  regex) en 6 (hoe overstorten in de export verschijnen) staan als afgehandeld gemarkeerd,
-  elk met de plek waar de afhandeling te controleren is. Wat er onder punt 6 nog wel
-  open stond -- dat `Overnamepunt` en een klasse voor het IT-stelsel niet in de
-  GWSW-ontologie bestaan en de engine ze zelf invult -- is issue #11 geworden; de twee
-  verwijzingen in `checks.toml` wijzen daarheen in plaats van naar open punt 6.
+  `CLAUDE.md` of in de open punten van het checkregister. Van de open punten van het
+  register zijn 1, 9, 11 en 13 issues geworden en dragen ze nu een verwijzing daarheen;
+  2 (drempelwaarden), 3 (ADM-003 als regex) en 6 (hoe overstorten in de export verschijnen)
+  staan als afgehandeld gemarkeerd, elk met de plek waar dat te controleren is; en van
+  punt 10 wordt het restant niet opgepakt, wat er met de inhoud bij staat. Wat er onder
+  punt 6 nog wel open stond -- dat `Overnamepunt` en een klasse voor het IT-stelsel niet in
+  de GWSW-ontologie bestaan en de engine ze zelf invult -- is een eigen issue geworden; de
+  twee verwijzingen in `checks.toml` wijzen daarheen in plaats van naar open punt 6. De
+  nummering van de open punten is ongemoeid gelaten, omdat `checks.toml` en twee modules er
+  bij nummer naar verwijzen.
 - `bgt_waterlagen` bevat alleen nog `waterdeel`; `ondersteunendwaterdeel` valt buiten
   scope. Dat is de oever en niet het water zelf, en een streng die een slootkant raakt
   kruist geen watergang. Op De Wolden gaan EXT-002 en EXT-003 daarmee van 993 naar 859
