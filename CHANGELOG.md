@@ -94,6 +94,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- Openstaand werk staat voortaan als GitHub-issue op `mcolee/nlriochecker` en niet meer in
+  `CLAUDE.md` of in de open punten van het checkregister. De punten 1, 9, 11 en 13 en het
+  restant van punt 10 van het register zijn issues #5 tot en met #10 geworden en dragen nu
+  een verwijzing; de nummering is ongemoeid gelaten, omdat `checks.toml` en twee modules
+  naar punt 6 en punt 8 bij nummer verwijzen.
 - `bgt_waterlagen` bevat alleen nog `waterdeel`; `ondersteunendwaterdeel` valt buiten
   scope. Dat is de oever en niet het water zelf, en een streng die een slootkant raakt
   kruist geen watergang. Op De Wolden gaan EXT-002 en EXT-003 daarmee van 993 naar 859

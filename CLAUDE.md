@@ -218,10 +218,9 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - Wat een check NIET heeft bekeken hoort in het rapport: objecten buiten de graaf, weggelaten bevindingen, ontbrekende typeringspoort. Stilte leest als "alles gecontroleerd".
 
 ## Open punten
-- 1773 doodlopende eindknopen in De Wolden: het vrijverval watert af op 2148 knopen waarvan er maar 375 als uitstroompunt gelden. Bepaalt of NET-001 zinvolle uitkomsten geeft. Bij een afgebakende run raakt dit alleen de kern; de contextschil voorkomt dat de grens van het studiegebied zelf als doodlopend eindpunt meetelt.
-- Bij de SHACL-meting komt de put-strengkoppeling in alle drie de CFK's voor, terwijl het register stelt dat die alleen uit Hyd komt (ADM-001).
-- Er is geen SHACL-vorm voor Drempelniveau of Drempelbreedte; RVZ-002 en RVZ-003 gelden daardoor als niet geraakt terwijl ze juist geschrapt zijn omdat de nulmeting ze zou dekken.
-- Negentien TOP- en NET-checks uit het register zijn nog niet gebouwd.
+Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
+`gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
+niemand een openstaand punt in twee toestanden aantreft.
 
 ## Agent skills
 
