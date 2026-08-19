@@ -425,3 +425,18 @@ def test_de_module_kent_de_opdrachtregel_niet() -> None:
         for alias in knoop.names
     }
     assert "click" not in namen
+
+
+def test_onleesbare_geometrie_wordt_geteld_en_gemeld(tmp_path: Path) -> None:
+    """Een object met een kapotte GML-literaal breekt de run niet af, maar zwijgt ook niet.
+
+    De fixture bevat een streng waarvan de lijn maar een coordinaat heeft. GEOS
+    weigert die; de lader telt het object als onleesbaar en de rest loopt door. Dat
+    laatste hoort op het scherm te komen, anders leest een run over een deels
+    onleesbare export als een volledige run.
+    """
+    uitslag = toets(tmp_path, "geometriefout.ttl", check_ids=("TOP-001",))
+
+    assert len(uitslag.dataset.geometry_errors) == 1
+    assert len(uitslag.dataset.conduits) == 2
+    assert any(regel == "  1 objecten met onleesbare geometrie." for regel in uitslag.regels())

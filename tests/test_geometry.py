@@ -83,3 +83,18 @@ def test_is_finite_verdraagt_een_vlak() -> None:
 
     assert is_finite(Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])) is True
     assert is_finite(Polygon([(0, 0), (float("inf"), 0), (1, 1), (0, 1)])) is False
+
+
+def test_lijn_met_een_enkel_punt_is_een_leesfout() -> None:
+    """GEOS gooit hier zijn eigen fout, en die erft niet van `ValueError`.
+
+    Zonder de expliciete tak brak deze literaal het inlezen van de hele export af.
+    Het bedoelde gedrag is dat het object als onleesbaar geteld wordt en de rest
+    gewoon doorgaat.
+    """
+    literal = (
+        '<gml:LineString xmlns:gml="g"><gml:posList srsDimension="2">'
+        "1000.0 2000.0</gml:posList></gml:LineString>"
+    )
+    with pytest.raises(GeometryError, match="onbruikbare LineString-geometrie"):
+        parse_gml(literal)

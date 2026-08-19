@@ -1175,6 +1175,30 @@ FIXTURES["selectie_rollen.ttl"] = (
 )
 
 
+# Een streng waarvan de GML-literaal een lijn met precies een coordinaat bevat. GEOS
+# weigert die, en de lader hoort het object als onleesbaar te tellen in plaats van af
+# te breken. Er staat een gezonde streng naast, zodat zichtbaar is dat de rest
+# gewoon doorloopt.
+FIXTURES["geometriefout.ttl"] = (
+    "streng 2 heeft een lijngeometrie met maar een coordinaat en is dus onleesbaar",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding(
+        "L2",
+        "2",
+        [],
+        "PutB",
+        "PutC",
+        literal=(
+            '<gml:LineString xmlns:gml=\\"http://www.opengis.net/gml\\">'
+            '<gml:posList srsDimension=\\"2\\">1050.0 2000.0</gml:posList></gml:LineString>'
+        ),
+    ),
+)
+
+
 def main() -> None:
     DOEL.mkdir(parents=True, exist_ok=True)
     for naam, (defect, inhoud) in FIXTURES.items():
