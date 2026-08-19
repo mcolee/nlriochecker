@@ -92,10 +92,14 @@ verzwijgen.
 De logica blijft ongewijzigd (`gpkg._richting_bob`, kolom `richting_bob`); alleen de
 weergave verandert.
 
-- `mee` → één groene pijl met de lijnrichting mee.
+- `mee` → één groene pijl met de lijnrichting mee, **klein** (1,8). Dit is het normale
+  geval: op een echte kaart draagt vrijwel elke streng een pijl, en een pijl die groter
+  is dan het putsymbool overstemt precies datgene waar de kaart over gaat. Dat is met
+  een echte PyQGIS-render vastgesteld en daarna bijgesteld van 3,0 naar 1,8.
 - `tegen` → één **rode** pijl, gedraaid over 180°, zodat hij in de BOB-vervalrichting
-  wijst: waar het water werkelijk heen loopt. De dubbele pijl (blauw voor de
-  tekenrichting, rood voor het verval) vervalt.
+  wijst: waar het water werkelijk heen loopt. Groter (3,0) dan de andere twee, want dit
+  is de uitzondering en die mag opvallen. De dubbele pijl (blauw voor de tekenrichting,
+  rood voor het verval) vervalt.
 - `onbekend` → één grijze pijl met de lijnrichting mee.
 
 De pijlkleur staat los van de statuskleur van de lijn; beide lagen het symbool over
@@ -127,4 +131,6 @@ PyQGIS-test (`tests/test_uitvoer_qgis.py`), die op deze machine echt draait: hij
 de GeoPackage als `QgsVectorLayer`, past de default-stijl toe en leest de renderer en
 de maptip terug. Dat toetst harder dan een blik op het scherm -- een ontbrekend
 symbool of een expressie naar een niet-bestaande kolom valt er meteen uit -- maar het
-zegt niets over of het er *goed uitziet*. Dat blijft aan de gebruiker.
+zegt niets over of het er *goed uitziet*. Daarvoor is de kaart tijdens de bouw een keer
+met `QgsMapRendererParallelJob` naar een PNG gerenderd en bekeken; dat leverde één
+bijstelling op (de pijlgrootte hierboven). Het eindoordeel blijft aan de gebruiker.

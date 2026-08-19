@@ -61,6 +61,13 @@ PIJLKLEUR_MEE = "27,120,55"
 PIJLKLEUR_TEGEN = "178,24,43"
 PIJLKLEUR_ONBEKEND = "130,130,130"
 
+# En hun grootte. `mee` is het normale geval en hoort stil te zijn -- op een echte
+# kaart staat er op vrijwel elke streng een pijl, en een luide pijl overstemt dan de
+# putsymbolen die het eigenlijke onderwerp zijn. `tegen` is de uitzondering en mag
+# opvallen: daar loopt het water de andere kant op dan de tekening suggereert.
+PIJLGROOTTE_NORMAAL = 1.8
+PIJLGROOTTE_UITZONDERING = 3.0
+
 
 @dataclass(frozen=True)
 class Puntsymbool:
@@ -295,12 +302,26 @@ def _qml_lijnen() -> str:
     opbouw.regels.append(
         _typeregel(opbouw, _filter_vangnet(LIJNSYMBOLEN), VANGNET_LIJN_LABEL, VANGNET_LIJN)
     )
-    for richting, kleur, hoek, label in (
-        ("mee", PIJLKLEUR_MEE, 0, "BOB volgt de lijnrichting"),
-        ("tegen", PIJLKLEUR_TEGEN, 180, "BOB tegen de lijnrichting in"),
-        ("onbekend", PIJLKLEUR_ONBEKEND, 0, "BOB-richting niet te bepalen"),
+    for richting, kleur, hoek, grootte, label in (
+        ("mee", PIJLKLEUR_MEE, 0, PIJLGROOTTE_NORMAAL, "BOB volgt de lijnrichting"),
+        (
+            "tegen",
+            PIJLKLEUR_TEGEN,
+            180,
+            PIJLGROOTTE_UITZONDERING,
+            "BOB tegen de lijnrichting in",
+        ),
+        (
+            "onbekend",
+            PIJLKLEUR_ONBEKEND,
+            0,
+            PIJLGROOTTE_NORMAAL,
+            "BOB-richting niet te bepalen",
+        ),
     ):
-        naam = opbouw.voeg_symbool_toe(lambda n, k=kleur, h=hoek: _pijlsymbool(n, k, h))
+        naam = opbouw.voeg_symbool_toe(
+            lambda n, k=kleur, h=hoek, g=grootte: _pijlsymbool(n, k, h, g)
+        )
         voorwaarde = f'"richting_bob" = {_tekst(richting)}'
         opbouw.regels.append(
             f"<rule key={quoteattr('{' + opbouw.sleutel() + '}')} "
@@ -378,12 +399,17 @@ def _lijnsymbool(naam: str, symbool: Lijnsymbool, status: str) -> str:
     )
 
 
-def _pijlsymbool(naam: str, kleur: str, hoek: int) -> str:
+def _pijlsymbool(naam: str, kleur: str, hoek: int, grootte: float) -> str:
     """De richtingpijl op het midden van een streng.
 
     `rotate=1` laat de marker met de lijn meedraaien; `angle=180` keert hem om, zodat
     hij bij `tegen` in de BOB-vervalrichting wijst in plaats van met de getekende lijn
     mee.
+
+    De grootte verschilt per geval, en dat is een keuze en geen detail: op een echte
+    kaart draagt vrijwel elke streng een pijl, en een pijl die groter is dan het
+    putsymbool overstemt precies datgene waar de kaart over gaat. `mee` is het normale
+    geval en blijft klein; `tegen` is de uitzondering en mag opvallen.
     """
     return (
         f'<symbol type="line" name={quoteattr(naam)} alpha="1">'
@@ -395,7 +421,7 @@ def _pijlsymbool(naam: str, kleur: str, hoek: int) -> str:
         '<prop k="name" v="filled_arrowhead"/>'
         f'<prop k="color" v={quoteattr(kleur + ",255")}/>'
         f'<prop k="outline_color" v={quoteattr(kleur + ",255")}/>'
-        '<prop k="size" v="3"/>'
+        f'<prop k="size" v={quoteattr(f"{grootte}")}/>'
         f'<prop k="angle" v={quoteattr(str(hoek))}/>'
         "</layer></symbol>"
         "</layer></symbol>"
