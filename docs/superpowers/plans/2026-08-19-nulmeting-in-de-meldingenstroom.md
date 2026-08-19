@@ -49,7 +49,7 @@ hem mee, en `bouw_meldingen` maakt er `Melding`s van naast die van het register.
   - `bouw_nulbevindingen(nulmeting: Nulmeting, dataset: GwswDataset, drempel: float) -> list[Nulbevinding]`
   - `CHECK_VOORVOEGSEL: str = "NULMETING"`
 
-- [ ] **Step 1: schrijf de falende tests**
+- [x] **Step 1: schrijf de falende tests**
 
 `tests/test_nulbevinding.py`, met een handgeschreven TTL waarin één streng
 `:lei1-2-1` met een `BeginpuntLeiding` `:lei1-2-1_o_beg` hangt, plus een put
@@ -65,10 +65,10 @@ def test_systemisch_boven_de_drempel_per_vorm_en_objecttype(...): ...
 def test_onbekend_objecttype_is_nooit_systemisch(...): ...
 ```
 
-- [ ] **Step 2: draai ze en zie ze falen** — `uv run pytest tests/test_nulbevinding.py -q`
-- [ ] **Step 3: schrijf `nulbevinding.py`**
-- [ ] **Step 4: groen** — `uv run pytest tests/test_nulbevinding.py -q`
-- [ ] **Step 5: commit**
+- [x] **Step 2: draai ze en zie ze falen** — `uv run pytest tests/test_nulbevinding.py -q`
+- [x] **Step 3: schrijf `nulbevinding.py`**
+- [x] **Step 4: groen** — `uv run pytest tests/test_nulbevinding.py -q`
+- [x] **Step 5: commit**
 
 ### Task 2: `cfk` op `Melding`, en de nulbevindingen door `bouw_meldingen`
 
@@ -83,7 +83,7 @@ def test_onbekend_objecttype_is_nooit_systemisch(...): ...
 - Produces: `Melding.cfk: tuple[str, ...]`, `BRON_NULMETING = "nulmeting"`,
   `CheckRun.nulbevindingen: tuple[Nulbevinding, ...]`.
 
-- [ ] **Step 1..5** — zelfde TDD-lus: test dat een `CheckRun` met nulbevindingen
+- [x] **Step 1..5** — zelfde TDD-lus: test dat een `CheckRun` met nulbevindingen
   meldingen met `bron="nulmeting"`, gevuld `cfk` en `dimensie="Compliance"` oplevert;
   dat een eigen-checkmelding `cfk == ()` houdt; dat `beperk_tot_studiegebied` een
   nulbevinding buiten het gebied weglaat en een onherleide erin houdt met leeg gebied.
@@ -98,7 +98,7 @@ def test_onbekend_objecttype_is_nooit_systemisch(...): ...
 - Modify: `docs/json-schema.md`
 - Test: `tests/test_uitvoer_herkomst.py`, `tests/test_uitvoer_gpkg.py`
 
-- [ ] **Step 1..5** — de drifttests eisen het veld in het document en de versie in
+- [x] **Step 1..5** — de drifttests eisen het veld in het document en de versie in
   het voorbeeld; de GPKG-test eist de kolom `cfk` in `meldingen`.
 
 ### Task 4: `toetsrun` en `toetsloop` voeren de nulbevindingen aan
@@ -108,7 +108,7 @@ def test_onbekend_objecttype_is_nooit_systemisch(...): ...
 - Modify: `src/nlriochecker/toetsloop.py`
 - Test: `tests/test_toetsrun.py`, `tests/test_toetsloop.py`
 
-- [ ] **Step 1..5** — `_typeringspoort` levert voortaan ook de `Nulmeting` terug,
+- [x] **Step 1..5** — `_typeringspoort` levert voortaan ook de `Nulmeting` terug,
   zodat het rapport één keer gelezen wordt; `toets_gebieden` krijgt
   `nulbevindingen` mee en zet ze op elke run vóór `beperk_tot_studiegebied`.
 
@@ -118,7 +118,7 @@ def test_onbekend_objecttype_is_nooit_systemisch(...): ...
 - Modify: `src/nlriochecker/uitvoer/bevindingen.py` (`_render_checks`)
 - Test: `tests/test_uitvoer_herkomst.py` of een nieuw `tests/test_uitvoer_nulmeting.py`
 
-- [ ] **Step 1..5** — een blok met het aantal nulmetingmeldingen, de verdeling per
+- [x] **Step 1..5** — een blok met het aantal nulmetingmeldingen, de verdeling per
   CFK, en de twee tellingen uit K2 (geen object; object zonder geometrie), ook als
   ze nul zijn.
 
@@ -127,4 +127,23 @@ def test_onbekend_objecttype_is_nooit_systemisch(...): ...
 **Files:**
 - Modify: `CHANGELOG.md`, `README.md`, `CLAUDE.md`, `docs/beslislog.md` (BO-28)
 
-- [ ] **Step 1: schrijf ze** — [ ] **Step 2: `ruff`, `mypy`, `pytest`** — [ ] **Step 3: commit**
+- [x] **Step 1: schrijf ze** — [x] **Step 2: `ruff`, `mypy`, `pytest`** — [x] **Step 3: commit**
+
+
+---
+
+## Uitgevoerd
+
+Alle taken zijn af en op `dev` gecommit; issue #12 is gesloten met een samenvatting van
+de gemaakte keuzes. Twee dingen liepen anders dan gepland:
+
+- **De join loopt ook via `hasConnection`.** Met alleen `hasPart` en `hasAspect` bleven
+  2.183 overtredingen zonder object, waarvan 1.605 op een `Maaiveldorientatie` die in de
+  De Wolden-export via `hasConnection` onder haar putorientatie hangt. De verbinding doet
+  daarom mee als laatste redmiddel in de eerste stap, in beide schrijfrichtingen, met een
+  breedte-eerst-wandeling zodat de uitkomst deterministisch is. Resultaat: 105.385 van de
+  105.963 overtredingen herleiden tot een object.
+- **Taak 5 groeide.** Het rapport moest niet alleen de nulmeting tellen; de codereview
+  wees uit dat `bouw_meldingen` meer afnemers heeft dan de vier schrijvers. `rode_draad`,
+  `gwsw_run` en de opdrachtregel moesten mee, en `CheckRun.weggelaten` telt sindsdien ook
+  de nulbevindingen die de afbakening wegliet. Zie BO-28.
