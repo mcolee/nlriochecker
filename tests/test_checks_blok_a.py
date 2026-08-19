@@ -9,6 +9,7 @@ check van de categorie iets meldt.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -16,7 +17,7 @@ import pytest
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import load_dataset, markeer_vulwaarden
+from nlriochecker.dataset import Aspect, load_dataset, markeer_vulwaarden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -155,6 +156,38 @@ def test_attr013_meldt_een_keer_per_object_met_de_kenmerken() -> None:
     assert any("0.01" in note or "0,01" in note for note in outcome.notes)
 
 
+def test_attr013_noemt_twee_kenmerken_elk_met_hun_eigen_waarde() -> None:
+    """Bij meer dan een vulwaarde blijft de zin lopen en staat het werkwoord in het meervoud.
+
+    De fixture heeft geen object met twee vulwaarden -- put C is er juist de schone
+    tegenhanger -- dus die situatie wordt hier op de geladen dataset nagebootst.
+    """
+    config = fixtureconfig()
+    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl")
+    put = next(node for node in ruw.nodes.values() if node.label == "C")
+    nodes = dict(ruw.nodes)
+    nodes[put.uri] = replace(
+        put,
+        maaiveld_aspect=Aspect("Maaiveldhoogte", "0.0"),
+        deksel_aspect=Aspect("Putdekselniveau", "0.0"),
+    )
+    dataset = markeer_vulwaarden(
+        replace(ruw, nodes=nodes),
+        config.vulwaarden.hoogte_kenmerken,
+        config.vulwaarden.hoogte_band_m,
+    )
+
+    context = CheckContext(dataset=dataset, config=config)
+    outcome = run_checks(context, ["ATTR-013"]).outcomes[0]
+    melding = next(f.message for f in outcome.findings if f.object_label == "C")
+
+    assert melding == (
+        "Maaiveldhoogte op 0.000 m NAP en Putdekselniveau op 0.000 m NAP vallen binnen de "
+        "vulwaardeband van 0.01 m en zijn als niet geregistreerd gelezen in plaats van "
+        "als meting."
+    )
+
+
 def test_hoogtechecks_zwijgen_over_vulwaarden_met_toelichting() -> None:
     for check_id in ("HGT-004", "HGT-014"):
         outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", check_id)
@@ -170,7 +203,35 @@ def test_attr013_zegt_dat_de_regel_uit_staat() -> None:
     outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", "ATTR-013", config)
 
     assert outcome.findings == []
-    assert any("uit" in note for note in outcome.notes)
+    assert any("De vulwaarde-leesregel staat uit" in note for note in outcome.notes)
+
+
+def test_hgt018_verantwoordt_alle_drie_de_overslagredenen() -> None:
+    """`run` heeft BOB, profielmaat en bovenkant nodig; alle drie horen in de notes.
+
+    De fixture levert de eerste twee (put A en B dragen een vulwaarde in het maaiveld,
+    streng 1 een vulwaarde in de BOB); de profielmaat wordt hier weggehaald, want geen
+    enkele fixture kent een streng zonder maatvoering.
+    """
+    config = fixtureconfig()
+    context = context_voor("attr013_vulwaarde_hoogte.ttl", config)
+    conduits = dict(context.dataset.conduits)
+    for uri, conduit in conduits.items():
+        conduits[uri] = replace(
+            conduit,
+            aspects=tuple(
+                aspect
+                for aspect in conduit.aspects
+                if aspect.kind not in ("BreedteLeiding", "HoogteLeiding")
+            ),
+        )
+    kaal = CheckContext(dataset=replace(context.dataset, conduits=conduits), config=config)
+
+    notes = run_checks(kaal, ["HGT-018"]).outcomes[0].notes
+
+    assert any("BOB" in note for note in notes)
+    assert any("profielmaat" in note for note in notes)
+    assert any("bovenkant" in note for note in notes)
 
 
 def test_attr001_noemt_het_bereik_en_het_materiaal() -> None:

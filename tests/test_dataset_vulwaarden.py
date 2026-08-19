@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
-from nlriochecker.dataset import GwswDataset, Vulwaarde, load_dataset, markeer_vulwaarden
+from nlriochecker.dataset import (
+    Aspect,
+    GwswDataset,
+    Vulwaarde,
+    load_dataset,
+    markeer_vulwaarden,
+)
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 KENMERKEN = ["BobBeginpuntLeiding", "BobEindpuntLeiding", "Maaiveldhoogte", "Putdekselniveau"]
@@ -58,3 +65,21 @@ def test_een_kenmerk_buiten_de_lijst_blijft_staan() -> None:
 
     assert put.maaiveld == 0.0
     assert put.vulwaarden == ()
+
+
+def test_negatieve_waarde_binnen_de_band_telt_ook() -> None:
+    """De band is symmetrisch: -0,005 is net zo goed een vulwaarde als +0,005.
+
+    Zo'n waarde staat niet in de fixture -- het GWSW schrijft ze als 0,000 -- maar
+    `markeer_vulwaarden` weegt met `abs()`, en een tekenfout daarin zou anders
+    onopgemerkt blijven.
+    """
+    ruw = _dataset()
+    put = next(node for node in ruw.nodes.values() if node.label == "C")
+    nodes = dict(ruw.nodes)
+    nodes[put.uri] = replace(put, maaiveld_aspect=Aspect("Maaiveldhoogte", "-0.005"))
+
+    dataset = markeer_vulwaarden(replace(ruw, nodes=nodes), KENMERKEN, 0.01)
+
+    assert dataset.nodes[put.uri].maaiveld is None
+    assert dataset.nodes[put.uri].vulwaarden == (Vulwaarde("Maaiveldhoogte", -0.005),)

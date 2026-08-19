@@ -845,10 +845,23 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengeinden zonder BOB of zonder bovenkant zijn overgeslagen."""
+        """Meldt per ontbrekend kenmerk hoeveel strengeinden zijn overgeslagen.
+
+        `run` heeft alle drie de kenmerken nodig -- BOB, profielmaat en bovenkant --
+        en slaat een uiteinde over zodra er een ontbreekt. Alle drie staan hier
+        daarom apart, zodat een lezer ziet welke van de drie de dekking beperkt en
+        niet alleen dat er iets overgeslagen is.
+        """
         uiteinden = _uiteinden(context)
         return [
             *_ontbreekt(context, "BOB", lambda u: u.bob, objecten=uiteinden, soort="strengeinden"),
+            *_ontbreekt(
+                context,
+                "profielmaat (hoogte of breedte) van de streng",
+                lambda u: u.conduit.hoogte_mm or u.conduit.breedte_mm,
+                objecten=uiteinden,
+                soort="strengeinden",
+            ),
             *_ontbreekt(
                 context,
                 "bovenkant (dekselniveau of maaiveld) aan de put",

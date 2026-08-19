@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from datetime import date
 
+from nlriochecker import taal
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -617,16 +618,19 @@ class HoogteOpVulwaarde(Check):
         for object_ in self._objecten(context):
             if not object_.vulwaarden:
                 continue
-            kenmerken = [vul.kind for vul in object_.vulwaarden]
-            waarden = [vul.value for vul in object_.vulwaarden]
+            aantal = len(object_.vulwaarden)
+            opsomming = " en ".join(
+                f"{vul.kind} op {vul.value:.3f} m NAP" for vul in object_.vulwaarden
+            )
             yield self.finding(
                 context,
                 object_.uri,
                 object_.label,
-                f"{', '.join(kenmerken)} staat op {', '.join(f'{w:g}' for w in waarden)} m NAP; "
-                f"binnen de vulwaardeband van {band:g} m geldt dat als niet geregistreerd.",
-                kenmerken=kenmerken,
-                waarden=waarden,
+                f"{opsomming} {taal.vorm(aantal, 'valt', 'vallen')} binnen de vulwaardeband "
+                f"van {band:g} m en {taal.vorm(aantal, 'is', 'zijn')} als niet geregistreerd "
+                "gelezen in plaats van als meting.",
+                kenmerken=[vul.kind for vul in object_.vulwaarden],
+                waarden=[vul.value for vul in object_.vulwaarden],
                 band_m=band,
             )
 
@@ -641,7 +645,8 @@ class HoogteOpVulwaarde(Check):
         return [
             f"Als vulwaarde gold |waarde| <= {opties.hoogte_band_m:g} m op "
             f"{', '.join(opties.hoogte_kenmerken)}. Zo'n kenmerk is als ontbrekend gelezen; "
-            "de hoogtechecks slaan het object over en melden dat in hun toelichting."
+            "de hoogtechecks slaan het object daardoor over en tellen het in hun toelichting "
+            "mee bij de objecten zonder dat kenmerk, zonder de vulwaarde als reden te noemen."
         ]
 
     def examined(self, context: CheckContext) -> int:
