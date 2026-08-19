@@ -71,6 +71,7 @@ class Trefferregister:
 
     _treffers: dict[str, Treffer] = field(default_factory=dict)
     _afstanden: dict[tuple[str, str, str], float] = field(default_factory=dict)
+    _zonder_id: dict[str, set[str]] = field(default_factory=dict)
 
     def registreer(
         self,
@@ -93,6 +94,20 @@ class Trefferregister:
         if afstand_m is not None:
             self._afstanden[(treffer.sleutel, check_id, object_uri)] = afstand_m
         return treffer.sleutel
+
+    def meld_zonder_id(self, check_id: str, bronbestand: str) -> None:
+        """Legt vast dat een bron geen identificatie draagt.
+
+        De check meldt dat in haar toelichting: een sleutel op grond van geometrie is
+        bruikbaar, maar hij verandert zodra de geometrie in de bron wijzigt, en dat
+        hoort de lezer te weten. De staat staat hier en niet op de check zelf, omdat
+        hij bij de run hoort en niet bij het checkobject.
+        """
+        self._zonder_id.setdefault(check_id, set()).add(bronbestand)
+
+    def zonder_id(self, check_id: str) -> tuple[str, ...]:
+        """De bronbestanden waarvoor deze check op de geometriehash terugviel."""
+        return tuple(sorted(self._zonder_id.get(check_id, set())))
 
     def get(self, sleutel: str) -> Treffer | None:
         """De treffer bij deze sleutel, of None als hij niet geregistreerd is."""

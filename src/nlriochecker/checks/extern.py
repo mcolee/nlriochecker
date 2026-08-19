@@ -27,12 +27,39 @@ from nlriochecker.checks.base import (
     SkeletonCheck,
     register,
 )
+from nlriochecker.checks.treffers import Treffer, bouw_sleutel
 from nlriochecker.checks.verbanden import objecten_van_klassen, verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
 from nlriochecker.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
 MARKERING_NIET_TOETSBAAR = "niet betrouwbaar toetsbaar"
+
+# Het URI-voorvoegsel per bron-rol; de sleutel van een treffer wordt
+# `<voorvoegsel>/<bron-id>`. Zie `checks/treffers.py` voor de terugval.
+VOORVOEGSEL = {
+    "bgt_pand": "bgt:pand",
+    "bag_pand": "bag:pand",
+    "bgt_bouwwerk": "bgt:bouwwerk",
+    "bgt_water": "bgt:waterdeel",
+}
+
+MARKERING_ZONDER_ID = (
+    "Een of meer geraakte objecten komen uit een bron zonder identificatie; die dragen "
+    "een sleutel op grond van hun geometrie (`geo:...`) in plaats van hun bron-ID."
+)
+
+
+def _notitie_zonder_id(context: CheckContext, check_id: str) -> list[str]:
+    """De toelichting bij bronnen die geen identificatie dragen, of niets.
+
+    `run()` draait voor `notes()` in `run_checks`, dus wat de check tijdens het
+    draaien in het register meldde staat hier al klaar.
+    """
+    bronbestanden = context.treffers.zonder_id(check_id)
+    if not bronbestanden:
+        return []
+    return [f"{MARKERING_ZONDER_ID} Betreft: {', '.join(bronbestanden)}."]
 
 
 @dataclass(frozen=True)
@@ -247,7 +274,10 @@ class KruisingMetBouwwerk(_ExterneCheck):
             geraakt = self._sterkste(geometrie, lagen, buffer)
             if geraakt is None:
                 continue
-            relatie, afstand, laag = geraakt
+            relatie, afstand, laag, vorm, attributen = geraakt
+            sleutel, aanduiding = self._registreer(
+                context, object_, laag, vorm, attributen, afstand
+            )
             yield self.finding(
                 context,
                 object_.uri,
@@ -259,25 +289,71 @@ class KruisingMetBouwwerk(_ExterneCheck):
                 afstand_m=round(afstand, 3),
                 bron=laag.source.name,
                 laag=laag.layer,
+                object2_uri=sleutel,
+                object2_label=aanduiding,
             )
 
+    def _registreer(self, context, object_, laag, vorm, attributen, afstand: float):
+        """Legt het geraakte bouwwerk vast en levert sleutel en aanduiding terug.
+
+        De GeoPackage-laag `bouwwerken` wordt hieruit gevuld, gejoind op de meldingen;
+        de melding zelf draagt alleen de sleutel en de aanduiding, want een polygoon
+        hoort niet in de CSV of de JSON.
+        """
+        sleutel, terugval = bouw_sleutel(VOORVOEGSEL[laag.role], attributen, vorm)
+        if terugval:
+            context.treffers.meld_zonder_id(self.id, laag.source.name)
+        naam = sleutel.split("/")[-1]
+        soort = attributen.get("type")
+        if laag.role == "bgt_bouwwerk":
+            aanduiding = f"bouwwerk {naam}" + (f" ({soort})" if soort else "")
+        else:
+            aanduiding = f"pand {naam}"
+        context.treffers.registreer(
+            Treffer(
+                sleutel=sleutel,
+                bron=laag.role,
+                label=aanduiding,
+                bronbestand=laag.source.name,
+                geometrie=vorm,
+                attributen=dict(attributen),
+            ),
+            check_id=self.id,
+            object_uri=object_.uri,
+            afstand_m=round(afstand, 3),
+        )
+        return sleutel, aanduiding
+
     def _sterkste(self, geometrie, lagen, buffer: float):
-        """De zwaarste relatie met een bouwwerk binnen de buffer, met afstand en laag.
+        """De zwaarste relatie met een bouwwerk binnen de buffer.
 
         Bij gelijke relatie wint het dichtstbijzijnde bouwwerk; zo hangt de melding
         niet af van de volgorde waarin de lagen toevallig gelezen zijn.
+
+        Levert `(relatie, afstand, laag, vorm, attributen)`. De vorm en de attributen
+        zijn nodig om de treffer te registreren voor de GIS-uitvoer; de keuze zelf
+        verandert er niet door, want de vergelijking blijft op `(volgorde, afstand)`.
         """
         beste = None
         for laag in lagen:
-            for vorm, _ in laag.nabij(geometrie, buffer):
+            for vorm, attributen in laag.nabij(geometrie, buffer):
                 afstand = geometrie.distance(vorm)
                 if afstand > buffer:
                     continue
                 relatie = self._relatie(geometrie, vorm, afstand)
-                kandidaat = (RELATIE_VOLGORDE.index(relatie), afstand, relatie, laag)
+                kandidaat = (
+                    RELATIE_VOLGORDE.index(relatie),
+                    afstand,
+                    relatie,
+                    laag,
+                    vorm,
+                    attributen,
+                )
                 if beste is None or kandidaat[:2] < beste[:2]:
                     beste = kandidaat
-        return None if beste is None else (beste[2], beste[1], beste[3])
+        if beste is None:
+            return None
+        return (beste[2], beste[1], beste[3], beste[4], beste[5])
 
     def _relatie(self, geometrie, bouwwerk, afstand: float) -> str:
         """De relatie tussen object en bouwwerk: binnen, kruist of nabij."""
@@ -318,7 +394,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
         return bool(self.bouwwerklagen(context))
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt welke pandbronnen gebruikt zijn."""
+        """Meldt welke pandbronnen gebruikt zijn, en of er identificaties ontbraken."""
         if context.bronnen is None or context.bronnen.extent is None:
             return _bereiknotities(context, self.selectie(context), self.soort)
         gebruikt = self.bouwwerklagen(context)
@@ -328,6 +404,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
         return [
             *_bereiknotities(context, self.selectie(context), self.soort),
             f"Getoetst tegen: {omschrijving}.",
+            *_notitie_zonder_id(context, self.id),
         ]
 
 

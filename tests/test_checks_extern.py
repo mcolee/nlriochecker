@@ -314,3 +314,49 @@ def test_hgt001_gebruikt_het_juiste_lidwoord(config: CheckConfig, bronnen: Exter
 
     bevinding = next(f for f in outcome.findings if f.details["bron"] == "maaiveldhoogte")
     assert bevinding.message.startswith("De maaiveldhoogte ")
+
+
+def test_ext001_wijst_het_geraakte_pand_aan(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Alle vier de bevindingen raken hetzelfde pand uit de BGT-fixture."""
+    outcome = uitkomst("EXT-001", config, bronnen)
+
+    uris = {finding.details["object2_uri"] for finding in outcome.findings}
+    aanduidingen = {finding.details["object2_label"] for finding in outcome.findings}
+
+    assert uris == {"bgt:pand/pand-1"}
+    assert aanduidingen == {"pand pand-1"}
+
+
+def test_ext001_registreert_de_treffer_met_geometrie(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-001"])
+
+    treffer = run.treffers.get("bgt:pand/pand-1")
+    assert treffer is not None
+    assert treffer.bron == "bgt_pand"
+    assert treffer.bronbestand == "bgt.gpkg"
+    assert treffer.geometrie.geom_type in {"Polygon", "MultiPolygon"}
+    assert len(run.treffers) == 1
+
+
+def test_ext001_bewaart_de_afstand_per_melding(config: CheckConfig, bronnen: ExternalData) -> None:
+    """`Melding` draagt de afstand niet; de laag haalt hem uit het register."""
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-001"])
+    streng = next(f for f in run.findings if f.object_label == "1")
+
+    assert run.treffers.afstand("bgt:pand/pand-1", "EXT-001", streng.object_uri) == 0.0
+
+
+def test_ext001_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:
+    """De detectie blijft gelijk; er komt alleen een verwijzing bij."""
+    outcome = uitkomst("EXT-001", config, bronnen)
+    relaties = {finding.object_label: finding.details["waarde"] for finding in outcome.findings}
+
+    assert relaties == {"1": "kruist", "4": "binnen", "P": "binnen", "Q": "binnen"}

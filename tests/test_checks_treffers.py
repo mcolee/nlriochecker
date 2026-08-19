@@ -90,3 +90,14 @@ def test_over_de_treffers_lopen() -> None:
 
 def test_onbekende_sleutel_geeft_none() -> None:
     assert Trefferregister().get("bgt:pand/weg") is None
+
+
+def test_bron_zonder_id_wordt_per_check_gemeld() -> None:
+    """De check meldt in haar toelichting dat de sleutel uit de geometrie komt."""
+    register = Trefferregister()
+
+    register.meld_zonder_id("EXT-001", "bgt.gpkg")
+    register.meld_zonder_id("EXT-001", "bgt.gpkg")
+
+    assert register.zonder_id("EXT-001") == ("bgt.gpkg",)
+    assert register.zonder_id("EXT-003") == ()
