@@ -99,7 +99,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   register zijn 1, 9, 11 en 13 issues geworden en dragen ze nu een verwijzing daarheen;
   2 (drempelwaarden), 3 (ADM-003 als regex) en 6 (hoe overstorten in de export verschijnen)
   staan als afgehandeld gemarkeerd, elk met de plek waar dat te controleren is; en van
-  punt 10 wordt het restant niet opgepakt, wat er met de inhoud bij staat. Wat er onder
+  punt 10 wordt het restant niet opgepakt -- er is geen Mds-nulmetingrapport beschikbaar,
+  en daarmee valt het buiten scope -- wat er met de inhoud bij staat. Wat er onder
   punt 6 nog wel open stond -- dat `Overnamepunt` en een klasse voor het IT-stelsel niet in
   de GWSW-ontologie bestaan en de engine ze zelf invult -- is een eigen issue geworden; de
   twee verwijzingen in `checks.toml` wijzen daarheen in plaats van naar open punt 6. De
