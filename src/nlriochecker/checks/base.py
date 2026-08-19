@@ -12,6 +12,7 @@ from shapely.geometry import Point
 
 from nlriochecker.afbakening import Analyseset, objecten_in_gebied
 from nlriochecker.checkconfig import CheckConfig
+from nlriochecker.checks.treffers import Trefferregister
 from nlriochecker.dataset import GwswDataset
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import ExternalData
@@ -85,6 +86,12 @@ class CheckContext:
     # draaien de karakteristiek en de checks met `volledig_bereik` per gebied opnieuw
     # over de hele export.
     gedeelde_volledige_context: CheckContext | None = field(default=None, compare=False, repr=False)
+    # De externe objecten die de EXT-checks tijdens deze run raken. Mutabel, net als
+    # `_cache`: een check registreert zijn treffer terwijl hij draait, en `run_checks`
+    # bouwt de `CheckOutcome` pas als de generator leeg is. Het register doet geen
+    # uitspraken -- alleen wat een melding aanwijst komt in de uitvoer terecht -- dus
+    # een entry die blijft staan kan geen verkeerde laag opleveren.
+    treffers: Trefferregister = field(default_factory=Trefferregister, compare=False, repr=False)
     _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     def volledige_context(self) -> CheckContext:
@@ -199,6 +206,10 @@ class CheckRun:
     # verschillende dingen over -- Markdown zweeg terwijl de JSON `volledig: false`
     # beweerde.
     meetbereik: Meetbereik = field(default_factory=lambda: Meetbereik.niet_gemeten(()))
+    # Het trefferregister van de context waarop deze run gedraaid heeft; de
+    # GeoPackage-schrijver joint de meldingen erop om de lagen met externe objecten te
+    # vullen. Zie `checks/treffers.py`.
+    treffers: Trefferregister = field(default_factory=Trefferregister, compare=False, repr=False)
     _binnen: frozenset[str] | None = field(default=None, compare=False, repr=False)
 
     @property
@@ -444,4 +455,5 @@ def run_checks(
         ),
         config=context.config,
         analyseset=context.analyseset,
+        treffers=context.treffers,
     )

@@ -29,6 +29,7 @@ from dataclasses import dataclass, replace
 from nlriochecker.afbakening import GedeeldeIndex, bouw_analyseset, bouw_gedeelde_index
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
+from nlriochecker.checks.treffers import Trefferregister
 from nlriochecker.dataset import GwswDataset
 from nlriochecker.externedata import ExternalData
 from nlriochecker.meting import Meetbereik
@@ -126,11 +127,16 @@ def _per_gebied(
 ) -> GebiedsRun:
     """Bouwt de analyseset van een gebied en draait er de checks op."""
     analyseset = bouw_analyseset(basis.dataset, area, config, gedeeld=gedeeld)
+    # Vers register en verse cache per gebied. Een gedeeld register zou geen verkeerde
+    # laag opleveren -- de join op de meldingen van dit gebied beslist -- maar het zou
+    # wel meegroeien met het aantal buurten en bij het debuggen treffers van een ander
+    # gebied tonen.
     context = replace(
         basis,
         dataset=analyseset.dataset,
         analyseset=analyseset,
         gedeelde_volledige_context=volledig,
+        treffers=Trefferregister(),
         _cache={},
     )
     naam = area.gebied or area.name

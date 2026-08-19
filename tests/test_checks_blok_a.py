@@ -319,3 +319,13 @@ def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
 
     assert eerste.volledige_context() is gedeeld
     assert tweede.volledige_context() is gedeeld
+
+
+def test_de_run_draagt_het_trefferregister_van_zijn_context() -> None:
+    """De GeoPackage-schrijver joint de meldingen later op dit register."""
+    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    run = run_checks(context, ["TOP-001"])
+
+    assert run.treffers is context.treffers
