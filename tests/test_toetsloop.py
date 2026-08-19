@@ -8,16 +8,18 @@ Zonder die eigenschap is rapportage per gebied niet te vertrouwen.
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import date
 from pathlib import Path
 
 import pytest
 from shapely.geometry import Point, box, mapping
 
-from gpkghelper import schrijf_buurten
+from gpkghelper import schrijf_buurten, schrijf_vlakken
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import StudyAreaError
+from nlriochecker.externedata import load_external_data
 from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
@@ -315,3 +317,62 @@ def test_overgeslagen_geometrieen_staan_in_het_rapport(tmp_path: Path) -> None:
 
     rapport = (tmp_path / "uit" / "bevindingen.md").read_text(encoding="utf-8")
     assert "Studiegebiedbestand" in rapport and "Point" in rapport
+
+
+def _laag_ids(pad: Path, laag: str) -> list[str]:
+    """De id-kolom van een laag in een geschreven GeoPackage."""
+    verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    try:
+        return [rij[0] for rij in verbinding.execute(f'select id from "{laag}"')]
+    finally:
+        verbinding.close()
+
+
+def test_treffers_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
+    """Een pand dat alleen vanuit Noord geraakt wordt, hoort niet in de uitvoer van Zuid.
+
+    Dat volgt uit de strikte aansluiting: de laag komt uit de meldingen van dat
+    gebied, niet uit het register.
+    """
+    bron = tmp_path / "bron"
+    bron.mkdir()
+    schrijf_vlakken(
+        bron / "bgt.gpkg", "pand", [({"lokaal_id": "p-noord"}, box(1000, 2000.5, 1010, 2005))]
+    )
+    schrijf_vlakken(
+        bron / "studiegebied.gpkg",
+        "studiegebied",
+        [({"lokaal_id": "g"}, box(990, 1985, 1160, 2015))],
+    )
+    config = _config()
+    bronnen = load_external_data(
+        config.bronnen.model_copy(
+            update={
+                "map": ".",
+                "bgt": "bgt.gpkg",
+                "bag_pand": None,
+                "nwb_wegvakken": None,
+                "studiegebied": "studiegebied.gpkg",
+                "ahn_dtm": None,
+                "bgt_pandlagen": ["pand"],
+            }
+        ),
+        bron,
+    )
+    gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
+
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        gebieden,
+        config,
+        bronnen=bronnen,
+        check_ids=["EXT-001"],
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    schrijf_uitvoer_gebieden(runs, tmp_path / "uit", RUNDATUM)
+
+    noord = next((tmp_path / "uit" / "noord").glob("*.gpkg"))
+    zuid = next((tmp_path / "uit" / "zuid").glob("*.gpkg"))
+
+    assert _laag_ids(noord, "bouwwerken") == ["bgt:pand/p-noord"]
+    assert _laag_ids(zuid, "bouwwerken") == []

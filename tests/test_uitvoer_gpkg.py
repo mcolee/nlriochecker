@@ -14,7 +14,9 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from shapely.geometry import box
 
+from gpkghelper import schrijf_vlakken
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
@@ -638,3 +640,85 @@ def test_lege_lagen_bestaan_en_zijn_geregistreerd(tmp_path: Path) -> None:
         geregistreerd = _rijen(pad, "select count(*) from gpkg_contents where table_name = ?", laag)
         gestyled = _rijen(pad, "select count(*) from layer_styles where f_table_name = ?", laag)
         assert (geregistreerd[0][0], gestyled[0][0]) == (1, 1)
+
+
+def _bronnen_met_pand(
+    map_pad: Path,
+    vlakken: list[tuple[dict[str, str], object]],
+    kolommen: tuple[str, ...] = ("lokaal_id",),
+) -> ExternalData:
+    """Miniatuurbronnen met een zelfgekozen pandenlaag, zonder dekkingspoort."""
+    map_pad.mkdir(parents=True, exist_ok=True)
+    schrijf_vlakken(map_pad / "bgt.gpkg", "pand", vlakken, kolommen)
+    schrijf_vlakken(
+        map_pad / "studiegebied.gpkg",
+        "studiegebied",
+        [({"lokaal_id": "gebied"}, box(990, 1985, 1160, 2015))],
+    )
+    basis = load_check_config().bronnen.model_copy(
+        update={
+            "map": ".",
+            "bgt": "bgt.gpkg",
+            "bag_pand": None,
+            "nwb_wegvakken": None,
+            "studiegebied": "studiegebied.gpkg",
+            "ahn_dtm": None,
+            "bgt_pandlagen": ["pand"],
+        }
+    )
+    return load_external_data(basis, map_pad)
+
+
+def _run_met_bronnen(bronnen: ExternalData, *check_ids: str) -> CheckRun:
+    """Draait checks op de EXT-scenariofixture met eigen bronnen."""
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl")
+    context = CheckContext(dataset=dataset, config=_config(), bronnen=bronnen)
+    return run_checks(context, list(check_ids))
+
+
+def test_nabij_geval_komt_in_de_laag(tmp_path: Path) -> None:
+    """Een pand op 0,5 m van streng 1 en knoop A: geen raakvlak, wel binnen de buffer."""
+    bronnen = _bronnen_met_pand(
+        tmp_path / "bron", [({"lokaal_id": "p-nabij"}, box(1000, 2000.5, 1010, 2005))]
+    )
+    run = _run_met_bronnen(bronnen, "EXT-001")
+
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
+    rijen = _laagrijen(pad, "bouwwerken")
+
+    assert [rij["id"] for rij in rijen] == ["bgt:pand/p-nabij"]
+    assert rijen[0]["relatie"] == "nabij"
+    assert rijen[0]["aantal_meldingen"] == 2
+    assert rijen[0]["afstand_min_m"] == 0.5
+
+
+def test_bron_zonder_id_levert_een_geo_sleutel(tmp_path: Path) -> None:
+    """Externe data is context, geen poort: een bron zonder ID mag niet hard falen."""
+    bronnen = _bronnen_met_pand(
+        tmp_path / "bron",
+        [({"soort": "pand"}, box(1000, 2000.5, 1010, 2005))],
+        kolommen=("soort",),
+    )
+    run = _run_met_bronnen(bronnen, "EXT-001")
+
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
+    rijen = _laagrijen(pad, "bouwwerken")
+
+    assert rijen[0]["id"].startswith("geo:")
+    assert any("geo:" in note for note in run.outcomes[0].notes)
+
+
+def test_geo_sleutel_is_stabiel_over_runs(tmp_path: Path) -> None:
+    """Twee identieke runs moeten dezelfde sleutel opleveren."""
+    sleutels = []
+    for naam in ("een", "twee"):
+        bronnen = _bronnen_met_pand(
+            tmp_path / naam,
+            [({"soort": "pand"}, box(1000, 2000.5, 1010, 2005))],
+            kolommen=("soort",),
+        )
+        run = _run_met_bronnen(bronnen, "EXT-001")
+        sleutels.append({finding.details["object2_uri"] for finding in run.findings})
+
+    assert sleutels[0] == sleutels[1]
+    assert len(sleutels[0]) == 1

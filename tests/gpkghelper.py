@@ -23,6 +23,34 @@ from shapely.geometry.base import BaseGeometry
 RD_NEW = 28992
 
 
+def schrijf_vlakken(
+    pad: Path,
+    laag: str,
+    vlakken: list[tuple[dict[str, str], BaseGeometry]],
+    kolommen: tuple[str, ...] = ("lokaal_id",),
+) -> Path:
+    """Schrijft een vlakkenlaag met vrije tekstkolommen naar een GeoPackage.
+
+    Voor de EXT-tests: een BGT-achtige laag met of juist zonder `lokaal_id`, zodat
+    zowel de gewone sleutel als de terugval op de geometriehash te toetsen is. Bestaat
+    het bestand al, dan komt de laag erbij; zo passen meerdere rollen in een bestand,
+    net als in de echte BGT-export.
+
+    Met geopandas geschreven en niet met stdlib `sqlite3`, anders dan `schrijf_buurten`
+    hieronder: `externedata.py` leest zijn lagen via pyogrio, en dat weigert een
+    GeoPackage zonder `gpkg_spatial_ref_sys`. Dezelfde route als
+    `scripts/maak_gis_fixtures.py`, dus geen extra afhankelijkheid.
+    """
+    import geopandas as gpd
+
+    frame = gpd.GeoDataFrame(
+        {kolom: [attributen.get(kolom, "") for attributen, _ in vlakken] for kolom in kolommen},
+        geometry=[vlak for _, vlak in vlakken],
+    )
+    frame.set_crs(f"EPSG:{RD_NEW}", allow_override=True).to_file(pad, layer=laag, driver="GPKG")
+    return pad
+
+
 def schrijf_buurten(
     pad: Path,
     vlakken: list[tuple[str, BaseGeometry]],
