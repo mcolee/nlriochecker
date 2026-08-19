@@ -202,7 +202,7 @@ class VervallenObjectInActiefNetwerk(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel objecten geen einddatum hebben."""
-        objecten = [*netwerkknopen(context), *leidingen(context)]
+        objecten: list[Node | Conduit] = [*netwerkknopen(context), *leidingen(context)]
         met_einde = sum(1 for object_ in objecten if object_.date("Einddatum") is not None)
         if met_einde:
             return [f"{met_einde} van de {len(objecten)} objecten hebben een einddatum."]
@@ -376,12 +376,12 @@ class PutonderdelenZonderVerbinding(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten meer dan een onderdeel hebben."""
-        putten = netwerkknopen(context)
-        met_delen = sum(1 for node in putten if len(self._onderdelen(context, node)) >= 2)
+        knopen = netwerkknopen(context)
+        met_delen = sum(1 for node in knopen if len(self._onderdelen(context, node)) >= 2)
         if met_delen:
-            return [f"{met_delen} van de {len(putten)} putten hebben meer dan een onderdeel."]
+            return [f"{met_delen} van de {len(knopen)} putten hebben meer dan een onderdeel."]
         return [
-            f"Geen van de {len(putten)} putten heeft meer dan een compartiment; er valt "
+            f"Geen van de {len(knopen)} putten heeft meer dan een compartiment; er valt "
             "niets te verbinden en er is dus niets getoetst."
         ]
 
@@ -449,12 +449,12 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten compartimenten hebben."""
-        putten = netwerkknopen(context)
-        met = sum(1 for node in putten if self._compartimenten(context, node))
+        knopen = netwerkknopen(context)
+        met = sum(1 for node in knopen if self._compartimenten(context, node))
         if met:
-            return [f"{met} van de {len(putten)} putten hebben compartimenten."]
+            return [f"{met} van de {len(knopen)} putten hebben compartimenten."]
         return [
-            f"Geen van de {len(putten)} putten heeft compartimenten; elke leiding hoort dan "
+            f"Geen van de {len(knopen)} putten heeft compartimenten; elke leiding hoort dan "
             "aan de put zelf te hangen en er is niets getoetst."
         ]
 

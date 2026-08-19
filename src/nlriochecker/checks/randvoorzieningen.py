@@ -53,7 +53,7 @@ class Drempel:
 def bbb_notitie(context: CheckContext) -> list[str]:
     """Meldt of er bergbezinkvoorzieningen zijn en wat er buiten de toets valt."""
     knopen = bergbezinkvoorzieningen(context)
-    leidingen = bergbezinkleidingen(context)
+    riolen = bergbezinkleidingen(context)
     notities: list[str] = []
     if not knopen:
         klassen = ", ".join(context.config.klassen.bergbezinkvoorziening) or "geen"
@@ -62,12 +62,12 @@ def bbb_notitie(context: CheckContext) -> list[str]:
             f"bergbezinkvoorziening van de geconfigureerde klassen ({klassen}); er is niets "
             "getoetst."
         )
-    if leidingen:
+    if riolen:
         notities.append(
-            f"{len(leidingen)} bergbezinkriolen staan als leiding geregistreerd en niet als "
+            f"{len(riolen)} bergbezinkriolen staan als leiding geregistreerd en niet als "
             "bouwwerk. Deze check redeneert over de voorziening als knoop in het netwerk "
             "(aanvoer, lediging, nooduitlaat) en laat die leidingen buiten beschouwing; "
-            f"het gaat om: {', '.join(sorted(conduit.label for conduit in leidingen)[:10])}."
+            f"het gaat om: {', '.join(sorted(conduit.label for conduit in riolen)[:10])}."
         )
     return notities
 

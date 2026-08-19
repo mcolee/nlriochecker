@@ -121,8 +121,11 @@ class CheckContext:
         Het type volgt uit `bouw`, zodat de bellers hun eigen structuur terugkrijgen
         en niet `object`. De cache zelf bewaart ze door elkaar en kan dat niet
         vasthouden; die ene `cast` is de prijs. Hij is veilig zolang een sleutel
-        altijd met dezelfde `bouw` gevuld wordt -- de sleutels zijn per module
-        voorvoegsel gescheiden (`rvz:`, `net:`, `top:`).
+        altijd met dezelfde `bouw` gevuld wordt, en daar zorgt het voorvoegsel voor:
+        elk voorvoegsel heeft een eigenaar. `hgt:` en `rvz:` zijn van hun eigen
+        checkmodule; `sel:` en `aansluitingen:` zijn juist gedeeld en horen bij
+        `checks/selectie.py` respectievelijk `checks/verbanden.py`, die als enige
+        die sleutels vullen.
         """
         if sleutel not in self._cache:
             self._cache[sleutel] = bouw()

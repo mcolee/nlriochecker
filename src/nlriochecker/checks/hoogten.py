@@ -165,9 +165,9 @@ class BobBuitenDePut(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt welk deel van de toets niet uitgevoerd kon worden."""
-        putten = netwerkknopen(context)
-        zonder_boven = sum(1 for node in putten if node.bovenkant is None)
-        zonder_bodem = sum(1 for node in putten if node.bodem is None)
+        knopen = netwerkknopen(context)
+        zonder_boven = sum(1 for node in knopen if node.bovenkant is None)
+        zonder_bodem = sum(1 for node in knopen if node.bodem is None)
         notities = [
             "Het GWSW kent geen kenmerk `Putbodemniveau`; de bodem volgt uit het "
             "bovenkantniveau min `HoogtePut`. Ontbreekt een van die twee, dan blijft de "
@@ -175,12 +175,12 @@ class BobBuitenDePut(_StrengCheck):
         ]
         if zonder_boven:
             notities.append(
-                f"{zonder_boven} van de {len(putten)} putten hebben geen putdekselniveau en "
+                f"{zonder_boven} van de {len(knopen)} putten hebben geen putdekselniveau en "
                 "geen maaiveldhoogte; daar is de bovenkant niet te toetsen."
             )
         if zonder_bodem:
             notities.append(
-                f"{zonder_bodem} van de {len(putten)} putten hebben geen afleidbaar "
+                f"{zonder_bodem} van de {len(knopen)} putten hebben geen afleidbaar "
                 "bodemniveau; daar is de bodemtoets overgeslagen."
             )
         return notities
