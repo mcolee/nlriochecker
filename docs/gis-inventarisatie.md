@@ -49,7 +49,7 @@ voordat een EXT- of AHN-check draait.
 | --- | ---: | --- | --- |
 | `pand` | 199 | multipolygoon | `bgt_pand` — EXT-001 |
 | `waterdeel` | 233 | polygoon | `bgt_water` — EXT-002, EXT-003, EXT-007 |
-| `ondersteunendwaterdeel` | 94 | polygoon | `bgt_water` — idem |
+| `ondersteunendwaterdeel` | 94 | polygoon | geen check — buiten scope, zie BO-24 |
 | `wegdeel` | 192 | polygoon | geen check |
 | `begroeidterreindeel` | 429 | polygoon | geen check |
 | `onbegroeidterreindeel` | 136 | polygoon | geen check |

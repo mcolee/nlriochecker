@@ -148,7 +148,11 @@ ahn_dtm = "AHN6_DeWoldenHoogeveen_DTM.tif"
 # zie docs/gis-inventarisatie.md. Een lege of ontbrekende laag laat de bijbehorende
 # checks overslaan met de melding "laag niet aanwezig in aangeleverde data".
 bgt_pandlagen = ["pand"]
-bgt_waterlagen = ["waterdeel", "ondersteunendwaterdeel"]
+# Alleen `waterdeel`, nooit `ondersteunendwaterdeel`: dat is de oever en niet het water
+# zelf, en een streng die een slootkant raakt kruist geen watergang. Binnen `waterdeel`
+# telt elk type mee (waterloop, greppel/droge sloot, watervlakte, zee); daar wordt niet
+# op gefilterd. Zie BO-24 in de beslislog.
+bgt_waterlagen = ["waterdeel"]
 # De BGT-laag `put` telt hier 843 objecten, waarvan 595 van ProRail en 72 van de twee
 # gemeenten samen; tegenover ruim 23.000 GWSW-putten is dat geen putdekselbron maar
 # spoorinfrastructuur. EXT-005 en EXT-006 slaan daarom over.

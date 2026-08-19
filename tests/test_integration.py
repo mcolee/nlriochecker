@@ -211,7 +211,8 @@ def test_externe_bronnen_van_koekangerveld() -> None:
     assert bronnen.extent.area / 10_000 == pytest.approx(43.2, abs=0.5)
     assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
         "bgt_pand": 199,
-        "bgt_water": 327,
+        # Alleen `waterdeel`; `ondersteunendwaterdeel` (94 oevers) valt buiten scope.
+        "bgt_water": 233,
         "bgt_bouwwerk": 52,
         "bag_pand": 166,
         "nwb_wegvak": 13,

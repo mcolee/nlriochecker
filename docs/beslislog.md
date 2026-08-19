@@ -1129,3 +1129,41 @@ docstring van beide functies uitgelegd.
 **Wanneer dit heroverwogen hoort te worden.** Als er een schrijver bijkomt die zijn
 meldingen zelf ophaalt in plaats van ze aangereikt te krijgen. Dan is de invariant wel
 degelijk schendbaar, en weegt hij op tegen de testbaarheid.
+
+### BO-24 De oever telt niet als watergang
+
+**Wat.** `bgt_waterlagen` bevat alleen `waterdeel`, nooit `ondersteunendwaterdeel`. Die
+laatste laag valt buiten scope voor de hele analyse. Binnen `waterdeel` telt elk type
+mee; er wordt niet op `type` gefilterd.
+
+**Waarom.** EXT-002 en EXT-003 gaan over een streng die een watergang kruist, en EXT-007
+over een lozingspunt bij ontvangend oppervlaktewater. `ondersteunendwaterdeel` is in de
+BGT de oever: van de 44.144 objecten in de De Wolden-export draagt 44.143 het type
+`oever, slootkant` en één `transitie`. Een streng die een slootkant raakt kruist geen
+water. Erger nog: de check stopt na het eerste waterdeel per streng (BO-18), dus een
+oever die eerder in de index staat dan de sloot waar hij bij hoort, verdringt de echte
+kruising uit de melding.
+
+**De meting.** Op de eerste volledige run over De Wolden + Hoogeveen (2026-08-19) meldden
+EXT-002 en EXT-003 elk 993 strengen. Naar BGT-type: waterloop 514, oever/slootkant 306,
+greppel/droge sloot 109, watervlakte 64. Bijna een derde van de meldingen ging dus over
+een oever. Op Koekangerveld viel dat niet op: daar telt `ondersteunendwaterdeel` 94
+objecten en ging het om enkele meldingen.
+
+**Waarom niet op type filteren binnen `waterdeel`.** De verleiding is om ook
+`greppel, droge sloot` (21.673 van de 97.148 objecten in De Wolden) te laten vallen: droog
+is geen watergang. Dat is niet gedaan. Een greppel is een watervoerend element dat bij
+neerslag wel degelijk water afvoert, en of hij ter plaatse droog staat is een momentopname
+en geen eigenschap van de kruising. Bovendien is de scheiding tussen laag en type
+principieel: de laag zegt *wat het object is* (water of oever), het type zegt *hoe het
+eruitziet*. Alleen het eerste hoort de populatie te bepalen.
+
+**Waarom in de config en niet in de code.** `bgt_waterlagen` blijft een lijst in de
+projectconfiguratie, zoals alle laagrollen. Een export met andere laagnamen moet die
+kunnen aanwijzen. Wat hier verandert is de standaard, en de reden staat in het configbestand
+zelf zodat wie hem overschrijft weet wat hij weggooit.
+
+**Gevolg voor de meldingidentiteit.** De meldingen die op een oever stonden verdwijnen, en
+strengen die zowel een oever als een echte watergang kruisen kunnen een andere `object2_uri`
+krijgen dan voorheen. Hun `melding_id` verschuift daarmee eenmalig, net als bij BO-19: een
+trendvergelijking over die grens heen laat ze als opgelost plus nieuw zien.
