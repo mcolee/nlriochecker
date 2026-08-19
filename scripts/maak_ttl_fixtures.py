@@ -2,8 +2,10 @@
 """Schrijft de TTL-fixtures onder tests/fixtures/ttl.
 
 Elke fixture bevat precies een ingebouwd defect, met bovenaan in een DEFECT-regel
-wat dat defect is. De prelude met de klassenhierarchie is voor alle fixtures
-gelijk; die staat hier een keer in plaats van twintig keer in de bestanden.
+wat dat defect is. De uitzondering is `selectie_rollen.ttl`: die bevat geen defect
+maar een object per klassenrol, om de selecties uit `checks/selectie.py` te dekken.
+De prelude met de klassenhierarchie is voor alle fixtures gelijk; die staat hier een
+keer in plaats van twintig keer in de bestanden.
 
 Gebruik:  uv run python scripts/maak_ttl_fixtures.py
 """
@@ -1111,6 +1113,65 @@ FIXTURES["ext_scenario.ttl"] = (
     )
     # Streng 4 verbindt de lozingsputten met het net.
     + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35)),
+)
+
+
+# Geen check maar de klassenselecties uit checks/selectie.py: het Juinen-voorbeeld
+# bevat maar zes van de veertien rollen, en een selectie die stil leeg blijft leest
+# als "die rol komt niet voor". Hier staat precies een object per ontbrekende rol.
+FIXTURES["selectie_rollen.ttl"] = (
+    "geen -- deze fixture dekt de klassenselecties, niet een gebrek",
+    # Bergbezinkleiding staat niet in de gedeelde prelude; alleen deze fixture heeft
+    # hem nodig. De regel gaat met een toelichting mee het bestand in, zodat hij daar
+    # niet als een losse zwerver leest.
+    "# Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude"
+    " kent haar niet.\n"
+    "gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .\n\n"
+    + put("Put1", "Put1", 1000.0, 2000.0)
+    + put("Lozing1", "Lozing1", 1050.0, 2000.0, klasse="Lozingsput")
+    + put("Val1", "Val1", 1200.0, 2000.0, klasse="Valput")
+    # Overstortput en loze put staan hier ook, zodat de fixture alle veertien rollen
+    # dekt zonder het Juinen-voorbeeld: dat staat in data/ en ontbreekt in een
+    # schone kloon, en dan zou de dekkingstest stil overslaan.
+    + put("Overstort1", "Overstort1", 1250.0, 2000.0, klasse="Overstortput")
+    + put("Loos1", "Loos1", 1300.0, 2000.0, klasse="LozePut")
+    # Een uitlaatconstructie en een bergbezinkbassin zijn bouwwerken, geen putten;
+    # hun orientatie is dus een Bouwwerkorientatie.
+    + put("Uitlaat1", "Uitlaat1", 1100.0, 2000.0, klasse="Uitlaatconstructie").replace(
+        "gwsw:Putorientatie", "gwsw:Bouwwerkorientatie"
+    )
+    + put("Bbb1", "Bbb1", 1150.0, 2000.0, klasse="Bergbezinkbassin").replace(
+        "gwsw:Putorientatie", "gwsw:Bouwwerkorientatie"
+    )
+    + leiding("L1", "L1", [(1000.0, 2000.0), (1050.0, 2000.0)], "Put1", "Lozing1")
+    + leiding(
+        "L2",
+        "L2",
+        [(1050.0, 2000.0), (1100.0, 2000.0)],
+        "Lozing1",
+        "Uitlaat1",
+        klasse="Overstortleiding",
+    )
+    + leiding(
+        "L3",
+        "L3",
+        [(1100.0, 2000.0), (1150.0, 2000.0)],
+        "Uitlaat1",
+        "Bbb1",
+        klasse="Bergbezinkleiding",
+    )
+    + leiding(
+        "L4",
+        "L4",
+        [(1150.0, 2000.0), (1200.0, 2000.0)],
+        "Bbb1",
+        "Val1",
+        klasse="Infiltratieriool",
+    )
+    # Een persleiding is wel een gwsw:Leiding maar geen vrijvervalrioolleiding.
+    + leiding("P1", "P1", [(1200.0, 2000.0), (1250.0, 2000.0)], "Val1", None, klasse="Persleiding")
+    # Oppervlaktewater is lijnvormig en komt dus bij de verbindingen terecht.
+    + leiding("Sloot1", "Sloot1", [(1000.0, 2100.0), (1250.0, 2100.0)], None, None, klasse="Sloot"),
 )
 
 
