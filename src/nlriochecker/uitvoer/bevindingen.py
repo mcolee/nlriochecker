@@ -399,14 +399,15 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     ]
     regels += [
         "",
-        f"> **{getal(len(zonder_object), 'focusnode kwam', 'focusnodes kwamen')} nergens "
-        "op uit** en staat dus niet op de kaart: een klassenaam uit `CfkTypes_typ`, of "
-        "een stelsel dat geen knoop of streng is. Die overtredingen staan wel in dit "
-        "rapport en in de meldingentabel, met een leeg gebied -- ze zijn aan geen enkel "
-        "studiegebied toe te wijzen.",
+        f"> **{getal(len(zonder_object), 'overtreding kwam', 'overtredingen kwamen')} "
+        f"nergens op uit** en {vorm(len(zonder_object), 'staat', 'staan')} dus niet op de "
+        "kaart: de focusnode is een klassenaam uit `CfkTypes_typ`, of een stelsel dat geen "
+        "knoop of streng is. Ze staan wel in dit rapport en in de meldingentabel, met een "
+        "leeg gebied -- ze zijn aan geen enkel studiegebied toe te wijzen.",
         "",
         f"> **{getal(len(zonder_plek), 'overtreding staat', 'overtredingen staan')} op een "
-        "object zonder bruikbare geometrie** en kreeg daarom geen plek op de kaart.",
+        f"object zonder bruikbare geometrie** en {vorm(len(zonder_plek), 'kreeg', 'kregen')} "
+        "daarom geen plek op de kaart.",
         "",
     ]
     return regels

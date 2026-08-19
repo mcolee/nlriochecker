@@ -125,8 +125,8 @@ def test_het_rapport_noemt_de_nulmeting_en_wat_er_niet_op_de_kaart_kwam(tmp_path
 
     assert "GWSW-nulmeting" in tekst
     assert "MdsPlan" in tekst and "MdsProj" in tekst
-    # Twee focusnodes komen nergens op uit: `vw_geb_1` en `Rioolstelsel`.
-    assert "2 focusnodes" in tekst
+    # Twee overtredingen komen nergens op uit: `vw_geb_1` en `Rioolstelsel`.
+    assert "2 overtredingen kwamen nergens op uit" in tekst
 
 
 def test_zonder_nulmeting_verandert_het_rapport_niet(tmp_path: Path) -> None:

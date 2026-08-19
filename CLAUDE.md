@@ -143,6 +143,13 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien hetzelfde.
   De package levert `py.typed`, dus haar hints komen bij een importeur aan.
 - CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
+- De SHACL-nulmeting is naast het checkregister een tweede bron in diezelfde
+  meldingenstroom: `nulbevinding.py` maakt van elke overtreding een `Nulbevinding` met
+  `bron = "nulmeting"`, categorie `NULMETING` en het veld `cfk`, en `bouw_meldingen`
+  maakt er meldingen van. Geen `CheckOutcome`, geen tweede schrijver. De focusnode
+  wordt via `hasPart`, `hasAspect` en als laatste `hasConnection` omhooggelopen tot een
+  put of streng; komt hij nergens op uit, dan blijft de melding staan zonder object en
+  met een leeg gebied, en het rapport telt die gevallen. Zie BO-28.
 - Rapportage-output: Markdown, CSV, een GeoPackage en JSON naar een output-map; nooit
   invoerbestanden overschrijven. Alle vier komen uit dezelfde meldingenstroom
   (`uitvoer/melding.py`); een schrijver die zelf een `Finding` interpreteert laat ze uit

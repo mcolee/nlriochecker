@@ -1419,3 +1419,66 @@ inwinningswijze zakt mee. Dat zijn de eerlijker getallen -- een vulwaarde is gee
 registratie -- maar een noemer die zonder uitleg
 verspringt leest als een meetfout, dus het rapport zegt het er zelf bij: onder de tabel
 staat hoeveel hoogtewaarden de leesregel heeft weggezet.
+
+### BO-28 De nulmeting is een tweede bron in de meldingenstroom, geen zeventigtal checks
+
+**Context.** De SHACL-nulmeting voedde alleen de typeringspoort; de overtredingen zelf
+verdwenen. Daardoor kon geen enkele uitvoervorm tonen dat een gebrek uit de GWSW-nulmeting
+komt, laat staan uit welke conformiteitsklasse -- terwijl de categorie `NULMETING` en de
+kolom `n_nulmeting` al in de GeoPackage stonden te wachten op een producent (issue #12).
+
+**Besluit.** De overtredingen worden `Nulbevinding`'s (`nulbevinding.py`), hangen als veld
+aan de `CheckRun` en worden door `bouw_meldingen` tot gewone `Melding`'s gemaakt, naast die
+van het register. Ze dragen `bron = "nulmeting"`, categorie `NULMETING`, check-ID
+`NULMETING-<SHACL-vorm>`, dimensie `Compliance` en een nieuw veld `cfk`.
+
+**Verworpen: er `CheckOutcome`'s van maken.** Dan is elke SHACL-vorm een pseudo-check, geeft
+`REGISTRY[outcome.check_id]` overal een `KeyError`, en krijgt het bevindingenrapport enkele
+honderden vormsecties. De nulmeting is een tweede *bron*, geen tweede register.
+
+**Verworpen: een tweede schrijver.** De vier uitvoervormen komen uit een meldingenstroom;
+dat is geen afspraak maar een eigenschap van de code, en de sweep in
+`tests/test_uitvoer_herkomst.py` bewaakt hem.
+
+**De join loopt omhoog, en `hasConnection` mag alleen de eerste stap zijn.** De kolom
+`Focus node` draagt het URI-fragment uit de dataset, maar wijst lang niet altijd een put of
+streng aan: een `BeginpuntLeiding` hangt via `hasPart` onder zijn leidingorientatie, een
+`Maaiveldorientatie` hangt via `hasConnection` onder de putorientatie. Er wordt daarom
+omhooggelopen. `hasPart` en `hasAspect` zijn insluitingen en gaan altijd voor;
+`hasConnection` is een symmetrische netwerkverbinding en zou de wandeling zijwaarts het
+net in kunnen laten lopen, en doet daarom alleen in de eerste stap mee en pas als de twee
+andere niets opleveren. Gemeten op De Wolden: strikt direct joint 87%, met insluitingen
+98%, met de verbindingsstap erbij 99,5% (105.385 van de 105.963). Wat overblijft zijn 575
+overtredingen op een stelsel (`vw_geb_6`) en drie klassenamen uit `CfkTypes_typ` --
+objecten die geen put en geen streng zijn en dat ook niet horen te worden.
+
+**Een overtreding zonder object verdwijnt niet.** Hij krijgt geen `object_uri`, geen
+locatie en een **leeg** gebied: hij is aan geen enkel studiegebied toe te wijzen, en hem
+het gebied van de run geven zou beweren dat hij daarbinnen ligt. Hij blijft daarom in elke
+gebiedsrun staan -- een losse run over dat ene gebied zou hem ook opnemen, en dat is de
+equivalentie-eis van BO-12. In `totaal/` staat hij een keer, want daar wordt op
+`melding_id` ontdubbeld. Het rapport telt hem apart, ook als het er nul zijn: stilte over
+een gebrek dat de nulmeting wel telt, leest als "alles gecontroleerd".
+
+**De identiteit hangt aan de focusnode en de boodschap.** De object-URI onderscheidt niet
+genoeg -- twee eindpunten van dezelfde streng herleiden naar diezelfde streng -- en de
+boodschap is bovendien de ontdubbelsleutel, want dezelfde vorm noemt per CFK een andere
+drempel. Prijs: herformuleert de GWSW-server een boodschap, dan verschuiven de
+melding-ID's van die vorm eenmalig en leest een trendvergelijking ze als opgelost plus
+nieuw. Dat staat in `docs/json-schema.md` en in de wijzigingslog.
+
+**Honderdduizend meldingen is de uitslag, niet een modelleerfout.** De drie rapporten
+tellen samen 213.500 regels; na ontdubbeling over de conformiteitsklassen blijven er
+105.963 over (87.017 fouten, 18.946 waarschuwingen). De zwaarste posten zijn drie
+kardinaliteitsvormen die vrijwel elke `Inspectieput` raken -- `Put_HoogtePut_card`,
+`Rioolput_Maaiveldschematisering_card` en `Rioolput_BergendOppervlak_card`, elk 19.322 keer
+op ongeveer 19,5 duizend inspectieputten. Daar is de systemisch-vlag voor: 68.882 van de
+105.963 meldingen dragen hem, en zeggen daarmee iets over de export als geheel in plaats
+van over een los gebrek. De noemer van die vlag is het aantal instanties van het
+objecttype uit `type=`, geteld over de volledige export en niet over een studiegebied --
+anders zou "systemisch" iets anders betekenen naargelang er een gebied is opgegeven.
+
+**Het contract.** `cfk` is een achterwaarts verenigbare toevoeging, dus `schema_versie`
+gaat van `1.0` naar `1.1` en niet naar `2.0`. `docs/json-schema.md` beschrijft het veld en
+de nulmetingmeldingen; de twee drifttests bewaken dat het document de velden en de versie
+blijft noemen.
