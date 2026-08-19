@@ -242,6 +242,8 @@ type `Overstortdrempel`. Waar de drempelgegevens ontbreken meldt de check dat
 expliciet in plaats van nul bevindingen te tonen. Dit bevestigt het openstaande punt
 uit CLAUDE.md: RVZ-002 en RVZ-003 zijn geschrapt omdat de nulmeting ze zou dekken,
 maar er is in deze dataset geen enkele SHACL-vorm en geen enkel object dat ze raakt.
+Die laatste vaststelling heeft de schrapping later ongedaan gemaakt: beide checks zijn
+alsnog gebouwd (zie BO-26). De zin hierboven beschrijft de toestand van voor dat besluit.
 
 **Gevolg voor ADM-007.** 181 van de 273 overstort- en lozingsputten hebben geen
 overstortleiding of -drempel. Dat is geen 181 losse gebreken maar een systematisch
@@ -1187,3 +1189,197 @@ komen.
 de 195 strengen die op een ander object gemeld worden krijgen een andere `object2_uri`.
 Hun `melding_id` verschuift daarmee eenmalig, net als bij BO-19: een trendvergelijking over
 die grens heen laat ze als opgelost plus nieuw zien.
+
+### BO-25 Een duiker is geen rioolleiding; EXT-002 en EXT-003 blijven op VrijvervalRioolleiding
+
+**Wat.** De populatie van EXT-002 en EXT-003 blijft `klassen.vrijvervalleiding`
+(`VrijvervalRioolleiding`). Een `Duiker` valt daar buiten en wordt dus niet op een
+watergangkruising getoetst. De uitzondering van EXT-003 luistert nog steeds naar
+`klassen.kruisingsleiding` (zinker en duiker), maar alleen de zinker kan binnen de
+populatie voorkomen; titel en meldingstekst noemen daarom de zinker. Het rapport telt in
+de toelichting hoeveel strengen van een kruisingsklasse buiten de populatie vielen.
+
+**Waarom.** De ontologie is er ondubbelzinnig over.
+`gwsw:Duiker rdfs:subClassOf gwsw:Leiding`, met als definitie "Een leiding die
+oppervlaktewater-elementen verbindt" -- een duiker *is* de watergang, hij kruist er geen.
+`gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding`: die zit dus wel in de
+populatie, en daar is de uitzondering van EXT-003 ook voor bedoeld. Issue #3 las de
+gelijkheid van EXT-002 en EXT-003 als een fout in de populatie; ze is een gevolg van de
+klassenhierarchie. Wat er wel aan mankeerde is dat niets dat opschreef.
+
+**Verworpen: de populatie verbreden naar `Leiding`.** Dan komen ook drains (1.216),
+kolkaansluitleidingen (124), loze leidingen (54) en perceelaansluitleidingen (113) in
+beeld, en meldt EXT-002 elke drain die langs een sloot ligt als watergangkruising. Dat is
+niet wat het register met "kruising met watergang" bedoelt, en het zou de meldingenstroom
+met ruis vullen om een uitzondering te kunnen laten afgaan.
+
+**Verworpen: EXT-003 een eigen, bredere populatie geven.** Duikers erbij halen om ze
+vervolgens door de uitzondering te laten uitzonderen levert per constructie nul extra
+meldingen op. Objecten binnenhalen met de enige bedoeling ze weer weg te strepen is
+vertoon, geen toets.
+
+**De fixtures.** `scripts/maak_ttl_fixtures.py` zette `Duiker` en `Zinker` allebei onder
+`VrijvervalRioolleiding`. Daarmee testte het EXT-scenario een hierarchie die niet bestaat
+en kon de fout uit issue #3 in de tests niet zichtbaar worden. De fixtures volgen nu de
+totaal-ontologie: `Duiker` onder `Leiding`, `Zinker` onder `VrijvervalRioolleiding`.
+
+**De meting.** Op De Wolden + Hoogeveen melden EXT-002 en EXT-003 elk 859 strengen op
+17.603 bekeken -- ongewijzigd ten opzichte van BO-24, zoals de bedoeling was: deze ronde
+verandert geen enkele melding van de twee. Nieuw is de regel in de toelichting van EXT-003:
+"Buiten de populatie (geen vrijvervalleiding) en dus niet bekeken: 610 strengen van de
+klasse Duiker." Dat is precies de 610 uit issue #3, nu in het rapport zelf.
+
+**Gevolg.** EXT-002 en EXT-003 delen sinds deze ronde een kruisingenlijst
+(`context.cached("ext:watergangkruisingen")`): hun `toetsbaar`-verzameling, buffer en laag
+zijn aantoonbaar dezelfde, dus de ruimtelijke toets liep twee keer voor niets. De uitslag
+verandert daar niet van. Dat EXT-003 gelijk is aan EXT-002 blijft waar zolang de dataset
+geen zinker bevat -- De Wolden heeft er nul -- maar het staat nu in het rapport in plaats
+van dat het opvalt als raadsel. De `break` na het eerste waterdeel per streng blijft staan
+(BO-17, BO-18).
+
+### BO-26 RVZ-002 en RVZ-003 terug in de engine; een sentinel moet iets aantonen
+
+**Wat.** RVZ-002 (drempelniveau) en RVZ-003 (drempelbreedte) zijn uit de tabel Geschrapte
+checks van het register gehaald en gebouwd: W, Compleetheid, een melding per overstortput
+zonder geregistreerd niveau respectievelijk zonder geregistreerde breedte. Hun sentinels
+zijn uit `dekking.toml`. De dekkinganalyse eist voortaan dat elke overgebleven sentinel
+in de referentiemeting werkelijk iets aantoont.
+
+**Waarom.** De schrapping rustte op de claim dat de nulmeting de twee zou dekken. In geen
+van de drie SHACL-rapporten over De Wolden bestaat een vorm op `Drempelniveau` of op
+`Drempelbreedte`; de enige drempelvorm is `Overstortput_Overstortdrempel_card`, en die
+toetst of de put een drempel *heeft*, niet of het niveau of de breedte geregistreerd is.
+Er keek dus niets naar die twee eigenschappen: de engine niet, want de check was
+geschrapt, de nulmeting niet, want de vorm bestaat niet, en het rapport meldde geen gat,
+want een geschrapte check hoort daar niet meer thuis. Het register waarschuwt onder de
+tabel Geschrapte checks precies voor dit geval.
+
+**Waarom ook putten zonder drempelonderdeel.** De check meldt een overstortput ook als er
+helemaal geen `Overstortdrempel`-onderdeel aan hangt -- en dat is in De Wolden de regel,
+niet de uitzondering. Die melding overlapt met `Overstortput_Overstortdrempel_card`, en
+die overlap is bewust: het register vraagt naar de geregistreerde *waarde*, en `toets`
+moet ook zonder `--shacl` iets zien. De toelichting benoemt de overlap, zodat wie beide
+rapporten naast elkaar legt weet dat hij hetzelfde gebrek twee keer telt.
+
+**Waarom W en Compleetheid.** Naar analogie van RVZ-007 t/m RVZ-009: een ontbrekende
+registratie op een randvoorziening is een gat in de gegevens, geen aantoonbare fout in de
+werkelijkheid. Een drempel die niet geregistreerd staat hoeft er fysiek niet te ontbreken.
+
+**De poort eronder.** Het echte gat zat in de dekkinganalyse zelf: `verify_register`
+toetste alleen ID-pariteit tussen het register en de sentineltabel, nooit of een sentinel
+in de referentiemeting iets aantoont. Daar is nu een inhoudelijke poort naast gezet:
+`CoverageResult.untouched == []`, op de mini-nulmeting (`tests/test_coverage.py`) en op de
+volledige De Wolden-rapporten (`tests/test_integration.py`). Een schrapping waarvan het
+bewijs nul meldingen oplevert valt daarmee in CI om. De weergave van "niet geraakt" blijft
+apart getoetst met een fixture-mapping waarvan de sentinel nergens vuurt.
+
+**De meting.** Op De Wolden + Hoogeveen melden RVZ-002 en RVZ-003 allebei alle 245 bekeken
+overstortputten: 218 `Overstortput` plus 27 `Stuwput`, want `klassen.overstortput` bevat ze
+allebei. Dat is geen 245 losse gebreken maar een systematisch registratiepatroon -- de
+export bevat geen enkel `Overstortdrempel`-onderdeel (BA-10) -- en de toelichting van de
+check zegt dat er met zoveel woorden bij. De twee checks samen brengen 490 waarschuwingen
+in de totaaltelling.
+
+**Gevolg.** Het aantal ID's in de engine groeit met twee; de dekkingsmatrix en de
+versiehistorie van het register (v0.9) volgen. De ID's zijn nooit hergebruikt, dus RVZ-002
+en RVZ-003 betekenen nog steeds wat ze in v0.1 betekenden.
+
+### BO-27 Een vulwaarde rond 0 m NAP is geen meting: een leesregel plus ATTR-013
+
+**Wat.** Een hoogtekenmerk uit `[vulwaarden] hoogte_kenmerken` met |waarde| <=
+`hoogte_band_m` wordt gelezen als *niet geregistreerd*. De regel staat in
+`dataset.markeer_vulwaarden`, wordt op precies een plek toegepast -- in
+`toetsrun.voer_toets_uit`, direct na `laad_met_cache` -- en onthoudt op het object welk
+kenmerk welke waarde droeg. De nieuwe check ATTR-013 (W, Compleetheid) meldt dat een keer
+per object.
+
+**Waarom.** In de De Wolden-export is 11.786 van de 46.880 BOB-waarden (25,1%) exact
+`0.000`; de op een na meest voorkomende waarde komt 399 keer voor. Van de 22.363
+maaiveldhoogten staat 14% op `0,00` of `0,01`. Het AHN ligt in dit gebied tussen 5,09 en
+17,09 m NAP. Dat is een vulwaarde voor "niet geregistreerd", geen buisbodem op zeeniveau.
+De hoogtechecks lazen hem als meting: HGT-004 stond voor 94% op zo'n nul, HGT-018 voor
+85%, HGT-003 voor 61%, HGT-002 voor 48% -- samen circa 5.700 van de 31.901 harde fouten
+(issue #1). Dat is de situatie waar CLAUDE.md voor waarschuwt: duizenden bevindingen
+wijzen op een modelleerfout in de engine, niet op duizenden gebreken.
+
+**Het gemeten effect.** Dezelfde run over De Wolden + Hoogeveen twee keer gedraaid, alleen
+`hoogte_kenmerken` leeggemaakt in de tweede: dat isoleert de leesregel van de rest van deze
+bugronde.
+
+| | zonder leesregel | met leesregel |
+|---|---:|---:|
+| HGT-002 (deksel vs AHN) F | 5.231 | 2.128 |
+| HGT-003 (BOB-sanity vs AHN) F | 2.813 | 1.090 |
+| HGT-004 (BOB boven deksel) F | 532 | 31 |
+| HGT-018 (buiskruin boven maaiveld) F | 1.190 | 175 |
+| HGT-006 (fors tegenverhang) F | 2.459 | 2.377 |
+| NET-003 (stroming tegen het verhang) F | 3.725 | 3.651 |
+| HGT-013 (gronddekking) W | 2.545 | 340 |
+| HGT-014 (verhang vs maaiveld) W | 889 | 157 |
+| HGT-007 (te weinig verhang) W | 2.126 | 1.559 |
+| ATTR-013 W | 0 | 4.215 |
+| **fouten totaal** | **31.901** | **25.403** |
+| **waarschuwingen totaal** | **20.697** | **21.265** |
+
+Beide kolommen komen van de code *na* deze bugronde; alleen de leesregel verschilt. Dat de
+linkerkolom precies de 31.901 uit issue #1 reproduceert, en HGT-002/003/004/014/018 daar op
+precies 5.231 / 2.813 / 532 / 889 / 1.190 staan, is dus zelf een uitkomst: geen andere
+wijziging van deze ronde verschuift een van die aantallen. Er verdwijnen
+6.498 fouten en 3.647 waarschuwingen. Elke verdwenen melding is terug te voeren op een
+vulwaarde op het gemelde object zelf of op een van zijn twee putten -- nagelopen op de
+melding-ID's, met nul onverklaarde gevallen. Er komt er ook bijna geen bij: alleen HGT-009
+wint er twee, doordat een 0,000-BOB de werkelijke, kleinere BOB-sprong op die put stond te
+verdringen.
+
+De schatting van circa 5.700 uit issue #1 was een ondergrens: die regex keek naar vijf
+checks en naar de waarde in de meldingtekst. HGT-002 verliest er 566 meer dan de regex
+zag, en HGT-006 en NET-003 stonden er niet eens in. Wie op de vulwaarde in de tekst zoekt,
+mist de melding waarin het buurobject de nul draagt.
+
+**Wat de leesregel niet raakt.** Van de 11.812 BOB-waarden binnen de band liggen er 2.003
+op een `VrijvervalRioolleiding`; de overige 9.809 zitten op klassen die de hoogtechecks
+sowieso niet bekijken -- `Persleiding` 6.894 van 7.096 (97%), `Drain` 1.593, `Duiker` 483,
+`Kolkaansluitleiding` 244, de perceelaansluitleidingen 223, `Vacuumleiding` 294 (alle),
+`Drukleiding` 49, `LozeLeiding` 29. Dat is geen gat maar dezelfde afbakening: ATTR-013
+bekijkt de netwerkknopen plus de vrijvervalstrengen, en meldt 2.003 BOB's op 1.095
+strengen plus 3.120 maaiveldhoogten, samen 4.215 objecten. Wie het getal 11.786 uit issue
+#1 naast 4.215 legt, moet dat verschil kennen: een persleiding zonder BOB is geen gebrek
+dat deze checks aanwijzen.
+
+**Waarom een leesregel na het laden en niet in de lader.** De cache bewaart de ruwe parse;
+de band is projectconfiguratie. Zou de lader hem toepassen, dan zat een projectkeuze in de
+cachesleutel en leverde dezelfde TTL onder twee configuraties twee cache-ingangen op. Nu
+is `markeer_vulwaarden` een pure functie op een geladen dataset -- ze geeft via
+`dataclasses.replace` een nieuwe dataset terug -- met precies een aanroepplek. `analyseer`
+en `dekking` raken hem niet: die gaan over de nulmeting en niet over de hoogten.
+
+**Waarom een nieuw ATTR-nummer en geen HGT.** Wat er gemeld wordt is dat een kenmerk niet
+geregistreerd is terwijl het als meting in de export staat. Dat is een registratiegebrek
+(Compleetheid), geen hoogtefout (Plausibiliteit of Nauwkeurigheid). Een HGT-nummer zou het
+tussen de verhang- en dekkingchecks zetten, waar de lezer een uitspraak over de hoogte
+verwacht. En het is er precies een per object, niet een per hoogtevergelijking.
+
+**Waarom een band en geen exacte nul.** Naast `0,000` komt `0,01` voor: 11.786 BOB's staan
+exact op nul, 11.812 binnen de band, dus 26 waarden zitten ertussenin. `hoogte_band_m`
+staat daarom op 0,01 en de regel toetst `abs(waarde) <= band`, zodat ook `-0,01` meetelt.
+Een exacte gelijkheid op een float zou bovendien een broze toets zijn.
+
+**Waarom `[vulwaarden]` met een lege lijst als uit-schakelaar.** TOML kent geen null, dus
+een aparte `aan`-vlag naast een kenmerkenlijst zou twee waarheden opleveren die uit elkaar
+kunnen lopen. Een lege `hoogte_kenmerken` is de uit-stand, en die stand staat met zoveel
+woorden in de toelichting van ATTR-013: in laag Nederland kan 0,00 m NAP een echte meting
+zijn, en stilte mag daar niet als "alles gecontroleerd" lezen.
+
+**Verworpen: elke HGT-check filtert zelf.** Dan staat dezelfde drempel in dertien checks
+opgeschreven -- zoveel blijken er in de meting geraakt te worden, en NET-003 zit er ook bij,
+dus het is niet eens tot de HGT-familie beperkt. Het filter verschuift bij de eerste die
+het vergeet, en geen enkele check kan dan zeggen hoeveel objecten er om deze reden zijn
+overgeslagen. Een leesregel op een plek laat de checks doen waar ze voor zijn, en laat een
+van hen -- ATTR-013 -- het gebrek benoemen.
+
+**Gevolg.** De hoogtechecks slaan de betrokken objecten over en tellen ze in hun
+toelichting mee bij de objecten zonder dat kenmerk; HGT-018 kreeg daarvoor de `notes()`
+die ze nog niet had. Ze noemen de vulwaarde niet als reden -- dat doet ATTR-013 -- dus wie
+alleen een HGT-toelichting leest, ziet "geen BOB" en niet "een BOB van 0,000". De
+`melding_id`'s van de vervallen HGT-meldingen verdwijnen; een trendvergelijking over deze
+grens heen ziet ze eenmalig als opgelost.
