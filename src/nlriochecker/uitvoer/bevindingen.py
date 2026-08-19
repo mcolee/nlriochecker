@@ -231,8 +231,8 @@ def _render_checks(
             f"netwerkchecks geen randeffecten krijgen van strengen die het gebied uit lopen "
             f"-- en pas daarna is tot de kern afgebakend. "
             f"**{getal(weggelaten, 'bevinding viel', 'bevindingen vielen')} buiten "
-            "het gebied** en staat hier niet in; dit rapport zegt dus niets over de rest van "
-            "de dataset.",
+            f"het gebied** en {vorm(weggelaten, 'staat', 'staan')} hier niet in; dit rapport "
+            "zegt dus niets over de rest van de dataset.",
             "",
         ]
         if run.analyseset is not None and not run.analyseset.kern:
@@ -421,7 +421,7 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     if run.nulbevindingen_weggelaten:
         buiten = getal(run.nulbevindingen_weggelaten, "overtreding viel", "overtredingen vielen")
         regels += [
-            f"> **{buiten} buiten dit gebied** en staat hier niet in. Ze horen bij objecten "
+            f"> **{buiten} buiten dit gebied** en staan hier niet in. Ze horen bij objecten "
             "elders in de export; dit rapport zegt niets over die.",
             "",
         ]
