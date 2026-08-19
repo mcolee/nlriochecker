@@ -1163,7 +1163,27 @@ projectconfiguratie, zoals alle laagrollen. Een export met andere laagnamen moet
 kunnen aanwijzen. Wat hier verandert is de standaard, en de reden staat in het configbestand
 zelf zodat wie hem overschrijft weet wat hij weggooit.
 
+**Het gemeten effect.** Dezelfde run opnieuw gedraaid met alleen `waterdeel`:
+
+| | voor | na |
+|---|---:|---:|
+| EXT-002 / EXT-003 | 993 | 859 |
+| EXT-007 | 55 | 58 |
+| meldingen totaal | 52.373 | 52.108 |
+
+Er vielen 134 strengen weg en er kwam er geen enkele bij. De overige 172 oevertreffers
+bleken strengen die óók een echte watergang kruisen; die worden nu op dat waterdeel gemeld.
+Bij **195 strengen** wijst de melding daardoor een ander object aan dan voorheen -- dat is
+de verdringing uit BO-18 die zichtbaar wordt, en meteen de belangrijkste winst: die
+meldingen wezen naar de verkeerde watergang. Wat overblijft is waterloop 657,
+greppel/droge sloot 123, watervlakte 79.
+
+EXT-007 gaat juist *omhoog*, van 55 naar 58. Drie lozingspunten lagen naast een oever en
+telden daardoor als aangesloten op oppervlaktewater terwijl er geen waterdeel in de buurt
+lag. Dat zijn geen valse meldingen erbij maar drie gemiste bevindingen die nu boven water
+komen.
+
 **Gevolg voor de meldingidentiteit.** De meldingen die op een oever stonden verdwijnen, en
-strengen die zowel een oever als een echte watergang kruisen kunnen een andere `object2_uri`
-krijgen dan voorheen. Hun `melding_id` verschuift daarmee eenmalig, net als bij BO-19: een
-trendvergelijking over die grens heen laat ze als opgelost plus nieuw zien.
+de 195 strengen die op een ander object gemeld worden krijgen een andere `object2_uri`.
+Hun `melding_id` verschuift daarmee eenmalig, net als bij BO-19: een trendvergelijking over
+die grens heen laat ze als opgelost plus nieuw zien.

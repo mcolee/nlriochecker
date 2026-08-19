@@ -96,8 +96,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 - `bgt_waterlagen` bevat alleen nog `waterdeel`; `ondersteunendwaterdeel` valt buiten
   scope. Dat is de oever en niet het water zelf, en een streng die een slootkant raakt
-  kruist geen watergang. Op De Wolden ging bijna een derde van de EXT-002- en
-  EXT-003-meldingen over een oever. Binnen `waterdeel` telt elk type mee. Zie BO-24.
+  kruist geen watergang. Op De Wolden gaan EXT-002 en EXT-003 daarmee van 993 naar 859
+  meldingen, wijzen er 195 een andere watergang aan dan voorheen, en komen er bij EXT-007
+  drie bevindingen bij die een oever eerder afdekte. Binnen `waterdeel` telt elk type mee.
+  Zie BO-24.
 - De aangeleverde geodata staat niet meer in `data/gis` maar in
   `data/gis_koekangerveld`; daarnaast is er `data/gis_dewoldenhoogeveen` met dezelfde
   bronsoorten voor het hele gebied van de OroX-dataset. De standaard `[bronnen] map`
