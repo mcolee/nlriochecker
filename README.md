@@ -156,6 +156,28 @@ enkele feature verandert er niets ten opzichte van eerdere versies; een aanwezig
 `naam_gebied` wordt dan wel de gebiedsaanduiding, anders blijft de terugval op
 `statcode`/`statnaam` of de laagnaam gelden.
 
+### Het bevindingenrapport
+
+`bevindingen.md` leest van gebied naar detail:
+
+1. **De naam van het gebied** als titel. Zonder studiegebied blijft de dataset de
+   aanduiding; in `totaal/` heet de synthese "Totaal (N gebieden)".
+2. **Wat er in dit gebied ligt:** een tabel objecttype x stelseltype over de kern, met bij
+   de leidingen zowel het aantal als de meters. De contextschil staat als voetnoot en telt
+   niet mee -- er wordt niet over gerapporteerd.
+3. **Voldoen we in dit gebied?** Een regel per conformiteitsklasse plus een totaalregel
+   voor de eigen checks. Een vinkje betekent **nul fouten**; waarschuwingen blokkeren niet
+   maar hun aantal staat er wel bij, met tussen haakjes hoeveel er systemisch zijn. Is er
+   op een klasse niet gemeten, dan staat er geen oordeel maar de reden.
+4. **De rode draad**, als de bevindingen een gezamenlijke oorzaak hebben.
+5. **De verantwoording:** wat er niet bekeken is, wat er buiten het gebied viel, welke
+   bronnen ontbraken, en waaronder de rest gelezen moet worden.
+6. **De detailrapportage** in twee blokken: eerst de GWSW-nulmeting per SHACL-vorm (fouten
+   boven waarschuwingen, met de conformiteitsklassen erbij), dan de eigen checks (de
+   foutchecks boven de waarschuwingschecks).
+
+De rapporten van `analyseer`, `dekking` en `vergelijk` zijn ongewijzigd.
+
 ### Uitvoer
 
 `analyseer`, `dekking` en `vergelijk` schrijven Markdown en CSV. `toets` schrijft

@@ -1617,3 +1617,49 @@ kolom verwijst, dat de markervormen zijn wat de tabel zegt, en dat de maptipexpr
 een echte feature HTML oplevert in plaats van een letterlijke `[% ... %]`. Dat toetst
 harder dan een blik op het scherm; wat het niet toetst is of het er goed uitziet, en dat
 blijft aan de gebruiker.
+
+### BO-31 Het bevindingenrapport leest van gebied naar detail
+
+**Context.** Het rapport opende met "Checkbevindingen <dataset>" en somde daarna per check
+de meldingen op. De lezer -- beheerder of management -- wil eerst weten over welk gebied
+het gaat, wat erin ligt en of het voldoet, en pas daarna het detail (issue #16).
+
+**Besluit.** De volgorde is onderdeel van de uitvoer: titel met de gebiedsnaam, aantallen,
+managementsamenvatting, rode draad, verantwoording, en dan het detail in twee
+herkomstblokken -- eerst de GWSW-nulmeting, dan de eigen checks, elk met de fouten voorop.
+
+**De aantallen tellen de kern, niet de schil.** De contextschil zit in de dataset van de
+run omdat de netwerkchecks hem nodig hebben, maar er wordt niet over gerapporteerd. Hem
+meetellen zou de aantallen laten afwijken van de bevindingen eronder; hij staat als
+voetnoot. De meters zijn de **getekende** lengte en niet het kenmerk `LengteLeiding`: de
+tabel hoort te zeggen wat er op de kaart ligt, en wijken de twee af dan is dat ATTR-009.
+
+**Een vinkje betekent nul fouten, en zwijgt niet over waarschuwingen.** Vorm: "12 fouten
+(waarvan 9 systemisch), 4 waarschuwingen (0 systemisch)". Een regel die vierhonderd
+waarschuwingen weglaat leest als "niets aan de hand".
+
+**Per CFK een oordeel, ook binnen een deelset.** Het issue schrijft voor dat de CFK-regels
+bij een `--cfk`-deelset de toestandstekst uit `Meetbereik` tonen, "want er is niet
+gemeten". Die reden gaat niet op voor een klasse die *wel* in de deelset zat: daar is
+gemeten en valt er iets te oordelen. De regel volgt daarom de reden en niet de letter: een
+gekozen klasse krijgt haar vinkje of kruisje, een niet-gekozen klasse de toestandstekst.
+Het voorbehoud over de deelset als geheel staat al als markering boven het rapport (BO-7),
+dus er gaat niets verloren.
+
+**De klassen staan in de volgorde van de projectconfiguratie** (gesorteerd), niet in de
+volgorde waarin het issue ze opsomt: zo krijgt een project met andere klassen dezelfde
+opzet zonder dat er iets in de code hoeft te veranderen.
+
+**De nulmeting per vorm, niet per melding.** De SHACL-vormen zijn er honderden en de
+meldingen op De Wolden ruim honderdduizend; een lijst daarvan is geen rapport maar een CSV.
+Wat een lezer nodig heeft is welke eis waar de mist in gaat, hoe vaak, en welke
+conformiteitsklassen hem stellen. De losse meldingen staan in `bevindingen.csv`, in de
+JSON en op de kaart.
+
+**De rode draad schuift mee naar voren.** Hij zegt wat de bevindingen samen betekenen, en
+dat is wat een lezer na de vier regels van de samenvatting wil weten -- niet pas achter de
+tabellen.
+
+**`stelseltypen` verhuist naar `uitvoer/omvang.py`.** Zowel de aantallentabel als de
+GeoPackage heeft hem nodig; twee kopieen zouden op een dag verschillende stelsels aan
+dezelfde put toekennen.

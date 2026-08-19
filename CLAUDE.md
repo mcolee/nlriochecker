@@ -150,6 +150,13 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   wordt via `hasPart`, `hasAspect` en als laatste `hasConnection` omhooggelopen tot een
   put of streng; komt hij nergens op uit, dan blijft de melding staan zonder object en
   met een leeg gebied, en het rapport telt die gevallen. Zie BO-28.
+- Het bevindingenrapport van `toets` leest van gebied naar detail: gebiedsnaam als
+  titel, aantallen (objecttype x stelseltype over de kern, leidingen ook in meters),
+  managementsamenvatting (een regel per CFK plus de eigen checks; vinkje = nul fouten),
+  rode draad, verantwoording, en dan detail in twee herkomstblokken -- eerst de
+  nulmeting per SHACL-vorm, dan de eigen checks, elk met de fouten voorop. De
+  aantallen komen uit `uitvoer/omvang.py`, de samenvatting uit
+  `uitvoer/samenvatting.py`. Zie BO-31.
 - Rapportage-output: Markdown, CSV, een GeoPackage en JSON naar een output-map; nooit
   invoerbestanden overschrijven. Alle vier komen uit dezelfde meldingenstroom
   (`uitvoer/melding.py`); een schrijver die zelf een `Finding` interpreteert laat ze uit
