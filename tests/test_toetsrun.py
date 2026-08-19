@@ -440,3 +440,23 @@ def test_onleesbare_geometrie_wordt_geteld_en_gemeld(tmp_path: Path) -> None:
     assert len(uitslag.dataset.geometry_errors) == 1
     assert len(uitslag.dataset.conduits) == 2
     assert any(regel == "  1 objecten met onleesbare geometrie." for regel in uitslag.regels())
+
+
+def test_een_beschadigde_cache_wordt_gemeld(tmp_path: Path) -> None:
+    """Opnieuw inlezen omdat de cache stuk was, hoort de gebruiker te zien.
+
+    Het herstel zelf is elders getoetst (`tests/test_cache.py`); wat hier telt is
+    dat de melding erover het scherm haalt. Een run die er stilzwijgend drie minuten
+    langer over doet, laat de gebruiker zoeken naar een oorzaak die het gereedschap
+    al kent.
+    """
+    # `toets` zet de cachemap op tmp_path/cache; beide aanroepen delen hem dus.
+    toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",))
+    for bestand in (tmp_path / "cache").rglob("*.pickle"):
+        bestand.write_bytes(b"dit is geen pickle")
+
+    uitslag = toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",))
+
+    assert uitslag.cache.bron == "bestand"
+    assert "onbruikbaar" in uitslag.cache.melding
+    assert any(uitslag.cache.melding in regel for regel in uitslag.regels())
