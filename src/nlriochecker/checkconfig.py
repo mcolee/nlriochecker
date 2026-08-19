@@ -192,6 +192,23 @@ class CheckThresholds(BaseModel):
     ext_lozingspunt_water_afstand_m: float = Field(default=10.0, gt=0.0)
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
 
+    @property
+    def ext_zoekafstand_max_m(self) -> float:
+        """De verste blik van de EXT-checks in de externe lagen.
+
+        De dekkingspoort verruimt het bereik van de bronnen hiermee: een pand net
+        buiten dat bereik telt mee voor een object er net binnen. Bewust niet de
+        contextschil uit `[studiegebied]` -- die hoort bij de afbakening van de
+        GWSW-analyse en niet bij het zoekbereik in de externe lagen.
+        """
+        return max(
+            self.ext_pand_buffer_m,
+            self.ext_watergang_buffer_m,
+            self.ext_putdeksel_afstand_m,
+            self.ext_lozingspunt_water_afstand_m,
+            self.ext_perceel_buffer_m,
+        )
+
 
 class NetworkOptions(BaseModel):
     """Keuzes voor de netwerkanalyse."""
@@ -286,6 +303,14 @@ class ExternalSources(BaseModel):
     """Paden en laagnamen van de externe bronnen uit data/gis/."""
 
     model_config = ConfigDict(extra="forbid")
+
+    # Hoeveel een aangeleverde laag kleiner mag zijn dan het bereik waarvoor je hem
+    # geldig verklaart (`studiegebied` hieronder), voordat het laden faalt. Nul is
+    # streng. De omhullende van een laag is die van zijn *features*: een dunne laag
+    # met een lege rand is niet te onderscheiden van een afgeknipt extract, en die
+    # afweging hoort in het project thuis en niet in de code. Zie BO-19 in de
+    # beslislog.
+    dekking_tolerantie_m: float = Field(default=0.0, ge=0.0)
 
     map: str = "data/gis"
     bgt: str | None = None

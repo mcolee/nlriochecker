@@ -16,9 +16,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from shapely.geometry.base import BaseGeometry
+from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 from nlriochecker.errors import PipelineError
@@ -28,6 +29,13 @@ RD_NEW = 28992
 
 class ExternalDataError(PipelineError):
     """Een externe bron ontbreekt, is onleesbaar of staat in een ander stelsel."""
+
+
+class Dekkingseis(NamedTuple):
+    """Hoe ver buiten het bereik de checks kijken, en welk tekort toegestaan is."""
+
+    marge_m: float
+    tolerantie_m: float
 
 
 @dataclass(frozen=True)
@@ -138,12 +146,19 @@ ROLLEN = {
 }
 
 
-def load_external_data(bronnen, wortel: Path | None = None) -> ExternalData:
+def load_external_data(
+    bronnen, wortel: Path | None = None, *, dekkingseis: Dekkingseis | None = None
+) -> ExternalData:
     """Leest de externe bronnen uit de geconfigureerde map.
 
     Ontbreekt een bestand, dan is dat geen fout: de bronnen zijn optioneel en de
     checks die ze nodig hebben melden zelf dat ze niets konden toetsen. Wat er niet
     was komt in `missing` te staan en daarmee in het rapport.
+
+    Met een `dekkingseis` wordt elke aangeleverde bron getoetst op dekking van het
+    bereik voordat er ook maar een check draait; zie `_toets_dekking`. Zonder eis
+    blijft die toets achterwege -- een beller die de zoekafstanden en de tolerantie
+    niet kent, kan er ook geen oordeel over vellen.
     """
     basis = Path(wortel) if wortel is not None else Path.cwd()
     map_pad = basis / bronnen.map
@@ -169,7 +184,7 @@ def load_external_data(bronnen, wortel: Path | None = None) -> ExternalData:
 
     raster = _lees_raster(map_pad, bronnen.ahn_dtm, ontbrekend, notities)
 
-    return ExternalData(
+    data = ExternalData(
         extent=extent,
         extent_source=extent_pad,
         extent_name=extent_naam,
@@ -178,6 +193,91 @@ def load_external_data(bronnen, wortel: Path | None = None) -> ExternalData:
         missing=tuple(ontbrekend),
         notes=tuple(notities),
     )
+    if dekkingseis is not None:
+        _toets_dekking(data, dekkingseis)
+    return data
+
+
+def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
+    """Weigert bronnen die kleiner zijn dan het bereik waarvoor ze gelden.
+
+    Een extract dat maar een deel van het bereik dekt geeft een misleidend schone
+    uitkomst: geen treffer leest als geen probleem, terwijl de bron er domweg niet
+    was. Daarom is dit een fout en geen waarschuwing, en is er geen forceer-vlag --
+    wel een geconfigureerde tolerantie (`[bronnen] dekking_tolerantie_m`).
+
+    Het bereik is dat van `bronnen.studiegebied`: het gebied waarvoor je de bronnen
+    geldig verklaart, en precies het gebied waarbinnen de checks uitslagen geven. Dat
+    de bronnen maar een deel van de GWSW-dataset dekken is iets anders en al eerlijk
+    afgevangen: objecten daarbuiten krijgen de status *buiten studiegebied* (BC-2).
+    Zonder bereik draait deze poort dan ook niet -- dan geeft geen enkele EXT-check
+    een uitslag en valt er niets te maskeren.
+
+    De vectorlagen worden getoetst tegen het bereik plus `marge_m`, want een pand net
+    buiten het bereik telt mee voor een object er net binnen. Het raster krijgt geen
+    marge: bemonsteren is puntsgewijs.
+
+    Wat deze poort *niet* kan: bbox-dekking is noodzakelijk maar niet voldoende. Een
+    gat midden in het extract valt er niet mee op, en een tekort op een dunne laag
+    betekent "hier staan geen features", niet per se "extract afgeknipt". De
+    `binnen_bereik`-notities per object blijven het tweede vangnet.
+    """
+    if data.extent is None:
+        return
+
+    bereik = data.extent.bounds
+    tekorten: list[str] = []
+    for rol, laag in sorted(data.layers.items()):
+        omhullende = unary_union(list(laag.geometries)).bounds
+        tekorten += _tekortregel(rol, laag.source.name, omhullende, bereik, eis.marge_m, eis)
+    if data.raster is not None:
+        tekorten += _tekortregel(
+            "ahn_dtm", data.raster.source.name, data.raster.bounds, bereik, 0.0, eis
+        )
+
+    if tekorten:
+        raise ExternalDataError(
+            "de aangeleverde bronnen dekken het bereik niet waarvoor ze gelden; een te "
+            "klein extract geeft een misleidend schone uitkomst. Trek de betreffende "
+            "extracten opnieuw, ruimer dan het bereik, of verhoog "
+            "`[bronnen] dekking_tolerantie_m` als de lege rand klopt.\n" + "\n".join(tekorten)
+        )
+
+
+def _tekortregel(
+    rol: str,
+    bestand: str,
+    omhullende: tuple[float, float, float, float],
+    bereik: tuple[float, float, float, float],
+    marge_m: float,
+    eis: Dekkingseis,
+) -> list[str]:
+    """De foutregel voor een bron die het bereik niet dekt, of niets."""
+    referentie = (
+        bereik[0] - marge_m,
+        bereik[1] - marge_m,
+        bereik[2] + marge_m,
+        bereik[3] + marge_m,
+    )
+    tekort = (
+        max(0.0, omhullende[0] - referentie[0]),
+        max(0.0, omhullende[1] - referentie[1]),
+        max(0.0, referentie[2] - omhullende[2]),
+        max(0.0, referentie[3] - omhullende[3]),
+    )
+    if max(tekort) <= eis.tolerantie_m:
+        return []
+    return [
+        f"- {rol} (`{bestand}`): bron {_bbox(omhullende)}, vereist {_bbox(referentie)}; "
+        f"tekort west/zuid/oost/noord = "
+        f"{tekort[0]:.1f}/{tekort[1]:.1f}/{tekort[2]:.1f}/{tekort[3]:.1f} m, "
+        f"toegestaan {eis.tolerantie_m:.1f} m."
+    ]
+
+
+def _bbox(grenzen: tuple[float, float, float, float]) -> str:
+    """Een omhullende als leesbare tekst."""
+    return f"({grenzen[0]:.1f}, {grenzen[1]:.1f} - {grenzen[2]:.1f}, {grenzen[3]:.1f})"
 
 
 def _lees_studiegebied(

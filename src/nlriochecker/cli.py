@@ -19,7 +19,7 @@ from nlriochecker.config import CoverageConfig, load_coverage_config
 from nlriochecker.coverage import assess_coverage, verify_register
 from nlriochecker.dataset import GwswDataset, load_dataset
 from nlriochecker.errors import PipelineError
-from nlriochecker.externedata import load_external_data
+from nlriochecker.externedata import Dekkingseis, load_external_data
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.register import Register, default_register_path, load_register
@@ -771,12 +771,19 @@ def _externe_bronnen(config, bronnen_dir: Path | None):
 
     De aangeleverde bronnen dekken maar een deel van het beheergebied; ze worden
     daarom alleen geladen als de gebruiker er expliciet om vraagt, en de EXT-checks
-    melden zelf wanneer ze niets konden toetsen.
+    melden zelf wanneer ze niets konden toetsen. Wat wel hard faalt is een bron die
+    kleiner is dan het bereik waarvoor hij geldig verklaard is; zie `_toets_dekking`.
     """
     if bronnen_dir is None:
         return None
     bronnen = config.bronnen.model_copy(update={"map": "."})
-    return load_external_data(bronnen, bronnen_dir)
+    # De poortcheck draait hier, voordat er ook maar een check gedraaid heeft: een
+    # bron die het bereik niet dekt geeft anders een misleidend schone uitkomst.
+    eis = Dekkingseis(
+        marge_m=config.drempels.ext_zoekafstand_max_m,
+        tolerantie_m=config.bronnen.dekking_tolerantie_m,
+    )
+    return load_external_data(bronnen, bronnen_dir, dekkingseis=eis)
 
 
 def _typing_gate(
