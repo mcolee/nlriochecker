@@ -67,7 +67,7 @@ dan een feature, dan rapporteert `toets` per feature:
 ```bash
 nlriochecker toets \
   --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
-  --studiegebied data/gis/buurten.gpkg \
+  --studiegebied data/gis_koekangerveld/buurten.gpkg \
   --output uitvoer
 ```
 
@@ -171,8 +171,9 @@ puntsgewijs.
 Wat die toets niet kan: een gat midden in een extract valt er niet mee op, en een
 tekort op een dunne laag betekent "hier staan geen features" en niet per se "extract
 afgeknipt". Daarvoor is `[bronnen] dekking_tolerantie_m`, standaard `0.0`. Voor de
-bronnen in `data/gis` is ongeveer `300` nodig: `bgt_bouwwerk` telt 52 objecten die aan
-de oostkant 276 m voor de rand ophouden, wat aan die bron niets mankeert.
+bronnen in `data/gis_koekangerveld` is ongeveer `300` nodig: `bgt_bouwwerk` telt 52
+objecten die aan de oostkant 276 m voor de rand ophouden, wat aan die bron niets
+mankeert.
 
 ### Voortgang
 

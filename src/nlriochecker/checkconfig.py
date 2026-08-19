@@ -300,7 +300,7 @@ class NamingOptions(BaseModel):
 
 
 class ExternalSources(BaseModel):
-    """Paden en laagnamen van de externe bronnen uit data/gis/."""
+    """Paden en laagnamen van de externe bronnen uit data/gis_koekangerveld/."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -312,7 +312,7 @@ class ExternalSources(BaseModel):
     # beslislog.
     dekking_tolerantie_m: float = Field(default=0.0, ge=0.0)
 
-    map: str = "data/gis"
+    map: str = "data/gis_koekangerveld"
     bgt: str | None = None
     bag_pand: str | None = None
     nwb_wegvakken: str | None = None

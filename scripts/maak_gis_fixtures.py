@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Schrijft de kleine externe-bronfixtures onder tests/fixtures/gis/ext.
 
-De echte bronnen in `data/gis/` dekken alleen Koekangerveld en zijn te groot en te
-traag voor unit tests. Deze fixtures zijn miniatuurversies met dezelfde structuur
-(dezelfde laagnamen, dezelfde attribuutnamen, EPSG:28992) in het lokale
+De echte bronnen in `data/gis_koekangerveld/` dekken alleen Koekangerveld en zijn te
+groot en te traag voor unit tests. Deze fixtures zijn miniatuurversies met dezelfde
+structuur (dezelfde laagnamen, dezelfde attribuutnamen, EPSG:28992) in het lokale
 assenstelsel dat de TTL-fixtures ook gebruiken.
 
 Gebruik:  uv run python scripts/maak_gis_fixtures.py

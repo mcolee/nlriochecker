@@ -105,7 +105,7 @@ toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben.
 # Blok C: de aangeleverde externe bronnen. Ze dekken alleen het studiegebied
 # Koekangerveld; objecten daarbuiten krijgen geen EXT-uitslag maar de status
 # "buiten studiegebied".
-map = "data/gis"
+map = "data/gis_koekangerveld"
 # Hoeveel een aangeleverde bron kleiner mag zijn dan het bereik in `studiegebied`
 # voordat het laden faalt. De code staat standaard op 0 (streng); voor déze bronnen is
 # ruimte nodig: `bgt_bouwwerk` telt 52 objecten die aan de oostkant 276 m voor de rand

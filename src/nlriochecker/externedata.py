@@ -1,4 +1,4 @@
-"""Externe geodata uit `data/gis/` voor de EXT- en AHN-checks.
+"""Externe geodata uit `data/gis_koekangerveld/` voor de EXT- en AHN-checks.
 
 De aangeleverde bronnen dekken alleen het studiegebied Koekangerveld, terwijl de
 GWSW-dataset de hele gemeente De Wolden beslaat. Een GWSW-object buiten dat gebied

@@ -29,7 +29,7 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 SHACL_DIR = DATA_DIR / "shacl_nulmeting"
 OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
 ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
-GIS_DIR = DATA_DIR / "gis"
+GIS_DIR = DATA_DIR / "gis_koekangerveld"
 
 OROX_DE_WOLDEN = OROX_DIR / "dewolden_orox.ttl"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
@@ -193,14 +193,16 @@ AHN_TIF = GIS_DIR / "ahn5_dtm_koekangerveld.tif"
 
 
 def _koekangerveld_bronnen():
-    """Leest de echte externe bronnen uit data/gis."""
+    """Leest de echte externe bronnen uit data/gis_koekangerveld."""
     from nlriochecker.externedata import load_external_data
 
     basis = load_check_config().bronnen
     return load_external_data(basis.model_copy(update={"map": "."}), GIS_DIR)
 
 
-@pytest.mark.skipif(not AHN_TIF.exists(), reason="de externe bronnen staan niet in data/gis/")
+@pytest.mark.skipif(
+    not AHN_TIF.exists(), reason="de externe bronnen staan niet in data/gis_koekangerveld/"
+)
 def test_externe_bronnen_van_koekangerveld() -> None:
     """Legt de inventarisatie uit docs/gis-inventarisatie.md vast."""
     bronnen = _koekangerveld_bronnen()

@@ -22,8 +22,8 @@ from hashlib import sha256
 from shapely.geometry.base import BaseGeometry
 
 # De kolommen waarin de aangeleverde bronnen hun identificatie dragen, in de volgorde
-# waarin ze gezocht worden. Gemeten op data/gis en op de fixtures: de BGT-lagen dragen
-# `lokaal_id`, de BAG-laag `identificatie`, en beide daarnaast een `id`.
+# waarin ze gezocht worden. Gemeten op data/gis_koekangerveld en op de fixtures: de
+# BGT-lagen dragen `lokaal_id`, de BAG-laag `identificatie`, en beide daarnaast een `id`.
 SLEUTELKOLOMMEN = ("lokaal_id", "identificatie", "id")
 
 # Zoveel hextekens van de geometriehash gaan in een terugvalsleutel. Twaalf is 48 bits:

@@ -1,7 +1,8 @@
 """Tests voor de EXT-checks en de AHN-hoogtechecks op miniatuurbronnen.
 
 De fixtures onder `tests/fixtures/gis/ext` hebben dezelfde structuur als de echte
-bronnen in `data/gis` (dezelfde laagnamen, dezelfde attribuutnamen, EPSG:28992),
+bronnen in `data/gis_koekangerveld` (dezelfde laagnamen, dezelfde attribuutnamen,
+EPSG:28992),
 maar dan in het lokale assenstelsel van de TTL-fixtures. Ze worden gemaakt met
 `scripts/maak_gis_fixtures.py`; het hoogteraster staat overal op 10,00 m NAP met
 een nodata-vlek rond (1040, 2010).

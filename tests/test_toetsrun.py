@@ -42,8 +42,8 @@ SHACL_DIR = Path(__file__).parent / "fixtures" / "shacl"
 EXT_DIR = GIS_DIR / "ext"
 
 # De namen van de miniatuurbronnen wijken af van de aangeleverde bestanden in
-# `data/gis`; een projectconfiguratie die ze aanwijst is precies de weg die een
-# gebruiker met eigen bestandsnamen ook gaat.
+# `data/gis_koekangerveld`; een projectconfiguratie die ze aanwijst is precies de weg
+# die een gebruiker met eigen bestandsnamen ook gaat.
 BRONBESTANDEN = {
     'bgt = "BGT.gpkg"': 'bgt = "bgt.gpkg"',
     'bag_pand = "bag_pand_koekangerveld.gpkg"': 'bag_pand = "bag_pand.gpkg"',

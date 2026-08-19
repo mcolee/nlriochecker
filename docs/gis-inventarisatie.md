@@ -1,4 +1,4 @@
-# Inventarisatie externe geodata (`data/gis/`)
+# Inventarisatie externe geodata (`data/gis_koekangerveld/`)
 
 Opgemaakt op 2026-08-16 op de aangeleverde bestanden. Alles is gelezen met
 `sqlite3` (GeoPackage-metadata), `geopandas`/`pyogrio` (features) en `rasterio`

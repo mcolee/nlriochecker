@@ -1,7 +1,7 @@
 """EXT-checks en de AHN-hoogtechecks: toetsing tegen externe bronnen.
 
-Alle bronnen in `data/gis/` dekken uitsluitend het studiegebied Koekangerveld,
-terwijl de GWSW-dataset de hele gemeente De Wolden beslaat. Een GWSW-object daar
+Alle bronnen in `data/gis_koekangerveld/` dekken uitsluitend het studiegebied
+Koekangerveld, terwijl de GWSW-dataset de hele gemeente De Wolden beslaat. Een GWSW-object daar
 buiten krijgt daarom geen uitslag maar de status *buiten studiegebied*: dat er geen
 BGT-deksel of BAG-pand naast ligt zegt daar niets over de datakwaliteit en alles
 over de dekking van de bron. Elke check meldt in haar toelichting hoeveel objecten

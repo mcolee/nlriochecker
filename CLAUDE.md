@@ -5,7 +5,7 @@ Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen
 1. Inlezen en analyseren van de GWSW-nulmeting, aangeleverd als SHACL-validatierapporten (apps.gwsw.nl/item_validate_shacl).
 2. Eigen aanvullende checks conform het checkregister (data/checkregister-gwsw-nulmeting-v0_8.md) op de GWSW-dataset (OroX/TTL) en later externe bronnen.
 
-We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis/.
+We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis_koekangerveld/ (Koekangerveld) en data/gis_dewoldenhoogeveen/ (het hele OroX-gebied).
 
 ## Gouden regels van Karpathy
 
@@ -107,7 +107,7 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - Klassen als Lozingspunt, Overnamepunt en UitlaatPunt zijn Knooppunt-subklassen en staan dus op de orientatie. Overnamepunt bestaat alleen in de totaal-ontologie, niet in de deelmodellen.
 - Welke ontologie je laadt bepaalt de uitkomst; gebruik data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl. Zonder ontologie valt de lader terug op herkenning via geometrie en meldt het verschil.
 
-### Studiegebied (data/gis/)
+### Studiegebied (data/gis_koekangerveld/, data/gis_dewoldenhoogeveen/)
 - GeoPackage of GeoJSON, gelezen met stdlib sqlite3 plus shapely; geen extra afhankelijkheid. Moet in EPSG:28992 staan, net als de GWSW-coordinaten; herprojecteren doen we niet.
 - Analyseer de kern plus een contextschil, rapporteer de kern. De schil is de
   samenhangende vrijvervalcomponent waar de kern in ligt plus een buffer om het gebied;

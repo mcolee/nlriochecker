@@ -91,6 +91,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- De aangeleverde geodata staat niet meer in `data/gis` maar in
+  `data/gis_koekangerveld`; daarnaast is er `data/gis_dewoldenhoogeveen` met dezelfde
+  bronsoorten voor het hele gebied van de OroX-dataset. De standaard `[bronnen] map`
+  in `checks.toml` en de integratietests wijzen mee.
 - De laatste twee plekken in de uitvoerlaag die hun eigen klassenselectie opbouwden
   (`uitvoer/synthese.py` en `uitvoer/gpkg.py`) gebruiken nu `checks/selectie.py`,
   waarmee het restant uit BO-20 weg is. De rol `mechanischeleidingen` is daar
