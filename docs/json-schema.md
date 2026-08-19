@@ -45,7 +45,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 
 ```json
 {
-  "schema_versie": "1.0",
+  "schema_versie": "1.1",
   "gereedschap": "nlriochecker 0.2.0",
   "run_datum": "2026-08-18",
   "dataset": "hgt004_bob_boven_deksel.ttl",
@@ -78,7 +78,8 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
       "systemisch": true,
       "foutlocatie": [1025.0, 2000.0],
       "run_datum": "2026-08-18",
-      "dataset": "hgt004_bob_boven_deksel.ttl"
+      "dataset": "hgt004_bob_boven_deksel.ttl",
+      "cfk": []
     }
   ]
 }
@@ -176,6 +177,39 @@ De geometrie van het externe object zit **niet** in de JSON -- die zou als WKB i
 contract belanden. Wie hem wil, vindt het object in de GeoPackage: de lagen
 `bouwwerken` en `waterdelen_zonder_zinker` dragen dezelfde sleutel in hun kolom `id`.
 
+### Meldingen uit de nulmeting
+
+Sinds schemaversie `1.1` staan ook de overtredingen uit de GWSW SHACL-nulmeting in
+`bevindingen.json`, mits `toets` met `--shacl` gedraaid heeft. Ze zijn te herkennen
+aan `bron: "nulmeting"` en `categorie: "NULMETING"`; hun `check_id` is
+`NULMETING-<naam van de SHACL-vorm>`, bijvoorbeeld `NULMETING-LengteLeiding_val`.
+Hun `dimensie` is altijd `Compliance` — een nulmeting toetst of de dataset aan een
+conformiteitsklasse voldoet, en dat is voor elke vorm dezelfde vraag.
+
+Wat je van zo'n melding moet weten:
+
+- **Eén melding per overtreding, ongeacht in hoeveel CFK-rapporten hij staat.**
+  `cfk` somt ze op. Een telling per conformiteitsklasse telt de melding bij elke
+  genoemde klasse mee; de kaart en `n_fout` tellen gebreken, geen rapportregels.
+- **`object_uri` kan leeg zijn.** De focusnode van een SHACL-melding is niet altijd
+  een knoop of streng: `CfkTypes_typ` noemt een klassenaam, en er zijn stelsels
+  (`dru_geb_0`) die geen kaartobject zijn. Zo'n melding staat wel in het bestand —
+  hem weglaten zou een gebrek verzwijgen dat de nulmeting telt — maar heeft geen
+  `foutlocatie` en een leeg `gebied`, want hij is aan geen enkel studiegebied toe
+  te wijzen. Bij een run over meerdere gebieden staat hij daarom in de JSON van elk
+  gebied.
+- **`drempel` is altijd leeg.** De SHACL-rapporten noemen de drempel binnen de
+  boodschap (`waarde wijkt af (min=1,max=75)`) en niet in een eigen kolom; hem eruit
+  peuteren zou een tweede lezing van dezelfde tekst zijn.
+- **`melding_id` hangt aan de boodschap.** De onderscheidende sleutels zijn de
+  focusnode en de boodschap: twee eindpunten van dezelfde streng herleiden naar
+  diezelfde streng, dus de object-URI onderscheidt ze niet. Herformuleert de
+  GWSW-server een boodschap, dan verschuiven de ID's van die vorm eenmalig en leest
+  een trendvergelijking ze als opgelost plus nieuw.
+- **`systemisch`** wordt per (vorm, objecttype) bepaald, met als noemer het aantal
+  instanties van dat type in de dataset. Zonder objecttype in het rapport of zonder
+  instanties van dat type is er geen noemer en is de melding niet systemisch.
+
 ### Over `typering_betrouwbaar`
 
 Elke melding draagt `typering_betrouwbaar`. Dat veld is onwaar als de SHACL-nulmeting
@@ -200,8 +234,8 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 |---|---|---|
 | `melding_id` | string | Identiteit van deze melding: dezelfde check op hetzelfde object geeft hetzelfde ID, ook tussen runs. De sorteersleutel van het bestand. Eén uitzondering: botsen twee meldingen binnen één check op dezelfde ID, dan krijgt de tweede een volgnummer (`…-2`) dat tussen runs kan verschuiven. Dat is een gebrek in de `id_sleutels` van die check en het wordt als waarschuwing gelogd; zolang het optreedt is het bestand op dat punt niet diffbaar. |
 | `check_id` | string | Check-ID uit het checkregister, bijvoorbeeld `TOP-009`. ID's zijn stabiel en worden nooit hergebruikt. |
-| `categorie` | string | Het voorvoegsel van het check-ID: `TOP`, `NET`, `HGT`, `ATTR`, `ADM`, `RVZ`, `BTR`, `EXT`. |
-| `bron` | string | Waar de melding uit komt. `register` voor de eigen check-engine. |
+| `categorie` | string | Het voorvoegsel van het check-ID: `TOP`, `NET`, `HGT`, `ATTR`, `ADM`, `RVZ`, `BTR`, `EXT` of `NULMETING`. |
+| `bron` | string | Waar de melding uit komt. `register` voor de eigen check-engine, `nulmeting` voor een overtreding uit de GWSW SHACL-nulmeting. |
 | `ernst` | string | `F` voor fout, `W` voor waarschuwing. |
 | `dimensie` | string | Dimensietag uit het kwaliteitsraamwerk: `Consistentie`, `Compleetheid`, `Plausibiliteit`, `Actualiteit`, `Traceerbaarheid`, `Precisie`, `Nauwkeurigheid` of `Compliance`. |
 | `object_uri` | string | Volledige GWSW-URI van het object waarop de melding staat. |
@@ -222,6 +256,7 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 | `foutlocatie` | array van twee getallen, of `null` | `[x, y]` in EPSG:28992. `null` als de melding niet op een plek te zetten is. |
 | `run_datum` | string | Gelijk aan het enveloppeveld. |
 | `dataset` | string | Gelijk aan het enveloppeveld. |
+| `cfk` | array van string | De conformiteitsklassen die deze overtreding noemen, gesorteerd. Leeg (`[]`) bij een melding uit de eigen check-engine: die toetst niet tegen een conformiteitsklasse. Zie [Meldingen uit de nulmeting](#meldingen-uit-de-nulmeting). |
 
 ### Waarom `run_datum` en `dataset` dubbel staan
 
@@ -247,8 +282,8 @@ versie 1.x.
 hierop en niet op de packageversie: de checks mogen veranderen zonder dat het formaat
 dat doet.
 
-Het tweede nummer telt op bij een achterwaarts verenigbare toevoeging: `"1.0"` wordt
-`"1.1"` zodra er een optioneel veld bij komt. Pin daarom op het **hoofdnummer**
+Het tweede nummer telt op bij een achterwaarts verenigbare toevoeging: `"1.0"` werd
+`"1.1"` toen het veld `cfk` erbij kwam. Pin daarom op het **hoofdnummer**
 (`schema_versie.split(".")[0] == "1"`), niet op de volledige string.
 
 **Binnen een hoofdversie mag:**

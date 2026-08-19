@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from typing import ClassVar, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
 
 from shapely.geometry import Point
 
@@ -21,6 +21,12 @@ from nlriochecker.meting import Meetbereik
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import StudyArea
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
+
+if TYPE_CHECKING:  # pragma: no cover
+    # Alleen als type. `nulbevinding` leest `uitvoer.identiteit`, en die module
+    # trekt via haar package `checks` weer binnen; een gewone import zou de kring
+    # rond maken.
+    from nlriochecker.nulbevinding import Nulbevinding
 
 
 class Severity(StrEnum):
@@ -210,6 +216,12 @@ class CheckRun:
     # verschillende dingen over -- Markdown zweeg terwijl de JSON `volledig: false`
     # beweerde.
     meetbereik: Meetbereik = field(default_factory=lambda: Meetbereik.niet_gemeten(()))
+    # De overtredingen uit de SHACL-nulmeting, herleid tot objecten uit deze dataset.
+    # Ze zijn geen `CheckOutcome`: de nulmeting is een tweede bron naast het register,
+    # geen zeventigtal extra checks. `uitvoer.melding.bouw_meldingen` maakt er
+    # meldingen van naast die van de checks, zodat de vier uitvoervormen ook hiervoor
+    # uit een stroom komen. Zie `nulbevinding.py` en BO-28.
+    nulbevindingen: tuple[Nulbevinding, ...] = ()
     # Het trefferregister van de context waarop deze run gedraaid heeft; de
     # GeoPackage-schrijver joint de meldingen erop om de lagen met externe objecten te
     # vullen. Zie `checks/treffers.py`.
@@ -302,7 +314,30 @@ class CheckRun:
         # `replace` in plaats van elk veld opsommen: die opsomming vergat bij elke
         # uitbreiding een veld, en dan valt het stil weg op precies de runs met een
         # studiegebied.
-        return replace(self, outcomes=outcomes, study_area=area, _binnen=binnen)
+        return replace(
+            self,
+            outcomes=outcomes,
+            nulbevindingen=tuple(
+                bevinding
+                for bevinding in self.nulbevindingen
+                if _nul_hoort_erbij(bevinding, binnen)
+            ),
+            study_area=area,
+            _binnen=binnen,
+        )
+
+
+def _nul_hoort_erbij(bevinding: Nulbevinding, binnen: frozenset[str]) -> bool:
+    """Geeft aan of deze nulmetingbevinding in het studiegebied hoort.
+
+    Een bevinding die tot een knoop of streng herleid is, volgt de gewone regel: hij
+    telt mee als dat object het gebied raakt. Een bevinding die nergens op uitkwam --
+    een klassenaam uit `CfkTypes_typ`, een stelsel als `dru_geb_0` -- is aan geen
+    enkel gebied toe te wijzen en blijft daarom in elke gebiedsrun staan. Een losse
+    run over dat ene gebied zou hem ook opnemen, en dat is de equivalentie-eis van
+    BO-12; hem hier wegfilteren zou hem uit *elk* gebiedsrapport laten verdwijnen.
+    """
+    return bevinding.object_uri in binnen if bevinding.herleid else True
 
 
 class Check(ABC):

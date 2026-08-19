@@ -40,7 +40,6 @@ from rdflib import URIRef
 
 from nlriochecker.dataset import GWSW, GwswDataset
 from nlriochecker.meting import Nulmeting
-from nlriochecker.uitvoer.identiteit import kort
 
 # Het voorvoegsel van elk check-ID uit de nulmeting; ook de categorie, want die is
 # het deel van het ID voor het eerste koppelteken (`melding.categorie_van`).
@@ -81,15 +80,26 @@ class Nulbevinding:
     cfk: tuple[str, ...]
     systemisch: bool
     herleid: bool
+    # Onwaar als de typeringspoort dit object te globaal getypeerd noemt. Dezelfde
+    # betekenis als op een checkbevinding: de melding blijft staan, maar is niet
+    # betrouwbaar te duiden.
+    typering_betrouwbaar: bool = True
 
 
 def bouw_nulbevindingen(
-    nulmeting: Nulmeting, dataset: GwswDataset, systemisch_drempel: float
+    nulmeting: Nulmeting,
+    dataset: GwswDataset,
+    systemisch_drempel: float,
+    onbetrouwbaar: frozenset[str] = frozenset(),
 ) -> list[Nulbevinding]:
     """Zet de rapporten van een nulmeting om in ontdubbelde bevindingen.
 
     De volgorde is die van (vorm, focusnode, boodschap), zodat twee runs op dezelfde
     bestanden hetzelfde opleveren en een diff tussen meetmomenten geen ruis geeft.
+
+    `onbetrouwbaar` is de uitkomst van de typeringspoort uit diezelfde nulmeting. Hij
+    komt van de beller en wordt hier niet zelf berekend: `analysis.bepaal_typeringspoort`
+    is er de ene plek voor, en die draait in `toetsrun` al.
     """
     ruw = _ontdubbel(nulmeting)
     joiner = _Joiner(dataset)
@@ -117,6 +127,7 @@ def bouw_nulbevindingen(
                     vorm, objecttype, tellingen, joiner.instanties, systemisch_drempel
                 ),
                 herleid=bool(uri),
+                typering_betrouwbaar=uri not in onbetrouwbaar,
             )
         )
     return bevindingen
@@ -191,6 +202,11 @@ class _Joiner:
     """
 
     def __init__(self, dataset: GwswDataset) -> None:
+        # Binnen de functie: `uitvoer.identiteit` hangt onder een package die op haar
+        # beurt `checks` binnentrekt, en die leest deze module. Een import bovenaan
+        # zou die kring rond maken.
+        from nlriochecker.uitvoer.identiteit import kort
+
         self._dataset = dataset
         self._objecten = frozenset(dataset.nodes) | frozenset(dataset.conduits)
         self._per_fragment = {kort(uri): uri for uri in self._objecten}

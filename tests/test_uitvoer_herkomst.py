@@ -379,7 +379,7 @@ def test_schrijf_json_draagt_de_envelop(tmp_path: Path) -> None:
     )
 
     document = json.loads(pad.read_text(encoding="utf-8"))
-    assert document["schema_versie"] == SCHEMA_VERSIE == "1.0"
+    assert document["schema_versie"] == SCHEMA_VERSIE == "1.1"
     assert document["gereedschap"] == gereedschap()
     assert document["run_datum"] == "2026-08-17"
     assert document["dataset"] == "dewolden.ttl"

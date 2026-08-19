@@ -20,7 +20,7 @@ import pandas as pd
 from nlriochecker.checks import REGISTRY, CheckRun, Severity
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
-from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.melding import BRON_NULMETING, Melding, bouw_meldingen
 from nlriochecker.uitvoer.synthese import rode_draad
 from nlriochecker.uitvoer.tabel import prepare, table
 
@@ -63,6 +63,7 @@ CSV_KOLOMMEN = [
     "Dataset",
     "ObjectURI",
     "Object2URI",
+    "CFK",
 ]
 
 
@@ -113,9 +114,10 @@ def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
     regel erna weggegooid worden. `Melding` heeft geen geneste dataclasses, dus een
     ondiepe kopie is hier gelijkwaardig.
 
-    Alleen `foutlocatie` wordt omgezet, want een shapely `Point` is niet
-    serialiseerbaar. Hij wordt `[x, y]` in EPSG:28992; er wordt niet
-    geherprojecteerd, net als in de rest van de uitvoer.
+    Twee velden worden omgezet. `foutlocatie` wordt `[x, y]` in EPSG:28992, want een
+    shapely `Point` is niet serialiseerbaar; er wordt niet geherprojecteerd, net als
+    in de rest van de uitvoer. `cfk` wordt een lijst: de JSON-schrijver maakt van een
+    tuple ook een array, maar dan spreekt de code het contract niet uit.
     """
     namen = [veld.name for veld in fields(Melding)]
     rijen: list[dict[str, object]] = []
@@ -123,6 +125,7 @@ def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
         rij: dict[str, object] = {naam: getattr(melding, naam) for naam in namen}
         punt = melding.foutlocatie
         rij["foutlocatie"] = None if punt is None else [punt.x, punt.y]
+        rij["cfk"] = list(melding.cfk)
         rijen.append(rij)
     return rijen
 
@@ -156,6 +159,7 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
             "Dataset": melding.dataset,
             "ObjectURI": melding.object_uri,
             "Object2URI": melding.object2_uri,
+            "CFK": ", ".join(melding.cfk),
         }
         for melding in meldingen
     ]
@@ -172,9 +176,10 @@ def _render_checks(
         f"{len(run.dataset.conduits)} strengen.",
         "",
         f"{run.count(Severity.ERROR)} fouten en {run.count(Severity.WARNING)} waarschuwingen "
-        f"uit {len(run.outcomes)} checks.",
+        f"uit {len(run.outcomes)} eigen checks.",
         "",
     ]
+    lines += _nulmeting_section(run, meldingen)
 
     if run.typing_gate_applied:
         lines += [
@@ -351,6 +356,60 @@ def _render_checks(
 
     lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
     return lines
+
+
+def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+    """Wat de GWSW SHACL-nulmeting bijdroeg, en wat er niet van op de kaart kwam.
+
+    Deze sectie staat er alleen als er gemeten is. De aantallen komen uit de
+    meldingenstroom en niet uit de rapporten zelf: wat hier staat is precies wat er
+    in de CSV, de GeoPackage en de JSON terechtkomt, ook na afbakening tot een
+    studiegebied.
+
+    De tellingen per conformiteitsklasse tellen een melding bij elke klasse die hem
+    noemt. Dat is met opzet: de klassen zijn geen partitie van de meldingen, en de
+    som over de kolom is dus hoger dan het totaal.
+    """
+    uit_nulmeting = [melding for melding in meldingen if melding.bron == BRON_NULMETING]
+    if not run.meetbereik.gemeten:
+        return []
+
+    fouten = sum(1 for melding in uit_nulmeting if melding.ernst == Severity.ERROR.value)
+    systemisch = sum(1 for melding in uit_nulmeting if melding.systemisch)
+    regels = [
+        "**GWSW-nulmeting**",
+        "",
+        f"{getal(len(uit_nulmeting), 'overtreding', 'overtredingen')} uit de "
+        f"SHACL-nulmeting: {fouten} fouten en {len(uit_nulmeting) - fouten} waarschuwingen, "
+        f"waarvan {systemisch} systemisch. Dezelfde overtreding in meerdere "
+        "conformiteitsklassen telt hier een keer; de klassen staan erbij.",
+        "",
+    ]
+
+    per_cfk: defaultdict[str, int] = defaultdict(int)
+    for melding in uit_nulmeting:
+        for cfk in melding.cfk:
+            per_cfk[cfk] += 1
+    regels += ["| Conformiteitsklasse | Overtredingen |", "| --- | ---: |"]
+    regels += [f"| {cfk} | {per_cfk.get(cfk, 0)} |" for cfk in run.meetbereik.gekozen]
+
+    zonder_object = {melding.melding_id for melding in uit_nulmeting if not melding.object_uri}
+    zonder_plek = [
+        melding for melding in uit_nulmeting if melding.object_uri and melding.foutlocatie is None
+    ]
+    regels += [
+        "",
+        f"> **{getal(len(zonder_object), 'focusnode kwam', 'focusnodes kwamen')} nergens "
+        "op uit** en staat dus niet op de kaart: een klassenaam uit `CfkTypes_typ`, of "
+        "een stelsel dat geen knoop of streng is. Die overtredingen staan wel in dit "
+        "rapport en in de meldingentabel, met een leeg gebied -- ze zijn aan geen enkel "
+        "studiegebied toe te wijzen.",
+        "",
+        f"> **{getal(len(zonder_plek), 'overtreding staat', 'overtredingen staan')} op een "
+        "object zonder bruikbare geometrie** en kreeg daarom geen plek op de kaart.",
+        "",
+    ]
+    return regels
 
 
 def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:

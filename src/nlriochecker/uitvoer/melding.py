@@ -16,12 +16,21 @@ from shapely.geometry import Point
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY as CHECK_REGISTRY
-from nlriochecker.checks import CheckOutcome, CheckRun, Finding
+from nlriochecker.checks import CheckOutcome, CheckRun, Dimension, Finding, Severity
+from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.uitvoer.identiteit import kort, melding_id
 
 logger = logging.getLogger(__name__)
 
 BRON_REGISTER = "register"
+# De tweede bron naast het register: de GWSW SHACL-nulmeting. Zie `nulbevinding.py`.
+BRON_NULMETING = "nulmeting"
+
+# De dimensietag van elke nulmetingmelding. Een SHACL-nulmeting toetst of de dataset
+# aan een conformiteitsklasse voldoet, en dat is voor elke vorm dezelfde vraag; een
+# fijnere tag zou een tweede register van vorm naar dimensie vergen dat bij elke
+# serverwijziging achterloopt.
+DIMENSIE_NULMETING = Dimension.COMPLIANCE
 
 SCOPE_BINNEN = "binnen_studiegebied"
 SCOPE_GEEN_GEBIED = "geen_studiegebied"
@@ -62,6 +71,11 @@ class Melding:
     foutlocatie: Point | None
     run_datum: str
     dataset: str
+    # De conformiteitsklassen die deze overtreding noemen, gesorteerd. Leeg bij een
+    # eigen check: die toetst niet tegen een CFK. Dezelfde overtreding staat vaak in
+    # meerdere CFK-rapporten en levert een melding op; tellingen per CFK tellen hem
+    # bij elke genoemde klasse mee.
+    cfk: tuple[str, ...] = ()
 
 
 def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
@@ -112,7 +126,109 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
                     dataset=run.dataset.source.name,
                 )
             )
+
+    meldingen += _nulmeldingen(run, run_datum, scope, gebied, kritiek, gebruikte_ids)
     return meldingen
+
+
+def _nulmeldingen(
+    run: CheckRun,
+    run_datum: date,
+    scope: str,
+    gebied: str,
+    kritiek: set[str],
+    gebruikte_ids: set[str],
+) -> list[Melding]:
+    """Zet de overtredingen uit de SHACL-nulmeting om in meldingen.
+
+    Ze lopen door dezelfde functie als de checkbevindingen en dragen daarom dezelfde
+    velden; alleen `bron`, `categorie` en `cfk` verraden waar ze vandaan komen.
+
+    De onderscheidende sleutels zijn de focusnode en de boodschap. De object-URI
+    volstaat niet: twee eindpunten van dezelfde streng herleiden naar diezelfde
+    streng. De boodschap zit erin omdat hij ook de ontdubbelsleutel is; herformuleert
+    de GWSW-server hem, dan verschuiven de melding-ID's van die vorm eenmalig.
+
+    Een bevinding die nergens op uitkwam draagt geen gebied: hij is aan geen enkel
+    studiegebied toe te wijzen. Hem het gebied van de run geven zou beweren dat hij
+    daarbinnen ligt, en dat is niet gemeten.
+    """
+    meldingen = []
+    for bevinding in run.nulbevindingen:
+        kenmerk = _uniek_id(
+            Finding(
+                check_id=bevinding.check_id,
+                severity=Severity(bevinding.ernst),
+                dimension=DIMENSIE_NULMETING,
+                object_uri=bevinding.object_uri,
+                object_label=bevinding.object_label,
+                message=bevinding.boodschap,
+                typing_reliable=True,
+                details={"focusnode": bevinding.focus_node, "boodschap": bevinding.boodschap},
+            ),
+            ("focusnode", "boodschap"),
+            gebruikte_ids,
+        )
+        gebruikte_ids.add(kenmerk)
+        meldingen.append(
+            Melding(
+                melding_id=kenmerk,
+                check_id=bevinding.check_id,
+                categorie=categorie_van(bevinding.check_id),
+                bron=BRON_NULMETING,
+                ernst=bevinding.ernst,
+                dimensie=DIMENSIE_NULMETING.value,
+                object_uri=bevinding.object_uri,
+                object_id=kort(bevinding.object_uri),
+                object_label=bevinding.object_label,
+                object2_uri="",
+                object2_id="",
+                object2_label="",
+                boodschap=bevinding.boodschap,
+                waarde=bevinding.waarde,
+                drempel="",
+                typering_betrouwbaar=bevinding.typering_betrouwbaar,
+                cluster_id="",
+                scope=scope,
+                gebied=gebied if bevinding.herleid else "",
+                prioriteit=_nulprioriteit(run, bevinding, kritiek),
+                systemisch=bevinding.systemisch,
+                foutlocatie=_nullocatie(run, bevinding),
+                run_datum=run_datum.isoformat(),
+                dataset=run.dataset.source.name,
+                cfk=bevinding.cfk,
+            )
+        )
+    return meldingen
+
+
+def _nulprioriteit(run: CheckRun, bevinding: Nulbevinding, kritiek: set[str]) -> int:
+    """Dezelfde regel als bij een eigen check: 1 kritiek, 2 fout, 3 waarschuwing."""
+    if bevinding.ernst != Severity.ERROR.value:
+        return 3
+    if kritiek and any(run.dataset.is_a(bevinding.object_uri, wortel) for wortel in kritiek):
+        return 1
+    return 2
+
+
+def _nullocatie(run: CheckRun, bevinding: Nulbevinding) -> Point | None:
+    """De plek van een nulmetingmelding: die van het object waar hij op uitkwam."""
+    from nlriochecker.uitvoer.locatie import foutlocatie
+
+    if not bevinding.herleid:
+        return None
+    return foutlocatie(
+        Finding(
+            check_id=bevinding.check_id,
+            severity=Severity(bevinding.ernst),
+            dimension=DIMENSIE_NULMETING,
+            object_uri=bevinding.object_uri,
+            object_label=bevinding.object_label,
+            message=bevinding.boodschap,
+            typing_reliable=True,
+        ),
+        run.dataset,
+    )
 
 
 def categorie_van(check_id: str) -> str:

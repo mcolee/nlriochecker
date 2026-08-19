@@ -41,7 +41,7 @@ VELD_GEREEDSCHAP = "gereedschap"
 # De versie van het JSON-contract, los van het versienummer van deze package. Een
 # afnemer pint hierop, niet op de packageversie: de checks mogen veranderen zonder
 # dat het formaat dat doet. Zie `docs/json-schema.md` voor de versioneringsregel.
-SCHEMA_VERSIE = "1.0"
+SCHEMA_VERSIE = "1.1"
 
 
 def gereedschap() -> str:
