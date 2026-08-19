@@ -1069,6 +1069,9 @@ EXT_C = (1090.0, 2000.0)
 EXT_D = (2000.0, 2000.0)
 EXT_E = (1000.0, 2010.0)
 EXT_F = (1040.0, 2010.0)
+# De duiker (streng 6) kruist water-2 op eigen hoogte, los van streng 3.
+EXT_G = (1010.0, 2013.0)
+EXT_H = (1030.0, 2013.0)
 
 # Datakarakteristieken: jaarprecisie van de datums en expliciete onbekend-waarden.
 # Vier strengen met een begindatum, waarvan drie op 1 januari; vier putten met een
@@ -1127,10 +1130,13 @@ FIXTURES["ext_scenario.ttl"] = (
     + hoogteleiding("L3", "3", [EXT_E, EXT_F], "PutE", "PutF", bob=(9.60, 9.55)).replace(
         "gwsw:GemengdRiool", "gwsw:Zinker"
     )
-    # Streng 6 is een duiker op dezelfde route: een duiker is geen rioolleiding
-    # (subklasse van Leiding, niet van VrijvervalRioolleiding) en valt buiten de
-    # populatie van EXT-002 en EXT-003; geen van beide meldt hem.
-    + leiding("L6", "6", [EXT_E, EXT_F], "PutE", "PutF", klasse="Duiker")
+    # Streng 6 is een duiker die water-2 kruist, net als streng 3, maar drie meter
+    # noordelijker en op een eigen route: een duiker is geen rioolleiding (subklasse
+    # van Leiding, niet van VrijvervalRioolleiding) en valt buiten de populatie van
+    # EXT-002 en EXT-003; geen van beide meldt hem. Hij verbindt oppervlaktewater en
+    # heeft dus geen rioolputten aan zijn uiteinden. Boven op streng 3 leverde hij
+    # TOP-006 een samenvalmelding op; die check draait op alle leidingen.
+    + leiding("L6", "6", [EXT_G, EXT_H], None, None, klasse="Duiker")
     # Streng 4 verbindt de lozingsputten met het net.
     + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35))
     + "\n"

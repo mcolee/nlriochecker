@@ -76,7 +76,8 @@ def main() -> None:
         bgt,
         "pand",
     )
-    # W1 kruist streng 2 (gemengd), W2 kruist streng 3 (een duiker).
+    # W1 kruist streng 2 (gemengd), W2 kruist streng 3 (een zinker) en streng 6
+    # (een duiker, en dus geen rioolleiding).
     schrijf(
         gpd.GeoDataFrame(
             {

@@ -456,9 +456,9 @@ class _WatergangKruising(_ExterneCheck):
         notities = super().notes(context)
         for klasse, aantal in self.buiten_populatie(context).items():
             notities.append(
-                f"{aantal} strengen van de klasse {klasse} vallen buiten de populatie "
-                "(geen vrijvervalleiding) en zijn niet bekeken; een kruising van zo'n streng "
-                "met een watergang is geen bevinding."
+                "Buiten de populatie (geen vrijvervalleiding) en dus niet bekeken: "
+                f"{getal(aantal, 'streng', 'strengen')} van de klasse {klasse}. Een "
+                "kruising van zo'n streng met een watergang is geen bevinding."
             )
         return notities
 
@@ -501,10 +501,17 @@ class KruisingMetWatergang(_WatergangKruising):
 
 @register
 class KruisingZonderZinkerOfDuiker(_WatergangKruising):
-    """EXT-003: een watergangkruising die niet als zinker of duiker geregistreerd staat."""
+    """EXT-003: een watergangkruising die niet als kruisingsconstructie geregistreerd staat.
+
+    De klassenaam dateert van voor de correctie van de klassenhierarchie. Wat de
+    uitzondering doorlaat staat in `klassen.kruisingsleiding`, en dat is nog steeds
+    zinker en duiker; alleen een zinker kan binnen de populatie voorkomen, want een
+    duiker is geen vrijvervalleiding. De titel en de meldingstekst noemen daarom de
+    zinker: dat is wat het gebrek oplost.
+    """
 
     id = "EXT-003"
-    title = "Kruising met watergang zonder registratie als zinker of duiker"
+    title = "Kruising met watergang zonder registratie als zinker"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
 
@@ -536,8 +543,7 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
                 context,
                 conduit.uri,
                 conduit.label,
-                f"Kruist een BGT-waterdeel ({soort}) maar staat niet geregistreerd als "
-                f"{' of '.join(wortels) or 'kruisingsconstructie'}.",
+                f"Kruist een BGT-waterdeel ({soort}) maar staat niet geregistreerd als zinker.",
                 watertype=soort,
                 buffer_m=buffer,
                 object2_uri=sleutel,

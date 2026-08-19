@@ -200,9 +200,28 @@ def test_een_duiker_valt_buiten_beide_kruisingschecks(
     for check_id in ("EXT-002", "EXT-003"):
         outcome = uitkomst(check_id, config, bronnen)
         assert "6" not in labels(outcome)
-        assert any("1 strengen van de klasse Duiker" in note for note in outcome.notes), (
-            outcome.notes
-        )
+        assert any(
+            "niet bekeken: 1 streng van de klasse Duiker" in note for note in outcome.notes
+        ), outcome.notes
+
+
+def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
+    """Streng 6 is decor voor de populatiegrens en mag nergens een gebrek opleveren.
+
+    Hij ligt op een eigen route, los van streng 3: precies bovenop streng 3 gaf hij
+    TOP-006 een samenvalmelding, en die dook op in de melding van streng 3 -- niet in
+    die van streng 6. Een assertie op zijn eigen label zou dat dus missen; deze kijkt
+    daarom ook in de meldingsteksten.
+    """
+    dataset = load_dataset(SCENARIO)
+    resultaat = run_checks(CheckContext(dataset=dataset, config=config))
+    betrokken = [
+        (outcome.check_id, finding.message)
+        for outcome in resultaat.outcomes
+        for finding in outcome.findings
+        if finding.object_label == "6" or "'6'" in finding.message
+    ]
+    assert betrokken == []
 
 
 def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: ExternalData) -> None:
