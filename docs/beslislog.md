@@ -998,3 +998,60 @@ voor iets wat los staat van de duplicatie; `extra="forbid"` in de pydantic-model
 zorgt wel dat zo'n breuk hard faalt en niet stil, dus het kan later alsnog. Een sweep
 over de 448 keer "streng" in `src/`: dat is een andere verbouwing, en hij zou het bewijs
 hierboven onleesbaar maken omdat elke rapportregel verandert.
+
+### BO-21 De toetsrun is een module, en de opdrachtregel een adapter
+
+**Wat.** `toetsrun.py` voert een toets uit: `Toetsopdracht` (paden en vlaggen) in,
+`Toetsuitslag` uit. De module laadt, bewaakt de volgorde, toetst, schrijft en levert
+met `regels()` het verhaal dat de gebruiker te zien krijgt. `cli.py` bouwt de
+opdracht, roept aan en echoot; hij houdt alleen nog `_BalkVoortgang`, de click-kant
+van het voortgangsprotocol. Alleen `toets` is omgezet -- `analyseer`, `dekking` en
+`vergelijk` waren al dunne adapters van vijf tot acht statements zonder
+domeinbeslissingen onderweg.
+
+**Waarom.** De beslissingen in `check_command` waren geen presentatiekeuzes. De
+volgorde (valideer de keuzes, de gebieden en de bronnen vóór je drie minuten en 3 GB
+aan dataset laadt), de typeringspoort met haar drie samenhangende uitkomsten, en de
+dekkingspoort op de bronnen zijn domeinregels. Ze stonden in privéfuncties van een
+click-commando, en daarmee was `CliRunner` de enige seam om ze te bereiken:
+`test_cli.py` telde 899 regels en 38 invokes, waarvan er veertien niets over de
+opdrachtregel zeiden.
+
+**Waarom de zinnen meegaan.** Het lag voor de hand om alleen data terug te geven en
+de CLI de tekst te laten maken. Maar de tekst velt oordelen -- dat het net binnen een
+gebied met vrijwel de hele export samenhangt, dat een gebied geen objecten bevat, dat
+een check bevindingen met typeringsvoorbehoud heeft. Dat is interpretatie en geen
+opmaak; in de CLI laten zou kandidaat A voor de helft laten mislukken. De uitslag
+draagt daarom naast `regels()` ook negen velden, zodat een test op een veld kan
+toetsen in plaats van op een zin, en een programmatische beller niet aan tekst vast
+zit.
+
+**Waarom `regels()` vlagnamen mag noemen.** Zinnen als "Geen typeringspoort toegepast
+(--shacl niet opgegeven)" verwijzen naar de opdrachtregel. Neutraal formuleren maakt
+de melding minder bruikbaar voor de enige gebruiker die er vandaag is; hem op twee
+plekken zetten laat de twee uit elkaar lopen. De afspraak staat in de docstring:
+`regels()` is de tekst voor de opdrachtregelgebruiker, en wie programmeert leest de
+velden.
+
+**Waarom `Toetsopdracht` paden draagt en geen geladen objecten.** Zou de opdracht een
+geladen `Studiegebieden` en `ExternalData` bevatten, dan moest de beller ze zelf in
+de goede volgorde laden -- precies de kennis die deze module overneemt. Dan was de
+opdracht verplaatst en de kennis niet.
+
+**Wat er niet in zit.** `_gekozen_cfk` kon niet mee: alle vier de commando's
+gebruiken hem. Hij heet nu `meting.kies_cfk` en neemt twee reeksen in plaats van een
+`CheckConfig`, zodat `meting.py` los blijft van de configuratielaag; dat sluit aan op
+de regel dat de CFK-toestanden uit `Meetbereik` komen en nergens anders.
+
+**Publiek, zonder belofte.** `toetsrun` is de bedoelde ingang voor een tweede beller
+en de package levert `py.typed`, dus de hints komen bij een importeur aan. Onder 1.0
+kan de vorm nog schuiven; `docs/versionering.md` noemt de Python-API nu expliciet
+naast de CLI, de configuratie en het uitvoerformaat.
+
+**Hoe is vastgesteld dat er niets verschoof.** De veertig verhaalregels verhuisden
+naar een ander bestand, en daar kan een spatie of een omgekeerde volgorde bij
+sneuvelen zonder dat een assertie faalt. Van een volledige run op De Wolden is
+daarom de hele stdout vergeleken: 95 regels, identiek op de gemeten laadtijd na (2,6
+tegen 2,5 seconden), en `bevindingen.csv` byte-identiek. De regeldekking is gemeten
+op de staat vóór en na: `cli.py` had 18 ongedekte statements, en elke ongedekte regel
+erna heeft een voorganger.

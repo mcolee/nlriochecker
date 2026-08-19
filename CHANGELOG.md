@@ -13,6 +13,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- `nlriochecker.toetsrun` voert een toets uit zonder de opdrachtregel:
+  `Toetsopdracht` in, `Toetsuitslag` uit, met de gemeten uitkomsten als velden en het
+  verhaal voor de gebruiker in `regels()`. Het commando `toets` is er de adapter van
+  geworden; de uitvoer op het scherm en op schijf is ongewijzigd. Zie BO-21.
+- `errors.OpdrachtError` voor een verzoek dat niet kan (een gebiedskeuze zonder
+  studiegebied, een onbekende conformiteitsklasse, een onbekend check-ID), en
+  `meting.kies_cfk` om een CFK-keuze tegen de vereiste set te toetsen.
 - Twee lagen in de GeoPackage met de externe objecten waarnaar de EXT-checks verwijzen:
   `bouwwerken` (EXT-001) en `waterdelen_zonder_zinker` (EXT-003), elk met een eigen
   QGIS-stijl. Ze worden uitsluitend gevuld vanuit de meldingen van die uitvoer, dus hun

@@ -59,7 +59,7 @@ checkregister ontbreken.
 | Deel  | Wanneer |
 |-------|---------|
 | patch | Reparaties, en nieuwe checks binnen een blok dat er al is. |
-| minor | Een afgerond blok of fase. Ook: een breuk in de CLI, de configuratie (`checks.toml`, projectconfig) of het uitvoerformaat. |
+| minor | Een afgerond blok of fase. Ook: een breuk in de CLI, de configuratie (`checks.toml`, projectconfig), het uitvoerformaat of de Python-API (`nlriochecker.toetsrun` en wat het aanreikt). |
 | major | Pas als het checkregister volledig gedekt is. Daarna: elke breuk in de publieke API. |
 
 Check-ID's uit het checkregister zijn stabiel en staan los van dit nummer; een vervallen
