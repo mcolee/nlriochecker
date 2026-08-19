@@ -178,7 +178,7 @@ max_bevindingen_per_check = 0
 # zegt dan meer over de export als geheel dan over de losse objecten.
 systemisch_drempel = 0.80
 # Versie van het checkregister waaraan deze run getoetst is.
-register_versie = "v0.8"
+register_versie = "v0.9"
 
 # Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
 # draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de

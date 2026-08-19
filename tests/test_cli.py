@@ -254,7 +254,7 @@ def test_dekking_faalt_als_de_mapping_niet_bij_het_register_past(
 
     assert resultaat.exit_code == 1
     assert "0.6" in resultaat.output
-    assert "0.8" in resultaat.output
+    assert "0.9" in resultaat.output
 
 
 def test_analyseer_meldt_de_drift_in_het_rapport(

@@ -12,7 +12,7 @@ from nlriochecker.checkconfig import ReportOptions, load_check_config
 from nlriochecker.config import load_coverage_config
 from nlriochecker.register import default_register_path, load_register
 
-VERWACHTE_VERSIE = "0.8"
+VERWACHTE_VERSIE = "0.9"
 
 
 def test_registerbestand_bestaat_en_draagt_de_versie() -> None:

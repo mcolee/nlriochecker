@@ -3,7 +3,7 @@
 ## Doel
 Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen:
 1. Inlezen en analyseren van de GWSW-nulmeting, aangeleverd als SHACL-validatierapporten (apps.gwsw.nl/item_validate_shacl).
-2. Eigen aanvullende checks conform het checkregister (data/checkregister-gwsw-nulmeting-v0_8.md) op de GWSW-dataset (OroX/TTL) en later externe bronnen.
+2. Eigen aanvullende checks conform het checkregister (data/checkregister-gwsw-nulmeting-v0_9.md) op de GWSW-dataset (OroX/TTL) en later externe bronnen.
 
 We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis_koekangerveld/ (Koekangerveld) en data/gis_dewoldenhoogeveen/ (het hele OroX-gebied).
 
@@ -69,7 +69,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-## Domeinregels (hard, uit het checkregister v0.8)
+## Domeinregels (hard, uit het checkregister v0.9)
 - Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
   MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
   foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk`; zonder die
@@ -210,7 +210,7 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   want het script eist `main` (`TAKVOORWAARDE`) en breekt af op elke andere tak. Zet
   `dev` daarna weer gelijk aan `main`, anders mist hij de bumpcommit.
 - Kleine stappen, na elke werkende stap een git-commit met een duidelijke boodschap.
-- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_8.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
+- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_9.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
 - Voer na elke wijziging ruff, mypy en pytest uit voordat je afrondt.
 - Elke noemenswaardige wijziging krijgt een regel onder `## [Unreleased]` in
   `CHANGELOG.md`. `scripts/uitgave.py` weigert een uitgave met een lege sectie.

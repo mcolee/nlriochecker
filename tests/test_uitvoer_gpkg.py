@@ -170,7 +170,7 @@ def test_runmetadata_maakt_het_bestand_herleidbaar(tmp_path: Path) -> None:
 
     assert rij[0] == "schoon.ttl"
     assert rij[1] == "2026-08-16"
-    assert rij[2] == "v0.8"
+    assert rij[2] == "v0.9"
     assert rij[3] == 0
     assert rij[4] == ""
 

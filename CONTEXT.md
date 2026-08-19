@@ -2,7 +2,7 @@
 
 De termen waarmee dit project over vrijvervalriolering praat, en waar ze vandaan
 komen. De bron is de GWSW-ontologie (`data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`)
-en het checkregister (`data/checkregister-gwsw-nulmeting-v0_8.md`). Staat een begrip
+en het checkregister (`data/checkregister-gwsw-nulmeting-v0_9.md`). Staat een begrip
 hier, gebruik dan dit woord -- in code, in bevindingsteksten en in issues.
 
 Dit bestand beschrijft alleen begrippen waarover verwarring mogelijk is of geweest is.

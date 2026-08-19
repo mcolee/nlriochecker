@@ -6,8 +6,8 @@
 # tegen die versie. De vormnamen zijn geverifieerd tegen de drie SHACL-rapporten
 # over dewolden_orox.ttl. Pas ze aan per project; niets is hardcoded in de code.
 
-checkregister_versie = "0.8"
-bron = "data/checkregister-gwsw-nulmeting-v0_8.md"
+checkregister_versie = "0.9"
+bron = "data/checkregister-gwsw-nulmeting-v0_9.md"
 
 [drempels]
 # Onder deze typeringsscore verklaart de nulmeting haar eigen vervolgvalidaties

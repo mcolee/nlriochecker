@@ -105,7 +105,7 @@ def test_rapportinstellingen_hebben_bruikbare_defaults() -> None:
     assert rapport.multi_melding_checks == 3
     assert rapport.max_bevindingen_per_check == 0
     assert rapport.systemisch_drempel == 0.80
-    assert rapport.register_versie == "v0.8"
+    assert rapport.register_versie == "v0.9"
 
 
 def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:

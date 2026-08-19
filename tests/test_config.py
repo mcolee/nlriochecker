@@ -12,7 +12,7 @@ from nlriochecker.errors import ConfigError
 REGISTER_IDS = {"ADM-001", "ADM-004", "ADM-005", "ATTR-011", "RVZ-002", "RVZ-003"}
 
 GELDIGE_TOML = """
-checkregister_versie = "0.9"
+checkregister_versie = "0.7"
 bron = "eigen-register.md"
 
 [drempels]
@@ -31,7 +31,7 @@ def test_standaardmapping_bevat_de_geschrapte_checks() -> None:
     config = load_coverage_config()
 
     assert default_config_path().exists()
-    assert config.checkregister_versie == "0.8"
+    assert config.checkregister_versie == "0.9"
     assert {mapping.id for mapping in config.check} == REGISTER_IDS
 
 

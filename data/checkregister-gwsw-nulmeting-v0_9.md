@@ -1,6 +1,6 @@
 # Checkregister GWSW-nulmeting vrijverval
 
-Versie 0.8, werkdocument (afbakening tot een studiegebied toegevoegd d.d. 2026-08-16; EXT-008 vervallen). Scope: vrijvervalriolering inclusief randvoorzieningen (bergbezinkbassins, overstorten, drempels). Buiten scope: mechanische riolering en gemalen als object; gemalen en overnamepunten tellen wel mee als eindpunt in de netwerkanalyse. Bronnen: Brutis/Kikker-export (GWSW), AHN, BGT, BAG, BRK, waterschapsdata. Ernst: F = fout, W = waarschuwing. Elke check heeft een dimensietag conform het kwaliteitsraamwerk Omgevingswet/NORA (RIONED-kennisbank, Kwaliteit van gegevens). Alle drempelwaarden zijn configureerbaar per project.
+Versie 0.9, werkdocument (RVZ-002 en RVZ-003 terug in de engine, ATTR-013 toegevoegd, EXT-003 gepreciseerd d.d. 2026-08-19; afbakening tot een studiegebied toegevoegd d.d. 2026-08-16; EXT-008 vervallen). Scope: vrijvervalriolering inclusief randvoorzieningen (bergbezinkbassins, overstorten, drempels). Buiten scope: mechanische riolering en gemalen als object; gemalen en overnamepunten tellen wel mee als eindpunt in de netwerkanalyse. Bronnen: Brutis/Kikker-export (GWSW), AHN, BGT, BAG, BRK, waterschapsdata. Ernst: F = fout, W = waarschuwing. Elke check heeft een dimensietag conform het kwaliteitsraamwerk Omgevingswet/NORA (RIONED-kennisbank, Kwaliteit van gegevens). Alle drempelwaarden zijn configureerbaar per project.
 
 De dataset wordt aan twee GWSW-conformiteitsklassen getoetst: Mds en Hyd (deelmodellen v1.6, filters collectie_MDSTOP_v16 respectievelijk collectie_HYDTOP5_v16). Checks die deze nulmetingen aantoonbaar dekken zijn geschrapt; zie de tabel Geschrapte checks onderaan. Vervallen ID's worden niet hergebruikt. Let op: de verplichte aanwezigheid van de administratieve put-strengkoppeling rust volledig op Hyd (in Mds is de koppeling optioneel, max=1); het gelijktijdig toetsen van beide conformiteitsklassen is daarmee een harde voorwaarde voor de geldigheid van de schrapronde.
 
@@ -211,6 +211,16 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9 (2026-08-19): RVZ-002 en RVZ-003 zijn uit de tabel Geschrapte checks gehaald
+en gebouwd (W, Compleetheid): in geen van de drie SHACL-rapporten bestaat een vorm op
+Drempelniveau of Drempelbreedte, de enige drempelvorm
+(Overstortput_Overstortdrempel_card) toetst of de put een drempel heeft, dus de
+dekkingclaim was niet aantoonbaar en er keek niets naar die twee eigenschappen (issue
+#6). ATTR-013 toegevoegd (W, Compleetheid): een hoogtekenmerk op een vulwaarde rond 0 m
+NAP dat als meting geregistreerd staat (issue #1). EXT-003 gepreciseerd: een duiker is
+geen rioolleiding en valt buiten de populatie (issue #3). Verder geen checks toegevoegd,
+geschrapt of van ernst of dimensie veranderd. Vervallen ID's worden niet hergebruikt.
 
 Versie 0.8, addendum (2026-08-19): geen checks toegevoegd, geschrapt of van ernst of
 dimensie veranderd; het contract is ongewijzigd. Wel opgeschoond in de open punten: 1, 9,

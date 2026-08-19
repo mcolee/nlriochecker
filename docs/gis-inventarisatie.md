@@ -84,7 +84,7 @@ volledig, en de check gebruikt de vereniging van de twee lagen. Het veld
 `aantal_verblijfsobjecten` staat in de export maar wordt niet gebruikt: EXT-008
 (BAG-verblijfsobject zonder riolering binnen X m) is sinds checkregister v0.8
 vervallen — de dekkingsvraag hoort bij het rioleringsplan, niet bij deze toets.
-Zie `data/checkregister-gwsw-nulmeting-v0_8.md`.
+Zie `data/checkregister-gwsw-nulmeting-v0_9.md`.
 
 ## NWB-wegvakken
 

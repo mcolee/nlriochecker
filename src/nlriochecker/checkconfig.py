@@ -339,7 +339,7 @@ class ReportOptions(BaseModel):
     # Boven welk aandeel van de bekeken populatie een meldingtype systemisch heet.
     systemisch_drempel: float = Field(default=0.80, gt=0.0, le=1.0)
     # Versie van het checkregister, voor de metadata in de GIS-uitvoer.
-    register_versie: str = "v0.8"
+    register_versie: str = "v0.9"
 
 
 class CheckConfig(BaseModel):
