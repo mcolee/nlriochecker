@@ -195,9 +195,11 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - De GeoPackage draagt twee objectlagen: `putten` (punt) en `strengen` (lijn), met de
   gebreken op het object. Elk object heeft `status` (precies vier waarden: rood, oranje,
   groen, grijs) en `popup_html` (een voorgebakken fragment, zonder stijlblok -- dat
-  staat een keer in de maptip). Mechanisch riool staat grijs tussen de strengen en de
-  contextschil komt grijs mee; de popup zegt waarom. `status` telt systemische
-  meldingen niet mee, net als `ergste_ernst`. `meldinglocaties` bestaat niet meer; de
+  staat een keer in de maptip). Grijs betekent: niet beoordeeld **en** niets gevonden;
+  mechanisch riool wordt door de meeste checks overgeslagen maar niet door alle, en wat
+  er wel op staat kleurt het object. Met een studiegebied komt `Analyseset.buffer` als
+  grijze ring mee -- niet de hele schil, die kan het halve net zijn. `status` telt
+  systemische meldingen niet mee, net als `ergste_ernst`. `meldinglocaties` bestaat niet meer; de
   tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. De statusregel en
   de opmaak van de popup staan in `uitvoer/objectkaart.py`; `gpkg.py` levert alleen de
   feiten die alleen hij kent (stelsel, lengte, BOB-richting) als kant-en-klare regels
@@ -220,10 +222,12 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - De stijlen van `putten` en `strengen` worden opgebouwd uit de tabel in
   `uitvoer/stijlen/symbolen.py` (regelstructuur objecttype x status, ruim honderd
   bladregels); `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven bestanden. Het
-  symbool volgt het GWSW-objecttype, de kleur uitsluitend de kolom `status`. De maptip
-  is een expressie van een regel op `popup_html`; het stijlblok staat in de QML en niet
-  in elke rij. `styleCategories` moet `MapTips` noemen, anders leest QGIS het element
-  niet terug. Zie BO-30.
+  symbool volgt het GWSW-objecttype, de kleur uitsluitend de kolom `status`. Een stijl
+  draagt alleen regels voor de objecttypen die in zijn laag staan; met de hele tabel
+  krijgt de lagenboom van QGIS ruim tweehonderd legendaregels. De maptip is een
+  expressie van een regel op `popup_html`; het stijlblok staat in de QML en niet in
+  elke rij. `styleCategories` moet `MapTips` noemen, anders leest QGIS het element niet
+  terug. Zie BO-30.
 - De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
   over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
   `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.

@@ -63,10 +63,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
   De twee QML's worden opgebouwd uit een tabel in
   `src/nlriochecker/uitvoer/stijlen/symbolen.py` in plaats van als bestand
-  meegeleverd: de regelstructuur objecttype x status levert 56 respectievelijk 68
-  bladregels op, en die met de hand in XML onderhouden zou de typenlijst op twee
-  plekken zetten. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven
-  onveranderde bestanden. Zie BO-30 (issue #14).
+  meegeleverd: de regelstructuur objecttype x status levert met de 44 knoop- en 37
+  verbindingstypen in die tabel 220 respectievelijk 185 bladregels op, en die met de
+  hand in XML onderhouden zou de typenlijst op twee plekken zetten. De stijl die in een
+  GeoPackage meegaat draagt bovendien alleen regels voor de typen die er werkelijk in
+  staan: met de volledige tabel zou de lagenboom van QGIS 225 legendaregels tonen op
+  een laag met zes typen, met de voorkomende typen zijn het er 35. `bouwwerken.qml` en
+  `waterdelen_zonder_zinker.qml` blijven onveranderde bestanden. Zie BO-30 (issue #14).
 
 - **Hoverpopups (QGIS Map Tips) op beide objectlagen.** De QML draagt een
   `<mapTip enabled="1">` met een stijlblok, een vaste breedte van 300 px en één
@@ -83,11 +86,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `meldinglocaties` vervalt als featurelaag en `mechanisch_riool` gaat op in de
   lijnenlaag. Elk object draagt twee nieuwe kolommen: `status` met precies vier
   waarden (`rood` bij een fout, `oranje` bij alleen waarschuwingen, `groen` bij geen
-  eigen gebrek, `grijs` als er niet beoordeeld is) en `popup_html` met een
-  voorgebakken hoverpopup. Mechanisch riool houdt zijn GWSW-objecttype maar krijgt
-  status `grijs`, en met een studiegebied komt de contextschil er ook grijs bij: wat
-  de checks wel zagen maar niet beoordeelden, hoort zichtbaar te zijn. De popup zegt
-  per grijs object waarom.
+  eigen gebrek, `grijs` als er niet beoordeeld is én niets gevonden) en `popup_html`
+  met een voorgebakken hoverpopup. Mechanisch riool houdt zijn GWSW-objecttype; het
+  wordt door de meeste checks overgeslagen, maar niet door alle -- TOP-010, TOP-011 en
+  de SHACL-nulmeting raken het wel -- en dan kleurt het gewoon mee, met "maar deels
+  beoordeeld" in zijn popup. Met een studiegebied komt er een grijze ring om het gebied
+  heen: de objecten binnen de buffer, zodat de kaart niet bij de gebiedsgrens ophoudt
+  alsof daar niets ligt. Niet de hele contextschil -- die bevat ook de samenhangende
+  vrijvervalcomponent, op een buurt van 507 objecten al gauw 12.106, en dan zou elk
+  buurtbestand het net van de halve gemeente meesturen. De popup zegt per grijs object
+  waarom.
 
   **Bewust verlies:** de exacte foutlocatie op een lijn -- het snijpunt van een
   kruising, het midden van een streng -- en het naloopwerk in een kaal GIS-pakket

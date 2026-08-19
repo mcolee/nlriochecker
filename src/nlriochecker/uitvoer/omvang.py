@@ -29,6 +29,10 @@ KOLOMMEN = ["Objecttype", "Stelsel", "Aantal", "Lengte (m)"]
 # als een ontbrekende waarde in de tabel; dit zegt wat het is.
 GEEN_STELSEL = "—"
 
+# En wat er in de kolom Lengte staat bij een object dat er geen heeft: een put. Een
+# eigen constante, want hij betekent iets anders dan een ontbrekend stelseltype.
+GEEN_LENGTE = "—"
+
 
 def stelseltypen(run: CheckRun) -> dict[str, str]:
     """Het stelseltype per streng, en per put dat van de aansluitende strengen.
@@ -57,11 +61,6 @@ def stelseltypen(run: CheckRun) -> dict[str, str]:
     return per_object
 
 
-def kern(run: CheckRun) -> frozenset[str] | None:
-    """De objecten waarover gerapporteerd wordt, of None zonder studiegebied."""
-    return run.objecten_binnen()
-
-
 def omvangtabel(run: CheckRun) -> pd.DataFrame:
     """Een rij per objecttype en stelseltype, met aantallen en meters.
 
@@ -72,22 +71,28 @@ def omvangtabel(run: CheckRun) -> pd.DataFrame:
     Lange vorm en geen kruistabel: het aantal stelseltypen ligt niet vast -- een put
     waar twee stelsels samenkomen draagt ze allebei -- en een kruistabel zou daar
     kolommen bij krijgen tot hij niet meer op een scherm past.
+
+    Alleen objecten met een bruikbare geometrie tellen mee, ook zonder studiegebied.
+    Mét een gebied gebeurde dat al vanzelf -- `objecten_in_gebied` kan een object
+    zonder plek niet binnen een vlak leggen -- en zonder gebied telde de tabel ze wel,
+    zodat dezelfde export twee verschillende aantallen opleverde naargelang er een
+    gebied was opgegeven. `omvang_toelichting` telt wat er zo buiten valt.
     """
-    binnen = kern(run)
+    binnen = run.objecten_binnen()
     stelsels = stelseltypen(run)
     aantallen: defaultdict[tuple[str, str], int] = defaultdict(int)
     meters: defaultdict[tuple[str, str], float] = defaultdict(float)
 
-    for uri in run.dataset.nodes:
-        if binnen is not None and uri not in binnen:
+    for uri, node in run.dataset.nodes.items():
+        if not _telt_mee(uri, binnen, node.point):
             continue
         aantallen[(run.dataset.beheerobjecttype(uri), stelsels.get(uri, GEEN_STELSEL))] += 1
     for uri, conduit in run.dataset.conduits.items():
-        if binnen is not None and uri not in binnen:
+        if not _telt_mee(uri, binnen, conduit.line):
             continue
         sleutel = (run.dataset.beheerobjecttype(uri), stelsels.get(uri, GEEN_STELSEL))
         aantallen[sleutel] += 1
-        if conduit.line is not None and not conduit.line.is_empty:
+        if conduit.line is not None:
             meters[sleutel] += conduit.line.length
 
     rijen = [
@@ -97,8 +102,33 @@ def omvangtabel(run: CheckRun) -> pd.DataFrame:
             "Aantal": aantal,
             "Lengte (m)": round(meters[(objecttype, stelsel)])
             if meters.get((objecttype, stelsel))
-            else GEEN_STELSEL,
+            else GEEN_LENGTE,
         }
         for (objecttype, stelsel), aantal in sorted(aantallen.items())
     ]
     return pd.DataFrame(rijen, columns=KOLOMMEN)
+
+
+def _telt_mee(uri: str, binnen: frozenset[str] | None, geometrie: object) -> bool:
+    """Of dit object in de tabel hoort: binnen het gebied en met een plek op de kaart."""
+    if binnen is not None and uri not in binnen:
+        return False
+    return geometrie is not None and not geometrie.is_empty  # type: ignore[attr-defined]
+
+
+def zonder_geometrie(run: CheckRun) -> int:
+    """Het aantal objecten dat geen plek op de kaart heeft en dus niet in de tabel staat.
+
+    Compartimenten en hulpstukken zonder eigen punt, bijvoorbeeld. Ze bestaan wel en de
+    checks zien ze; ze zijn alleen niet te tekenen en niet aan een gebied toe te wijzen.
+    Zwijgen zou de tabel als volledig laten lezen.
+    """
+    if run.objecten_binnen() is not None:
+        return 0
+    zonder = sum(1 for node in run.dataset.nodes.values() if _leeg(node.point))
+    return zonder + sum(1 for conduit in run.dataset.conduits.values() if _leeg(conduit.line))
+
+
+def _leeg(geometrie: object) -> bool:
+    """Of een geometrie ontbreekt of leeg is."""
+    return geometrie is None or geometrie.is_empty  # type: ignore[attr-defined]

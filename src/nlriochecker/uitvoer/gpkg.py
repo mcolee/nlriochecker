@@ -507,10 +507,12 @@ def _schrijf_features(
 def _reden_niet_beoordeeld(
     uri: str, binnen: frozenset[str] | None, mechanisch: frozenset[str]
 ) -> str:
-    """Waarom dit object niet beoordeeld is, of leeg als het dat wel is.
+    """Waarom dit object buiten de beoordeling viel, of leeg als het erbinnen lag.
 
-    Mechanisch riool gaat voor de contextschil: het valt sowieso buiten scope, ook
-    binnen de kern, en dat is de scherpere reden om te noemen.
+    Mechanisch riool gaat voor de ring: het wordt door de meeste checks overgeslagen,
+    ook binnen de kern, en dat is de scherpere reden om te noemen. De reden staat er
+    ook als het object toch een melding draagt -- dan is het niet grijs maar wel maar
+    deels beoordeeld, en de popup zegt dat.
     """
     if uri in mechanisch:
         return REDEN_MECHANISCH
@@ -1094,6 +1096,11 @@ def _schrijf_runmetadata(
     )
 
 
+def _voorkomende_typen(verbinding: sqlite3.Connection, laag: str) -> set[str]:
+    """De objecttypen die daadwerkelijk in een geschreven laag staan."""
+    return {rij[0] for rij in verbinding.execute(f'select distinct objecttype from "{laag}"')}
+
+
 def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
     """Zet de QML-stijlen in `layer_styles` en registreert die tabel.
 
@@ -1119,7 +1126,7 @@ def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
         "QGIS-stijlen van dit bestand; QGIS past de standaardstijl per laag zelf toe.",
     )
     for laag in FEATURELAGEN:
-        qml = _stijl(laag)
+        qml = _stijl(laag, verbinding)
         verbinding.execute(
             "insert into layer_styles (f_table_catalog, f_table_schema, f_table_name, "
             "f_geometry_column, styleName, styleQML, styleSLD, useAsDefault, description, "
@@ -1136,10 +1143,16 @@ def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
 OPGEBOUWDE_STIJLEN = ("putten", "strengen")
 
 
-def _stijl(laag: str) -> str:
-    """De QML van een laag: opgebouwd waar de regelstructuur dat vraagt, anders gelezen."""
+def _stijl(laag: str, verbinding: sqlite3.Connection) -> str:
+    """De QML van een laag: opgebouwd waar de regelstructuur dat vraagt, anders gelezen.
+
+    De opgebouwde stijlen krijgen de objecttypen mee die werkelijk in de laag staan. De
+    stijl reist mee in dit bestand, dus hij hoeft alleen regels te dragen voor wat erin
+    zit; met de volledige symbolentabel zou de lagenboom van QGIS ruim tweehonderd
+    legendaregels tonen op een laag met zes typen.
+    """
     if laag in OPGEBOUWDE_STIJLEN:
-        return bouw_qml(laag)
+        return bouw_qml(laag, _voorkomende_typen(verbinding, laag))
     return (
         resources.files("nlriochecker.uitvoer.stijlen")
         .joinpath(f"{laag}.qml")

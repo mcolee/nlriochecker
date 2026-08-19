@@ -36,10 +36,12 @@ die hij vervangt.
 ### K2. De QML's worden opgebouwd, niet met de hand geschreven
 
 De regelstructuur die het issue voorschrijft is **objecttype × status**. De
-De Wolden-export telt 13 knooptypen en 16 verbindingstypen; met een vangnet erbij en
-vier statuswaarden zijn dat 56 respectievelijk 68 bladregels, elk met een eigen
-symbool. Met de hand is dat ruim vijftienhonderd regels XML waarin een tikfout de
-kaart stil leegtrekt, en waarin de typenlijst op twee plekken zou staan.
+symbolentabel telt 44 knooptypen en 37 verbindingstypen -- de De Wolden-export gebruikt
+er dertien respectievelijk zestien van, de rest komt uit de SLD's en uit het
+Juinen-voorbeeld. Met een vangnet erbij en vijf statusregels zijn dat 225 respectievelijk
+190 bladregels, elk met een eigen symbool. Met de hand is dat ruim vierduizend regels XML
+waarin een tikfout de kaart stil leegtrekt, en waarin de typenlijst op twee plekken zou
+staan.
 
 **Besluit: de twee QML's worden opgebouwd uit een tabel**, in
 `src/nlriochecker/uitvoer/stijlen/symbolen.py`. De stijlen blijven daarmee in
@@ -48,16 +50,26 @@ een tabel plus een opbouwer in plaats van twee grote XML-bestanden.
 `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven onaangeroerde bestanden --
 byte-gelijk, zoals het issue eist.
 
+**Herzien na review: een stijl draagt alleen de typen die in zijn laag staan.** Met de
+volledige tabel toont de lagenboom van QGIS 225 legendaregels voor de putten en 193 voor
+de strengen, op een laag met zes voorkomende objecttypen -- gemeten met PyQGIS op de
+echte uitvoer. Dat is geen legenda meer maar een muur, en het is precies wat een blik op
+het scherm zou hebben laten zien en wat de PyQGIS-test in zijn eerste vorm niet zag. De
+stijl reist mee in het bestand waar hij bij hoort, dus hij hoeft alleen te dragen wat
+erin zit; de schrijver geeft de voorkomende typen mee. Op Kattouw levert dat 35
+respectievelijk 38 legendaregels. Een type dat er later bij komt valt in het vangnet.
+
 De waarborg is de PyQGIS-test: hij laadt de opgebouwde stijl in een echte QGIS en
 controleert dat elke regel een symbool heeft, dat elke expressie naar een bestaande
-kolom verwijst, en dat elk objecttype uit de dataset een regel heeft.
+kolom verwijst, dat QGIS de markervormen terugcodeert zoals de tabel ze bedoelde, en
+dat de legenda meeschaalt met de data en niet met de tabel.
 
 ### K3. Welk symbool bij welk type
 
 Uit de SLD's, met de shape die hem vervangt. Wat niet in de tabel staat valt in het
-vangnet: een open cirkel met een kruis erin, gelabeld "objecttype niet in de
-symbolentabel". Geen stille default -- een onbekend type moet als onbekend te zien
-zijn.
+vangnet: een asterisk, gelabeld "objecttype niet in de symbolentabel". Geen
+stille default, en bewust geen cirkel -- die zou op een inspectieput lijken en dan valt
+een onbekend type juist níet op.
 
 Voor **verbindingen** kan het symbool het type maar half dragen. Het GWSW en de
 PDOK-SLD onderscheiden leidingsoorten met kleur (gemengd oranje, vuilwater rood,

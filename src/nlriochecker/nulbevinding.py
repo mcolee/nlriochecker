@@ -154,6 +154,7 @@ def _ontdubbel(nulmeting: Nulmeting) -> dict[tuple[str, str, str], _Gegevens]:
     overtreding zwaarder noemt dan een andere en dat niemand het merkt.
     """
     verzameld: dict[tuple[str, str, str], _Gegevens] = {}
+    afwijkingen = 0
     for cfk in nulmeting.cfks:
         meldingen = nulmeting.report(cfk).findings
         kolommen = zip(
@@ -172,16 +173,24 @@ def _ontdubbel(nulmeting: Nulmeting) -> dict[tuple[str, str, str], _Gegevens]:
             if bestaand is None:
                 verzameld[sleutel] = (ernst, waarde, objecttype, label, {cfk})
             else:
-                _meld_afwijking(sleutel, bestaand, (ernst, waarde, objecttype, label), cfk)
+                afwijkingen += _meld_afwijking(
+                    sleutel, bestaand, (ernst, waarde, objecttype, label), cfk, afwijkingen
+                )
                 bestaand[4].add(cfk)
+    if afwijkingen > MAX_GEMELDE_AFWIJKINGEN:
+        logger.warning(
+            "In totaal %d overtredingen worden door de CFK-rapporten verschillend "
+            "beschreven; alleen de eerste %d staan hierboven.",
+            afwijkingen,
+            MAX_GEMELDE_AFWIJKINGEN,
+        )
     return verzameld
 
 
-# Zoveel afwijkingen tussen CFK-rapporten worden er hooguit gelogd. Een export waarin
-# ze structureel voorkomen zou anders tienduizenden regels opleveren en het logboek
-# onbruikbaar maken; de laatste regel zegt hoeveel er nog volgden.
+# Zoveel afwijkingen tussen CFK-rapporten worden er per meting hooguit met naam en
+# toenaam gelogd. Een export waarin ze structureel voorkomen zou anders tienduizenden
+# regels opleveren en het logboek onbruikbaar maken; het totaal volgt aan het eind.
 MAX_GEMELDE_AFWIJKINGEN = 5
-_afwijkingen = 0
 
 
 def _meld_afwijking(
@@ -189,30 +198,28 @@ def _meld_afwijking(
     bestaand: _Gegevens,
     nieuw: tuple[str, str, str, str],
     cfk: str,
-) -> None:
-    """Logt dat twee CFK-rapporten dezelfde overtreding verschillend beschrijven."""
-    global _afwijkingen
+    gemeld: int,
+) -> bool:
+    """Logt dat twee CFK-rapporten dezelfde overtreding verschillend beschrijven.
+
+    Geeft terug of er iets te melden viel. De teller staat bij de beller en niet als
+    moduleniveau-variabele: die zou over gebieden, over aanroepen en over tests heen
+    blijven staan, en dan hangt af wat er gelogd wordt van wat er daarvoor gebeurde.
+    """
     if bestaand[:4] == nieuw:
-        return
-    _afwijkingen += 1
-    if _afwijkingen > MAX_GEMELDE_AFWIJKINGEN:
-        if _afwijkingen == MAX_GEMELDE_AFWIJKINGEN + 1:
-            logger.warning(
-                "Meer dan %d afwijkingen tussen de CFK-rapporten; de rest wordt niet "
-                "meer per stuk gemeld.",
-                MAX_GEMELDE_AFWIJKINGEN,
-            )
-        return
-    vorm, focus, _boodschap = sleutel
-    logger.warning(
-        "%s op %s wordt door %s anders beschreven dan door de eerdere klasse(n) "
-        "(%s tegen %s); de eerste op alfabet telt.",
-        vorm,
-        focus,
-        cfk,
-        nieuw,
-        bestaand[:4],
-    )
+        return False
+    if gemeld < MAX_GEMELDE_AFWIJKINGEN:
+        vorm, focus, _boodschap = sleutel
+        logger.warning(
+            "%s op %s wordt door %s anders beschreven dan door de eerdere klasse(n) "
+            "(%s tegen %s); de eerste op alfabet telt.",
+            vorm,
+            focus,
+            cfk,
+            nieuw,
+            bestaand[:4],
+        )
+    return True
 
 
 def _tellingen(ruw: dict[tuple[str, str, str], _Gegevens]) -> dict[tuple[str, str], int]:

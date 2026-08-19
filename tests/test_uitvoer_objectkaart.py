@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from shapely.geometry import Point
 
+from helpers_melding import melding as _basismelding
 from nlriochecker.uitvoer.melding import BRON_NULMETING, BRON_REGISTER, Melding
 from nlriochecker.uitvoer.objectkaart import (
     MAX_MELDINGEN_IN_POPUP,
@@ -24,35 +25,17 @@ def _melding(
     systemisch: bool = False,
     **velden: object,
 ) -> Melding:
-    """Een melding met alleen de velden die de kaartweergave leest."""
-    basis: dict[str, object] = {
-        "melding_id": f"{check_id}-{ernst}",
-        "check_id": check_id,
-        "categorie": check_id.split("-", 1)[0],
-        "bron": bron,
-        "ernst": ernst,
-        "dimensie": "Consistentie",
-        "object_uri": "http://example.org/toets#PutA",
-        "object_id": "PutA",
-        "object_label": "A",
-        "object2_uri": "",
-        "object2_id": "",
-        "object2_label": "",
-        "boodschap": "Er is iets mis met dit object.",
-        "waarde": "",
-        "drempel": "",
-        "typering_betrouwbaar": True,
-        "cluster_id": "",
-        "scope": "geen_studiegebied",
-        "gebied": "",
-        "prioriteit": 2 if ernst == "F" else 3,
-        "systemisch": systemisch,
-        "foutlocatie": Point(0, 0),
-        "run_datum": "2026-08-19",
-        "dataset": "toets.ttl",
-    }
-    basis.update(velden)
-    return Melding(**basis)  # type: ignore[arg-type]
+    """Een melding met de velden die de kaartweergave leest."""
+    return _basismelding(
+        melding_id=f"{check_id}-{ernst}",
+        check_id=check_id,
+        bron=bron,
+        ernst=ernst,
+        systemisch=systemisch,
+        prioriteit=2 if ernst == "F" else 3,
+        foutlocatie=Point(0, 0),
+        **velden,
+    )
 
 
 class TestStatus:

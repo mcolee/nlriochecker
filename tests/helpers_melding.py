@@ -1,7 +1,9 @@
 """Een `Melding` bouwen met alleen de velden die een test aangaan.
 
-Meerdere testbestanden hadden hun eigen versie van deze constructor. Een gedeelde
-plek voorkomt dat ze uit elkaar lopen zodra `Melding` een veld krijgt.
+Drie testbestanden hadden hun eigen versie van deze constructor
+(`test_uitvoer_objectkaart.py`, `test_uitvoer_synthese.py`,
+`test_uitvoer_rapportopbouw.py`). Een gedeelde plek voorkomt dat ze uit elkaar lopen
+zodra `Melding` een veld krijgt.
 """
 
 from __future__ import annotations

@@ -1519,13 +1519,21 @@ gebreken *op* het object (issue #13).
 hoverpopup. `mechanisch_riool` gaat op in de lijnenlaag met status `grijs`;
 `meldinglocaties` vervalt.
 
-**De contextschil komt erbij, grijs.** Het issue noemt bij `grijs` letterlijk "object in de
-schil (niet de kern)", en dat kan alleen als de schil ook in de laag staat. Hem weglaten
-laat de kaart bij de gebiedsgrens ophouden alsof daar niets ligt. De schil komt uit
-`run.analyseset` en niet uit "alles wat niet in de kern ligt": een run die met
-`beperk_tot_studiegebied` op de volledige export is afgebakend heeft geen analyseset, en
-dan hoort het bestand bij de grens op te houden zoals het altijd deed -- anders zou een
-toets op een buurt de hele export als grijze achtergrond meesturen.
+**Er komt een grijze ring om het gebied.** Het issue noemt bij `grijs` letterlijk "object
+in de schil (niet de kern)", en dat kan alleen als er iets naast de kern in de laag staat.
+Het weglaten laat de kaart bij de gebiedsgrens ophouden alsof daar niets ligt.
+
+*Herzien na codereview:* de ring is `Analyseset.buffer` en **niet** de hele schil. De
+schil bevat naast de buffer ook de samenhangende vrijvervalcomponent waar de kern in ligt,
+en die is op de buurt Kattouw 12.106 objecten bij een kern van 507. Elk van de tachtig
+buurtbestanden zou dan het net van de halve gemeente als grijze achtergrond meesturen, met
+een popup van bijna een kilobyte per object, en hetzelfde object zou groen zijn in zijn
+eigen buurtbestand en grijs in dat van de buurman. De buffer is precies wat een lezer om
+zijn gebied heen ziet liggen en is naar constructie begrensd: op Kattouw 79 objecten.
+
+De ring komt uit `run.analyseset` en niet uit "alles wat niet in de kern ligt": een run
+die met `beperk_tot_studiegebied` op de volledige export is afgebakend heeft geen
+analyseset, en dan hoort het bestand bij de grens op te houden zoals het altijd deed.
 
 **`status` telt systemische meldingen niet mee.** Dit is de scherpste keuze van dit issue.
 Op De Wolden draagt de nulmeting 68.882 systemische meldingen op 105.963; zouden die
@@ -1536,9 +1544,27 @@ Gevolg dat je moet kennen: een object waarvan *alle* meldingen systemisch zijn k
 "in orde". Twee dingen vangen dat op: `n_systemisch` blijft gevuld, en `popup_html` noemt
 de systemische meldingen met zoveel woorden.
 
+**Herzien na codereview: grijs wint niet van een gebrek.** De aanname in het issue dat
+mechanisch riool ongetoetst blijft, klopt niet: TOP-010 en TOP-011 draaien er wel op en de
+SHACL-nulmeting sowieso. Op de Koekangerveld-run droegen 17 van de 20 mechanische strengen
+een melding, en 48 van de 874 meldingen stonden op een object dat de kaart grijs verfde.
+Zouden die grijs blijven, dan beweert de kaart dat er niets bekeken is terwijl er fouten op
+staan -- en sinds `meldinglocaties` verviel is er geen tweede plek meer waar ze wel
+zichtbaar zijn. `grijs` betekent daarom: niet beoordeeld **en niets gevonden**. Wat er wel
+gevonden is kleurt het object, en de popup zegt "Maar deels beoordeeld" met de reden. Op
+de eindronde over twee buurten: nul grijze objecten met een melding.
+
+**En de popup zet de niet-systemische meldingen vooraan.** Zonder die sorteersleutel kon
+een rood object vijf systemische nulmetingmeldingen tonen en de fout die hem rood maakte
+achter "en nog N andere" verstoppen -- 6 van de 44 gekleurde objecten op de
+Koekangerveld-run. Er staat sindsdien ook een voetnoot onder de popup die zegt hoeveel
+meldingen niet meetellen in de status en waarom; zonder haar leest een groene kop met
+drie rode kruisen eronder als een tegenspraak.
+
 **Verworpen: een vijfde status.** Het issue vraagt precies vier waarden, en elke waarde
-erbij is een regel erbij in elke QML. De reden waarom een object grijs is -- mechanisch
-riool of contextschil -- staat daarom in de popup en niet in een eigen kolom.
+erbij is een regel erbij in elke QML. De reden waarom een object buiten de beoordeling
+viel -- mechanisch riool of de ring -- staat daarom in de popup en niet in een eigen
+kolom.
 
 **Bewust verlies.** Met `meldinglocaties` verdwijnen twee dingen van de kaart: de exacte
 foutlocatie op een lijn (het snijpunt van een kruising, het midden van een streng) en het
@@ -1555,9 +1581,15 @@ kunnen breken.
 
 **De tellingen in `gwsw_run`.** `n_putten` en `n_strengen` betekenen wat ze altijd
 betekenden: het aantal rijen dat er werkelijk in staat. Doordat de lijnenlaag nu ook
-mechanisch riool en de contextschil bevat, zijn dat er meer dan voorheen; `n_mechanisch`
-telt hoeveel van die lijnen mechanisch zijn. Er komt geen kolom bij: wie het per status
-wil weten, telt `select status, count(*) from strengen group by status`.
+mechanisch riool en de ring bevat, zijn dat er meer dan voorheen; `n_mechanisch` telt
+hoeveel van die lijnen mechanisch zijn. Er komt geen kolom bij: wie het per status wil
+weten, telt `select status, count(*) from strengen group by status`.
+
+**De kolom `gebied` noemt het gebied van deze uitvoer, niet dat het object erin ligt.**
+Een ringobject draagt dus de naam van de buurt waar het naast ligt. Dat is dezelfde
+betekenis als in `meldingen.gebied` en `gwsw_run.gebied` -- de kolom hoort niet in de ene
+laag iets anders te zeggen dan in de andere. Waar een object werkelijk ligt, staat in
+`status`: `grijs` met "ligt naast het studiegebied en niet erin" in de popup.
 
 ### BO-30 De symbologie wordt opgebouwd, en de SVG's van de SLD's blijven buiten beeld
 
@@ -1573,18 +1605,34 @@ en schrijft de uitweg voor: hertekenen als eenvoudige marker in de GWSW-vorm. De
 blijven wel de bron voor de *indeling* -- welk type welk symbool krijgt en welke typen er
 een delen -- en elke regel in `stijlen/symbolen.py` noemt de SLD-regel die hij vervangt.
 
-**De QML's worden opgebouwd in plaats van geschreven.** Objecttype x status levert op de
-De Wolden-export 56 bladregels voor de putten en 68 voor de strengen op, elk met een eigen
-symbool: samen ruim vijftienhonderd regels XML. Met de hand onderhouden zou de typenlijst
+**De QML's worden opgebouwd in plaats van geschreven.** Objecttype x status levert met de
+44 knoop- en 37 verbindingstypen in de symbolentabel 225 bladregels voor de putten en 190
+voor de strengen op, elk met een eigen symbool: samen ruim vierduizend regels XML. Met de hand onderhouden zou de typenlijst
 op twee plekken zetten, en een tikfout in een markernaam trekt de kaart stil leeg -- QGIS
 maakt van een onbekende vorm zonder morren een cirkel. De tabel plus een opbouwer staat in
 `src/nlriochecker/uitvoer/stijlen/symbolen.py`, dus de stijlen blijven waar het issue ze
 wil hebben. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven onveranderde
 bestanden.
 
+**Een stijl draagt alleen de typen die in zijn laag staan.** Dat kwam uit de codereview,
+en het is geen zuinigheid maar noodzaak: met de volledige tabel toont de lagenboom van
+QGIS 225 legendaregels voor de putten en 193 voor de strengen, op een laag met zes
+voorkomende objecttypen. Dat is geen legenda meer maar een muur -- precies wat de
+handmatige QGIS-controle uit het issue zou hebben laten zien en wat de PyQGIS-test in zijn
+eerste vorm niet zag. De stijl reist mee in het bestand waar hij bij hoort, dus hij hoeft
+alleen te dragen wat erin zit; op Kattouw levert dat 35 respectievelijk 38 legendaregels.
+Een type dat er later bij komt valt in het vangnet.
+
+**Ook de statuskolom heeft een vangnet.** Een waarde die de vier niet is zou door geen
+enkele regel geraakt worden en dus onzichtbaar zijn. Onbereikbaar zolang
+`objectkaart.bepaal_status` de bron is, maar onzichtbaar is een stiller gebrek dan een
+verkeerd symbool, en het objecttype kreeg om dezelfde reden zijn vangnet.
+
 De waarborg is de PyQGIS-test: hij laadt de GeoPackage in een echte QGIS, past de
-default-stijl toe, en laat QGIS de markervorm van elk symbool terugcoderen om hem met de
-tabel te vergelijken. Dat vangt precies de fout die een blik op het scherm mist.
+default-stijl toe, laat QGIS de markervorm van elk symbool terugcoderen om hem met de
+tabel te vergelijken, en telt de legendaregels. Dat vangt precies de fouten die een blik
+op het scherm mist -- en de kaart is tijdens de bouw ook een keer echt gerenderd, wat een
+pijl opleverde die de putsymbolen overstemde.
 
 **Kleur is van de status, en de legenda zegt wat groen betekent.** Het GWSW en de
 PDOK-SLD onderscheiden leidingsoorten met kleur; die is hier aan de status vergeven. Voor

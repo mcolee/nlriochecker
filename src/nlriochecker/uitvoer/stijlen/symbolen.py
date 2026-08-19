@@ -10,12 +10,19 @@ welke typen er een delen -- en elke regel in de tabellen hieronder noemt de SLD-
 die hij vervangt.
 
 De QML's worden hier opgebouwd in plaats van als bestand meegeleverd. De
-regelstructuur die issue #14 voorschrijft is objecttype x status, en op de
-De Wolden-export zijn dat 56 respectievelijk 68 bladregels met evenzoveel symbolen.
-Met de hand is dat ruim vijftienhonderd regels XML waarin een tikfout de kaart stil
-leegtrekt, en waarin de typenlijst op twee plekken zou staan. `bouwwerken.qml` en
-`waterdelen_zonder_zinker.qml` blijven wel gewone bestanden: die hebben een enkel
-symbool en veranderen niet.
+regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 44
+knooptypen en 37 verbindingstypen in deze tabel zijn dat 220 respectievelijk 185
+bladregels met evenzoveel symbolen. Met de hand is dat ruim vierduizend regels XML
+waarin een tikfout de kaart stil leegtrekt, en waarin de typenlijst op twee plekken
+zou staan. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven wel gewone
+bestanden: die hebben een enkel symbool en veranderen niet.
+
+Een opgebouwde stijl draagt alleen regels voor de objecttypen die werkelijk in zijn
+laag staan; die krijgt hij van de schrijver mee. Dat is niet alleen zuiniger maar
+noodzakelijk: met de volledige tabel toont de lagenboom van QGIS 225 legendaregels
+voor de putten en 193 voor de strengen, op een laag met zes voorkomende typen. Dat is
+geen legenda meer maar een muur. Met de voorkomende typen zijn het er 35 en 38 --
+gemeten met PyQGIS op de echte uitvoer.
 
 De kleur komt uitsluitend van de kolom `status`; het symbool zegt wat voor object het
 is. Voor verbindingen kan het symbool dat maar half dragen: het GWSW onderscheidt
@@ -28,6 +35,7 @@ drain, duiker, berging, loos.
 
 from __future__ import annotations
 
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from xml.sax.saxutils import escape, quoteattr
 
@@ -65,6 +73,7 @@ PIJLKLEUR_ONBEKEND = "130,130,130"
 # kaart staat er op vrijwel elke streng een pijl, en een luide pijl overstemt dan de
 # putsymbolen die het eigenlijke onderwerp zijn. `tegen` is de uitzondering en mag
 # opvallen: daar loopt het water de andere kant op dan de tekening suggereert.
+PIJLRAND = "40,40,40"
 PIJLGROOTTE_NORMAAL = 1.8
 PIJLGROOTTE_UITZONDERING = 3.0
 
@@ -151,10 +160,12 @@ PUNTSYMBOLEN: dict[str, Puntsymbool] = {
     "InlaatLeiding": Puntsymbool("circle", 2.2, "Aansluitpunt.sld: Inlaat"),
 }
 
-# Het vangnet. Een open cirkel met een kruis erin: zichtbaar anders dan elk symbool uit
-# de tabel, zodat een onbekend type als onbekend te zien is in plaats van stilzwijgend
-# als put door te gaan.
-VANGNET_PUNT = Puntsymbool("circle", 2.8, "geen; vangnet")
+# Het vangnet. Een asterisk: zichtbaar anders dan elk symbool uit de tabel, zodat een
+# onbekend type opvalt in plaats van stilzwijgend als inspectieput door te gaan. Een
+# cirkel zou daar precies op lijken. `asterisk_fill` staat in de vormenlijst van QGIS;
+# een naam die daar niet in staat wordt zonder melding een cirkel, en dat is precies
+# wat `test_qgis_leest_de_symbolentabel_terug_zoals_ze_bedoeld_is` afvangt.
+VANGNET_PUNT = Puntsymbool("asterisk_fill", 3.4, "geen; vangnet")
 VANGNET_PUNT_LABEL = "objecttype niet in de symbolentabel"
 
 # Verbindingstypen.
@@ -245,16 +256,40 @@ MAPTIP = """<style>
 _SLEUTELBASIS = "aa000000-0000-4000-8000-{:012d}"
 
 
-def bouw_qml(laag: str) -> str:
+def bouw_qml(laag: str, objecttypen: Collection[str] | None = None) -> str:
     """De opgebouwde QML van een objectlaag.
 
     Alleen `putten` en `strengen`; de andere twee lagen zijn gewone bestanden.
+
+    `objecttypen` zijn de typen die in deze laag voorkomen. De stijl reist mee in het
+    bestand waar hij bij hoort, dus hij hoeft alleen regels te dragen voor de data die
+    erin staat. Dat scheelt niet alleen bytes maar vooral **legenda**: met de volledige
+    tabel krijgt de lagenboom van QGIS 225 regels voor de putten en 193 voor de
+    strengen, op een laag met zes voorkomende typen. Onbruikbaar, en precies wat een
+    blik op het scherm zou hebben laten zien. Met de voorkomende typen zijn het er een
+    stuk of dertig.
+
+    Zonder `objecttypen` komt de hele tabel erin. Dat is wat de tests doen: zij toetsen
+    de tabel, niet een dataset.
     """
     if laag == "putten":
-        return _qml_punten()
+        return _qml_punten(objecttypen)
     if laag == "strengen":
-        return _qml_lijnen()
+        return _qml_lijnen(objecttypen)
     raise ValueError(f"{laag!r} heeft geen opgebouwde stijl; lees het QML-bestand.")
+
+
+def _gekozen[S](tabel: Mapping[str, S], objecttypen: Collection[str] | None) -> dict[str, S]:
+    """De regels die deze laag nodig heeft, in de volgorde van de tabel.
+
+    Vergelijking op kleine letters, net als de filters: een export die
+    `DwaPerceelaansluitleiding` schrijft waar de tabel `DWAPerceelaansluitleiding`
+    noemt, hoort zijn eigen regel te krijgen en niet het vangnet.
+    """
+    if objecttypen is None:
+        return dict(tabel)
+    aanwezig = {naam.lower() for naam in objecttypen}
+    return {naam: symbool for naam, symbool in tabel.items() if naam.lower() in aanwezig}
 
 
 class _Opbouw:
@@ -277,18 +312,19 @@ class _Opbouw:
         return naam
 
 
-def _qml_punten() -> str:
+def _qml_punten(objecttypen: Collection[str] | None = None) -> str:
     """De stijl van `putten`: markervorm naar objecttype, kleur naar status."""
     opbouw = _Opbouw()
-    for objecttype, symbool in PUNTSYMBOLEN.items():
+    gekozen = _gekozen(PUNTSYMBOLEN, objecttypen)
+    for objecttype, symbool in gekozen.items():
         opbouw.regels.append(_typeregel(opbouw, _filter_type(objecttype), objecttype, symbool))
     opbouw.regels.append(
-        _typeregel(opbouw, _filter_vangnet(PUNTSYMBOLEN), VANGNET_PUNT_LABEL, VANGNET_PUNT)
+        _typeregel(opbouw, _filter_vangnet(gekozen), VANGNET_PUNT_LABEL, VANGNET_PUNT)
     )
     return _document(opbouw)
 
 
-def _qml_lijnen() -> str:
+def _qml_lijnen(objecttypen: Collection[str] | None = None) -> str:
     """De stijl van `strengen`: lijndikte en streep naar objecttype, kleur naar status.
 
     Daar bovenop drie richtingsregels. De logica erachter (`gpkg._richting_bob`) is
@@ -297,10 +333,11 @@ def _qml_lijnen() -> str:
     werkelijk heen loopt. De dubbele pijl van voorheen vervalt.
     """
     opbouw = _Opbouw()
-    for objecttype, symbool in LIJNSYMBOLEN.items():
+    gekozen = _gekozen(LIJNSYMBOLEN, objecttypen)
+    for objecttype, symbool in gekozen.items():
         opbouw.regels.append(_typeregel(opbouw, _filter_type(objecttype), objecttype, symbool))
     opbouw.regels.append(
-        _typeregel(opbouw, _filter_vangnet(LIJNSYMBOLEN), VANGNET_LIJN_LABEL, VANGNET_LIJN)
+        _typeregel(opbouw, _filter_vangnet(gekozen), VANGNET_LIJN_LABEL, VANGNET_LIJN)
     )
     for richting, kleur, hoek, grootte, label in (
         ("mee", PIJLKLEUR_MEE, 0, PIJLGROOTTE_NORMAAL, "BOB volgt de lijnrichting"),
@@ -331,25 +368,49 @@ def _qml_lijnen() -> str:
     return _document(opbouw)
 
 
-def _typeregel(opbouw: _Opbouw, filter_: str, label: str, symbool: object) -> str:
-    """Een regel per objecttype, met vier kindregels: een per status."""
+# Het legendalabel van een statuswaarde die de vier niet is. Onbereikbaar zolang
+# `objectkaart.bepaal_status` de bron is, maar zonder deze regel zou zo'n object door
+# *geen* enkele regel geraakt worden en dus onzichtbaar zijn -- een stiller gebrek dan
+# een verkeerd symbool. Het objecttype heeft om dezelfde reden een vangnet.
+STATUS_ONBEKEND_LABEL = "status onbekend"
+
+
+def _typeregel(
+    opbouw: _Opbouw, filter_: str, label: str, symbool: Puntsymbool | Lijnsymbool
+) -> str:
+    """Een regel per objecttype, met een kindregel per status plus een vangnet."""
+    tekenaar = _puntsymbool if isinstance(symbool, Puntsymbool) else _lijnsymbool
     kinderen = []
-    for status in STATUSSEN:
-        if isinstance(symbool, Puntsymbool):
-            naam = opbouw.voeg_symbool_toe(lambda n, s=symbool, t=status: _puntsymbool(n, s, t))
-        else:
-            naam = opbouw.voeg_symbool_toe(lambda n, s=symbool, t=status: _lijnsymbool(n, s, t))
-        voorwaarde = f'"status" = {_tekst(status)}'
+    for status, voorwaarde, statuslabel in _statusregels():
+        naam = opbouw.voeg_symbool_toe(
+            lambda n, s=symbool, t=status, f=tekenaar: f(n, s, t)  # type: ignore[misc]
+        )
         kinderen.append(
             f"<rule key={quoteattr('{' + opbouw.sleutel() + '}')} "
             f"filter={quoteattr(voorwaarde)} "
             f"symbol={quoteattr(naam)} "
-            f"label={quoteattr(STATUS_WOORD[status])}/>"
+            f"label={quoteattr(statuslabel)}/>"
         )
     return (
         f"<rule key={quoteattr('{' + opbouw.sleutel() + '}')} "
         f"filter={quoteattr(filter_)} label={quoteattr(label)}>" + "".join(kinderen) + "</rule>"
     )
+
+
+def _statusregels() -> list[tuple[str, str, str]]:
+    """De vier statuswaarden met hun filter en legendalabel, plus een vangnet.
+
+    Het vangnet tekent met de grijze symboolkleur: een object waarvan de status niet te
+    duiden is, is per definitie niet beoordeeld.
+    """
+    regels = [
+        (status, f'"status" = {_tekst(status)}', STATUS_WOORD[status]) for status in STATUSSEN
+    ]
+    bekend = ", ".join(_tekst(status) for status in STATUSSEN)
+    regels.append(
+        (STATUS_GRIJS, f'"status" not in ({bekend}) or "status" is null', STATUS_ONBEKEND_LABEL)
+    )
+    return regels
 
 
 def _filter_type(objecttype: str) -> str:

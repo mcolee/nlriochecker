@@ -126,8 +126,38 @@ def test_qgis_leest_de_symbolentabel_terug_zoals_ze_bedoeld_is(
                     qgis_core.QgsSimpleMarkerSymbolLayerBase.encodeShape(symboollaag.shape())
                 )
 
-    bedoeld = {symbool.vorm for symbool in PUNTSYMBOLEN.values()} | {VANGNET_PUNT.vorm}
+    # De stijl draagt alleen regels voor de typen die in deze laag staan, plus het
+    # vangnet; de vormen die QGIS teruggeeft horen daar precies bij te horen.
+    aanwezig = {
+        kenmerk["objecttype"]
+        for kenmerk in vector.getFeatures()  # type: ignore[index]
+    }
+    bedoeld = {PUNTSYMBOLEN[naam].vorm for naam in aanwezig if naam in PUNTSYMBOLEN}
+    bedoeld.add(VANGNET_PUNT.vorm)
+
+    assert aanwezig, "de fixture levert geen putten op"
     assert gevonden == bedoeld
+
+
+def test_de_legenda_blijft_hanteerbaar(qgis_app, geschreven_gpkg: Path) -> None:
+    """De lagenboom van QGIS toont een regel per bladregel van de renderer.
+
+    Met de volledige symbolentabel zijn dat er ruim tweehonderd per laag, op een
+    bestand met een handvol objecttypen. Dat is geen legenda meer maar een muur, en
+    het is precies wat een blik op het scherm zou hebben laten zien. De stijl draagt
+    daarom alleen regels voor de typen die in de laag staan; deze test legt vast dat
+    de legenda meeschaalt met de data en niet met de tabel.
+    """
+    for laag in ("putten", "strengen"):
+        vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername={laag}", laag, "ogr")
+        vector.loadDefaultStyle()
+        soorten = {kenmerk["objecttype"] for kenmerk in vector.getFeatures()}  # type: ignore[index]
+
+        regels = len(vector.renderer().legendSymbolItems())
+
+        # Per objecttype vijf statusregels plus het vangnet, en bij de strengen drie
+        # richtingsregels. Ruim genomen, maar ver onder de tweehonderd.
+        assert regels <= (len(soorten) + 1) * 6 + 5, f"{laag}: {regels} legendaregels"
 
 
 def test_de_maptip_van_beide_objectlagen_toont_de_popup(qgis_app, geschreven_gpkg: Path) -> None:

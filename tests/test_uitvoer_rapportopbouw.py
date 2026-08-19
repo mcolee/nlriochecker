@@ -222,23 +222,36 @@ class TestDetailrapportage:
         assert "MdsPlan, MdsProj" in tekst
 
     def test_de_foutchecks_staan_boven_de_waarschuwingschecks(self, tmp_path: Path) -> None:
-        tekst = _rapport(_run("net003_tegen_de_richting.ttl"), tmp_path)
+        """De ernst komt uit de run zelf; een prefixheuristiek zou hem verkeerd raden."""
+        run = _run("net003_tegen_de_richting.ttl")
+        ernst_van = {outcome.check_id: outcome.severity.value for outcome in run.outcomes}
+        tekst = _rapport(run, tmp_path)
+
         koppen = [regel for regel in tekst.splitlines() if regel.startswith("#### ")]
-        ernsten = [
-            "F" if kop.split()[1].startswith(("TOP", "NET", "HGT", "ADM", "RVZ")) else "W"
-            for kop in koppen
-        ]
+        ernsten = [ernst_van[kop.split()[1]] for kop in koppen]
 
         assert koppen
-        # De volgorde is die van de ernst van de check zelf; de eerste kop hoort bij
-        # een foutcheck en de laatste bij een waarschuwingscheck.
-        assert ernsten[0] == "F"
+        assert set(ernsten) == {"F", "W"}, "de fixture moet beide soorten checks bevatten"
+        assert ernsten == sorted(ernsten), "alle F-checks boven alle W-checks"
 
-    def test_zonder_nulmeting_is_er_geen_nulmetingblok(self, tmp_path: Path) -> None:
+    def test_zonder_nulmeting_is_er_geen_nulmetingblok_en_geen_nummering(
+        self, tmp_path: Path
+    ) -> None:
+        """Zonder blok 1 is "2. Eigen checks" een verwijzing naar niets."""
         tekst = _rapport(_run("schoon.ttl"), tmp_path)
 
         assert "### 1. GWSW-nulmeting" not in tekst
-        assert "### 2. Eigen checks" in tekst
+        assert "### 2. Eigen checks" not in tekst
+        assert "### Eigen checks" in tekst
+
+    def test_de_detailkop_staat_er_altijd_boven(self, tmp_path: Path) -> None:
+        """Anders hangt het checkdetail als H3 onder "Verantwoording" in elke TOC."""
+        for run in (_run("schoon.ttl"), _met_nulmeting()):
+            tekst = _rapport(run, tmp_path)
+            kop = next(r for r in tekst.splitlines() if r.startswith("### ") and "Eigen" in r)
+
+            assert "## Detailrapportage" in tekst
+            assert tekst.index("## Detailrapportage") < tekst.index(kop)
 
 
 class TestVerantwoordingBlijft:

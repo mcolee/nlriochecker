@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from helpers_melding import melding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
@@ -172,8 +173,11 @@ class TestRodeDraadEnDeNulmeting:
         from nlriochecker.uitvoer.synthese import _multi_melding
 
         meldingen = [
-            _losse_melding(
-                f"NULMETING-Vorm_{n}_card", "http://example.org/toets#PutA", BRON_NULMETING
+            melding(
+                melding_id=f"NULMETING-Vorm_{n}_card",
+                check_id=f"NULMETING-Vorm_{n}_card",
+                object_uri="http://example.org/toets#PutA",
+                bron=BRON_NULMETING,
             )
             for n in range(1, 6)
         ]
@@ -184,7 +188,10 @@ class TestRodeDraadEnDeNulmeting:
         """Anders staan ze samen als een verdacht object in het rapport."""
         from nlriochecker.uitvoer.synthese import _multi_melding
 
-        meldingen = [_losse_melding(f"TOP-{n:03d}", "") for n in range(1, 6)]
+        meldingen = [
+            melding(melding_id=f"TOP-{n:03d}", check_id=f"TOP-{n:03d}", object_uri="")
+            for n in range(1, 6)
+        ]
 
         assert _multi_melding(meldingen, load_check_config()) == []
 
@@ -192,39 +199,14 @@ class TestRodeDraadEnDeNulmeting:
         from nlriochecker.uitvoer.synthese import _multi_melding
 
         meldingen = [
-            _losse_melding(f"TOP-{n:03d}", "http://example.org/toets#PutA") for n in range(1, 6)
+            melding(
+                melding_id=f"TOP-{n:03d}",
+                check_id=f"TOP-{n:03d}",
+                object_uri="http://example.org/toets#PutA",
+            )
+            for n in range(1, 6)
         ]
 
         regels = _multi_melding(meldingen, load_check_config())
 
         assert regels and "verschillende checks" in regels[0]
-
-
-def _losse_melding(check_id: str, object_uri: str, bron: str = "register") -> Melding:
-    """Een melding met alleen de velden die de rode draad leest."""
-    return Melding(
-        melding_id=check_id + object_uri,
-        check_id=check_id,
-        categorie=check_id.split("-", 1)[0],
-        bron=bron,
-        ernst="F",
-        dimensie="Consistentie",
-        object_uri=object_uri,
-        object_id="PutA",
-        object_label="A",
-        object2_uri="",
-        object2_id="",
-        object2_label="",
-        boodschap="iets",
-        waarde="",
-        drempel="",
-        typering_betrouwbaar=True,
-        cluster_id="",
-        scope="geen_studiegebied",
-        gebied="",
-        prioriteit=2,
-        systemisch=False,
-        foutlocatie=None,
-        run_datum="2026-08-19",
-        dataset="toets.ttl",
-    )

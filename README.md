@@ -240,6 +240,11 @@ BOB-richtingsregel erin; bij een grijs object waarom het niet beoordeeld is.
 > ingedrukt is (View → Show Map Tips, of het icoon met de gele tooltip). Staat hij uit,
 > dan gebeurt er bij hoveren niets -- en dat leest als kapot terwijl het een instelling is.
 
+De popup is opgemaakt met CSS. Een QGIS-bouw met QtWebKit toont hem zoals bedoeld; een
+bouw zonder valt terug op een eenvoudiger tekstweergave waarin de opmaak wegvalt en de
+velden tegen elkaar aan komen te staan. De inhoud blijft dan volledig, alleen minder
+prettig te lezen.
+
 Alle vier de uitvoervormen komen uit dezelfde meldingenstroom, dus ze kunnen niet uit
 elkaar lopen. Elk geschreven bestand noemt waarmee het gemaakt is: de Markdown-rapporten
 in een regel onder de titel, de CSV's in de kolom `Gereedschap`, de GeoPackage in het

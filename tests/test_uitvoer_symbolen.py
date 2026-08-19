@@ -36,6 +36,29 @@ def _boom(laag: str) -> ET.Element:
     return ET.fromstring(bouw_qml(laag))
 
 
+def test_alleen_de_voorkomende_typen_krijgen_een_regel(laag: str) -> None:
+    """De stijl reist mee in het bestand en hoeft alleen te dragen wat erin staat.
+
+    Met de volledige tabel krijgt de lagenboom van QGIS ruim tweehonderd legendaregels
+    op een laag met een handvol typen; dat is geen legenda meer maar een muur.
+    """
+    tabel = PUNTSYMBOLEN if laag == "putten" else LIJNSYMBOLEN
+    aanwezig = sorted(tabel)[:2]
+
+    boom = ET.fromstring(bouw_qml(laag, aanwezig))
+    labels = {regel.get("label") for regel in boom.iter("rule") if list(regel)}
+
+    assert labels == {*aanwezig, "objecttype niet in de symbolentabel"}
+
+
+def test_een_afwijkende_schrijfwijze_krijgt_toch_zijn_eigen_regel() -> None:
+    """De export schrijft `DwaPerceelaansluitleiding`, de tabel de SLD-schrijfwijze."""
+    boom = ET.fromstring(bouw_qml("strengen", ["dwaperceelaansluitleiding"]))
+    labels = {regel.get("label") for regel in boom.iter("rule") if list(regel)}
+
+    assert "DwaPerceelaansluitleiding" in labels
+
+
 def test_de_qml_is_geldige_xml(laag: str) -> None:
     assert _boom(laag).tag == "qgis"
 
@@ -53,15 +76,31 @@ def test_elke_regel_verwijst_naar_een_bestaand_symbool(laag: str) -> None:
 
 
 def test_elk_objecttype_heeft_een_regel_per_status(laag: str) -> None:
-    """Regelstructuur objecttype x status; een ontbrekende status tekent niets."""
+    """Regelstructuur objecttype x status; een ontbrekende status tekent niets.
+
+    De filters worden bij naam vergeleken en niet alleen geteld: vier verschillende
+    filters op `'blauw'` zouden een telling ook halen.
+    """
     tabel = PUNTSYMBOLEN if laag == "putten" else LIJNSYMBOLEN
     boom = _boom(laag)
+    verwacht = {f"\"status\" = '{status}'" for status in STATUSSEN}
 
     ouders = [regel for regel in boom.iter("rule") if list(regel)]
     assert len(ouders) == len(tabel) + 1, "elk type plus een vangnet"
     for ouder in ouders:
-        statussen = {kind.get("filter", "") for kind in ouder}
-        assert len(statussen) == len(STATUSSEN)
+        filters = {kind.get("filter", "") for kind in ouder}
+        assert verwacht <= filters
+        # En een vangnet, zodat een onbekende statuswaarde niet onzichtbaar wordt.
+        assert any("not in" in uitdrukking for uitdrukking in filters)
+
+
+def test_een_onbekende_status_wordt_niet_stil_overgeslagen(laag: str) -> None:
+    """Zonder vangnet raakt een object met een lege of onbekende status geen regel."""
+    filters = [regel.get("filter", "") for regel in _boom(laag).iter("rule")]
+    vangnetten = [f for f in filters if f.startswith('"status" not in')]
+
+    assert vangnetten
+    assert all('"status" is null' in f for f in vangnetten)
 
 
 def test_er_is_een_expliciet_vangnet(laag: str) -> None:

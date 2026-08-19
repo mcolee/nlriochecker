@@ -21,7 +21,7 @@ from nlriochecker.checks import REGISTRY, CheckRun, Severity
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import BRON_NULMETING, Melding, bouw_meldingen
-from nlriochecker.uitvoer.omvang import omvangtabel
+from nlriochecker.uitvoer.omvang import omvangtabel, zonder_geometrie
 from nlriochecker.uitvoer.samenvatting import (
     NIET_GEMETEN,
     VINKJE,
@@ -205,8 +205,10 @@ def _render_checks(
     # hierboven wil weten -- niet pas achter de tabellen.
     lines += rode_draad(run, meldingen)
     lines += _verantwoording(run, meldingen, notities)
-    lines += _detail_nulmeting(run, meldingen)
-    lines += _detail_eigen(run, meldingen)
+    lines += ["", "## Detailrapportage", ""]
+    nulmeting = _detail_nulmeting(run, meldingen)
+    lines += nulmeting
+    lines += _detail_eigen(run, meldingen, genummerd=bool(nulmeting))
     lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
     return lines
 
@@ -219,6 +221,15 @@ def _omvang_section(run: CheckRun) -> list[str]:
     """
     regels = ["## Wat er in dit gebied ligt", ""]
     regels += table(omvangtabel(run), "Aantallen in de kern")
+    ongetekend = zonder_geometrie(run)
+    if ongetekend:
+        regels += [
+            "",
+            f"> {getal(ongetekend, 'object heeft', 'objecten hebben')} geen bruikbare "
+            "geometrie en staat daarom niet in deze tabel en niet op de kaart -- "
+            "compartimenten en hulpstukken zonder eigen punt, bijvoorbeeld. De checks "
+            "zien ze wel.",
+        ]
     stel = run.analyseset
     if stel is not None:
         regels += [
@@ -429,7 +440,7 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     if not run.meetbereik.gemeten:
         return []
 
-    regels = ["", "## Detailrapportage", "", "### 1. GWSW-nulmeting", ""]
+    regels = ["### 1. GWSW-nulmeting", ""]
     if not uit_nulmeting:
         return [*regels, "_geen overtredingen_", ""]
 
@@ -443,7 +454,10 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         rijen.append(
             (
                 check_id,
-                groep[0].ernst,
+                # De zwaarste ernst in de groep, niet die van de eerste melding: zouden
+                # twee CFK-rapporten het oneens zijn over de Severity van dezelfde vorm,
+                # dan hoort de tabel de zwaarste te noemen en niet de toevallig eerste.
+                "F" if any(m.ernst == Severity.ERROR.value for m in groep) else "W",
                 len(groep),
                 sum(1 for melding in groep if melding.systemisch),
                 ", ".join(klassen),
@@ -460,10 +474,15 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     return [*regels, ""]
 
 
-def _detail_eigen(run: CheckRun, meldingen: list[Melding]) -> list[str]:
-    """Het detail van de eigen checks, eerst de foutchecks dan de waarschuwingschecks."""
+def _detail_eigen(run: CheckRun, meldingen: list[Melding], *, genummerd: bool) -> list[str]:
+    """Het detail van de eigen checks, eerst de foutchecks dan de waarschuwingschecks.
+
+    `genummerd` is onwaar als er geen nulmetingblok boven staat -- zonder `--shacl` is
+    er geen blok 1, en dan is "2. Eigen checks" een verwijzing naar niets.
+    """
     per_check = _per_check(meldingen)
-    regels = ["", "### 2. Eigen checks", ""]
+    kop = "### 2. Eigen checks" if genummerd else "### Eigen checks"
+    regels = ["", kop, ""]
     volgorde = sorted(
         run.outcomes, key=lambda outcome: (outcome.severity is not Severity.ERROR, outcome.check_id)
     )
@@ -814,14 +833,26 @@ def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
 
     objectloos = [melding for melding in zonder if not melding.object_uri]
     zonder_geometrie = [melding for melding in zonder if melding.object_uri]
-    checks = ", ".join(sorted({melding.check_id for melding in zonder}))
     regels = [
         f"> **{getal(len(zonder), 'melding heeft', 'meldingen hebben')} geen plek op de "
-        f"kaart** gekregen: {len(objectloos)} wijzen geen object aan en "
-        f"{len(zonder_geometrie)} staan op een object zonder bruikbare geometrie "
-        f"({checks}). Ze staan wel in de CSV, in `{FILE_CHECKS_JSON}` en in de "
+        f"kaart** gekregen. {_oorzaak(objectloos, 'wijst', 'wijzen')} geen object aan; "
+        f"{_oorzaak(zonder_geometrie, 'staat', 'staan')} op een object zonder bruikbare "
+        f"geometrie. Ze staan wel in de CSV, in `{FILE_CHECKS_JSON}` en in de "
         "meldingentabel van de GeoPackage, die de kolommen `x` en `y` draagt; alleen "
         "kleuren ze geen object op de kaart.",
         "",
     ]
     return regels
+
+
+def _oorzaak(meldingen: list[Melding], enkelvoud: str, meervoud: str) -> str:
+    """Een deeltelling met de checks die haar leveren, of niets als ze nul is.
+
+    De checks stonden eerder achter beide oorzaken samen, en kwamen daarmee terecht
+    achter een telling van nul -- twaalf vormnamen bij "0 meldingen". Ze horen bij de
+    oorzaak waar ze uit komen.
+    """
+    if not meldingen:
+        return f"0 {meervoud}"
+    checks = ", ".join(sorted({melding.check_id for melding in meldingen}))
+    return f"{getal(len(meldingen), enkelvoud, meervoud)} ({checks})"
