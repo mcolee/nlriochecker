@@ -11,28 +11,20 @@ import click
 
 from nlriochecker import __version__
 from nlriochecker.analysis import MetingAnalysis, analyze
-from nlriochecker.cache import laad_met_cache
-from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import REGISTRY, Severity
+from nlriochecker.checkconfig import load_check_config
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import CoverageConfig, load_coverage_config
 from nlriochecker.coverage import assess_coverage, verify_register
 from nlriochecker.dataset import GwswDataset, load_dataset
 from nlriochecker.errors import PipelineError
-from nlriochecker.externedata import Dekkingseis, load_external_data
-from nlriochecker.meting import Meetbereik, laad_nulmeting
-from nlriochecker.plausibiliteit import load_plausibility
+from nlriochecker.meting import kies_cfk, laad_nulmeting
 from nlriochecker.register import Register, default_register_path, load_register
 from nlriochecker.reporting import (
     write_comparison_reports,
     write_coverage_report,
     write_reports,
 )
-from nlriochecker.studiegebied import RdGrenzen, Studiegebieden, load_studiegebieden
-from nlriochecker.taal import getal, vorm
-from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
-from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
+from nlriochecker.toetsrun import Toetsopdracht, voer_toets_uit
 
 
 class _CliError(click.ClickException):
@@ -266,25 +258,6 @@ def _cfk_option():
     )
 
 
-def _gekozen_cfk(cfk_keuze: tuple[str, ...], config: CheckConfig) -> list[str]:
-    """Toetst de opgegeven conformiteitsklassen tegen de projectconfiguratie.
-
-    Geen `click.Choice`: de toegestane waarden staan pas vast nadat
-    `--projectconfig` gelezen is, en `click.Choice` moet ze al kennen op het moment
-    dat het commando opgebouwd wordt.
-    """
-    volledig = config.nulmeting.vereiste_cfk
-    if not cfk_keuze:
-        return list(volledig)
-    onbekend = sorted({keuze for keuze in cfk_keuze if keuze not in volledig})
-    if onbekend:
-        raise _CliError(
-            f"Onbekende conformiteitsklasse(n): {', '.join(onbekend)}. "
-            f"Toegestaan: {', '.join(volledig)}."
-        )
-    return sorted(set(cfk_keuze))
-
-
 def _projectconfig_option():
     """Bouwt de optie voor de projectconfiguratie."""
     return click.option(
@@ -327,7 +300,7 @@ def _bronnen_option():
 def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze=()):
     """Leest de nulmeting en optioneel de dataset, en analyseert ze."""
     project = load_check_config(project_config_path)
-    gekozen = _gekozen_cfk(cfk_keuze, project)
+    gekozen = kies_cfk(cfk_keuze, project.nulmeting.vereiste_cfk)
     nulmeting = laad_nulmeting(list(shacl_paths), gekozen, project.nulmeting.vereiste_cfk)
     dataset = load_dataset(dataset_path, list(ontology_paths)) if dataset_path is not None else None
     return project, nulmeting, analyze(nulmeting, dataset), dataset
@@ -481,7 +454,7 @@ def compare_command(
     try:
         project = load_check_config(project_config_path)
         volledig = project.nulmeting.vereiste_cfk
-        gekozen = _gekozen_cfk(cfk_keuze, project)
+        gekozen = kies_cfk(cfk_keuze, project.nulmeting.vereiste_cfk)
         eerder = analyze(laad_nulmeting(list(earlier_paths), gekozen, volledig))
         later = analyze(laad_nulmeting(list(later_paths), gekozen, volledig))
         comparison = compare_metingen(eerder, later, load_coverage_config(config_path))
@@ -594,228 +567,28 @@ def check_command(
     output_dir: Path,
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
+    opdracht = Toetsopdracht(
+        dataset=dataset_path,
+        ontologieen=ontology_paths,
+        shacl=shacl_paths,
+        check_ids=check_ids,
+        studiegebied=study_path,
+        studiegebied_laag=study_layer,
+        gebieden=gebied_keuze,
+        projectconfig=project_config_path,
+        plausibiliteit=plausibility_path,
+        bronnen=bronnen_dir,
+        cfk=cfk_keuze,
+        uitvoermap=output_dir,
+        met_geopackage=not geen_gpkg,
+        met_json=not geen_json,
+        gebruik_cache=not geen_cache,
+        cachemap=cache_dir,
+    )
     try:
-        voortgang: Voortgang = _BalkVoortgang()
-        config = load_check_config(project_config_path)
-        # Toets de keuzes voordat de dataset geladen wordt. Op De Wolden kost dat
-        # laden ruim drie minuten; een typefout in --cfk of --gebied hoort niet pas
-        # daarna te melden dat de run zinloos was.
-        _gekozen_cfk(cfk_keuze, config)
-        gebieden = _studiegebieden(study_path, study_layer, gebied_keuze, config)
-        # Ook de externe bronnen vóór het laden: de dekkingspoort weigert een te klein
-        # extract, en dat oordeel hangt alleen van de bronnen af. Erna zou de gebruiker
-        # drie minuten en 3 GB betalen voor een fout die in twee seconden vaststond.
-        bronnen = _externe_bronnen(config, bronnen_dir)
-        dataset, cache = laad_met_cache(
-            dataset_path, list(ontology_paths), cache_dir, not geen_cache, voortgang=voortgang
-        )
-        onbetrouwbaar, gate_applied, meetbereik = _typing_gate(
-            shacl_paths, config, dataset, cfk_keuze, voortgang
-        )
-        try:
-            runs = toets_gebieden(
-                dataset,
-                gebieden,
-                config,
-                onbetrouwbaar=onbetrouwbaar,
-                plausibiliteit=load_plausibility(plausibility_path),
-                bronnen=bronnen,
-                check_ids=list(check_ids) or None,
-                typing_gate_applied=gate_applied,
-                meetbereik=meetbereik,
-                voortgang=voortgang,
-            )
-        except KeyError as error:
-            # Alleen de opzoeking in REGISTRY levert een KeyError op. Het blok
-            # hieronder vangen zou ook een indexeerfout uit de schrijvers als
-            # "onbekende check" laten lezen.
-            bekend = ", ".join(sorted(REGISTRY))
-            raise _CliError(f"{error.args[0]}. Bekende checks: {bekend}.") from error
-        uitvoer = schrijf_uitvoer_gebieden(
-            runs,
-            output_dir,
-            met_geopackage=not geen_gpkg,
-            met_json=not geen_json,
-            voortgang=voortgang,
-            beschikbaar=gebieden.beschikbaar if gebieden is not None else (),
-            overgeslagen=gebieden.overgeslagen if gebieden is not None else (),
-        )
+        uitslag = voer_toets_uit(opdracht, voortgang=_BalkVoortgang())
     except PipelineError as error:
         raise _CliError(str(error)) from error
 
-    click.echo(
-        f"{dataset_path.name}: {len(dataset.nodes)} knooppunten, {len(dataset.conduits)} strengen"
-    )
-    herkomst = "uit de cache" if cache.bron == "cache" else "ingelezen"
-    click.echo(f"  Dataset {herkomst} in {cache.seconden:.1f} s.")
-    if cache.melding:
-        click.echo(f"  {cache.melding}")
-    if dataset.decode_fallback is not None:
-        fallback = dataset.decode_fallback
-        click.echo(
-            f"  Let op: geen geldige UTF-8; gelezen als {fallback.encoding} "
-            f"({fallback.byte_count} bytes buiten ASCII). Zie het rapport."
-        )
-    if dataset.geometry_errors:
-        click.echo(f"  {len(dataset.geometry_errors)} objecten met onleesbare geometrie.")
-    if not gate_applied:
-        click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
-        if cfk_keuze:
-            click.echo("  Let op: --cfk doet niets zonder --shacl; er is niets gemeten.")
-    elif not meetbereik.volledig:
-        click.echo(f"  {meetbereik.markering()}")
-    if bronnen is None:
-        click.echo("  Geen externe bronnen geladen (--bronnen niet opgegeven).")
-    else:
-        click.echo(
-            f"  Externe bronnen: {len(bronnen.layers)} lagen"
-            f"{', hoogteraster' if bronnen.raster is not None else ''}"
-            f", bereik {bronnen.extent_name or 'onbekend'}."
-        )
-        for ontbreekt in bronnen.missing:
-            click.echo(f"    Niet aanwezig: {ontbreekt}")
-    if len(runs) == 1:
-        _meld_gebied(runs[0], config)
-    else:
-        # Bij tachtig buurten zou een blok per gebied duizenden regels opleveren; de
-        # tellingen per check staan in totaal/synthese.md.
-        for gebiedsrun in runs:
-            _meld_gebied_kort(gebiedsrun)
-
-    # De paden dragen de gesaneerde gebiedsnaam al als submap; die er nog eens bij
-    # zetten zou de lijst alleen langer maken.
-    for geschreven in uitvoer.per_gebied.values():
-        for pad in (geschreven.markdown, geschreven.csv, geschreven.geopackage, geschreven.json):
-            if pad is not None:
-                click.echo(f"Geschreven: {pad}")
-    for pad in (uitvoer.synthese, uitvoer.totaal_csv, uitvoer.totaal_json):
-        if pad is not None:
-            click.echo(f"Geschreven: {pad}")
-
-
-def _meld_gebied_kort(gebiedsrun: GebiedsRun) -> None:
-    """Vat een gebiedsrun samen in een regel; het detail staat in de synthese."""
-    run = gebiedsrun.run
-    kern = len(run.analyseset.kern) if run.analyseset is not None else 0
-    weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
-    leeg = " -- geen objecten in dit gebied, niets getoetst" if not kern else ""
-    click.echo(
-        f"  Gebied {gebiedsrun.naam}: {getal(kern, 'object', 'objecten')} in de kern, "
-        f"{run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen, "
-        f"{weggelaten} buiten het gebied weggelaten{leeg}."
-    )
-
-
-def _meld_gebied(gebiedsrun: GebiedsRun, config: CheckConfig) -> None:
-    """Meldt de omvang en de uitslag van een enkele gebiedsrun op het scherm."""
-    run = gebiedsrun.run
-    if run.study_area is not None:
-        gebied = run.study_area
-        weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
-        click.echo(
-            f"  Studiegebied {gebied.name} ({gebied.area_ha:.1f} ha): "
-            f"{getal(weggelaten, 'bevinding', 'bevindingen')} buiten het gebied weggelaten."
-        )
-    if run.analyseset is not None:
-        stel = run.analyseset
-        click.echo(
-            f"  Analyseset: {getal(len(stel.kern), 'object', 'objecten')} in de kern, "
-            f"{len(stel.schil)} in de contextschil, van {stel.volledig_aantal} in de export."
-        )
-        if stel.aandeel > config.studiegebied.component_waarschuwingsdrempel:
-            click.echo(
-                "  Let op: het net binnen dit gebied hangt met vrijwel de hele export samen; "
-                "de afbakening levert weinig tijdwinst op."
-            )
-    for outcome in run.outcomes:
-        voorbehoud = (
-            f", {outcome.unreliable_count} met typeringsvoorbehoud"
-            if outcome.unreliable_count
-            else ""
-        )
-        aantal = len(outcome.findings)
-        click.echo(
-            f"  {outcome.check_id:9s} {outcome.severity.value}  "
-            f"{aantal:5d} {vorm(aantal, 'bevinding', 'bevindingen')}{voorbehoud}"
-        )
-    click.echo(
-        f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen"
-    )
-
-
-def _studiegebieden(
-    study_path: Path | None,
-    study_layer: str | None,
-    gebied_keuze: tuple[str, ...],
-    config: CheckConfig,
-) -> Studiegebieden | None:
-    """Leest en selecteert de studiegebieden, of levert None zonder studiegebied.
-
-    Het volledige bestand wordt altijd eerst gevalideerd en pas daarna geselecteerd:
-    een run met `--gebied` mag een defect in een ander gebied niet maskeren.
-    """
-    if study_path is None:
-        if gebied_keuze:
-            raise _CliError("--gebied werkt alleen samen met --studiegebied.")
-        return None
-    drempels = config.drempels
-    gebieden = load_studiegebieden(
-        study_path,
-        study_layer,
-        grenzen=RdGrenzen(
-            drempels.rd_x_min, drempels.rd_x_max, drempels.rd_y_min, drempels.rd_y_max
-        ),
-    )
-    return gebieden.selecteer(list(gebied_keuze)) if gebied_keuze else gebieden
-
-
-def _externe_bronnen(config, bronnen_dir: Path | None):
-    """Leest de externe geodata als er een bronmap opgegeven is.
-
-    De aangeleverde bronnen dekken maar een deel van het beheergebied; ze worden
-    daarom alleen geladen als de gebruiker er expliciet om vraagt, en de EXT-checks
-    melden zelf wanneer ze niets konden toetsen. Wat wel hard faalt is een bron die
-    kleiner is dan het bereik waarvoor hij geldig verklaard is; zie `_toets_dekking`.
-    """
-    if bronnen_dir is None:
-        return None
-    bronnen = config.bronnen.model_copy(update={"map": "."})
-    # De poortcheck draait hier, voordat er ook maar een check gedraaid heeft: een
-    # bron die het bereik niet dekt geeft anders een misleidend schone uitkomst.
-    eis = Dekkingseis(
-        marge_m=config.drempels.ext_zoekafstand_max_m,
-        tolerantie_m=config.bronnen.dekking_tolerantie_m,
-    )
-    return load_external_data(bronnen, bronnen_dir, dekkingseis=eis)
-
-
-def _typing_gate(
-    shacl_paths: tuple[Path, ...],
-    config: CheckConfig,
-    dataset: GwswDataset,
-    cfk_keuze: tuple[str, ...] = (),
-    voortgang: Voortgang = NUL_VOORTGANG,
-) -> tuple[frozenset[str], bool, Meetbereik]:
-    """Haalt de te globaal getypeerde objecten uit de nulmeting.
-
-    De SHACL-meting noemt de te globale klassen; de instanties komen uit de dataset.
-    Dat geeft een exacte verzameling in plaats van een labellijst.
-
-    Zonder `--shacl` is er geen meting. Het meetbereik zegt dat dan expliciet, in
-    plaats van de vereiste set te noemen alsof die gehaald is -- stilte over een
-    niet-uitgevoerde meting leest als "alles gecontroleerd".
-    """
-    volledig = config.nulmeting.vereiste_cfk
-    # Eerst toetsen, dan pas beslissen of er iets te meten valt: een typefout in
-    # --cfk moet ook opvallen bij een run zonder --shacl, waar de vlag geen effect
-    # heeft. Anders accepteert juist de aanroepvorm die er niets mee doet hem stil.
-    gekozen = _gekozen_cfk(cfk_keuze, config)
-    if not shacl_paths:
-        return frozenset(), False, Meetbereik.niet_gemeten(volledig)
-
-    nulmeting = laad_nulmeting(list(shacl_paths), gekozen, volledig, voortgang=voortgang)
-    analyse = analyze(nulmeting, dataset)
-    objecten: set[str] = set()
-    for deel in analyse.per_cfk.values():
-        objecten.update(deel.typing_gate.objects)
-    return frozenset(objecten), True, nulmeting.meetbereik
+    for regel in uitslag.regels():
+        click.echo(regel)

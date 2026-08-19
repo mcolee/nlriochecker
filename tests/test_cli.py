@@ -862,7 +862,7 @@ def test_gebiedsvalidatie_gaat_vooraf_aan_het_laden(tmp_path: Path, monkeypatch)
     def val(*args, **kwargs):
         raise AssertionError("de dataset werd geladen voordat het gebiedsbestand getoetst was")
 
-    monkeypatch.setattr("nlriochecker.cli.laad_met_cache", val)
+    monkeypatch.setattr("nlriochecker.toetsrun.laad_met_cache", val)
     kapot = tmp_path / "kapot.geojson"
     kapot.write_text(
         json.dumps(

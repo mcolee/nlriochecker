@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from nlriochecker.errors import NulmetingError
+from nlriochecker.errors import NulmetingError, OpdrachtError
 from nlriochecker.shaclrapport import ShaclReport, lees_shacl_rapport
 from nlriochecker.taal import vorm
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
@@ -88,6 +88,27 @@ class Meetbereik:
             f"**Onvolledige meting:** getoetst op {self.cfk_tekst}; {ontbreekt} "
             f"{vorm(len(self.ontbreekt), 'ontbreekt', 'ontbreken')}."
         )
+
+
+def kies_cfk(keuze: Sequence[str], volledig: Sequence[str]) -> list[str]:
+    """Toetst de gevraagde conformiteitsklassen tegen de vereiste set.
+
+    Zonder keuze gelden ze alle; dat is de standaard uit het checkregister. Een
+    onbekende waarde is een fout en geen stille overslag -- een typefout in de keuze
+    zou anders een run opleveren die minder toetst dan de gebruiker denkt.
+
+    Neemt twee reeksen en geen `CheckConfig`: zo blijft deze module los van de
+    configuratielaag, en kunnen zowel de opdrachtregel als `toetsrun` hem aanroepen.
+    """
+    if not keuze:
+        return list(volledig)
+    onbekend = sorted({item for item in keuze if item not in volledig})
+    if onbekend:
+        raise OpdrachtError(
+            f"Onbekende conformiteitsklasse(n): {', '.join(onbekend)}. "
+            f"Toegestaan: {', '.join(volledig)}."
+        )
+    return sorted(set(keuze))
 
 
 @dataclass(frozen=True)
