@@ -1087,3 +1087,45 @@ toetst dat de gezette labels precies die rij zijn.
 `bouwwerken` en `waterdelen_zonder_zinker` delen wél hun vorm, want ze komen allebei
 uit het trefferregister via `_vul_trefferlaag`. Twee is krap voor een seam; drie
 maakt het een echte. Voor die twee alleen is de bestaande gedeelde functie genoeg.
+
+### BO-23 De uitvoerlaag krijgt geen gezamenlijk `(run, meldingen)`-object
+
+**Wat.** Een architectuurreview stelde voor om het paar `(run, meldingen)` -- dat
+door negen functies in de uitvoerlaag reist -- in een `Meldingenstroom` te vatten:
+run plus rundatum in, meldingen erbij gebouwd, en de schrijvers nemen die ene waarde.
+Dat is gebouwd en weer teruggedraaid. Wat er wel van over is: de twee plekken die nog
+hun eigen klassenselectie opbouwden gebruiken nu `checks/selectie.py` (het restant dat
+BO-20 aankondigde), en `mechanischeleidingen` is daar als rol bijgekomen.
+
+**Waarom het aantrekkelijk leek.** De vier uitvoervormen moeten aantoonbaar dezelfde
+meldingen wegschrijven. Dat de meldingen bij die run horen, en met dezelfde rundatum
+gebouwd zijn, stond nergens in een interface. `schrijf_uitvoer` had er zelfs een
+optionele parameter voor, met als enige reden dat de gebiedenlus de lijst niet twee
+keer wilde bouwen.
+
+**Waarom het niet doorgaat.** Bij het omzetten van de tests bleek dat vijf tests de
+meldinglijst met opzet los van de run aanleveren, en dat ze daar gelijk in hebben:
+
+- de stapelnummering moet onafhankelijk zijn van de volgorde van de lijst, dus voert
+  de test dezelfde meldingen omgekeerd in;
+- een melding die naar een niet-geregistreerde treffer wijst moet luid falen, dus
+  voert de test één zelfgemaakte melding in;
+- de afkapping van de verdachte-objectenlijst slaat pas aan bij acht objecten met
+  meldingen uit drie checks, en het meervoud in de slotzin bij precies één;
+- het rapport moet een melding zonder foutlocatie apart benoemen.
+
+Die toestanden zijn uit een echte dataset niet of alleen met veel moeite te bouwen.
+De `Meldingenstroom` maakt ze onbereikbaar, en dan verruil je een invariant die in de
+productiecode nooit geschonden werd -- de enige plek die het kon, gaf de lijst door
+die hij een regel eerder zelf gebouwd had -- voor testbaarheid die wel echt gebruikt
+wordt. Een escape hatch (`Meldingenstroom.van_meldingen(...)`) zou precies de
+ontkoppeling terugbrengen die het object moest opheffen, en dan is de winst nul.
+
+**Wat het wel zegt over de code.** De optionele `meldingen`-parameter van
+`schrijf_uitvoer` en `write_check_report` blijft een parameter die er alleen staat om
+dubbel rekenwerk te vermijden. Dat is een prijs die we bewust betalen; hij staat in de
+docstring van beide functies uitgelegd.
+
+**Wanneer dit heroverwogen hoort te worden.** Als er een schrijver bijkomt die zijn
+meldingen zelf ophaalt in plaats van ze aangereikt te krijgen. Dan is de invariant wel
+degelijk schendbaar, en weegt hij op tegen de testbaarheid.

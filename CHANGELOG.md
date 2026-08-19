@@ -91,6 +91,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- De laatste twee plekken in de uitvoerlaag die hun eigen klassenselectie opbouwden
+  (`uitvoer/synthese.py` en `uitvoer/gpkg.py`) gebruiken nu `checks/selectie.py`,
+  waarmee het restant uit BO-20 weg is. De rol `mechanischeleidingen` is daar
+  bijgekomen.
+
 - De klassenselecties van de checks staan op een plek, `checks/selectie.py`, in plaats
   van in vijf checkmodules met elk hun eigen cachesleutel. De namen volgen de
   GWSW-ontologie waar een klasse de rol dekt; `gwsw:Streng` bestaat niet, dus wat

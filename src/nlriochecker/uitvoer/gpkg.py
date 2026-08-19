@@ -29,7 +29,8 @@ from shapely.geometry import MultiPolygon
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import CheckRun, Severity
+from nlriochecker.checks import CheckContext, CheckRun, Severity
+from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer
 from nlriochecker.dataset import Conduit
 from nlriochecker.errors import PipelineError
@@ -364,13 +365,14 @@ def _mechanische_uris(run: CheckRun, config: CheckConfig) -> frozenset[str]:
 
     Ze doen niet mee aan de checks en horen dus niet tussen de strengen te staan,
     waar 'geen melding' ten onrechte als 'getoetst en in orde' leest.
+
+    De selectie komt uit `checks/selectie.py` en niet uit een eigen comprehension.
+    Deze laag heeft geen `CheckContext` van de run, dus hij wordt hier gemaakt over
+    de dataset van de run -- onder een studiegebied dus de kern plus de contextschil,
+    net als voorheen.
     """
-    return frozenset(
-        uri
-        for wortel in config.klassen.mechanisch
-        for uri in run.dataset.of_class(wortel)
-        if uri in run.dataset.conduits
-    )
+    context = CheckContext(dataset=run.dataset, config=config)
+    return frozenset(conduit.uri for conduit in mechanischeleidingen(context))
 
 
 def _schrijf_features(

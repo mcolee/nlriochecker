@@ -18,7 +18,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import CheckRun, Severity
+from nlriochecker.checks import CheckContext, CheckRun, Severity
+from nlriochecker.checks.selectie import vrijvervalrioolleidingen
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.melding import Melding
 from nlriochecker.uitvoer.tabel import table
@@ -103,17 +104,13 @@ def _richting(run: CheckRun, meldingen: list[Melding], config: CheckConfig) -> l
 
 
 def _bodemverloop(run: CheckRun, config: CheckConfig) -> tuple[int, int]:
-    """Telt de vrijvervalstrengen waarvan de bodem stijgt van begin naar eind."""
-    dataset = run.dataset
-    gezocht = {
-        uri
-        for wortel in config.klassen.vrijvervalleiding
-        for uri in dataset.of_class(wortel)
-        if uri in dataset.conduits
-    }
+    """Telt de vrijvervalstrengen waarvan de bodem stijgt van begin naar eind.
+
+    De selectie komt uit `checks/selectie.py`; de context wordt hier gemaakt over de
+    dataset van de run, want de uitvoerlaag heeft er geen.
+    """
     stijgend = meetbaar = 0
-    for uri in gezocht:
-        conduit = dataset.conduits[uri]
+    for conduit in vrijvervalrioolleidingen(CheckContext(dataset=run.dataset, config=config)):
         if conduit.bob_start is None or conduit.bob_end is None:
             continue
         meetbaar += 1

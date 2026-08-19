@@ -184,6 +184,17 @@ def infiltratieleidingen(context: CheckContext) -> list[Conduit]:
     return _verbindingen(context, "sel:infiltratieleidingen", context.config.klassen.infiltratie)
 
 
+def mechanischeleidingen(context: CheckContext) -> list[Conduit]:
+    """De leidingen van het mechanische stelsel: pers-, druk- en vacuumleiding.
+
+    Een *rol*: de ontologie kent de drie klassen los van elkaar. Deze selectie doet
+    niet mee aan de checks -- mechanisch riool valt buiten het checkregister -- maar
+    de GIS-uitvoer heeft haar nodig om die leidingen uit de strengenlaag te houden,
+    waar "geen melding" ten onrechte als "getoetst en in orde" zou lezen.
+    """
+    return _verbindingen(context, "sel:mechanischeleidingen", context.config.klassen.mechanisch)
+
+
 def oppervlaktewaterobjecten(context: CheckContext) -> list[Node | Conduit]:
     """Het oppervlaktewater uit de GWSW-dataset zelf: `gwsw:Oppervlaktewater`.
 
@@ -238,5 +249,6 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "bergbezinkleidingen": bergbezinkleidingen,
     "vuilwaterleidingen": vuilwaterleidingen,
     "infiltratieleidingen": infiltratieleidingen,
+    "mechanischeleidingen": mechanischeleidingen,
     "oppervlaktewaterobjecten": oppervlaktewaterobjecten,
 }
