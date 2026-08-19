@@ -20,7 +20,9 @@ import pandas as pd
 import pytest
 from shapely.geometry import box, mapping
 
+from nlriochecker.checkconfig import default_check_config_path
 from nlriochecker.errors import OpdrachtError, StudyAreaError
+from nlriochecker.externedata import ExternalDataError
 from nlriochecker.toetsrun import Toetsopdracht, Toetsuitslag, voer_toets_uit
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
@@ -31,6 +33,35 @@ from nlriochecker.uitvoer.bevindingen import (
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
 SHACL_DIR = Path(__file__).parent / "fixtures" / "shacl"
+EXT_DIR = GIS_DIR / "ext"
+
+# De namen van de miniatuurbronnen wijken af van de aangeleverde bestanden in
+# `data/gis`; een projectconfiguratie die ze aanwijst is precies de weg die een
+# gebruiker met eigen bestandsnamen ook gaat.
+BRONBESTANDEN = {
+    'bgt = "BGT.gpkg"': 'bgt = "bgt.gpkg"',
+    'bag_pand = "bag_pand_koekangerveld.gpkg"': 'bag_pand = "bag_pand.gpkg"',
+    'nwb_wegvakken = "nwb_wegvakken_koekangerveld.gpkg"': 'nwb_wegvakken = "nwb_wegvakken.gpkg"',
+    'studiegebied = "cbs_buurt_koekangerveld_studiegebied.gpkg"': (
+        'studiegebied = "studiegebied.gpkg"'
+    ),
+    'ahn_dtm = "ahn5_dtm_koekangerveld.tif"': 'ahn_dtm = "ahn.tif"',
+}
+
+
+def bronnenconfig(tmp_path: Path, tolerantie: float | None = None) -> Path:
+    """Schrijft een projectconfiguratie die naar de miniatuurbronnen wijst."""
+    tekst = default_check_config_path().read_text(encoding="utf-8")
+    for oud, nieuw in BRONBESTANDEN.items():
+        assert oud in tekst, oud
+        tekst = tekst.replace(oud, nieuw)
+    if tolerantie is not None:
+        tekst = tekst.replace(
+            "dekking_tolerantie_m = 300.0", f"dekking_tolerantie_m = {tolerantie}"
+        )
+    pad = tmp_path / "project.toml"
+    pad.write_text(tekst, encoding="utf-8")
+    return pad
 
 
 def toets(tmp_path: Path, bestand: str, **velden) -> Toetsuitslag:
@@ -270,3 +301,65 @@ def test_regels_beginnen_met_de_omvang_en_eindigen_met_de_bestanden(tmp_path: Pa
     assert regels[1].startswith("  Dataset ")
     assert regels[-1].startswith("Geschreven: ")
     assert any(regel.startswith("Totaal ") for regel in regels)
+
+
+@pytest.mark.skipif(
+    not (EXT_DIR / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+class TestExterneBronnen:
+    """Het pad achter `--bronnen`, dat tot nu toe door geen enkele test liep."""
+
+    def test_bronnen_worden_geladen_en_gemeld(self, tmp_path: Path) -> None:
+        """Met een bronmap draaien de EXT-checks, en de uitslag zegt wat er meedeed."""
+        uitslag = toets(
+            tmp_path,
+            "ext_scenario.ttl",
+            check_ids=("EXT-001",),
+            bronnen=EXT_DIR,
+            projectconfig=bronnenconfig(tmp_path),
+        )
+
+        assert uitslag.bronnen is not None
+        assert len(uitslag.bronnen.layers) == 6
+        assert uitslag.bronnen.raster is not None
+        assert uitslag.bronnen.missing == ()
+        assert any(
+            regel.startswith("  Externe bronnen: 6 lagen, hoogteraster, bereik ")
+            for regel in uitslag.regels()
+        )
+        assert not any("Geen externe bronnen geladen" in regel for regel in uitslag.regels())
+
+    def test_een_te_kleine_bron_is_een_harde_fout(self, tmp_path: Path) -> None:
+        """De dekkingspoort van BO-19: stilte is hier gevaarlijker dan een fout.
+
+        Met tolerantie 0 dekken de miniatuurbronnen hun eigen studiegebied net niet.
+        Dat moet het laden afbreken en niet leiden tot EXT-checks die niets vinden --
+        een te klein extract geeft anders een misleidend schone uitkomst.
+        """
+        with pytest.raises(ExternalDataError, match="dekken het bereik niet"):
+            toets(
+                tmp_path,
+                "ext_scenario.ttl",
+                check_ids=("EXT-001",),
+                bronnen=EXT_DIR,
+                projectconfig=bronnenconfig(tmp_path, tolerantie=0.0),
+            )
+
+    def test_de_dekkingspoort_gaat_vooraf_aan_het_laden(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Een bron die het bereik niet dekt hoort niet drie minuten laden af te wachten."""
+
+        def val(*args: object, **kwargs: object) -> None:
+            raise AssertionError("de dataset werd geladen voordat de bronnen getoetst waren")
+
+        monkeypatch.setattr("nlriochecker.toetsrun.laad_met_cache", val)
+        with pytest.raises(ExternalDataError):
+            toets(
+                tmp_path,
+                "ext_scenario.ttl",
+                check_ids=("EXT-001",),
+                bronnen=EXT_DIR,
+                projectconfig=bronnenconfig(tmp_path, tolerantie=0.0),
+            )
