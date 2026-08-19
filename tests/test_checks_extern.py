@@ -360,3 +360,31 @@ def test_ext001_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: Extern
     relaties = {finding.object_label: finding.details["waarde"] for finding in outcome.findings}
 
     assert relaties == {"1": "kruist", "4": "binnen", "P": "binnen", "Q": "binnen"}
+
+
+def test_ext003_wijst_het_geraakte_waterdeel_aan(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    outcome = uitkomst("EXT-003", config, bronnen)
+
+    verwijzingen = {
+        (finding.details["object2_uri"], finding.details["object2_label"])
+        for finding in outcome.findings
+    }
+
+    assert verwijzingen == {("bgt:waterdeel/water-1", "waterloop")}
+
+
+def test_ext002_registreert_geen_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
+    """De laag volgt EXT-003; kruisingen met een duiker horen er bewust buiten."""
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-002"])
+
+    assert len(run.treffers) == 0
+    assert run.findings
+
+
+def test_ext003_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:
+    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2"]

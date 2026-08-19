@@ -419,7 +419,14 @@ class _WatergangKruising(_ExterneCheck):
         return _strengen(context)
 
     def kruisingen(self, context: CheckContext):
-        """De strengen die een waterdeel raken, met het waterdeel erbij."""
+        """De strengen die een waterdeel raken, met het waterdeel erbij.
+
+        Levert `(conduit, geometrie, rij, laag, buffer)`. De geometrie is nodig om de
+        treffer voor de GIS-uitvoer te registreren; de detectie verandert er niet
+        door. Ook de `break` na het eerste gevonden waterdeel per streng blijft staan:
+        een streng die twee waterdelen kruist levert er een, en welke hangt van de
+        volgorde af. Dat is een bewust geaccepteerde beperking (zie de beslislog).
+        """
         laag = self.laag(context)
         if laag is None:
             return
@@ -428,7 +435,7 @@ class _WatergangKruising(_ExterneCheck):
             for geometrie, rij in laag.nabij(conduit.line, buffer):
                 if conduit.line.distance(geometrie) > buffer:
                     continue
-                yield conduit, rij, laag, buffer
+                yield conduit, geometrie, rij, laag, buffer
                 break
 
 
@@ -447,7 +454,7 @@ class KruisingMetWatergang(_WatergangKruising):
         Het register laat BGT als watergangbron toe; waterschapsdata is niet
         aangeleverd en valt in deze fase buiten scope.
         """
-        for conduit, rij, laag, buffer in self.kruisingen(context):
+        for conduit, _vorm, rij, laag, buffer in self.kruisingen(context):
             soort = rij.get("type") or "waterdeel"
             yield self.finding(
                 context,
@@ -482,10 +489,25 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
         dataset = context.dataset
         wortels = context.config.klassen.kruisingsleiding
 
-        for conduit, rij, _laag, buffer in self.kruisingen(context):
+        for conduit, vorm, rij, laag, buffer in self.kruisingen(context):
             if any(dataset.is_a(conduit.uri, wortel) for wortel in wortels):
                 continue
-            soort = rij.get("type") or "waterdeel"
+            soort = str(rij.get("type") or "waterdeel")
+            sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], rij, vorm)
+            if terugval:
+                context.treffers.meld_zonder_id(self.id, laag.source.name)
+            context.treffers.registreer(
+                Treffer(
+                    sleutel=sleutel,
+                    bron="bgt_water",
+                    label=soort,
+                    bronbestand=laag.source.name,
+                    geometrie=vorm,
+                    attributen=dict(rij),
+                ),
+                check_id=self.id,
+                object_uri=conduit.uri,
+            )
             yield self.finding(
                 context,
                 conduit.uri,
@@ -494,6 +516,8 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
                 f"{' of '.join(wortels) or 'kruisingsconstructie'}.",
                 watertype=soort,
                 buffer_m=buffer,
+                object2_uri=sleutel,
+                object2_label=soort,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -504,8 +528,13 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
                 *super().notes(context),
                 "Er zijn geen kruisingsconstructieklassen geconfigureerd "
                 "(`klassen.kruisingsleiding`); elke kruising telt daardoor mee.",
+                *_notitie_zonder_id(context, self.id),
             ]
-        return [*super().notes(context), f"Als kruisingsconstructie gelden: {', '.join(wortels)}."]
+        return [
+            *super().notes(context),
+            f"Als kruisingsconstructie gelden: {', '.join(wortels)}.",
+            *_notitie_zonder_id(context, self.id),
+        ]
 
 
 @register
