@@ -13,6 +13,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- Twee lagen in de GeoPackage met de externe objecten waarnaar de EXT-checks verwijzen:
+  `bouwwerken` (EXT-001) en `waterdelen_zonder_zinker` (EXT-003), elk met een eigen
+  QGIS-stijl. Ze worden uitsluitend gevuld vanuit de meldingen van die uitvoer, dus hun
+  inhoud is per constructie gelijk aan de testuitkomst -- ook per gebied.
+- EXT-001 en EXT-003 wijzen het geraakte externe object aan in `object2_uri` en
+  `object2_label` (`bgt:pand/...`, `bag:pand/...`, `bgt:bouwwerk/...`,
+  `bgt:waterdeel/...`, met `geo:<hash>` als terugval voor een bron zonder
+  identificatie). Achterwaarts verenigbaar binnen schemaversie 1.0; de conventies staan
+  in [docs/json-schema.md](docs/json-schema.md).
+- Een dekkingspoort op de externe bronnen: elke aangeleverde laag en het AHN-raster
+  moeten het bereik uit `bronnen.studiegebied` dekken, vectorlagen inclusief de grootste
+  EXT-zoekafstand. Een tekort boven `[bronnen] dekking_tolerantie_m` (standaard 0) is
+  een harde fout die beide omhullenden en het tekort per zijde noemt. Een te kleine bron
+  gaf tot nu toe stilte in plaats van bevindingen.
 - Rapportage per studiegebied-feature. Bevat het studiegebiedbestand meer dan een vlak,
   dan schrijft `toets` per gebied een submap met alle vier de uitvoervormen, plus een
   `totaal/` met de synthese en de unieke meldingen over alle gebieden. De meldingen van
@@ -24,6 +38,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   mapnamen niet mogen botsen, en voor GeoJSON een toets op het coordinaatstelsel: een
   legacy `crs`-member met EPSG:28992, of alle coordinaten binnen de RD-grenzen uit
   `[drempels]`.
+- Uitbreidingen in de Python-API rond de externe bronnen (0.x, dus zonder
+  deprecatietermijn): `load_external_data` kreeg een keyword-only `dekkingseis`,
+  `CheckContext` en `CheckRun` kregen het veld `treffers`, en
+  `_WatergangKruising.kruisingen()` levert vijf waarden in plaats van vier -- de
+  geometrie van het waterdeel is erbij gekomen. De eerste twee zijn additief.
 - Een gebied zonder GWSW-objecten stopt een run over meerdere gebieden niet meer, maar
   levert een eigen rapport met nul bevindingen en een expliciete melding -- in dat rapport
   en in de synthese. Bij een run op een enkel gebied blijft het een harde fout.

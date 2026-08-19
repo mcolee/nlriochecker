@@ -178,6 +178,18 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   in `cli.py`, schrijft naar stderr en zet het staplabel via `item_show_func` -- niet
   door `balk.label` te overschrijven, want dan echoot click in een niet-interactieve
   omgeving een regel per stap.
+- De GeoPackage draagt naast de rioleringslagen `bouwwerken` (EXT-001) en
+  `waterdelen_zonder_zinker` (EXT-003): de externe objecten waarnaar de meldingen van
+  díé uitvoer verwijzen, gejoind op het trefferregister (`checks/treffers.py`) via
+  `object2_uri`. De schrijver bevraagt zelf nooit een externe bron -- dan zouden laag en
+  uitslag uit elkaar kunnen lopen. Twee beperkingen erven mee en blijven staan: EXT-001
+  meldt alleen het sterkste bouwwerk, en de watergangcheck stopt na het eerste waterdeel
+  per streng. Zie BO-17 en BO-18.
+- Aangeleverde externe bronnen worden bij het laden getoetst op dekking van
+  `bronnen.studiegebied` (vectorlagen plus de grootste EXT-zoekafstand, het raster
+  zonder marge). Een tekort boven `[bronnen] dekking_tolerantie_m` (standaard 0) is een
+  harde fout: een te kleine bron geeft stilte in plaats van bevindingen. Ontbrekende
+  bronnen blijven toegestaan. Zie BO-19.
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.

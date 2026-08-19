@@ -825,3 +825,93 @@ overschrijft en er een map achterblijft die er compleet uitziet. Dat is stille c
 de bestaande botsingscontrole tussen twee gebiedsnamen zag hem niet, want de tweede naam
 is geen gebied. De constante staat in `studiegebied.py` en de uitvoerlaag leest hem daar,
 zodat de reservering en het gebruik niet uit elkaar kunnen lopen.
+
+### BO-17 De twee EXT-lagen volgen de meldingen, en erven hun beperkingen
+
+**Wat.** De GeoPackage-lagen `bouwwerken` (EXT-001) en `waterdelen_zonder_zinker`
+(EXT-003) worden uitsluitend gevuld door de meldingen van die uitvoer te joinen op het
+trefferregister van de run (`checks/treffers.py`). De schrijver bevraagt geen externe
+bron en doet geen ruimtelijke selectie.
+
+**Waarom.** Een tweede pad naar dezelfde vraag is een tweede antwoord. Zou
+`uitvoer/gpkg.py` zelf de BGT bevragen, dan kan de laag panden tonen waar geen melding
+over gaat, of andersom -- en dan is niet meer te zeggen welk van beide de uitslag is.
+Nu is de laag per constructie de verzameling unieke `object2_uri`'s van die check, en
+de kerntest in `tests/test_uitvoer_gpkg.py` legt precies dat vast. Bij rapportage per
+gebied volgt het juiste gedrag er gratis uit: per gebied de treffers van dát gebied.
+
+**Twee beperkingen die bewust meekomen.** EXT-001 meldt per streng of put alleen het
+sterkste bouwwerk (`_sterkste`); een object dat twee panden raakt levert dus één pand
+in de laag. `_WatergangKruising.kruisingen()` breekt af na het eerste gevonden
+waterdeel per streng; een streng die er twee kruist levert er één, en welke hangt van
+de volgorde af. Beide zijn niet gerepareerd: dat zou meldingaantallen, rapporten en
+trendvergelijkingen wijzigen, en dat is een eigen beslissing met een eigen ronde.
+
+**De verruiming als benoemde optie.** Alle geraakte objecten melden in plaats van
+alleen het sterkste (en het eerste) is de voor de hand liggende volgende stap. Hij
+staat niet gepland; wie hem oppakt, moet weten dat de meldingaantallen erdoor
+veranderen en dat elke trendvergelijking over die grens heen breekt.
+
+### BO-18 De sleutel van een extern object, met een geometriehash als terugval
+
+**Wat.** `object2_uri` van een EXT-melding is `bgt:pand/<id>`, `bag:pand/<id>`,
+`bgt:bouwwerk/<id>` of `bgt:waterdeel/<id>`. De `<id>` komt uit de eerste gevulde
+kolom van `lokaal_id`, `identificatie`, `id` -- gemeten op `data/gis` én op de
+fixtures: de BGT-lagen dragen `lokaal_id`, de BAG-laag `identificatie`, en beide
+daarnaast een `id`. Draagt een bron geen van drieën, dan wordt de sleutel
+`geo:<eerste 12 hex van sha256 over de WKB>`, met een notitie in de checkuitkomst.
+
+**Waarom geen harde fout bij een ontbrekend ID.** Externe data is context, geen poort
+(BC-1). Een bron zonder identificatie is nog steeds bruikbaar; alleen is de sleutel
+dan gevoelig voor een wijziging in de geometrie, en dat hoort de lezer te weten.
+Vandaar de notitie in plaats van een uitzondering.
+
+**Waarom de geometrie en niet de rij-index.** Een index is niet stabiel over exports
+en zegt niets als de bron opnieuw getrokken wordt. De hash over de WKB is stabiel
+zolang de geometrie dat is, en ontdubbelt twee bestanden met hetzelfde object -- wat
+hier precies de bedoeling is.
+
+**Waarom de geometrie niet in de melding zit.** Een polygoon in `Finding.details` zou
+in de CSV en de JSON als WKB terechtkomen. De geometrie gaat daarom via het
+trefferregister naar de GeoPackage; de JSON draagt alleen de sleutel en het label.
+
+### BO-19 De dekkingspoort meet tegen het bereik van de bronnen
+
+**Wat.** Bij het laden van de externe bronnen wordt elke aangeleverde laag, plus het
+AHN-raster, getoetst op dekking van de omhullende van `bronnen.studiegebied`. De
+vectorlagen krijgen daar de grootste EXT-zoekafstand bij (`ext_zoekafstand_max_m`, in
+de standaardconfig 10 m); het raster niet, want bemonsteren is puntsgewijs. Een tekort
+groter dan `[bronnen] dekking_tolerantie_m` (standaard 0) is een `ExternalDataError`
+die per falende bron beide omhullenden en het tekort per zijde noemt. Geen
+forceer-vlag.
+
+**Waarom een harde fout, terwijl externe data "context, geen poort" is.** Die
+filosofie (BC-1, BC-2) gaat over *ontbrekende* data: een check die zijn bron mist,
+meldt dat en geeft geen uitslag. Deze poort gaat over *aangeleverde maar te kleine*
+data. Daar is de faalwijze omgekeerd: de check draait, vindt niets, en dat leest als
+"geen probleem" terwijl de bron er domweg niet was. Stil falen is hier het gevaar, en
+een waarschuwing in een rapport dat verder schoon oogt is niet genoeg.
+
+**Waarom `bronnen.studiegebied` als referentie en niet het studiegebied van de run.**
+Het masterdocument stelde de unie van de studiegebied-features voor. Dat de bronnen
+maar een deel van de GWSW-dataset dekken is in dit project echter normaal en al
+eerlijk afgevangen: objecten buiten het bereik krijgen de status *buiten studiegebied*
+en worden geteld (BC-2). Wat overblijft is een laag die kleiner is dan het gebied
+waarvoor je hem geldig verklaart, en dat gebied is precies `bronnen.studiegebied`.
+Bijkomend voordeel: de poort blijft binnen `load_external_data`, zonder nieuwe
+parameter en zonder volgorde-afspraak in de CLI die iemand later kan omdraaien.
+Nadeel dat je moet kennen: dekt het bereik zelf maar de helft van je studiegebied, dan
+zegt deze poort daar niets over -- de per-objectnotities doen dat.
+
+**Waarom een instelbare tolerantie.** De omhullende van een laag is die van zijn
+*features*. Een dunne laag met een lege rand is niet te onderscheiden van een
+afgeknipt extract. Gemeten op de eigen bronnen van dit project: het AHN-raster komt
+0,3 m tekort (afrondingsruis van de uitsnede) en `bgt_bouwwerk` 276 m (52 objecten die
+aan de oostkant ophouden). Elke drempel daartussen is een keuze en geen meting, en die
+keuze hoort in de projectconfiguratie. De standaard is 0, dus streng; voor `data/gis`
+is ongeveer 300 m nodig.
+
+**Wat deze poort niet kan.** Bbox-dekking is noodzakelijk maar niet voldoende: een gat
+midden in het extract valt er niet mee op. Dat staat in de docstring, en er is een
+test die het vastlegt (`test_gat_middenin_slaagt`) zodat de belofte niet stilletjes
+groter wordt dan de meting.

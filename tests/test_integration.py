@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import sqlite3
 import time
 from datetime import date
 from pathlib import Path
@@ -388,3 +389,44 @@ def _helften(vlak):
         vlak.intersection(box(x_min, y_min, midden, y_max)),
         vlak.intersection(box(midden, y_min, x_max, y_max)),
     )
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DE_WOLDEN.exists() and AHN_TIF.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden-OroX of de externe bronnen staan niet in data/",
+)
+def test_ext_lagen_op_de_wolden(tmp_path: Path) -> None:
+    """De lagen in de GeoPackage zijn exact de treffers uit de meldingen.
+
+    Op de echte BGT- en BAG-bronnen, met het studiegebied Koekangerveld als bereik.
+    De dekkingspoort krijgt hier geen eis mee: deze extracten komen tot 276 m tekort
+    doordat hun randen leeg zijn, en dat is een projectkeuze (`dekking_tolerantie_m`)
+    en geen eigenschap van deze test.
+    """
+    from nlriochecker.uitvoer.gpkg import schrijf_geopackage
+    from nlriochecker.uitvoer.melding import bouw_meldingen
+
+    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    context = CheckContext(
+        dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
+    )
+    run = run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
+    meldingen = bouw_meldingen(run, RUNDATUM)
+
+    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+
+    verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    try:
+        geschreven = {
+            laag: {rij[0] for rij in verbinding.execute(f'select id from "{laag}"')}
+            for laag in ("bouwwerken", "waterdelen_zonder_zinker")
+        }
+    finally:
+        verbinding.close()
+
+    for laag, check_id in (("bouwwerken", "EXT-001"), ("waterdelen_zonder_zinker", "EXT-003")):
+        verwacht = {m.object2_uri for m in meldingen if m.check_id == check_id and m.object2_uri}
+        assert geschreven[laag] == verwacht
+        assert all(sleutel.startswith(("bgt:", "bag:")) for sleutel in geschreven[laag])
+    assert geschreven["bouwwerken"]

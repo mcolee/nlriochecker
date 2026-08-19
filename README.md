@@ -137,11 +137,42 @@ JSON-bestand is een geversioneerd contract voor machinale verwerking; zie
 [docs/json-schema.md](docs/json-schema.md). `--output` staat standaard op `uitvoer/`.
 Invoerbestanden worden nooit overschreven.
 
+De GeoPackage bevat naast de riolering twee lagen met de externe objecten waarnaar de
+EXT-checks verwijzen: `bouwwerken` (elk BGT-pand, BAG-pand of overig bouwwerk waarover
+EXT-001 meldt, rood omlijnd) en `waterdelen_zonder_zinker` (elk BGT-waterdeel waarover
+EXT-003 meldt, blauw omlijnd). Beide lagen worden uitsluitend gevuld vanuit de
+meldingen van die uitvoer: wat erin staat is exact wat de check gemeld heeft, niet meer
+en niet minder. Kruisingen mét geregistreerde zinker of duiker (EXT-002) blijven er dus
+buiten, en bij rapportage per gebied bevat elk gebied alleen zijn eigen treffers. De
+lagen bestaan altijd, ook leeg.
+
 Alle vier de uitvoervormen komen uit dezelfde meldingenstroom, dus ze kunnen niet uit
 elkaar lopen. Elk geschreven bestand noemt waarmee het gemaakt is: de Markdown-rapporten
 in een regel onder de titel, de CSV's in de kolom `Gereedschap`, de GeoPackage in het
 veld `gereedschap` van de tabel `gwsw_run`, de JSON in het enveloppeveld `gereedschap`.
 Een rapport is daarmee altijd te herleiden tot de versie die het opleverde.
+
+### Externe bronnen en hun dekking
+
+`--bronnen` wijst de map met BGT, BAG, NWB en het AHN-raster aan. Welke bestanden en
+laagnamen dat zijn staat in `[bronnen]` van de projectconfiguratie, samen met
+`studiegebied`: de polygoon die het gebied afbakent waarvoor je die bronnen geldig
+verklaart. Objecten daarbuiten krijgen geen EXT-uitslag maar de status *buiten
+studiegebied*, en dat wordt geteld in het rapport.
+
+Bij het laden wordt elke aangeleverde bron getoetst op dekking van dat bereik, voordat
+er ook maar een check draait. Een laag die kleiner is dan het gebied waarvoor hij geldt
+levert namelijk geen fout op maar stilte: de check draait, vindt niets, en dat leest
+als "geen probleem". Een tekort is daarom een harde fout die per bron beide omhullenden
+en het tekort per zijde noemt. De vectorlagen moeten het bereik plus de grootste
+EXT-zoekafstand dekken; het raster alleen het bereik zelf, want bemonsteren is
+puntsgewijs.
+
+Wat die toets niet kan: een gat midden in een extract valt er niet mee op, en een
+tekort op een dunne laag betekent "hier staan geen features" en niet per se "extract
+afgeknipt". Daarvoor is `[bronnen] dekking_tolerantie_m`, standaard `0.0`. Voor de
+bronnen in `data/gis` is ongeveer `300` nodig: `bgt_bouwwerk` telt 52 objecten die aan
+de oostkant 276 m voor de rand ophouden, wat aan die bron niets mankeert.
 
 ### Voortgang
 

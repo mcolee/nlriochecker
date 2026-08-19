@@ -126,6 +126,33 @@ het eerste voorkomen bij oplopende gebiedsnaam. De aantallen per gebied staan in
 De geometrieen van de gebieden gaan niet mee in de JSON; die staan in het
 studiegebiedbestand dat de run meekreeg.
 
+### Over `object2_uri` en `object2_label`
+
+De meeste checks laten deze twee leeg. Ze zijn gevuld bij een melding die twee objecten
+tegen elkaar afzet: de TOP-checks (twee GWSW-objecten, dus twee dataset-URI's) en sinds
+deze versie EXT-001 en EXT-003, die een extern object aanwijzen. Dat is een
+achterwaarts verenigbare toevoeging: de velden bestonden al.
+
+De URI's van externe objecten volgen een vaste conventie:
+
+| Voorvoegsel | Bron | `<id>` uit |
+|---|---|---|
+| `bgt:pand/<id>` | BGT-pand | `lokaal_id` |
+| `bgt:bouwwerk/<id>` | overig BGT-bouwwerk | `lokaal_id` |
+| `bgt:waterdeel/<id>` | BGT-waterdeel | `lokaal_id` |
+| `bag:pand/<id>` | BAG-pand | `identificatie` |
+| `geo:<12 hex>` | een bron zonder identificatie | sha256 over de WKB |
+
+De zoekvolgorde voor `<id>` is `lokaal_id`, `identificatie`, `id`. Draagt de bron geen
+van drieen, dan valt de sleutel terug op `geo:` plus de eerste twaalf hextekens van de
+sha256 over de WKB van de geometrie; de checkuitkomst meldt dat in haar toelichting.
+Zo'n sleutel is stabiel over runs op hetzelfde bestand, maar verandert zodra de
+geometrie in de bron wijzigt.
+
+De geometrie van het externe object zit **niet** in de JSON -- die zou als WKB in het
+contract belanden. Wie hem wil, vindt het object in de GeoPackage: de lagen
+`bouwwerken` en `waterdelen_zonder_zinker` dragen dezelfde sleutel in hun kolom `id`.
+
 ### Over `typering_betrouwbaar`
 
 Elke melding draagt `typering_betrouwbaar`. Dat veld is onwaar als de SHACL-nulmeting
