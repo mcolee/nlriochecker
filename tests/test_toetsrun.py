@@ -82,6 +82,9 @@ def test_met_shacl_wordt_de_typeringspoort_toegepast(tmp_path: Path) -> None:
     assert uitslag.typeringspoort_toegepast is True
     assert uitslag.meetbereik.volledig is True
     assert uitslag.meetbereik.markering() is None
+    # Een volledige meting krijgt geen markering en dus geen meetregel: stilte is
+    # hier de juiste uitkomst, en die hoort net zo goed vastgelegd te zijn.
+    assert not any("typeringspoort" in regel for regel in uitslag.regels())
 
 
 def test_cfk_deelset_markeert_de_uitslag(tmp_path: Path) -> None:
@@ -158,6 +161,13 @@ def test_analyseset_splitst_kern_en_schil(tmp_path: Path) -> None:
     assert analyseset.kern
     assert analyseset.schil
     assert analyseset.volledig_aantal >= len(analyseset.alles)
+    # De omvang van elk deel hoort ook op het scherm; wat een check niet gezien
+    # heeft mag niet als "alles gecontroleerd" lezen.
+    assert any(
+        f"Analyseset: {len(analyseset.kern)} objecten in de kern, "
+        f"{len(analyseset.schil)} in de contextschil" in regel
+        for regel in uitslag.regels()
+    )
 
 
 def test_afwijkende_codering_wordt_gemeld(tmp_path: Path) -> None:
@@ -189,6 +199,11 @@ def test_meerdere_gebieden_leveren_een_run_per_gebied(tmp_path: Path) -> None:
     assert uitslag.studiegebieden is not None
     assert len(uitslag.uitvoer.per_gebied) == 2
     assert uitslag.uitvoer.synthese is not None
+    # Vanaf twee gebieden krijgt elk gebied een regel en geen blok per check; bij
+    # tachtig buurten zou dat laatste duizenden regels opleveren.
+    gebiedsregels = [regel for regel in uitslag.regels() if regel.startswith("  Gebied ")]
+    assert len(gebiedsregels) == 2
+    assert all("in de kern" in regel for regel in gebiedsregels)
 
 
 def test_gebiedskeuze_beperkt_de_run(tmp_path: Path) -> None:
@@ -230,6 +245,7 @@ def test_geopackage_kan_aan(tmp_path: Path) -> None:
 
     geschreven = uitslag.uitvoer.per_gebied[""].geopackage
     assert geschreven is not None and geschreven.exists()
+    assert any(regel == f"Geschreven: {geschreven}" for regel in uitslag.regels())
 
 
 def test_de_csv_en_de_uitslag_tellen_hetzelfde(tmp_path: Path) -> None:

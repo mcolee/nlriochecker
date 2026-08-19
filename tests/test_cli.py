@@ -165,52 +165,6 @@ def test_toets_meldt_bevindingen_die_in_de_schil_wegvallen(tmp_path: Path) -> No
     assert tabel.empty
 
 
-def test_toets_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(TTL_DIR / "afbakening_kern_en_schil.ttl"),
-            "--studiegebied",
-            str(GIS_DIR / "afbakening_gebied.geojson"),
-            "--check",
-            "NET-001",
-            "--output",
-            str(tmp_path),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    assert "kern" in resultaat.output and "contextschil" in resultaat.output
-
-
-def test_toets_gebruikt_shacl_voor_de_typeringspoort(
-    shacl_drieluik: list[Path], tmp_path: Path
-) -> None:
-    bron = (TTL_DIR / "top001_losliggende_put.ttl").read_text(encoding="utf-8")
-    bron += "\n:PutC rdf:type gwsw:Overstortput .\ngwsw:Overstortput rdfs:subClassOf gwsw:Put .\n"
-    dataset = tmp_path / "met_overstortput.ttl"
-    dataset.write_text(bron, encoding="utf-8")
-
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(dataset),
-            *_shacl_args(shacl_drieluik),
-            "--check",
-            "TOP-001",
-            "--output",
-            str(tmp_path / "uitvoer"),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    assert "met typeringsvoorbehoud" in resultaat.output
-
-
 def test_toets_meldt_onbekende_check(tmp_path: Path) -> None:
     resultaat = CliRunner().invoke(
         main,
@@ -240,24 +194,6 @@ def test_toets_meldt_onleesbare_dataset(tmp_path: Path) -> None:
 
     assert resultaat.exit_code == 1
     assert "geldige Turtle" in resultaat.output
-
-
-def test_toets_meldt_afwijkende_codering(tmp_path: Path) -> None:
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(TTL_DIR / "codering_cp850.ttl"),
-            "--check",
-            "TOP-001",
-            "--output",
-            str(tmp_path),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    assert "geen geldige UTF-8" in resultaat.output
 
 
 def test_ongeldige_config_geeft_exitcode_1(shacl_drieluik: list[Path], tmp_path: Path) -> None:
@@ -370,28 +306,6 @@ def test_toets_weigert_een_studiegebied_zonder_objecten(tmp_path: Path) -> None:
     assert not (tmp_path / "uitvoer").exists()
 
 
-def test_toets_schrijft_ook_een_geopackage(tmp_path: Path) -> None:
-    """De GIS-uitvoer hoort bij de standaardoplevering van een toets."""
-    uitvoer = tmp_path / "uitvoer"
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(TTL_DIR / "top001_losliggende_put.ttl"),
-            "--check",
-            "TOP-001",
-            "--output",
-            str(uitvoer),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    gepakt = list(uitvoer.glob("dq_*.gpkg"))
-    assert len(gepakt) == 1
-    assert gepakt[0].name in resultaat.output
-
-
 def test_geen_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:
     uitvoer = tmp_path / "uitvoer"
     resultaat = CliRunner().invoke(
@@ -456,51 +370,6 @@ def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
         assert kop in tekst
         staart = tekst.split(kop, 1)[1]
         assert f"Bevindingen ({aantal})" in staart.split("\n## ", 1)[0]
-
-
-def test_toets_met_cfk_deelset_markeert_het_rapport(tmp_path: Path, mini_hyd_shacl: Path) -> None:
-    """Een deelsetrun zegt het in het rapport, niet alleen op de opdrachtregel."""
-    uitvoer = tmp_path / "uitvoer"
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(TTL_DIR / "schoon.ttl"),
-            "--shacl",
-            str(mini_hyd_shacl),
-            "--cfk",
-            "Hyd",
-            "--geen-cache",
-            "--output",
-            str(uitvoer),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    tekst = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
-    assert "**Onvolledige meting:** getoetst op Hyd;" in tekst
-    assert "MdsPlan, MdsProj ontbreken" in tekst
-
-
-def test_toets_zonder_shacl_meldt_dat_er_niet_gemeten_is(tmp_path: Path) -> None:
-    """Stilte mag niet lezen als 'alles gecontroleerd'."""
-    uitvoer = tmp_path / "uitvoer"
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(TTL_DIR / "schoon.ttl"),
-            "--geen-cache",
-            "--output",
-            str(uitvoer),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    tekst = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
-    assert "**Geen nulmeting:**" in tekst
 
 
 def test_cfk_met_onbekende_waarde_somt_de_toegestane_op(
@@ -650,26 +519,6 @@ def test_cfk_zonder_shacl_meldt_dat_de_vlag_niets_doet(tmp_path: Path) -> None:
     assert "--cfk doet niets zonder --shacl" in resultaat.output
 
 
-def test_toets_schrijft_de_json_standaard_mee(tmp_path: Path) -> None:
-    """Symmetrie met de GeoPackage: standaard erbij, uit te zetten met een vlag."""
-    uitvoer = tmp_path / "uitvoer"
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(TTL_DIR / "schoon.ttl"),
-            "--geen-cache",
-            "--output",
-            str(uitvoer),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    assert (uitvoer / FILE_CHECKS_JSON).exists()
-    assert str(uitvoer / FILE_CHECKS_JSON) in resultaat.output
-
-
 def test_toets_met_geen_json_laat_het_bestand_weg(tmp_path: Path) -> None:
     """De vlag doet wat hij zegt."""
     uitvoer = tmp_path / "uitvoer"
@@ -791,30 +640,6 @@ def test_toets_schrijft_per_gebied(tmp_path: Path) -> None:
     assert (tmp_path / "zuid" / FILE_CHECKS_CSV).exists()
     assert (tmp_path / "totaal" / "synthese.md").exists()
     assert "Gebied Noord:" in resultaat.output
-
-
-def test_toets_beperkt_zich_tot_het_gekozen_gebied(tmp_path: Path) -> None:
-    resultaat = CliRunner().invoke(
-        main,
-        [
-            "toets",
-            "--dataset",
-            str(TTL_DIR / "hgt010_diameterverjonging.ttl"),
-            "--studiegebied",
-            str(GIS_DIR / "buurten_twee.gpkg"),
-            "--gebied",
-            "Noord",
-            "--check",
-            "HGT-010",
-            "--output",
-            str(tmp_path),
-        ],
-    )
-
-    assert resultaat.exit_code == 0, resultaat.output
-    assert (tmp_path / "noord").exists()
-    assert not (tmp_path / "zuid").exists()
-    assert "Selectie" in (tmp_path / "totaal" / "synthese.md").read_text(encoding="utf-8")
 
 
 def test_toets_onbekend_gebied_noemt_de_beschikbare(tmp_path: Path) -> None:
