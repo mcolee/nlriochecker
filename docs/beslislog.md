@@ -1055,3 +1055,35 @@ daarom de hele stdout vergeleken: 95 regels, identiek op de gemeten laadtijd na 
 tegen 2,5 seconden), en `bevindingen.csv` byte-identiek. De regeldekking is gemeten
 op de staat vóór en na: `cli.py` had 18 ongedekte statements, en elke ongedekte regel
 erna heeft een voorganger.
+
+### BO-22 De GeoPackage-lagen krijgen geen gezamenlijke declaratie
+
+**Wat.** Een architectuurreview stelde voor om elke laag van de GeoPackage als een
+`Laagdefinitie` te beschrijven -- naam, geometriesoort, kolommen, omschrijving,
+stijl, rijenbouwer -- en `schrijf_geopackage` die lijst te laten aflopen. Dat gaat
+niet door. Wat er wel gebeurd is: het fase-totaal van de voortgang volgt nu uit een
+rij staplabels in plaats van uit een met de hand geteld getal.
+
+**Waarom niet.** De aanleiding was echt: een laag toevoegen raakt zes plaatsen, en de
+laatste uitbreiding kostte 196 regels. Maar de zes featurelagen zijn niet
+gelijkvormig. `putten` en `strengen` delen hun kolommen en lopen al door een
+gezamenlijke lus. `mechanisch_riool`, `meldinglocaties`, `bouwwerken` en
+`waterdelen_zonder_zinker` hebben elk een eigen schrijver met eigen ingrediënten: de
+een heeft de verzameling objecten binnen het gebied nodig, de ander de meldingen per
+object, de derde het trefferregister. Ze onder één declaratie brengen vraagt om een
+rijenbouwer per laag met een eigen signatuur, en dan staat de complexiteit in een
+tabel met lambda's in plaats van in zes functies. De deletion test valt negatief uit:
+haal de declaratie weg en er verdwijnt niets, het verhuist alleen terug.
+
+**Wat er wel fout was.** `start_fase("GeoPackage", 10)` was een getal dat met de hand
+geteld werd over drie functies heen (twee in de featurelus, twee losse lagen, twee
+trefferlagen, vier attribuuttabellen en stijlen). Niets hield het gelijk aan het
+aantal `stap()`-aanroepen. Liep het uit de pas, dan telde de balk over of stopte hij
+te vroeg -- geen verkeerde uitslag, wel een verkeerd beeld van wat er gebeurt tijdens
+de duurste schrijffase. Het totaal is nu `len(GEOPACKAGE_STAPPEN)`, en een test
+toetst dat de gezette labels precies die rij zijn.
+
+**Wanneer dit heroverwogen hoort te worden.** Als er een derde trefferlaag bijkomt --
+`bouwwerken` en `waterdelen_zonder_zinker` delen wél hun vorm, want ze komen allebei
+uit het trefferregister via `_vul_trefferlaag`. Twee is krap voor een seam; drie
+maakt het een echte. Voor die twee alleen is de bestaande gedeelde functie genoeg.

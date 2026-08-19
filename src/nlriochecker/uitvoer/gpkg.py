@@ -78,6 +78,25 @@ RD_WKT = (
 )
 
 
+# De stappen van de GeoPackage-fase, in de volgorde waarin ze gezet worden. Het
+# fase-totaal was een met de hand geteld getal dat over drie functies verspreid
+# stond; liep het uit de pas met de `stap()`-aanroepen, dan telde de balk over of
+# stopte hij te vroeg. `tests/test_uitvoer_gpkg.py` toetst dat de gezette labels
+# precies deze rij zijn.
+GEOPACKAGE_STAPPEN = (
+    "putten",
+    "strengen",
+    "mechanisch_riool",
+    "meldinglocaties",
+    "bouwwerken",
+    "waterdelen_zonder_zinker",
+    "meldingen",
+    "overzicht_checks",
+    "gwsw_run",
+    "layer_styles",
+)
+
+
 @dataclass(frozen=True)
 class _Kolom:
     """Een kolom van een laag: naam en SQLite-type."""
@@ -121,11 +140,10 @@ def schrijf_geopackage(
     doel.unlink(missing_ok=True)
 
     binnen = run.objecten_binnen()
-    # Vier featurelagen, drie attribuuttabellen en de stijltabel; elk een stap.
     # `connect` staat binnen de try: faalde hij ervoor, dan werd `einde_fase` nooit
     # geroepen en kreeg de gebruiker na de foutmelding een terminal zonder cursor
     # terug -- die zet click pas bij het afsluiten van de balk weer aan.
-    voortgang.start_fase("GeoPackage", 10)
+    voortgang.start_fase("GeoPackage", len(GEOPACKAGE_STAPPEN))
     verbinding: sqlite3.Connection | None = None
     try:
         verbinding = sqlite3.connect(doel)

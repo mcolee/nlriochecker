@@ -148,6 +148,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- Het fase-totaal van de GeoPackage-voortgang werd met de hand geteld en kon uit de
+  pas lopen met het aantal gezette stappen. Het volgt nu uit dezelfde rij staplabels.
+
 - Een streng met een lijngeometrie van precies een coordinaat brak het inlezen van de
   hele export af. GEOS gooit daar zijn eigen fout, en die erft niet van `ValueError`,
   dus vloog hij ongevangen door de GML-parser heen. Het object wordt nu als onleesbaar

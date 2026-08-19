@@ -25,7 +25,7 @@ from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import _lees_geopackage, load_study_area
-from nlriochecker.uitvoer.gpkg import RD_NEW, schrijf_geopackage
+from nlriochecker.uitvoer.gpkg import GEOPACKAGE_STAPPEN, RD_NEW, schrijf_geopackage
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -765,3 +765,40 @@ def test_melding_zonder_geregistreerde_treffer_faalt_luid(tmp_path: Path) -> Non
 
     with pytest.raises(PipelineError, match="trefferregister"):
         schrijf_geopackage(run, [melding], tmp_path, RUNDATUM)
+
+
+def test_de_voortgangsstappen_zijn_precies_de_vastgelegde_rij(tmp_path: Path) -> None:
+    """Het fase-totaal en de gezette stappen mogen niet uit elkaar lopen.
+
+    Het totaal was een met de hand geteld getal dat over drie functies verspreid
+    stond. Telde iemand een laag erbij zonder het getal te verhogen, dan liep de balk
+    over; verwijderde iemand er een, dan stopte hij te vroeg. Nu volgt het totaal uit
+    dezelfde rij als de labels, en deze test bewaakt dat de rij klopt met wat er
+    daadwerkelijk gezet wordt.
+    """
+    opnemer = _Stapopnemer()
+    run = _run("top001_losliggende_put.ttl", "TOP-001")
+    schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM, voortgang=opnemer)
+
+    assert opnemer.totaal == len(GEOPACKAGE_STAPPEN)
+    assert tuple(opnemer.labels) == GEOPACKAGE_STAPPEN
+
+
+class _Stapopnemer:
+    """Legt het fase-totaal en de labels van de gezette stappen vast."""
+
+    def __init__(self) -> None:
+        self.totaal: int | None = None
+        self.labels: list[str] = []
+
+    def start_fase(self, naam: str, totaal: int | None) -> None:
+        """Onthoudt het aangekondigde totaal."""
+        self.totaal = totaal
+
+    def stap(self, n: int = 1, label: str | None = None) -> None:
+        """Onthoudt het label van deze stap."""
+        if label is not None:
+            self.labels.append(label)
+
+    def einde_fase(self) -> None:
+        """Doet niets; het einde zegt hier niets."""
