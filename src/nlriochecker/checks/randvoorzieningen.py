@@ -1,7 +1,8 @@
 """RVZ-checks: bergbezinkvoorzieningen, overstorten en drempels.
 
-Hoe overstorten in een export verschijnen ligt niet vast; het checkregister noemt
-dat expliciet als open punt. Empirisch op de De Wolden-export (zie
+Hoe overstorten in een export verschijnen ligt niet vast; het checkregister noemde
+dat als open punt 6, inmiddels afgehandeld op grond van wat hieronder staat.
+Empirisch op de De Wolden-export (zie
 docs/beslislog.md): overstorten staan er als `Overstortput` met een
 `Overstortleiding` eraan. Losse `Overstortdrempel`-onderdelen met `Drempelniveau`
 en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel

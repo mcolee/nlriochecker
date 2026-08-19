@@ -100,7 +100,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   een verwijzing; de nummering is ongemoeid gelaten, omdat `checks.toml` en twee modules
   naar punt 6 en punt 8 bij nummer verwijzen. De punten 2 (drempelwaarden), 3 (ADM-003 als
   regex) en 6 (hoe overstorten in de export verschijnen) staan als afgehandeld gemarkeerd,
-  elk met de plek waar de afhandeling te controleren is.
+  elk met de plek waar de afhandeling te controleren is. Wat er onder punt 6 nog wel
+  open stond -- dat `Overnamepunt` en een klasse voor het IT-stelsel niet in de
+  GWSW-ontologie bestaan en de engine ze zelf invult -- is issue #11 geworden; de twee
+  verwijzingen in `checks.toml` wijzen daarheen in plaats van naar open punt 6.
 - `bgt_waterlagen` bevat alleen nog `waterdeel`; `ondersteunendwaterdeel` valt buiten
   scope. Dat is de oever en niet het water zelf, en een streng die een slootkant raakt
   kruist geen watergang. Op De Wolden gaan EXT-002 en EXT-003 daarmee van 993 naar 859

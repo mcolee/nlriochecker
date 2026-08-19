@@ -17,7 +17,7 @@ streng = ["Leiding"]
 # tegen de export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
 mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. 'Overnamepunt' bestaat
-# niet als klasse in de GWSW-ontologie; dat is open punt 6 uit het checkregister.
+# niet als klasse in de GWSW-ontologie; zie issue #11.
 # Pompunit staat erbij omdat een vrijvervalstreng die op een drukrioleringspomp
 # eindigt daar het mechanische stelsel in gaat; dat is het overnamepunt waar het
 # register over spreekt. Zonder deze regel geldt heel de drukriolering van De
@@ -38,7 +38,7 @@ lozings_eindpunt = [
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]
 hemelwater = ["Hemelwaterriool"]
 # De ontologie kent geen klasse "IT-stelsel"; NET-007 leest een deelstelsel met
-# infiltratieleidingen als IT-stelsel. Zie open punt 6 van het checkregister.
+# infiltratieleidingen als IT-stelsel. Zie issue #11.
 infiltratie = ["Infiltratieriool"]
 drempel = ["Overstortdrempel"]
 
