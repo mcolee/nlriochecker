@@ -554,10 +554,10 @@ de gevaarlijkste variant, want hij geeft vertrouwen dat hij niet verdient).
 
 ### BO-6 Twee beveiligingsmeldingen die blijven staan
 
-**Wat.** Bandit meldt elf punten op `src/`. Ze blijven alle elf staan, met deze
+**Wat.** Bandit meldt twaalf punten op `src/`. Ze blijven alle twaalf staan, met deze
 onderbouwing; `pip-audit` is schoon.
 
-**B608, acht keer: SQL uit een f-string.** In `studiegebied.py` en `uitvoer/gpkg.py`
+**B608, negen keer: SQL uit een f-string.** In `studiegebied.py` en `uitvoer/gpkg.py`
 worden tabel- en kolomnamen geinterpoleerd, want SQLite laat identifiers niet als
 parameter toe. Alle *waarden* gaan wel als parameter mee, en de identifiers gaan door
 `_escape()`, dat aanhalingstekens verdubbelt -- de manier die SQLite daarvoor kent. De
