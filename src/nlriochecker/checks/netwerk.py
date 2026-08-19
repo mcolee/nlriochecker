@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import networkx as nx
 
@@ -17,7 +17,7 @@ from nlriochecker.checks.base import (
 )
 from nlriochecker.checks.selectie import infiltratieleidingen, vrijvervalrioolleidingen
 from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import HAS_PART, Conduit
+from nlriochecker.dataset import HAS_PART, Conduit, GwswDataset
 from nlriochecker.taal import getal, vorm
 
 
@@ -34,6 +34,11 @@ class _Netwerk:
     conduits: list[Conduit]
     unconnected: list[Conduit]
     reversed_count: int = 0
+    # Per gerichte kant de strengen die erop liggen, gesorteerd op URI. De graaf zelf
+    # draagt geen kantattributen: in een DiGraph delen parallelle strengen een kant en
+    # zou de laatste de eerste stilzwijgend overschrijven (zie issue #5 en
+    # `afbakening._componentstructuur`, dat hetzelfde patroon bewust vermijdt).
+    strengen_per_kant: dict[tuple[str, str], tuple[Conduit, ...]] = field(default_factory=dict)
 
 
 def _netwerk(context: CheckContext) -> _Netwerk:
@@ -53,6 +58,7 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     aangesloten: list[Conduit] = []
     los: list[Conduit] = []
     omgedraaid = 0
+    per_kant: dict[tuple[str, str], list[Conduit]] = {}
     for conduit in conduits:
         begin = dataset.resolve_network_node(conduit.start_node, wortels)
         eind = dataset.resolve_network_node(conduit.end_node, wortels)
@@ -62,10 +68,20 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
         if op_bob and _stijgt(conduit):
             begin, eind = eind, begin
             omgedraaid += 1
-        graph.add_edge(begin, eind, uri=conduit.uri, label=conduit.label)
+        graph.add_edge(begin, eind)
+        per_kant.setdefault((begin, eind), []).append(conduit)
         aangesloten.append(conduit)
 
-    return _Netwerk(graph=graph, conduits=aangesloten, unconnected=los, reversed_count=omgedraaid)
+    return _Netwerk(
+        graph=graph,
+        conduits=aangesloten,
+        unconnected=los,
+        reversed_count=omgedraaid,
+        strengen_per_kant={
+            kant: tuple(sorted(groep, key=lambda streng: streng.uri))
+            for kant, groep in per_kant.items()
+        },
+    )
 
 
 def _stijgt(conduit: Conduit) -> bool:
@@ -367,7 +383,7 @@ class KringloopInNetwerk(Check):
             subgraaf = netwerk.graph.subgraph(deel)
             kring = self._voorbeeldkring(subgraaf)
             labels = [self._label(dataset, uri) for uri in kring]
-            uri, label = self._eerste_streng(subgraaf, kring, dataset)
+            uri, label = self._eerste_streng(netwerk, kring, dataset)
             yield self.finding(
                 context,
                 uri,
@@ -399,16 +415,19 @@ class KringloopInNetwerk(Check):
             return sorted(subgraaf)[:1]
         return [begin for begin, _, *_ in kanten]
 
-    def _label(self, dataset, uri: str) -> str:
+    def _label(self, dataset: GwswDataset, uri: str) -> str:
         """Het label van een knooppunt, of de URI als dat er niet is."""
         node = dataset.nodes.get(uri)
         return node.label if node is not None and node.label else uri
 
-    def _eerste_streng(self, subgraaf, kring: list[str], dataset) -> tuple[str, str]:
-        """De streng waarop de melding wordt gehangen."""
-        if len(kring) > 1 and subgraaf.has_edge(kring[0], kring[1]):
-            kant = subgraaf.edges[kring[0], kring[1]]
-            return kant["uri"], kant["label"]
+    def _eerste_streng(
+        self, netwerk: _Netwerk, kring: list[str], dataset: GwswDataset
+    ) -> tuple[str, str]:
+        """De streng waarop de melding wordt gehangen: de eerste op de kant kring[0] -> kring[1]."""
+        if len(kring) > 1:
+            strengen = netwerk.strengen_per_kant.get((kring[0], kring[1]), ())
+            if strengen:
+                return strengen[0].uri, strengen[0].label
         return kring[0], self._label(dataset, kring[0])
 
     def notes(self, context: CheckContext) -> list[str]:

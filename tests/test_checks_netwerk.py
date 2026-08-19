@@ -10,7 +10,7 @@ import pytest
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.netwerk import KringloopInNetwerk, _netwerk
-from nlriochecker.checks.verbanden import deelstelsel_ids
+from nlriochecker.checks.verbanden import deelstelsel_ids, verbonden_knopen
 from nlriochecker.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -78,6 +78,26 @@ def test_net004_voorbeeldkring_hangt_niet_van_de_knoopvolgorde_af() -> None:
         kringen.add(tuple(check._voorbeeldkring(graaf)))
 
     assert kringen == {("a", "b", "c")}
+
+
+@pytest.mark.parametrize(
+    "bestand", ["net004_parallelle_strengen.ttl", "net004_parallelle_strengen_omgekeerd.ttl"]
+)
+def test_net004_noemt_dezelfde_streng_ongeacht_de_invoervolgorde(bestand: str) -> None:
+    """Twee parallelle strengen op de kring: de melding hangt aan een streng die echt op
+    de kant kring[0] -> kring[1] ligt, en aan dezelfde streng ongeacht de volgorde waarin
+    de export ze declareert. Anders verschuift de melding-ID tussen twee exports."""
+    dataset = load_dataset(TTL_DIR / bestand)
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    bevindingen = run_checks(context, ["NET-004"]).outcomes[0].findings
+
+    assert len(bevindingen) == 1
+    assert bevindingen[0].details["voorbeeldkring"] == ["C", "D", "E"]
+    streng = dataset.conduits[bevindingen[0].object_uri]
+    begin, eind = verbonden_knopen(context, streng)
+    assert (dataset.nodes[begin].label, dataset.nodes[eind].label) == ("C", "D")
+    # De kleinste URI van de parallelle set, in beide declaratievolgordes.
+    assert bevindingen[0].object_label == "5"
 
 
 def test_net007_vindt_it_zonder_drempel() -> None:
