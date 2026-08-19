@@ -844,6 +844,20 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
                 put=uiteinde.node.label,
             )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt hoeveel strengeinden zonder BOB of zonder bovenkant zijn overgeslagen."""
+        uiteinden = _uiteinden(context)
+        return [
+            *_ontbreekt(context, "BOB", lambda u: u.bob, objecten=uiteinden, soort="strengeinden"),
+            *_ontbreekt(
+                context,
+                "bovenkant (dekselniveau of maaiveld) aan de put",
+                lambda u: u.node.bovenkant,
+                objecten=uiteinden,
+                soort="strengeinden",
+            ),
+        ]
+
 
 def _maat(conduit: Conduit) -> float | None:
     """De grootste profielmaat van een streng in millimeters."""

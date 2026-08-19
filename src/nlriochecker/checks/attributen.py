@@ -19,7 +19,7 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.selectie import putten, vrijvervalrioolleidingen
+from nlriochecker.checks.selectie import netwerkknopen, putten, vrijvervalrioolleidingen
 from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
 
@@ -591,6 +591,62 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
             f"{zonder} van de {totaal} strengen hebben een materiaal zonder vormregel in "
             "`plausibiliteit.toml` (of geen materiaal) en zijn niet getoetst."
         ]
+
+
+@register
+class HoogteOpVulwaarde(Check):
+    """ATTR-013: een hoogtekenmerk dat een vulwaarde draagt in plaats van een meting.
+
+    De leesregel zelf staat in `dataset.markeer_vulwaarden` (toegepast in `toetsrun`);
+    deze check meldt per object een keer wat die regel heeft weggezet, zodat het in de
+    uitvoer staat en niet alleen in de toelichting van de hoogtechecks.
+    """
+
+    id = "ATTR-013"
+    title = "Hoogtekenmerk op vulwaarde (rond 0 m NAP) geregistreerd als meting"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+
+    def _objecten(self, context: CheckContext) -> list[Node | Conduit]:
+        """De objecten die een hoogtekenmerk kunnen dragen: knopen plus strengen."""
+        return [*netwerkknopen(context), *vrijvervalrioolleidingen(context)]
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elk object waarop ten minste een hoogtekenmerk een vulwaarde was."""
+        band = context.config.vulwaarden.hoogte_band_m
+        for object_ in self._objecten(context):
+            if not object_.vulwaarden:
+                continue
+            kenmerken = [vul.kind for vul in object_.vulwaarden]
+            waarden = [vul.value for vul in object_.vulwaarden]
+            yield self.finding(
+                context,
+                object_.uri,
+                object_.label,
+                f"{', '.join(kenmerken)} staat op {', '.join(f'{w:g}' for w in waarden)} m NAP; "
+                f"binnen de vulwaardeband van {band:g} m geldt dat als niet geregistreerd.",
+                kenmerken=kenmerken,
+                waarden=waarden,
+                band_m=band,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Zegt waarop de leesregel werkte, of dat hij uit staat."""
+        opties = context.config.vulwaarden
+        if not opties.hoogte_kenmerken:
+            return [
+                "De vulwaarde-leesregel staat uit (`[vulwaarden] hoogte_kenmerken` is leeg); "
+                "een 0,000 in een hoogtekenmerk is in dit project als meting gelezen."
+            ]
+        return [
+            f"Als vulwaarde gold |waarde| <= {opties.hoogte_band_m:g} m op "
+            f"{', '.join(opties.hoogte_kenmerken)}. Zo'n kenmerk is als ontbrekend gelezen; "
+            "de hoogtechecks slaan het object over en melden dat in hun toelichting."
+        ]
+
+    def examined(self, context: CheckContext) -> int:
+        """Putten plus vrijvervalstrengen."""
+        return len(self._objecten(context))
 
 
 def _soortnaam(object_) -> str:

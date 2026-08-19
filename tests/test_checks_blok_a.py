@@ -16,7 +16,7 @@ import pytest
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import load_dataset
+from nlriochecker.dataset import load_dataset, markeer_vulwaarden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -28,10 +28,19 @@ def fixtureconfig() -> CheckConfig:
     return config
 
 
+def context_voor(bestand: str, config: CheckConfig) -> CheckContext:
+    """Laadt een fixture zoals `toetsrun` dat doet: met de vulwaarde-leesregel erop."""
+    dataset = markeer_vulwaarden(
+        load_dataset(TTL_DIR / bestand),
+        config.vulwaarden.hoogte_kenmerken,
+        config.vulwaarden.hoogte_band_m,
+    )
+    return CheckContext(dataset=dataset, config=config)
+
+
 def uitkomst(bestand: str, check_id: str, config: CheckConfig | None = None) -> CheckOutcome:
     """Draait een enkele check op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
-    context = CheckContext(dataset=dataset, config=config or fixtureconfig())
+    context = context_voor(bestand, config or fixtureconfig())
     return run_checks(context, [check_id]).outcomes[0]
 
 
@@ -58,6 +67,7 @@ DEFECTEN = [
     ("attr009_lengte_wijkt_af.ttl", "ATTR-009", ["1"]),
     ("attr010_materiaal_put.ttl", "ATTR-010", ["1"]),
     ("attr012_metselwerk_rond.ttl", "ATTR-012", ["1"]),
+    ("attr013_vulwaarde_hoogte.ttl", "ATTR-013", ["1", "A", "B"]),
     ("hgt004_bob_boven_deksel.ttl", "HGT-004", ["1"]),
     ("hgt005_tegenverhang_licht.ttl", "HGT-005", ["1"]),
     ("hgt006_tegenverhang_fors.ttl", "HGT-006", ["1"]),
@@ -128,12 +138,39 @@ def test_elk_defect_heeft_een_eigen_fixture() -> None:
     ],
 )
 def test_schone_fixture_geeft_geen_bevinding(bestand: str, groep: str) -> None:
-    dataset = load_dataset(TTL_DIR / bestand)
-    context = CheckContext(dataset=dataset, config=fixtureconfig())
-    run = run_checks(context, ids_van(groep))
+    run = run_checks(context_voor(bestand, fixtureconfig()), ids_van(groep))
 
     gemeld = {outcome.check_id: labels(outcome) for outcome in run.outcomes if outcome.findings}
     assert gemeld == {}
+
+
+def test_attr013_meldt_een_keer_per_object_met_de_kenmerken() -> None:
+    outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", "ATTR-013")
+    per_label = {bevinding.object_label: bevinding for bevinding in outcome.findings}
+
+    assert per_label["1"].details["kenmerken"] == ["BobBeginpuntLeiding"]
+    assert per_label["1"].details["waarden"] == [0.0]
+    assert per_label["A"].details["kenmerken"] == ["Maaiveldhoogte"]
+    assert outcome.examined == 5  # 3 putten + 2 strengen
+    assert any("0.01" in note or "0,01" in note for note in outcome.notes)
+
+
+def test_hoogtechecks_zwijgen_over_vulwaarden_met_toelichting() -> None:
+    for check_id in ("HGT-004", "HGT-014"):
+        outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", check_id)
+
+        assert labels(outcome) == [], check_id
+        assert outcome.notes, check_id
+
+
+def test_attr013_zegt_dat_de_regel_uit_staat() -> None:
+    config = fixtureconfig()
+    config.vulwaarden.hoogte_kenmerken = []
+
+    outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", "ATTR-013", config)
+
+    assert outcome.findings == []
+    assert any("uit" in note for note in outcome.notes)
 
 
 def test_attr001_noemt_het_bereik_en_het_materiaal() -> None:

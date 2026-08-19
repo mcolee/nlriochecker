@@ -111,3 +111,16 @@ def test_rapportinstellingen_hebben_bruikbare_defaults() -> None:
 def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
     """Een fout op een overstort weegt zwaarder dan een fout op een gewone put."""
     assert "Overstortput" in load_check_config().klassen.kritiek
+
+
+def test_vulwaarden_uit_de_standaardconfig() -> None:
+    """De vulwaarde-leesregel staat als projectconfiguratie in `[vulwaarden]`."""
+    config = load_check_config()
+
+    assert config.vulwaarden.hoogte_kenmerken == [
+        "BobBeginpuntLeiding",
+        "BobEindpuntLeiding",
+        "Maaiveldhoogte",
+        "Putdekselniveau",
+    ]
+    assert config.vulwaarden.hoogte_band_m == 0.01

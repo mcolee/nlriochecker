@@ -28,7 +28,7 @@ from nlriochecker.analysis import analyze
 from nlriochecker.cache import CacheUitslag, laad_met_cache
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, Severity
-from nlriochecker.dataset import GwswDataset
+from nlriochecker.dataset import GwswDataset, markeer_vulwaarden
 from nlriochecker.errors import OpdrachtError
 from nlriochecker.externedata import Dekkingseis, ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik, kies_cfk, laad_nulmeting
@@ -197,6 +197,9 @@ def voer_toets_uit(
         opdracht.cachemap,
         opdracht.gebruik_cache,
         voortgang=voortgang,
+    )
+    dataset = markeer_vulwaarden(
+        dataset, config.vulwaarden.hoogte_kenmerken, config.vulwaarden.hoogte_band_m
     )
     onbetrouwbaar, poort_toegepast, meetbereik = _typeringspoort(
         opdracht, config, dataset, voortgang

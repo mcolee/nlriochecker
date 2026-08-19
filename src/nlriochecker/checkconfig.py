@@ -273,6 +273,22 @@ class InwinningOptions(BaseModel):
     onbekend: list[str] = Field(default_factory=list)
 
 
+class VulwaardeOptions(BaseModel):
+    """Welke hoogtekenmerken een vulwaarde rond 0 m NAP kunnen dragen.
+
+    Sommige bronsystemen schrijven 0,000 als "niet geregistreerd" in plaats van het
+    kenmerk leeg te laten. Dat is per project te beoordelen: in laag Nederland kan
+    0,00 m NAP een echte meting zijn. Een lege lijst zet de leesregel uit.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # De kenmerken (korte GWSW-naam, zoals `Aspect.kind`) waarop de leesregel werkt.
+    hoogte_kenmerken: list[str] = Field(default_factory=list)
+    # |waarde| kleiner dan of gelijk aan deze band telt als vulwaarde.
+    hoogte_band_m: float = Field(default=0.01, ge=0.0)
+
+
 class NamingOptions(BaseModel):
     """ADM-003: de naamgevingsconventie als configureerbaar regex-patroon."""
 
@@ -354,6 +370,7 @@ class CheckConfig(BaseModel):
     nulmeting: NulmetingOptions
     naamgeving: NamingOptions = Field(default_factory=NamingOptions)
     inwinning: InwinningOptions = Field(default_factory=InwinningOptions)
+    vulwaarden: VulwaardeOptions = Field(default_factory=VulwaardeOptions)
     puttyperegels: list[PutTypeRule] = Field(default_factory=list)
     bronnen: ExternalSources = Field(default_factory=ExternalSources)
     rapport: ReportOptions = Field(default_factory=ReportOptions)

@@ -825,6 +825,21 @@ FIXTURES["hgt018_buiskruin_boven_maaiveld.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(9.98, 8.55)),
 )
 
+# ATTR-013: vulwaarden in hoogtekenmerken (issue #1). Staat hier omdat ze de
+# HGT-helpers gebruikt. Put A heeft maaiveld 0,00 (en geen deksel), put B maaiveld
+# 0,01, put C is schoon; streng 1 heeft een BOB van 0,000 aan het beginpunt. Met de
+# standaardconfig meldt ATTR-013 put A, put B en streng 1; HGT-004 en HGT-014
+# zwijgen over hen met een toelichting.
+FIXTURES["attr013_vulwaarde_hoogte.ttl"] = (
+    "put A (maaiveld 0,00), put B (maaiveld 0,01) en streng 1 (BOB begin 0,000) "
+    "dragen een vulwaarde",
+    hoogteput("PutA", "A", A, mv=0.0, dek=None)
+    + hoogteput("PutB", "B", B, mv=0.01, dek=None)
+    + hoogteput("PutC", "C", C)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(0.0, 8.55))
+    + hoogteleiding("L2", "2", [B, C], "PutB", "PutC", bob=(8.60, 8.55)),
+)
+
 # --- RVZ ------------------------------------------------------------------
 
 
