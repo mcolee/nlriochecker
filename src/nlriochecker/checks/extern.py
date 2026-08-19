@@ -18,6 +18,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from shapely.geometry.base import BaseGeometry
+
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -30,7 +32,8 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import lozingspunten, netwerkknopen, vrijvervalrioolleidingen
 from nlriochecker.checks.treffers import Treffer, bouw_sleutel
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.dataset import Node
+from nlriochecker.dataset import Conduit, Node
+from nlriochecker.externedata import VectorLayer
 from nlriochecker.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
@@ -387,6 +390,46 @@ class KruisingMetBouwwerk(_ExterneCheck):
         ]
 
 
+@dataclass(frozen=True)
+class _Kruising:
+    """Een streng die binnen de buffer van een BGT-waterdeel ligt.
+
+    De geometrie van het waterdeel gaat mee omdat EXT-003 er de treffer voor de
+    GIS-uitvoer mee registreert; de detectie verandert er niet door. Een dataclass in
+    plaats van een tuple: beide checks pakten hem uit op positie, en een veld erbij of
+    een andere volgorde zou daar pas tijdens het draaien opvallen.
+    """
+
+    conduit: Conduit
+    vorm: BaseGeometry
+    rij: dict[str, object]
+    laag: VectorLayer
+    buffer: float
+
+
+def _zoek_kruisingen(
+    strengen: list[Conduit], laag: VectorLayer | None, buffer: float
+) -> Iterator[_Kruising]:
+    """Loopt de toetsbare strengen langs de waterdeellaag.
+
+    Vrije functie zonder `self`: de uitkomst hangt alleen van deze drie argumenten af,
+    zodat de gedeelde cache-ingang van `_WatergangKruising.kruisingen` niet aan de
+    eerste aanroepende subklasse vastzit.
+    """
+    if laag is None:
+        return
+    for conduit in strengen:
+        # `_selecteer` liet alleen strengen met een geometrie door; deze functie leunt
+        # daar niet op, zodat ze ook los van die selectie te lezen is.
+        if conduit.line is None:
+            continue
+        for geometrie, rij in laag.nabij(conduit.line, buffer):
+            if conduit.line.distance(geometrie) > buffer:
+                continue
+            yield _Kruising(conduit, geometrie, rij, laag, buffer)
+            break
+
+
 class _WatergangKruising(_ExterneCheck):
     """Gedeelde basis voor de twee kruisingschecks op BGT-waterdelen.
 
@@ -403,38 +446,32 @@ class _WatergangKruising(_ExterneCheck):
         """De vrijvervalstrengen."""
         return vrijvervalrioolleidingen(context)
 
-    def kruisingen(self, context: CheckContext) -> tuple[tuple, ...]:
+    def kruisingen(self, context: CheckContext) -> tuple[_Kruising, ...]:
         """De strengen die een waterdeel raken, met het waterdeel erbij.
 
-        Levert `(conduit, geometrie, rij, laag, buffer)`. De geometrie is nodig om de
-        treffer voor de GIS-uitvoer te registreren; de detectie verandert er niet door.
-
         De lijst wordt een keer per context berekend en door EXT-002 en EXT-003 gedeeld.
-        Dat mag: beide `objecten()` leveren `vrijvervalrioolleidingen(context)` en
-        `selectie()` filtert die met dezelfde `_selecteer`, dus `toetsbaar` is voor
-        beide checks dezelfde verzameling; ook de buffer en de laag zijn dezelfde. De
-        twee deden dus tweemaal dezelfde ruimtelijke toets.
+        Dat mag omdat de drie ingredienten van deze basisklasse zijn en niet van de
+        aanroepende check: de populatie (`objecten()` levert voor beide
+        `vrijvervalrioolleidingen(context)`, door dezelfde `selectie()` gefilterd), de
+        laag `bgt_water` en de buffer. De twee deden dus tweemaal dezelfde ruimtelijke
+        toets.
+
+        De bouwer is daarom een vrije functie: hij krijgt die drie mee en kent geen
+        `self`, zodat de gedeelde ingang niet stilzwijgend van de eerste aanroeper kan
+        gaan afhangen. Wie hier ooit een derde subklasse met een eigen populatie onder
+        hangt (BO-25 verwierp dat voor EXT-003), moet haar dus een eigen sleutel geven.
 
         De `break` na het eerste gevonden waterdeel per streng blijft staan: een streng
         die twee waterdelen kruist levert er een, en welke hangt van de volgorde af. Dat
         is een bewust geaccepteerde beperking (BO-17).
         """
-        return context.cached(
-            "ext:watergangkruisingen", lambda: tuple(self._zoek_kruisingen(context))
-        )
-
-    def _zoek_kruisingen(self, context: CheckContext) -> Iterator[tuple]:
-        """Loopt de toetsbare strengen langs de waterdeellaag."""
+        toetsbaar = self.selectie(context).toetsbaar
         laag = self.laag(context)
-        if laag is None:
-            return
         buffer = context.config.drempels.ext_watergang_buffer_m
-        for conduit in self.selectie(context).toetsbaar:
-            for geometrie, rij in laag.nabij(conduit.line, buffer):
-                if conduit.line.distance(geometrie) > buffer:
-                    continue
-                yield conduit, geometrie, rij, laag, buffer
-                break
+        return context.cached(
+            "ext:watergangkruisingen",
+            lambda: tuple(_zoek_kruisingen(toetsbaar, laag, buffer)),
+        )
 
     def buiten_populatie(self, context: CheckContext) -> dict[str, int]:
         """Per kruisingsklasse die geen vrijvervalleiding is: hoeveel strengen erbuiten vallen."""
@@ -478,16 +515,16 @@ class KruisingMetWatergang(_WatergangKruising):
         Het register laat BGT als watergangbron toe; waterschapsdata is niet
         aangeleverd en valt in deze fase buiten scope.
         """
-        for conduit, _vorm, rij, laag, buffer in self.kruisingen(context):
-            soort = rij.get("type") or "waterdeel"
+        for kruising in self.kruisingen(context):
+            soort = kruising.rij.get("type") or "waterdeel"
             yield self.finding(
                 context,
-                conduit.uri,
-                conduit.label,
-                f"Kruist een BGT-waterdeel van het type {soort!r} (buffer {buffer:g} m).",
+                kruising.conduit.uri,
+                kruising.conduit.label,
+                f"Kruist een BGT-waterdeel van het type {soort!r} (buffer {kruising.buffer:g} m).",
                 watertype=soort,
-                bron=laag.source.name,
-                buffer_m=buffer,
+                bron=kruising.laag.source.name,
+                buffer_m=kruising.buffer,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -520,21 +557,22 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
         dataset = context.dataset
         wortels = context.config.klassen.kruisingsleiding
 
-        for conduit, vorm, rij, laag, buffer in self.kruisingen(context):
+        for kruising in self.kruisingen(context):
+            conduit = kruising.conduit
             if any(dataset.is_a(conduit.uri, wortel) for wortel in wortels):
                 continue
-            soort = str(rij.get("type") or "waterdeel")
-            sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], rij, vorm)
+            soort = str(kruising.rij.get("type") or "waterdeel")
+            sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], kruising.rij, kruising.vorm)
             if terugval:
-                context.treffers.meld_zonder_id(self.id, laag.source.name)
+                context.treffers.meld_zonder_id(self.id, kruising.laag.source.name)
             context.treffers.registreer(
                 Treffer(
                     sleutel=sleutel,
                     bron="bgt_water",
                     label=soort,
-                    bronbestand=laag.source.name,
-                    geometrie=vorm,
-                    attributen=dict(rij),
+                    bronbestand=kruising.laag.source.name,
+                    geometrie=kruising.vorm,
+                    attributen=dict(kruising.rij),
                 ),
                 check_id=self.id,
                 object_uri=conduit.uri,
@@ -545,7 +583,7 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
                 conduit.label,
                 f"Kruist een BGT-waterdeel ({soort}) maar staat niet geregistreerd als zinker.",
                 watertype=soort,
-                buffer_m=buffer,
+                buffer_m=kruising.buffer,
                 object2_uri=sleutel,
                 object2_label=soort,
             )

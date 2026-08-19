@@ -110,6 +110,16 @@ class Vulwaarde:
     value: float
 
 
+# De kenmerken waarop `markeer_vulwaarden` werkt: precies de vier velden die zij
+# inspecteert (KLASSE_MAAIVELDHOOGTE, KLASSE_PUTDEKSELNIVEAU, KLASSE_BOB_BEGIN en
+# KLASSE_BOB_EIND). Een andere naam in `[vulwaarden] hoogte_kenmerken` -- een tikfout,
+# of een kenmerk dat de pijplijn niet inleest -- zou stil niets doen terwijl ATTR-013
+# meldt dat de regel is toegepast; `checkconfig.VulwaardeOptions` weigert hem daarom.
+VULWAARDE_KENMERKEN: frozenset[str] = frozenset(
+    {"Maaiveldhoogte", "Putdekselniveau", "BobBeginpuntLeiding", "BobEindpuntLeiding"}
+)
+
+
 class _MetAspecten:
     """Toegang tot de kenmerken van een object, per GWSW-klassenaam."""
 

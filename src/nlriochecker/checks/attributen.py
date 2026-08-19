@@ -634,6 +634,27 @@ class HoogteOpVulwaarde(Check):
                 band_m=band,
             )
 
+    def _buiten_populatie(self, context: CheckContext) -> tuple[int, int]:
+        """Knopen en strengen met een vulwaarde die deze check niet meldt.
+
+        De leesregel loopt over alle knopen en alle strengen van de dataset; deze check
+        meldt de netwerkknopen plus de vrijvervalstrengen. Wat daarbuiten valt -- een
+        persleiding of een drain, een compartiment- of hulpstukorientatie -- is wel als
+        ontbrekend gelezen maar staat in geen enkele melding (BO-27).
+        """
+        gemeld = {object_.uri for object_ in self._objecten(context)}
+        knopen = sum(
+            1
+            for node in context.dataset.nodes.values()
+            if node.vulwaarden and node.uri not in gemeld
+        )
+        strengen = sum(
+            1
+            for conduit in context.dataset.conduits.values()
+            if conduit.vulwaarden and conduit.uri not in gemeld
+        )
+        return knopen, strengen
+
     def notes(self, context: CheckContext) -> list[str]:
         """Zegt waarop de leesregel werkte, of dat hij uit staat."""
         opties = context.config.vulwaarden
@@ -642,15 +663,32 @@ class HoogteOpVulwaarde(Check):
                 "De vulwaarde-leesregel staat uit (`[vulwaarden] hoogte_kenmerken` is leeg); "
                 "een 0,000 in een hoogtekenmerk is in dit project als meting gelezen."
             ]
-        return [
+        notities = [
             f"Als vulwaarde gold |waarde| <= {opties.hoogte_band_m:g} m op "
             f"{', '.join(opties.hoogte_kenmerken)}. Zo'n kenmerk is als ontbrekend gelezen; "
             "de hoogtechecks slaan het object daardoor over en tellen het in hun toelichting "
             "mee bij de objecten zonder dat kenmerk, zonder de vulwaarde als reden te noemen."
         ]
+        knopen, strengen = self._buiten_populatie(context)
+        if knopen or strengen:
+            geraakt = " en ".join(
+                deel
+                for deel in (
+                    taal.getal(knopen, "knoop", "knopen") if knopen else "",
+                    taal.getal(strengen, "streng", "strengen") if strengen else "",
+                )
+                if deel
+            )
+            notities.append(
+                f"De leesregel raakte daarnaast {geraakt} buiten de gemelde populatie "
+                "(netwerkknopen plus vrijvervalstrengen) -- een persleiding, een drain, "
+                "een compartiment- of hulpstukorientatie. Ook daar geldt het kenmerk als "
+                "ontbrekend, maar deze check meldt die objecten niet."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
-        """Putten plus vrijvervalstrengen."""
+        """Netwerkknopen plus vrijvervalstrengen."""
         return len(self._objecten(context))
 
 

@@ -31,7 +31,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   kleinere dalingen bij HGT-001, HGT-005, HGT-006, HGT-008 en NET-003); ATTR-013 meldt
   4.215 objecten. Er komt er geen bij, op twee HGT-009-bevindingen na: die check verliest
   er 47 en wint er 2, doordat een vulwaarde daar de werkelijke, kleinere BOB-sprong stond
-  te verdringen. HGT-018 heeft nu een toelichting. Zie BO-27 (issue #1).
+  te verdringen. HGT-018 heeft nu een toelichting. De tabel met datakarakteristieken
+  telt sindsdien alleen echte registraties -- een hoogte binnen de vulwaardeband staat
+  niet meer als gevulde waarde in de noemer -- en het rapport zegt onder die tabel
+  hoeveel waarden de leesregel heeft weggezet. Zie BO-27 (issue #1).
 - `configs/dewoldenhoogeveen.toml`: de projectconfiguratie voor het hele gebied van de
   OroX-dataset, met de bronnen uit `data/gis_dewoldenhoogeveen`. Alleen het blok
   `[bronnen]` wijkt af van de meegeleverde `checks.toml`.
@@ -80,8 +83,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 - Uitbreidingen in de Python-API rond de externe bronnen (0.x, dus zonder
   deprecatietermijn): `load_external_data` kreeg een keyword-only `dekkingseis`,
   `CheckContext` en `CheckRun` kregen het veld `treffers`, en
-  `_WatergangKruising.kruisingen()` levert vijf waarden in plaats van vier -- de
-  geometrie van het waterdeel is erbij gekomen. De eerste twee zijn additief.
+  `_WatergangKruising.kruisingen()` levert `_Kruising`-objecten (streng, geometrie en
+  attributen van het waterdeel, laag, buffer) in plaats van tuples van vier waarden --
+  de geometrie van het waterdeel is erbij gekomen en de velden hebben een naam gekregen. De eerste twee zijn additief.
 - Een gebied zonder GWSW-objecten stopt een run over meerdere gebieden niet meer, maar
   levert een eigen rapport met nul bevindingen en een expliciete melding -- in dat rapport
   en in de synthese. Bij een run op een enkel gebied blijft het een harde fout.
@@ -197,6 +201,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   in plaats van `object`. Dat haalde in een keer 23 typefouten weg.
 - `scripts/uitgave.py` toetst nu ook met mypy en onderhoudt dit wijzigingslog.
 - Werkafspraak: werk staat op `dev`, `main` draagt alleen uitgebrachte versies.
+- `[vulwaarden]` weigert een kenmerk waarop de leesregel niet werkt: alleen
+  `Maaiveldhoogte`, `Putdekselniveau`, `BobBeginpuntLeiding` en `BobEindpuntLeiding`
+  (de verzameling staat als `VULWAARDE_KENMERKEN` bij `Vulwaarde` in `dataset.py`).
+  Een tikfout in het hoofdlettergebruik gaf tot nu toe een run waarin de regel stil
+  niets deed terwijl ATTR-013 meldde dat hij gold. `hoogte_band_m` heeft daarnaast een
+  bovengrens van 0,5 m gekregen: dat is geen drempelkeuze maar een invoertoets, want een
+  band in centimeters of millimeters leest elke BOB en elke maaiveldhoogte als
+  ontbrekend en laat veertien checks zwijgen.
+- De toelichting van ATTR-013 telt hoeveel knopen en strengen met een vulwaarde buiten
+  haar gemelde populatie vallen (persleidingen, drains, compartiment- en
+  hulpstukorientaties). De leesregel raakt ze wel, geen enkele melding noemt ze; het
+  getal komt per run uit de gemarkeerde dataset. Zie BO-27.
 
 ### Gerepareerd
 

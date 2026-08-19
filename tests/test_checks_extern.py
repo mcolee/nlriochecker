@@ -189,6 +189,25 @@ def test_ext003_zwijgt_over_een_zinker(config: CheckConfig, bronnen: ExternalDat
     assert "3" not in labels(uitkomst("EXT-003", config, bronnen))
 
 
+def test_de_twee_kruisingschecks_delen_een_populatie(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """De gedeelde kruisingenlijst mag alleen bestaan zolang de populatie gedeeld is.
+
+    EXT-002 en EXT-003 lezen dezelfde cache-ingang `ext:watergangkruisingen`. Kreeg een
+    van de twee een eigen, bredere populatie -- BO-25 verwierp dat, maar dat is een
+    besluit en geen onmogelijkheid -- dan zou de check die het eerst draait de lijst van
+    de ander bepalen, zonder uitzondering en met de verkeerde uitslag.
+    """
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+    ext002 = REGISTRY["EXT-002"]()
+    ext003 = REGISTRY["EXT-003"]()
+
+    assert ext002.selectie(context).toetsbaar == ext003.selectie(context).toetsbaar
+    assert ext002.laag(context) is ext003.laag(context)
+
+
 def test_een_duiker_valt_buiten_beide_kruisingschecks(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:

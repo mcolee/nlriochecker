@@ -431,6 +431,14 @@ def _karakteristiek_section(run: CheckRun) -> list[str]:
             lines.append(
                 f"| {vulling.kenmerk} | {vulling.aantal} | {vulling.met_wijze} | {onbekend} |"
             )
+        if karakteristiek.vulwaarden:
+            lines += [
+                "",
+                "> De kolom *Waarden* telt alleen echte registraties: "
+                f"{karakteristiek.vulwaarden} hoogtewaarden vielen binnen de "
+                "vulwaardeband en zijn als niet geregistreerd gelezen (zie ATTR-013). "
+                "Zonder die leesregel stonden ze hier als gevulde waarde in de noemer.",
+            ]
         if karakteristiek.onbekend_totaal:
             lines += [
                 "",

@@ -17,10 +17,12 @@ buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar
 
+from nlriochecker import taal
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -252,21 +254,29 @@ class _OverstortZonderDrempelkenmerk(Check):
     kenmerk: ClassVar[str] = ""
     omschrijving: ClassVar[str] = ""
 
-    def _waarde(self, drempel: Drempel) -> float | None:
+    @abstractmethod
+    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
         """De waarde van het gevraagde kenmerk op deze drempel."""
-        raise NotImplementedError
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke overstortput zonder geregistreerd kenmerk op een van haar drempels."""
         per_put = drempels_per_put(context)
         for node in overstortputten(context):
             groep = per_put.get(node.uri, [])
-            if any(self._waarde(drempel) is not None for drempel in groep):
+            if any(self._kenmerkwaarde(drempel) is not None for drempel in groep):
                 continue
-            if groep:
+            # Het voltooid deelwoord achteraan: `drempelniveau` is onzijdig en
+            # `drempelbreedte` niet, dus "een geregistreerd {omschrijving}" klopt maar
+            # voor een van de twee checks.
+            if len(groep) == 1:
+                tekst = (
+                    "De enige overstortdrempel van deze put heeft geen "
+                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
+                )
+            elif groep:
                 tekst = (
                     f"Geen van de {len(groep)} overstortdrempels van deze put heeft een "
-                    f"geregistreerd {self.omschrijving} (`{self.kenmerk}`)."
+                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
                 )
             else:
                 tekst = (
@@ -281,12 +291,14 @@ class _OverstortZonderDrempelkenmerk(Check):
         putten = overstortputten(context)
         zonder = sum(1 for node in putten if not per_put.get(node.uri))
         notities = [
-            f"Bekeken zijn de {len(putten)} overstortputten "
+            f"Bekeken: {taal.getal(len(putten), 'overstortput', 'overstortputten')} in "
+            f"{context.scope_in_woorden()} "
             f"({', '.join(context.config.klassen.overstortput)})."
         ]
         if zonder:
             notities.append(
-                f"{zonder} daarvan staan zonder enig `Overstortdrempel`-onderdeel geregistreerd; "
+                f"{zonder} daarvan {taal.vorm(zonder, 'staat', 'staan')} zonder enig "
+                "`Overstortdrempel`-onderdeel geregistreerd; "
                 "de nulmetingvorm `Overstortput_Overstortdrempel_card` meldt dat ook. De "
                 "overlap is bewust: deze check toetst de geregistreerde waarde en werkt ook "
                 "zonder nulmeting."
@@ -309,7 +321,7 @@ class OverstortZonderDrempelniveau(_OverstortZonderDrempelkenmerk):
     kenmerk = "Drempelniveau"
     omschrijving = "drempelniveau"
 
-    def _waarde(self, drempel: Drempel) -> float | None:
+    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
         """Het geregistreerde drempelniveau."""
         return drempel.niveau
 
@@ -325,7 +337,7 @@ class OverstortZonderDrempelbreedte(_OverstortZonderDrempelkenmerk):
     kenmerk = "Drempelbreedte"
     omschrijving = "drempelbreedte"
 
-    def _waarde(self, drempel: Drempel) -> float | None:
+    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
         """De geregistreerde drempelbreedte."""
         return drempel.breedte
 

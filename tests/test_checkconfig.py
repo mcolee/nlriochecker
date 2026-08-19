@@ -64,6 +64,24 @@ def test_eigen_config_vervangt_de_drempels(tmp_path: Path) -> None:
             "greater than 0",
         ),
         ("[klassen]\nput = ['Put']\nvrijvervalleiding = ['X']\nonbekend = ['Y']\n", "onbekend"),
+        # Een tikfout in het hoofdlettergebruik gaf een leesregel die stil niets deed,
+        # terwijl ATTR-013 meldde dat hij op dat kenmerk gold.
+        (
+            "[klassen]\nput = ['Put']\nvrijvervalleiding = ['X']\n[vulwaarden]\n"
+            "hoogte_kenmerken = ['bobbeginpuntleiding']\n",
+            "kent bobbeginpuntleiding niet",
+        ),
+        (
+            "[klassen]\nput = ['Put']\nvrijvervalleiding = ['X']\n[vulwaarden]\n"
+            "hoogte_kenmerken = ['HoogtePut']\n",
+            "kent HoogtePut niet",
+        ),
+        # Een band die de dataset opslokt is geen drempelkeuze maar een eenheidsfout.
+        (
+            "[klassen]\nput = ['Put']\nvrijvervalleiding = ['X']\n[vulwaarden]\n"
+            "hoogte_band_m = 1\n",
+            "less than or equal to 0.5",
+        ),
     ],
 )
 def test_ongeldige_config(tmp_path: Path, inhoud: str, melding: str) -> None:

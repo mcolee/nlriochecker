@@ -6,6 +6,11 @@ from dataclasses import replace
 from pathlib import Path
 
 from nlriochecker.dataset import (
+    KLASSE_BOB_BEGIN,
+    KLASSE_BOB_EIND,
+    KLASSE_MAAIVELDHOOGTE,
+    KLASSE_PUTDEKSELNIVEAU,
+    VULWAARDE_KENMERKEN,
     Aspect,
     GwswDataset,
     Vulwaarde,
@@ -83,3 +88,20 @@ def test_negatieve_waarde_binnen_de_band_telt_ook() -> None:
 
     assert dataset.nodes[put.uri].maaiveld is None
     assert dataset.nodes[put.uri].vulwaarden == (Vulwaarde("Maaiveldhoogte", -0.005),)
+
+
+def test_ondersteunde_kenmerken_volgen_de_vier_geladen_klassen() -> None:
+    """`VULWAARDE_KENMERKEN` is precies wat `markeer_vulwaarden` inspecteert.
+
+    De config weigert elke andere naam; loopt deze lijst uit de pas met de klassen
+    die de lader in de vier hoogtevelden zet, dan zou ze een geldig kenmerk weigeren
+    of een inert kenmerk toelaten.
+    """
+    klassen = (
+        KLASSE_MAAIVELDHOOGTE,
+        KLASSE_PUTDEKSELNIVEAU,
+        KLASSE_BOB_BEGIN,
+        KLASSE_BOB_EIND,
+    )
+
+    assert VULWAARDE_KENMERKEN == {str(klasse).rsplit("/", 1)[-1] for klasse in klassen}

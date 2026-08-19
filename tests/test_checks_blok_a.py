@@ -17,7 +17,7 @@ import pytest
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import Aspect, load_dataset, markeer_vulwaarden
+from nlriochecker.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -152,8 +152,12 @@ def test_attr013_meldt_een_keer_per_object_met_de_kenmerken() -> None:
     assert per_label["1"].details["kenmerken"] == ["BobBeginpuntLeiding"]
     assert per_label["1"].details["waarden"] == [0.0]
     assert per_label["A"].details["kenmerken"] == ["Maaiveldhoogte"]
-    assert outcome.examined == 5  # 3 putten + 2 strengen
-    assert any("0.01" in note or "0,01" in note for note in outcome.notes)
+    assert outcome.examined == 5  # 3 netwerkknopen + 2 strengen
+    # De band staat in de toelichting zoals de code hem opmaakt (`:g`), niet in een
+    # van twee toegestane schrijfwijzen: dan pint de assertie er geen.
+    assert any("Als vulwaarde gold |waarde| <= 0.01 m" in note for note in outcome.notes), (
+        outcome.notes
+    )
 
 
 def test_attr013_noemt_twee_kenmerken_elk_met_hun_eigen_waarde() -> None:
@@ -188,12 +192,58 @@ def test_attr013_noemt_twee_kenmerken_elk_met_hun_eigen_waarde() -> None:
     )
 
 
-def test_hoogtechecks_zwijgen_over_vulwaarden_met_toelichting() -> None:
-    for check_id in ("HGT-004", "HGT-014"):
-        outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", check_id)
+@pytest.mark.parametrize(
+    ("check_id", "toelichting"),
+    [
+        ("HGT-004", "2 van de 3 putten hebben geen putdekselniveau en geen maaiveldhoogte"),
+        ("HGT-014", "Geen enkele van de 2 strengen in deze dataset heeft een maaiveldhoogte"),
+    ],
+)
+def test_hoogtechecks_zwijgen_over_vulwaarden_met_toelichting(
+    check_id: str, toelichting: str
+) -> None:
+    """De hoogtecheck zwijgt over een vulwaarde en zegt in haar toelichting waarom.
 
-        assert labels(outcome) == [], check_id
-        assert outcome.notes, check_id
+    De assertie pint de zin die de stilte verklaart: een toelichting over iets anders
+    zou de belofte van deze test niet waarmaken.
+    """
+    outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", check_id)
+
+    assert labels(outcome) == [], check_id
+    assert any(toelichting in note for note in outcome.notes), outcome.notes
+
+
+def test_attr013_telt_de_vulwaarden_buiten_haar_populatie() -> None:
+    """De leesregel raakt meer objecten dan deze check meldt; dat hoort in de toelichting.
+
+    `markeer_vulwaarden` loopt over alle knopen en alle strengen, ATTR-013 meldt de
+    netwerkknopen plus de vrijvervalstrengen. Een persleiding of een compartiment houdt
+    daardoor een weggezette hoogte die in geen enkele melding terugkomt (BO-27). De
+    fixture kent zulke objecten niet, dus ze worden hier op de geladen dataset
+    nagebootst: streng 1 en put A krijgen een klasse buiten de populatie.
+    """
+    config = fixtureconfig()
+    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl")
+    streng = next(conduit for conduit in ruw.conduits.values() if conduit.label == "1")
+    put = next(node for node in ruw.nodes.values() if node.label == "A")
+    conduits = dict(ruw.conduits)
+    conduits[streng.uri] = replace(streng, types=frozenset({f"{GWSW}Persleiding"}))
+    nodes = dict(ruw.nodes)
+    nodes[put.uri] = replace(put, types=frozenset({f"{GWSW}Compartiment"}))
+    dataset = markeer_vulwaarden(
+        replace(ruw, conduits=conduits, nodes=nodes),
+        config.vulwaarden.hoogte_kenmerken,
+        config.vulwaarden.hoogte_band_m,
+    )
+
+    context = CheckContext(dataset=dataset, config=config)
+    outcome = run_checks(context, ["ATTR-013"]).outcomes[0]
+
+    assert labels(outcome) == ["B"]
+    assert any(
+        "daarnaast 1 knoop en 1 streng buiten de gemelde populatie" in note
+        for note in outcome.notes
+    ), outcome.notes
 
 
 def test_attr013_zegt_dat_de_regel_uit_staat() -> None:
@@ -316,6 +366,39 @@ def test_rvz002_verantwoordt_de_putten_zonder_drempel() -> None:
         outcome.notes
     )
     assert any("Overstortput_Overstortdrempel_card" in note for note in outcome.notes)
+
+
+@pytest.mark.parametrize(
+    ("bestand", "check_id", "boodschap"),
+    [
+        (
+            "rvz002_drempel_zonder_niveau.ttl",
+            "RVZ-002",
+            "De enige overstortdrempel van deze put heeft geen drempelniveau "
+            "(`Drempelniveau`) geregistreerd.",
+        ),
+        (
+            "rvz003_drempel_zonder_breedte.ttl",
+            "RVZ-003",
+            "De enige overstortdrempel van deze put heeft geen drempelbreedte "
+            "(`Drempelbreedte`) geregistreerd.",
+        ),
+    ],
+)
+def test_overstort_met_drempel_zonder_waarde_meldt_lopend_nederlands(
+    bestand: str, check_id: str, boodschap: str
+) -> None:
+    """De tak 'wel een drempel, geen waarde' had geen test op haar tekst.
+
+    Bij een enkele drempel liep de zin fout ("Geen van de 1 overstortdrempels"), en het
+    voltooid deelwoord stond ervoor, waar het bij de breedte niet klopte ("een
+    geregistreerd drempelbreedte"). De toelichting noemt nu het bereik zoals de andere
+    notities in deze module dat doen.
+    """
+    outcome = uitkomst(bestand, check_id)
+
+    assert [bevinding.message for bevinding in outcome.findings] == [boodschap]
+    assert outcome.notes == ["Bekeken: 1 overstortput in deze dataset (Overstortput, Stuwput)."]
 
 
 def test_rvz011_meldt_de_waking() -> None:

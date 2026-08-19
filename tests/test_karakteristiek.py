@@ -12,7 +12,7 @@ from pathlib import Path
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.dataset import load_dataset
+from nlriochecker.dataset import load_dataset, markeer_vulwaarden
 from nlriochecker.karakteristiek import bepaal_karakteristiek
 from nlriochecker.reporting import write_check_report
 
@@ -113,3 +113,28 @@ def test_de_sectie_staat_in_het_bevindingenrapport(tmp_path: Path) -> None:
     assert "| Begindatum | 4 | 3 (75.0%) | dag |" in tekst
     assert "| maaiveldhoogte | 5 | 2 | 1 (50.0%) |" in tekst
     assert "expliciet dat de inwinning niet te achterhalen is" in tekst
+
+
+def test_de_weggezette_vulwaarden_staan_onder_de_inwinningstabel(tmp_path: Path) -> None:
+    """De vulwaarde-leesregel verlaagt de noemers van deze tabel; het rapport zegt het erbij.
+
+    `bepaal_karakteristiek` draait op de gemarkeerde dataset, dus een hoogte binnen de
+    band telt niet meer als registratie. Op De Wolden scheelt dat bijna 15.000 waarden
+    (BO-27); een noemer die zonder uitleg verspringt leest als een meetfout.
+    """
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    dataset = markeer_vulwaarden(
+        load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl"),
+        config.vulwaarden.hoogte_kenmerken,
+        config.vulwaarden.hoogte_band_m,
+    )
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["ATTR-013"])
+
+    assert run.karakteristiek is not None
+    assert run.karakteristiek.vulwaarden == 3
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "3 hoogtewaarden vielen binnen de vulwaardeband" in tekst

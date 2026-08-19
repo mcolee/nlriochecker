@@ -155,6 +155,23 @@ meldingen een ander ID dan in de vorige versie, en verschijnen ze in een diff ee
 als opgelost plus nieuw. Een `geo:`-sleutel verschuift bovendien mee zodra de geometrie
 in de bron wijzigt.
 
+Sinds deze versie verschuiven er nog drie dingen, alle drie zonder dat `schema_versie`
+verandert -- de vorm van het contract blijft gelijk, alleen de meldingen die het draagt
+bewegen:
+
+- **ATTR-006** vult voortaan de detailsleutel `zijde` (`beginpunt` of `eindpunt`). Die
+  sleutel telt mee in `melding_id`, dus *elke* ATTR-006-melding krijgt een ander ID dan
+  in de vorige versie. Voorheen botsten de twee meldingen op dezelfde streng en kreeg de
+  tweede een volgnummer (`…-2`); nu heeft elke zijde haar eigen, stabiele ID.
+- **NET-004** noemt bij parallelle strengen op dezelfde kant de eerste op URI in plaats
+  van de laatst toegevoegde. Ligt er zo'n paar in de gemelde kring, dan wijst de melding
+  een andere streng aan en verschuift haar ID eenmalig.
+- De **vulwaarde-leesregel** (`[vulwaarden]`, ATTR-013) laat meldingen verdwijnen die op
+  een hoogte rond 0 m NAP rustten. Op De Wolden zijn dat 6.498 fouten en 3.647
+  waarschuwingen, verdeeld over veertien checks; een trendvergelijking over deze grens
+  heen leest die ID's als opgelost terwijl er in de dataset niets is hersteld. Zie BO-27
+  in [docs/beslislog.md](beslislog.md) voor de tabel per check.
+
 De geometrie van het externe object zit **niet** in de JSON -- die zou als WKB in het
 contract belanden. Wie hem wil, vindt het object in de GeoPackage: de lagen
 `bouwwerken` en `waterdelen_zonder_zinker` dragen dezelfde sleutel in hun kolom `id`.

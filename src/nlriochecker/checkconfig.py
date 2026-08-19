@@ -8,8 +8,16 @@ from importlib import resources
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
+from nlriochecker.dataset import VULWAARDE_KENMERKEN
 from nlriochecker.errors import ConfigError
 
 DEFAULT_CHECK_CONFIG_NAME = "checks.toml"
@@ -285,8 +293,30 @@ class VulwaardeOptions(BaseModel):
 
     # De kenmerken (korte GWSW-naam, zoals `Aspect.kind`) waarop de leesregel werkt.
     hoogte_kenmerken: list[str] = Field(default_factory=list)
-    # |waarde| kleiner dan of gelijk aan deze band telt als vulwaarde.
-    hoogte_band_m: float = Field(default=0.01, ge=0.0)
+    # |waarde| kleiner dan of gelijk aan deze band telt als vulwaarde. De bovengrens is
+    # geen drempel maar een invoertoets: een halve meter is als vulwaardeband al veel
+    # ruimer dan enig project nodig heeft (De Wolden komt uit op 0,01), en wie de eenheid
+    # mist en centimeters of millimeters invult (1 of 10 in plaats van 0,01) leest zonder
+    # die grens elke BOB en elke maaiveldhoogte als ontbrekend -- een stille run waarin
+    # veertien checks niets meer vinden.
+    hoogte_band_m: float = Field(default=0.01, ge=0.0, le=0.5)
+
+    @field_validator("hoogte_kenmerken")
+    @classmethod
+    def _bekende_kenmerken(cls, kenmerken: list[str]) -> list[str]:
+        """Weigert een kenmerk waarop de leesregel niet werkt.
+
+        `markeer_vulwaarden` kijkt naar vier velden. Een naam die daar niet bij hoort,
+        of dezelfde naam met ander hoofdlettergebruik, doet stil niets terwijl ATTR-013
+        in haar toelichting meldt dat de regel op dat kenmerk gold.
+        """
+        onbekend = [kenmerk for kenmerk in kenmerken if kenmerk not in VULWAARDE_KENMERKEN]
+        if onbekend:
+            raise ValueError(
+                f"hoogte_kenmerken kent {', '.join(onbekend)} niet; de leesregel werkt "
+                f"alleen op {', '.join(sorted(VULWAARDE_KENMERKEN))}"
+            )
+        return kenmerken
 
 
 class NamingOptions(BaseModel):

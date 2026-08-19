@@ -1359,6 +1359,17 @@ melding: ATTR-013 rapporteert die objecten nooit. Dat is hier zonder gevolg -- g
 hoogtecheck kijkt naar een persleiding -- maar het is een stille plek, en zodra een check op
 die klassen gebouwd wordt moet ATTR-013's populatie meebewegen.
 
+Aan de knoopkant staat precies hetzelfde: `markeer_vulwaarden` loopt over *alle* knopen in
+`dataset.nodes`, terwijl ATTR-013 de netwerkknopen meldt (put, afvoer- en lozingseindpunt,
+bergbezinkvoorziening). Een maaiveldhoogte of dekselniveau op een compartiment- of
+hulpstukorientatie wordt dus wel als ontbrekend gelezen en nooit gemeld.
+
+Beide helften zijn sindsdien niet meer stil: de toelichting van ATTR-013 telt hoeveel knopen
+en hoeveel strengen met een vulwaarde buiten haar gemelde populatie vallen. Het getal wordt
+per run berekend uit de gemarkeerde dataset, zodat het niet uit de pas kan lopen met wat de
+leesregel deed. Wat er nog niet staat is de klasse-uitsplitsing hierboven -- die staat hier,
+gemeten op De Wolden, en niet in het rapport.
+
 **Waarom een leesregel na het laden en niet in de lader.** De cache bewaart de ruwe parse;
 de band is projectconfiguratie. Zou de lader hem toepassen, dan zat een projectkeuze in de
 cachesleutel en leverde dezelfde TTL onder twee configuraties twee cache-ingangen op. Nu
@@ -1396,3 +1407,12 @@ die ze nog niet had. Ze noemen de vulwaarde niet als reden -- dat doet ATTR-013 
 alleen een HGT-toelichting leest, ziet "geen BOB" en niet "een BOB van 0,000". De
 `melding_id`'s van de vervallen HGT-meldingen verdwijnen; een trendvergelijking over deze
 grens heen ziet ze eenmalig als opgelost.
+
+Ook de tabel met datakarakteristieken beweegt mee: `bepaal_karakteristiek` draait op de
+gemarkeerde dataset, dus de kolom *Waarden* telt sindsdien alleen echte registraties.
+Op De Wolden zakt de noemer daarmee met de 11.812 BOB-waarden binnen de band en met de
+circa 3,1 duizend maaiveldhoogten daarbinnen (de 14% hierboven), en het histogram per
+inwinningswijze zakt mee. Dat zijn de eerlijker
+getallen -- een vulwaarde is geen registratie -- maar een noemer die zonder uitleg
+verspringt leest als een meetfout, dus het rapport zegt het er zelf bij: onder de tabel
+staat hoeveel hoogtewaarden de leesregel heeft weggezet.
