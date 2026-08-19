@@ -19,6 +19,7 @@ from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
+from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import _lees_geopackage, load_study_area
 from nlriochecker.uitvoer.gpkg import RD_NEW, schrijf_geopackage
@@ -180,10 +181,12 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
     )
 
     assert [naam for naam, _, _ in stijlen] == [
+        "bouwwerken",
         "mechanisch_riool",
         "meldinglocaties",
         "putten",
         "strengen",
+        "waterdelen_zonder_zinker",
     ]
     for _, qml, standaard in stijlen:
         assert standaard == 1
@@ -534,3 +537,104 @@ def test_runmetadata_zonder_meetbereik_laat_de_velden_leeg(tmp_path: Path) -> No
     pad = _schrijf(_run("schoon.ttl"), tmp_path)
 
     assert _rijen(pad, "select cfk_set, volledig from gwsw_run") == [("", 0)]
+
+
+def _ext_bronnen() -> ExternalData:
+    """De miniatuurbronnen uit tests/fixtures/gis/ext."""
+    basis = load_check_config().bronnen.model_copy(
+        update={
+            "map": ".",
+            "bgt": "bgt.gpkg",
+            "bag_pand": "bag_pand.gpkg",
+            "nwb_wegvakken": "nwb_wegvakken.gpkg",
+            "studiegebied": "studiegebied.gpkg",
+            "ahn_dtm": "ahn.tif",
+        }
+    )
+    return load_external_data(basis, GIS_DIR / "ext")
+
+
+def _ext_run() -> CheckRun:
+    """Een run met de EXT-checks op de scenariofixture."""
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl")
+    context = CheckContext(dataset=dataset, config=_config(), bronnen=_ext_bronnen())
+    return run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
+
+
+def _laagrijen(pad: Path, laag: str) -> list[dict]:
+    """De rijen van een laag als dicts, zonder geometrie en fid."""
+    con = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+    try:
+        return [
+            {sleutel: rij[sleutel] for sleutel in rij.keys() if sleutel not in {"geom", "fid"}}
+            for rij in con.execute(f'select * from "{laag}"')
+        ]
+    finally:
+        con.close()
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_bouwwerkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) -> None:
+    """De kerntest: niets erbij, niets eraf."""
+    run = _ext_run()
+    meldingen = bouw_meldingen(run, RUNDATUM)
+    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+
+    verwacht = {m.object2_uri for m in meldingen if m.check_id == "EXT-001"}
+
+    assert {rij["id"] for rij in _laagrijen(pad, "bouwwerken")} == verwacht
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_bouwwerk_wordt_ontdubbeld_met_de_sterkste_relatie(tmp_path: Path) -> None:
+    """Vier objecten raken hetzelfde pand: een rij, vier meldingen, binnen wint."""
+    run = _ext_run()
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    rijen = _laagrijen(pad, "bouwwerken")
+
+    assert len(rijen) == 1
+    assert rijen[0]["id"] == "bgt:pand/pand-1"
+    assert rijen[0]["bron"] == "bgt_pand"
+    assert rijen[0]["bronbestand"] == "bgt.gpkg"
+    assert rijen[0]["label"] == "pand pand-1"
+    assert rijen[0]["relatie"] == "binnen"
+    assert rijen[0]["afstand_min_m"] == 0.0
+    assert rijen[0]["aantal_meldingen"] == 4
+    assert rijen[0]["check_ids"] == "EXT-001"
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_waterdelenlaag_volgt_ext003_en_niet_ext002(tmp_path: Path) -> None:
+    """Streng 3 kruist water-2 met een duiker; dat waterdeel hoort er niet in."""
+    run = _ext_run()
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    rijen = _laagrijen(pad, "waterdelen_zonder_zinker")
+
+    assert [rij["id"] for rij in rijen] == ["bgt:waterdeel/water-1"]
+    assert rijen[0]["watertype"] == "waterloop"
+    assert rijen[0]["aantal_meldingen"] == 1
+    assert rijen[0]["check_ids"] == "EXT-003"
+    assert rijen[0]["buffer_m"] == _config().drempels.ext_watergang_buffer_m
+
+
+def test_lege_lagen_bestaan_en_zijn_geregistreerd(tmp_path: Path) -> None:
+    """Een run zonder EXT-treffers heeft beide lagen, leeg, met stijl en registratie."""
+    pad = _schrijf(_run("schoon.ttl"), tmp_path)
+
+    for laag in ("bouwwerken", "waterdelen_zonder_zinker"):
+        assert _rijen(pad, f'select count(*) from "{laag}"')[0][0] == 0
+        geregistreerd = _rijen(pad, "select count(*) from gpkg_contents where table_name = ?", laag)
+        gestyled = _rijen(pad, "select count(*) from layer_styles where f_table_name = ?", laag)
+        assert (geregistreerd[0][0], gestyled[0][0]) == (1, 1)

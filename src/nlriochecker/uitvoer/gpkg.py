@@ -49,7 +49,18 @@ RICHTING_MEE = "mee"
 RICHTING_TEGEN = "tegen"
 RICHTING_ONBEKEND = "onbekend"
 
-FEATURELAGEN = ("putten", "strengen", "meldinglocaties", "mechanisch_riool")
+FEATURELAGEN = (
+    "putten",
+    "strengen",
+    "meldinglocaties",
+    "mechanisch_riool",
+    "bouwwerken",
+    "waterdelen_zonder_zinker",
+)
+
+# De relaties van EXT-001, van zwaar naar licht. De laag toont de sterkste over de
+# meldingen die naar hetzelfde bouwwerk verwijzen.
+RELATIE_STERKTE = ("binnen", "kruist", "nabij")
 
 MECHANISCH_OMSCHRIJVING = "Mechanisch riool: niet geanalyseerd"
 
@@ -83,6 +94,8 @@ class _LaagTellingen:
     putten: int
     strengen: int
     mechanisch: int
+    bouwwerken: int
+    waterdelen: int
 
 
 def schrijf_geopackage(
@@ -109,7 +122,7 @@ def schrijf_geopackage(
     # `connect` staat binnen de try: faalde hij ervoor, dan werd `einde_fase` nooit
     # geroepen en kreeg de gebruiker na de foutmelding een terminal zonder cursor
     # terug -- die zet click pas bij het afsluiten van de balk weer aan.
-    voortgang.start_fase("GeoPackage", 8)
+    voortgang.start_fase("GeoPackage", 10)
     verbinding: sqlite3.Connection | None = None
     try:
         verbinding = sqlite3.connect(doel)
@@ -404,12 +417,191 @@ def _schrijf_features(
     voortgang.stap(label="mechanisch_riool")
     _schrijf_meldinglocaties(verbinding, meldingen)
     voortgang.stap(label="meldinglocaties")
+    bouwwerken, waterdelen = _schrijf_treffers(verbinding, run, meldingen, config, voortgang)
 
     return _LaagTellingen(
         putten=tellingen["putten"],
         strengen=tellingen["strengen"],
         mechanisch=tellingen["mechanisch"],
+        bouwwerken=bouwwerken,
+        waterdelen=waterdelen,
     )
+
+
+def _bouwwerk_kolommen() -> list[_Kolom]:
+    """De kolommen van de laag `bouwwerken`."""
+    return [
+        _Kolom("id", "text"),
+        _Kolom("bron", "text"),
+        _Kolom("bronbestand", "text"),
+        _Kolom("label", "text"),
+        _Kolom("relatie", "text"),
+        _Kolom("afstand_min_m", "real"),
+        _Kolom("aantal_meldingen", "integer"),
+        _Kolom("check_ids", "text"),
+    ]
+
+
+def _waterdeel_kolommen() -> list[_Kolom]:
+    """De kolommen van de laag `waterdelen_zonder_zinker`."""
+    return [
+        _Kolom("id", "text"),
+        _Kolom("watertype", "text"),
+        _Kolom("bronbestand", "text"),
+        _Kolom("label", "text"),
+        _Kolom("aantal_meldingen", "integer"),
+        _Kolom("check_ids", "text"),
+        _Kolom("buffer_m", "real"),
+    ]
+
+
+def _schrijf_treffers(
+    verbinding: sqlite3.Connection,
+    run: CheckRun,
+    meldingen: list[Melding],
+    config: CheckConfig,
+    voortgang: Voortgang,
+) -> tuple[int, int]:
+    """Schrijft de externe objecten waarnaar de EXT-meldingen verwijzen.
+
+    Strikte aansluiting: de rijen komen uit de meldingen van déze uitvoer, gejoind op
+    het trefferregister van de run (`checks/treffers.py`). Deze schrijver bevraagt
+    geen externe bron en doet geen ruimtelijke selectie, dus laag en testuitkomst
+    kunnen niet uit elkaar lopen. Bij rapportage per studiegebied-feature betekent dat
+    vanzelf: per gebied alleen de treffers van dat gebied, en een pand op de
+    buurtgrens in beide bestanden.
+
+    Twee beperkingen erven mee uit de detectie en worden bewust niet gerepareerd:
+    EXT-001 meldt per object alleen het sterkste bouwwerk, en de watergangcheck stopt
+    na het eerste gevonden waterdeel per streng. Zie de beslislog.
+    """
+    _maak_featurelaag(
+        verbinding,
+        "bouwwerken",
+        "MULTIPOLYGON",
+        _bouwwerk_kolommen(),
+        "BGT- en BAG-bouwwerken waarnaar een EXT-001-melding verwijst.",
+    )
+    _maak_featurelaag(
+        verbinding,
+        "waterdelen_zonder_zinker",
+        "MULTIPOLYGON",
+        _waterdeel_kolommen(),
+        "BGT-waterdelen waarnaar een EXT-003-melding verwijst.",
+    )
+
+    aantal_bouwwerken = _vul_trefferlaag(
+        verbinding,
+        run,
+        "bouwwerken",
+        _bouwwerk_kolommen(),
+        _groepeer_op_treffer(meldingen, "EXT-001"),
+        lambda treffer, verwijzend: (
+            treffer.sleutel,
+            treffer.bron,
+            treffer.bronbestand,
+            treffer.label,
+            _sterkste_relatie(verwijzend),
+            _kleinste_afstand(run, treffer.sleutel, verwijzend),
+            len(verwijzend),
+            _check_ids(verwijzend),
+        ),
+    )
+    voortgang.stap(label="bouwwerken")
+
+    aantal_waterdelen = _vul_trefferlaag(
+        verbinding,
+        run,
+        "waterdelen_zonder_zinker",
+        _waterdeel_kolommen(),
+        _groepeer_op_treffer(meldingen, "EXT-003"),
+        lambda treffer, verwijzend: (
+            treffer.sleutel,
+            treffer.label,
+            treffer.bronbestand,
+            treffer.label,
+            len(verwijzend),
+            _check_ids(verwijzend),
+            config.drempels.ext_watergang_buffer_m,
+        ),
+    )
+    voortgang.stap(label="waterdelen_zonder_zinker")
+    return aantal_bouwwerken, aantal_waterdelen
+
+
+def _groepeer_op_treffer(meldingen: list[Melding], check_id: str) -> dict[str, list[Melding]]:
+    """De meldingen van een check, gegroepeerd op het externe object dat ze aanwijzen."""
+    per_treffer: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        if melding.check_id == check_id and melding.object2_uri:
+            per_treffer[melding.object2_uri].append(melding)
+    return per_treffer
+
+
+def _vul_trefferlaag(
+    verbinding: sqlite3.Connection,
+    run: CheckRun,
+    laag: str,
+    kolommen: list[_Kolom],
+    per_treffer: dict[str, list[Melding]],
+    rij_van,
+) -> int:
+    """Schrijft een trefferlaag en levert het aantal rijen terug.
+
+    Een sleutel zonder treffer in het register wordt overgeslagen: dat kan alleen bij
+    een met de hand samengestelde `CheckRun`, en een rij zonder geometrie is in een
+    featurelaag niets waard.
+    """
+    rijen = []
+    grenzen: list[tuple[float, float, float, float]] = []
+    for sleutel in sorted(per_treffer):
+        treffer = run.treffers.get(sleutel)
+        if treffer is None or treffer.geometrie.is_empty:
+            continue
+        grenzen.append(treffer.geometrie.bounds)
+        rijen.append((_blob(treffer.geometrie), *rij_van(treffer, per_treffer[sleutel])))
+
+    if rijen:
+        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
+        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
+        verbinding.executemany(
+            f'insert into "{laag}" (geom, {velden}) values ({plaatshouders})', rijen
+        )
+    _zet_omhullende(verbinding, laag, grenzen)
+    return len(rijen)
+
+
+def _sterkste_relatie(meldingen: list[Melding]) -> str:
+    """De zwaarste relatie over de verwijzende meldingen: binnen > kruist > nabij.
+
+    De relatie staat in het meldingveld `waarde`, dat EXT-001 al vulde; er wordt hier
+    niets uit een `Finding` opnieuw afgeleid.
+    """
+    relaties = [melding.waarde for melding in meldingen if melding.waarde in RELATIE_STERKTE]
+    if not relaties:
+        return ""
+    return min(relaties, key=RELATIE_STERKTE.index)
+
+
+def _kleinste_afstand(run: CheckRun, sleutel: str, meldingen: list[Melding]) -> float | None:
+    """De kleinste afstand over de verwijzende meldingen, of None.
+
+    `Melding` draagt de afstand niet -- die zit in `Finding.details` en komt daar niet
+    doorheen -- dus hij komt uit het trefferregister, opgezocht op de drie velden die
+    elke melding wel draagt.
+    """
+    afstanden = [
+        afstand
+        for melding in meldingen
+        if (afstand := run.treffers.afstand(sleutel, melding.check_id, melding.object_uri))
+        is not None
+    ]
+    return min(afstanden) if afstanden else None
+
+
+def _check_ids(meldingen: list[Melding]) -> str:
+    """De checks die naar deze treffer verwijzen, gesorteerd."""
+    return ", ".join(sorted({melding.check_id for melding in meldingen}))
 
 
 def _mechanisch_kolommen() -> list[_Kolom]:
