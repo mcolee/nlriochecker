@@ -20,7 +20,7 @@ from nlriochecker.checks.base import (
     register,
 )
 from nlriochecker.checks.selectie import putten, vrijvervalrioolleidingen
-from nlriochecker.checks.verbanden import putten_van
+from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
 
 
@@ -355,7 +355,11 @@ class DiameterGroterDanPut(_StrengCheck):
             maat = _grootste_maat(conduit)
             if maat is None:
                 continue
-            for node in putten_van(context, conduit):
+            begin, eind = verbonden_knopen(context, conduit)
+            for zijde, put_uri in (("beginpunt", begin), ("eindpunt", eind)):
+                node = context.dataset.nodes.get(put_uri) if put_uri else None
+                if node is None:
+                    continue
                 putmaat = _grootste_putmaat(node)
                 if putmaat is None or maat <= putmaat + marge:
                     continue
@@ -364,10 +368,11 @@ class DiameterGroterDanPut(_StrengCheck):
                     conduit.uri,
                     conduit.label,
                     f"Profielmaat {maat:g} mm is groter dan de grootste binnenmaat "
-                    f"{putmaat:g} mm van put {node.label!r}.",
+                    f"{putmaat:g} mm van put {node.label!r} aan het {zijde}.",
                     maat_mm=maat,
                     putmaat_mm=putmaat,
                     put=node.label,
+                    zijde=zijde,
                 )
 
     def notes(self, context: CheckContext) -> list[str]:

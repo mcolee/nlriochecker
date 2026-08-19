@@ -52,6 +52,7 @@ DEFECTEN = [
     ("attr004_rond_ongelijk.ttl", "ATTR-004", ["1"]),
     ("attr005_centimeters.ttl", "ATTR-005", ["1", "1"]),
     ("attr006_te_grote_streng.ttl", "ATTR-006", ["1"]),
+    ("attr006_twee_te_kleine_putten.ttl", "ATTR-006", ["1", "1"]),
     ("attr007_toekomstig_jaar.ttl", "ATTR-007", ["1"]),
     ("attr008_lange_streng.ttl", "ATTR-008", ["1"]),
     ("attr009_lengte_wijkt_af.ttl", "ATTR-009", ["1"]),
@@ -144,6 +145,13 @@ def test_attr005_noemt_de_vermoedelijke_waarde() -> None:
 
     assert bevinding.details["waarde_mm"] == pytest.approx(30)
     assert bevinding.details["vermoedelijke_waarde_mm"] == pytest.approx(300)
+
+
+def test_attr006_onderscheidt_de_twee_zijden() -> None:
+    bevindingen = uitkomst("attr006_twee_te_kleine_putten.ttl", "ATTR-006").findings
+
+    assert sorted(b.details["zijde"] for b in bevindingen) == ["beginpunt", "eindpunt"]
+    assert sorted(b.details["put"] for b in bevindingen) == ["A", "B"]
 
 
 def test_attr009_meldt_beide_lengten() -> None:

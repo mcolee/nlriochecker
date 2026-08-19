@@ -552,6 +552,20 @@ FIXTURES["attr006_te_grote_streng.ttl"] = (
     ),
 )
 
+FIXTURES["attr006_twee_te_kleine_putten.ttl"] = (
+    "streng 1 is 1200 mm terwijl put A en put B allebei 800 bij 800 mm zijn",
+    nette_put("PutA", "A", *A, BreedtePut=800, LengtePut=800)
+    + nette_put("PutB", "B", *B, BreedtePut=800, LengtePut=800)
+    + nette_leiding(
+        "L1",
+        "1",
+        [A, B],
+        "PutA",
+        "PutB",
+        velden={"BreedteLeiding": 1200, "HoogteLeiding": 1200},
+    ),
+)
+
 FIXTURES["attr007_toekomstig_jaar.ttl"] = (
     "streng 1 heeft begindatum 2099-01-01",
     nette_put("PutA", "A", *A)
