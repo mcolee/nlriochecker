@@ -100,8 +100,8 @@ groen is om een reden die op echte data niet geldt. Er is geen `Zinker`-fixture.
    waterdeel per streng) blijft ongewijzigd.
 3. `notes()` van EXT-002 en EXT-003 melden hoeveel strengen van de klassen in
    `klassen.kruisingsleiding` die géén vrijvervalleiding zijn (op deze dataset dus
-   duikers) buiten de populatie vallen en niet bekeken zijn. Nul is ook een regel waard
-   als de klasse in de config staat.
+   duikers) buiten de populatie vallen en niet bekeken zijn; alleen klassen met ten
+   minste één zo'n streng krijgen een regel.
 4. Registerrij EXT-003 gepreciseerd: "Kruising met watergang zonder registratie als
    zinker; een duiker is geen rioolleiding en valt buiten de populatie". Ernst en dimensie
    ongewijzigd. Beslislog BO-25.
