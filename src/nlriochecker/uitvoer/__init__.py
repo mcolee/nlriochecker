@@ -19,6 +19,7 @@ from pathlib import Path
 
 from nlriochecker.checks import CheckRun
 from nlriochecker.studiegebied import MAP_TOTAAL
+from nlriochecker.taal import getal
 from nlriochecker.toetsloop import GebiedsRun
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
@@ -212,8 +213,10 @@ def _schrijf_totaal(
 
     synthese = schrijf_markdown(
         doel / FILE_SYNTHESE,
-        f"# Synthese over {len(runs)} gebieden {eerste.dataset.source.name}",
-        totaalsynthese(verzameld, beschikbaar, overgeslagen),
+        # De titel noemt het gebied waar het rapport over gaat, net als het
+        # bevindingenrapport per gebied; de dataset staat in de romp.
+        f"# Totaal ({getal(len(runs), 'gebied', 'gebieden')})",
+        totaalsynthese(verzameld, beschikbaar, overgeslagen, eerste.dataset.source.name),
         run_datum,
         markering=eerste.meetbereik.markering(),
     )

@@ -21,6 +21,13 @@ from nlriochecker.checks import REGISTRY, CheckRun, Severity
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import BRON_NULMETING, Melding, bouw_meldingen
+from nlriochecker.uitvoer.omvang import omvangtabel
+from nlriochecker.uitvoer.samenvatting import (
+    NIET_GEMETEN,
+    VINKJE,
+    als_tabel,
+    samenvatting,
+)
 from nlriochecker.uitvoer.synthese import rode_draad
 from nlriochecker.uitvoer.tabel import prepare, table
 
@@ -90,7 +97,7 @@ def write_check_report(
 
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
-        f"# Checkbevindingen {run.dataset.source.name}",
+        f"# {_titel(run)}",
         _render_checks(run, meldingen, notities),
         run_datum,
         markering=run.meetbereik.markering(),
@@ -166,12 +173,93 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=CSV_KOLOMMEN)
 
 
+def _titel(run: CheckRun) -> str:
+    """De titel van het rapport: de naam van het gebied waar het over gaat.
+
+    De lezer moet aan de titel kunnen zien waar dit rapport over gaat; "Checkbevindingen
+    dewolden_orox.ttl" zei dat niet zodra er per buurt gerapporteerd werd.
+
+    Bij een gebied zonder `naam_gebied` -- een bestand met een enkele feature -- valt de
+    titel terug op de aanduiding die `StudyArea` zelf samenstelt uit het bestand en de
+    laag. Zonder studiegebied blijft de dataset de aanduiding.
+    """
+    if run.study_area is None:
+        return f"Checkbevindingen {run.dataset.source.name}"
+    return run.study_area.gebied or run.study_area.name
+
+
 def _render_checks(
     run: CheckRun, meldingen: list[Melding], notities: Sequence[str] = ()
 ) -> list[str]:
-    """Stelt de romp van het bevindingenrapport samen; de kop komt uit `schrijf_markdown`."""
+    """Stelt de romp van het bevindingenrapport samen; de kop komt uit `schrijf_markdown`.
+
+    De volgorde is die van issue #16 en is onderdeel van de uitvoer: eerst waar het
+    over gaat (de aantallen), dan of het voldoet (de managementsamenvatting en de rode
+    draad), dan de verantwoording van wat er wel en niet bekeken is, en pas daarna het
+    detail -- eerst de compliance van de GWSW-nulmeting, dan de eigen bevindingen.
+    """
+    lines = _omvang_section(run)
+    lines += _samenvatting_section(run, meldingen)
+    # De rode draad hoort bij de samenvatting en niet bij het detail: hij zegt wat de
+    # bevindingen samen betekenen, en dat is precies wat een lezer na de vier regels
+    # hierboven wil weten -- niet pas achter de tabellen.
+    lines += rode_draad(run, meldingen)
+    lines += _verantwoording(run, meldingen, notities)
+    lines += _detail_nulmeting(run, meldingen)
+    lines += _detail_eigen(run, meldingen)
+    lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
+    return lines
+
+
+def _omvang_section(run: CheckRun) -> list[str]:
+    """Wat er in het gebied ligt: aantallen per objecttype en stelseltype.
+
+    De schil staat als voetnoot en niet in de tabel: er wordt niet over gerapporteerd,
+    en hem meetellen zou de aantallen laten afwijken van de bevindingen eronder.
+    """
+    regels = ["## Wat er in dit gebied ligt", ""]
+    regels += table(omvangtabel(run), "Aantallen in de kern")
+    stel = run.analyseset
+    if stel is not None:
+        regels += [
+            "",
+            f"> De tabel telt de {getal(len(stel.kern), 'object', 'objecten')} in de kern. "
+            f"Daarbuiten zag de analyse nog {len(stel.schil)} objecten in de contextschil, "
+            "nodig om de netwerkchecks hun antwoord te laten houden; daar wordt niet over "
+            "gerapporteerd.",
+        ]
+    regels += [""]
+    return regels
+
+
+def _samenvatting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+    """Voldoen we in dit gebied: een regel per conformiteitsklasse plus de eigen checks."""
+    regels = ["## Voldoen we in dit gebied?", ""]
+    regels += als_tabel(samenvatting(meldingen, run.meetbereik))
+    regels += [
+        "",
+        f"> Een {VINKJE} betekent nul fouten in dit gebied; waarschuwingen blokkeren niet "
+        "maar staan er wel bij. Een melding die meerdere conformiteitsklassen noemt telt "
+        "bij elke klasse mee, dus de som over de regels ligt hoger dan het totaal. "
+        f"Een {NIET_GEMETEN} betekent dat er over die klasse niets te zeggen valt.",
+        "",
+    ]
+    return regels
+
+
+def _verantwoording(
+    run: CheckRun, meldingen: list[Melding], notities: Sequence[str] = ()
+) -> list[str]:
+    """Wat er bekeken is, wat niet, en waaronder de rest gelezen moet worden.
+
+    Deze sectie stond voorheen boven aan het rapport. Ze is verplaatst, niet
+    ingekort: wat een check *niet* bekeken heeft hoort in het rapport, en stilte
+    leest als "alles gecontroleerd".
+    """
     onbetrouwbaar = sum(outcome.unreliable_count for outcome in run.outcomes)
     lines = [
+        "## Verantwoording",
+        "",
         f"Bron: `{run.dataset.source}` — {len(run.dataset.nodes)} knooppunten, "
         f"{len(run.dataset.conduits)} strengen.",
         "",
@@ -304,13 +392,8 @@ def _render_checks(
             "",
         ]
 
-    per_check: dict[str, list[Melding]] = defaultdict(list)
-    for melding in meldingen:
-        per_check[melding.check_id].append(melding)
-
     lines += _zonder_locatie(meldingen)
-    lines += rode_draad(run, meldingen)
-    lines += table(_check_summary(run, per_check), "Samenvatting per check")
+    lines += table(_check_summary(run, _per_check(meldingen)), "Samenvatting per check")
 
     skeletten = [outcome for outcome in run.outcomes if outcome.skeleton]
     if skeletten:
@@ -322,40 +405,96 @@ def _render_checks(
             + ". De reden staat bij de check zelf.",
             "",
         ]
+    return lines
 
-    for outcome in run.outcomes:
+
+def _per_check(meldingen: list[Melding]) -> dict[str, list[Melding]]:
+    """De meldingen gegroepeerd op check-ID."""
+    per_check: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        per_check[melding.check_id].append(melding)
+    return per_check
+
+
+def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+    """Het detail van de GWSW-nulmeting: per SHACL-vorm, eerst fouten dan waarschuwingen.
+
+    Per vorm en niet per melding. De vormen zijn er honderden en de meldingen op De
+    Wolden ruim honderdduizend; een lijst daarvan is geen rapport maar een CSV. Wat
+    een lezer hier nodig heeft is welke eis waar de mist in gaat, hoe vaak, en welke
+    conformiteitsklassen hem stellen. De losse meldingen staan in `bevindingen.csv`
+    en op de kaart.
+    """
+    uit_nulmeting = [melding for melding in meldingen if melding.bron == BRON_NULMETING]
+    if not run.meetbereik.gemeten:
+        return []
+
+    regels = ["", "## Detailrapportage", "", "### 1. GWSW-nulmeting", ""]
+    if not uit_nulmeting:
+        return [*regels, "_geen overtredingen_", ""]
+
+    per_vorm: dict[str, list[Melding]] = defaultdict(list)
+    for melding in uit_nulmeting:
+        per_vorm[melding.check_id].append(melding)
+
+    rijen: list[tuple[str, str, int, int, str]] = []
+    for check_id, groep in per_vorm.items():
+        klassen = sorted({cfk for melding in groep for cfk in melding.cfk})
+        rijen.append(
+            (
+                check_id,
+                groep[0].ernst,
+                len(groep),
+                sum(1 for melding in groep if melding.systemisch),
+                ", ".join(klassen),
+            )
+        )
+    kolommen = ["Vorm", "Ernst", "Overtredingen", "Systemisch", "Conformiteitsklassen"]
+    tabel = pd.DataFrame(
+        # Fouten boven waarschuwingen, en binnen elk het zwaarste eerst; dat is de
+        # volgorde waarin een lezer ze wil aflopen.
+        sorted(rijen, key=lambda rij: (rij[1] != "F", -rij[2], rij[0])),
+        columns=kolommen,
+    )
+    regels += table(tabel, f"Overtredingen per SHACL-vorm ({len(uit_nulmeting)})")
+    return [*regels, ""]
+
+
+def _detail_eigen(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+    """Het detail van de eigen checks, eerst de foutchecks dan de waarschuwingschecks."""
+    per_check = _per_check(meldingen)
+    regels = ["", "### 2. Eigen checks", ""]
+    volgorde = sorted(
+        run.outcomes, key=lambda outcome: (outcome.severity is not Severity.ERROR, outcome.check_id)
+    )
+    for outcome in volgorde:
         eigen = per_check.get(outcome.check_id, [])
-        lines += ["", f"## {outcome.check_id} — {outcome.title}", ""]
+        regels += ["", f"#### {outcome.check_id} — {outcome.title}", ""]
         markering = f" **Skelet: {outcome.skeleton}.**" if outcome.skeleton else ""
-        lines += [
+        regels += [
             f"Ernst {outcome.severity.value}, dimensie {outcome.dimension.value}. "
             f"{getal(len(eigen), 'bevinding', 'bevindingen')} op "
             f"{outcome.examined} bekeken objecten."
             f"{markering}",
         ]
         for note in outcome.notes:
-            lines += ["", f"> {note}"]
-        lines += _clusterduiding(eigen)
+            regels += ["", f"> {note}"]
+        regels += _clusterduiding(eigen)
         if not eigen:
-            lines += ["", "_geen bevindingen_"]
+            regels += ["", "_geen bevindingen_"]
             continue
-        lines += [""]
+        regels += [""]
         maximum = _maximum_per_check(run)
         getoond = eigen if maximum == 0 else eigen[:maximum]
-        lines += table(
-            _findings_frame(getoond),
-            f"Bevindingen ({len(eigen)})",
-        )
+        regels += table(_findings_frame(getoond), f"Bevindingen ({len(eigen)})")
         weggelaten = len(eigen) - len(getoond)
         if weggelaten:
-            lines += [
+            regels += [
                 "",
                 f"_{getal(weggelaten, 'bevinding', 'bevindingen')} niet getoond; "
                 f"de volledige lijst staat in `{FILE_CHECKS_CSV}`._",
             ]
-
-    lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
-    return lines
+    return regels
 
 
 def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:

@@ -48,6 +48,7 @@ from nlriochecker.uitvoer.objectkaart import (
     bepaal_status,
     popup_html,
 )
+from nlriochecker.uitvoer.omvang import stelseltypen
 from nlriochecker.uitvoer.stijlen.symbolen import bouw_qml
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
@@ -437,7 +438,7 @@ def _schrijf_features(
 
     per_object = _meldingen_per_object(meldingen)
     metadata = _metadata(run, run_datum)
-    stelsels = _stelseltypen(run)
+    stelsels = stelseltypen(run)
     config = run.config if run.config is not None else load_check_config()
     mechanisch = _mechanische_uris(run, config)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
@@ -1151,31 +1152,4 @@ def _meldingen_per_object(meldingen: list[Melding]) -> dict[str, list[Melding]]:
     per_object: dict[str, list[Melding]] = defaultdict(list)
     for melding in meldingen:
         per_object[melding.object_uri].append(melding)
-    return per_object
-
-
-def _stelseltypen(run: CheckRun) -> dict[str, str]:
-    """Het stelseltype per streng, en per put dat van de aansluitende strengen.
-
-    Het GWSW legt het stelseltype op de leiding vast; een put ontleent het aan wat
-    erop uitkomt. Komen daar meerdere soorten samen, dan staan ze er allemaal --
-    dat is voor NET-006 juist het interessante geval.
-    """
-    config = run.config if run.config is not None else load_check_config()
-    dataset = run.dataset
-    per_object: dict[str, str] = {}
-    per_put: dict[str, set[str]] = defaultdict(set)
-
-    for uri, conduit in dataset.conduits.items():
-        soort = config.klassen.stelseltype(conduit.types, dataset.closure)
-        if soort is None:
-            continue
-        per_object[uri] = soort
-        for kant in (conduit.start_node, conduit.end_node):
-            knoop = dataset.resolve_network_node(kant, config.klassen.netwerkknopen)
-            if knoop is not None:
-                per_put[knoop].add(soort)
-
-    for knoop, soorten in per_put.items():
-        per_object[knoop] = ", ".join(sorted(soorten))
     return per_object

@@ -16,10 +16,10 @@ tienduizenden keren in het bestand.
 Om dezelfde reden zijn de klassenamen kort. De markup staat per object in de
 GeoPackage, de stijl staat er een keer in de QML; wat hier een teken scheelt, scheelt
 op de volledige De Wolden-export tienduizenden keren zoveel. Gemeten op de
-Koekangerveld-run: circa 1.284 bytes per object met lange namen, circa 900 met korte,
-en dat schaalt op de 46.925 objecten van de volledige export naar circa 60 tegen circa
-42 MB. Wat overblijft is de boodschaptekst zelf, en die valt niet in te korten zonder
-er informatie uit te halen.
+Koekangerveld-run: 1.284 bytes per object met lange namen, 1.085 met korte, en dat
+schaalt op de 46.925 objecten van de volledige export naar circa 60 tegen circa 51 MB.
+De rest is de boodschaptekst zelf, en die valt niet in te korten zonder er informatie
+uit te halen.
 """
 
 from __future__ import annotations

@@ -13,6 +13,35 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Het bevindingenrapport van `toets` is opnieuw opgebouwd** (issue #16). De volgorde
+  is nu: de naam van het gebied als titel, dan wat er in dat gebied ligt, dan of het
+  voldoet, dan de verantwoording, en pas daarna het detail. De rapporten van
+  `analyseer`, `dekking` en `vergelijk` blijven ongewijzigd.
+
+  - **Titel:** de `naam_gebied` van het studiegebied, met terugval op de aanduiding die
+    `StudyArea` zelf samenstelt en, zonder studiegebied, op de dataset. De synthese in
+    `totaal/` heet "Totaal (N gebieden)"; de dataset staat in de romp.
+  - **Aantallen:** een tabel objecttype x stelseltype over de kern van het gebied, met
+    bij de leidingen zowel het aantal als de getekende meters. De contextschil staat als
+    voetnoot eronder en telt niet mee -- er wordt niet over gerapporteerd.
+  - **Managementsamenvatting:** een regel per conformiteitsklasse uit `vereiste_cfk`
+    plus een totaalregel voor de eigen checks. Een vinkje betekent nul fouten in dit
+    gebied; waarschuwingen blokkeren niet maar hun aantal staat er wel bij, met tussen
+    haakjes hoeveel er systemisch zijn. Een klasse waarop niet gemeten is -- geen
+    `--shacl`, of een `--cfk`-deelset waar zij buiten valt -- krijgt geen oordeel maar de
+    toestandstekst. Een klasse die wél in de deelset zat krijgt haar oordeel; het
+    voorbehoud over de deelset staat als markering boven het rapport (BO-7).
+  - **Detailrapportage** in twee herkomstblokken: eerst de GWSW-nulmeting (per SHACL-vorm,
+    fouten boven waarschuwingen, met de conformiteitsklassen erbij), dan de eigen checks
+    (de foutchecks boven de waarschuwingschecks).
+  - De rode draad staat bij de samenvatting in plaats van achter de tabellen. De
+    verantwoording -- niet-bekeken objecten, weggelaten bevindingen, ontbrekende
+    typeringspoort, niet-herleidbare focusnodes, externe bronnen, datakarakteristieken --
+    is verplaatst maar niet ingekort.
+
+  Nieuwe modules `uitvoer/omvang.py` (de aantallen, plus `stelseltypen` die de
+  GeoPackage ook gebruikt) en `uitvoer/samenvatting.py` (de vier regels).
+
 - **GWSW-conforme symbologie voor `putten` en `strengen`, met de kleur uitsluitend uit
   `status`.** Het symbool zegt wat voor object het is -- de indeling komt uit de
   PDOK-SLD's in `data/gwsw_opmaak/` -- en de kleur zegt hoe het ervoor staat:

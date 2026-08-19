@@ -192,8 +192,12 @@ def totaalsynthese(
     gebieden: Sequence[GebiedsSamenvatting],
     beschikbaar: Sequence[str],
     overgeslagen: Sequence[str],
+    dataset: str = "",
 ) -> list[str]:
     """Stelt de romp van de totaalsynthese over meerdere studiegebieden samen.
+
+    `dataset` staat in de romp en niet meer in de titel: die noemt sinds issue #16 het
+    gebied waar het rapport over gaat, hier "Totaal (N gebieden)".
 
     Per gebied de omvang en de meldingen, en daarboven het totaal over alle
     gebieden. Objecten op een gebiedsgrens tellen in elk rakend gebied mee (zie
@@ -201,6 +205,7 @@ def totaalsynthese(
     meldingen, en zegt deze sectie precies hoeveel dat verschil is. Zonder die zin
     leest een lezer die de kolommen optelt een verschil dat er niet is.
     """
+    kop = [f"Dataset: `{dataset}`.", ""] if dataset else []
     per_gebied = pd.DataFrame(
         [
             {
@@ -223,6 +228,7 @@ def totaalsynthese(
     meervoudig = sum(1 for aantal in Counter(alle_ids).values() if aantal > 1)
 
     regels = [
+        *kop,
         f"Deze synthese beslaat {getal(len(gebieden), 'gebied', 'gebieden')} "
         f"({', '.join(deel.naam for deel in gebieden)}).",
         "",

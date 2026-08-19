@@ -104,8 +104,10 @@ de brondata en mogen de popup niet kunnen breken.
 
 De klassenamen zijn kort (`k`, `l`, `t`, ...). De markup staat per object in de
 GeoPackage, de stijl staat er een keer in de QML; wat een teken scheelt, scheelt op de
-volledige export tienduizenden keren zoveel. Gemeten: circa 1.284 bytes per object met
-lange namen, en dat schaalt op 46.925 objecten naar circa 60 MB alleen aan `popup_html`.
+volledige export tienduizenden keren zoveel. Gemeten op de Koekangerveld-run: 1.284
+bytes per object met lange namen en 1.085 met korte, wat op de 46.925 objecten van de
+volledige export neerkomt op circa 60 tegen circa 51 MB alleen aan `popup_html`. De rest
+is de boodschaptekst, en die valt niet in te korten zonder er informatie uit te halen.
 
 ### K5. Wat er met de tellingen in `gwsw_run` gebeurt
 
