@@ -61,6 +61,20 @@ De rem staat op zes stappen: de langste keten in de export is drie
 (`beginpunt → orientatie → streng`), en zonder rem zou een cyclus in de brondata de
 run laten hangen.
 
+**Aanvulling na meting: ook `hasConnection`, maar alleen als eerste stap.** Met alleen
+`hasPart` en `hasAspect` bleven er 2.183 overtredingen zonder object, waarvan 1.605 op
+een `Maaiveldorientatie`. Die hangt in de De Wolden-export niet via `hasPart` of
+`hasAspect` onder haar put, maar via `hasConnection` onder de putorientatie -- en heeft
+verder geen houder. `hasConnection` is een symmetrische netwerkverbinding en dus geen
+insluiting; hem zomaar volgen zou de wandeling zijwaarts het netwerk in kunnen laten
+lopen en een melding op de verkeerde soort object laten landen. Twee beperkingen sluiten
+dat uit: hij wordt **als laatste** geprobeerd (een `BeginpuntLeiding` vindt eerst zijn
+leidingorientatie via `hasPart`, dus zijn melding landt op de streng) en **alleen in de
+eerste stap** (daarna gaat het weer puur langs insluitingen omhoog). Daarmee herleidt
+105.385 van de 105.963 overtredingen; wat overblijft zijn 575 op een stelsel en drie
+klassenamen -- objecten die geen put en geen streng zijn en dat ook niet horen te
+worden.
+
 ### K2. Wat "niet herleidbaar" betekent, en wat er dan met de melding gebeurt
 
 Het issue noemt twee gevallen in één adem: "joinen op geen object, of object zonder

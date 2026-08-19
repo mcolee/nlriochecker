@@ -147,3 +147,31 @@ def test_de_bevindingen_staan_in_een_vaste_volgorde(bevindingen: list[Nulbevindi
     sleutels = [(b.vorm, b.focus_node, b.boodschap) for b in bevindingen]
 
     assert sleutels == sorted(sleutels)
+
+
+def test_maaiveldorientatie_herleidt_via_hasconnection(
+    bevindingen: list[Nulbevinding], joinset: GwswDataset
+) -> None:
+    """De maaiveldorientatie hangt via hasConnection onder de putorientatie.
+
+    Op De Wolden zijn dat 1.605 overtredingen die anders geen put zouden vinden,
+    terwijl ze wel over het maaiveld van een bestaande put gaan.
+    """
+    bevinding = _een(bevindingen, "Maaiveldorientatie_Putorientatie_card", "PutC_ori_maa")
+
+    assert bevinding.object_uri in joinset.nodes
+    assert bevinding.object_label == "C"
+
+
+def test_een_leidingeinde_herleidt_naar_zijn_streng_en_niet_naar_de_put(
+    bevindingen: list[Nulbevinding], joinset: GwswDataset
+) -> None:
+    """hasConnection wordt pas als laatste geprobeerd, en alleen als eerste stap.
+
+    Een BeginpuntLeiding heeft zowel een hasPart-houder (zijn leidingorientatie) als
+    een hasConnection naar de putorientatie. Zou de verbinding voorgaan, dan zou de
+    melding op de verkeerde soort object landen.
+    """
+    bevinding = _een(bevindingen, "BeginpuntLeiding_Knooppunt_card", "L1_b")
+
+    assert bevinding.object_uri in joinset.conduits

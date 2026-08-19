@@ -21,6 +21,7 @@ from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import load_external_data
 from nlriochecker.meting import Meetbereik
+from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
 from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
@@ -54,7 +55,11 @@ def _uitslagen(gebiedsrun: GebiedsRun) -> list[tuple[str, int, int, tuple[str, .
     return [(o.check_id, o.examined, o.weggelaten, tuple(o.notes)) for o in gebiedsrun.run.outcomes]
 
 
-def _draai(bestand: str | None, ttl: str = "afbakening_kern_en_schil.ttl") -> list[GebiedsRun]:
+def _draai(
+    bestand: str | None,
+    ttl: str = "afbakening_kern_en_schil.ttl",
+    nulbevindingen: tuple[Nulbevinding, ...] = (),
+) -> list[GebiedsRun]:
     """Draait de toetsloop op een fixture, met of zonder studiegebiedbestand."""
     gebieden = load_studiegebieden(GIS_DIR / bestand) if bestand is not None else None
     return toets_gebieden(
@@ -63,7 +68,37 @@ def _draai(bestand: str | None, ttl: str = "afbakening_kern_en_schil.ttl") -> li
         _config(),
         onbetrouwbaar=frozenset(),
         meetbereik=Meetbereik.niet_gemeten(()),
+        nulbevindingen=nulbevindingen,
     )
+
+
+def _nulbevinding(focus: str, uri: str, herleid: bool = True) -> Nulbevinding:
+    """Een nulmetingbevinding op een object uit de afbakeningsfixture."""
+    return Nulbevinding(
+        check_id="NULMETING-Put_HoogtePut_card",
+        vorm="Put_HoogtePut_card",
+        focus_node=focus,
+        ernst="F",
+        object_uri=uri,
+        object_label=focus,
+        objecttype="Inspectieput",
+        boodschap="aantal voorkomens wijkt af (exact=1)",
+        waarde="te weinig voorkomens",
+        cfk=("Hyd", "MdsPlan"),
+        systemisch=False,
+        herleid=herleid,
+    )
+
+
+# De vier putten van `afbakening_kern_en_schil.ttl` liggen verdeeld over de buurten
+# Noord en Zuid; welke waar ligt is wat de equivalentietest hieronder uitzoekt.
+NULBEVINDINGEN = (
+    _nulbevinding("PutA", "http://example.org/toets#PutA"),
+    _nulbevinding("PutB", "http://example.org/toets#PutB"),
+    _nulbevinding("PutC", "http://example.org/toets#PutC"),
+    _nulbevinding("PutD", "http://example.org/toets#PutD"),
+    _nulbevinding("Rioolstelsel", "", herleid=False),
+)
 
 
 def test_per_gebied_gelijk_aan_een_losse_run() -> None:
@@ -460,3 +495,49 @@ def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: 
 
     assert aangewezen == {"bgt:pand/p-noord"}
     assert geschreven == aangewezen
+
+
+class TestNulmetingPerGebied:
+    """De nulmetingmeldingen volgen dezelfde equivalentie-eis als de eigen checks."""
+
+    def test_een_gebied_is_gelijk_aan_een_losse_run(self) -> None:
+        samen = _draai("buurten_twee.gpkg", nulbevindingen=NULBEVINDINGEN)
+        los = _draai("buurt_noord.gpkg", nulbevindingen=NULBEVINDINGEN)
+
+        noord = next(run for run in samen if run.naam == "Noord")
+
+        assert _sleutels(noord) == _sleutels(los[0])
+
+    def test_de_gebieden_zien_verschillende_putten(self) -> None:
+        """Anders zou de equivalentietest ook slagen als de afbakening niets deed."""
+        noord, zuid = _draai("buurten_twee.gpkg", nulbevindingen=NULBEVINDINGEN)
+
+        def herleid(run: GebiedsRun) -> set[str]:
+            return {b.focus_node for b in run.run.nulbevindingen if b.herleid}
+
+        assert herleid(noord) and herleid(zuid)
+        assert herleid(noord) != herleid(zuid)
+
+    def test_een_onherleide_bevinding_staat_in_elk_gebied(self) -> None:
+        """Hij is aan geen gebied toe te wijzen, dus hij mag uit geen gebied verdwijnen."""
+        noord, zuid = _draai("buurten_twee.gpkg", nulbevindingen=NULBEVINDINGEN)
+
+        for run in (noord, zuid):
+            assert any(not b.herleid for b in run.run.nulbevindingen)
+
+    def test_de_totaalsynthese_ontdubbelt_de_onherleide_bevinding(self, tmp_path: Path) -> None:
+        """In `totaal/` staat hij een keer, want daar wordt op melding-ID ontdubbeld."""
+        gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
+        runs = toets_gebieden(
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            gebieden,
+            _config(),
+            meetbereik=Meetbereik.niet_gemeten(()),
+            nulbevindingen=NULBEVINDINGEN,
+        )
+        schrijf_uitvoer_gebieden(runs, tmp_path, RUNDATUM, met_geopackage=False)
+
+        regels = (tmp_path / "totaal" / "bevindingen.csv").read_text(encoding="utf-8").splitlines()
+        onherleid = [regel for regel in regels if "Rioolstelsel" in regel]
+
+        assert len(onherleid) == 1

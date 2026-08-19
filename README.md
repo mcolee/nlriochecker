@@ -59,6 +59,34 @@ niet te onderscheiden. Lees zo'n CSV naast het rapport of de JSON van dezelfde r
 Een `toets` zonder `--shacl` meldt dat er niet tegen de conformiteitsklassen gemeten is.
 Dat is een eigen toestand, los van "volledig" en van "deelset".
 
+### De nulmeting tussen de eigen bevindingen
+
+Met `--shacl` komen de SHACL-overtredingen zelf ook in de uitvoer terecht, naast de
+bevindingen van de eigen checks en uit dezelfde meldingenstroom. Ze dragen
+`Bron = nulmeting`, `Categorie = NULMETING` en een check-ID dat de SHACL-vorm noemt
+(`NULMETING-LengteLeiding_val`). De kolom `CFK` -- in de JSON het veld `cfk` -- zegt welke
+conformiteitsklassen de overtreding noemen.
+
+Dezelfde overtreding staat vaak in meerdere CFK-rapporten. Er komt er dan **een**, met
+alle klassen erbij: de kaart en de kolom `n_fout` tellen gebreken, geen rapportregels.
+Een telling per klasse telt zo'n melding bij elke genoemde klasse mee, dus de som over de
+klassen ligt hoger dan het totaal.
+
+De focusnode van een SHACL-melding is meestal een put of een streng, en anders een
+onderdeel daarvan: het eindpunt van een leiding, de maaiveldorientatie van een put. Zo'n
+onderdeel wordt via `hasPart`, `hasAspect` en als laatste `hasConnection` omhooggelopen
+tot het object waar het bij hoort. Op De Wolden herleidt daarmee 99,5% van de
+overtredingen tot een put of een streng. Komt de focusnode nergens op uit -- een
+klassenaam uit `CfkTypes_typ`, een stelsel dat geen kaartobject is -- dan blijft de
+melding staan zonder object, zonder plek op de kaart en met een leeg gebied. Het rapport
+telt die gevallen expliciet, ook als het er nul zijn.
+
+Op de De Wolden-export leveren de drie rapporten samen 213.500 regels, en na ontdubbeling
+105.963 meldingen: 87.017 fouten en 18.946 waarschuwingen. Dat is geen modelleerfout maar
+de uitslag van de nulmeting zelf; de zwaarste posten zijn drie kardinaliteitsvormen die
+vrijwel elke inspectieput raken. Precies daarvoor is de systemisch-vlag: die zegt dat het
+over de export als geheel gaat en niet over een los gebrek.
+
 ### Rapporteren per gebied
 
 Met `--studiegebied` wordt de rapportage tot dat gebied beperkt. Bevat het bestand meer

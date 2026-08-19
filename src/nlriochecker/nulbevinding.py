@@ -12,9 +12,10 @@ Drie dingen gebeuren hier, en nergens anders:
    `lei2806-2807-1_lei2706_beg2706` is een `BeginpuntLeiding` die via `hasPart` onder
    de leidingorientatie hangt en via `hasAspect` onder de streng. Er wordt daarom
    omhooggelopen tot een knoop of streng -- dezelfde beweging als
-   `dataset.resolve_network_node`. Op De Wolden scheelt dat 3.025 focusnodes die
-   anders de kaart nooit zouden halen, waaronder alle 1.846
-   `EindpuntLeiding_Knooppunt_card`-fouten.
+   `dataset.resolve_network_node`. Op De Wolden herleidt 98% van de overtredingen zo
+   tot een object: 103.780 van de 105.963. Wat overblijft zijn de stelsels
+   (`vw_geb_6`, 575 stuks) en drie klassenamen uit `CfkTypes_typ` -- objecten die
+   geen put en geen streng zijn, en dat ook niet horen te worden.
 2. **De ontdubbeling.** Dezelfde overtreding staat vaak in meerdere CFK-rapporten.
    Er komt er een, met de conformiteitsklassen erbij. De sleutel is (focusnode,
    vorm, boodschap): binnen een rapport is (focusnode, vorm) al uniek, en de
@@ -56,6 +57,7 @@ MAX_DIEPTE = 6
 
 HAS_PART = URIRef(f"{GWSW}hasPart")
 HAS_ASPECT = URIRef(f"{GWSW}hasAspect")
+HAS_CONNECTION = URIRef(f"{GWSW}hasConnection")
 
 
 @dataclass(frozen=True)
@@ -244,22 +246,46 @@ class _Joiner:
         return gevonden
 
     def _omhoog(self, focus: str) -> str:
-        """Loopt via inkomende hasPart- en hasAspect-kanten omhoog tot een object."""
+        """Loopt via inkomende kanten omhoog tot een knoop of streng."""
         huidig = f"{self._basis}{focus}"
         gezien: set[str] = set()
-        for _ in range(MAX_DIEPTE):
+        for stap in range(MAX_DIEPTE):
             if huidig in self._objecten:
                 return huidig
             gezien.add(huidig)
-            ouder = self._ouder(huidig, gezien)
+            ouder = self._ouder(huidig, gezien, met_verbinding=stap == 0)
             if ouder is None:
                 return ""
             huidig = ouder
         return ""
 
-    def _ouder(self, uri: str, gezien: set[str]) -> str | None:
-        """Het object dat dit object via hasPart of hasAspect bevat."""
-        for predicaat in (HAS_PART, HAS_ASPECT):
+    def _ouder(self, uri: str, gezien: set[str], *, met_verbinding: bool) -> str | None:
+        """Het object dat dit object bevat, van sterk naar zwak verband.
+
+        `hasPart` en `hasAspect` zijn insluitingen: wat eraan hangt hoort echt bij de
+        houder. `hasConnection` is dat niet -- het is een symmetrische
+        netwerkverbinding -- en wordt daarom alleen bij de eerste stap geprobeerd, en
+        pas als de twee andere niets opleveren.
+
+        Die twee beperkingen samen zijn precies wat het veilig maakt. Een
+        `Maaiveldorientatie` hangt in de De Wolden-export via `hasConnection` onder
+        haar putorientatie en heeft verder geen houder; die wordt zo alsnog aan zijn
+        put toegewezen (1.605 overtredingen). Een `BeginpuntLeiding` heeft ook een
+        `hasConnection`, naar de put aan die kant, maar heeft daarnaast een
+        `hasPart`-houder in zijn leidingorientatie -- en die gaat voor, dus zijn
+        melding landt op de streng en niet op de verkeerde soort object. En doordat de
+        verbinding alleen in de eerste stap meedoet, kan de wandeling daarna niet
+        zijwaarts het netwerk in lopen.
+        """
+        predicaten = (
+            (HAS_PART, HAS_ASPECT, HAS_CONNECTION)
+            if met_verbinding
+            else (
+                HAS_PART,
+                HAS_ASPECT,
+            )
+        )
+        for predicaat in predicaten:
             for houder in self._dataset.graph.subjects(predicaat, URIRef(uri)):
                 tekst = str(houder)
                 if tekst not in gezien:

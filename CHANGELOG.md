@@ -13,6 +13,27 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- De SHACL-nulmetingovertredingen komen als meldingen in alle vier de uitvoervormen
+  terecht, uit dezelfde meldingenstroom als de eigen checks: `Bron = nulmeting`,
+  `Categorie = NULMETING`, check-ID `NULMETING-<SHACL-vorm>`, dimensie `Compliance`.
+  Nieuw veld `cfk` op `Melding` -- kolom `CFK` in de CSV, kolom `cfk` in de
+  GeoPackage-tabel `meldingen`, veld `cfk` in de JSON -- met de conformiteitsklassen
+  die de overtreding noemen. Daarmee gaat `schema_versie` van `1.0` naar `1.1`; het is
+  een achterwaarts verenigbare toevoeging, dus een afnemer die op het hoofdnummer pint
+  merkt er niets van. Dezelfde overtreding in meerdere CFK-rapporten levert **een**
+  melding met de klassen erbij. Een focusnode die niet zelf een put of streng is --
+  het eindpunt van een leiding, de maaiveldorientatie van een put -- wordt via
+  `hasPart`, `hasAspect` en als laatste `hasConnection` omhooggelopen tot het object
+  waar hij bij hoort; op De Wolden herleidt daarmee 99,5% (105.385 van de 105.963),
+  waar een strikt directe join op 87% was blijven steken. Komt hij nergens op uit --
+  de 578 overtredingen op een stelsel of een klassenaam -- dan blijft de melding staan
+  zonder object, zonder plek op de kaart en met een leeg gebied, en het rapport telt
+  die gevallen expliciet -- ook als het er nul zijn. Op De
+  Wolden leveren de drie rapporten samen 213.500 regels en na ontdubbeling 105.963
+  meldingen (87.017 fouten, 18.946 waarschuwingen); de zwaarste posten zijn drie
+  kardinaliteitsvormen die vrijwel elke inspectieput raken en die daardoor als
+  systemisch gemarkeerd worden. Zie BO-28 (issue #12).
+
 - RVZ-002 en RVZ-003 (W, Compleetheid): een overstortput zonder geregistreerd
   drempelniveau respectievelijk zonder geregistreerde drempelbreedte, ook als het
   `Overstortdrempel`-onderdeel zelf ontbreekt. De nulmeting kent geen vorm op die twee

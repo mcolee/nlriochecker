@@ -51,7 +51,12 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
     gwsw:hasAspect :PutC_ori .
 :PutC_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
-        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1100.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1100.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] ;
+    gwsw:hasConnection :PutC_ori_maa .
+# De maaiveldorientatie hangt via hasConnection onder de putorientatie, niet via
+# hasPart of hasAspect. Zo staat het in de De Wolden-export.
+:PutC_ori_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 14.5 ] .
 :L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
     gwsw:hasAspect :L1_ori .
 :L1_ori rdf:type gwsw:Leidingorientatie ;

@@ -16,5 +16,6 @@ PutA;Put_HoogtePut_card;te weinig voorkomens;Violation;Subject Put, path hasAspe
 PutB;Put_HoogtePut_card;te weinig voorkomens;Violation;Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1);hasAspect;;Focus-node: type=Inspectieput, label=B
 PutC;Put_HoogtePut_card;te weinig voorkomens;Violation;Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1);hasAspect;;Focus-node: type=Inspectieput, label=C
 L1_b;BeginpuntLeiding_Knooppunt_card;te weinig voorkomens;Violation;Subject BeginpuntLeiding, path hasConnection, object Knooppunt - aantal voorkomens wijkt af (exact=1);b1;;Focus-node: type=BeginpuntLeiding, hasConnection=PutA_ori
+PutC_ori_maa;Maaiveldorientatie_Putorientatie_card;te weinig voorkomens;Violation;Subject Maaiveldorientatie, path hasConnection, object Putorientatie - aantal voorkomens wijkt af (exact=1);b4;;Focus-node: type=Maaiveldorientatie, hasAspect=PutC_ori_maa_maa
 vw_geb_1;Vuilwaterstelsel_Lozingspunt_card;te weinig voorkomens;Warning;Subject Vuilwaterstelsel, path hasPart, object Lozingspunt - aantal voorkomens wijkt af (min=1);b2;;Focus-node: type=Vuilwaterstelsel, label=1_vw
 Rioolstelsel;CfkTypes_typ;;Violation;Type individu wijkt af (is abstract, te globaal binnen CFK);b3;;
