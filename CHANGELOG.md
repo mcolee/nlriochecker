@@ -13,6 +13,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- `configs/dewoldenhoogeveen.toml`: de projectconfiguratie voor het hele gebied van de
+  OroX-dataset, met de bronnen uit `data/gis_dewoldenhoogeveen`. Alleen het blok
+  `[bronnen]` wijkt af van de meegeleverde `checks.toml`.
 - `nlriochecker.toetsrun` voert een toets uit zonder de opdrachtregel:
   `Toetsopdracht` in, `Toetsuitslag` uit, met de gemeten uitkomsten als velden en het
   verhaal voor de gebruiker in `regels()`. Het commando `toets` is er de adapter van

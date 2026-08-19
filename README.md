@@ -175,6 +175,22 @@ bronnen in `data/gis_koekangerveld` is ongeveer `300` nodig: `bgt_bouwwerk` telt
 objecten die aan de oostkant 276 m voor de rand ophouden, wat aan die bron niets
 mankeert.
 
+De tolerantie geldt voor alle lagen tegelijk. Dekt een enkele laag het gebied echt niet,
+zet die laag dan uit in plaats van de tolerantie op te rekken: `bgt_putdeksellagen = []`
+schakelt EXT-005 en EXT-006 uit met een uitleg in het rapport, terwijl een tolerantie van
+kilometers de poort voor elke bron opheft.
+
+### Projectconfiguraties
+
+`configs/` bewaart de projectconfiguraties van de gebieden waarop dit project draait; geef
+er een mee met `--projectconfig`. `configs/dewoldenhoogeveen.toml` hoort bij de bronnen in
+`data/gis_dewoldenhoogeveen` en beslaat het hele gebied van de OroX-dataset. Zonder die
+optie geldt de meegeleverde `src/nlriochecker/checks.toml`, die naar Koekangerveld wijst.
+
+Let op: `--projectconfig` vervangt de configuratie in haar geheel; er is geen overlay. Een
+projectconfiguratie is dus een volledige kopie van `checks.toml`, en een drempel die daar
+verandert moet in elke kopie na.
+
 ### Voortgang
 
 `toets` toont bij de zware stappen een voortgangsbalk: het inlezen van de TTL's, het

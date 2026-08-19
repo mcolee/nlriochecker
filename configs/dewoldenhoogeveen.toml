@@ -1,0 +1,216 @@
+# Projectconfiguratie voor De Wolden + Hoogeveen.
+#
+# Dit bestand is een KOPIE van src/nlriochecker/checks.toml, waarin alleen het blok
+# [bronnen] afwijkt. Alle drempelwaarden zijn dus gedupliceerd en lopen niet vanzelf
+# mee met de meegeleverde standaard; wie daar een drempel wijzigt, moet hem hier ook
+# wijzigen. Er is geen overlay-mechanisme -- `--projectconfig` vervangt de hele
+# configuratie.
+#
+# De afwijkingen ten opzichte van checks.toml, met de meting waarop ze rusten:
+#   map                  data/gis_dewoldenhoogeveen in plaats van data/gis_koekangerveld
+#   bag_pand             BAG_light_pand.gpkg (58.067 panden)
+#   nwb_wegvakken        niet aangeleverd voor dit gebied
+#   studiegebied         de CBS-buurtenkaart met 100 m buffer (36.708,5 ha, een feature)
+#   ahn_dtm              AHN6 in plaats van AHN5
+#   bgt_putdeksellagen   leeg; zie de toelichting bij dat veld
+#
+# Gebruik:
+#   uv run nlriochecker toets \
+#     --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+#     --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
+#     --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv \
+#     --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_MdsPlan.csv \
+#     --shacl data/shacl_nulmeting/gwsw_shacl_report_MdsProj.csv \
+#     --projectconfig configs/dewoldenhoogeveen.toml \
+#     --bronnen data/gis_dewoldenhoogeveen \
+#     --output uitvoer/dewoldenhoogeveen
+#
+# Op 2026-08-19 kostte die run 6:00 en 5,9 GB piekgeheugen.
+
+#
+# Klassenwortels bepalen welke objecten als put, vrijvervalleiding of netwerk-
+# eindpunt tellen; de engine gebruikt de subklasse-afsluiting uit de ontologie,
+# dus een wortel dekt al haar subklassen. Drempelwaarden zijn per project aan
+# te passen; er staat niets hardgecodeerd in de code.
+
+[klassen]
+put = ["Put"]
+vrijvervalleiding = ["VrijvervalRioolleiding"]
+# Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
+# Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
+streng = ["Leiding"]
+# Mechanisch riool valt buiten scope (zie het checkregister). Deze klassen komen
+# niet in de analyse maar wel in de GIS-uitvoer, in een eigen grijze laag; een leeg
+# kaartbeeld daar zou anders als "geen gebreken" lezen. De namen zijn geverifieerd
+# tegen de export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
+mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
+# NET-001 en NET-002 vragen om verschillende eindpunten. 'Overnamepunt' bestaat
+# niet als klasse in de GWSW-ontologie; dat is open punt 6 uit het checkregister.
+# Pompunit staat erbij omdat een vrijvervalstreng die op een drukrioleringspomp
+# eindigt daar het mechanische stelsel in gaat; dat is het overnamepunt waar het
+# register over spreekt. Zonder deze regel geldt heel de drukriolering van De
+# Wolden als onbereikbaar.
+afvoer_eindpunt = ["Gemaal", "Pompunit"]
+# Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
+# staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
+# (een Bouwwerk) fysieke objecten zijn. De Wolden gebruikt alleen die laatste twee.
+lozings_eindpunt = [
+  "Lozingspunt",
+  "UitlaatPunt",
+  "Uitlaat",
+  "Lozingsput",
+  "Uitlaatconstructie",
+]
+# Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
+# geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
+vuilwater = ["Vuilwaterriool", "GemengdRiool"]
+hemelwater = ["Hemelwaterriool"]
+# De ontologie kent geen klasse "IT-stelsel"; NET-007 leest een deelstelsel met
+# infiltratieleidingen als IT-stelsel. Zie open punt 6 van het checkregister.
+infiltratie = ["Infiltratieriool"]
+drempel = ["Overstortdrempel"]
+
+# TOP-019: een pseudo-knoop is een knoop *zonder* functie. In een rioolstelsel zit
+# op vrijwel elke knik een put, en een put is een functie (toegang, onderhoud).
+# Alleen deze klassen knopen twee strengen aan elkaar zonder zelf iets te doen.
+# Staat de lijst leeg, dan draait TOP-019 niet en zegt dat in het rapport.
+functieloze_knoop = ["LozePut", "BlindePut", "Ontstoppingsstuk", "Verbindingsstuk"]
+
+# RVZ: hoe randvoorzieningen in de export verschijnen. Empirisch vastgesteld op de
+# De Wolden-export: overstorten staan er als Overstortput met een Overstortleiding
+# eraan; losse Overstortdrempel-objecten met Drempelniveau komen er niet in voor.
+# Zie docs/beslislog.md.
+overstortput = ["Overstortput", "Stuwput"]
+overstortleiding = ["Overstortleiding"]
+# Alleen bouwwerkklassen: RVZ-007 t/m RVZ-009 redeneren over een BBB als knoop in
+# het netwerk (aanvoer, lediging, nooduitlaat). Bergbezinkleiding staat er bewust
+# niet bij, want dat is een VrijvervalRioolleiding en dus een kant, geen knoop;
+# hij wordt apart geteld en gemeld onder bergbezinkleiding.
+bergbezinkvoorziening = ["Bergbezinkbassin", "Bergingsbassin", "Bezinkbassin"]
+bergbezinkleiding = ["Bergbezinkleiding", "Bergingsleiding"]
+ledigingsvoorziening = ["Ledigingsvoorziening"]
+oppervlaktewater = ["Oppervlaktewater"]
+# HGT-009 en HGT-016: constructies die een BOB-sprong verklaren.
+valconstructie = ["Valput", "Zandvangput"]
+# EXT-003: een streng die een watergang kruist hoort een van deze klassen te zijn.
+kruisingsleiding = ["Zinker", "Duiker"]
+
+# Prioriteit 1 in de GIS-uitvoer: een fout op een van deze klassen weegt het
+# zwaarst, want daar zijn de gevolgen van een gebrek het grootst.
+kritiek = ["Overstortput", "Bergbezinkbassin", "Gemaal"]
+
+# NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen. Anders dan
+# de rollen hierboven (die zeggen welk eindpunt een streng moet bereiken) deelt
+# deze tabel het net in soorten in, om buurstrengen te kunnen vergelijken.
+[klassen.stelseltypen]
+gemengd = ["GemengdRiool"]
+vuilwater = ["Vuilwaterriool"]
+hemelwater = ["Hemelwaterriool"]
+infiltratie = ["Infiltratieriool"]
+drainage = ["Drain"]
+overstort = ["Overstortleiding"]
+transport = ["Duiker"]
+
+# ADM-007: welk puttype welke aansluiting nodig heeft in het netwerk. Een lege
+# lijst laat de check niets toetsen; regels zijn projectafspraken.
+[[puttyperegels]]
+puttype = "Overstortput"
+vereist_een_van = ["Overstortleiding", "Overstortdrempel"]
+toelichting = "Een overstortput hoort een overstortleiding of -drempel te hebben."
+
+[[puttyperegels]]
+puttype = "Lozingsput"
+vereist_een_van = ["VrijvervalRioolleiding", "Duiker"]
+toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben."
+
+[naamgeving]
+# ADM-003: de naamgevingsconventie is projectafhankelijk. Zonder patroon draait de
+# check niet; een verzonnen conventie zou elke dataset afkeuren.
+# putpatroon = "^[A-Z]{2}[0-9]{4}$"
+# strengpatroon = "^[0-9]{6}-[0-9]{6}-[0-9]+$"
+
+[bronnen]
+# Blok C: de aangeleverde externe bronnen voor De Wolden + Hoogeveen. Het bereik is de
+# CBS-buurtenkaart met 100 m buffer (36.709 ha); objecten daarbuiten krijgen geen
+# EXT-uitslag maar de status "buiten studiegebied".
+map = "data/gis_dewoldenhoogeveen"
+# Hoeveel een aangeleverde bron kleiner mag zijn dan het bereik in `studiegebied`
+# voordat het laden faalt. De code staat standaard op 0 (streng); voor déze bronnen is
+# ruimte nodig: `bag_pand` houdt 168 m voor de noordrand van de buffer op, en die 100 m
+# brede rand is leegte en geen afgeknipt extract. Zie BO-19 in de beslislog.
+dekking_tolerantie_m = 300.0
+bgt = "BGT.gpkg"
+bag_pand = "BAG_light_pand.gpkg"
+# nwb_wegvakken: niet aangeleverd voor dit gebied
+studiegebied = "CBS_buurten_DeWoldenHoogeveen_buffer_100m.gpkg"
+ahn_dtm = "AHN6_DeWoldenHoogeveen_DTM.tif"
+# Welke BGT-lagen welke rol vervullen. De namen komen uit de aangeleverde export;
+# zie docs/gis-inventarisatie.md. Een lege of ontbrekende laag laat de bijbehorende
+# checks overslaan met de melding "laag niet aanwezig in aangeleverde data".
+bgt_pandlagen = ["pand"]
+bgt_waterlagen = ["waterdeel", "ondersteunendwaterdeel"]
+# De BGT-laag `put` telt hier 843 objecten, waarvan 595 van ProRail en 72 van de twee
+# gemeenten samen; tegenover ruim 23.000 GWSW-putten is dat geen putdekselbron maar
+# spoorinfrastructuur. EXT-005 en EXT-006 slaan daarom over.
+bgt_putdeksellagen = []
+bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
+
+[drempels]
+# TOP-004: hoe ver een strengeindpunt van zijn put mag liggen.
+snapping_tolerantie_m = 0.10
+# TOP-005: binnen deze afstand gelden twee putten als dubbel.
+dubbele_put_tolerantie_m = 0.30
+
+[netwerk]
+# Hoe de afvoerrichting van een vrijvervalstreng bepaald wordt.
+#   administratief - de van-naar-richting uit het GWSW-model (standaard; dat is wat
+#                    het register bedoelt, en NET-003 toetst of die richting klopt)
+#   bob            - afgeleid uit het bodemverloop, met terugval op de
+#                    administratieve richting bij ontbrekende of gelijke BOB's
+richting = "administratief"
+
+[nulmeting]
+# De conformiteitsklassen die de GWSW-server aanbiedt en die alle drie aanwezig
+# moeten zijn. Ontbreekt er een, dan faalt de pijplijn.
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
+
+[inwinning]
+# Hoe de inwinningsmetagegevens van deze bronexport gelezen moeten worden. De
+# waarden komen uit de collectie WijzeVanInwinningColl van de GWSW-ontologie; die
+# maakt geen onderscheid naar kenmerksoort, dus de betekenis is projectafspraak.
+#
+# Wijzen die uit een landelijk hoogtemodel komen. Een maaiveldhoogte die zo is
+# ingewonnen, vergelijken HGT-001 en HGT-002 met haar eigen bron; de bevinding
+# krijgt daarom een kanttekening. In De Wolden geldt dat voor 5104 van de 22363
+# maaiveldhoogten: daar staat AHN2 op het Punt-aspect van de maaiveldorientatie.
+uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN5"]
+# Waarden die expliciet "onbekend" zeggen. Ze passeren elke kardinaliteits- en
+# collectietoets van de nulmeting maar zijn informatief leeg; het bevindingen-
+# rapport telt ze apart zodat een compleetheidscijfer niet te rooskleurig leest.
+onbekend = ["NietAchterhaald"]
+
+# Instellingen van het rapport en de GIS-uitvoer. Geen enkele drempel staat in de
+# code; wie ze wil verleggen doet dat hier.
+[rapport]
+# Boven dit aandeel strengen met stijgende bodem benoemt het rapport systematisch
+# omgekeerde registratie als gezamenlijke oorzaak.
+richtingsdrempel = 0.10
+# Vanaf hoeveel verschillende checks op hetzelfde object dat als een enkele
+# vermoedelijke fout wordt gepresenteerd in plaats van als losse meldingen.
+multi_melding_checks = 3
+# 0 = alle bevindingen tonen. Het rapport verwijst toch al naar de CSV, maar
+# afkappen zonder het te zeggen leest als "dit is alles".
+max_bevindingen_per_check = 0
+# Boven dit aandeel van de bekeken populatie heet een meldingtype systemisch: het
+# zegt dan meer over de export als geheel dan over de losse objecten.
+systemisch_drempel = 0.80
+# Versie van het checkregister waaraan deze run getoetst is.
+register_versie = "v0.8"
+
+# Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
+# draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de
+# netwerkchecks hun antwoord houden; gerapporteerd wordt alleen de kern.
+[studiegebied]
+context_buffer_m = 50.0
+volledige_dataset_checks = ["ADM-002"]
+component_waarschuwingsdrempel = 0.5
