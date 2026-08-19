@@ -1297,14 +1297,17 @@ per object.
 `0.000`; de op een na meest voorkomende waarde komt 399 keer voor. Van de 22.363
 maaiveldhoogten staat 14% op `0,00` of `0,01`. Het AHN ligt in dit gebied tussen 5,09 en
 17,09 m NAP. Dat is een vulwaarde voor "niet geregistreerd", geen buisbodem op zeeniveau.
-De hoogtechecks lazen hem als meting: HGT-004 stond voor 94% op zo'n nul, HGT-018 voor
-85%, HGT-003 voor 61%, HGT-002 voor 48% -- samen circa 5.700 van de 31.901 harde fouten
-(issue #1). Dat is de situatie waar CLAUDE.md voor waarschuwt: duizenden bevindingen
-wijzen op een modelleerfout in de engine, niet op duizenden gebreken.
+De hoogtechecks lazen hem als meting. Een regex over de meldingteksten in issue #1 vond een
+nul in 94% van de HGT-004-meldingen, 85% van HGT-018, 61% van HGT-003 en 48% van HGT-002 --
+samen circa 5.700 van de 31.901 harde fouten. Dat zijn de cijfers van die regex, niet van de
+meting hieronder: hij zag de nul alleen waar die in de tekst stond. Dat is de situatie waar
+CLAUDE.md voor waarschuwt: duizenden bevindingen wijzen op een modelleerfout in de engine,
+niet op duizenden gebreken.
 
 **Het gemeten effect.** Dezelfde run over De Wolden + Hoogeveen twee keer gedraaid, alleen
 `hoogte_kenmerken` leeggemaakt in de tweede: dat isoleert de leesregel van de rest van deze
-bugronde.
+bugronde. De tabel noemt elke check die beweegt -- veertien -- zodat beide kolommen op hun
+totaal uitkomen; alle overige checks staan links en rechts op hetzelfde getal.
 
 | | zonder leesregel | met leesregel |
 |---|---:|---:|
@@ -1317,6 +1320,10 @@ bugronde.
 | HGT-013 (gronddekking) W | 2.545 | 340 |
 | HGT-014 (verhang vs maaiveld) W | 889 | 157 |
 | HGT-007 (te weinig verhang) W | 2.126 | 1.559 |
+| HGT-008 (extreem verhang) W | 247 | 159 |
+| HGT-009 (BOB-sprong zonder valput) W | 327 | 282 |
+| HGT-001 (dekselhoogte vs AHN, 5 cm) W | 5.820 | 5.811 |
+| HGT-005 (licht tegenverhang) W | 1.286 | 1.285 |
 | ATTR-013 W | 0 | 4.215 |
 | **fouten totaal** | **31.901** | **25.403** |
 | **waarschuwingen totaal** | **20.697** | **21.265** |
@@ -1336,7 +1343,7 @@ checks en naar de waarde in de meldingtekst. HGT-002 verliest er 566 meer dan de
 zag, en HGT-006 en NET-003 stonden er niet eens in. Wie op de vulwaarde in de tekst zoekt,
 mist de melding waarin het buurobject de nul draagt.
 
-**Wat de leesregel niet raakt.** Van de 11.812 BOB-waarden binnen de band liggen er 2.003
+**Wat ATTR-013 niet meldt.** Van de 11.812 BOB-waarden binnen de band liggen er 2.003
 op een `VrijvervalRioolleiding`; de overige 9.809 zitten op klassen die de hoogtechecks
 sowieso niet bekijken -- `Persleiding` 6.894 van 7.096 (97%), `Drain` 1.593, `Duiker` 483,
 `Kolkaansluitleiding` 244, de perceelaansluitleidingen 223, `Vacuumleiding` 294 (alle),
@@ -1345,6 +1352,12 @@ bekijkt de netwerkknopen plus de vrijvervalstrengen, en meldt 2.003 BOB's op 1.0
 strengen plus 3.120 maaiveldhoogten, samen 4.215 objecten. Wie het getal 11.786 uit issue
 #1 naast 4.215 legt, moet dat verschil kennen: een persleiding zonder BOB is geen gebrek
 dat deze checks aanwijzen.
+
+Let wel: de leesregel zelf loopt over *alle* strengen in `dataset.conduits` en zet die 9.809
+BOB's dus ook op ontbrekend. Wat de populatie buitensluit is niet de bewerking maar de
+melding: ATTR-013 rapporteert die objecten nooit. Dat is hier zonder gevolg -- geen enkele
+hoogtecheck kijkt naar een persleiding -- maar het is een stille plek, en zodra een check op
+die klassen gebouwd wordt moet ATTR-013's populatie meebewegen.
 
 **Waarom een leesregel na het laden en niet in de lader.** De cache bewaart de ruwe parse;
 de band is projectconfiguratie. Zou de lader hem toepassen, dan zat een projectkeuze in de

@@ -27,10 +27,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `toetsrun`; de cache bewaart de ruwe parse. Op De Wolden vervallen daarmee 6.498 harde
   fouten en 3.647 waarschuwingen die op zo'n vulwaarde rustten (HGT-002 5.231 naar 2.128,
   HGT-003 2.813 naar 1.090, HGT-004 532 naar 31, HGT-018 1.190 naar 175, HGT-013 2.545
-  naar 340, HGT-014 889 naar 157, HGT-007 2.126 naar 1.559, en kleinere dalingen bij
-  HGT-001, HGT-005, HGT-006, HGT-008 en NET-003); ATTR-013 meldt 4.215 objecten. Er komt
-  er geen bij, op twee HGT-009-bevindingen na die een vulwaarde eerder verdrong. HGT-018
-  heeft nu een toelichting. Zie BO-27 (issue #1).
+  naar 340, HGT-014 889 naar 157, HGT-007 2.126 naar 1.559, HGT-009 327 naar 282, en
+  kleinere dalingen bij HGT-001, HGT-005, HGT-006, HGT-008 en NET-003); ATTR-013 meldt
+  4.215 objecten. Er komt er geen bij, op twee HGT-009-bevindingen na: die check verliest
+  er 47 en wint er 2, doordat een vulwaarde daar de werkelijke, kleinere BOB-sprong stond
+  te verdringen. HGT-018 heeft nu een toelichting. Zie BO-27 (issue #1).
 - `configs/dewoldenhoogeveen.toml`: de projectconfiguratie voor het hele gebied van de
   OroX-dataset, met de bronnen uit `data/gis_dewoldenhoogeveen`. Alleen het blok
   `[bronnen]` wijkt af van de meegeleverde `checks.toml`.
@@ -203,11 +204,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   streng krijgen daarmee een eigen, stabiele ID in plaats van een volgnummer dat tussen
   runs kon verschuiven. **De melding-ID's van ATTR-006 verschuiven eenmalig**;
   `schema_versie` blijft 1.0 (issue #2).
+
 - NET-004 noemt bij parallelle strengen de eerste op de kant (gesorteerd op URI) in plaats
   van de laatst ingelezen; de graafkanten dragen geen attributen meer. Twee parallelle
   strengen delen in een `DiGraph` een kantsleutel, dus de tweede `add_edge` overschreef de
   `uri` en het `label` van de eerste. De genoemde streng kan eenmalig verschuiven
   (issue #5).
+
 - EXT-002 en EXT-003 delen een kruisingenlijst en melden in hun toelichting hoeveel
   duikers buiten de populatie vallen; de testfixtures volgen de ontologie (`Duiker` onder
   `Leiding`, `Zinker` onder `VrijvervalRioolleiding`). Geen verandering in de meldingen.
