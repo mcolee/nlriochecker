@@ -1,0 +1,20 @@
+Rapport SHACL-meting dd;2026-08-16T12:55:55
+Gevalideerd RDF-bestand;nulmeting_join.ttl
+Gebruikte SHACL-processor;TopBraid 1.4.4
+SHACL-meting op basis GWSW;ja
+SHACL-meting op basis CFK;MdsProj
+Lokale kwaliteitseisen uit bestand;geen
+Gevalideerd op onderdelen;Kardinaliteit, CFK-types
+Niet gevalideerd op;Geen, alle metingen gedaan
+Maximaal aantal meldingen;onbeperkt
+
+Draaitijd;(1.0 sec bezig)
+Rapport 'conforms';false
+
+Focus node;Source;Value;Severity;Message;Path;Detail-message;Detail-value;
+PutA;Put_HoogtePut_card;te weinig voorkomens;Violation;Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1);hasAspect;;Focus-node: type=Inspectieput, label=A
+PutB;Put_HoogtePut_card;te weinig voorkomens;Violation;Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1);hasAspect;;Focus-node: type=Inspectieput, label=B
+PutC;Put_HoogtePut_card;te weinig voorkomens;Violation;Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1);hasAspect;;Focus-node: type=Inspectieput, label=C
+L1_e;LengteLeiding_val;164.200 (decimal) ;Warning;Kenmerk LengteLeiding - waarde wijkt af (min=1,max=75);hasAspect;;Focus-node: type=GemengdRiool, label=1
+vw_geb_1;Vuilwaterstelsel_Lozingspunt_card;te weinig voorkomens;Warning;Subject Vuilwaterstelsel, path hasPart, object Lozingspunt - aantal voorkomens wijkt af (min=1);b2;;Focus-node: type=Vuilwaterstelsel, label=1_vw
+Rioolstelsel;CfkTypes_typ;;Violation;Type individu wijkt af (is abstract, te globaal binnen CFK);b3;;

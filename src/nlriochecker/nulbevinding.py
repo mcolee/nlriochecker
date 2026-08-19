@@ -1,0 +1,264 @@
+"""De SHACL-nulmeting als bevindingen op dataset-objecten.
+
+De nulmeting voedde tot nu toe alleen de typeringspoort; de overtredingen zelf
+verdwenen. Deze module zet ze om in `Nulbevinding`'s, zodat `uitvoer.melding` er
+gewone meldingen van kan maken en alle vier de uitvoervormen laten zien welk gebrek
+uit de GWSW SHACL-nulmeting komt, en uit welke conformiteitsklasse.
+
+Drie dingen gebeuren hier, en nergens anders:
+
+1. **De join.** De kolom `Focus node` draagt het URI-fragment uit de dataset. Meestal
+   is dat een knoop of een streng en is de join direct. Bij een leidingeinde niet:
+   `lei2806-2807-1_lei2706_beg2706` is een `BeginpuntLeiding` die via `hasPart` onder
+   de leidingorientatie hangt en via `hasAspect` onder de streng. Er wordt daarom
+   omhooggelopen tot een knoop of streng -- dezelfde beweging als
+   `dataset.resolve_network_node`. Op De Wolden scheelt dat 3.025 focusnodes die
+   anders de kaart nooit zouden halen, waaronder alle 1.846
+   `EindpuntLeiding_Knooppunt_card`-fouten.
+2. **De ontdubbeling.** Dezelfde overtreding staat vaak in meerdere CFK-rapporten.
+   Er komt er een, met de conformiteitsklassen erbij. De sleutel is (focusnode,
+   vorm, boodschap): binnen een rapport is (focusnode, vorm) al uniek, en de
+   boodschap zit erin omdat dezelfde vorm per CFK een andere drempel kan noemen --
+   dan zijn het echt twee eisen en horen het twee bevindingen te zijn.
+3. **De systemisch-vlag.** Per (vorm, objecttype), met als noemer het aantal
+   instanties van dat type in de dataset. Zonder objecttype of zonder instanties is
+   er geen noemer en valt de vlag naar de veilige kant: een melding ten onrechte
+   systemisch noemen haalt hem van de kaart.
+
+De teller van die vlag telt over de volledige export, vóór afbakening tot een
+studiegebied -- dezelfde keuze als bij de eigen checks (`melding._is_systemisch`), en
+om dezelfde reden: anders betekent "systemisch" iets anders naargelang er een gebied
+is opgegeven.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from dataclasses import dataclass
+
+from rdflib import URIRef
+
+from nlriochecker.dataset import GWSW, GwswDataset
+from nlriochecker.meting import Nulmeting
+from nlriochecker.uitvoer.identiteit import kort
+
+# Het voorvoegsel van elk check-ID uit de nulmeting; ook de categorie, want die is
+# het deel van het ID voor het eerste koppelteken (`melding.categorie_van`).
+CHECK_VOORVOEGSEL = "NULMETING"
+
+# De SHACL-ernst zoals de GWSW-server hem schrijft. Alles wat geen `Violation` is
+# geldt als waarschuwing: het checkregister kent maar twee niveaus, en een onbekende
+# derde als fout lezen zou zwaarder wegen dan de meting rechtvaardigt.
+ERNST_VIOLATION = "Violation"
+
+# Hoe ver er omhoog gelopen wordt. De langste keten in de export is drie stappen
+# (beginpunt, orientatie, streng); de rem is er tegen een cyclus in de brondata.
+MAX_DIEPTE = 6
+
+HAS_PART = URIRef(f"{GWSW}hasPart")
+HAS_ASPECT = URIRef(f"{GWSW}hasAspect")
+
+
+@dataclass(frozen=True)
+class Nulbevinding:
+    """Een SHACL-overtreding, herleid tot een object uit de dataset.
+
+    `herleid` zegt of de focusnode op een knoop of streng uitkwam. Is dat niet zo --
+    een klassenaam uit `CfkTypes_typ`, een stelsel als `dru_geb_0` -- dan blijft de
+    bevinding staan zonder object: hem overslaan zou betekenen dat het rapport
+    zwijgt over een gebrek dat de nulmeting wel telt.
+    """
+
+    check_id: str
+    vorm: str
+    focus_node: str
+    ernst: str
+    object_uri: str
+    object_label: str
+    objecttype: str
+    boodschap: str
+    waarde: str
+    cfk: tuple[str, ...]
+    systemisch: bool
+    herleid: bool
+
+
+def bouw_nulbevindingen(
+    nulmeting: Nulmeting, dataset: GwswDataset, systemisch_drempel: float
+) -> list[Nulbevinding]:
+    """Zet de rapporten van een nulmeting om in ontdubbelde bevindingen.
+
+    De volgorde is die van (vorm, focusnode, boodschap), zodat twee runs op dezelfde
+    bestanden hetzelfde opleveren en een diff tussen meetmomenten geen ruis geeft.
+    """
+    ruw = _ontdubbel(nulmeting)
+    joiner = _Joiner(dataset)
+    tellingen = _tellingen(ruw)
+
+    bevindingen = []
+    for (vorm, focus, boodschap), gegevens in sorted(ruw.items()):
+        ernst_rauw, waarde, objecttype, label, cfks = gegevens
+        uri = joiner.herleid(focus)
+        object_ = dataset.nodes.get(uri) or dataset.conduits.get(uri) if uri else None
+        eigen_label = object_.label if object_ is not None else ""
+        bevindingen.append(
+            Nulbevinding(
+                check_id=f"{CHECK_VOORVOEGSEL}-{vorm}",
+                vorm=vorm,
+                focus_node=focus,
+                ernst="F" if ernst_rauw == ERNST_VIOLATION else "W",
+                object_uri=uri,
+                object_label=eigen_label or label,
+                objecttype=objecttype,
+                boodschap=boodschap,
+                waarde=waarde,
+                cfk=tuple(sorted(cfks)),
+                systemisch=_systemisch(
+                    vorm, objecttype, tellingen, joiner.instanties, systemisch_drempel
+                ),
+                herleid=bool(uri),
+            )
+        )
+    return bevindingen
+
+
+# Wat er per ontdubbelde overtreding onthouden wordt: ernst, waarde, objecttype,
+# label en de conformiteitsklassen die hem noemen.
+_Gegevens = tuple[str, str, str, str, set[str]]
+
+
+def _ontdubbel(nulmeting: Nulmeting) -> dict[tuple[str, str, str], _Gegevens]:
+    """Groepeert de meldingen van alle rapporten op (vorm, focusnode, boodschap).
+
+    De eerste CFK op alfabet levert de ernst, de waarde, het objecttype en het label;
+    die zijn per definitie gelijk zodra de boodschap dat is. Zouden ze afwijken, dan
+    is dat een verschil dat de sleutel niet ziet, en dan is de eerste net zo goed als
+    de laatste -- maar dan wel altijd dezelfde, zodat de uitkomst niet van de
+    bestandsvolgorde afhangt.
+    """
+    verzameld: dict[tuple[str, str, str], _Gegevens] = {}
+    for cfk in nulmeting.cfks:
+        meldingen = nulmeting.report(cfk).findings
+        kolommen = zip(
+            meldingen["Source"],
+            meldingen["Focus node"],
+            meldingen["Message"],
+            meldingen["Severity"],
+            meldingen["Value"],
+            meldingen["Objecttype"],
+            meldingen["Label"],
+            strict=True,
+        )
+        for vorm, focus, boodschap, ernst, waarde, objecttype, label in kolommen:
+            sleutel = (vorm, focus, boodschap)
+            bestaand = verzameld.get(sleutel)
+            if bestaand is None:
+                verzameld[sleutel] = (ernst, waarde, objecttype, label, {cfk})
+            else:
+                bestaand[4].add(cfk)
+    return verzameld
+
+
+def _tellingen(ruw: dict[tuple[str, str, str], _Gegevens]) -> dict[tuple[str, str], int]:
+    """Het aantal overtredingen per (vorm, objecttype)."""
+    per_groep: dict[tuple[str, str], int] = defaultdict(int)
+    for (vorm, _focus, _boodschap), gegevens in ruw.items():
+        per_groep[(vorm, gegevens[2])] += 1
+    return per_groep
+
+
+def _systemisch(
+    vorm: str,
+    objecttype: str,
+    tellingen: dict[tuple[str, str], int],
+    instanties: dict[str, int],
+    drempel: float,
+) -> bool:
+    """Geeft aan of deze vorm vrijwel elke instantie van dit objecttype raakt."""
+    if not objecttype:
+        return False
+    noemer = instanties.get(objecttype)
+    if noemer is None or noemer == 0:
+        return False
+    return tellingen[(vorm, objecttype)] / noemer > drempel
+
+
+class _Joiner:
+    """Herleidt een SHACL-focusnode tot de knoop of streng waar hij bij hoort.
+
+    Houdt zijn antwoorden vast: op De Wolden komen dertigduizend focusnodes langs,
+    en de opgaande wandeling raakt de rdflib-graaf.
+    """
+
+    def __init__(self, dataset: GwswDataset) -> None:
+        self._dataset = dataset
+        self._objecten = frozenset(dataset.nodes) | frozenset(dataset.conduits)
+        self._per_fragment = {kort(uri): uri for uri in self._objecten}
+        self._basis = _basis(self._objecten)
+        self._memo: dict[str, str] = {}
+        self._instanties: dict[str, int] | None = None
+
+    @property
+    def instanties(self) -> dict[str, int]:
+        """Het aantal knopen en strengen per korte typenaam.
+
+        De telling gaat over `types_of`, dus inclusief de typen van de orientatie:
+        een Lozingspunt staat volgens het GWSW daar, en de nulmeting noemt hem in
+        haar `type=`. Alleen de korte naam telt, want dat is wat `Detail-value`
+        draagt.
+        """
+        if self._instanties is None:
+            per_type: dict[str, int] = defaultdict(int)
+            for uri in self._objecten:
+                for volledig in self._dataset.types_of(uri):
+                    per_type[volledig.rsplit("/", 1)[-1].rsplit("#", 1)[-1]] += 1
+            self._instanties = dict(per_type)
+        return self._instanties
+
+    def herleid(self, focus: str) -> str:
+        """De URI van de knoop of streng achter deze focusnode, of leeg."""
+        if focus in self._memo:
+            return self._memo[focus]
+        direct = self._per_fragment.get(focus)
+        if direct is not None:
+            self._memo[focus] = direct
+            return direct
+        gevonden = self._omhoog(focus) if self._basis else ""
+        self._memo[focus] = gevonden
+        return gevonden
+
+    def _omhoog(self, focus: str) -> str:
+        """Loopt via inkomende hasPart- en hasAspect-kanten omhoog tot een object."""
+        huidig = f"{self._basis}{focus}"
+        gezien: set[str] = set()
+        for _ in range(MAX_DIEPTE):
+            if huidig in self._objecten:
+                return huidig
+            gezien.add(huidig)
+            ouder = self._ouder(huidig, gezien)
+            if ouder is None:
+                return ""
+            huidig = ouder
+        return ""
+
+    def _ouder(self, uri: str, gezien: set[str]) -> str | None:
+        """Het object dat dit object via hasPart of hasAspect bevat."""
+        for predicaat in (HAS_PART, HAS_ASPECT):
+            for houder in self._dataset.graph.subjects(predicaat, URIRef(uri)):
+                tekst = str(houder)
+                if tekst not in gezien:
+                    return tekst
+        return None
+
+
+def _basis(objecten: frozenset[str]) -> str:
+    """De naamruimte van de export, afgeleid uit een willekeurig object.
+
+    Een OroX-export gebruikt een enkele naamruimte voor al haar objecten
+    (`http://sparql.gwsw.nl/<export>#`), dus een object volstaat. Draagt die geen
+    `#`, dan is er geen fragmentconventie en is er niets omhoog te lopen.
+    """
+    for uri in sorted(objecten):
+        if "#" in uri:
+            return uri.rsplit("#", 1)[0] + "#"
+    return ""
