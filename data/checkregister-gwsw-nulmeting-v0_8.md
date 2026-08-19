@@ -160,7 +160,7 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 |---|---|---|---|
 | EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit |
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit |
-| EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid |
+| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie van EXT-002 en EXT-003, het rapport meldt hoeveel dat er zijn | W | Compleetheid |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit |
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid |

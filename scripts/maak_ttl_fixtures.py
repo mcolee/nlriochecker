@@ -43,7 +43,8 @@ gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
-gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
+gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 """
@@ -1121,10 +1122,15 @@ FIXTURES["ext_scenario.ttl"] = (
     + hoogteleiding("L1", "1", [EXT_A, EXT_B], "PutA", "PutB", bob=(11.00, 9.50))
     # Streng 2 kruist water-1 en is geen duiker: EXT-002 en EXT-003.
     + hoogteleiding("L2", "2", [EXT_B, EXT_C], "PutB", "PutC", bob=(9.50, 6.30))
-    # Streng 3 is een duiker die water-2 kruist: wel EXT-002, geen EXT-003.
+    # Streng 3 is een zinker die water-2 kruist: wel EXT-002, geen EXT-003. Een zinker
+    # is in de ontologie een VrijvervalRioolleiding en zit dus in de populatie.
     + hoogteleiding("L3", "3", [EXT_E, EXT_F], "PutE", "PutF", bob=(9.60, 9.55)).replace(
-        "gwsw:GemengdRiool", "gwsw:Duiker"
+        "gwsw:GemengdRiool", "gwsw:Zinker"
     )
+    # Streng 6 is een duiker op dezelfde route: een duiker is geen rioolleiding
+    # (subklasse van Leiding, niet van VrijvervalRioolleiding) en valt buiten de
+    # populatie van EXT-002 en EXT-003; geen van beide meldt hem.
+    + leiding("L6", "6", [EXT_E, EXT_F], "PutE", "PutF", klasse="Duiker")
     # Streng 4 verbindt de lozingsputten met het net.
     + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35))
     + "\n"

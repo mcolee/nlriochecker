@@ -388,7 +388,13 @@ class KruisingMetBouwwerk(_ExterneCheck):
 
 
 class _WatergangKruising(_ExterneCheck):
-    """Gedeelde basis voor de twee kruisingschecks op BGT-waterdelen."""
+    """Gedeelde basis voor de twee kruisingschecks op BGT-waterdelen.
+
+    De populatie is die van `klassen.vrijvervalleiding`. Een duiker is in de
+    GWSW-ontologie een `Leiding` die oppervlaktewater verbindt, geen rioolleiding;
+    hij valt dus buiten deze checks en `buiten_populatie()` telt hoeveel dat er zijn,
+    zodat het rapport dat meldt in plaats van erover te zwijgen (BO-25).
+    """
 
     rol = "bgt_water"
     soort = "vrijvervalstrengen"
@@ -397,15 +403,28 @@ class _WatergangKruising(_ExterneCheck):
         """De vrijvervalstrengen."""
         return vrijvervalrioolleidingen(context)
 
-    def kruisingen(self, context: CheckContext):
+    def kruisingen(self, context: CheckContext) -> tuple[tuple, ...]:
         """De strengen die een waterdeel raken, met het waterdeel erbij.
 
         Levert `(conduit, geometrie, rij, laag, buffer)`. De geometrie is nodig om de
-        treffer voor de GIS-uitvoer te registreren; de detectie verandert er niet
-        door. Ook de `break` na het eerste gevonden waterdeel per streng blijft staan:
-        een streng die twee waterdelen kruist levert er een, en welke hangt van de
-        volgorde af. Dat is een bewust geaccepteerde beperking (zie de beslislog).
+        treffer voor de GIS-uitvoer te registreren; de detectie verandert er niet door.
+
+        De lijst wordt een keer per context berekend en door EXT-002 en EXT-003 gedeeld.
+        Dat mag: beide `objecten()` leveren `vrijvervalrioolleidingen(context)` en
+        `selectie()` filtert die met dezelfde `_selecteer`, dus `toetsbaar` is voor
+        beide checks dezelfde verzameling; ook de buffer en de laag zijn dezelfde. De
+        twee deden dus tweemaal dezelfde ruimtelijke toets.
+
+        De `break` na het eerste gevonden waterdeel per streng blijft staan: een streng
+        die twee waterdelen kruist levert er een, en welke hangt van de volgorde af. Dat
+        is een bewust geaccepteerde beperking (BO-17).
         """
+        return context.cached(
+            "ext:watergangkruisingen", lambda: tuple(self._zoek_kruisingen(context))
+        )
+
+    def _zoek_kruisingen(self, context: CheckContext) -> Iterator[tuple]:
+        """Loopt de toetsbare strengen langs de waterdeellaag."""
         laag = self.laag(context)
         if laag is None:
             return
@@ -416,6 +435,32 @@ class _WatergangKruising(_ExterneCheck):
                     continue
                 yield conduit, geometrie, rij, laag, buffer
                 break
+
+    def buiten_populatie(self, context: CheckContext) -> dict[str, int]:
+        """Per kruisingsklasse die geen vrijvervalleiding is: hoeveel strengen erbuiten vallen."""
+        dataset = context.dataset
+        binnen = {conduit.uri for conduit in vrijvervalrioolleidingen(context)}
+        telling: dict[str, int] = {}
+        for wortel in context.config.klassen.kruisingsleiding:
+            buiten = [
+                uri
+                for uri in dataset.of_class(wortel)
+                if uri in dataset.conduits and uri not in binnen
+            ]
+            if buiten:
+                telling[wortel] = len(buiten)
+        return telling
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt de strengen die wel kruisingsklasse zijn maar buiten de populatie vallen."""
+        notities = super().notes(context)
+        for klasse, aantal in self.buiten_populatie(context).items():
+            notities.append(
+                f"{aantal} strengen van de klasse {klasse} vallen buiten de populatie "
+                "(geen vrijvervalleiding) en zijn niet bekeken; een kruising van zo'n streng "
+                "met een watergang is geen bevinding."
+            )
+        return notities
 
 
 @register

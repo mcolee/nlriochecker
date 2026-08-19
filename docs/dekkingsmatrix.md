@@ -142,7 +142,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | --- | --- | --- | --- | --- |
 | EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit | geimplementeerd met test | — |
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit | geimplementeerd met test | — |
-| EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid | geimplementeerd met test | — |
+| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie… | W | Compleetheid | geimplementeerd met test | — |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd met test | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid | geimplementeerd met test | — |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid | geimplementeerd met test | — |

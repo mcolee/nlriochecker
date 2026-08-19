@@ -183,10 +183,26 @@ def test_ext001_benoemt_de_relatie_met_het_bouwwerk(
     )
 
 
-def test_ext003_zwijgt_over_een_duiker(config: CheckConfig, bronnen: ExternalData) -> None:
-    # Streng 3 is een duiker en kruist water-2; EXT-002 meldt hem wel, EXT-003 niet.
+def test_ext003_zwijgt_over_een_zinker(config: CheckConfig, bronnen: ExternalData) -> None:
+    # Streng 3 is een zinker en kruist water-2; EXT-002 meldt hem wel, EXT-003 niet.
     assert "3" in labels(uitkomst("EXT-002", config, bronnen))
     assert "3" not in labels(uitkomst("EXT-003", config, bronnen))
+
+
+def test_een_duiker_valt_buiten_beide_kruisingschecks(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 6 is een Duiker: in de ontologie een Leiding, geen VrijvervalRioolleiding.
+
+    Hij kruist water-2 net als streng 3, maar zit in geen van beide populaties. De
+    toelichting van beide checks zegt dat hij niet bekeken is.
+    """
+    for check_id in ("EXT-002", "EXT-003"):
+        outcome = uitkomst(check_id, config, bronnen)
+        assert "6" not in labels(outcome)
+        assert any("1 strengen van de klasse Duiker" in note for note in outcome.notes), (
+            outcome.notes
+        )
 
 
 def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: ExternalData) -> None:
