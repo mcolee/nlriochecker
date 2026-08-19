@@ -85,8 +85,8 @@ def test_lagen_staan_in_gpkg_contents(tmp_path: Path) -> None:
 
     assert soorten["putten"] == "features"
     assert soorten["strengen"] == "features"
-    assert soorten["meldinglocaties"] == "features"
-    assert soorten["mechanisch_riool"] == "features"
+    assert "meldinglocaties" not in soorten
+    assert "mechanisch_riool" not in soorten
     assert soorten["meldingen"] == "attributes"
     assert soorten["overzicht_checks"] == "attributes"
     assert soorten["gwsw_run"] == "attributes"
@@ -140,13 +140,15 @@ def test_paarmelding_draagt_beide_objecten(tmp_path: Path) -> None:
     assert rij[0][0] and rij[0][1]
 
 
-def test_meldinglocaties_bevat_een_punt_per_melding_met_locatie(tmp_path: Path) -> None:
+def test_de_meldingentabel_houdt_elke_melding(tmp_path: Path) -> None:
+    """`meldinglocaties` verviel als featurelaag; de tabel bleef, met alles erin."""
     run = _run("top011_hartlijnkruising.ttl", "TOP-011")
     meldingen = bouw_meldingen(run, RUNDATUM)
-    met_punt = [melding for melding in meldingen if melding.foutlocatie is not None]
     pad = _schrijf(run, tmp_path)
 
-    assert _rijen(pad, "select count(*) from meldinglocaties")[0][0] == len(met_punt)
+    assert _rijen(pad, "select count(*) from meldingen")[0][0] == len(meldingen)
+    tabellen = {naam for (naam,) in _rijen(pad, "select name from sqlite_master")}
+    assert "meldinglocaties" not in tabellen
 
 
 def test_overzicht_checks_toont_ook_de_checks_zonder_bevinding(tmp_path: Path) -> None:
@@ -185,8 +187,6 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
 
     assert [naam for naam, _, _ in stijlen] == [
         "bouwwerken",
-        "mechanisch_riool",
-        "meldinglocaties",
         "putten",
         "strengen",
         "waterdelen_zonder_zinker",
@@ -306,24 +306,6 @@ def test_geschreven_bestand_is_leesbaar_met_de_eigen_lezer(tmp_path: Path) -> No
     assert all(not vlak.geometrie.is_empty for vlak in gelezen.features)
 
 
-def test_meldinglocatiestijl_filtert_systemische_meldingen_echt(tmp_path: Path) -> None:
-    """De stijl moet doen wat zijn toelichting belooft.
-
-    Drie meldingtypen slaan op vrijwel elke put aan; die even zwaar tekenen maakt
-    het kaartbeeld onbruikbaar. Ze blijven wel in het bestand staan, maar de
-    default-stijl laat ze weg. Een toelichting die dat belooft terwijl de stijl het
-    niet doet, is erger dan geen toelichting.
-    """
-    pad = _schrijf(_run("schoon.ttl"), tmp_path)
-
-    qml = _rijen(pad, "select styleQML from layer_styles where f_table_name = 'meldinglocaties'")
-    boom = ET.fromstring(qml[0][0])
-
-    filters = [regel.get("filter", "") for regel in boom.iter("rule")]
-    assert filters, "de stijl kent geen regels en kan dus niet filteren"
-    assert all("systemisch" in uitdrukking for uitdrukking in filters)
-
-
 def test_feature_id_is_het_fragment_en_de_uri_staat_erbij(tmp_path: Path) -> None:
     pad = _schrijf(_run("schoon.ttl"), tmp_path)
 
@@ -358,19 +340,17 @@ def test_meldingen_op_dezelfde_plek_worden_genummerd(tmp_path: Path) -> None:
     """
     from collections import defaultdict
 
-    from nlriochecker.studiegebied import _ontleed_gpkg
     from nlriochecker.uitvoer.gpkg import STAPEL_RASTER_M
 
     run = _run("top005_dubbele_put.ttl")
     pad = _schrijf(run, tmp_path)
 
-    rijen = _rijen(pad, "select geom, stapel_aantal, stapel_nr from meldinglocaties")
+    rijen = _rijen(pad, "select x, y, stapel_aantal, stapel_nr from meldingen where x is not null")
     assert rijen
 
     per_plek: dict[tuple[int, int], list[tuple[int, int]]] = defaultdict(list)
-    for geom, aantal, nummer in rijen:
-        punt = _ontleed_gpkg(geom)
-        sleutel = (round(punt.x / STAPEL_RASTER_M), round(punt.y / STAPEL_RASTER_M))
+    for x, y, aantal, nummer in rijen:
+        sleutel = (round(x / STAPEL_RASTER_M), round(y / STAPEL_RASTER_M))
         per_plek[sleutel].append((aantal, nummer))
 
     # De fixture moet zelf minstens een echte stapel bevatten, anders toetst deze
@@ -402,13 +382,13 @@ def test_stapelnummering_is_onafhankelijk_van_lijstvolgorde(tmp_path: Path) -> N
     eerste = {
         melding_id: (aantal, nummer)
         for melding_id, aantal, nummer in _rijen(
-            eerste_pad, "select melding_id, stapel_aantal, stapel_nr from meldinglocaties"
+            eerste_pad, "select melding_id, stapel_aantal, stapel_nr from meldingen"
         )
     }
     tweede = {
         melding_id: (aantal, nummer)
         for melding_id, aantal, nummer in _rijen(
-            tweede_pad, "select melding_id, stapel_aantal, stapel_nr from meldinglocaties"
+            tweede_pad, "select melding_id, stapel_aantal, stapel_nr from meldingen"
         )
     }
 
@@ -416,44 +396,41 @@ def test_stapelnummering_is_onafhankelijk_van_lijstvolgorde(tmp_path: Path) -> N
     assert eerste == tweede
 
 
-def test_mechanische_leidingen_staan_in_een_eigen_laag(tmp_path: Path) -> None:
+def test_mechanisch_riool_staat_grijs_tussen_de_strengen(tmp_path: Path) -> None:
+    """Het objecttype blijft kloppen; alleen de status zegt dat er niets getoetst is."""
     pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
 
-    soorten = [rij[0] for rij in _rijen(pad, "select objecttype from mechanisch_riool")]
-    omschrijvingen = {rij[0] for rij in _rijen(pad, "select omschrijving from mechanisch_riool")}
+    rijen = _rijen(pad, "select objecttype, status from strengen where objecttype = 'Persleiding'")
 
-    assert soorten == ["Persleiding"]
-    assert omschrijvingen == {"Mechanisch riool: niet geanalyseerd"}
+    assert rijen == [("Persleiding", "grijs")]
 
 
-def test_mechanische_leidingen_staan_gesorteerd_in_de_laag(tmp_path: Path) -> None:
-    """`mechanisch` is een frozenset; ongesorteerd itereren zou de rijvolgorde en
-    daarmee de fid-toekenning tussen twee runs op dezelfde data laten wisselen.
-    """
+def test_mechanisch_riool_zegt_in_zijn_popup_waarom_het_grijs_is(tmp_path: Path) -> None:
+    pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
+
+    ((popup,),) = _rijen(pad, "select popup_html from strengen where objecttype = 'Persleiding'")
+
+    assert "mechanisch riool" in popup
+
+
+def test_de_strengen_staan_in_een_vaste_volgorde(tmp_path: Path) -> None:
+    """Ongesorteerd itereren zou de fid-toekenning tussen twee runs laten wisselen."""
     pad = _schrijf(_run("mechanisch_riool_twee.ttl"), tmp_path)
 
-    labels = [rij[0] for rij in _rijen(pad, "select label from mechanisch_riool order by fid")]
+    labels = [rij[0] for rij in _rijen(pad, "select label from strengen order by fid")]
 
     assert labels == sorted(labels)
-    assert len(labels) == 2
-
-
-def test_mechanische_leidingen_staan_niet_meer_bij_de_strengen(tmp_path: Path) -> None:
-    pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
-
-    soorten = {rij[0] for rij in _rijen(pad, "select objecttype from strengen")}
-
-    assert "Persleiding" not in soorten
 
 
 def test_runmetadata_telt_de_lagen(tmp_path: Path) -> None:
+    """`n_strengen` telt de rijen in de laag; `n_mechanisch` hoeveel daarvan grijs zijn."""
     pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
 
     ((putten, strengen, mechanisch),) = _rijen(
         pad, "select n_putten, n_strengen, n_mechanisch from gwsw_run"
     )
 
-    assert (putten, strengen, mechanisch) == (4, 1, 1)
+    assert (putten, strengen, mechanisch) == (4, 2, 1)
 
 
 def test_featurelagen_dragen_het_stelseltype(tmp_path: Path) -> None:
@@ -802,3 +779,100 @@ class _Stapopnemer:
 
     def einde_fase(self) -> None:
         """Doet niets; het einde zegt hier niets."""
+
+
+class TestStatusEnPopup:
+    """De twee kolommen waarop de symbologie en de maptip rusten (issue #13)."""
+
+    def test_elk_object_draagt_een_status_uit_de_vier(self, tmp_path: Path) -> None:
+        from nlriochecker.uitvoer.objectkaart import STATUSSEN
+
+        pad = _schrijf(_run("hgt010_diameterverjonging.ttl"), tmp_path)
+
+        waarden = {rij[0] for rij in _rijen(pad, "select status from putten")}
+        waarden |= {rij[0] for rij in _rijen(pad, "select status from strengen")}
+
+        assert waarden
+        assert waarden <= set(STATUSSEN)
+
+    def test_de_status_klopt_met_de_meldingentabel(self, tmp_path: Path) -> None:
+        """De kolom en de tabel komen uit dezelfde stroom; ze mogen niet uiteenlopen."""
+        run = _run("hgt010_diameterverjonging.ttl")
+        pad = _schrijf(run, tmp_path)
+
+        rijen = _rijen(
+            pad,
+            "select o.gwsw_uri, o.status, "
+            "  sum(case when m.ernst = 'F' and m.systemisch = 0 then 1 else 0 end), "
+            "  sum(case when m.ernst = 'W' and m.systemisch = 0 then 1 else 0 end) "
+            "from (select gwsw_uri, status from putten "
+            "      union all select gwsw_uri, status from strengen) o "
+            "left join meldingen m on m.gwsw_uri = o.gwsw_uri "
+            "group by o.gwsw_uri, o.status",
+        )
+
+        assert rijen
+        for _uri, status, fouten, waarschuwingen in rijen:
+            if status == "grijs":
+                continue
+            verwacht = "rood" if fouten else ("oranje" if waarschuwingen else "groen")
+            assert status == verwacht
+
+    def test_de_popup_noemt_de_meldingen_van_het_object(self, tmp_path: Path) -> None:
+        run = _run("hgt010_diameterverjonging.ttl", "HGT-010")
+        pad = _schrijf(run, tmp_path)
+        meldingen = bouw_meldingen(run, RUNDATUM)
+        eerste = meldingen[0]
+
+        ((popup,),) = _rijen(
+            pad, "select popup_html from strengen where gwsw_uri = ?", eerste.object_uri
+        )
+
+        assert eerste.check_id in popup
+
+    def test_een_streng_noemt_stelsel_lengte_en_bob_in_haar_popup(self, tmp_path: Path) -> None:
+        pad = _schrijf(_run("net003_tegen_de_richting.ttl"), tmp_path)
+
+        ((popup,),) = _rijen(pad, "select popup_html from strengen limit 1")
+
+        assert "Stelsel" in popup
+        assert "Lengte" in popup
+        assert "BOB" in popup
+
+    def test_de_popup_van_een_put_noemt_geen_bob(self, tmp_path: Path) -> None:
+        pad = _schrijf(_run("net003_tegen_de_richting.ttl"), tmp_path)
+
+        ((popup,),) = _rijen(pad, "select popup_html from putten limit 1")
+
+        assert "BOB" not in popup
+
+    def test_de_contextschil_komt_grijs_mee(self, tmp_path: Path) -> None:
+        """Wat de checks zagen maar niet beoordeelden, hoort zichtbaar op de kaart."""
+        from nlriochecker.meting import Meetbereik
+        from nlriochecker.studiegebied import load_studiegebieden
+        from nlriochecker.toetsloop import toets_gebieden
+
+        gebieden = load_studiegebieden(
+            Path(__file__).parent / "fixtures" / "gis" / "buurt_noord.gpkg"
+        )
+        runs = toets_gebieden(
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            gebieden,
+            _config(),
+            meetbereik=Meetbereik.niet_gemeten(()),
+        )
+        run = runs[0].run
+        assert run.analyseset is not None and run.analyseset.schil
+        pad = _schrijf(run, tmp_path)
+
+        statussen = dict(
+            _rijen(
+                pad,
+                "select gwsw_uri, status from putten union all "
+                "select gwsw_uri, status from strengen",
+            )
+        )
+
+        for uri in run.analyseset.schil:
+            assert statussen.get(uri) == "grijs", uri
+        assert any(statussen.get(uri) != "grijs" for uri in run.analyseset.kern)

@@ -4,9 +4,15 @@ Geschreven met `sqlite3` en `shapely.wkb` — dezelfde route waarmee
 `studiegebied.py` een GeoPackage al *leest*, nu de schrijfkant. Dat scheelt een
 afhankelijkheid en houdt lees- en schrijfkant bij elkaar.
 
+Er zijn twee objectlagen -- `putten` en `strengen` -- met de gebreken *op* het object:
+de kolom `status` draagt de uitslag in vier waarden en `popup_html` de voorgebakken
+hoverpopup. Mechanisch riool staat tussen de strengen met status `grijs`, en met een
+studiegebied staat de contextschil er ook grijs bij: wat de checks wel zagen maar niet
+beoordeelden, hoort zichtbaar te zijn.
+
 Het bestand is bewust zelfvoorzienend: de featurelagen bevatten genoeg samenvatting
-om zonder join bruikbaar te zijn, `meldinglocaties` is bewust redundant met
-`meldingen`, en er zijn geen GPKG-relaties of andere uitbreidingen die niet elk
+om zonder join bruikbaar te zijn, de tabel `meldingen` draagt elke melding met haar
+coordinaat, en er zijn geen GPKG-relaties of andere uitbreidingen die niet elk
 GIS-pakket leest.
 
 QGIS-stijlen worden in de tabel `layer_styles` opgeslagen en via `gpkg_contents`
@@ -37,6 +43,11 @@ from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
 from nlriochecker.uitvoer.melding import Melding, categorie_van
+from nlriochecker.uitvoer.objectkaart import (
+    Objectkop,
+    bepaal_status,
+    popup_html,
+)
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
@@ -56,8 +67,6 @@ RICHTING_ONBEKEND = "onbekend"
 FEATURELAGEN = (
     "putten",
     "strengen",
-    "meldinglocaties",
-    "mechanisch_riool",
     "bouwwerken",
     "waterdelen_zonder_zinker",
 )
@@ -66,7 +75,10 @@ FEATURELAGEN = (
 # meldingen die naar hetzelfde bouwwerk verwijzen.
 RELATIE_STERKTE = ("binnen", "kruist", "nabij")
 
-MECHANISCH_OMSCHRIJVING = "Mechanisch riool: niet geanalyseerd"
+# Waarom een object grijs is. De popup noemt de reden; grijs zonder reden leest als
+# "in orde", en dat is het niet.
+REDEN_MECHANISCH = "mechanisch riool, valt buiten scope van het checkregister"
+REDEN_SCHIL = "contextschil van het studiegebied, buiten de kern"
 
 RD_WKT = (
     'PROJCS["Amersfoort / RD New",GEOGCS["Amersfoort",DATUM["Amersfoort",'
@@ -87,8 +99,6 @@ RD_WKT = (
 GEOPACKAGE_STAPPEN = (
     "putten",
     "strengen",
-    "mechanisch_riool",
-    "meldinglocaties",
     "bouwwerken",
     "waterdelen_zonder_zinker",
     "meldingen",
@@ -115,7 +125,10 @@ class _LaagTellingen:
     """
 
     putten: int
+    # Alle lijnen in de laag `strengen`, mechanisch riool en contextschil inbegrepen.
     strengen: int
+    # Hoeveel van die lijnen mechanisch riool zijn; ze staan sinds issue #13 tussen de
+    # strengen met status `grijs` in plaats van in een eigen laag.
     mechanisch: int
     bouwwerken: int
     waterdelen: int
@@ -345,6 +358,7 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("richting_bob", "text"),
         _Kolom("bob_verval_m", "real"),
         _Kolom("gebied", "text"),
+        _Kolom("status", "text"),
         _Kolom("ergste_ernst", "text"),
         _Kolom("n_fout", "integer"),
         _Kolom("n_waarschuwing", "integer"),
@@ -357,6 +371,7 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("dataset_versie", "text"),
         _Kolom("register_versie", "text"),
         _Kolom("gwsw_uri", "text"),
+        _Kolom("popup_html", "text"),
     ]
 
 
@@ -383,17 +398,35 @@ def _schrijf_features(
     run_datum: date,
     voortgang: Voortgang = NUL_VOORTGANG,
 ) -> _LaagTellingen:
-    """Schrijft `putten`, `strengen`, `mechanisch_riool` en `meldinglocaties`."""
+    """Schrijft de twee objectlagen plus de twee lagen met externe objecten.
+
+    Naast de beoordeelde objecten komt erin wat de checks wel zagen maar niet
+    beoordeelden: mechanisch riool, dat volgens het checkregister buiten scope valt,
+    en de contextschil van een studiegebied. Beide krijgen status `grijs` met de reden
+    in hun popup. Ze weglaten zou de kaart bij de gebiedsgrens laten ophouden alsof
+    daar niets ligt, en een lege mechanische laag zou als "geen mechanisch riool
+    aanwezig" lezen.
+
+    De schil komt uit `run.analyseset` en niet uit "alles wat niet in de kern ligt".
+    Een run die met `beperk_tot_studiegebied` op de volledige export is afgebakend
+    heeft geen analyseset, en dan hoort het bestand bij de gebiedsgrens op te houden
+    zoals het altijd deed -- anders zou een toets op een buurt de hele export als
+    grijze achtergrond meesturen.
+    """
     kolommen = _samenvatting_kolommen()
     _maak_featurelaag(
-        verbinding, "putten", "POINT", kolommen, "Knooppunten met een samenvatting per object."
+        verbinding,
+        "putten",
+        "POINT",
+        kolommen,
+        "Knooppunten met de uitslag per object; `status` draagt hem in vier waarden.",
     )
     _maak_featurelaag(
         verbinding,
         "strengen",
         "LINESTRING",
         kolommen,
-        "Vrijvervalstrengen met een samenvatting per object.",
+        "Verbindingen met de uitslag per object; mechanisch riool staat er grijs bij.",
     )
 
     per_object = _meldingen_per_object(meldingen)
@@ -401,21 +434,22 @@ def _schrijf_features(
     stelsels = _stelseltypen(run)
     config = run.config if run.config is not None else load_check_config()
     mechanisch = _mechanische_uris(run, config)
+    schil = run.analyseset.schil if run.analyseset is not None else frozenset()
 
     tellingen: dict[str, int] = {}
+    mechanisch_geschreven = 0
     for laag, verzameling, geometrie_veld in (
         ("putten", run.dataset.nodes, "point"),
-        (
-            "strengen",
-            {uri: c for uri, c in run.dataset.conduits.items() if uri not in mechanisch},
-            "line",
-        ),
+        ("strengen", run.dataset.conduits, "line"),
     ):
         rijen = []
         grenzen: list[tuple[float, float, float, float]] = []
-        for uri, object_ in verzameling.items():
-            if binnen is not None and uri not in binnen:
+        # Gesorteerd, niet in de volgorde van het woordenboek: anders wisselen
+        # rijvolgorde en fid-toekenning tussen twee runs op dezelfde data.
+        for uri in sorted(verzameling):
+            if binnen is not None and uri not in binnen and uri not in schil:
                 continue
+            object_ = verzameling[uri]
             geometrie = getattr(object_, geometrie_veld)
             if geometrie is None or geometrie.is_empty:
                 continue
@@ -423,6 +457,9 @@ def _schrijf_features(
             richting, verval = (
                 _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
             )
+            reden = _reden_niet_beoordeeld(uri, binnen, mechanisch)
+            if uri in mechanisch:
+                mechanisch_geschreven += 1
             rijen.append(
                 (
                     _blob(geometrie),
@@ -435,6 +472,7 @@ def _schrijf_features(
                         stelsels.get(uri, ""),
                         richting,
                         verval,
+                        reden,
                     ),
                 )
             )
@@ -448,19 +486,30 @@ def _schrijf_features(
         tellingen[laag] = len(rijen)
         voortgang.stap(label=laag)
 
-    tellingen["mechanisch"] = _schrijf_mechanisch(verbinding, run, binnen, mechanisch, metadata)
-    voortgang.stap(label="mechanisch_riool")
-    _schrijf_meldinglocaties(verbinding, meldingen)
-    voortgang.stap(label="meldinglocaties")
     bouwwerken, waterdelen = _schrijf_treffers(verbinding, run, meldingen, config, voortgang)
 
     return _LaagTellingen(
         putten=tellingen["putten"],
         strengen=tellingen["strengen"],
-        mechanisch=tellingen["mechanisch"],
+        mechanisch=mechanisch_geschreven,
         bouwwerken=bouwwerken,
         waterdelen=waterdelen,
     )
+
+
+def _reden_niet_beoordeeld(
+    uri: str, binnen: frozenset[str] | None, mechanisch: frozenset[str]
+) -> str:
+    """Waarom dit object niet beoordeeld is, of leeg als het dat wel is.
+
+    Mechanisch riool gaat voor de contextschil: het valt sowieso buiten scope, ook
+    binnen de kern, en dat is de scherpere reden om te noemen.
+    """
+    if uri in mechanisch:
+        return REDEN_MECHANISCH
+    if binnen is not None and uri not in binnen:
+        return REDEN_SCHIL
+    return ""
 
 
 def _bouwwerk_kolommen() -> list[_Kolom]:
@@ -665,78 +714,6 @@ def _check_ids(meldingen: list[Melding]) -> str:
     return ", ".join(sorted({melding.check_id for melding in meldingen}))
 
 
-def _mechanisch_kolommen() -> list[_Kolom]:
-    """De smalle kolomset van de laag `mechanisch_riool`."""
-    return [
-        _Kolom("feature_id", "text"),
-        _Kolom("label", "text"),
-        _Kolom("objecttype", "text"),
-        _Kolom("omschrijving", "text"),
-        _Kolom("gebied", "text"),
-        _Kolom("run_datum", "text"),
-        _Kolom("dataset_versie", "text"),
-        _Kolom("gwsw_uri", "text"),
-    ]
-
-
-def _schrijf_mechanisch(
-    verbinding: sqlite3.Connection,
-    run: CheckRun,
-    binnen: frozenset[str] | None,
-    mechanisch: frozenset[str],
-    metadata: tuple[str, str, str],
-) -> int:
-    """Schrijft de laag `mechanisch_riool` en geeft het aantal weggeschreven objecten terug.
-
-    Mechanisch riool valt buiten scope voor de checks (zie het checkregister), maar
-    hoort wel in het kaartbeeld: een lege laag zou als 'geen mechanisch riool
-    aanwezig' lezen, en dat is niet wat er onderzocht is.
-    """
-    kolommen = _mechanisch_kolommen()
-    _maak_featurelaag(
-        verbinding,
-        "mechanisch_riool",
-        "LINESTRING",
-        kolommen,
-        "Mechanisch riool (druk-, pers- en vacuumleidingen): niet getoetst.",
-    )
-
-    run_datum_iso, dataset_versie, _register_versie = metadata
-    rijen = []
-    grenzen: list[tuple[float, float, float, float]] = []
-    # Gesorteerd, niet in de willekeurige volgorde van de frozenset: anders
-    # wisselen rijvolgorde en fid-toekenning tussen twee runs op dezelfde data.
-    for uri in sorted(mechanisch):
-        if binnen is not None and uri not in binnen:
-            continue
-        object_ = run.dataset.conduits[uri]
-        geometrie = object_.line
-        if geometrie is None or geometrie.is_empty:
-            continue
-        grenzen.append(geometrie.bounds)
-        rijen.append(
-            (
-                _blob(geometrie),
-                kort(uri),
-                getattr(object_, "label", ""),
-                run.dataset.beheerobjecttype(uri),
-                MECHANISCH_OMSCHRIJVING,
-                _gebied(run),
-                run_datum_iso,
-                dataset_versie,
-                uri,
-            )
-        )
-    if rijen:
-        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
-        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
-        verbinding.executemany(
-            f'insert into "mechanisch_riool" (geom, {velden}) values ({plaatshouders})', rijen
-        )
-    _zet_omhullende(verbinding, "mechanisch_riool", grenzen)
-    return len(rijen)
-
-
 def _samenvatting(
     run: CheckRun,
     uri: str,
@@ -746,8 +723,15 @@ def _samenvatting(
     stelsel: str = "",
     richting_bob: str = "",
     bob_verval_m: float | None = None,
+    reden: str = "",
 ) -> tuple[object, ...]:
-    """De samenvattingsvelden van een object, in de volgorde van de kolommen."""
+    """De samenvattingsvelden van een object, in de volgorde van de kolommen.
+
+    `reden` is gevuld als dit object niet beoordeeld is; dan is de status grijs en
+    noemt de popup waarom. De status volgt verder dezelfde regel als `ergste_ernst`:
+    systemische meldingen tellen niet mee, want anders is op De Wolden vrijwel elke
+    put rood. Zie `objectkaart.bepaal_status`.
+    """
     niet_systemisch = [melding for melding in eigen if not melding.systemisch]
     fouten = [melding for melding in niet_systemisch if melding.ernst == "F"]
     waarschuwingen = [melding for melding in niet_systemisch if melding.ernst == "W"]
@@ -758,14 +742,25 @@ def _samenvatting(
     for melding in eigen:
         per_categorie[melding.categorie] += 1
 
+    label = getattr(object_, "label", "")
+    objecttype = run.dataset.beheerobjecttype(uri)
+    status = bepaal_status(eigen, geanalyseerd=not reden)
+    kop = Objectkop(
+        label=label,
+        objecttype=objecttype,
+        status=status,
+        feiten=_feiten(object_, stelsel, richting_bob),
+        reden=reden,
+    )
     return (
         kort(uri),
-        getattr(object_, "label", ""),
-        run.dataset.beheerobjecttype(uri),
+        label,
+        objecttype,
         stelsel,
         richting_bob,
         bob_verval_m,
         _gebied(run),
+        status,
         ernst,
         len(fouten),
         len(waarschuwingen),
@@ -776,7 +771,39 @@ def _samenvatting(
         prioriteit,
         *metadata,
         uri,
+        popup_html(kop, eigen),
     )
+
+
+# Hoe de kolom `richting_bob` in de popup gelezen wordt. De logica erachter blijft
+# ongewijzigd (`_richting_bob`); dit is alleen de verwoording.
+RICHTING_IN_WOORDEN = {
+    RICHTING_MEE: "BOB-verval loopt met de getekende lijn mee",
+    RICHTING_TEGEN: "BOB-verval loopt tegen de getekende lijn in",
+    RICHTING_ONBEKEND: "BOB-richting niet te bepalen",
+}
+
+
+def _feiten(object_: object, stelsel: str, richting_bob: str) -> tuple[str, ...]:
+    """De losse feiten die in de kopregel van de popup horen.
+
+    Alleen bij een verbinding: stelsel, de getekende lengte en de BOB-richtingsregel.
+    Een put heeft ze geen van drieen, en een lege regel tonen is erger dan geen regel.
+
+    De lengte is die van de getekende lijn en niet het kenmerk `LengteLeiding`: de
+    popup hoort te zeggen wat er op de kaart staat. Wijken de twee af, dan is dat een
+    bevinding van ATTR-009 en die staat in de lijst eronder.
+    """
+    if not isinstance(object_, Conduit):
+        return ()
+    feiten = []
+    if stelsel:
+        feiten.append(f"Stelsel: {stelsel}")
+    if object_.line is not None and not object_.line.is_empty:
+        feiten.append(f"Lengte: {object_.line.length:.1f} m")
+    if richting_bob:
+        feiten.append(RICHTING_IN_WOORDEN.get(richting_bob, richting_bob))
+    return tuple(feiten)
 
 
 def _gebied(run: CheckRun) -> str:
@@ -825,6 +852,13 @@ MELDING_KOLOMMEN = [
     _Kolom("gwsw_uri_2", "text"),
     _Kolom("stapel_aantal", "integer"),
     _Kolom("stapel_nr", "integer"),
+    # De foutlocatie in RD, zoals de CSV hem als X/Y draagt en de JSON als
+    # `foutlocatie`. Sinds de laag `meldinglocaties` verviel is dit de plek waar de
+    # exacte plek van een melding in de GeoPackage staat; zonder deze twee kolommen
+    # zou hij daar stilzwijgend uit verdwijnen. Leeg als de melding niet op een plek
+    # te zetten is.
+    _Kolom("x", "real"),
+    _Kolom("y", "real"),
 ]
 
 
@@ -880,16 +914,24 @@ def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
         melding.object2_uri,
         stapel[0],
         stapel[1],
+        melding.foutlocatie.x if melding.foutlocatie is not None else None,
+        melding.foutlocatie.y if melding.foutlocatie is not None else None,
     )
 
 
 def _schrijf_meldingen(verbinding: sqlite3.Connection, meldingen: list[Melding]) -> None:
-    """Schrijft de meldingentabel: het volledige register, zonder geometrie."""
+    """Schrijft de meldingentabel: het volledige register, zonder geometrie.
+
+    De kolommen `x` en `y` dragen de foutlocatie. Sinds de laag `meldinglocaties`
+    verviel (issue #13) staat de exacte plek van een melding -- het snijpunt van een
+    kruising, het midden van een streng -- alleen nog hier; wie hem als punten wil,
+    bouwt er in QGIS een geometriegenerator of een puntenlaag van.
+    """
     _maak_attribuuttabel(
         verbinding,
         "meldingen",
         MELDING_KOLOMMEN,
-        "Alle meldingen van deze run, koppelbaar op feature_id.",
+        "Alle meldingen van deze run, koppelbaar op feature_id; x/y is de foutlocatie.",
     )
     stapels = _stapels(meldingen)
     velden = ", ".join(f'"{kolom.naam}"' for kolom in MELDING_KOLOMMEN)
@@ -898,38 +940,6 @@ def _schrijf_meldingen(verbinding: sqlite3.Connection, meldingen: list[Melding])
         f"insert into meldingen ({velden}) values ({plaatshouders})",
         [_melding_rij(melding, stapels.get(melding.melding_id, (1, 1))) for melding in meldingen],
     )
-
-
-def _schrijf_meldinglocaties(verbinding: sqlite3.Connection, meldingen: list[Melding]) -> None:
-    """Schrijft de naloopwerklaag: een punt per melding op de foutlocatie.
-
-    Bewust redundant met de meldingentabel: wie met een kaal GIS-pakket werkt kan
-    hiermee uit de voeten zonder joins.
-    """
-    _maak_featurelaag(
-        verbinding,
-        "meldinglocaties",
-        "POINT",
-        MELDING_KOLOMMEN,
-        "Een punt per melding, op de plek waar het probleem zit.",
-    )
-    stapels = _stapels(meldingen)
-    velden = ", ".join(f'"{kolom.naam}"' for kolom in MELDING_KOLOMMEN)
-    plaatshouders = ", ".join("?" * (len(MELDING_KOLOMMEN) + 1))
-    met_punt = [melding for melding in meldingen if melding.foutlocatie is not None]
-    rijen = [
-        (
-            _blob(melding.foutlocatie),
-            *_melding_rij(melding, stapels.get(melding.melding_id, (1, 1))),
-        )
-        for melding in met_punt
-    ]
-    if rijen:
-        verbinding.executemany(
-            f"insert into meldinglocaties (geom, {velden}) values ({plaatshouders})", rijen
-        )
-    omhullenden = [punt.bounds for melding in met_punt if (punt := melding.foutlocatie) is not None]
-    _zet_omhullende(verbinding, "meldinglocaties", omhullenden)
 
 
 def _schrijf_overzicht(

@@ -130,12 +130,10 @@ def test_geopackagefase_zet_een_stap_per_laag(tmp_path: Path) -> None:
 
     schrijf_uitvoer(run, tmp_path, RUNDATUM, voortgang=opnemer)
 
-    assert opnemer.fasen() == [("GeoPackage", 10)]
+    assert opnemer.fasen() == [("GeoPackage", 8)]
     assert opnemer.labels("GeoPackage") == [
         "putten",
         "strengen",
-        "mechanisch_riool",
-        "meldinglocaties",
         "bouwwerken",
         "waterdelen_zonder_zinker",
         "meldingen",
