@@ -568,7 +568,7 @@ def check_command(
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
     opdracht = Toetsopdracht(
-        dataset=dataset_path,
+        dataset_pad=dataset_path,
         ontologieen=ontology_paths,
         shacl=shacl_paths,
         check_ids=check_ids,

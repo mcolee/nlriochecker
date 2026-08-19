@@ -21,7 +21,7 @@ pakket onder 1.0 staat kan de vorm nog schuiven; zie `docs/versionering.md`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from nlriochecker.analysis import analyze
@@ -49,7 +49,8 @@ class Toetsopdracht:
     zodra je ze programmatisch zet.
     """
 
-    dataset: Path
+    dataset_pad: Path
+    uitvoermap: Path
     ontologieen: tuple[Path, ...] = ()
     shacl: tuple[Path, ...] = ()
     check_ids: tuple[str, ...] = ()
@@ -60,7 +61,6 @@ class Toetsopdracht:
     plausibiliteit: Path | None = None
     bronnen: Path | None = None
     cfk: tuple[str, ...] = ()
-    uitvoermap: Path = Path("uitvoer")
     met_geopackage: bool = True
     met_json: bool = True
     gebruik_cache: bool = True
@@ -83,7 +83,7 @@ class Toetsuitslag:
     # De CFK-keuze van de opdracht; alleen nodig om te melden dat `--cfk` niets doet
     # zonder `--shacl`. Het meetbereik zelf zegt daar niets over, want zonder meting
     # is er geen bereik om een deelset van te zijn.
-    cfk_keuze: tuple[str, ...] = field(default=(), repr=False)
+    cfk_keuze: tuple[str, ...] = ()
 
     def regels(self) -> list[str]:
         """Het verhaal van deze run, in de volgorde waarin het gelezen hoort te worden.
@@ -92,6 +92,10 @@ class Toetsuitslag:
         vlagnamen. De volgorde is onderdeel van de uitvoer: een beller hoort deze
         lijst af te drukken en hem niet zelf samen te stellen.
         """
+        # `source` is het pad waarmee de dataset gelezen is. Bij een cachetreffer
+        # komt dat uit het bewaarde exemplaar, en dat klopt omdat de cachesleutel de
+        # bestandsnaam meeneemt; zou die eruit gaan, dan zou hier de naam van een
+        # andere export kunnen staan.
         regels = [
             f"{self.dataset.source.name}: {len(self.dataset.nodes)} knooppunten, "
             f"{len(self.dataset.conduits)} strengen"
@@ -188,7 +192,7 @@ def voer_toets_uit(
     bronnen = _externe_bronnen(opdracht, config)
 
     dataset, cache = laad_met_cache(
-        opdracht.dataset,
+        opdracht.dataset_pad,
         list(opdracht.ontologieen),
         opdracht.cachemap,
         opdracht.gebruik_cache,

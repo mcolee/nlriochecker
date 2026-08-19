@@ -13,6 +13,7 @@ vlagcombinaties en de voortgangsbalk.
 
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -20,10 +21,15 @@ import pandas as pd
 import pytest
 from shapely.geometry import box, mapping
 
+from nlriochecker import toetsrun as toetsrun_module
 from nlriochecker.checkconfig import default_check_config_path
 from nlriochecker.errors import OpdrachtError, StudyAreaError
 from nlriochecker.externedata import ExternalDataError
-from nlriochecker.toetsrun import Toetsopdracht, Toetsuitslag, voer_toets_uit
+from nlriochecker.toetsrun import (
+    Toetsopdracht,
+    Toetsuitslag,
+    voer_toets_uit,
+)
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
     FILE_CHECKS_JSON,
@@ -67,9 +73,12 @@ def bronnenconfig(tmp_path: Path, tolerantie: float | None = None) -> Path:
 def toets(tmp_path: Path, bestand: str, **velden) -> Toetsuitslag:
     """Draait een toets op een fixture, met de uitvoer in `tmp_path`."""
     opdracht = Toetsopdracht(
-        dataset=TTL_DIR / bestand,
+        dataset_pad=TTL_DIR / bestand,
         uitvoermap=tmp_path / "uitvoer",
         met_geopackage=False,
+        # Niet in de cache van de ontwikkelaar schrijven: die map wordt nergens
+        # opgeruimd, en een test hoort geen sporen buiten haar tmp_path te laten.
+        cachemap=tmp_path / "cache",
         **velden,
     )
     return voer_toets_uit(opdracht)
@@ -237,24 +246,26 @@ def test_meerdere_gebieden_leveren_een_run_per_gebied(tmp_path: Path) -> None:
     assert all("in de kern" in regel for regel in gebiedsregels)
 
 
-def test_gebiedskeuze_beperkt_de_run(tmp_path: Path) -> None:
-    """Met een keuze draait alleen dat gebied, maar wordt het bestand wel volledig gelezen."""
+def test_gebiedskeuze_beperkt_de_run_en_meldt_dat(tmp_path: Path) -> None:
+    """Met een keuze draait alleen dat gebied, en de synthese zegt dat er gekozen is.
+
+    Die tweede helft hangt aan de bedrading: `voer_toets_uit` geeft `beschikbaar` en
+    `overgeslagen` door aan de uitvoerlaag. Valt dat weg, dan verdwijnt de mededeling
+    dat het grootste deel van het gebiedsbestand niet gedraaid heeft -- en dan leest
+    een schone synthese als een schoon beheergebied.
+    """
     uitslag = toets(
         tmp_path,
-        "schoon.ttl",
-        check_ids=("TOP-001",),
+        "hgt010_diameterverjonging.ttl",
+        check_ids=("HGT-010",),
         studiegebied=GIS_DIR / "buurten_twee.gpkg",
-        gebieden=(_eerste_gebiedsnaam(tmp_path),),
+        gebieden=("Noord",),
     )
 
     assert len(uitslag.runs) == 1
-
-
-def _eerste_gebiedsnaam(tmp_path: Path) -> str:
-    """De naam van het eerste gebied in de tweebuurten-fixture."""
-    from nlriochecker.studiegebied import load_studiegebieden
-
-    return load_studiegebieden(GIS_DIR / "buurten_twee.gpkg", None).beschikbaar[0]
+    assert set(uitslag.uitvoer.per_gebied) == {"Noord"}
+    assert uitslag.uitvoer.synthese is not None
+    assert "Selectie" in uitslag.uitvoer.synthese.read_text(encoding="utf-8")
 
 
 def test_json_kan_uit(tmp_path: Path) -> None:
@@ -268,9 +279,10 @@ def test_json_kan_uit(tmp_path: Path) -> None:
 def test_geopackage_kan_aan(tmp_path: Path) -> None:
     """De GIS-uitvoer staat standaard aan en levert een bestand op."""
     opdracht = Toetsopdracht(
-        dataset=TTL_DIR / "schoon.ttl",
+        dataset_pad=TTL_DIR / "schoon.ttl",
         uitvoermap=tmp_path / "uitvoer",
         check_ids=("TOP-001",),
+        cachemap=tmp_path / "cache",
     )
     uitslag = voer_toets_uit(opdracht)
 
@@ -363,3 +375,53 @@ class TestExterneBronnen:
                 bronnen=EXT_DIR,
                 projectconfig=bronnenconfig(tmp_path, tolerantie=0.0),
             )
+
+
+def test_typeringsvoorbehoud_wordt_gemeld(tmp_path: Path) -> None:
+    """Een object waarvan de typering te globaal is, komt met voorbehoud in de uitslag.
+
+    De SHACL-meting benoemt de te globale klassen; de instanties volgen uit de
+    dataset. Zonder deze test toont niets meer aan dat het voorbehoud daadwerkelijk
+    doorwerkt tot in de melding op het scherm -- en een voorbehoud dat je niet ziet
+    is geen voorbehoud.
+    """
+    bron = (TTL_DIR / "top001_losliggende_put.ttl").read_text(encoding="utf-8")
+    bron += "\n:PutC rdf:type gwsw:Overstortput .\ngwsw:Overstortput rdfs:subClassOf gwsw:Put .\n"
+    dataset = tmp_path / "met_overstortput.ttl"
+    dataset.write_text(bron, encoding="utf-8")
+
+    uitslag = voer_toets_uit(
+        Toetsopdracht(
+            dataset_pad=dataset,
+            uitvoermap=tmp_path / "uitvoer",
+            check_ids=("TOP-001",),
+            shacl=drieluik(),
+            met_geopackage=False,
+            cachemap=tmp_path / "cache",
+        )
+    )
+
+    assert uitslag.typeringspoort_toegepast is True
+    assert uitslag.runs[0].run.outcomes[0].unreliable_count
+    assert any("met typeringsvoorbehoud" in regel for regel in uitslag.regels())
+
+
+def test_de_module_kent_de_opdrachtregel_niet() -> None:
+    """`toetsrun` mag niet van click afhangen; dat is de hele scheiding.
+
+    Een import die er stilletjes bij komt zou de module weer aan de opdrachtregel
+    vastknopen zonder dat een test faalt -- pas de volgende beller merkt het.
+    """
+    boom = ast.parse(Path(toetsrun_module.__file__).read_text(encoding="utf-8"))
+    namen = {
+        knoop.module.split(".")[0]
+        for knoop in ast.walk(boom)
+        if isinstance(knoop, ast.ImportFrom) and knoop.module
+    }
+    namen |= {
+        alias.name.split(".")[0]
+        for knoop in ast.walk(boom)
+        if isinstance(knoop, ast.Import)
+        for alias in knoop.names
+    }
+    assert "click" not in namen
