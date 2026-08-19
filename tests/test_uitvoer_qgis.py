@@ -103,6 +103,59 @@ def test_qgis_laadt_de_stijl_uit_het_bestand(qgis_app, geschreven_gpkg: Path, la
     assert "Provider" in boodschap
 
 
+def test_qgis_leest_de_symbolentabel_terug_zoals_ze_bedoeld_is(
+    qgis_app, geschreven_gpkg: Path
+) -> None:
+    """Een onbekende markervorm wordt door QGIS stil een cirkel.
+
+    De opgebouwde stijl noemt vormen als `octagon` en `cross2` bij naam. Staat daar een
+    tikfout in, dan tekent QGIS zonder morren een cirkel en ziet niemand dat het
+    GWSW-symbool weg is. Deze test laat QGIS de vorm terugcoderen en vergelijkt hem met
+    de tabel.
+    """
+    from nlriochecker.uitvoer.stijlen.symbolen import PUNTSYMBOLEN, VANGNET_PUNT
+
+    vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=putten", "p", "ogr")
+    vector.loadDefaultStyle()
+
+    gevonden = set()
+    for regel in vector.renderer().rootRule().children():
+        for kind in regel.children():
+            for symboollaag in kind.symbol().symbolLayers():
+                gevonden.add(
+                    qgis_core.QgsSimpleMarkerSymbolLayerBase.encodeShape(symboollaag.shape())
+                )
+
+    bedoeld = {symbool.vorm for symbool in PUNTSYMBOLEN.values()} | {VANGNET_PUNT.vorm}
+    assert gevonden == bedoeld
+
+
+def test_de_maptip_van_beide_objectlagen_toont_de_popup(qgis_app, geschreven_gpkg: Path) -> None:
+    """De maptip moet uit `layer_styles` mee terugkomen, niet alleen in de QML staan."""
+    for laag in ("putten", "strengen"):
+        vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername={laag}", laag, "ogr")
+        boodschap, gelukt = vector.loadDefaultStyle()
+
+        assert gelukt, f"{laag}: {boodschap}"
+        assert '[% "popup_html" %]' in vector.mapTipTemplate(), laag
+        assert "<style>" in vector.mapTipTemplate(), laag
+
+
+def test_de_maptipexpressie_levert_de_popup_van_het_object(qgis_app, geschreven_gpkg: Path) -> None:
+    """Niet alleen de tekst, maar de uitkomst: de expressie moet echt HTML opleveren."""
+    vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=strengen", "s", "ogr")
+    vector.loadDefaultStyle()
+    feature = next(vector.getFeatures())
+
+    context = qgis_core.QgsExpressionContext()
+    context.appendScopes(qgis_core.QgsExpressionContextUtils.globalProjectLayerScopes(vector))
+    context.setFeature(feature)
+    gerenderd = qgis_core.QgsExpression.replaceExpressionText(vector.mapTipTemplate(), context)
+
+    assert "gwsw-popup" in gerenderd
+    assert "[%" not in gerenderd
+
+
 def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_gpkg: Path) -> None:
     vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=strengen", "s", "ogr")
     vector.loadDefaultStyle()

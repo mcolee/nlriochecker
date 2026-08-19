@@ -48,6 +48,7 @@ from nlriochecker.uitvoer.objectkaart import (
     bepaal_status,
     popup_html,
 )
+from nlriochecker.uitvoer.stijlen.symbolen import bouw_qml
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
@@ -1119,8 +1120,17 @@ def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
         )
 
 
+# De lagen waarvan de stijl opgebouwd wordt in plaats van uit een bestand te komen.
+# Hun regelstructuur is objecttype x status; op De Wolden zijn dat samen ruim honderd
+# bladregels met evenzoveel symbolen, en die met de hand in XML onderhouden zou de
+# typenlijst op twee plekken zetten. Zie `stijlen/symbolen.py`.
+OPGEBOUWDE_STIJLEN = ("putten", "strengen")
+
+
 def _stijl(laag: str) -> str:
-    """Leest een meegeleverde QML-sjabloon."""
+    """De QML van een laag: opgebouwd waar de regelstructuur dat vraagt, anders gelezen."""
+    if laag in OPGEBOUWDE_STIJLEN:
+        return bouw_qml(laag)
     return (
         resources.files("nlriochecker.uitvoer.stijlen")
         .joinpath(f"{laag}.qml")
