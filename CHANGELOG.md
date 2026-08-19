@@ -85,7 +85,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `CheckContext` en `CheckRun` kregen het veld `treffers`, en
   `_WatergangKruising.kruisingen()` levert `_Kruising`-objecten (streng, geometrie en
   attributen van het waterdeel, laag, buffer) in plaats van tuples van vier waarden --
-  de geometrie van het waterdeel is erbij gekomen en de velden hebben een naam gekregen. De eerste twee zijn additief.
+  de geometrie van het waterdeel is erbij gekomen en de velden hebben een naam
+  gekregen. De eerste twee zijn additief.
 - Een gebied zonder GWSW-objecten stopt een run over meerdere gebieden niet meer, maar
   levert een eigen rapport met nul bevindingen en een expliciete melding -- in dat rapport
   en in de synthese. Bij een run op een enkel gebied blijft het een harde fout.
@@ -207,8 +208,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   Een tikfout in het hoofdlettergebruik gaf tot nu toe een run waarin de regel stil
   niets deed terwijl ATTR-013 meldde dat hij gold. `hoogte_band_m` heeft daarnaast een
   bovengrens van 0,5 m gekregen: dat is geen drempelkeuze maar een invoertoets, want een
-  band in centimeters of millimeters leest elke BOB en elke maaiveldhoogte als
-  ontbrekend en laat veertien checks zwijgen.
+  band in centimeters of millimeters leest elke BOB en elke maaiveldhoogte als ontbrekend,
+  waarna dertien checks stilvallen en ATTR-013 elk object met een hoogte meldt.
 - De toelichting van ATTR-013 telt hoeveel knopen en strengen met een vulwaarde buiten
   haar gemelde populatie vallen (persleidingen, drains, compartiment- en
   hulpstukorientaties). De leesregel raakt ze wel, geen enkele melding noemt ze; het

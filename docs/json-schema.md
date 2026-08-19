@@ -168,7 +168,7 @@ bewegen:
   een andere streng aan en verschuift haar ID eenmalig.
 - De **vulwaarde-leesregel** (`[vulwaarden]`, ATTR-013) laat meldingen verdwijnen die op
   een hoogte rond 0 m NAP rustten. Op De Wolden zijn dat 6.498 fouten en 3.647
-  waarschuwingen, verdeeld over veertien checks; een trendvergelijking over deze grens
+  waarschuwingen, verdeeld over dertien checks; een trendvergelijking over deze grens
   heen leest die ID's als opgelost terwijl er in de dataset niets is hersteld. Zie BO-27
   in [docs/beslislog.md](beslislog.md) voor de tabel per check.
 

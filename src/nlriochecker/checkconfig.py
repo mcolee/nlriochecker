@@ -297,8 +297,8 @@ class VulwaardeOptions(BaseModel):
     # geen drempel maar een invoertoets: een halve meter is als vulwaardeband al veel
     # ruimer dan enig project nodig heeft (De Wolden komt uit op 0,01), en wie de eenheid
     # mist en centimeters of millimeters invult (1 of 10 in plaats van 0,01) leest zonder
-    # die grens elke BOB en elke maaiveldhoogte als ontbrekend -- een stille run waarin
-    # veertien checks niets meer vinden.
+    # die grens elke BOB en elke maaiveldhoogte als ontbrekend: dertien checks vallen dan
+    # stil en ATTR-013 meldt elk object dat een hoogte draagt.
     hoogte_band_m: float = Field(default=0.01, ge=0.0, le=0.5)
 
     @field_validator("hoogte_kenmerken")

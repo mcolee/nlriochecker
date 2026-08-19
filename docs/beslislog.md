@@ -1410,9 +1410,12 @@ grens heen ziet ze eenmalig als opgelost.
 
 Ook de tabel met datakarakteristieken beweegt mee: `bepaal_karakteristiek` draait op de
 gemarkeerde dataset, dus de kolom *Waarden* telt sindsdien alleen echte registraties.
-Op De Wolden zakt de noemer daarmee met de 11.812 BOB-waarden binnen de band en met de
-circa 3,1 duizend maaiveldhoogten daarbinnen (de 14% hierboven), en het histogram per
-inwinningswijze zakt mee. Dat zijn de eerlijker
-getallen -- een vulwaarde is geen registratie -- maar een noemer die zonder uitleg
+Op De Wolden zakt de noemer met de kenmerken waarvoor hierboven een daling gemeten is: de
+11.812 BOB-waarden binnen de band en de circa 3,1 duizend maaiveldhoogten daarbinnen (de
+14% hierboven). Dat is geen volledige balans -- `Putdekselniveau` staat in dezelfde
+leesregel en de noemer loopt over alle knopen, ook die buiten de netwerkknopen, maar
+hoeveel er daar wegvalt is in deze ronde niet apart gemeten. Het histogram per
+inwinningswijze zakt mee. Dat zijn de eerlijker getallen -- een vulwaarde is geen
+registratie -- maar een noemer die zonder uitleg
 verspringt leest als een meetfout, dus het rapport zegt het er zelf bij: onder de tabel
 staat hoeveel hoogtewaarden de leesregel heeft weggezet.
