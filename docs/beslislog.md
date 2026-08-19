@@ -915,3 +915,16 @@ is ongeveer 300 m nodig.
 midden in het extract valt er niet mee op. Dat staat in de docstring, en er is een
 test die het vastlegt (`test_gat_middenin_slaagt`) zodat de belofte niet stilletjes
 groter wordt dan de meting.
+
+**Overwogen en niet gedaan:** een raster een pixelmaat speling geven in plaats van de
+gewone tolerantie. Het AHN-raster komt 0,3 m tekort door afronding van de uitsnede, en
+een halve cel is daar een natuurlijker maat voor dan een drempel in meters. Het is niet
+gebouwd: het zou een tweede drempelbegrip introduceren voor precies één bron, terwijl de
+bestaande tolerantie het geval al afvangt. Wie het alsnog wil, heeft aan de celgrootte
+uit `RasterSampler` genoeg.
+
+**Gevolg voor de meldingidentiteit.** Nu EXT-001 en EXT-003 hun `object2_uri` vullen,
+verschuift hun `melding_id` eenmalig -- die hash bevat dat veld. Een trendvergelijking
+over die grens heen laat de meldingen als opgelost plus nieuw zien. Dat staat in het
+wijzigingslog en in `docs/json-schema.md`; het alternatief (het veld buiten de hash
+houden) zou twee meldingen over verschillende panden dezelfde identiteit geven.

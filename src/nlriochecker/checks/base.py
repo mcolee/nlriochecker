@@ -422,6 +422,19 @@ def run_checks(
             check = REGISTRY[check_id]()
             over_volledige_populatie = check.volledig_bereik or check.id in volledige_ids
             gebruikt = context.volledige_context() if over_volledige_populatie else context
+            if gebruikt is not context:
+                # De volledige-export-context heeft een eigen trefferregister, en bij
+                # een run over meerdere gebieden is dat een gedeeld exemplaar. Een
+                # check die daar zijn treffers in achterlaat, zou een melding met
+                # `object2_uri` opleveren waarvan de GIS-laag het object niet meer kan
+                # vinden -- precies de stille afwijking tussen laag en uitslag die dit
+                # ontwerp uitsluit. `replace` deelt het cachewoordenboek, dus de dure
+                # structuren van de volledige export blijven hergebruikt.
+                gebruikt = replace(gebruikt, treffers=context.treffers)
+            # De bevindingen bewust vóór de toelichting: `notes()` van de EXT-checks
+            # leest wat `run()` in het register meldde. Als keyword-argument zou de
+            # volgorde ook kloppen, maar dan staat ze nergens.
+            bevindingen = list(check.run(gebruikt))
             outcomes.append(
                 CheckOutcome(
                     check_id=check.id,
@@ -429,7 +442,7 @@ def run_checks(
                     severity=check.severity,
                     dimension=check.dimension,
                     examined=check.examined(gebruikt),
-                    findings=list(check.run(gebruikt)),
+                    findings=bevindingen,
                     notes=check.notes(gebruikt),
                     skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
                 )

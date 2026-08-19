@@ -293,7 +293,9 @@ class KruisingMetBouwwerk(_ExterneCheck):
                 object2_label=aanduiding,
             )
 
-    def _registreer(self, context, object_, laag, vorm, attributen, afstand: float):
+    def _registreer(
+        self, context: CheckContext, object_, laag, vorm, attributen, afstand: float
+    ) -> tuple[str, str]:
         """Legt het geraakte bouwwerk vast en levert sleutel en aanduiding terug.
 
         De GeoPackage-laag `bouwwerken` wordt hieruit gevuld, gejoind op de meldingen;

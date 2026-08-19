@@ -376,3 +376,87 @@ def test_treffers_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
 
     assert _laag_ids(noord, "bouwwerken") == ["bgt:pand/p-noord"]
     assert _laag_ids(zuid, "bouwwerken") == []
+
+
+def _ext_bronnen(bron: Path, panden: list[tuple[dict[str, str], object]]) -> object:
+    """Miniatuurbronnen met een eigen pandenlaag over de EXT-scenariofixture."""
+    bron.mkdir(parents=True, exist_ok=True)
+    schrijf_vlakken(bron / "bgt.gpkg", "pand", panden)
+    schrijf_vlakken(
+        bron / "studiegebied.gpkg",
+        "studiegebied",
+        [({"lokaal_id": "g"}, box(990, 1985, 1160, 2015))],
+    )
+    return load_external_data(
+        load_check_config().bronnen.model_copy(
+            update={
+                "map": ".",
+                "bgt": "bgt.gpkg",
+                "bag_pand": None,
+                "nwb_wegvakken": None,
+                "studiegebied": "studiegebied.gpkg",
+                "ahn_dtm": None,
+                "bgt_pandlagen": ["pand"],
+            }
+        ),
+        bron,
+    )
+
+
+def test_grenspand_staat_in_beide_gebieden(tmp_path: Path) -> None:
+    """Een pand dat vanuit beide buurten geraakt wordt, hoort in beide GeoPackages.
+
+    De andere helft van de dubbeltellingskeuze: de per-gebied-join mag niets
+    kwijtraken.
+    """
+    # Streng 2 loopt van (1050, 2000) naar (1090, 2000) en kruist de buurtgrens op
+    # x = 1060; dit pand ligt eroverheen en wordt dus vanuit Noord en Zuid geraakt.
+    bronnen = _ext_bronnen(
+        tmp_path / "bron", [({"lokaal_id": "p-grens"}, box(1055, 1999, 1065, 2001))]
+    )
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_studiegebieden(GIS_DIR / "buurten_twee.gpkg"),
+        _config(),
+        bronnen=bronnen,
+        check_ids=["EXT-001"],
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    schrijf_uitvoer_gebieden(runs, tmp_path / "uit", RUNDATUM)
+
+    noord = next((tmp_path / "uit" / "noord").glob("*.gpkg"))
+    zuid = next((tmp_path / "uit" / "zuid").glob("*.gpkg"))
+
+    assert _laag_ids(noord, "bouwwerken") == ["bgt:pand/p-grens"]
+    assert _laag_ids(zuid, "bouwwerken") == ["bgt:pand/p-grens"]
+
+
+def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: Path) -> None:
+    """`volledige_dataset_checks` draait op een gedeelde context met een eigen register.
+
+    Zonder het doorgeven van het register zou de melding wel een `object2_uri` dragen
+    en de laag leeg blijven -- de stille afwijking tussen laag en uitslag die dit
+    ontwerp uitsluit.
+    """
+    bronnen = _ext_bronnen(
+        tmp_path / "bron", [({"lokaal_id": "p-noord"}, box(1000, 2000.5, 1010, 2005))]
+    )
+    config = _config()
+    config.studiegebied.volledige_dataset_checks = ["EXT-001"]
+
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_studiegebieden(GIS_DIR / "buurten_twee.gpkg"),
+        config,
+        bronnen=bronnen,
+        check_ids=["EXT-001"],
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    schrijf_uitvoer_gebieden(runs, tmp_path / "uit", RUNDATUM)
+
+    noord = next(run for run in runs if run.naam == "Noord")
+    aangewezen = {m.object2_uri for m in bouw_meldingen(noord.run, RUNDATUM) if m.object2_uri}
+    geschreven = set(_laag_ids(next((tmp_path / "uit" / "noord").glob("*.gpkg")), "bouwwerken"))
+
+    assert aangewezen == {"bgt:pand/p-noord"}
+    assert geschreven == aangewezen

@@ -38,6 +38,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   mapnamen niet mogen botsen, en voor GeoJSON een toets op het coordinaatstelsel: een
   legacy `crs`-member met EPSG:28992, of alle coordinaten binnen de RD-grenzen uit
   `[drempels]`.
+- **De melding-ID's van EXT-001 en EXT-003 verschuiven.** `melding_id` is een hash over
+  check, objecten en detailsleutels; nu die twee checks hun `object2_uri` vullen, krijgen
+  hun meldingen een ander ID dan in de vorige versie. Wie meetmomenten vergelijkt, ziet
+  ze eenmalig als opgelost plus nieuw. Datzelfde gebeurt bij een bron zonder
+  identificatie zodra haar geometrie wijzigt, want dan verschuift de `geo:`-sleutel mee.
+  Het JSON-schema blijft 1.0: het contract verandert niet, alleen de inhoud van een veld
+  dat er al was.
+- `[bronnen] dekking_tolerantie_m` staat in de meegeleverde `checks.toml` op 300 m. De
+  code blijft standaard streng (0 m); deze waarde hoort bij de bronnen in `data/gis`,
+  waarvan `bgt_bouwwerk` aan de oostkant 276 m voor de rand ophoudt.
 - Uitbreidingen in de Python-API rond de externe bronnen (0.x, dus zonder
   deprecatietermijn): `load_external_data` kreeg een keyword-only `dekkingseis`,
   `CheckContext` en `CheckRun` kregen het veld `treffers`, en

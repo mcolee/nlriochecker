@@ -21,6 +21,7 @@ from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
+from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import _lees_geopackage, load_study_area
@@ -722,3 +723,45 @@ def test_geo_sleutel_is_stabiel_over_runs(tmp_path: Path) -> None:
 
     assert sleutels[0] == sleutels[1]
     assert len(sleutels[0]) == 1
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_runmetadata_telt_de_trefferlagen_mee(tmp_path: Path) -> None:
+    """De aantallen per laag horen ook in gwsw_run te staan, net als de andere lagen."""
+    run = _ext_run()
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    rij = _rijen(pad, "select n_bouwwerken, n_waterdelen from gwsw_run")[0]
+
+    assert rij == (1, 1)
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_waterdeel_label_noemt_type_en_identificatie(tmp_path: Path) -> None:
+    """`watertype` is om op te filteren, `label` is om iets in terug te vinden."""
+    run = _ext_run()
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    rij = _laagrijen(pad, "waterdelen_zonder_zinker")[0]
+
+    assert rij["watertype"] == "waterloop"
+    assert rij["label"] == "waterloop water-1"
+
+
+def test_melding_zonder_geregistreerde_treffer_faalt_luid(tmp_path: Path) -> None:
+    """Een laag die stil kleiner is dan de uitslag is precies wat hier uitgesloten is."""
+    run = _run("schoon.ttl", "TOP-001")
+    melding = replace(
+        bouw_meldingen(_run("top001_losliggende_put.ttl", "TOP-001"), RUNDATUM)[0],
+        check_id="EXT-001",
+        object2_uri="bgt:pand/verdwenen",
+    )
+
+    with pytest.raises(PipelineError, match="trefferregister"):
+        schrijf_geopackage(run, [melding], tmp_path, RUNDATUM)

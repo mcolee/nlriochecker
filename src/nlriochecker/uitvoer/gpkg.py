@@ -19,15 +19,18 @@ from __future__ import annotations
 import sqlite3
 import struct
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from importlib import resources
 from pathlib import Path
 
+from shapely.geometry import MultiPolygon
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckRun, Severity
+from nlriochecker.checks.treffers import Treffer
 from nlriochecker.dataset import Conduit
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
@@ -257,6 +260,18 @@ def _zet_omhullende(
             naam,
         ),
     )
+
+
+def _als_multipolygon(geometrie: BaseGeometry) -> BaseGeometry:
+    """Promoveert een enkele polygoon naar een MultiPolygon.
+
+    De trefferlagen zijn als `MULTIPOLYGON` gedeclareerd. GDAL leest een `POLYGON` daar
+    zonder morren, maar de GeoPackage-spec wil een feature van het gedeclareerde type;
+    promoveren kost niets en houdt het bestand ook voor strengere lezers geldig.
+    """
+    if geometrie.geom_type == "Polygon":
+        return MultiPolygon([geometrie])
+    return geometrie
 
 
 def _blob(geometrie: BaseGeometry) -> bytes:
@@ -519,7 +534,7 @@ def _schrijf_treffers(
             treffer.sleutel,
             treffer.label,
             treffer.bronbestand,
-            treffer.label,
+            _waterdeel_aanduiding(treffer),
             len(verwijzend),
             _check_ids(verwijzend),
             config.drempels.ext_watergang_buffer_m,
@@ -544,22 +559,38 @@ def _vul_trefferlaag(
     laag: str,
     kolommen: list[_Kolom],
     per_treffer: dict[str, list[Melding]],
-    rij_van,
+    rij_van: Callable[[Treffer, list[Melding]], tuple[object, ...]],
 ) -> int:
     """Schrijft een trefferlaag en levert het aantal rijen terug.
 
-    Een sleutel zonder treffer in het register wordt overgeslagen: dat kan alleen bij
-    een met de hand samengestelde `CheckRun`, en een rij zonder geometrie is in een
-    featurelaag niets waard.
+    Een melding die een extern object aanwijst dat niet in het register staat, is een
+    gebroken afspraak: de check heeft de verwijzing wel gezet maar de treffer niet
+    geregistreerd, en dan zou de laag stil kleiner zijn dan de uitslag. Dat is precies
+    de afwijking die dit ontwerp uitsluit, dus faalt het luid in plaats van de rij over
+    te slaan.
     """
     rijen = []
+    ontbreekt: list[str] = []
     grenzen: list[tuple[float, float, float, float]] = []
     for sleutel in sorted(per_treffer):
         treffer = run.treffers.get(sleutel)
-        if treffer is None or treffer.geometrie.is_empty:
+        if treffer is None:
+            ontbreekt.append(sleutel)
+            continue
+        if treffer.geometrie.is_empty:
             continue
         grenzen.append(treffer.geometrie.bounds)
-        rijen.append((_blob(treffer.geometrie), *rij_van(treffer, per_treffer[sleutel])))
+        rijen.append(
+            (_blob(_als_multipolygon(treffer.geometrie)), *rij_van(treffer, per_treffer[sleutel]))
+        )
+
+    if ontbreekt:
+        raise PipelineError(
+            f"laag {laag!r}: {len(ontbreekt)} melding(en) verwijzen naar een extern object "
+            f"dat niet in het trefferregister van deze run staat "
+            f"({', '.join(sorted(ontbreekt)[:5])}). De laag zou stil kleiner zijn dan de "
+            f"uitslag; controleer of de check zijn treffer registreert."
+        )
 
     if rijen:
         velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
@@ -597,6 +628,16 @@ def _kleinste_afstand(run: CheckRun, sleutel: str, meldingen: list[Melding]) -> 
         is not None
     ]
     return min(afstanden) if afstanden else None
+
+
+def _waterdeel_aanduiding(treffer: Treffer) -> str:
+    """Een leesbare aanduiding van een waterdeel: het type plus zijn identificatie.
+
+    `watertype` draagt het type kaal, zodat je erop kunt filteren; deze kolom is voor
+    de lezer, en die heeft aan "waterloop" alleen niet genoeg om er een terug te
+    vinden.
+    """
+    return f"{treffer.label} {treffer.sleutel.split('/')[-1]}".strip()
 
 
 def _check_ids(meldingen: list[Melding]) -> str:
@@ -956,6 +997,8 @@ def _schrijf_runmetadata(
         _Kolom("n_putten", "integer"),
         _Kolom("n_strengen", "integer"),
         _Kolom("n_mechanisch", "integer"),
+        _Kolom("n_bouwwerken", "integer"),
+        _Kolom("n_waterdelen", "integer"),
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
@@ -992,6 +1035,8 @@ def _schrijf_runmetadata(
             tellingen.putten,
             tellingen.strengen,
             tellingen.mechanisch,
+            tellingen.bouwwerken,
+            tellingen.waterdelen,
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,

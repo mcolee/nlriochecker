@@ -602,13 +602,16 @@ def check_command(
         # daarna te melden dat de run zinloos was.
         _gekozen_cfk(cfk_keuze, config)
         gebieden = _studiegebieden(study_path, study_layer, gebied_keuze, config)
+        # Ook de externe bronnen vóór het laden: de dekkingspoort weigert een te klein
+        # extract, en dat oordeel hangt alleen van de bronnen af. Erna zou de gebruiker
+        # drie minuten en 3 GB betalen voor een fout die in twee seconden vaststond.
+        bronnen = _externe_bronnen(config, bronnen_dir)
         dataset, cache = laad_met_cache(
             dataset_path, list(ontology_paths), cache_dir, not geen_cache, voortgang=voortgang
         )
         onbetrouwbaar, gate_applied, meetbereik = _typing_gate(
             shacl_paths, config, dataset, cfk_keuze, voortgang
         )
-        bronnen = _externe_bronnen(config, bronnen_dir)
         try:
             runs = toets_gebieden(
                 dataset,

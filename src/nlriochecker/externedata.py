@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 from nlriochecker.errors import PipelineError
@@ -228,7 +227,9 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
     bereik = data.extent.bounds
     tekorten: list[str] = []
     for rol, laag in sorted(data.layers.items()):
-        omhullende = unary_union(list(laag.geometries)).bounds
+        omhullende = _omhullende(laag.geometries)
+        if omhullende is None:
+            continue
         tekorten += _tekortregel(rol, laag.source.name, omhullende, bereik, eis.marge_m, eis)
     if data.raster is not None:
         tekorten += _tekortregel(
@@ -242,6 +243,26 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
             "extracten opnieuw, ruimer dan het bereik, of verhoog "
             "`[bronnen] dekking_tolerantie_m` als de lege rand klopt.\n" + "\n".join(tekorten)
         )
+
+
+def _omhullende(
+    geometrieen: tuple[BaseGeometry, ...],
+) -> tuple[float, float, float, float] | None:
+    """De omhullende van een verzameling geometrieen, of None als er niets in zit.
+
+    Met min/max over de losse omhullenden en niet met `unary_union`: die berekent een
+    echte unie -- op de aangeleverde BGT-panden meetbaar traag -- terwijl hier alleen
+    de buitenmaat telt.
+    """
+    grenzen = [vorm.bounds for vorm in geometrieen if vorm is not None and not vorm.is_empty]
+    if not grenzen:
+        return None
+    return (
+        min(g[0] for g in grenzen),
+        min(g[1] for g in grenzen),
+        max(g[2] for g in grenzen),
+        max(g[3] for g in grenzen),
+    )
 
 
 def _tekortregel(

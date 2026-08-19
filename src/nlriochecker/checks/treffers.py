@@ -62,7 +62,12 @@ def bouw_sleutel(
         waarde = attributen.get(kolom)
         if waarde is not None and str(waarde).strip():
             return f"{voorvoegsel}/{str(waarde).strip()}", False
-    return f"geo:{sha256(geometrie.wkb).hexdigest()[:HASHLENGTE]}", True
+    # Het voorvoegsel gaat mee in de hash: twee ID-loze bronnen met dezelfde geometrie
+    # -- een pand en een waterdeel op precies dezelfde vorm -- zouden anders dezelfde
+    # sleutel krijgen, en dan wint de eerste registratie met haar rol, label en
+    # bronbestand. Onwaarschijnlijk, maar het voorkomen kost niets.
+    grondslag = voorvoegsel.encode("utf-8") + b"|" + geometrie.wkb
+    return f"geo:{sha256(grondslag).hexdigest()[:HASHLENGTE]}", True
 
 
 @dataclass

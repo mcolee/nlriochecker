@@ -149,6 +149,12 @@ sha256 over de WKB van de geometrie; de checkuitkomst meldt dat in haar toelicht
 Zo'n sleutel is stabiel over runs op hetzelfde bestand, maar verandert zodra de
 geometrie in de bron wijzigt.
 
+Let op bij het vergelijken van meetmomenten: `melding_id` is een hash over onder meer
+`object2_uri`. Doordat EXT-001 en EXT-003 dat veld sinds deze versie vullen, hebben hun
+meldingen een ander ID dan in de vorige versie, en verschijnen ze in een diff eenmalig
+als opgelost plus nieuw. Een `geo:`-sleutel verschuift bovendien mee zodra de geometrie
+in de bron wijzigt.
+
 De geometrie van het externe object zit **niet** in de JSON -- die zou als WKB in het
 contract belanden. Wie hem wil, vindt het object in de GeoPackage: de lagen
 `bouwwerken` en `waterdelen_zonder_zinker` dragen dezelfde sleutel in hun kolom `id`.
