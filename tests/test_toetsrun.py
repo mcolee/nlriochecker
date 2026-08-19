@@ -460,3 +460,61 @@ def test_een_beschadigde_cache_wordt_gemeld(tmp_path: Path) -> None:
     assert uitslag.cache.bron == "bestand"
     assert "onbruikbaar" in uitslag.cache.melding
     assert any(uitslag.cache.melding in regel for regel in uitslag.regels())
+
+
+class TestNulmetingInDeMeldingen:
+    """De SHACL-overtredingen komen in de uitvoer terecht (issue #12)."""
+
+    def test_zonder_shacl_zijn_er_geen_nulmetingmeldingen(self, tmp_path: Path) -> None:
+        """Geen nulmeting, geen nulmetingmeldingen: dat verandert niets aan de uitvoer."""
+        uitslag = toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",))
+
+        assert uitslag.runs[0].run.nulbevindingen == ()
+
+    def test_met_shacl_leveren_de_rapporten_meldingen(self, tmp_path: Path) -> None:
+        """De mini-nulmeting bevat overtredingen; die horen in de CSV te staan."""
+        uitslag = toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",), shacl=drieluik())
+
+        tabel = pd.read_csv(uitslag.uitvoer.per_gebied[""].csv, sep=";", keep_default_na=False)
+        uit_nulmeting = tabel[tabel["Bron"] == "nulmeting"]
+
+        assert len(uit_nulmeting) == len(uitslag.runs[0].run.nulbevindingen) > 0
+        assert set(uit_nulmeting["Categorie"]) == {"NULMETING"}
+        assert all(kolom for kolom in uit_nulmeting["CFK"])
+
+    def test_een_cfk_deelset_levert_alleen_de_gekozen_klassen(self, tmp_path: Path) -> None:
+        """Alleen de meegegeven rapporten dragen bij; de markering blijft."""
+        uitslag = toets(
+            tmp_path,
+            "schoon.ttl",
+            check_ids=("TOP-001",),
+            shacl=(SHACL_DIR / "mini_hyd.csv",),
+            cfk=("Hyd",),
+        )
+
+        klassen = {
+            klasse for bevinding in uitslag.runs[0].run.nulbevindingen for klasse in bevinding.cfk
+        }
+
+        assert klassen == {"Hyd"}
+        assert uitslag.meetbereik.volledig is False
+
+    def test_het_rapport_wordt_maar_een_keer_gelezen(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """De typeringspoort en de meldingen delen dezelfde ingelezen nulmeting.
+
+        Twee keer lezen zou op De Wolden ruim tweehonderdduizend regels dubbel
+        parsen, en de twee zouden bij een wijziging uit elkaar kunnen lopen.
+        """
+        gelezen: list[int] = []
+        origineel = toetsrun_module.laad_nulmeting
+
+        def tel(*args: object, **kwargs: object):
+            gelezen.append(1)
+            return origineel(*args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(toetsrun_module, "laad_nulmeting", tel)
+        toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",), shacl=drieluik())
+
+        assert len(gelezen) == 1

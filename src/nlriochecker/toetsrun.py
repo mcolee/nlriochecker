@@ -32,6 +32,7 @@ from nlriochecker.dataset import GwswDataset, markeer_vulwaarden
 from nlriochecker.errors import OpdrachtError
 from nlriochecker.externedata import Dekkingseis, ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik, kies_cfk, laad_nulmeting
+from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.studiegebied import RdGrenzen, Studiegebieden, load_studiegebieden
 from nlriochecker.taal import getal, vorm
@@ -201,7 +202,7 @@ def voer_toets_uit(
     dataset = markeer_vulwaarden(
         dataset, config.vulwaarden.hoogte_kenmerken, config.vulwaarden.hoogte_band_m
     )
-    onbetrouwbaar, poort_toegepast, meetbereik = _typeringspoort(
+    onbetrouwbaar, poort_toegepast, meetbereik, nulbevindingen = _nulmeting(
         opdracht, config, dataset, voortgang
     )
 
@@ -216,6 +217,7 @@ def voer_toets_uit(
             check_ids=list(opdracht.check_ids) or None,
             typing_gate_applied=poort_toegepast,
             meetbereik=meetbereik,
+            nulbevindingen=nulbevindingen,
             voortgang=voortgang,
         )
     except KeyError as error:
@@ -289,16 +291,23 @@ def _externe_bronnen(opdracht: Toetsopdracht, config: CheckConfig) -> ExternalDa
     return load_external_data(bronnen, opdracht.bronnen, dekkingseis=eis)
 
 
-def _typeringspoort(
+def _nulmeting(
     opdracht: Toetsopdracht,
     config: CheckConfig,
     dataset: GwswDataset,
     voortgang: Voortgang,
-) -> tuple[frozenset[str], bool, Meetbereik]:
-    """Haalt de te globaal getypeerde objecten uit de nulmeting.
+) -> tuple[frozenset[str], bool, Meetbereik, tuple[Nulbevinding, ...]]:
+    """Leest de nulmeting en haalt er twee dingen uit: de poort en de overtredingen.
 
-    De SHACL-meting noemt de te globale klassen; de instanties komen uit de dataset.
-    Dat geeft een exacte verzameling in plaats van een labellijst.
+    De typeringspoort levert de te globaal getypeerde objecten. De SHACL-meting
+    noemt de te globale klassen; de instanties komen uit de dataset. Dat geeft een
+    exacte verzameling in plaats van een labellijst.
+
+    De overtredingen zelf worden bevindingen (`nulbevinding.py`), zodat elke
+    uitvoervorm kan tonen welk gebrek uit de nulmeting komt en uit welke
+    conformiteitsklasse. Beide komen uit hetzelfde ingelezen rapport: twee keer lezen
+    zou op De Wolden ruim tweehonderdduizend regels dubbel parsen, en de twee zouden
+    bij een wijziging uit elkaar kunnen lopen.
 
     Zonder SHACL-rapporten is er geen meting. Het meetbereik zegt dat dan expliciet,
     in plaats van de vereiste set te noemen alsof die gehaald is -- stilte over een
@@ -307,14 +316,18 @@ def _typeringspoort(
     volledig = config.nulmeting.vereiste_cfk
     gekozen = kies_cfk(opdracht.cfk, volledig)
     if not opdracht.shacl:
-        return frozenset(), False, Meetbereik.niet_gemeten(volledig)
+        return frozenset(), False, Meetbereik.niet_gemeten(volledig), ()
 
     nulmeting = laad_nulmeting(list(opdracht.shacl), gekozen, volledig, voortgang=voortgang)
     analyse = analyze(nulmeting, dataset)
     objecten: set[str] = set()
     for deel in analyse.per_cfk.values():
         objecten.update(deel.typing_gate.objects)
-    return frozenset(objecten), True, nulmeting.meetbereik
+    onbetrouwbaar = frozenset(objecten)
+    bevindingen = bouw_nulbevindingen(
+        nulmeting, dataset, config.rapport.systemisch_drempel, onbetrouwbaar
+    )
+    return onbetrouwbaar, True, nulmeting.meetbereik, tuple(bevindingen)
 
 
 def _gebied_kort(gebiedsrun: GebiedsRun) -> str:

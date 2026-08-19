@@ -33,6 +33,7 @@ from nlriochecker.checks.treffers import Trefferregister
 from nlriochecker.dataset import GwswDataset
 from nlriochecker.externedata import ExternalData
 from nlriochecker.meting import Meetbereik
+from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import Studiegebieden, StudyArea, mapnaam
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
@@ -65,6 +66,7 @@ def toets_gebieden(
     check_ids: list[str] | None = None,
     typing_gate_applied: bool = False,
     meetbereik: Meetbereik,
+    nulbevindingen: tuple[Nulbevinding, ...] = (),
     voortgang: Voortgang = NUL_VOORTGANG,
 ) -> list[GebiedsRun]:
     """Draait de checks per studiegebied en levert een run per gebied.
@@ -86,7 +88,15 @@ def toets_gebieden(
         return [
             GebiedsRun(
                 gebied=None,
-                run=_draai(basis, check_ids, typing_gate_applied, meetbereik, voortgang, "Checks"),
+                run=_draai(
+                    basis,
+                    check_ids,
+                    typing_gate_applied,
+                    meetbereik,
+                    nulbevindingen,
+                    voortgang,
+                    "Checks",
+                ),
                 map="",
             )
         ]
@@ -105,6 +115,7 @@ def toets_gebieden(
             check_ids=check_ids,
             typing_gate_applied=typing_gate_applied,
             meetbereik=meetbereik,
+            nulbevindingen=nulbevindingen,
             voortgang=voortgang,
             met_submap=not gebieden.enkel,
         )
@@ -122,6 +133,7 @@ def _per_gebied(
     check_ids: list[str] | None,
     typing_gate_applied: bool,
     meetbereik: Meetbereik,
+    nulbevindingen: tuple[Nulbevinding, ...],
     voortgang: Voortgang,
     met_submap: bool,
 ) -> GebiedsRun:
@@ -141,7 +153,9 @@ def _per_gebied(
     )
     naam = area.gebied or area.name
     fase = f"Checks {naam}" if met_submap else "Checks"
-    run = _draai(context, check_ids, typing_gate_applied, meetbereik, voortgang, fase)
+    run = _draai(
+        context, check_ids, typing_gate_applied, meetbereik, nulbevindingen, voortgang, fase
+    )
     return GebiedsRun(
         gebied=area,
         # `analyseset.kern` is per constructie wat `beperk_tot_studiegebied` zelf zou
@@ -157,10 +171,18 @@ def _draai(
     check_ids: list[str] | None,
     typing_gate_applied: bool,
     meetbereik: Meetbereik,
+    nulbevindingen: tuple[Nulbevinding, ...],
     voortgang: Voortgang,
     fase: str,
 ) -> CheckRun:
-    """Draait de checks en hangt er het meetbereik van de run aan."""
+    """Draait de checks en hangt er het meetbereik en de nulmeting van de run aan.
+
+    De nulbevindingen zijn over de volledige export gebouwd, net als de
+    systemisch-vlag erop. Ze worden hier op elke gebiedsrun gezet en pas daarna door
+    `beperk_tot_studiegebied` tot de kern afgebakend -- dezelfde volgorde als bij de
+    checkbevindingen, en de reden waarom een gebiedsrapport gelijk is aan een losse
+    run over dat ene gebied.
+    """
     run = run_checks(
         context,
         check_ids,
@@ -168,4 +190,4 @@ def _draai(
         voortgang=voortgang,
         fase=fase,
     )
-    return replace(run, meetbereik=meetbereik)
+    return replace(run, meetbereik=meetbereik, nulbevindingen=nulbevindingen)
