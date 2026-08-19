@@ -22,7 +22,7 @@ from nlriochecker.checks.base import (
     SkeletonCheck,
     register,
 )
-from nlriochecker.checks.verbanden import objecten_van_klassen
+from nlriochecker.checks.selectie import netwerkknopen, vrijvervalrioolleidingen
 
 MARKERING_METAGEGEVENS = "vereist inwinningsmetagegevens"
 
@@ -166,10 +166,8 @@ class SystematischAfgerondeHoogtewaarden(Check):
 
     def _reeksen(self, context: CheckContext):
         """De hoogtereeksen die op afronding getoetst worden, met een voorbeeld erbij."""
-        strengen = objecten_van_klassen(
-            context, context.config.klassen.vrijvervalleiding, "conduits"
-        )
-        putten = objecten_van_klassen(context, context.config.klassen.netwerkknopen, "nodes")
+        strengen = vrijvervalrioolleidingen(context)
+        putten = netwerkknopen(context)
 
         bobs = [
             waarde

@@ -19,21 +19,14 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.verbanden import objecten_van_klassen, putten_van
-from nlriochecker.dataset import Conduit
-
-
-def _strengen(context: CheckContext) -> list[Conduit]:
-    """De vrijvervalstrengen waarop de ATTR-checks draaien."""
-    return context.cached(
-        "attr:strengen",
-        lambda: objecten_van_klassen(context, context.config.klassen.vrijvervalleiding, "conduits"),
-    )
+from nlriochecker.checks.selectie import putten, vrijvervalrioolleidingen
+from nlriochecker.checks.verbanden import putten_van
+from nlriochecker.dataset import Conduit, Node
 
 
 def _zonder_regel(context: CheckContext, kies) -> tuple[int, int]:
     """Telt hoeveel strengen geen plausibiliteitsregel hebben, en hoeveel er zijn."""
-    strengen = _strengen(context)
+    strengen = vrijvervalrioolleidingen(context)
     return sum(1 for conduit in strengen if kies(conduit) is None), len(strengen)
 
 
@@ -42,7 +35,7 @@ class _StrengCheck(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal vrijvervalstrengen."""
-        return len(_strengen(context))
+        return len(vrijvervalrioolleidingen(context))
 
 
 @register
@@ -58,7 +51,7 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
         """Vergelijkt de grootste profielmaat met het bereik uit de tabel."""
         tabel = context.plausibiliteit
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             regel = tabel.diameter(conduit.materiaal)
             maat = _grootste_maat(conduit)
             if regel is None or maat is None:
@@ -109,7 +102,7 @@ class DiameterOnderMinimum(_StrengCheck):
         """Meldt strengen waarvan de grootste profielmaat onder het minimum ligt."""
         minimum = context.config.drempels.minimale_diameter_mm
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             maat = _grootste_maat(conduit)
             if maat is None or maat >= minimum:
                 continue
@@ -128,7 +121,7 @@ class DiameterOnderMinimum(_StrengCheck):
         minimum = context.config.drempels.minimale_diameter_mm
         klein = [
             conduit
-            for conduit in _strengen(context)
+            for conduit in vrijvervalrioolleidingen(context)
             if (_grootste_maat(conduit) or minimum) < minimum
         ]
         notities = [
@@ -165,7 +158,7 @@ class MateriaalPastNietBijAanlegjaar(_StrengCheck):
         """Vergelijkt het aanlegjaar met het tijdvak waarin het materiaal bestond."""
         tabel = context.plausibiliteit
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             regel = tabel.aanlegjaar(conduit.materiaal)
             jaar = conduit.aanlegjaar
             if regel is None or jaar is None:
@@ -190,7 +183,7 @@ class MateriaalPastNietBijAanlegjaar(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel strengen geen aanlegjaar of geen regel hebben."""
-        strengen = _strengen(context)
+        strengen = vrijvervalrioolleidingen(context)
         zonder_jaar = sum(1 for conduit in strengen if conduit.aanlegjaar is None)
         zonder_regel = sum(
             1
@@ -231,7 +224,7 @@ class VormVersusAfmetingen(_StrengCheck):
         tabel = context.plausibiliteit
         tolerantie = context.config.drempels.rondheid_tolerantie_mm
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             regel = tabel.afmetingen(conduit.vorm)
             if regel is None:
                 continue
@@ -308,7 +301,7 @@ class EenhedenfoutBinnenBereik(_StrengCheck):
         if not tabel.standaarddiameters_mm:
             return
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             for naam, maat in (("breedte", conduit.breedte_mm), ("hoogte", conduit.hoogte_mm)):
                 if maat is None or maat <= 0 or maat > drempel:
                     continue
@@ -358,7 +351,7 @@ class DiameterGroterDanPut(_StrengCheck):
         """
         marge = context.config.drempels.put_diameter_marge_mm
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             maat = _grootste_maat(conduit)
             if maat is None:
                 continue
@@ -379,12 +372,12 @@ class DiameterGroterDanPut(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten geen afmetingen hebben."""
-        putten = objecten_van_klassen(context, context.config.klassen.put, "nodes")
-        zonder = sum(1 for node in putten if _grootste_putmaat(node) is None)
+        alle_putten = putten(context)
+        zonder = sum(1 for node in alle_putten if _grootste_putmaat(node) is None)
         if not zonder:
             return []
         return [
-            f"{zonder} van de {len(putten)} putten hebben geen breedte of lengte; "
+            f"{zonder} van de {len(alle_putten)} putten hebben geen breedte of lengte; "
             "strengen die daaraan hangen zijn niet getoetst."
         ]
 
@@ -403,8 +396,9 @@ class AanlegjaarBuitenBereik(_StrengCheck):
         minimum = context.config.drempels.aanlegjaar_minimum
         dit_jaar = date.today().year
 
-        putten = objecten_van_klassen(context, context.config.klassen.put, "nodes")
-        for object_ in (*_strengen(context), *putten):
+        alle_putten = putten(context)
+        alles: list[Node | Conduit] = [*vrijvervalrioolleidingen(context), *alle_putten]
+        for object_ in alles:
             datum = object_.date("Begindatum")
             if datum is None:
                 continue
@@ -423,8 +417,8 @@ class AanlegjaarBuitenBereik(_StrengCheck):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen plus putten."""
-        putten = objecten_van_klassen(context, context.config.klassen.put, "nodes")
-        return len(_strengen(context)) + len(putten)
+        alle_putten = putten(context)
+        return len(vrijvervalrioolleidingen(context)) + len(alle_putten)
 
 
 @register
@@ -442,7 +436,7 @@ class StrenglengteBuitenBereik(_StrengCheck):
         minimum = drempels.minimale_strenglengte_m
         maximum = drempels.maximale_strenglengte_m
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             lengte = conduit.lengte_m
             if lengte is None or minimum <= lengte <= maximum:
                 continue
@@ -459,7 +453,7 @@ class StrenglengteBuitenBereik(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel strengen geen lengte hebben."""
-        strengen = _strengen(context)
+        strengen = vrijvervalrioolleidingen(context)
         zonder = sum(1 for conduit in strengen if conduit.lengte_m is None)
         if not zonder:
             return []
@@ -479,7 +473,7 @@ class LengteWijktAfVanGeometrie(_StrengCheck):
         """Vergelijkt de lengte van de hartlijn met de administratieve lengte."""
         drempel = context.config.drempels.lengte_afwijking_procent
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             administratief = conduit.lengte_m
             if administratief is None or administratief <= 0:
                 continue
@@ -503,7 +497,7 @@ class LengteWijktAfVanGeometrie(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel strengen niet te vergelijken waren."""
-        strengen = _strengen(context)
+        strengen = vrijvervalrioolleidingen(context)
         zonder = sum(
             1
             for conduit in strengen
@@ -530,7 +524,7 @@ class LeidingmateriaalPastNietBijPut(_StrengCheck):
         """Vergelijkt het leidingmateriaal met dat van de aangesloten putten."""
         tabel = context.plausibiliteit
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             regel = tabel.putmateriaal(conduit.materiaal)
             if regel is None:
                 continue
@@ -564,7 +558,7 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
         """Toetst de profielvorm tegen de vormen die bij het materiaal horen."""
         tabel = context.plausibiliteit
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             regel = tabel.vorm(conduit.materiaal)
             if regel is None or conduit.vorm is None:
                 continue

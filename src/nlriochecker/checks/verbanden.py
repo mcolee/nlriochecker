@@ -81,19 +81,6 @@ def putten_van(context: CheckContext, conduit: Conduit) -> list[Node]:
     return gevonden
 
 
-def objecten_van_klassen(context: CheckContext, wortels: list[str], bron: str) -> list:
-    """De knopen of strengen van deze klassen, ontdubbeld en in vaste volgorde."""
-    dataset = context.dataset
-    verzameling = dataset.nodes if bron == "nodes" else dataset.conduits
-    gevonden = {
-        uri: verzameling[uri]
-        for wortel in wortels
-        for uri in dataset.of_class(wortel)
-        if uri in verzameling
-    }
-    return list(gevonden.values())
-
-
 def netwerkdelen(context: CheckContext) -> list[set[str]]:
     """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen.
 

@@ -27,9 +27,10 @@ from nlriochecker.checks.base import (
     SkeletonCheck,
     register,
 )
+from nlriochecker.checks.selectie import lozingspunten, netwerkknopen, vrijvervalrioolleidingen
 from nlriochecker.checks.treffers import Treffer, bouw_sleutel
-from nlriochecker.checks.verbanden import objecten_van_klassen, verbonden_knopen
-from nlriochecker.dataset import Conduit, Node
+from nlriochecker.checks.verbanden import verbonden_knopen
+from nlriochecker.dataset import Node
 from nlriochecker.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
@@ -141,30 +142,6 @@ def _bereiknotities(context: CheckContext, selectie: _Selectie, soort: str) -> l
     return notities
 
 
-def _strengen(context: CheckContext) -> list[Conduit]:
-    """De vrijvervalstrengen waarop de EXT-checks draaien."""
-    return context.cached(
-        "ext:strengen",
-        lambda: objecten_van_klassen(context, context.config.klassen.vrijvervalleiding, "conduits"),
-    )
-
-
-def _putten(context: CheckContext) -> list[Node]:
-    """De putten van het netwerk."""
-    return context.cached(
-        "ext:putten",
-        lambda: objecten_van_klassen(context, context.config.klassen.netwerkknopen, "nodes"),
-    )
-
-
-def _lozingspunten(context: CheckContext) -> list[Node]:
-    """De knopen die als lozings- of uitstroompunt gelden."""
-    return context.cached(
-        "ext:lozingspunten",
-        lambda: objecten_van_klassen(context, context.config.klassen.lozings_eindpunt, "nodes"),
-    )
-
-
 class _ExterneCheck(Check):
     """Basis voor de checks die een externe laag nodig hebben."""
 
@@ -252,7 +229,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De vrijvervalstrengen en de putten; beide horen niet in een pand."""
-        return [*_strengen(context), *_putten(context)]
+        return [*vrijvervalrioolleidingen(context), *netwerkknopen(context)]
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elk object dat binnen, door of vlak langs een bouwwerk ligt.
@@ -418,7 +395,7 @@ class _WatergangKruising(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De vrijvervalstrengen."""
-        return _strengen(context)
+        return vrijvervalrioolleidingen(context)
 
     def kruisingen(self, context: CheckContext):
         """De strengen die een waterdeel raken, met het waterdeel erbij.
@@ -569,7 +546,7 @@ class PutZonderBgtDeksel(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De putten van het netwerk."""
-        return _putten(context)
+        return netwerkknopen(context)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt putten zonder BGT-deksel binnen de afstand."""
@@ -606,7 +583,7 @@ class BgtDekselZonderPut(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De putten van het netwerk; die vormen de vergelijkingsbasis."""
-        return _putten(context)
+        return netwerkknopen(context)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BGT-deksels zonder GWSW-put binnen de afstand.
@@ -685,7 +662,7 @@ class LozingspuntZonderWatergang(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De knopen die als lozings- of uitstroompunt gelden."""
-        return _lozingspunten(context)
+        return lozingspunten(context)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt lozingspunten zonder BGT-waterdeel binnen de afstand."""
@@ -716,7 +693,7 @@ class _AhnCheck(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De putten van het netwerk."""
-        return _putten(context)
+        return netwerkknopen(context)
 
     def raster(self, context: CheckContext):
         """Het hoogteraster, of None."""
@@ -937,7 +914,7 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
         if raster is None:
             return
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             begin, eind = verbonden_knopen(context, conduit)
             for uri, bob, zijde in (
                 (begin, conduit.bob_start, "beginpunt"),

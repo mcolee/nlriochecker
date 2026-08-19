@@ -25,13 +25,18 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
+from nlriochecker.checks.selectie import (
+    bergbezinkleidingen,
+    bergbezinkvoorzieningen,
+    overstortleidingen,
+    overstortputten,
+)
 from nlriochecker.checks.verbanden import (
     aansluitingen,
     deelstelsel_ids,
     netwerkdelen,
-    objecten_van_klassen,
 )
-from nlriochecker.dataset import HAS_PART, Conduit, Node
+from nlriochecker.dataset import HAS_PART, Node
 
 
 @dataclass(frozen=True)
@@ -45,44 +50,10 @@ class Drempel:
     put_uri: str | None
 
 
-def _overstortputten(context: CheckContext) -> list[Node]:
-    """De putten die als overstort geregistreerd staan."""
-    return context.cached(
-        "rvz:overstortputten",
-        lambda: objecten_van_klassen(context, context.config.klassen.overstortput, "nodes"),
-    )
-
-
-def _overstortleidingen(context: CheckContext) -> list[Conduit]:
-    """De leidingen die als overstortleiding geregistreerd staan."""
-    return context.cached(
-        "rvz:overstortleidingen",
-        lambda: objecten_van_klassen(context, context.config.klassen.overstortleiding, "conduits"),
-    )
-
-
-def _bergbezink(context: CheckContext) -> list[Node]:
-    """De bergbezinkvoorzieningen (BBB's) in de dataset."""
-    return context.cached(
-        "rvz:bbb",
-        lambda: objecten_van_klassen(
-            context, context.config.klassen.bergbezinkvoorziening, "nodes"
-        ),
-    )
-
-
-def _bergbezinkleidingen(context: CheckContext) -> list[Conduit]:
-    """De bergbezinkriolen: bergingsvoorzieningen die als leiding geregistreerd staan."""
-    return context.cached(
-        "rvz:bbb_leidingen",
-        lambda: objecten_van_klassen(context, context.config.klassen.bergbezinkleiding, "conduits"),
-    )
-
-
 def bbb_notitie(context: CheckContext) -> list[str]:
     """Meldt of er bergbezinkvoorzieningen zijn en wat er buiten de toets valt."""
-    knopen = _bergbezink(context)
-    leidingen = _bergbezinkleidingen(context)
+    knopen = bergbezinkvoorzieningen(context)
+    leidingen = bergbezinkleidingen(context)
     notities: list[str] = []
     if not knopen:
         klassen = ", ".join(context.config.klassen.bergbezinkvoorziening) or "geen"
@@ -248,7 +219,7 @@ class RandvoorzieningNietAangesloten(Check):
         nulmeting al.
         """
         index = aansluitingen(context)
-        for node in (*_overstortputten(context), *_bergbezink(context)):
+        for node in (*overstortputten(context), *bergbezinkvoorzieningen(context)):
             if index.strengen(node.uri):
                 continue
             yield self.finding(
@@ -261,7 +232,7 @@ class RandvoorzieningNietAangesloten(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal randvoorzieningen."""
-        return len(_overstortputten(context)) + len(_bergbezink(context))
+        return len(overstortputten(context)) + len(bergbezinkvoorzieningen(context))
 
 
 @register
@@ -285,7 +256,7 @@ class ExterneOverstortZonderWater(Check):
         if not wateren:
             return
 
-        for node in _overstortputten(context):
+        for node in overstortputten(context):
             if node.point is None:
                 continue
             if any(water.distance(node.point) <= afstand for water in wateren):
@@ -315,7 +286,7 @@ class ExterneOverstortZonderWater(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal overstortputten."""
-        return len(_overstortputten(context))
+        return len(overstortputten(context))
 
 
 @register
@@ -339,7 +310,7 @@ class OverstortOpVerkeerdStelsel(Check):
         klassen = context.config.klassen
         verdacht = {"hemelwater", "infiltratie"}
 
-        for node in _overstortputten(context):
+        for node in overstortputten(context):
             soorten = {
                 soort
                 for conduit in index.strengen(node.uri)
@@ -360,7 +331,7 @@ class OverstortOpVerkeerdStelsel(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal overstortputten."""
-        return len(_overstortputten(context))
+        return len(overstortputten(context))
 
 
 @register
@@ -374,8 +345,8 @@ class GemengdDeelstelselZonderOverstort(Check):
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt samenhangende gemengde deelstelsels zonder noodafvoer."""
-        randvoorzieningen = {node.uri for node in _overstortputten(context)}
-        randvoorzieningen |= {node.uri for node in _bergbezink(context)}
+        randvoorzieningen = {node.uri for node in overstortputten(context)}
+        randvoorzieningen |= {node.uri for node in bergbezinkvoorzieningen(context)}
         clusters = deelstelsel_ids(context)
 
         for deel in _stelseldelen(context):
@@ -417,7 +388,7 @@ class _BbbKenmerk(Check):
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke BBB waarvan het gevraagde kenmerk ontbreekt."""
-        for node in _bergbezink(context):
+        for node in bergbezinkvoorzieningen(context):
             if self.aanwezig(context, node):
                 continue
             yield self.finding(
@@ -438,7 +409,7 @@ class _BbbKenmerk(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal bergbezinkvoorzieningen."""
-        return len(_bergbezink(context))
+        return len(bergbezinkvoorzieningen(context))
 
 
 @register
@@ -480,7 +451,7 @@ class BbbZonderLediging(Check):
         index = aansluitingen(context)
         ledigingsklassen = context.config.klassen.ledigingsvoorziening
 
-        for node in _bergbezink(context):
+        for node in bergbezinkvoorzieningen(context):
             if self._heeft_voorziening(context, node, ledigingsklassen):
                 continue
             uit = [
@@ -519,7 +490,7 @@ class BbbZonderLediging(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal bergbezinkvoorzieningen."""
-        return len(_bergbezink(context))
+        return len(bergbezinkvoorzieningen(context))
 
 
 @register
@@ -535,12 +506,12 @@ class BbbZonderNooduitlaat(Check):
         """Zoekt BBB's zonder overstortdrempel en zonder overstortleiding."""
         drempels = drempels_per_put(context)
         index = aansluitingen(context)
-        overstortleidingen = {conduit.uri for conduit in _overstortleidingen(context)}
+        overstort_uris = {conduit.uri for conduit in overstortleidingen(context)}
 
-        for node in _bergbezink(context):
+        for node in bergbezinkvoorzieningen(context):
             if node.uri in drempels:
                 continue
-            if any(conduit.uri in overstortleidingen for conduit in index.strengen(node.uri)):
+            if any(conduit.uri in overstort_uris for conduit in index.strengen(node.uri)):
                 continue
             yield self.finding(
                 context,
@@ -557,7 +528,7 @@ class BbbZonderNooduitlaat(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal bergbezinkvoorzieningen."""
-        return len(_bergbezink(context))
+        return len(bergbezinkvoorzieningen(context))
 
 
 @register
@@ -580,7 +551,7 @@ class InterneOverstortZelfdeStelseltype(Check):
         klassen = context.config.klassen
         dataset = context.dataset
 
-        for conduit in _overstortleidingen(context):
+        for conduit in overstortleidingen(context):
             begin, eind = index.knopen(conduit.uri)
             if begin is None or eind is None:
                 continue
@@ -610,7 +581,7 @@ class InterneOverstortZelfdeStelseltype(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoe interne overstorten in deze dataset herkend worden."""
-        aantal = len(_overstortleidingen(context))
+        aantal = len(overstortleidingen(context))
         if not aantal:
             klassen = ", ".join(context.config.klassen.overstortleiding) or "geen"
             return [
@@ -627,7 +598,7 @@ class InterneOverstortZelfdeStelseltype(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal overstortleidingen."""
-        return len(_overstortleidingen(context))
+        return len(overstortleidingen(context))
 
 
 @register
