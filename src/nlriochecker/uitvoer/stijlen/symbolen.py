@@ -209,25 +209,27 @@ VANGNET_LIJN_LABEL = "objecttype niet in de symbolentabel"
 # afbeelding-URL: de popup moet zelfstandig reizen.
 MAPTIP = """<style>
   .gwsw-popup { font-family: sans-serif; font-size: 9pt; color: #222; }
-  .gwsw-kop { border-bottom: 1px solid #bbb; padding-bottom: 2px; margin-bottom: 4px; }
-  .gwsw-label { font-weight: bold; }
-  .gwsw-type { color: #555; margin-left: 6px; }
-  .gwsw-status { float: right; text-transform: uppercase; font-size: 7pt; }
-  .s-rood .gwsw-status { color: #b2182b; }
-  .s-oranje .gwsw-status { color: #e08214; }
-  .s-groen .gwsw-status { color: #4d9221; }
-  .s-grijs .gwsw-status { color: #777; }
-  .gwsw-feiten, .gwsw-reden { color: #555; font-size: 8pt; margin-bottom: 4px; }
-  .gwsw-meldingen { margin: 0; padding-left: 14px; }
-  .gwsw-meldingen li { margin-bottom: 3px; }
-  .gwsw-ernst { font-weight: bold; margin-right: 3px; }
-  .e-F .gwsw-ernst { color: #b2182b; }
-  .e-W .gwsw-ernst { color: #e08214; }
-  .gwsw-check { font-weight: bold; margin-right: 4px; }
-  .gwsw-waarde, .gwsw-drempel, .gwsw-systemisch, .gwsw-herkomst {
+  .gwsw-popup .k { border-bottom: 1px solid #bbb; padding-bottom: 2px; margin-bottom: 4px; }
+  .gwsw-popup .l { font-weight: bold; }
+  .gwsw-popup .t { color: #555; margin-left: 6px; }
+  .gwsw-popup .s { float: right; text-transform: uppercase; font-size: 7pt; }
+  .s-rood .s { color: #b2182b; }
+  .s-oranje .s { color: #e08214; }
+  .s-groen .s { color: #4d9221; }
+  .s-grijs .s { color: #777; }
+  .gwsw-popup .f, .gwsw-popup .r { color: #555; font-size: 8pt; margin-bottom: 4px; }
+  .gwsw-popup .m { margin: 0; padding-left: 14px; }
+  .gwsw-popup .m li { margin-bottom: 3px; }
+  .gwsw-popup .e { font-weight: bold; margin-right: 3px; }
+  .e-F .e { color: #b2182b; }
+  .e-W .e { color: #e08214; }
+  .gwsw-popup .c { font-weight: bold; margin-right: 4px; }
+  .gwsw-popup .v, .gwsw-popup .d, .gwsw-popup .y, .gwsw-popup .h {
     color: #666; font-size: 8pt; margin-left: 5px;
   }
-  .gwsw-rest, .gwsw-leeg { color: #666; font-size: 8pt; margin-top: 4px; }
+  .gwsw-popup .x, .gwsw-popup .z, .gwsw-popup .n {
+    color: #666; font-size: 8pt; margin-top: 4px;
+  }
 </style>
 <div style="width:300px">[% "popup_html" %]</div>"""
 

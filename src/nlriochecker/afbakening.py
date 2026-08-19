@@ -37,6 +37,14 @@ class Analyseset:
     # zodat het rapport kan zeggen wat er niet meegewogen is in plaats van te
     # zwijgen.
     strengen_zonder_netwerkverband: int = 0
+    # Het deel van de schil dat om het gebied heen ligt: de objecten binnen de buffer,
+    # zonder de kern. De schil is groter -- daar hoort de hele samenhangende
+    # vrijvervalcomponent bij, en die kan in een stad het halve net zijn -- maar alleen
+    # deze ring is wat een lezer om zijn gebied heen ziet liggen. De GeoPackage tekent
+    # hem grijs mee, zodat de kaart niet bij de gebiedsgrens ophoudt alsof daar niets
+    # ligt; de rest van de component grijs meesturen zou elk buurtbestand met het net
+    # van de hele stad opzadelen. Zie BO-29.
+    buffer: frozenset[str] = frozenset()
 
     @property
     def alles(self) -> frozenset[str]:
@@ -154,7 +162,8 @@ def bouw_analyseset(
     gedeeld = gedeeld if gedeeld is not None else bouw_gedeelde_index(dataset, config)
     kern = objecten_in_gebied(dataset, area, gedeeld=gedeeld)
     component, zonder_netwerkverband = gedeeld.component(kern)
-    schil = component | _binnen_buffer(dataset, area, config, gedeeld)
+    buffer = _binnen_buffer(dataset, area, config, gedeeld)
+    schil = component | buffer
     schil |= _sluit_tussenschakels(dataset, config, kern | schil)
     schil -= kern
     volledig = len(dataset.nodes) + len(dataset.conduits)
@@ -164,6 +173,7 @@ def bouw_analyseset(
         dataset=dataset.subset(kern | schil),
         volledig_aantal=volledig,
         strengen_zonder_netwerkverband=zonder_netwerkverband,
+        buffer=frozenset(buffer - kern),
     )
 
 

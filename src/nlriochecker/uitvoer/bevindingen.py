@@ -421,8 +421,9 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     if run.nulbevindingen_weggelaten:
         buiten = getal(run.nulbevindingen_weggelaten, "overtreding viel", "overtredingen vielen")
         regels += [
-            f"> **{buiten} buiten dit gebied** en staan hier niet in. Ze horen bij objecten "
-            "elders in de export; dit rapport zegt niets over die.",
+            f"> **{buiten} buiten dit gebied** en "
+            f"{vorm(run.nulbevindingen_weggelaten, 'staat', 'staan')} hier niet in. Ze horen "
+            "bij objecten elders in de export; dit rapport zegt niets over die.",
             "",
         ]
     return regels
@@ -656,20 +657,32 @@ def _clusterduiding(meldingen: list[Melding]) -> list[str]:
 
 
 def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
-    """Meldt hoeveel meldingen geen plek op de kaart kregen.
+    """Meldt hoeveel meldingen geen plek op de kaart kregen, en waarom.
 
-    De GeoPackage telt ze in `gwsw_run`, maar wie alleen het rapport leest zou
-    denken dat de kaartlaag compleet is. Zwijgen leest hier als "alles staat erop".
+    De GeoPackage telt ze in `gwsw_run`, maar wie alleen het rapport leest zou denken
+    dat het kaartbeeld compleet is. Zwijgen leest hier als "alles staat erop".
+
+    Twee oorzaken, en ze horen uit elkaar gehouden te worden: een melding die geen
+    object aanwijst (dataset-breed, een EXT-verwijzing zonder rioolobject, een
+    focusnode uit de nulmeting die nergens op uitkwam) en een melding op een object
+    zonder bruikbare geometrie. Ze op een hoop gooien leverde een rapport op dat in
+    de ene alinea 578 meldingen aan een ontbrekende geometrie weet en in de andere
+    telde dat er nul zo'n geval was.
     """
     zonder = [melding for melding in meldingen if melding.foutlocatie is None]
     if not zonder:
         return []
 
+    objectloos = [melding for melding in zonder if not melding.object_uri]
+    zonder_geometrie = [melding for melding in zonder if melding.object_uri]
     checks = ", ".join(sorted({melding.check_id for melding in zonder}))
-    return [
+    regels = [
         f"> **{getal(len(zonder), 'melding heeft', 'meldingen hebben')} geen plek op de "
-        f"kaart** gekregen, omdat het object geen bruikbare geometrie heeft ({checks}). "
-        "Ze staan wel in de CSV en in de meldingentabel van de GeoPackage, maar niet in "
-        "de laag `meldinglocaties`.",
+        f"kaart** gekregen: {len(objectloos)} wijzen geen object aan en "
+        f"{len(zonder_geometrie)} staan op een object zonder bruikbare geometrie "
+        f"({checks}). Ze staan wel in de CSV, in `{FILE_CHECKS_JSON}` en in de "
+        "meldingentabel van de GeoPackage, die de kolommen `x` en `y` draagt; alleen "
+        "kleuren ze geen object op de kaart.",
         "",
     ]
+    return regels

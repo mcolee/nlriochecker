@@ -423,7 +423,11 @@ def test_de_strengen_staan_in_een_vaste_volgorde(tmp_path: Path) -> None:
 
 
 def test_runmetadata_telt_de_lagen(tmp_path: Path) -> None:
-    """`n_strengen` telt de rijen in de laag; `n_mechanisch` hoeveel daarvan grijs zijn."""
+    """`n_strengen` telt de rijen in de laag; `n_mechanisch` hoeveel daarvan mechanisch zijn.
+
+    Niet hoeveel er grijs zijn: met een studiegebied zit de contextschil ook in de laag,
+    en een mechanische streng met een melding is niet grijs maar gekleurd.
+    """
     pad = _schrijf(_run("mechanisch_riool.ttl"), tmp_path)
 
     ((putten, strengen, mechanisch),) = _rijen(
@@ -792,8 +796,10 @@ class TestStatusEnPopup:
         waarden = {rij[0] for rij in _rijen(pad, "select status from putten")}
         waarden |= {rij[0] for rij in _rijen(pad, "select status from strengen")}
 
-        assert waarden
         assert waarden <= set(STATUSSEN)
+        # Een deelverzameling-assertie alleen zou ook slagen als alles groen was; de
+        # fixture hoort meer dan een status op te leveren.
+        assert len(waarden) > 1
 
     def test_de_status_klopt_met_de_meldingentabel(self, tmp_path: Path) -> None:
         """De kolom en de tabel komen uit dezelfde stroom; ze mogen niet uiteenlopen."""
@@ -833,21 +839,31 @@ class TestStatusEnPopup:
     def test_een_streng_noemt_stelsel_lengte_en_bob_in_haar_popup(self, tmp_path: Path) -> None:
         pad = _schrijf(_run("net003_tegen_de_richting.ttl"), tmp_path)
 
-        ((popup,),) = _rijen(pad, "select popup_html from strengen limit 1")
+        ((popup,),) = _rijen(pad, "select popup_html from strengen order by fid limit 1")
 
         assert "Stelsel" in popup
         assert "Lengte" in popup
         assert "BOB" in popup
 
-    def test_de_popup_van_een_put_noemt_geen_bob(self, tmp_path: Path) -> None:
+    def test_de_popup_van_een_put_noemt_geen_richtingsregel(self, tmp_path: Path) -> None:
+        """Stelsel, lengte en richting horen bij een streng; een put heeft ze niet.
+
+        De assertie kijkt naar het feitenblok en niet naar de hele popup: een
+        checkboodschap mag best over een BOB gaan.
+        """
         pad = _schrijf(_run("net003_tegen_de_richting.ttl"), tmp_path)
 
-        ((popup,),) = _rijen(pad, "select popup_html from putten limit 1")
+        popups = [rij[0] for rij in _rijen(pad, "select popup_html from putten order by fid")]
 
-        assert "BOB" not in popup
+        assert popups
+        assert all('class="f"' not in popup for popup in popups)
 
-    def test_de_contextschil_komt_grijs_mee(self, tmp_path: Path) -> None:
-        """Wat de checks zagen maar niet beoordeelden, hoort zichtbaar op de kaart."""
+    def test_de_ring_om_het_gebied_komt_grijs_mee(self, tmp_path: Path) -> None:
+        """Wat naast het gebied ligt hoort zichtbaar te zijn, maar wel begrensd.
+
+        De ring is `Analyseset.buffer` en niet de hele schil: die bevat ook de
+        samenhangende vrijvervalcomponent, en die kan in een stad het halve net zijn.
+        """
         from nlriochecker.meting import Meetbereik
         from nlriochecker.studiegebied import load_studiegebieden
         from nlriochecker.toetsloop import toets_gebieden
@@ -862,7 +878,7 @@ class TestStatusEnPopup:
             meetbereik=Meetbereik.niet_gemeten(()),
         )
         run = runs[0].run
-        assert run.analyseset is not None and run.analyseset.schil
+        assert run.analyseset is not None and run.analyseset.buffer
         pad = _schrijf(run, tmp_path)
 
         statussen = dict(
@@ -873,6 +889,8 @@ class TestStatusEnPopup:
             )
         )
 
-        for uri in run.analyseset.schil:
+        for uri in run.analyseset.buffer:
             assert statussen.get(uri) == "grijs", uri
         assert any(statussen.get(uri) != "grijs" for uri in run.analyseset.kern)
+        buiten_de_ring = run.analyseset.schil - run.analyseset.buffer
+        assert all(uri not in statussen for uri in buiten_de_ring)

@@ -177,6 +177,13 @@ def _ontdubbel(nulmeting: Nulmeting) -> dict[tuple[str, str, str], _Gegevens]:
     return verzameld
 
 
+# Zoveel afwijkingen tussen CFK-rapporten worden er hooguit gelogd. Een export waarin
+# ze structureel voorkomen zou anders tienduizenden regels opleveren en het logboek
+# onbruikbaar maken; de laatste regel zegt hoeveel er nog volgden.
+MAX_GEMELDE_AFWIJKINGEN = 5
+_afwijkingen = 0
+
+
 def _meld_afwijking(
     sleutel: tuple[str, str, str],
     bestaand: _Gegevens,
@@ -184,7 +191,17 @@ def _meld_afwijking(
     cfk: str,
 ) -> None:
     """Logt dat twee CFK-rapporten dezelfde overtreding verschillend beschrijven."""
+    global _afwijkingen
     if bestaand[:4] == nieuw:
+        return
+    _afwijkingen += 1
+    if _afwijkingen > MAX_GEMELDE_AFWIJKINGEN:
+        if _afwijkingen == MAX_GEMELDE_AFWIJKINGEN + 1:
+            logger.warning(
+                "Meer dan %d afwijkingen tussen de CFK-rapporten; de rest wordt niet "
+                "meer per stuk gemeld.",
+                MAX_GEMELDE_AFWIJKINGEN,
+            )
         return
     vorm, focus, _boodschap = sleutel
     logger.warning(

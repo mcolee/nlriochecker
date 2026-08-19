@@ -172,7 +172,9 @@ class TestRodeDraadEnDeNulmeting:
         from nlriochecker.uitvoer.synthese import _multi_melding
 
         meldingen = [
-            _nulmelding(f"NULMETING-Vorm_{n}_card", "http://example.org/toets#PutA", BRON_NULMETING)
+            _losse_melding(
+                f"NULMETING-Vorm_{n}_card", "http://example.org/toets#PutA", BRON_NULMETING
+            )
             for n in range(1, 6)
         ]
 
@@ -182,7 +184,7 @@ class TestRodeDraadEnDeNulmeting:
         """Anders staan ze samen als een verdacht object in het rapport."""
         from nlriochecker.uitvoer.synthese import _multi_melding
 
-        meldingen = [_nulmelding(f"TOP-{n:03d}", "") for n in range(1, 6)]
+        meldingen = [_losse_melding(f"TOP-{n:03d}", "") for n in range(1, 6)]
 
         assert _multi_melding(meldingen, load_check_config()) == []
 
@@ -190,7 +192,7 @@ class TestRodeDraadEnDeNulmeting:
         from nlriochecker.uitvoer.synthese import _multi_melding
 
         meldingen = [
-            _nulmelding(f"TOP-{n:03d}", "http://example.org/toets#PutA") for n in range(1, 6)
+            _losse_melding(f"TOP-{n:03d}", "http://example.org/toets#PutA") for n in range(1, 6)
         ]
 
         regels = _multi_melding(meldingen, load_check_config())
@@ -198,7 +200,7 @@ class TestRodeDraadEnDeNulmeting:
         assert regels and "verschillende checks" in regels[0]
 
 
-def _nulmelding(check_id: str, object_uri: str, bron: str = "register") -> Melding:
+def _losse_melding(check_id: str, object_uri: str, bron: str = "register") -> Melding:
     """Een melding met alleen de velden die de rode draad leest."""
     return Melding(
         melding_id=check_id + object_uri,

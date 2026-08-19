@@ -70,9 +70,21 @@ class TestStatus:
     def test_niet_geanalyseerd_maakt_grijs(self) -> None:
         assert bepaal_status([], geanalyseerd=False) == STATUS_GRIJS
 
-    def test_niet_geanalyseerd_wint_van_een_melding(self) -> None:
-        """Een object buiten de kern wordt niet beoordeeld, ook niet half."""
-        assert bepaal_status([_melding("F")], geanalyseerd=False) == STATUS_GRIJS
+    def test_een_gebrek_wint_van_niet_geanalyseerd(self) -> None:
+        """Mechanisch riool wordt wel degelijk door TOP-010 en de nulmeting geraakt.
+
+        Op de Koekangerveld-run dragen 17 van de 20 mechanische strengen een melding.
+        Zouden die grijs blijven, dan beweert de kaart dat er niets bekeken is terwijl
+        er fouten op staan -- en sinds `meldinglocaties` verviel is er geen tweede plek
+        meer waar ze wel zichtbaar zijn.
+        """
+        assert bepaal_status([_melding("F")], geanalyseerd=False) == STATUS_ROOD
+        assert bepaal_status([_melding("W")], geanalyseerd=False) == STATUS_ORANJE
+
+    def test_grijs_blijft_grijs_zonder_meldingen(self) -> None:
+        """Grijs betekent: niet beoordeeld en niets gevonden."""
+        assert bepaal_status([], geanalyseerd=False) == STATUS_GRIJS
+        assert bepaal_status([_melding("F", systemisch=True)], geanalyseerd=False) == STATUS_GRIJS
 
     def test_systemische_meldingen_tellen_niet_mee(self) -> None:
         """Anders is op De Wolden vrijwel elke put rood en zegt de kaart niets meer.
@@ -179,6 +191,23 @@ class TestPopup:
         html = popup_html(Objectkop("A", "Inspectieput", STATUS_GROEN), [_melding(systemisch=True)])
 
         assert "systemisch" in html
+
+    def test_de_popup_zegt_waarom_de_systemische_meldingen_niet_meetellen(self) -> None:
+        """Anders leest een groene kop met drie rode kruisen eronder als een fout."""
+        html = popup_html(Objectkop("A", "Inspectieput", STATUS_GROEN), [_melding(systemisch=True)])
+
+        assert "tellen niet mee in de status" in html or "telt niet mee in de status" in html
+
+    def test_een_niet_systemische_melding_staat_boven_de_systemische(self) -> None:
+        """De cap van vijf mag niet net de melding wegsnijden die de status bepaalde."""
+        meldingen = [
+            _melding("F", check_id=f"NULMETING-Vorm_{n}_card", systemisch=True) for n in range(1, 8)
+        ]
+        meldingen.append(_melding("F", check_id="RVZ-006"))
+
+        html = popup_html(Objectkop("A", "Inspectieput", STATUS_ROOD), meldingen)
+
+        assert "RVZ-006" in html
 
     def test_de_inhoud_wordt_geescaped(self) -> None:
         """Labels en boodschappen komen uit de brondata en mogen niets breken."""

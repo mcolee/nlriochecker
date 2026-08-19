@@ -191,8 +191,10 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   staat een keer in de maptip). Mechanisch riool staat grijs tussen de strengen en de
   contextschil komt grijs mee; de popup zegt waarom. `status` telt systemische
   meldingen niet mee, net als `ergste_ernst`. `meldinglocaties` bestaat niet meer; de
-  tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. Beide kolommen
-  komen uit `uitvoer/objectkaart.py` en nergens anders. Zie BO-29.
+  tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. De statusregel en
+  de opmaak van de popup staan in `uitvoer/objectkaart.py`; `gpkg.py` levert alleen de
+  feiten die alleen hij kent (stelsel, lengte, BOB-richting) als kant-en-klare regels
+  aan. Zie BO-29.
 - De GeoPackage draagt naast de rioleringslagen `bouwwerken` (EXT-001) en
   `waterdelen_zonder_zinker` (EXT-003): de externe objecten waarnaar de meldingen van
   díé uitvoer verwijzen, gejoind op het trefferregister (`checks/treffers.py`) via

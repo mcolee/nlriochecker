@@ -78,8 +78,8 @@ RELATIE_STERKTE = ("binnen", "kruist", "nabij")
 
 # Waarom een object grijs is. De popup noemt de reden; grijs zonder reden leest als
 # "in orde", en dat is het niet.
-REDEN_MECHANISCH = "mechanisch riool, valt buiten scope van het checkregister"
-REDEN_SCHIL = "contextschil van het studiegebied, buiten de kern"
+REDEN_MECHANISCH = "mechanisch riool, dat de meeste checks overslaan"
+REDEN_SCHIL = "ligt naast het studiegebied en niet erin"
 
 RD_WKT = (
     'PROJCS["Amersfoort / RD New",GEOGCS["Amersfoort",DATUM["Amersfoort",'
@@ -379,8 +379,11 @@ def _samenvatting_kolommen() -> list[_Kolom]:
 def _mechanische_uris(run: CheckRun, config: CheckConfig) -> frozenset[str]:
     """De verbindingen die tot het mechanische stelsel horen.
 
-    Ze doen niet mee aan de checks en horen dus niet tussen de strengen te staan,
-    waar 'geen melding' ten onrechte als 'getoetst en in orde' leest.
+    Het merendeel van de checks slaat ze over -- het checkregister rekent mechanisch
+    riool niet tot zijn bereik -- maar niet alle: TOP-010 en TOP-011 draaien er wel op,
+    en de SHACL-nulmeting sowieso. Daarom krijgen ze status `grijs` alleen zolang er
+    niets op staat; wat er wel op staat kleurt ze (zie `objectkaart.bepaal_status`).
+    Zonder die uitzondering zou 'geen kleur' hier als 'getoetst en in orde' lezen.
 
     De selectie komt uit `checks/selectie.py` en niet uit een eigen comprehension.
     Deze laag heeft geen `CheckContext` van de run, dus hij wordt hier gemaakt over
@@ -408,11 +411,13 @@ def _schrijf_features(
     daar niets ligt, en een lege mechanische laag zou als "geen mechanisch riool
     aanwezig" lezen.
 
-    De schil komt uit `run.analyseset` en niet uit "alles wat niet in de kern ligt".
-    Een run die met `beperk_tot_studiegebied` op de volledige export is afgebakend
-    heeft geen analyseset, en dan hoort het bestand bij de gebiedsgrens op te houden
-    zoals het altijd deed -- anders zou een toets op een buurt de hele export als
-    grijze achtergrond meesturen.
+    De grijze context is `Analyseset.buffer`: de objecten die binnen de buffer om het
+    gebied liggen. Niet de hele schil -- daar hoort ook de samenhangende
+    vrijvervalcomponent bij, en die kan in een stad het halve net zijn, zodat elk
+    buurtbestand met het net van de hele stad zou worden opgezadeld. En niet "alles wat
+    niet in de kern ligt": een run die met `beperk_tot_studiegebied` op de volledige
+    export is afgebakend heeft geen analyseset, en dan hoort het bestand bij de
+    gebiedsgrens op te houden zoals het altijd deed.
     """
     kolommen = _samenvatting_kolommen()
     _maak_featurelaag(
@@ -435,7 +440,7 @@ def _schrijf_features(
     stelsels = _stelseltypen(run)
     config = run.config if run.config is not None else load_check_config()
     mechanisch = _mechanische_uris(run, config)
-    schil = run.analyseset.schil if run.analyseset is not None else frozenset()
+    ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
 
     tellingen: dict[str, int] = {}
     mechanisch_geschreven = 0
@@ -448,7 +453,7 @@ def _schrijf_features(
         # Gesorteerd, niet in de volgorde van het woordenboek: anders wisselen
         # rijvolgorde en fid-toekenning tussen twee runs op dezelfde data.
         for uri in sorted(verzameling):
-            if binnen is not None and uri not in binnen and uri not in schil:
+            if binnen is not None and uri not in binnen and uri not in ring:
                 continue
             object_ = verzameling[uri]
             geometrie = getattr(object_, geometrie_veld)
@@ -824,7 +829,10 @@ def _metadata(run: CheckRun, run_datum: date) -> tuple[str, str, str]:
 
 # Op welke afstand twee meldingen als dezelfde plek gelden. Een millimeter: kleiner
 # dan elke echte afstand in een rioolbestand en groter dan het afrondingsverschil
-# tussen twee berekende punten.
+# tussen twee berekende punten. De kolommen `stapel_aantal` en `stapel_nr` dreven
+# vroeger de verspringing in de laag `meldinglocaties`; die laag is er niet meer, maar
+# de tellingen zeggen nog steeds hoeveel meldingen op dezelfde plek zitten en blijven
+# daarom in de meldingentabel staan.
 STAPEL_RASTER_M = 0.001
 
 MELDING_KOLOMMEN = [
