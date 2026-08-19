@@ -84,6 +84,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- De klassenselecties van de checks staan op een plek, `checks/selectie.py`, in plaats
+  van in vijf checkmodules met elk hun eigen cachesleutel. De namen volgen de
+  GWSW-ontologie waar een klasse de rol dekt; `gwsw:Streng` bestaat niet, dus wat
+  `_strengen` heette selecteert `gwsw:Leiding` en heet nu `leidingen`. Interne
+  wijziging: de uitvoer van een volledige run is byte-identiek gebleven. Zie BO-20 en
+  [CONTEXT.md](CONTEXT.md).
 - Een studiegebiedbestand met meerdere vlakken zonder kolom `naam_gebied` is voortaan een
   fout in plaats van een stilzwijgende samenvoeging tot een gebied. Datzelfde geldt voor
   niet-vlakken: die werden ingelezen en tellen nu niet meer mee.

@@ -928,3 +928,73 @@ verschuift hun `melding_id` eenmalig -- die hash bevat dat veld. Een trendvergel
 over die grens heen laat de meldingen als opgelost plus nieuw zien. Dat staat in het
 wijzigingslog en in `docs/json-schema.md`; het alternatief (het veld buiten de hash
 houden) zou twee meldingen over verschillende panden dezelfde identiteit geven.
+
+### BO-20 De klassenselecties staan op een plek, met de GWSW-naam waar die bestaat
+
+**Wat.** Elke rol waarop de checks selecteren -- netwerkknopen, putten, leidingen,
+vrijvervalrioolleidingen en tien andere -- heeft een functie in
+`src/nlriochecker/checks/selectie.py` en cachet daar onder `sel:<rolnaam>`. De
+generieke ingang `verbanden.objecten_van_klassen` is verwijderd. De begrippen staan in
+[CONTEXT.md](../CONTEXT.md).
+
+**Waarom.** Dezelfde selectie werd op zes plaatsen opgebouwd. `netwerkknopen` had drie
+cachesleutels (`adm:putten`, `hgt:putten`, `ext:putten`) plus een ongecachete aanroep
+plus twee met de hand overgeschreven comprehensions; `vrijvervalleiding` idem.
+`dataset.of_class` doet per wortelklasse een volledige doorloop over knopen en strengen
+en wordt niet gememoiseerd, en `netwerkknopen` telt elf wortelklassen. Dat waren dus
+tientallen doorlopen waar er elf nodig zijn, en evenveel kopieen van dezelfde lijst in
+geheugen op een dataset van 3 GB.
+
+**Waarom een module en geen methoden op `CheckContext`.** `context.putten()` leest
+beter, maar `objecten_van_klassen` woonde in `verbanden.py` en dat importeert
+`base.py`. Methoden zouden de implementatie naar `base.py` trekken, en dat bestand is
+al de knoop waar elke checkmodule op leunt. Een module met functies die de context als
+parameter nemen volgt bovendien het patroon dat `verbanden.aansluitingen(context)` al
+had.
+
+**Waarom de GWSW-naam.** De oude helper `_strengen` selecteerde `gwsw:Leiding`, en dat
+is een verkeerd woord: `gwsw:Streng` bestaat niet en `gwsw:Rioolstreng` is iets anders
+(de NEN 3300-aanduiding voor de riolering tussen twee putmiddelpunten). Waar een klasse
+de rol dekt draagt de functie die klassenaam, ook als hij lang is
+(`vrijvervalrioolleidingen`). Waar geen klasse de rol dekt is de naam een rolnaam en
+zegt de docstring dat erbij. Bij `netwerkknopen` uitdrukkelijk: `gwsw:Knooppunt`
+bestaat wel, maar is de orientatie en niet het object, dus die naam zou de ontologie
+verkeerd citeren. Alle 22 wortelklassen uit `checks.toml` zijn tegen
+`Ontologie_GWSW_Totaal.ttl` nagelopen en bestaan letterlijk.
+
+**Waarom geen generieke ingang.** Een opzoeking op naam
+(`selecteer(context, "putten")`) zou de vijftien functies overbodig maken. Precies zo'n
+ingang bestond al -- `objecten_van_klassen` stond klaar -- en dat is hoe elke
+checkmodule aan zijn eigen variant kwam. Een nieuwe rol kost nu een sleutel in
+`[klassen]` en een functie; dat is een regel meer werk en het houdt de seam heel. Om
+dezelfde reden is de naam-naar-functietabel in de module privé (`_ROLLEN`) en bestaat
+hij alleen zodat de tests kunnen bewaken dat geen rol uitsluitend op een lege
+verzameling getoetst wordt.
+
+**Wat er niet in zit, en waarom dat geen vergeetachtigheid is.** Drie plekken krijgen
+de rol als *gegeven* mee, via `getattr(context.config.klassen, rol)`:
+`verbanden._bouw_aansluitingen` (aangeroepen met `"streng"` en `"vrijvervalleiding"`),
+`netwerk._eindpunten` (met `"afvoer_eindpunt"` en `"lozings_eindpunt"`) en de
+`stelselrol` van de NET-checks (met `"vuilwater"` en `"hemelwater"`). Daar is de rol
+een variabele, en een benoemde functie kan die niet bedienen zonder de opzoeking op
+naam die hierboven juist verworpen is. Ze bouwen dus nog steeds hun eigen selectie.
+Buiten de checklaag geldt hetzelfde voor `afbakening.py`, `analysis.py`,
+`uitvoer/synthese.py` en `uitvoer/gpkg.py`: die hebben geen `CheckContext` en dus geen
+cache om in te hangen. Ze horen bij de uitvoerlaag en gaan mee met de eerstvolgende
+verbouwing daarvan. De belofte "de selecties staan op een plek" geldt dus voor de
+vaste rollen in de checklaag, en niet verder.
+
+**Hoe is vastgesteld dat er niets verschoof.** Een volledige run op De Wolden (23.485
+knooppunten, 23.440 strengen, 35.975 bevindingen over 86 checks) voor en na de reeks
+levert een byte-identieke `bevindingen.csv` en `bevindingen.json` op.
+`tests/test_checks_selectie.py` legt daarnaast per rol de aantallen vast op het
+Juinen-voorbeeld en op een fixture die alle rollen dekt, met de deelverzamelingsrelatie
+tussen `putten` en `netwerkknopen` er expliciet bij -- dat is de verwisseling die deze
+verbouwing had kunnen maken.
+
+**Verworpen alternatieven.** De configuratiesleutels meehernoemen (`[klassen] streng`
+naar `leiding`): dat maakt de laag consistent maar breekt bestaande projectconfiguraties
+voor iets wat los staat van de duplicatie; `extra="forbid"` in de pydantic-modellen
+zorgt wel dat zo'n breuk hard faalt en niet stil, dus het kan later alsnog. Een sweep
+over de 448 keer "streng" in `src/`: dat is een andere verbouwing, en hij zou het bewijs
+hierboven onleesbaar maken omdat elke rapportregel verandert.
