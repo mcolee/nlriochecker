@@ -222,3 +222,19 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - Bij de SHACL-meting komt de put-strengkoppeling in alle drie de CFK's voor, terwijl het register stelt dat die alleen uit Hyd komt (ADM-001).
 - Er is geen SHACL-vorm voor Drempelniveau of Drempelbreedte; RVZ-002 en RVZ-003 gelden daardoor als niet geraakt terwijl ze juist geschrapt zijn omdat de nulmeting ze zou dekken.
 - Negentien TOP- en NET-checks uit het register zijn nog niet gebouwd.
+
+## Agent skills
+
+### Issuetracker
+
+Issues leven als GitHub-issues op `mcolee/nlriochecker`, bediend met de `gh` CLI. Zie
+`docs/agents/issue-tracker.md`.
+
+### Triage-labels
+
+De vijf standaardrollen; elke labelstring is gelijk aan de rolnaam. Zie
+`docs/agents/triage-labels.md`.
+
+### Domeindocumentatie
+
+Single-context: `CONTEXT.md` in de root plus `docs/adr/`. Zie `docs/agents/domain.md`.
