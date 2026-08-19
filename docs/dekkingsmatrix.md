@@ -11,10 +11,10 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ATTR | 12 | 11 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 8 | 8 | 0 | 0 | 0 |
-| RVZ | 11 | 9 | 0 | 0 | 2 |
+| RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **92** | **86** | **0** | **0** | **6** |
+| **totaal** | **92** | **88** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -114,8 +114,8 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |
 | --- | --- | --- | --- | --- | --- |
 | RVZ-001 | Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk; geometrisch-topologische variant, de administratieve koppeling dekt… | F | Consistentie | geimplementeerd met test | — |
-| RVZ-002 | Overstort zonder geregistreerde drempelhoogte | — | — | geschrapt (gedekt door nulmeting) | Beide CFK's: Drempelniveau exact=1 (Mds) / min=1 (Hyd) |
-| RVZ-003 | Overstort zonder geregistreerde drempelbreedte | — | — | geschrapt (gedekt door nulmeting) | Alleen Hyd: Drempelbreedte exact=1; Mds staat ontbreken toe (max=1, geen min-eis) |
+| RVZ-002 | Overstort zonder geregistreerde drempelhoogte (Drempelniveau), ook als het drempelonderdeel zelf ontbreekt; overlapt bewust met de nulmetingvorm Over… | W | Compleetheid | geimplementeerd met test | — |
+| RVZ-003 | Overstort zonder geregistreerde drempelbreedte (Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt | W | Compleetheid | geimplementeerd met test | — |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit | geimplementeerd met test | — |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie | geimplementeerd met test | — |
 | RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB | W | Plausibiliteit | geimplementeerd met test | — |

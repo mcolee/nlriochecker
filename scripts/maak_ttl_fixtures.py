@@ -827,33 +827,65 @@ FIXTURES["hgt018_buiskruin_boven_maaiveld.ttl"] = (
 
 # --- RVZ ------------------------------------------------------------------
 
-FIXTURES["rvz_schoon.ttl"] = (
-    "geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost",
-    hoogteput("PutA", "A", A)
-    + put(
-        "PutO",
-        "O",
-        B[0],
-        B[1],
-        klasse="Overstortput",
-        extra=kenmerken(
-            "PutO", BreedtePut=1000, LengtePut=1000, HoogtePut=1500, MateriaalPut_ref="Beton"
-        ),
-    )
-    + maaiveld("PutO", 10.0)
-    + deksel("PutO", 10.0)
-    + drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0)
-    + hoogteput("PutU", "U", C)
-    + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55))
-    + hoogteleiding(
-        "L2", "2", [B, C], "PutO", "PutU", bob=(9.00, 8.95), Begindatum="1980-01-01"
-    ).replace("gwsw:GemengdRiool", "gwsw:Overstortleiding")
-    + """:Sloot1 rdf:type gwsw:Sloot ; rdfs:label "sloot" ;
+
+def _overstortstelsel(drempelregel: str) -> str:
+    """Een gemengd stelsel met een aangesloten overstortput O die op een sloot loost.
+
+    `drempelregel` is de TTL van de overstortdrempel van put O (uit `drempel(...)`),
+    of een lege string voor een put zonder drempelonderdeel. Basis van rvz_schoon en
+    van de RVZ-002/003-fixtures.
+    """
+    return (
+        hoogteput("PutA", "A", A)
+        + put(
+            "PutO",
+            "O",
+            B[0],
+            B[1],
+            klasse="Overstortput",
+            extra=kenmerken(
+                "PutO", BreedtePut=1000, LengtePut=1000, HoogtePut=1500, MateriaalPut_ref="Beton"
+            ),
+        )
+        + maaiveld("PutO", 10.0)
+        + deksel("PutO", 10.0)
+        + drempelregel
+        + hoogteput("PutU", "U", C)
+        + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55))
+        + hoogteleiding(
+            "L2", "2", [B, C], "PutO", "PutU", bob=(9.00, 8.95), Begindatum="1980-01-01"
+        ).replace("gwsw:GemengdRiool", "gwsw:Overstortleiding")
+        + """:Sloot1 rdf:type gwsw:Sloot ; rdfs:label "sloot" ;
     gwsw:hasAspect :Sloot1_ori .
 :Sloot1_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>1062.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
-""",
+"""
+    )
+
+
+FIXTURES["rvz_schoon.ttl"] = (
+    "geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost",
+    _overstortstelsel(drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0)),
+)
+
+# RVZ-002: de drempel draagt geen Drempelniveau.
+FIXTURES["rvz002_drempel_zonder_niveau.ttl"] = (
+    "de drempel van overstortput O heeft wel een breedte maar geen Drempelniveau",
+    _overstortstelsel(drempel("PutO", "DrempelO", niveau=None, breedte=2000.0)),
+)
+
+# RVZ-003: de drempel draagt geen Drempelbreedte.
+FIXTURES["rvz003_drempel_zonder_breedte.ttl"] = (
+    "de drempel van overstortput O heeft wel een niveau maar geen Drempelbreedte",
+    _overstortstelsel(drempel("PutO", "DrempelO", niveau=9.00, breedte=None)),
+)
+
+# RVZ-002 en RVZ-003: er is helemaal geen drempelonderdeel.
+FIXTURES["rvz002_overstort_zonder_drempel.ttl"] = (
+    "overstortput O heeft geen enkel Overstortdrempel-onderdeel; RVZ-002 en RVZ-003 "
+    "gaan allebei af",
+    _overstortstelsel(""),
 )
 
 FIXTURES["rvz001_losse_overstort.ttl"] = (

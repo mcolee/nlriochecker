@@ -45,7 +45,7 @@ def test_analyseer_schrijft_uitvoer(shacl_drieluik: list[Path], tmp_path: Path) 
     assert (uitvoer / FILE_MARKDOWN).exists()
     assert (uitvoer / FILE_CSV).exists()
     assert "Hyd, MdsPlan, MdsProj" in resultaat.output
-    assert "Niet geraakte geschrapte checks: RVZ-002, RVZ-003" in resultaat.output
+    assert "Niet geraakte geschrapte checks" not in resultaat.output
 
 
 def test_ontbrekende_cfk_geeft_exitcode_1(mini_hyd_shacl: Path, tmp_path: Path) -> None:
@@ -66,7 +66,48 @@ def test_dekking_schrijft_uitvoer(shacl_drieluik: list[Path], tmp_path: Path) ->
     assert resultaat.exit_code == 0, resultaat.output
     assert (uitvoer / FILE_COVERAGE_MARKDOWN).exists()
     assert (uitvoer / FILE_COVERAGE_CSV).exists()
-    assert "RVZ-003   niet geraakt" in resultaat.output
+    assert "ADM-001   geraakt" in resultaat.output
+
+
+def test_analyseer_meldt_een_sentinel_zonder_bewijs(
+    shacl_drieluik: list[Path], mapping_zonder_bewijs: Path, tmp_path: Path
+) -> None:
+    """Een geschrapte check die de nulmeting niet raakt, hoort op de regel te komen."""
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "analyseer",
+            *_shacl_args(shacl_drieluik),
+            "--config",
+            str(mapping_zonder_bewijs),
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "Niet geraakte geschrapte checks: ADM-001" in resultaat.output
+
+
+def test_dekking_toont_een_sentinel_zonder_bewijs(
+    shacl_drieluik: list[Path], mapping_zonder_bewijs: Path, tmp_path: Path
+) -> None:
+    """Het oordeel 'niet geraakt' hoort per check zichtbaar te zijn."""
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "dekking",
+            *_shacl_args(shacl_drieluik),
+            "--config",
+            str(mapping_zonder_bewijs),
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "ADM-001   niet geraakt" in resultaat.output
+    assert "Dekking niet aangetoond voor: ADM-001" in resultaat.output
 
 
 def test_vergelijk_schrijft_uitvoer(shacl_drieluik: list[Path], tmp_path: Path) -> None:

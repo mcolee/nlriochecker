@@ -67,26 +67,3 @@ bewijs = [
   { vorm = "LengteLeiding_val" },
 ]
 tegenbewijs = []
-
-[[check]]
-id = "RVZ-002"
-onderwerp = "Overstort zonder geregistreerde drempelhoogte"
-claim = "Beide CFK's: Drempelniveau exact=1 (Mds) / min=1 (Hyd)"
-vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
-# In de SHACL-rapporten over De Wolden komt geen enkele vorm op Drempelniveau voor;
-# de dichtstbijzijnde vorm toetst of de overstortput een drempel *heeft*, niet of
-# het niveau ervan geregistreerd is.
-bewijs = [
-  { vorm_prefix = "Drempelniveau" },
-]
-tegenbewijs = []
-
-[[check]]
-id = "RVZ-003"
-onderwerp = "Overstort zonder geregistreerde drempelbreedte"
-claim = "Alleen Hyd: Drempelbreedte exact=1; Mds staat ontbreken toe (max=1, geen min-eis)"
-vereiste_cfk = ["Hyd"]
-bewijs = [
-  { vorm_prefix = "Drempelbreedte" },
-]
-tegenbewijs = []

@@ -108,9 +108,8 @@ def test_dekkingoordelen(meting) -> None:
     assert oordelen["ADM-004"] is Verdict.TOUCHED
     assert oordelen["ADM-005"] is Verdict.TOUCHED
     assert oordelen["ATTR-011"] is Verdict.TOUCHED
-    # In de SHACL-meting komt geen enkele vorm op Drempelniveau of Drempelbreedte voor.
-    assert oordelen["RVZ-002"] is Verdict.UNTOUCHED
-    assert oordelen["RVZ-003"] is Verdict.UNTOUCHED
+    # Geen enkele geschrapte check mag ongeraakt blijven; zie test_coverage.py.
+    assert result.untouched == []
 
 
 def test_samenvatting_schrijven(meting, tmp_path: Path) -> None:

@@ -71,9 +71,21 @@ def test_dekkingrapport(analyse, tmp_path: Path) -> None:
 
     assert markdown_path.name == FILE_COVERAGE_MARKDOWN
     assert csv_path.name == FILE_COVERAGE_CSV
-    assert "RVZ-003" in tekst
+    assert "ADM-001" in tekst
     assert "niet goedgekeurd" in tekst
-    assert "RVZ-002, RVZ-003" in tekst
+    assert "raakt de nulmeting alle geschrapte checks" in tekst
+
+
+def test_dekkingrapport_noemt_een_sentinel_zonder_bewijs(
+    analyse, mapping_zonder_bewijs: Path, tmp_path: Path
+) -> None:
+    """De andere tak van dezelfde weergave: een check die de nulmeting niet raakt."""
+    coverage = assess_coverage(analyse, load_coverage_config(mapping_zonder_bewijs))
+    markdown_path, _ = write_coverage_report(coverage, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "niet goedgekeurd" in tekst
+    assert "In deze dataset geldt dat voor: ADM-001." in tekst
 
 
 def test_vergelijkingsrapport(analyse, tmp_path: Path) -> None:

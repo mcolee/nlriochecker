@@ -9,7 +9,7 @@ import pytest
 from nlriochecker.config import default_config_path, load_coverage_config
 from nlriochecker.errors import ConfigError
 
-REGISTER_IDS = {"ADM-001", "ADM-004", "ADM-005", "ATTR-011", "RVZ-002", "RVZ-003"}
+REGISTER_IDS = {"ADM-001", "ADM-004", "ADM-005", "ATTR-011"}
 
 GELDIGE_TOML = """
 checkregister_versie = "0.7"
@@ -35,11 +35,11 @@ def test_standaardmapping_bevat_de_geschrapte_checks() -> None:
     assert {mapping.id for mapping in config.check} == REGISTER_IDS
 
 
-def test_rvz_003_leunt_uitsluitend_op_hyd() -> None:
-    mapping = load_coverage_config().mapping("RVZ-003")
+def test_attr_011_leunt_op_de_lengtevorm() -> None:
+    mapping = load_coverage_config().mapping("ATTR-011")
 
-    assert mapping.vereiste_cfk == ["Hyd"]
-    assert mapping.bewijs[0].vorm_prefix == "Drempelbreedte"
+    assert mapping.vereiste_cfk == ["Hyd", "MdsPlan", "MdsProj"]
+    assert mapping.bewijs[0].vorm == "LengteLeiding_val"
 
 
 def test_adm_001_leunt_op_de_koppelingsvormen() -> None:

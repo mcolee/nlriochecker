@@ -69,6 +69,51 @@ def shacl_drieluik(
     return [mini_hyd_shacl, mini_mdsplan_shacl, mini_mdsproj_shacl]
 
 
+MINIREGISTER = """# Checkregister
+
+Versie 99.9, werkdocument.
+
+## ADM: Administratief
+
+| ID | Check | Ernst | Dimensie |
+|---|---|---|---|
+| ADM-002 | Dubbele identificatie | F | Consistentie |
+
+## Geschrapte checks
+
+| ID | Check | Gedekt door |
+|---|---|---|
+| ADM-001 | Streng verwijst naar niet-bestaande begin- of eindput | verzonnen sentinel |
+"""
+
+
+@pytest.fixture
+def mapping_zonder_bewijs(tmp_path: Path) -> Path:
+    """Een dekkingmapping waarvan de enige sentinel nergens een melding oplevert.
+
+    De meegeleverde `dekking.toml` raakt elke geschrapte check, ook op de
+    mini-nulmeting; daarmee is er geen echte run meer waarin "niet geraakt" te zien
+    is. Deze mapping toont die weergave zonder dat er een gat in de dekking van het
+    project voor nodig is. Het bijgeleverde miniregister hoort erbij, zodat de ijking
+    van mapping tegen register klopt.
+    """
+    register = tmp_path / "miniregister.md"
+    register.write_text(MINIREGISTER, encoding="utf-8")
+    pad = tmp_path / "dekking-zonder-bewijs.toml"
+    pad.write_text(
+        'checkregister_versie = "99.9"\n'
+        f'bron = "{register}"\n'
+        "[[check]]\n"
+        'id = "ADM-001"\n'
+        'onderwerp = "Streng verwijst naar niet-bestaande begin- of eindput"\n'
+        'claim = "verzonnen sentinel"\n'
+        'vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]\n'
+        'bewijs = [{ vorm_prefix = "BestaatNiet" }]\n',
+        encoding="utf-8",
+    )
+    return pad
+
+
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Laat de run alsnog vallen als er te weinig tests echt gedraaid hebben.
 

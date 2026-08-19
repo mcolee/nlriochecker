@@ -74,6 +74,10 @@ DEFECTEN = [
     ("hgt017_z_wijkt_af.ttl", "HGT-017", ["1", "1"]),
     ("hgt018_buiskruin_boven_maaiveld.ttl", "HGT-018", ["1"]),
     ("rvz001_losse_overstort.ttl", "RVZ-001", ["O"]),
+    ("rvz002_drempel_zonder_niveau.ttl", "RVZ-002", ["O"]),
+    ("rvz002_overstort_zonder_drempel.ttl", "RVZ-002", ["O"]),
+    ("rvz003_drempel_zonder_breedte.ttl", "RVZ-003", ["O"]),
+    ("rvz002_overstort_zonder_drempel.ttl", "RVZ-003", ["O"]),
     ("rvz004_overstort_zonder_water.ttl", "RVZ-004", ["O"]),
     ("rvz005_overstort_op_hemelwater.ttl", "RVZ-005", ["O"]),
     ("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006", ["A"]),
@@ -200,6 +204,20 @@ def test_rvz004_zwijgt_zonder_oppervlaktewater() -> None:
 
     assert outcome.findings == []
     assert any("geen enkel `Oppervlaktewater`-object" in note for note in outcome.notes)
+
+
+def test_rvz002_zwijgt_bij_een_drempel_met_niveau() -> None:
+    assert labels(uitkomst("rvz003_drempel_zonder_breedte.ttl", "RVZ-002")) == []
+
+
+def test_rvz002_verantwoordt_de_putten_zonder_drempel() -> None:
+    outcome = uitkomst("rvz002_overstort_zonder_drempel.ttl", "RVZ-002")
+
+    assert outcome.examined == 1
+    assert any("zonder enig `Overstortdrempel`-onderdeel" in note for note in outcome.notes), (
+        outcome.notes
+    )
+    assert any("Overstortput_Overstortdrempel_card" in note for note in outcome.notes)
 
 
 def test_rvz011_meldt_de_waking() -> None:

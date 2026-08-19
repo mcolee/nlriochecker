@@ -7,7 +7,9 @@ docs/beslislog.md): overstorten staan er als `Overstortput` met een
 `Overstortleiding` eraan. Losse `Overstortdrempel`-onderdelen met `Drempelniveau`
 en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel
 kent. Deze module leest daarom beide vormen, en meldt in de toelichting welke ze in
-deze dataset heeft aangetroffen.
+deze dataset heeft aangetroffen. RVZ-002 en RVZ-003 melden dat per overstortput: een
+put zonder geregistreerd drempelniveau of zonder geregistreerde drempelbreedte, ook
+als het drempelonderdeel zelf ontbreekt.
 
 Een *externe* overstort loost op oppervlaktewater en heeft een overstortleiding naar
 buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put.
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import ClassVar
 
 from nlriochecker.checks.base import (
     Check,
@@ -235,6 +238,96 @@ class RandvoorzieningNietAangesloten(Check):
     def examined(self, context: CheckContext) -> int:
         """Het aantal randvoorzieningen."""
         return len(overstortputten(context)) + len(bergbezinkvoorzieningen(context))
+
+
+class _OverstortZonderDrempelkenmerk(Check):
+    """Basis voor RVZ-002 en RVZ-003: een overstortput waarvan geen enkele drempel
+    het gevraagde kenmerk draagt -- ook als er helemaal geen drempelonderdeel is.
+
+    De nulmetingvorm `Overstortput_Overstortdrempel_card` meldt het ontbreken van het
+    onderdeel zelf al; die overlap is bewust (BO-26): het register vraagt naar de
+    geregistreerde waarde, en `toets` moet ook zonder `--shacl` iets zien.
+    """
+
+    kenmerk: ClassVar[str] = ""
+    omschrijving: ClassVar[str] = ""
+
+    def _waarde(self, drempel: Drempel) -> float | None:
+        """De waarde van het gevraagde kenmerk op deze drempel."""
+        raise NotImplementedError
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke overstortput zonder geregistreerd kenmerk op een van haar drempels."""
+        per_put = drempels_per_put(context)
+        for node in overstortputten(context):
+            groep = per_put.get(node.uri, [])
+            if any(self._waarde(drempel) is not None for drempel in groep):
+                continue
+            if groep:
+                tekst = (
+                    f"Geen van de {len(groep)} overstortdrempels van deze put heeft een "
+                    f"geregistreerd {self.omschrijving} (`{self.kenmerk}`)."
+                )
+            else:
+                tekst = (
+                    "Deze overstortput heeft geen enkel `Overstortdrempel`-onderdeel, en dus "
+                    f"ook geen {self.omschrijving}."
+                )
+            yield self.finding(context, node.uri, node.label, tekst, drempels=len(groep))
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Zegt hoeveel putten geen drempel hebben en dat de nulmeting dat ook meldt."""
+        per_put = drempels_per_put(context)
+        putten = overstortputten(context)
+        zonder = sum(1 for node in putten if not per_put.get(node.uri))
+        notities = [
+            f"Bekeken zijn de {len(putten)} overstortputten "
+            f"({', '.join(context.config.klassen.overstortput)})."
+        ]
+        if zonder:
+            notities.append(
+                f"{zonder} daarvan staan zonder enig `Overstortdrempel`-onderdeel geregistreerd; "
+                "de nulmetingvorm `Overstortput_Overstortdrempel_card` meldt dat ook. De "
+                "overlap is bewust: deze check toetst de geregistreerde waarde en werkt ook "
+                "zonder nulmeting."
+            )
+        return notities
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal overstortputten."""
+        return len(overstortputten(context))
+
+
+@register
+class OverstortZonderDrempelniveau(_OverstortZonderDrempelkenmerk):
+    """RVZ-002: overstortput zonder geregistreerd drempelniveau."""
+
+    id = "RVZ-002"
+    title = "Overstort zonder geregistreerde drempelhoogte"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    kenmerk = "Drempelniveau"
+    omschrijving = "drempelniveau"
+
+    def _waarde(self, drempel: Drempel) -> float | None:
+        """Het geregistreerde drempelniveau."""
+        return drempel.niveau
+
+
+@register
+class OverstortZonderDrempelbreedte(_OverstortZonderDrempelkenmerk):
+    """RVZ-003: overstortput zonder geregistreerde drempelbreedte."""
+
+    id = "RVZ-003"
+    title = "Overstort zonder geregistreerde drempelbreedte"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    kenmerk = "Drempelbreedte"
+    omschrijving = "drempelbreedte"
+
+    def _waarde(self, drempel: Drempel) -> float | None:
+        """De geregistreerde drempelbreedte."""
+        return drempel.breedte
 
 
 @register
