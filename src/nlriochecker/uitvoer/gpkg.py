@@ -838,6 +838,25 @@ def _metadata(run: CheckRun, run_datum: date) -> tuple[str, str, str]:
 # daarom in de meldingentabel staan.
 STAPEL_RASTER_M = 0.001
 
+# De kolommen van `overzicht_checks`, het dashboard met een rij per check. Op
+# moduleniveau en niet in de schrijver, net als `MELDING_KOLOMMEN`: buiten deze
+# package leest `scripts/steekproef.py` deze tabel op naam, en een drifttest daar kan
+# alleen tegen een lijst beweren die te noemen valt.
+OVERZICHT_KOLOMMEN = [
+    _Kolom("check_id", "text"),
+    _Kolom("omschrijving", "text"),
+    _Kolom("bron", "text"),
+    _Kolom("ernst", "text"),
+    _Kolom("categorie", "text"),
+    _Kolom("dimensie", "text"),
+    _Kolom("aantal_meldingen", "integer"),
+    _Kolom("bekeken", "integer"),
+    _Kolom("percentage_populatie", "real"),
+    _Kolom("systemisch", "integer"),
+    _Kolom("aantal_gebieden", "integer"),
+    _Kolom("skelet", "text"),
+]
+
 MELDING_KOLOMMEN = [
     _Kolom("melding_id", "text"),
     _Kolom("feature_id", "text"),
@@ -964,20 +983,7 @@ def _schrijf_overzicht(
     Ook de skeletchecks staan erin. Een check die ontbreekt leest als een check
     zonder problemen, en dat is precies het misverstand dat dit project vermijdt.
     """
-    kolommen = [
-        _Kolom("check_id", "text"),
-        _Kolom("omschrijving", "text"),
-        _Kolom("bron", "text"),
-        _Kolom("ernst", "text"),
-        _Kolom("categorie", "text"),
-        _Kolom("dimensie", "text"),
-        _Kolom("aantal_meldingen", "integer"),
-        _Kolom("bekeken", "integer"),
-        _Kolom("percentage_populatie", "real"),
-        _Kolom("systemisch", "integer"),
-        _Kolom("aantal_gebieden", "integer"),
-        _Kolom("skelet", "text"),
-    ]
+    kolommen = OVERZICHT_KOLOMMEN
     _maak_attribuuttabel(
         verbinding, "overzicht_checks", kolommen, "Een rij per check: het dashboard."
     )

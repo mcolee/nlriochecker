@@ -123,6 +123,25 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **`scripts/steekproef.py`** trekt uit de GeoPackage van een `toets`-run een
+  gemeentebrede steekproef van tien bevindingen per eigen check, om elke check met de
+  hand na te kunnen lopen. De trekking spreidt over een vast grid van 1000 m, zodat de
+  tien niet in een straat klonteren, en is reproduceerbaar via een seed per check. De
+  bron is de GeoPackage van de run zelf -- de tabel `meldingen`, het dashboard
+  `overzicht_checks` en de lagen `putten` en `strengen`, waarvan de geometrie als blob
+  wordt overgenomen -- dus kan de steekproef niet afwijken van de run die hij
+  bemonstert, en hoeft de dataset er niet voor ingelezen te worden. Alleen
+  `bron = 'register'`: de nulmeting blijft erbuiten. Het bestand draagt de lagen
+  `steekproef_putten`, `steekproef_strengen` en `steekproef_locaties` (de foutlocatie
+  van elke getrokken melding), de tabel `steekproef_dekking` met een rij per eigen
+  check -- ook de checks zonder bevindingen, met de reden erbij -- en `steekproef_run`
+  met de herkomst en de trekkingsinstellingen. Elke rij heeft lege kolommen `oordeel`
+  en `opmerking` om het handmatige oordeel in QGIS in te vullen. Een doelbestand dat
+  de bron zelf is wordt geweigerd -- een typefout in `--uit` zou anders een run van
+  minuten wissen -- en twee drifttests houden de kolomnamen die het script leest vast
+  aan `MELDING_KOLOMMEN` en `OVERZICHT_KOLOMMEN` in `uitvoer/gpkg.py`. Die tweede lijst
+  staat daarvoor nu op moduleniveau in plaats van in de schrijver.
+
 - De SHACL-nulmetingovertredingen komen als meldingen in alle vier de uitvoervormen
   terecht, uit dezelfde meldingenstroom als de eigen checks: `Bron = nulmeting`,
   `Categorie = NULMETING`, check-ID `NULMETING-<SHACL-vorm>`, dimensie `Compliance`.
