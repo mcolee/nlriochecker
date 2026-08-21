@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
 
-from nlriochecker.checkconfig import default_check_config_path, load_check_config
+from nlriochecker.checkconfig import (
+    CheckThresholds,
+    default_check_config_path,
+    load_check_config,
+)
 from nlriochecker.errors import ConfigError
+
+PROJECTCONFIG = Path(__file__).resolve().parents[1] / "configs" / "dewoldenhoogeveen.toml"
 
 
 def test_standaardconfig_laadt() -> None:
@@ -129,6 +136,31 @@ def test_rapportinstellingen_hebben_bruikbare_defaults() -> None:
 def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
     """Een fout op een overstort weegt zwaarder dan een fout op een gewone put."""
     assert "Overstortput" in load_check_config().klassen.kritiek
+
+
+@pytest.mark.parametrize(
+    ("pad", "herkomst"),
+    [
+        (default_check_config_path(), "src/nlriochecker/checks.toml"),
+        (PROJECTCONFIG, "configs/dewoldenhoogeveen.toml"),
+    ],
+)
+def test_elke_drempel_staat_expliciet_in_de_toml(pad: Path, herkomst: str) -> None:
+    """Issue #28: geen enkele drempel mag stilzwijgend op een Python-default vallen.
+
+    Vergelijkt de veldnamen van `CheckThresholds` met de sleutels die daadwerkelijk
+    onder `[drempels]` in het bestand staan (via `tomllib`, niet via de geladen
+    `CheckConfig` -- die vult ontbrekende velden juist met de default op en zou het
+    verschil verbergen). Een nieuw veld dat hier niet bij komt, of een hernoeming die
+    de TOML niet meekrijgt, maakt deze test rood.
+    """
+    verwacht = set(CheckThresholds.model_fields)
+    aanwezig = set(tomllib.loads(pad.read_text(encoding="utf-8"))["drempels"])
+
+    assert aanwezig == verwacht, (
+        f"{herkomst} [drempels] mist {verwacht - aanwezig} en/of draagt onbekende "
+        f"velden {aanwezig - verwacht}"
+    )
 
 
 def test_vulwaarden_uit_de_standaardconfig() -> None:

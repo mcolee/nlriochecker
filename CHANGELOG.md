@@ -121,6 +121,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   hetzelfde object" zegt daar niets. Het rapport meldt voortaan ook hoeveel
   nulmetingovertredingen buiten het studiegebied vielen.
 
+- **Alle 53 velden van `CheckThresholds` staan nu expliciet in `[drempels]`**, in zowel
+  `src/nlriochecker/checks.toml` als `configs/dewoldenhoogeveen.toml`, elk met zijn
+  huidige default en een commentaarregel over de betrokken check en de herkomst van het
+  getal (checkregister of projectkeuze). Voorheen droeg `[drempels]` er twee van de
+  drieënvijftig en vielen de overige stilzwijgend terug op de Python-default, onzichtbaar
+  voor wie het configbestand las. Geen enkele waarde is veranderd; een nieuwe drifttest
+  (`test_elke_drempel_staat_expliciet_in_de_toml` in `tests/test_checkconfig.py`) dwingt
+  af dat beide bestanden elk veld blijven dragen (issue #28).
+
 ### Toegevoegd
 
 - **`tests/test_gwsw_vocabulaire.py` bewaakt dat elke GWSW-naam die het pakket gebruikt
