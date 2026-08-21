@@ -13,6 +13,26 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **ATTR-010 noemt wat onwaarschijnlijk is in plaats van wat toegestaan is** (issue #43).
+  `[[leiding_put_materiaal]]` in `plausibiliteit.toml` draagt het veld
+  `onwaarschijnlijke_putmaterialen` in plaats van `verwachte_putmaterialen`. Een lijst met
+  verwachte materialen maakte van elk lid van `MateriaalPutColl` dat niemand had ingetypt
+  een bevinding: 26 van de 30 leden, waaronder `Gres`, `Klei`, `Staal` en `Asbestcement`.
+  Een gemeente die netjes volgens de GWSW-domeinlijst exporteerde kreeg daar een valse
+  waarschuwing op. Elke regel houdt precies de uitsluitingen die hij had: `GewapendBeton` en
+  `Metselwerk` verbieden alle acht kunststoffen uit `MateriaalPutColl`, `Beton` zes daarvan
+  (`PVC` en `PE` stonden op zijn oude lijst en blijven toegestaan). Op De Wolden verandert
+  er niets: ATTR-010 stond en staat op 0 bevindingen over dezelfde 11.969 vergeleken
+  strengen. Zie BO-36; wie een eigen `plausibiliteit.toml` meegeeft moet het veld hernoemen.
+
+### Toegevoegd
+
+- **ATTR-010 meldt wat hij niet vergeleken heeft.** De check heeft een `notes()` gekregen:
+  `examined` telt alle vrijvervalstrengen, maar vergeleken worden alleen de materialen die
+  in `[[leiding_put_materiaal]]` staan. Op De Wolden zijn dat er 5634 van de 17603 niet
+  (PVC 5376, zonder materiaal 227, Gres 31). Zonder die regel las "0 bevindingen op 17603
+  bekeken objecten" als een schone rekening voor het hele stelsel.
+
 - **`toets` weigert een run zonder `--ontologie`** (issue #33). Zonder
   klassenhierarchie typeert de OroX-export niets op wortelniveau en leveren `putten()`
   en `leidingen()` een lege verzameling; de checks draaien dan over een onvolledige

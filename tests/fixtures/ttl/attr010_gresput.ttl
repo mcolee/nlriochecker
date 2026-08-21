@@ -32,15 +32,15 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: gemetselde streng 1 komt uit op put B van PVC.
-# Het putmateriaal was hier `Kunststof`, een waarde die MateriaalPutColl niet kent:
-# de fixture toetste een export die niet kan bestaan (issue #43).
+# DEFECT: geen; een betonnen streng tussen twee gresputten. Gres is een legaal lid van
+# MateriaalPutColl en een gresput onder een betonnen riool is niets bijzonders.
+# De tegenhanger van attr010_materiaal_put.ttl.
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .
 :PutA gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
     [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
-    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Metselwerk ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Gres ] ,
     [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
 :PutA_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
@@ -53,7 +53,7 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
     gwsw:hasAspect :PutB_ori .
 :PutB gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
     [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
-    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:PVC ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Gres ] ,
     [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
 :PutB_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
@@ -64,12 +64,12 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
     gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] .
 :L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
     gwsw:hasAspect :L1_ori .
-:L1 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 400 ] ,
-    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 600 ] ,
-    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Metselwerk ] ,
-    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Eivormig ] ,
+:L1 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
     [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] ,
-    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1930-01-01"^^xsd:date ] .
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date ] .
 :L1_ori rdf:type gwsw:Leidingorientatie ;
     gwsw:hasPart :L1_b , :L1_e ;
     gwsw:hasAspect [ rdf:type gwsw:Lijn ;

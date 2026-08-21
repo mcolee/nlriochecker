@@ -627,9 +627,11 @@ FIXTURES["attr009_lengte_wijkt_af.ttl"] = (
 )
 
 FIXTURES["attr010_materiaal_put.ttl"] = (
-    "gemetselde streng 1 komt uit op put B van kunststof",
+    "gemetselde streng 1 komt uit op put B van PVC.\n"
+    "# Het putmateriaal was hier `Kunststof`, een waarde die MateriaalPutColl niet kent:\n"
+    "# de fixture toetste een export die niet kan bestaan (issue #43).",
     nette_put("PutA", "A", *A, MateriaalPut_ref="Metselwerk")
-    + nette_put("PutB", "B", *B, MateriaalPut_ref="Kunststof")
+    + nette_put("PutB", "B", *B, MateriaalPut_ref="PVC")
     + nette_leiding(
         "L1",
         "1",
@@ -644,6 +646,15 @@ FIXTURES["attr010_materiaal_put.ttl"] = (
             "Begindatum": "1930-01-01",
         },
     ),
+)
+
+FIXTURES["attr010_gresput.ttl"] = (
+    "geen; een betonnen streng tussen twee gresputten. Gres is een legaal lid van\n"
+    "# MateriaalPutColl en een gresput onder een betonnen riool is niets bijzonders.\n"
+    "# De tegenhanger van attr010_materiaal_put.ttl.",
+    nette_put("PutA", "A", *A, MateriaalPut_ref="Gres")
+    + nette_put("PutB", "B", *B, MateriaalPut_ref="Gres")
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
 )
 
 FIXTURES["attr012_metselwerk_rond.ttl"] = (

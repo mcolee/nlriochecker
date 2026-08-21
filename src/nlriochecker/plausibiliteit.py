@@ -53,12 +53,17 @@ class MaterialShape(BaseModel):
 
 
 class ConduitManholeMaterial(BaseModel):
-    """ATTR-010: welk putmateriaal bij een leidingmateriaal past."""
+    """ATTR-010: welk putmateriaal onwaarschijnlijk is bij een leidingmateriaal.
+
+    De tabel noemt het verbod en niet de toestemming. Een lijst met verwachte
+    materialen maakt van elk lid van `MateriaalPutColl` dat niemand heeft ingetypt
+    een bevinding, en dat waren er 26 van de 30 (issue #43).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     leidingmateriaal: str
-    verwachte_putmaterialen: list[str] = Field(min_length=1)
+    onwaarschijnlijke_putmaterialen: list[str] = Field(min_length=1)
     toelichting: str = ""
 
 

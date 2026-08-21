@@ -111,13 +111,13 @@ BEKENDE_AFWIJKINGEN: dict[tuple[str, str], str] = {
         "laten staan als vooruitloop op een latere GWSW-versie is een open vraag; besluit "
         "bij de auteur, zie vraag 1 van issue #47."
     ),
-    ("Metselwerk", "MateriaalPutColl"): (
-        "zit in MateriaalLeidingColl en niet in MateriaalPutColl, maar De Wolden schrijft "
-        "gwsw:Metselwerk feitelijk op 33 putten, en de SHACL-nulmeting meldt dat al (33 keer "
-        "per CFK als MateriaalPut_ref). Een bewuste, tijdelijke afwijking van 'GWSW is "
-        "leidend'; zie BO-35 en vraag 2 van issue #47."
-    ),
 }
+# `("Metselwerk", "MateriaalPutColl")` stond hier tot issue #43. Die afwijking heeft geen
+# drager meer: `[[leiding_put_materiaal]]` noemt sinds de omkering alleen nog
+# onwaarschijnlijke putmaterialen, en `Metselwerk` staat op geen van die twee lijsten.
+# Dat is geen antwoord op vraag 2 van issue #47 -- de 33 gemetselde putten van De Wolden
+# werden ook voorheen niet gemeld -- maar het pakket claimt niet langer dat `Metselwerk`
+# een putmateriaal is. Zie BO-35 en BO-36.
 
 
 @dataclass(frozen=True)
@@ -255,10 +255,10 @@ def _termen_uit_plausibiliteit() -> list[Term]:
             Term(
                 naam,
                 f"plausibiliteit.toml [[leiding_put_materiaal]] "
-                f"{regel.leidingmateriaal}.verwachte_putmaterialen",
+                f"{regel.leidingmateriaal}.onwaarschijnlijke_putmaterialen",
                 "MateriaalPutColl",
             )
-            for naam in regel.verwachte_putmaterialen
+            for naam in regel.onwaarschijnlijke_putmaterialen
         ]
     termen += [
         Term(regel.vorm, "plausibiliteit.toml [[vorm_afmeting]]", "VormLeidingColl")
@@ -441,7 +441,10 @@ BRONSENTINELS: tuple[tuple[str, str], ...] = (
     ("plausibiliteit.toml [[materiaal_diameter]]", "Beton"),
     ("plausibiliteit.toml [[materiaal_aanlegjaar]]", "PVC"),
     ("plausibiliteit.toml [[materiaal_vorm]]", "PVC"),
-    ("plausibiliteit.toml [[leiding_put_materiaal]]", "Beton"),
+    # Een naam die alleen aan de leidingkant staat: `PVC` en `PE` staan sinds issue #43
+    # in `onwaarschijnlijke_putmaterialen` en zouden deze sentinel ook groen houden als
+    # de leidingkant wegviel.
+    ("plausibiliteit.toml [[leiding_put_materiaal]]", "GewapendBeton"),
     ("plausibiliteit.toml [[vorm_afmeting]]", "Rond"),
     ("symbolen.py PUNTSYMBOLEN", "Inspectieput"),
     ("symbolen.py LIJNSYMBOLEN", "Drain"),

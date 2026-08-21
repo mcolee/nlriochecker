@@ -8,6 +8,7 @@ haar toelichting hoeveel strengen daardoor buiten beeld bleven.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterator
 from datetime import date
 
@@ -536,19 +537,44 @@ class LeidingmateriaalPastNietBijPut(_StrengCheck):
                 continue
             for node in putten_van(context, conduit):
                 putmateriaal = node.reference("MateriaalPut") or node.reference("MateriaalBouwwerk")
-                if putmateriaal is None or putmateriaal in regel.verwachte_putmaterialen:
+                onwaarschijnlijk = regel.onwaarschijnlijke_putmaterialen
+                if putmateriaal is None or putmateriaal not in onwaarschijnlijk:
                     continue
                 yield self.finding(
                     context,
                     conduit.uri,
                     conduit.label,
                     f"Leidingmateriaal {conduit.materiaal} op put {node.label!r} van "
-                    f"{putmateriaal}; verwacht wordt {', '.join(regel.verwachte_putmaterialen)}. "
+                    f"{putmateriaal}; dat putmateriaal is daar onwaarschijnlijk. "
                     f"{regel.toelichting}".strip(),
                     materiaal=conduit.materiaal,
                     putmateriaal=putmateriaal,
                     put=node.label,
                 )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt hoeveel strengen geen regel in de tabel hebben en dus ongemoeid bleven.
+
+        `examined` telt alle vrijvervalstrengen, maar vergeleken worden alleen de
+        materialen die in `[[leiding_put_materiaal]]` staan. Zonder deze regel leest
+        "0 bevindingen op 17.603 bekeken objecten" als een schone rekening voor het
+        hele stelsel, terwijl de tabel er misschien maar een handvol van aanraakt.
+        """
+        tabel = context.plausibiliteit
+        strengen = vrijvervalrioolleidingen(context)
+        zonder = Counter(
+            conduit.materiaal or "zonder materiaal"
+            for conduit in strengen
+            if tabel.putmateriaal(conduit.materiaal) is None
+        )
+        if not zonder:
+            return []
+        verdeling = ", ".join(f"{naam} {aantal}" for naam, aantal in zonder.most_common())
+        return [
+            f"{sum(zonder.values())} van de {len(strengen)} strengen dragen een "
+            f"leidingmateriaal waarvoor de tabel geen regel heeft en zijn niet "
+            f"vergeleken ({verdeling})."
+        ]
 
 
 @register

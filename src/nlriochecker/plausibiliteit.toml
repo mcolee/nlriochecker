@@ -136,35 +136,65 @@ toegestane_vormen = ["Rond", "Eivormig"]
 # ATTR-010: leidingmateriaal beton of metselwerk terwijl het putmateriaal daar
 # niet bij past (W, Plausibiliteit).
 #
-# `Metselwerk` blijft voorlopig staan, hoewel de collectie MateriaalPutColl hem niet
-# kent (die heeft MetselwerkBaksteen, MetselwerkBepleisterd en MetselwerkOnbepleisterd).
-# De Wolden schrijft `gwsw:Metselwerk` feitelijk op 33 putten; dat de export buiten de
-# domeinlijst valt meldt de SHACL-nulmeting al (33 keer `MateriaalPut_ref` per CFK).
-# Dit is een bewuste, tijdelijke afwijking van "GWSW is leidend" en staat als BO-35 in
-# docs/beslislog.md; de vraag of deze tabel de export volgt of de domeinlijst ligt bij
-# de auteur, als vraag 2 van issue #47.
+# De tabel noemt wat onwaarschijnlijk is, niet wat toegestaan is. Andersom stond hij
+# tot issue #43, en dan is elk lid van MateriaalPutColl dat niemand heeft ingetypt een
+# bevinding: 26 van de 30 leden, waaronder Gres, Klei, Staal en Asbestcement. Een
+# gemeente die netjes volgens de domeinlijst exporteert kreeg daar een valse ATTR-010
+# op. Een verbodslijst onderhoudt zichzelf: een nieuwe klasse in een volgende
+# GWSW-versie meldt niets tot iemand besluit dat ze onwaarschijnlijk is.
 #
-# `Kunststof` stond hier wel en is weg: die waarde bestaat, maar in
-# MateriaalAfsluiterColl, MaterialOfStepsColl en Uitvoering -- niet in
-# MateriaalPutColl, dus geen enkele legale export schrijft hem op een put. Er is niets
-# voor in de plaats gekomen: PVC en PE stonden hier al. Die twee dekken de kunststofrol
-# maar deels, want MateriaalPutColl kent daarnaast HDPE, GVK, Polyester, Polypropyleen,
-# PitchFibre en UnidentifiedTypeOfPlastics, en geen van die zes staat hieronder. Een
-# export die keurig HDPE op een put schrijft krijgt dus nog steeds een ATTR-010 die er
-# niet hoort te zijn. Dat gat staat als issue #43; ze toevoegen verandert gedrag en is
-# een beslissing voor de auteur.
+# De acht kunststoffen hieronder zijn de leden van MateriaalPutColl die een put in zijn
+# geheel van kunststof maken. Epoxy en Bitumen staan er bewust niet bij: dat zijn
+# coatings, en juist op een gerenoveerde gemetselde put -- ze verbieden zou vals alarm
+# geven op precies de oude riolen waar deze check over gaat.
+#
+# `Beton` verbiedt er zes van de acht: PVC en PE stonden op zijn oude lijst met verwachte
+# putmaterialen en blijven dus toegestaan. Dat is geen nieuw domeinoordeel maar de
+# bestaande tolerantie, ongewijzigd overgenomen -- De Wolden telt 361 PVC-putten, vrijwel
+# alle onder betonnen strengen. Of een kunststof put onder een betonnen streng uberhaupt
+# een waarschuwing verdient is een vraag met een bron nodig; die hoort bij issue #20.
+#
+# `Metselwerk` staat hiermee niet langer als putmateriaal in dit bestand; de tolerantie
+# uit BO-35 heeft geen drager meer. Dat is geen antwoord op vraag 2 van issue #47 -- op
+# de data verandert er niets, de 33 gemetselde putten van De Wolden werden ook voorheen
+# niet gemeld -- maar de afwijking van "GWSW is leidend" is er wel mee vervallen.
+#
+# `Kunststof` stond hier ooit en is weg: die waarde bestaat, maar in
+# MateriaalAfsluiterColl, MaterialOfStepsColl en Uitvoering -- niet in MateriaalPutColl,
+# dus geen enkele legale export schrijft hem op een put.
+#
+# Het `toelichting`-veld gaat mee in de meldingstekst; het legt aan de lezer van een
+# bevinding uit waarom de combinatie ongewoon is. De herkomst van een regel hoort hier
+# in het commentaar en niet daar.
+#
+# Wat deze tabel NIET dekt: MateriaalLeidingColl kent naast `Metselwerk` ook
+# MetselwerkBaksteen, MetselwerkBepleisterd en MetselwerkOnbepleisterd, en naast `Beton`
+# ook BetonnenSegmenten, GespotenBeton en VoorgespannenBeton. Geen van die zes heeft een
+# regel, en de vergelijking is exact op naam, dus een export die ze netjes schrijft komt
+# ATTR-010 helemaal niet tegen. Dat is hetzelfde gat als issue #43 beschreef, op de
+# leidingkant. Zes bijna gelijke regels erbij is geen goede reparatie; die vraagt een
+# veld `leidingmaterialen` (meervoud), en dat is een uitbreiding voor de auteur.
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "Beton"
-verwachte_putmaterialen = ["Beton", "GewapendBeton", "Metselwerk", "PVC", "PE"]
+onwaarschijnlijke_putmaterialen = [
+    "HDPE", "GVK", "Polyester", "Polypropyleen", "PitchFibre",
+    "UnidentifiedTypeOfPlastics",
+]
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "GewapendBeton"
-verwachte_putmaterialen = ["Beton", "GewapendBeton", "Metselwerk"]
+onwaarschijnlijke_putmaterialen = [
+    "PVC", "PE", "HDPE", "GVK", "Polyester", "Polypropyleen", "PitchFibre",
+    "UnidentifiedTypeOfPlastics",
+]
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "Metselwerk"
-verwachte_putmaterialen = ["Metselwerk", "Beton", "GewapendBeton"]
+onwaarschijnlijke_putmaterialen = [
+    "PVC", "PE", "HDPE", "GVK", "Polyester", "Polypropyleen", "PitchFibre",
+    "UnidentifiedTypeOfPlastics",
+]
 toelichting = "Een gemetselde streng op een kunststof put is bouwhistorisch onmogelijk."
 
 # ATTR-004: vorm versus afmetingen (F, Consistentie). Een regel zegt wat er bij

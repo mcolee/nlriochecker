@@ -1945,3 +1945,76 @@ beslist te worden.
 **Wat dit besluit niet is.** Geen uitspraak dat `Metselwerk` niet bestaat: hij bestaat, als
 leidingmateriaal, en op de leidingkant van dezelfde tabel staat hij volkomen terecht. De
 afwijking zit uitsluitend in het gebruik als *put*materiaal.
+
+**Nagekomen (BO-36, issue #43).** De tolerantie heeft geen drager meer. De tabel noemt sinds
+de omkering alleen nog onwaarschijnlijke putmaterialen, en `Metselwerk` staat op geen van
+die twee lijsten; de regel op `BEKENDE_AFWIJKINGEN` is daarmee vervallen. Dat is géén
+antwoord op vraag 2 van #47 -- de 33 gemetselde putten van De Wolden werden voorheen niet
+gemeld en worden dat nu evenmin -- maar het pakket claimt niet langer dat `Metselwerk` een
+putmateriaal is, en dat was de afwijking van "GWSW is leidend".
+
+### BO-36 ATTR-010 noemt wat onwaarschijnlijk is, niet wat toegestaan is
+
+**Wat.** `[[leiding_put_materiaal]]` in `src/nlriochecker/plausibiliteit.toml` heeft geen
+veld `verwachte_putmaterialen` meer maar `onwaarschijnlijke_putmaterialen`, en de conditie
+in `checks/attributen.py` is meegedraaid. Er zijn nog twee regels in plaats van drie:
+`GewapendBeton` en `Metselwerk`, elk met dezelfde acht kunststoffen uit `MateriaalPutColl`
+(`PVC`, `PE`, `HDPE`, `GVK`, `Polyester`, `Polypropyleen`, `PitchFibre`,
+`UnidentifiedTypeOfPlastics`).
+
+**Waarom.** Een lijst met *verwachte* materialen maakt van elk lid van `MateriaalPutColl`
+dat niemand heeft ingetypt een bevinding. Dat waren er 26 van de 30 -- issue #43 telde er
+negen, maar `Gres`, `Klei`, `Staal`, `Asbestcement`, `Vezelcement`, de drie gietijzers en
+nog negen andere ontbraken net zo goed. Een gemeente die netjes volgens de GWSW-domeinlijst
+exporteert kreeg daar een valse W op, en dat is de omgekeerde wereld van "GWSW is leidend".
+De verbodsvorm zegt bovendien wat de check werkelijk bedoelt: de enige toelichting die het
+blok ooit droeg was *"Een gemetselde streng op een kunststof put is bouwhistorisch
+onmogelijk."* Een verbodslijst onderhoudt zichzelf ook: een nieuwe klasse in een volgende
+GWSW-versie meldt niets tot iemand besluit dat ze onwaarschijnlijk is.
+
+**Drie keuzes binnen de omkering.**
+
+- **Elke regel houdt precies de uitsluitingen die hij had.** De omkering is bedoeld om
+  valse positieven weg te nemen, niet om bestaande meldingen te laten vervallen. `Beton`
+  verbiedt daarom zes van de acht kunststoffen: `PVC` en `PE` stonden op zijn oude lijst
+  met verwachte putmaterialen en blijven toegestaan. `GewapendBeton` en `Metselwerk`
+  verbieden alle acht, want die stonden op geen van beide oude lijsten.
+- **`Epoxy` en `Bitumen` staan niet op de verbodslijst**, hoewel het kunststoffen zijn. Dat
+  zijn coatings, en juist op een gerenoveerde gemetselde put; ze verbieden zou vals alarm
+  geven op precies de oude riolen waar deze check over gaat.
+- **ATTR-010 heeft een `notes()` gekregen.** `examined` telt alle vrijvervalstrengen, maar
+  vergeleken worden alleen de materialen die in de tabel staan. Zonder die regel leest "0
+  bevindingen op 17.603 bekeken objecten" als een schone rekening voor het hele stelsel.
+  Op De Wolden meldt hij nu: *5634 van de 17603 strengen dragen een leidingmateriaal
+  waarvoor de tabel geen regel heeft en zijn niet vergeleken (PVC 5376, zonder materiaal
+  227, Gres 31).* Dat is de huisregel uit `CLAUDE.md` -- wat een check niet bekeken heeft
+  hoort in het rapport -- en hij was hier niet nagekomen.
+
+**Gemeten.** ATTR-010 stond op De Wolden op 0 bevindingen en staat er na de omkering nog
+steeds op 0, over dezelfde 11.969 vergeleken strengen (volledige export,
+`Ontologie_GWSW_Totaal.ttl`, alleen ATTR-010). Het gedrag op deze dataset verandert dus
+niet; wat verandert is wat een andere, correcte export krijgt.
+
+**Wat deze BO niet repareert.** De leidingkant van de tabel is nog steeds een whitelist, en
+de vergelijking is exact op naam. `MateriaalLeidingColl` kent naast `Metselwerk` ook
+`MetselwerkBaksteen`, `MetselwerkBepleisterd` en `MetselwerkOnbepleisterd`, en naast `Beton`
+ook `BetonnenSegmenten`, `GespotenBeton` en `VoorgespannenBeton`; geen van die zes heeft een
+regel. Een export die ze netjes schrijft komt ATTR-010 dus helemaal niet tegen. Dat is
+hetzelfde gat als #43 beschreef, op de andere as. Zes bijna gelijke regels erbij is geen
+goede reparatie -- dat vraagt een veld `leidingmaterialen` (meervoud) -- en het is dus een
+uitbreiding voor de auteur, niet iets om er stilzwijgend bij te doen. De `notes()` hierboven
+maakt het gat vanaf nu zichtbaar in elk rapport.
+
+**Bijvangst.** De enige fixture van ATTR-010 gaf de put `gwsw:Kunststof` als materiaal --
+een waarde die `MateriaalPutColl` niet kent. De fixture toetste dus een export die niet kan
+bestaan; hij draagt nu `PVC`. Er is een tegenhanger bij gekomen
+(`attr010_gresput.ttl`): een betonnen streng tussen twee gresputten, die zwijgt.
+
+**Alternatieven.** De negen klassen uit #43 toevoegen (verworpen: laat zeventien andere
+gaten open en herhaalt de fout bij elke volgende GWSW-versie). De whitelist compleet maken
+tegen `MateriaalPutColl` met een drifttest erop (verworpen: drie lijsten van ruim twintig
+namen die de eigenlijke regel -- geen kunststof onder metselwerk -- juist onzichtbaar
+maken). De `Beton`-regel helemaal schrappen omdat hij `PVC` en `PE` toestond (verworpen in
+de codereview, en terecht: die redenering stelt "kunststof" gelijk aan "PVC en PE", precies
+de denkfout die #43 aanwees. `MateriaalPutColl` kent zes andere kunststoffen, en de check
+zou van 11.969 naar 8 vergeleken strengen zijn gevallen zonder dat het rapport dat zei).

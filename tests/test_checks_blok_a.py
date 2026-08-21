@@ -18,6 +18,7 @@ from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.verbanden import deelstelsel_ids
 from nlriochecker.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
+from nlriochecker.plausibiliteit import load_plausibility
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -184,6 +185,25 @@ def test_muilprofiel_heet_muil_in_de_ontologie() -> None:
     """
     assert labels(uitkomst("attr004_muil_te_hoog.ttl", "ATTR-012")) == []
     assert labels(uitkomst("attr004_muil_te_hoog.ttl", "ATTR-004")) == ["1"]
+
+
+def test_attr010_meldt_alleen_de_kunststofput_en_niet_elk_ander_materiaal() -> None:
+    """De tabel noemt wat onwaarschijnlijk is, niet wat toegestaan is (issue #43).
+
+    Zolang `[[leiding_put_materiaal]]` de verwachte putmaterialen opsomde, gold elk
+    lid van `MateriaalPutColl` dat niemand had ingetypt als bevinding -- 26 van de 30
+    leden, waaronder `Gres`. Een gemeente die netjes volgens de domeinlijst
+    exporteert kreeg daar een valse ATTR-010 op. Beide kanten staan hier: de
+    kunststof put onder een gemetselde streng blijft melden, de gresput onder een
+    betonnen streng zwijgt.
+
+    De eerste assertie is de bewaker van de tweede. Zonder regel voor `Beton` stopt
+    `run()` al vóór het putmateriaal, en dan zwijgt de gresput om de verkeerde reden:
+    de test zou groen blijven ook als de tabel morgen weer een whitelist werd.
+    """
+    assert load_plausibility().putmateriaal("Beton") is not None
+    assert labels(uitkomst("attr010_materiaal_put.ttl", "ATTR-010")) == ["1"]
+    assert labels(uitkomst("attr010_gresput.ttl", "ATTR-010")) == []
 
 
 def test_attr013_meldt_een_keer_per_object_met_de_kenmerken() -> None:
