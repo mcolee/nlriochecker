@@ -82,6 +82,13 @@ RELATIE_STERKTE = ("binnen", "kruist", "nabij")
 # "in orde", en dat is het niet.
 REDEN_MECHANISCH = "mechanisch riool, dat de meeste checks overslaan"
 REDEN_SCHIL = "ligt naast het studiegebied en niet erin"
+# Deze reden geldt niet voor een object maar voor de hele run: zonder klassenhierarchie
+# heeft de lader knopen en strengen op geometrie herkend en draaiden de checks over een
+# onvolledige selectie. Groen zou hier "beoordeeld en niets gevonden" beweren, terwijl
+# er niets beoordeeld is; grijs is precies de waarde die dat zegt.
+REDEN_GEEN_KLASSENHIERARCHIE = (
+    "deze run kende de klassenhierarchie niet; de checks draaiden over een onvolledige selectie"
+)
 
 RD_WKT = (
     'PROJCS["Amersfoort / RD New",GEOGCS["Amersfoort",DATUM["Amersfoort",'
@@ -413,6 +420,12 @@ def _schrijf_features(
     daar niets ligt, en een lege mechanische laag zou als "geen mechanisch riool
     aanwezig" lezen.
 
+    Kende de run de klassenhierarchie niet, dan geldt dat voor *elk* object: de checks
+    hebben dan over een onvolledige selectie gedraaid en er valt niets te beoordelen.
+    De hele kaart wordt dan grijs waar zij anders groen was. Het voorbehoud staat ook
+    in `gwsw_run`, maar dat is een metadatatabel die niemand in QGIS openslaat, en een
+    groene kaart eronder zou het tegenovergestelde uitstralen.
+
     De grijze context is `Analyseset.buffer`: de objecten die binnen de buffer om het
     gebied liggen. Niet de hele schil -- daar hoort ook de samenhangende
     vrijvervalcomponent bij, en die kan in een stad het halve net zijn, zodat elk
@@ -443,6 +456,7 @@ def _schrijf_features(
     config = run.config if run.config is not None else load_check_config()
     mechanisch = _mechanische_uris(run, config)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
+    geen_hierarchie = not run.dataset.klassenhierarchie_bekend
 
     tellingen: dict[str, int] = {}
     mechanisch_geschreven = 0
@@ -465,7 +479,7 @@ def _schrijf_features(
             richting, verval = (
                 _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
             )
-            reden = _reden_niet_beoordeeld(uri, binnen, mechanisch)
+            reden = _reden_niet_beoordeeld(uri, binnen, mechanisch, geen_hierarchie)
             if uri in mechanisch:
                 mechanisch_geschreven += 1
             rijen.append(
@@ -506,7 +520,10 @@ def _schrijf_features(
 
 
 def _reden_niet_beoordeeld(
-    uri: str, binnen: frozenset[str] | None, mechanisch: frozenset[str]
+    uri: str,
+    binnen: frozenset[str] | None,
+    mechanisch: frozenset[str],
+    geen_klassenhierarchie: bool = False,
 ) -> str:
     """Waarom dit object buiten de beoordeling viel, of leeg als het erbinnen lag.
 
@@ -514,11 +531,18 @@ def _reden_niet_beoordeeld(
     ook binnen de kern, en dat is de scherpere reden om te noemen. De reden staat er
     ook als het object toch een melding draagt -- dan is het niet grijs maar wel maar
     deels beoordeeld, en de popup zegt dat.
+
+    Het runbrede voorbehoud komt achteraan, en juist omdat het voor elk object geldt:
+    het staat al in `gwsw_run` en boven het rapport, terwijl "mechanisch" en "schil"
+    dit ene object van zijn buren onderscheiden. Voor de status maakt de volgorde niet
+    uit -- elke reden zet hem op grijs zolang er niets op het object staat.
     """
     if uri in mechanisch:
         return REDEN_MECHANISCH
     if binnen is not None and uri not in binnen:
         return REDEN_SCHIL
+    if geen_klassenhierarchie:
+        return REDEN_GEEN_KLASSENHIERARCHIE
     return ""
 
 

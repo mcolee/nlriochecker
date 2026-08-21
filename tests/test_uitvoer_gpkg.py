@@ -801,6 +801,50 @@ class TestStatusEnPopup:
         # fixture hoort meer dan een status op te leveren.
         assert len(waarden) > 1
 
+    def test_zonder_klassenhierarchie_kleurt_de_kaart_niet_groen(self, tmp_path: Path) -> None:
+        """Groen betekent hier "beoordeeld en niets gevonden"; dat mag dan niet.
+
+        Zonder de subklassen van Knooppunt en Verbinding heeft de lader knopen en
+        strengen op geometrie herkend en draaiden de checks over een onvolledige
+        selectie. Het voorbehoud staat wel in `gwsw_run`, maar dat is een
+        metadatatabel die niemand in QGIS openslaat -- terwijl de kaart eronder de
+        tegenovergestelde boodschap uitstraalt. Grijs is precies de waarde die "niet
+        beoordeeld en niets gevonden" zegt.
+
+        De eerste helft is de tegenproef: dezelfde fixture *met* haar hierarchie levert
+        wel degelijk groen op, dus deze test kan werkelijk falen.
+        """
+        bron = TTL_DIR / "schoon.ttl"
+        kaal = tmp_path / "zonder_wortels.ttl"
+        kaal.write_text(
+            "\n".join(
+                regel
+                for regel in bron.read_text(encoding="utf-8").splitlines()
+                if "subClassOf gwsw:Knooppunt" not in regel
+                and "subClassOf gwsw:Verbinding" not in regel
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        met = _schrijf(_run("schoon.ttl"), tmp_path / "met")
+        zonder = load_dataset(kaal)
+        assert zonder.klassenhierarchie_bekend is False
+        pad = _schrijf(
+            run_checks(CheckContext(dataset=zonder, config=_config())), tmp_path / "zonder"
+        )
+
+        vraag = (
+            "select status, popup_html from putten union all "
+            "select status, popup_html from strengen"
+        )
+        assert any(status == "groen" for status, _ in _rijen(met, vraag))
+        rijen = _rijen(pad, vraag)
+        assert rijen
+        assert all(status != "groen" for status, _ in rijen)
+        grijs = [popup for status, popup in rijen if status == "grijs"]
+        assert grijs and all("klassenhierarchie" in popup for popup in grijs)
+
     def test_de_status_klopt_met_de_meldingentabel(self, tmp_path: Path) -> None:
         """De kolom en de tabel komen uit dezelfde stroom; ze mogen niet uiteenlopen."""
         run = _run("hgt010_diameterverjonging.ttl")
