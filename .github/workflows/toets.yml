@@ -29,7 +29,16 @@ jobs:
       # getrackte fixtures af, dus CI komt rond 736 uit. 700 houdt daar marge onder
       # en is weer een grens die bijt: met 650 zou een regressie die tachtig tests
       # laat wegvallen er ongezien doorheen zijn gekomen.
-      NLRIOCHECKER_MIN_GESLAAGD: "700"
+      #
+      # De suite staat nu lokaal op 1312 geslaagd; 700 bijt dus niet meer. Het
+      # CI-aantal is niet geschat maar gemeten in een schone `git clone` van dev
+      # (die heeft `data/` niet, net als deze runner): 1139 geslaagd, 180
+      # overgeslagen. Daar gaan de 10 tests van tests/test_uitvoer_qgis.py nog af --
+      # de kloonmachine heeft QGIS, ubuntu-latest niet -- dus CI komt op ongeveer
+      # 1129. 1070 houdt daar dezelfde marge van circa 5% onder als 700 onder 736
+      # deed. Let op: 140 van de 142 gevallen van tests/test_gwsw_vocabulaire.py
+      # zitten in die 180 overslagen, want de GWSW-ontologie is niet getrackt.
+      NLRIOCHECKER_MIN_GESLAAGD: "1070"
     steps:
       - uses: actions/checkout@v7
 

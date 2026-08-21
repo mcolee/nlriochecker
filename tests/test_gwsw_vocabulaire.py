@@ -20,6 +20,18 @@ Drie ontwerpkeuzes dragen de test:
 
 De test gaat *uitsluitend* over de vraag of een begrip in het model bestaat. Of er
 instanties van in een dataset voorkomen is een andere vraag met een ander antwoord.
+
+**Wat deze test op de CI-runner NIET doet.** Hij heeft `Ontologie_GWSW_Totaal.ttl`
+nodig, en `data/gwsw_ontologieen/` staat buiten versiebeheer. Op een schone kloon --
+en dus op de GitHub-runner -- slaan daarom 140 van de 142 gevallen over; alleen
+`test_de_termen_zijn_gevonden` en `test_shacl_vormnamen_horen_niet_bij_de_termen`
+draaien daar echt. De bewaking is met andere woorden **lokaal**: de CI dwingt niets
+af, en een groene bouw zegt hier niets over de GWSW-namen. Dat gat dichten vraagt om
+het herdistribueren van GWSW-data van Stichting RIONED in een publieke
+EUPL-repository (de TTL is 2,6 MB; een afgeleide index is niet minder een
+herdistributie), en dat is een beslissing van de auteur. Automatisch ophalen bij
+data.gwsw.nl is geen alternatief: `CLAUDE.md` verbiedt dat expliciet. Wie hier iets
+aan verandert, werkt deze alinea bij.
 """
 
 from __future__ import annotations
@@ -322,7 +334,10 @@ def _schending(term: Term, index: dict[str, frozenset[str]]) -> Schending | None
         anders = next((naam for naam in index if naam.lower() == term.naam.lower()), None)
         if anders is not None:
             return Schending(
-                term, "hoofdletterafwijking", index[anders], f"{anders} (zelfde begrip)"
+                term,
+                "hoofdletterafwijking",
+                tuple(sorted(index[anders])),
+                f"{anders} (zelfde begrip)",
             )
         return Schending(term, "ontbreekt", (), _suggestie(term, index))
     if term.collectie not in soorten:
@@ -435,3 +450,7 @@ def test_hoofdletterafwijking_krijgt_een_eigen_soort(gwsw_index: dict[str, froze
     assert schending is not None
     assert schending.soort == "hoofdletterafwijking"
     assert "InterneOverstortput" in schending.suggestie
+    # `gevonden` is een gesorteerde tuple en geen frozenset: een naam met meerdere
+    # `rdf:type`s zou anders per run in een andere volgorde in de melding staan.
+    assert schending.gevonden == tuple(sorted(schending.gevonden))
+    assert isinstance(schending.gevonden, tuple)
