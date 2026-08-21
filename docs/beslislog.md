@@ -1760,3 +1760,120 @@ de rest van `data/`). De ontologie bij data.gwsw.nl ophalen in CI (verworpen: `C
 verbiedt een automatische versiecontrole tegen die bron expliciet, en het maakt de suite
 afhankelijk van een netwerkdienst van een derde). De test op CI laten overslaan (verworpen:
 dat wás de toestand die #30 opheft).
+
+### BO-33 Overnamepunt staat in `afvoer_eindpunt`; Gemaal en Pompunit zijn een erkend noodverband
+
+**De klasse bestaat.** `data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl` (versie 1.6) draagt
+op regel 31892:
+
+```turtle
+gwsw:Overnamepunt rdfs:label "Overnamepunt"@nl;
+    rdfs:seeAlso "[NEN 3300:1996] locatie waar de overdracht plaatsvindt van het water uit de
+                  riolering aan de beheerder van de afvalwaterzuiveringinrichting"@nl,
+                 "[IRIS-RIOKEN:2012] Het punt waar de verantwoording over het afvalwater
+                  overgaat van een gemeente/bedrijf op het waterschap of omgekeerd ..."@nl;
+    skos:altLabel "Afgiftepunt"@nl, "Inprikpunt"@nl, "Overdrachtspunt"@nl;
+    skos:scopeNote gwsw:Cof_BAS, gwsw:Cof_PLI, gwsw:Cof_DMO;
+    a owl:Class;
+    rdfs:subClassOf gwsw:Aansluitpunt, ... .
+```
+
+`Aansluitpunt` is een `Knooppunt`-subklasse, dus `Overnamepunt` staat op de **orientatie**,
+net als `Lozingspunt`. `grep "rdfs:subClassOf.*gwsw:Overnamepunt"` levert niets: de klasse
+heeft zelf geen subklassen, dus haar subklasse-afsluiting is zij alleen. Ze staat ook in
+`data/gwsw-vocabulaire-index.json` als `owl:Class`. Ze ontbreekt in `Ontologie_GWSW_Mds.ttl`
+en `Ontologie_GWSW_Hyd.ttl`, maar die dragen conversiedatum 20210920 en zijn ruim vier jaar
+ouder dan het totaalbestand; daar valt geen modelleerkeuze uit af te lezen.
+
+**Eerdere vastlegging was fout, en dat is de aanleiding.** `checks.toml` schreef in een
+commentaar dat `Overnamepunt` "niet als klasse in de GWSW-ontologie" bestaat, en open punt 6
+van het checkregister herhaalde dat. Onjuist, en het is precies de verwisseling waar
+`CLAUDE.md` voor waarschuwt: "bestaat de klasse in de ontologie" en "komen er instanties voor
+in deze dataset" zijn twee vragen met verschillende antwoorden en tegengestelde ingrepen. Een
+ontbrekende klasse zou een gat in ons model zijn; ontbrekende instanties zijn een gat in de
+aanlevering. Het tweede is hier het geval.
+
+**De instanties ontbreken.** `grep -c "gwsw:Overnamepunt\b" data/gwsw_orox_ttl/dewolden_orox.ttl`
+geeft **0** -- geen `rdf:type`, geen verwijzing. De export van De Wolden kent geen enkel
+overnamepunt. (Hetzelfde beeld als bij `VerbeterdGescheidenStelsel`, zie #17.)
+
+**Besluit.** `Overnamepunt` gaat in `[klassen] afvoer_eindpunt`, en `Gemaal` en `Pompunit`
+blijven er voorlopig naast staan als **erkend noodverband**. De lijst is daarmee
+`["Overnamepunt", "Gemaal", "Pompunit"]` in `src/nlriochecker/checks.toml` en in
+`configs/dewoldenhoogeveen.toml`.
+
+**Waarom `Overnamepunt` erbij, terwijl het vandaag niets doet.** Nul instanties betekent nul
+verandering in de uitkomst -- geverifieerd, zie hieronder. Maar zodra een gemeente ze wel
+levert werkt NET-001 meteen goed, zonder dat iemand deze redenering opnieuw moet voeren. En
+het maakt de lijst leesbaar als wat ze is: één klasse die de rol dekt, plus twee die haar
+vervangen zolang ze leeg blijft.
+
+**Waarom `Gemaal` en `Pompunit` niet nu al weg kunnen.** Er is in De Wolden geen enkel
+overnamepunt om te bereiken. Ze eruit halen zou NET-001 élke vuilwater- en gemengde streng
+laten melden -- 9.062 bevindingen die niets over de data zeggen en alles over onze lijst. Dat
+is het geval waar de huisregel voor waarschuwt: duizenden bevindingen wijzen op een
+modelleerfout in de engine, niet op duizenden gebreken. Inhoudelijk is de brug ook niet
+willekeurig: een vrijvervalstreng die op een drukrioleringspomp eindigt gaat daar het
+mechanische stelsel in, en dat is in deze export de plek waar het vrijvervalnet ophoudt.
+
+**De richting staat wel vast: ze moeten er allebei uit.** Een gemaal is geen overdrachtspunt
+maar een knik in het stelsel; de NEN 3300-definitie hierboven legt de overdracht bij het
+overnamepunt. `Pompunit` valt onder hetzelfde verhaal. Dit is een surrogaat, geen model.
+
+**Het loslaatcriterium is meetbaar.** #22 voegt een rapportregel toe die toont wélke klassen
+als afvoereindpunt gelden en hoeveel instanties er van elk gevonden zijn. Zolang die regel
+voor `Overnamepunt` nul toont staat zwart op wit in het rapport dat de uitkomst van NET-001
+op een surrogaat rust; zodra hij boven nul komt is de vraag rijp. Dat `Overnamepunt` daar
+vandaag als nul verschijnt is de bedoeling van deze toevoeging, geen bijwerking.
+
+**Wat hier expliciet niet besloten wordt.** Op welk moment `Gemaal` er precies uit gaat -- bij
+het eerste overnamepunt in de data, of pas bij een af te spreken aandeel van de stelsels --
+is een domeinoordeel met 9.062 bevindingen eronder en ligt bij de auteur. Het staat als open
+vraag in #11.
+
+**Hoe is vastgesteld dat er niets verschoof.** Niet met een gerichte run: `afvoer_eindpunt`
+gaat behalve in NET-001 ook op in `KlassenConfig.netwerkknopen`, en die rol draagt de hele
+netwerkgraaf. Daarom een volle `toets` op De Wolden (`--dataset dewolden_orox.ttl
+--ontologie Ontologie_GWSW_Totaal.ttl`, zonder `--shacl`, `--bronnen` en `--studiegebied`),
+vóór en na. Uitkomst: 35.370 meldingen over 48 checks, geen enkele check beweegt, en de
+35.370 rijen van `bevindingen.csv` zijn over alle kolommen behalve `RunDatum` identiek.
+
+### BO-34 Het IT-stelsel heet `Infiltratiestelsel`; NET-007 blijft voorlopig op de leidingen
+
+**De klassen bestaan.** `checks.toml` schreef dat de ontologie geen klasse "IT-stelsel" kent.
+Onjuist. `Ontologie_GWSW_Totaal.ttl` (versie 1.6) draagt vier kandidaten:
+
+| regel | naam | label | `rdfs:subClassOf` |
+|---|---|---|---|
+| 38844 | `DIT_riool` | "DIT-riool" | `VrijvervalRioolleiding` |
+| 38875 | `DT_riool` | "DT-riool" | `VrijvervalRioolleiding` |
+| 39918 | `Infiltratiestelsel` | "Infiltratiestelsel" | `Rioolstelsel` |
+| 38865 | `DrainageInfiltratieTransportStelsel` | "Drainage/infiltratie transportstelsel" | `Infiltratiestelsel` |
+
+Alle vier `a owl:Class`, alle vier in `data/gwsw-vocabulaire-index.json`.
+
+**Welke klasse het register bedoelt.** NET-007 heet "IT-stelsel zonder drempel" en redeneert
+over een stelsel, niet over een leiding. Dat is `Infiltratiestelsel`; het
+`DrainageInfiltratieTransportStelsel` is daar een subklasse van en valt dus binnen dezelfde
+subklasse-afsluiting. `DIT_riool` en `DT_riool` zijn `VrijvervalRioolleiding`-subklassen: die
+benoemen de buis, niet het stelsel, en zijn hier het verkeerde niveau.
+
+**Besluit: NET-007 blijft voorlopig de afleiding uit de infiltratieleidingen gebruiken.** De
+check leest een zwak samenhangend deel met infiltratieleidingen (`[klassen] infiltratie`,
+nu `["Infiltratieriool"]`) als IT-stelsel. Dat blijft zo, en het commentaar in `checks.toml`
+zegt voortaan waarom: niet omdat de klasse ontbreekt, maar omdat **de engine de stelselboom
+uit de export nergens leest.**
+
+**Waarom niet meteen overgaan.** De De Wolden-export modelleert stelsels wel degelijk als
+objecten -- 13 `rdf:type gwsw:Infiltratiestelsel`, naast 57 `Vuilwaterstelsel`, 55
+`GemengdStelsel`, 48 `Hemelwaterstelsel` en 4 `Drainagestelsel`. Er zijn daarnaast 340
+`Infiltratieriool`-instanties, en NET-007 levert 340 bevindingen met ernst F. Overgaan op de
+stelselobjecten is dus geen commentaarcorrectie maar een andere check: hij zou de graafanalyse
+inruilen voor de `hasPart`-boom, en die twee kunnen op deze data uiteenlopen zonder dat we
+vandaag kunnen zeggen welke van de twee gelijk heeft. Dat de engine de stelselhiërarchie
+negeert is een breder gat dan NET-007 alleen; het staat in #17. Deze BO legt de afleiding vast
+als bewuste keuze met een vervaldatum, niet als de laatste stand.
+
+**Wat dit besluit niet is.** Geen afwijking van GWSW in de zin van "wij kennen dit begrip
+niet". De begrippen zijn erkend en staan hierboven met regelnummer; wat we uitstellen is het
+gebruik van de stelselobjecten door de engine.

@@ -13,6 +13,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`Overnamepunt` en het IT-stelsel bestaan wel degelijk in GWSW; de configuratie zei
+  het tegenovergestelde** (issue #11). Twee commentaren in `src/nlriochecker/checks.toml`
+  en `configs/dewoldenhoogeveen.toml` beweerden dat de ontologie deze begrippen niet
+  kent. Beide zijn onjuist: `Overnamepunt` staat er als subklasse van `Aansluitpunt`, en
+  het IT-stelsel als `Infiltratiestelsel` met zijn subklasse
+  `DrainageInfiltratieTransportStelsel` (plus de leidingklassen `DIT_riool` en
+  `DT_riool`). Wat ontbreekt zijn de instanties: De Wolden levert nul overnamepunten.
+  De commentaren, de docstring van NET-007 en open punt 6 van het checkregister zeggen dat
+  nu, en `Overnamepunt` staat in `[klassen] afvoer_eindpunt`. Het noodverband (`Gemaal`
+  en `Pompunit`) met zijn loslaatcriterium staat als BO-33 in `docs/beslislog.md`, de
+  keuze om NET-007 voorlopig op de infiltratieleidingen te laten draaien als BO-34. De
+  uitkomst op De Wolden verandert niet: 35.370 meldingen over 48 checks, voor en na.
+
 - **De bewaking rond de GWSW-vocabulairetest en de drempelconfiguratie bijt nu waar ze
   eerder groen kon blijven.** De zelfgarantie van `tests/test_gwsw_vocabulaire.py` hing
   aan vier sentinels die geen van alle uit een van de twee TOML-configuraties kwamen;

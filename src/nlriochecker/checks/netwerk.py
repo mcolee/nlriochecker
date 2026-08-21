@@ -451,9 +451,11 @@ class ItStelselZonderDrempel(Check):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt samenhangende delen met infiltratieleidingen maar zonder drempel.
 
-        De GWSW-ontologie kent geen klasse 'IT-stelsel'; een deelstelsel waarin
-        infiltratieleidingen liggen geldt hier als zodanig. Welke klassen dat zijn,
-        staat in de projectconfig.
+        De GWSW-ontologie kent het IT-stelsel wel (Infiltratiestelsel en zijn
+        subklasse DrainageInfiltratieTransportStelsel), maar de engine leest de
+        stelselboom uit de export nergens; een deelstelsel waarin infiltratieleidingen
+        liggen geldt hier daarom als IT-stelsel. Welke klassen dat zijn, staat in de
+        projectconfig. Zie BO-34 in docs/beslislog.md.
         """
         netwerk = _netwerk(context)
         dataset = context.dataset

@@ -46,13 +46,14 @@ streng = ["Leiding"]
 # kaartbeeld daar zou anders als "geen gebreken" lezen. De namen zijn geverifieerd
 # tegen de export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
 mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
-# NET-001 en NET-002 vragen om verschillende eindpunten. 'Overnamepunt' bestaat
-# niet als klasse in de GWSW-ontologie; dat is open punt 6 uit het checkregister.
-# Pompunit staat erbij omdat een vrijvervalstreng die op een drukrioleringspomp
-# eindigt daar het mechanische stelsel in gaat; dat is het overnamepunt waar het
-# register over spreekt. Zonder deze regel geldt heel de drukriolering van De
-# Wolden als onbereikbaar.
-afvoer_eindpunt = ["Gemaal", "Pompunit"]
+# NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
+# degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
+# ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden.
+# Gemaal en Pompunit staan erbij als erkend noodverband: een vrijvervalstreng die
+# op een drukrioleringspomp eindigt gaat daar het mechanische stelsel in. Zonder
+# die regel geldt heel de drukriolering van De Wolden als onbereikbaar. Het
+# noodverband en het criterium om het los te laten staan in BO-33.
+afvoer_eindpunt = ["Overnamepunt", "Gemaal", "Pompunit"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
 # (een Bouwwerk) fysieke objecten zijn. De Wolden gebruikt alleen die laatste twee.
@@ -67,8 +68,10 @@ lozings_eindpunt = [
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]
 hemelwater = ["Hemelwaterriool"]
-# De ontologie kent geen klasse "IT-stelsel"; NET-007 leest een deelstelsel met
-# infiltratieleidingen als IT-stelsel. Zie open punt 6 van het checkregister.
+# De ontologie kent het IT-stelsel wel: Infiltratiestelsel met zijn subklasse
+# DrainageInfiltratieTransportStelsel, plus de leidingklassen DIT_riool en DT_riool.
+# NET-007 leidt een IT-stelsel voorlopig toch af uit de infiltratieleidingen, omdat
+# de engine de stelselboom uit de export nergens leest. Zie BO-34.
 infiltratie = ["Infiltratieriool"]
 drempel = ["Overstortdrempel"]
 
