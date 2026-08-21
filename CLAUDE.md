@@ -70,6 +70,31 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
 ## Domeinregels (hard, uit het checkregister v0.9)
+- **GWSW IS LEIDEND.** Dit is de eerste regel en hij overstemt alle andere bronnen. Bestaat
+  een begrip in de GWSW-ontologie, dan bestaat het -- ongeacht wat de Leidraad Riolering, de
+  RIONED Kennisbank, een NEN-norm of je eigen aanname zegt. Externe bronnen leveren
+  uitsluitend bereiken, drempels en periodes; nooit de vraag WELKE begrippen bestaan.
+  Afwijken mag alleen als de auteur dat expliciet en onderbouwd heeft gedaan, en dan staat
+  de afwijking als BO-nummer in `docs/beslislog.md` -- niet als commentaar in een
+  configbestand.
+  Voordat je beweert dat een klasse of property niet bestaat, grep je
+  `data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`. Let op inconsistent hoofdlettergebruik:
+  een regex als `[A-Za-z]*Stelsel` mist `Vuilwaterstelsel` met kleine s. Scheid twee vragen
+  die makkelijk door elkaar lopen: "bestaat de klasse in de ontologie" en "komen er
+  instanties voor in deze dataset" hebben verschillende antwoorden en vragen om
+  tegengestelde ingrepen -- een ontbrekende klasse is een gat in ons model, ontbrekende
+  instanties zijn een gat in de aanlevering. Zie de correctie op issue #11
+  (`Overnamepunt` en `VerbeterdGescheidenStelsel` bestaan wél; De Wolden levert er nul).
+- **Leidende GWSW-versie: 1.6**, uit `Ontologie_GWSW_Totaal.ttl` (`owl:versionInfo` op regel
+  10: *"Deelmodel Totaal, filter op CoFs BAS DMO EN HYD LDR MDS NLCS PLI RRB TOP, versie=1.6
+  (2025-11-18T14:53:33)"*). Dat is het enige bestand dat de code laadt; `Mds` en `Hyd` komen
+  alleen in een integratietest voor en dragen geen versienummer maar een conversiedatum van
+  **20210920** -- ruim vier jaar ouder. Wees daarom voorzichtig met de uitspraak dat een
+  klasse "alleen in de totaal-ontologie" zit: dat kan net zo goed ouderdom van de
+  deelmodellen zijn als een modelleerkeuze.
+  Upgraden is handwerk van de auteur: hij levert nieuwe ontologiebestanden en dan trekt het
+  pakket bij. Bouw geen automatische versiecontrole tegen data.gwsw.nl. Werk deze regel bij
+  zodra de bestanden vervangen zijn -- de versie hier is de enige plek waar hij staat.
 - Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
   MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
   foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk`; zonder die
