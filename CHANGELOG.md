@@ -132,6 +132,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **`scripts/metingen/issue32_klassendekking.py` meet wat de voorgestelde
+  klassenlijsten van issue #32 op De Wolden zouden doen.** Alleen meten: er is geen
+  enkele lijst gewijzigd. Uitkomst: op één na raakt elke voorgestelde uitbreiding
+  nul objecten, omdat de export maar 13 knoop- en 16 verbindingklassen gebruikt; alleen
+  `Bergbezinkleiding` in `[klassen.stelseltypen]` raakt er een. Het script leest de
+  huidige lijsten uit beide configbestanden, scant de 112 MB TTL regelgewijs in plaats
+  van via rdflib, en ijkt die scan tegen `load_dataset` op een uittreksel van diezelfde
+  export.
 - **`data/gwsw-vocabulaire-index.json` gaat mee in versiebeheer**, zodat de
   vocabulairetest ook op de CI-runner draait in plaats van er 140 van zijn 142 gevallen
   over te slaan. Het is een afgeleide van `Ontologie_GWSW_Totaal.ttl` met per GWSW-naam
