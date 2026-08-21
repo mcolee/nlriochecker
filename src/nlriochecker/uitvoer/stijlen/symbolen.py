@@ -118,7 +118,7 @@ PUNTSYMBOLEN: dict[str, Puntsymbool] = {
     # Lozingen (PDOK; Lozing.sld)
     "Overstortput": Puntsymbool("triangle", 3.2, "Lozing.sld: Overstortput"),
     "ExterneOverstortput": Puntsymbool("triangle", 3.2, "Lozing.sld: Externe overstortput"),
-    "Interneoverstortput": Puntsymbool("triangle", 2.8, "Lozing.sld: Interne overstortput"),
+    "InterneOverstortput": Puntsymbool("triangle", 2.8, "Lozing.sld: Interne overstortput"),
     "Noodoverstortput": Puntsymbool("triangle", 3.2, "Lozing.sld: Noodoverstortput"),
     "Lozingsput": Puntsymbool("triangle", 3.0, "Lozing.sld: Lozingsput"),
     "UitlaatPunt": Puntsymbool("triangle", 3.0, "Lozing.sld: Uitlaat"),
@@ -130,7 +130,9 @@ PUNTSYMBOLEN: dict[str, Puntsymbool] = {
     # Pompen (PDOK; Pomp.sld)
     "Pompput": Puntsymbool("star", 3.2, "Pomp.sld: Pompput"),
     "Pompunit": Puntsymbool("star", 3.2, "Pomp.sld: Pompput"),
-    "Vacuumgemaal": Puntsymbool("star", 3.4, "Pomp.sld: Vacuumgemaal"),
+    # Pomp.sld kent ook een regel "Vacuumgemaal", maar dat is geen objecttype: de
+    # ontologie heeft alleen `Sym_Vacuumgemaal`, een klasse uit de symbolenset. Het
+    # vacuumgemaal zelf heet `Vacuumpompstation` en staat hieronder (#31 punt 2).
     # Bouwwerken (PDOK; Bouwwerk.sld)
     "Rioolgemaal": Puntsymbool("star", 3.6, "Bouwwerk.sld: Rioolgemaal"),
     "Boostergemaal": Puntsymbool("star", 3.6, "Bouwwerk.sld: Rioolgemaal"),
@@ -195,7 +197,7 @@ LIJNSYMBOLEN: dict[str, Lijnsymbool] = {
     "Lijngoot": Lijnsymbool(0.4, "dot", "Aansluitleiding.sld: Goot"),
     "Roostergoot": Lijnsymbool(0.4, "dot", "Aansluitleiding.sld: Goot"),
     "Taludgoot": Lijnsymbool(0.4, "dot", "Aansluitleiding.sld: Goot"),
-    "Verholengoot": Lijnsymbool(0.4, "dot", "Aansluitleiding.sld: Goot"),
+    "VerholenGoot": Lijnsymbool(0.4, "dot", "Aansluitleiding.sld: Goot"),
     # Overig.
     "Drain": Lijnsymbool(0.4, "dot", "Leiding.sld: Drain"),
     "Duiker": Lijnsymbool(1.4, "solid", "Leiding.sld: Duiker"),

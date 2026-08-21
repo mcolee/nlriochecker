@@ -427,6 +427,22 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   data toonden daardoor een verschil dat er niet was. De kringloop start nu bij de
   kleinste URI van het samenhangende deel.
 
+- **Vijf GWSW-namen in de configuratie bestonden niet zoals ze geschreven stonden**
+  (issue #31, gevonden door de vocabulaire-audit uit #30). De profielvorm heet in
+  `VormLeidingColl` `Muil` en niet `Muilprofiel`: daardoor kreeg een gemetseld
+  muilprofielriool een valse ATTR-012 en vuurde de ATTR-004-regel over de
+  hoogte-breedteverhouding op geen enkel muilprofiel. `Kunststof` stond als putmateriaal
+  in `[[leiding_put_materiaal]]` maar zit niet in `MateriaalPutColl`, dus geen legale
+  export kon die waarde schrijven; PVC en PE dekken de kunststof putten. De
+  symbolentabel schreef `Interneoverstortput` en `Verholengoot` waar de ontologie
+  `InterneOverstortput` en `VerholenGoot` schrijft (de symboolkeuze werkte al, want ze
+  vergelijkt hoofdletterongevoelig), en droeg een regel voor `Vacuumgemaal`, dat geen
+  objecttype is maar een symboolklasse -- die regel kon nooit een treffer krijgen en is
+  weg; `Vacuumpompstation` dekt het gemaal zelf. Op De Wolden verandert er niets: die
+  dataset kent geen `Muil` en geen kunststof put, en ATTR-004, ATTR-010 en ATTR-012
+  leveren er voor en na nul bevindingen. `AHN5` en `Metselwerk` blijven staan; dat zijn
+  open vragen voor de auteur (#31 punt 4 en 6).
+
 ### Verwijderd
 
 - De afhankelijkheid `pyproj`; die werd nergens geimporteerd en komt zo nodig via

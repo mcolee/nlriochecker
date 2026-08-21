@@ -77,38 +77,15 @@ SUGGESTIEDREMPEL = 0.5
 # terwijl hij opgeruimd is, krijgt een rode test.
 BEKENDE_AFWIJKINGEN: dict[str, str] = {
     "AHN5": (
-        "ontbreekt in de ontologie -- WijzeVanInwinningColl stopt bij AHN4. Blijft "
-        "bewust staan: de waarde loopt vooruit op een toekomstige GWSW-versie, het "
-        "besluit ligt bij de auteur (#31 punt 4)."
-    ),
-    "Interneoverstortput": (
-        "hoofdletterafwijking -- de ontologie schrijft InterneOverstortput. Werkt wel, "
-        "want de symboolkeuze en het QML-filter vergelijken hoofdletterongevoelig "
-        "(#31 punt 5)."
-    ),
-    "Kunststof": (
-        "verkeerde collectie -- bestaat als lid van MateriaalAfsluiterColl, "
-        "MaterialOfStepsColl en Uitvoering, maar niet van MateriaalPutColl. Geen enkele "
-        "legale export kan die waarde op een put schrijven (#31 punt 3)."
+        "ontbreekt in de ontologie -- WijzeVanInwinningColl stopt bij AHN4. Weghalen of "
+        "laten staan als vooruitloop op een latere GWSW-versie is een open vraag; besluit "
+        "bij de auteur, zie #31 punt 4."
     ),
     "Metselwerk": (
-        "bewuste afwijking -- zit in MateriaalLeidingColl en niet in MateriaalPutColl, "
-        "maar De Wolden schrijft gwsw:Metselwerk feitelijk op 33 putten. De regel blijft "
-        "staan; dat de export buiten de domeinlijst valt hoort ADM-005 te melden "
-        "(#31 punt 6)."
-    ),
-    "Muilprofiel": (
-        "ontbreekt in de ontologie -- de term is Muil. Kost vandaag een valse ATTR-012 "
-        "en een ATTR-004-regel die nooit vuurt (#31 punt 1)."
-    ),
-    "Vacuumgemaal": (
-        "ontbreekt in de ontologie -- alleen Sym_Vacuumgemaal bestaat, en dat is een "
-        "symboolklasse en geen objecttype. De symboolregel krijgt nooit een treffer "
-        "(#31 punt 2)."
-    ),
-    "Verholengoot": (
-        "hoofdletterafwijking -- de ontologie schrijft VerholenGoot. Werkt wel, om "
-        "dezelfde reden als Interneoverstortput (#31 punt 5)."
+        "zit in MateriaalLeidingColl en niet in MateriaalPutColl, maar De Wolden schrijft "
+        "gwsw:Metselwerk feitelijk op 33 putten, en ADM-005 meldt dat al (33 keer per CFK "
+        "als MateriaalPut_ref). Of de tabel de export volgt of de domeinlijst is een open "
+        "vraag; besluit bij de auteur, zie #31 punt 6."
     ),
 }
 

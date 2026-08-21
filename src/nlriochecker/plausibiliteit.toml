@@ -113,7 +113,7 @@ toelichting = "Na 1960 is er in Nederland geen riool meer gemetseld."
 
 [[materiaal_vorm]]
 materiaal = "Metselwerk"
-toegestane_vormen = ["Eivormig", "Muilprofiel", "Heul", "Rechthoekig", "Ovaal"]
+toegestane_vormen = ["Eivormig", "Muil", "Heul", "Rechthoekig", "Ovaal"]
 toelichting = "Gemetselde riolen zijn ei-, muil- of heulprofiel, niet rond."
 
 [[materiaal_vorm]]
@@ -135,10 +135,21 @@ toegestane_vormen = ["Rond", "Eivormig"]
 
 # ATTR-010: leidingmateriaal beton of metselwerk terwijl het putmateriaal daar
 # niet bij past (W, Plausibiliteit).
+#
+# `Metselwerk` blijft voorlopig staan, hoewel de collectie MateriaalPutColl hem niet
+# kent (die heeft MetselwerkBaksteen, MetselwerkBepleisterd en MetselwerkOnbepleisterd).
+# De Wolden schrijft `gwsw:Metselwerk` feitelijk op 33 putten; dat de export buiten de
+# domeinlijst valt meldt ADM-005 al (33 keer `MateriaalPut_ref` per CFK). Of deze tabel
+# de export volgt of de domeinlijst is een open vraag die bij de auteur ligt; zie issue
+# #31 punt 6.
+#
+# `Kunststof` stond hier wel en is weg: die waarde bestaat, maar in
+# MateriaalAfsluiterColl en niet in MateriaalPutColl, dus geen enkele legale export
+# schrijft hem op een put. PVC en PE dekken de kunststof putten (#31 punt 3).
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "Beton"
-verwachte_putmaterialen = ["Beton", "GewapendBeton", "Metselwerk", "Kunststof", "PVC", "PE"]
+verwachte_putmaterialen = ["Beton", "GewapendBeton", "Metselwerk", "PVC", "PE"]
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "GewapendBeton"
@@ -165,7 +176,7 @@ hoogte_groter_dan_breedte = true
 toelichting = "Een eiprofiel staat rechtop: de hoogte is groter dan de breedte."
 
 [[vorm_afmeting]]
-vorm = "Muilprofiel"
+vorm = "Muil"
 hoogte_kleiner_dan_breedte = true
 toelichting = "Een muilprofiel is breder dan hoog."
 

@@ -145,6 +145,19 @@ def test_schone_fixture_geeft_geen_bevinding(bestand: str, groep: str) -> None:
     assert gemeld == {}
 
 
+def test_muilprofiel_heet_muil_in_de_ontologie() -> None:
+    """Een gemetseld muilprofiel is geen ATTR-012, en zijn verhouding wordt wel getoetst.
+
+    `plausibiliteit.toml` schreef `Muilprofiel`, een naam die de GWSW-collectie
+    `VormLeidingColl` niet kent -- daar heet hij `Muil` (issue #31 punt 1). Dat kostte
+    twee dingen tegelijk: een valse ATTR-012 op een volkomen normaal gemetseld riool,
+    en een ATTR-004-regel die op geen enkel muilprofiel vuurde. De fixture heeft een
+    muil die hoger is dan breed, dus beide helften zijn hier zichtbaar.
+    """
+    assert labels(uitkomst("attr004_muil_te_hoog.ttl", "ATTR-012")) == []
+    assert labels(uitkomst("attr004_muil_te_hoog.ttl", "ATTR-004")) == ["1"]
+
+
 def test_attr013_meldt_een_keer_per_object_met_de_kenmerken() -> None:
     outcome = uitkomst("attr013_vulwaarde_hoogte.ttl", "ATTR-013")
     per_label = {bevinding.object_label: bevinding for bevinding in outcome.findings}
