@@ -22,6 +22,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar
 
+from rdflib import URIRef
+
 from nlriochecker import taal
 from nlriochecker.checks.base import (
     Check,
@@ -580,8 +582,6 @@ class BbbZonderLediging(Check):
     def _heeft_voorziening(self, context: CheckContext, node: Node, klassen: list[str]) -> bool:
         """Geeft aan of de BBB een ledigingsvoorziening als onderdeel heeft."""
         dataset = context.dataset
-        from rdflib import URIRef
-
         for deel in parts_of(dataset.graph, URIRef(node.uri)):
             if any(dataset.graph_is_a(str(deel), wortel) for wortel in klassen):
                 return True

@@ -204,7 +204,7 @@ def _sluit_tussenschakels(
 
 
 def _ouderketen(dataset: GwswDataset, uri: str | None, wortels: list[str]) -> set[str]:
-    """De schakels op de weg omhoog naar de herleidbare netwerkknoop, die erbij.
+    """De knopen die de klim omhoog naar de netwerkknoop tegenkwam, die erbij.
 
     Loopt langs `GwswDataset.klim_naar_knoop`, dezelfde wandeling als
     `resolve_network_node` -- twee klimfuncties naast elkaar zouden op een export met
@@ -212,6 +212,15 @@ def _ouderketen(dataset: GwswDataset, uri: str | None, wortels: list[str]) -> se
     niet vast die de resolutie nodig heeft. Schakels die niet in `dataset.nodes`
     staan blijven eruit: die zouden objecten in de analyseset zetten die niet in
     `dataset.nodes` of `dataset.conduits` voorkomen.
+
+    Dit is bewust een superset van het gevonden pad: `klim_naar_knoop` loopt in de
+    breedte en geeft *elke* bezochte knoop terug, dus ook broers op de laatste laag en
+    doodgelopen takken. Met enkelvoudige houders (De Wolden) is dat dezelfde
+    verzameling; met meervoudige houders groeit de schil met knopen die geen enkele
+    resolutie nodig heeft. Veilig, want dit vult alleen de contextschil aan en die
+    wordt nooit kern: wat erbij komt kan geen bevinding in het gebied opleveren. Het
+    smallere alternatief -- alleen het gevonden pad -- zou het risico de andere kant op
+    leggen, en dan loopt de wandeling op de uitgedunde dataset dood.
     """
     return set(dataset.klim_naar_knoop(uri, wortels)[1])
 

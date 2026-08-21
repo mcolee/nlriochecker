@@ -437,7 +437,16 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
                     )
 
     def _compartimenten(self, context: CheckContext, node) -> list[str]:
-        """De compartimenten van een put, inclusief subklassen als een pompkelder."""
+        """De compartimenten van een put, inclusief subklassen als een pompkelder.
+
+        `graph_is_a` en niet de expliciete typematch op de graaf: een compartiment is
+        een onderdeel en geen knoop, dus `is_a` zou hier stil `False` geven. Dat het
+        ruimer is dan de expliciete vorm -- `graph_types_of` unieert ook de
+        orientatietypen -- kan hier geen extra treffer opleveren: de afsluiting van
+        `Compartiment` (drie klassen) en die van `Knooppunt` (vijftien) delen in de
+        GWSW-totaalontologie 1.6 geen enkele klasse, dus geen orientatietype valt onder
+        `Compartiment`.
+        """
         dataset = context.dataset
         return [
             str(deel)

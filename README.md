@@ -31,9 +31,12 @@ Verder: `nlriochecker dekking` toetst de nulmeting tegen het checkregister, en
 `nlriochecker vergelijk --eerder ... --later ...` zet twee meetmomenten naast elkaar voor
 de trend. Elk subcommando kent `--help`.
 
-### De ontologie is verplicht
+### `toets` eist de ontologie
 
-`toets` weigert te draaien zonder `--ontologie`. De OroX-export typeert niet op
+`toets` weigert te draaien zonder `--ontologie`. De andere subcommando's niet:
+`analyseer --dataset` zonder `--ontologie` draait door en berekent de typeringsscore
+met een afsluiting die op de kale wortelklassen blijft steken, zonder voorbehoud. De
+poort staat dus bij `toets` en niet bij het pakket als geheel. De OroX-export typeert niet op
 wortelniveau -- er staat `Inspectieput` in en geen `Put` -- en draagt zelf geen enkele
 `rdfs:subClassOf`. Zonder de klassenhierarchie leveren `putten()` en `leidingen()` dus
 een lege verzameling. De checks draaien dan over een onvolledige selectie en hun

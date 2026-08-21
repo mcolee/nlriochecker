@@ -92,6 +92,36 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   overstortdrempels, nul ledigingsvoorzieningen en nul bergbezinkvoorzieningen; ADM-007
   blijft op 181 bevindingen.
 
+- **Een half gedeclareerde klassenhierarchie gold als een gekende hierarchie.**
+  `klassenhierarchie_bekend` was `bool(subclasses)` -- globaal -- terwijl de
+  werkelijke terugval op geometrie per wortel door `_bruikbare_afsluiting` bepaald
+  wordt. Eén willekeurige `rdfs:subClassOf` in een export zette het predicaat op
+  `True` terwijl de lader knopen en strengen wel degelijk aan hun geometrie herkende,
+  en dan kwam het rapport zónder voorbehoud en mét een oordeel: precies de faalwijze
+  die issue #33 sloot, overlevend in de naad met #36. Het predicaat vraagt nu
+  hetzelfde als de lader, met dezelfde functie, over `Knooppunt` én `Verbinding`.
+  Zevenentwintig van de 114 TTL-fixtures stonden in die tussentoestand en dragen vanaf
+  nu het voorbehoud; twee ervan (`top001_losliggende_put.ttl`,
+  `afbakening_kern_en_schil.ttl`) declareren nu de twee orientatiewortels die ze
+  bedoelden te hebben, zodat er vijfentwintig overblijven. Op De Wolden mét ontologie verandert er
+  niets.
+- **De GeoPackage kleurde een run zonder oordeel volledig groen.** Groen betekent hier
+  "beoordeeld en niets gevonden"; onder `--geen-ontologie` toetsen de checks over een
+  onvolledige selectie, vinden dus weinig, en dan beweerde elk object het
+  tegenovergestelde van het voorbehoud dat in `gwsw_run` stond -- een metadatatabel die
+  niemand in QGIS openslaat. Zo'n run kleurt haar objecten nu grijs, met de reden in de
+  popup. Wat er wél op een object staat kleurt het nog steeds (BO-29), en `status`
+  houdt zijn vier waarden.
+- **De eerlijkheidsroute van de typeringspoort dekte de verkeerde klassenfamilie.**
+  Een te globale klasse die op nul objecten uitkomt terwijl de graaf er instanties van
+  draagt heet nu onbeoordeelbaar, niet alleen een verbindingsklasse. Dat is het
+  werkelijke geval: over de drie SHACL-rapporten samen noemt `CfkTypes_typ` drie
+  klassen, en `Rioolstelsel` en `MechanischRioolstelsel` staan onder `Stelsel` -- knoop
+  noch streng -- dus scoorde de poort er nul te globale objecten voor zonder een woord.
+  Nul objecten bij nul instanties blijft een echte nul.
+- **De terminaluitvoer van `toets` noemde het voorbehoud niet.** Markdown, GeoPackage
+  en JSON droegen het al; de vierde plek waar een mens de uitkomst leest zweeg.
+
 ### Gewijzigd
 
 - **`Overnamepunt` en het IT-stelsel bestaan wel degelijk in GWSW; de configuratie zei

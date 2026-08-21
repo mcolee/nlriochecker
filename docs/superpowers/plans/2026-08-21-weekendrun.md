@@ -222,8 +222,13 @@ plaats van drie. Reken op koude runs in deze golf.
   in het issue.
   **Verwacht: nul verandering.**
 
-- [ ] **#33 — Zonder ontologie toetst de engine nul objecten** (tier A)
-  Hard falen plus `--geen-ontologie` als ontsnappingsvlag. De body draagt vijf uitgewerkte
+- [ ] **#33 — Zonder ontologie toetst de engine over een onvolledige selectie** (tier A)
+  De kop voorspelde nul objecten; gemeten zijn het er wél. Zonder ontologie draaien de checks
+  door en leveren ze bevindingen op: `putten()` en `leidingen()` dekken niets, maar
+  `netwerkknopen` somt naast de wortels ook klassen op die de export rechtstreeks typeert,
+  zodat een deel van de checks wel degelijk objecten ziet (de kolom *Bekeken* zegt hoeveel).
+  Het gebrek is dus niet dat er niets getoetst wordt maar dat een onvolledige selectie als
+  oordeel leest. Hard falen plus `--geen-ontologie` als ontsnappingsvlag. De body draagt vijf uitgewerkte
   stappen en is niet meer open. **Let op stap 3:** de runbrede markering wordt nu door precies
   één bron gevoed; een deelset-run zónder ontologie draagt er twee, dus er moet een
   samenstelplek komen. De test daarop is verplicht.
