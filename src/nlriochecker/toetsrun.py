@@ -260,9 +260,11 @@ def _eis_ontologie(opdracht: Toetsopdracht) -> None:
     Zonder ontologie kent de lader de subklassen van Knooppunt en Verbinding niet, en
     de OroX-export typeert geen enkel object op wortelniveau: `Inspectieput` staat er
     wel, `Put` niet. `putten()` en `leidingen()` leveren dan een lege verzameling en de
-    checks draaien over een onvolledige selectie -- op De Wolden zien ze zo 1.874 van
-    de 23.485 knopen, via de concrete klassen die `netwerkknopen` naast de wortels
-    opsomt. Hun uitkomst draagt dan geen oordeel, terwijl het rapport dat niet zei.
+    checks draaien over een onvolledige selectie -- op De Wolden zien 62 van de 89
+    checks er nul, en de achttien die via `netwerkknopen` gaan er 1.874 van de 23.485,
+    want die selectie somt naast de wortels ook klassen op die de export wel
+    rechtstreeks typeert. Hun uitkomst draagt dan geen oordeel, terwijl het rapport dat
+    niet zei.
     Stilte leest als "alles gecontroleerd", dus dit hoort een fout te zijn en geen
     stille overslag -- hetzelfde besluit als bij een ontbrekende conformiteitsklasse
     (BO-7).

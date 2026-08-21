@@ -21,18 +21,23 @@ from __future__ import annotations
 from nlriochecker.checks import CheckRun
 
 # De tekst spreekt de lezer van het rapport aan, niet de ontwikkelaar: geen
-# functienamen, wel GWSW-klassen die hij in QGIS terugvindt. En hij zegt niets over
-# waar de klassenkennis vandaan had moeten komen -- het signaal is dat de graaf geen
-# subklasserelaties draagt, en dat kan ook met een meegegeven ontologie zo zijn.
+# functienamen, wel GWSW-klassen die hij in QGIS terugvindt. Twee dingen staan er
+# bewust niet in, allebei omdat deze module ze niet weet. Waar de klassenkennis vandaan
+# had moeten komen -- het signaal is dat de graaf geen subklasserelaties draagt, en dat
+# kan ook met een meegegeven ontologie zo zijn. En dat de export niets op wortelniveau
+# typeert: dat volgt niet uit het ontbreken van subklassen, want een export die haar
+# objecten rechtstreeks als `gwsw:Put` schrijft heeft er geen nodig. Wat wel volgt is
+# hoe ver een wortelselectie dan reikt, en dat is wat er staat.
 GEEN_KLASSENHIERARCHIE = (
     "**Geen klassenhierarchie:** deze dataset draagt geen enkele subklasserelatie, dus "
-    "de GWSW-wortels dekken hun subklassen niet en de export typeert niets op "
-    "wortelniveau. Een selectie op `gwsw:Put` of `gwsw:Leiding` blijft daardoor leeg, "
-    "en knopen en strengen zijn hier aan hun geometrie herkend in plaats van aan hun "
-    "GWSW-type. De eigen checks hebben over een onvolledige selectie gedraaid: de kolom "
-    "*Bekeken* in de samenvatting per check zegt per check hoeveel objecten dat waren. "
-    "Wat er gemeld wordt is daarmee geen oordeel over de dataset, en wat er niet gemeld "
-    "wordt zegt niets over haar kwaliteit."
+    "de GWSW-wortels dekken hun subklassen niet. Een selectie op `gwsw:Put` of "
+    "`gwsw:Leiding` vindt daardoor alleen objecten die letterlijk zo getypeerd zijn; "
+    "een OroX-export schrijft daar doorgaans `Inspectieput` en `GemengdRiool`, en dan "
+    "blijft zo'n selectie leeg. Knopen en strengen zijn hier aan hun geometrie herkend "
+    "in plaats van aan hun GWSW-type. De eigen checks hebben over een onvolledige "
+    "selectie gedraaid: de kolom *Bekeken* in de samenvatting per check zegt per check "
+    "hoeveel objecten dat waren. Wat er gemeld wordt is daarmee geen oordeel over de "
+    "dataset, en wat er niet gemeld wordt zegt niets over haar kwaliteit."
 )
 
 

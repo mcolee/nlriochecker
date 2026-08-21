@@ -16,21 +16,26 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 - **`toets` weigert een run zonder `--ontologie`** (issue #33). Zonder
   klassenhierarchie typeert de OroX-export niets op wortelniveau en leveren `putten()`
   en `leidingen()` een lege verzameling; de checks draaien dan over een onvolledige
-  selectie -- op De Wolden 1.874 van de 23.485 knopen -- en hun uitkomst draagt geen
-  oordeel, terwijl het rapport dat nergens zei. Dat is nu een harde fout
+  selectie en hun uitkomst draagt geen oordeel, terwijl het rapport dat nergens zei.
+  Hoe onvolledig verschilt per check: gemeten op De Wolden zien 62 van de 89 checks er
+  **nul** -- die selecteren op `putten()`, `leidingen()` of
+  `vrijvervalrioolleidingen()` -- en achttien zien er 1.874 van de 23.485, omdat
+  `netwerkknopen` naast de wortels ook klassen opsomt die de export wel rechtstreeks
+  typeert. 1.874 is dus een bovengrens en geen gemiddelde. Dat is nu een harde fout
   met een melding die zegt wat er ontbreekt en wat je eraan doet, en hij valt vóór het
   laden, dus in seconden. Wie zo'n run bewust wil, geeft `--geen-ontologie` mee; dan
   draagt het rapport het voorbehoud in de kop, staat de regel van de eigen checks in de
   managementsamenvatting op `–` in plaats van op een vinkje of kruisje (met de
   tellingen in de toelichting), en is `structural_diff` juist dan gevuld -- op De
   Wolden 23.485 knooppunten en 23.440 strengen die alleen op geometrie herkend zijn.
+  Bestaande aanroepen zonder ontologie moeten de vlag krijgen.
 - **`structural_diff` wordt nu altijd berekend**, ook zonder klassenhierarchie; hij
   werd juist dan overgeslagen, terwijl hij daar zijn diagnose voor doet. Dat is een
   uitvoerverandering voor datasets waarin `Knooppunt` noch `Verbinding` subklassen
   heeft: hun rapport krijgt er de regel "De GWSW-definitie en de herkenning op
   geometrie wijken af (…)" bij. De uitspraak was altijd al waar, alleen werd zij niet
   geteld. Van de 114 TTL-fixtures gaat het om 25 stuks; op De Wolden mét ontologie
-  verandert er niets, want daar blijft de vergelijking leeg zoals voorheen. Bestaande aanroepen zonder ontologie moeten de vlag krijgen.
+  verandert er niets, want daar blijft de vergelijking leeg zoals voorheen.
 - **De runbrede voorbehouden komen samen in `uitvoer/voorbehoud.py`.** De markering
   boven een rapport werd door precies een bron gevoed; een deelset-run zonder ontologie
   draagt er twee, en met een enkel slot zou er een stilzwijgend verdwijnen. Markdown,

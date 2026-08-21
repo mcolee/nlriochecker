@@ -500,8 +500,8 @@ def compare_command(
     "geen_ontologie",
     is_flag=True,
     help=(
-        "Draai zonder klassenhierarchie. De checks toetsen dan nul putten en nul "
-        "leidingen; het rapport draagt dat als voorbehoud."
+        "Draai zonder klassenhierarchie. De checks draaien dan over een onvolledige "
+        "selectie en hun uitkomst draagt geen oordeel; het rapport zegt dat."
     ),
 )
 @click.option(

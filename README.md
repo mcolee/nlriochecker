@@ -36,9 +36,16 @@ de trend. Elk subcommando kent `--help`.
 `toets` weigert te draaien zonder `--ontologie`. De OroX-export typeert niet op
 wortelniveau -- er staat `Inspectieput` in en geen `Put` -- en draagt zelf geen enkele
 `rdfs:subClassOf`. Zonder de klassenhierarchie leveren `putten()` en `leidingen()` dus
-een lege verzameling. De checks draaien dan over een onvolledige selectie -- op De
-Wolden zien ze zo 1.874 van de 23.485 knopen -- en hun uitkomst draagt geen oordeel,
-terwijl het rapport dat nergens zei.
+een lege verzameling. De checks draaien dan over een onvolledige selectie en hun
+uitkomst draagt geen oordeel, terwijl het rapport dat nergens zei.
+
+Hoe onvolledig verschilt per check, en één cijfer eromheen misleidt dus. Gemeten op De
+Wolden zonder ontologie: van de 89 checks zien er **62 nul objecten** -- dat zijn de
+checks die op `putten()`, `leidingen()` of `vrijvervalrioolleidingen()` selecteren, en
+die wortels dekken zonder hierarchie niets. Achttien zien er 1.874 van de 23.485, omdat
+`netwerkknopen` naast de wortels ook klassen opsomt die de export wél rechtstreeks
+typeert; de overige negen zitten daartussen. 1.874 is dus een bovengrens en geen
+gemiddelde. De kolom *Bekeken* in het rapport zegt het per check.
 
 Wie zo'n run bewust wil, geeft `--geen-ontologie` mee. Dan loopt hij door, maar draagt
 elk rapport het voorbehoud in de kop, blijft de regel van de eigen checks in de
