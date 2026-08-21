@@ -1410,6 +1410,26 @@ FIXTURES["dataset_inverse_properties.ttl"] = (
 """,
 )
 
+# Een export mag beide schrijfrichtingen naast elkaar zetten -- ze zeggen hetzelfde.
+# Wie ze allebei leest zonder te ontdubbelen, telt het kenmerk en het onderdeel twee
+# keer, en dat is precies het soort dubbeltelling dat nergens een melding oplevert.
+FIXTURES["dataset_dubbele_schrijfrichting.ttl"] = (
+    "geen; put B schrijft dezelfde twee relaties zowel voorwaarts als invers",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB")
+    + """
+:PutB gwsw:hasAspect :PutB_bd .
+:PutB_bd gwsw:isAspectOf :PutB .
+:PutB_bd rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date .
+:PutB gwsw:hasPart :PutB_c1 .
+:PutB_c1 gwsw:isPartOf :PutB .
+:PutB_c1 rdf:type gwsw:Compartiment ; rdfs:label "B/c1" ;
+    gwsw:hasAspect :PutB_c1_ori .
+:PutB_c1_ori rdf:type gwsw:Compartimentorientatie .
+""",
+)
+
 # Een uitlaatconstructie die daarnaast als bouwwerk getypeerd is. Alfabetisch wint
 # "Bouwwerk", maar dat is de algemenere van de twee: de ontologie zegt dat
 # Uitlaatconstructie een subklasse van Bouwwerk is.

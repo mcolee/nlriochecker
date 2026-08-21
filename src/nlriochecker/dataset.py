@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date
@@ -553,7 +553,9 @@ def _short(uri: str) -> str:
     return uri.rsplit("/", 1)[-1].rsplit("#", 1)[-1]
 
 
-def _beide_richtingen(voorwaarts: Iterable[RdfNode], invers: Iterable[RdfNode]):
+def _beide_richtingen(
+    voorwaarts: Iterable[RdfNode], invers: Iterable[RdfNode]
+) -> Iterator[RdfNode]:
     """De termen uit beide schrijfrichtingen, elk hoogstens een keer.
 
     Een export mag `hasPart` schrijven, `isPartOf`, of allebei; in het laatste geval
@@ -570,24 +572,24 @@ def _beide_richtingen(voorwaarts: Iterable[RdfNode], invers: Iterable[RdfNode]):
             yield term
 
 
-def parts_of(graph: Graph, subject: RdfNode):
+def parts_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
     """De onderdelen van een object, in beide schrijfrichtingen van hasPart."""
     return _beide_richtingen(graph.objects(subject, HAS_PART), graph.subjects(IS_PART_OF, subject))
 
 
-def part_holders_of(graph: Graph, subject: RdfNode):
+def part_holders_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
     """De objecten die dit object als onderdeel bevatten, in beide schrijfrichtingen."""
     return _beide_richtingen(graph.subjects(HAS_PART, subject), graph.objects(subject, IS_PART_OF))
 
 
-def aspects_of(graph: Graph, subject: RdfNode):
+def aspects_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
     """De aspecten van een object, in beide schrijfrichtingen van hasAspect."""
     return _beide_richtingen(
         graph.objects(subject, HAS_ASPECT), graph.subjects(IS_ASPECT_OF, subject)
     )
 
 
-def aspect_holders_of(graph: Graph, subject: RdfNode):
+def aspect_holders_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
     """De objecten die dit object als aspect dragen, in beide schrijfrichtingen."""
     return _beide_richtingen(
         graph.subjects(HAS_ASPECT, subject), graph.objects(subject, IS_ASPECT_OF)
@@ -723,6 +725,16 @@ def _deksel_kenmerk(
     subklassen, en een exacte typevergelijking zou zo'n put stilzwijgend haar
     dekselniveau afnemen -- waarna `Node.bovenkant` op het maaiveld terugvalt zonder
     dat iemand het merkt.
+
+    **Wat hier niet gedekt is.** De afsluiting stopt bij `Putdeksel`. Het GWSW hangt
+    onder `Deksel` ook `Straatpot`, `Drainputdeksel` en `Peilbuisdeksel` -- zusters
+    van `Putdeksel`, geen subklassen -- en onder `Afdekking` daarnaast `Rooster`,
+    `Luik` en `Afdekplaat`. Een put met een `Straatpot` die netjes een
+    `Dekselorientatie` met een `Putdekselniveau` draagt, verliest dat niveau hier dus
+    nog steeds, met dezelfde stille terugval op het maaiveld. Verbreden naar `Deksel`
+    of `Afdekking` is een domeinkeuze -- telt het niveau onder een rooster als
+    putdekselniveau? -- en die ligt bij de auteur, niet hier. Zie het rapport bij
+    issue #36.
     """
     direct = _aspect_van_klasse(graph, subject, KLASSE_PUTDEKSELNIVEAU)
     if direct is not None:

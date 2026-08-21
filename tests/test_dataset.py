@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from rdflib import URIRef
 
-from nlriochecker.dataset import GWSW, GwswDataset, load_dataset
+from nlriochecker.dataset import GWSW, GwswDataset, aspects_of, load_dataset, parts_of
 from nlriochecker.errors import DatasetError
 
 JUINEN = "http://sparql.gwsw.nl/repositories/Juinen#"
@@ -208,6 +209,27 @@ def test_inverse_properties_bouwen_hetzelfde_domeinmodel() -> None:
     assert dataset.nodes[streng.start_node or ""].label == "A"
     assert dataset.nodes[streng.end_node or ""].label == "B"
     assert streng.bob_start == 8.60
+
+
+def test_beide_schrijfrichtingen_naast_elkaar_tellen_een_keer() -> None:
+    """`hasPart` en `isPartOf` naast elkaar zeggen hetzelfde, niet twee dingen.
+
+    Nu beide richtingen gelezen worden kan een export die ze allebei schrijft elk
+    kenmerk en elk onderdeel dubbel opleveren. Dat levert nergens een melding op --
+    het wordt een put met twee compartimenten die er een heeft, en een kenmerk dat
+    twee keer in `aspects` staat.
+    """
+    dataset = load_dataset(TTL_DIR / "dataset_dubbele_schrijfrichting.ttl")
+    put = next(node for node in dataset.nodes.values() if node.label == "B")
+    subject = URIRef(put.uri)
+
+    assert [aspect.kind for aspect in put.aspects].count("Begindatum") == 1
+    assert len(list(parts_of(dataset.graph, subject))) == 1
+    assert len(list(aspects_of(dataset.graph, subject))) == len(
+        set(aspects_of(dataset.graph, subject))
+    )
+    compartiment = next(uri for uri in dataset.nodes if uri.endswith("PutB_c1"))
+    assert dataset.nodes[compartiment].parents == (put.uri,)
 
 
 def test_beheerobjecttype_kiest_de_specifiekste_klasse() -> None:
