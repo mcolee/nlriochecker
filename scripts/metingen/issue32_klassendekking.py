@@ -29,6 +29,13 @@ seconden. Twee waarborgen houden die kortere weg eerlijk:
 * `_controleer_parser()` haalt een uittreksel van dezelfde export door de
   pakketlader en vergelijkt knopen, verbindingen en beide klassentellingen met de
   regelscan over datzelfde uittreksel.
+
+Die tweede waarborg dekt niet alles, en dat hoort er hardop bij te staan: een
+uittreksel is een uittreksel. `_dekking_van_de_ijking()` drukt daarom af welk aandeel
+van het bestand geijkt is en welke klassen erbuiten vallen. Een klasse die er niet in
+zit steunt uitsluitend op de directe telling van de regelscan. Dat is geen theoretisch
+voorbehoud: het enige getal boven nul in deze meting hangt aan een klasse met een
+enkele instantie, en die ligt ver buiten beide vensters.
 """
 
 from __future__ import annotations
@@ -274,10 +281,13 @@ def _klasseregel(export: Export, klasse: str) -> str:
     )
 
 
-def _verschil(
-    naam: str, oud: set[str], nieuw: set[str], export: Export, eenheid: str = "objecten"
-) -> None:
-    """Drukt af hoeveel objecten een lijstwijziging erbij of eraf haalt."""
+def _verschil(naam: str, oud: set[str], nieuw: set[str], export: Export, eenheid: str) -> None:
+    """Drukt af hoeveel objecten een lijstwijziging erbij of eraf haalt.
+
+    `eenheid` is bewust verplicht en heeft geen default. Deze meting draait om het
+    verschil tussen een knoop en een verbinding; een uitvoerregel die "objecten"
+    zegt waar ze verbindingen telt maakt juist dat onderscheid onleesbaar.
+    """
     erbij = nieuw - oud
     eraf = oud - nieuw
     print(f"  {naam}: nu {len(oud)} {eenheid}, na de ingreep {len(nieuw)}.")
@@ -302,6 +312,7 @@ def _punt1(export: Export, klassen: dict[str, object]) -> None:
         export.verbindingen_van(oud_wortels),
         export.verbindingen_van(nieuw_wortels),
         export,
+        "verbindingen",
     )
     overlap = export.ontologie.afsluiting(nieuw_wortels) & export.ontologie.afsluiting(
         ["VrijvervalRioolleiding"]
@@ -329,14 +340,26 @@ def _punt2(export: Export, klassen: dict[str, object]) -> None:
 
 
 def _punt3(export: Export, klassen: dict[str, object]) -> None:
-    """Punt 3: zes vrijvervalklassen zonder stelseltype."""
-    _kop("PUNT 3 -- klassen.stelseltypen: zes VrijvervalRioolleiding-subklassen ontbreken")
-    gedekt = set(_stelselwortels(klassen))
-    print(f"  [klassen.stelseltypen] noemt nu: {sorted(gedekt)}")
+    """Punt 3: de VrijvervalRioolleiding-subklassen zonder stelseltype.
+
+    Het issue spreekt van zes ontbrekende klassen en van "8 van de 14"; dat getal
+    klopt niet. De kop draagt daarom geen aantal, en het werkelijke aantal wordt
+    hieronder geteld in plaats van overgeschreven.
+    """
+    _kop("PUNT 3 -- klassen.stelseltypen: VrijvervalRioolleiding-subklassen zonder stelseltype")
+    wortels = _stelselwortels(klassen)
+    # De afsluiting en niet de rauwe lijst: een wortel dekt haar subklassen, dus die
+    # tellen als gedekt. Op De Wolden valt dat samen -- geen van deze wortels heeft
+    # subklassen -- maar tegen de rauwe lijst vergelijken geeft een te hoog aantal
+    # zodra dat wel zo is.
+    gedekt = export.ontologie.afsluiting(wortels)
+    print(f"  [klassen.stelseltypen] noemt nu {len(wortels)} wortels: {sorted(wortels)}")
+    print(f"  hun afsluiting telt {len(gedekt)} klassen.")
     kinderen = sorted(export.ontologie.kinderen.get("VrijvervalRioolleiding", ()))
     print(f"  VrijvervalRioolleiding heeft {len(kinderen)} directe subklassen: {kinderen}")
     ontbreekt = [naam for naam in kinderen if naam not in gedekt]
-    print(f"  niet in [klassen.stelseltypen]: {ontbreekt}")
+    print(f"  niet gedekt door [klassen.stelseltypen] ({len(ontbreekt)}): {ontbreekt}")
+    print("  (het issue noemt er zes; dat aantal klopt niet)")
     for klasse in ontbreekt:
         print(_klasseregel(export, klasse))
     totaal = export.verbindingen_van(ontbreekt)
@@ -401,7 +424,13 @@ def _punt6(export: Export, klassen: dict[str, object]) -> None:
     huidig = _lijst(klassen, "bergbezinkvoorziening")
     print(f"  Reservoir-afsluiting telt {len(afsluiting)} klassen (inclusief Reservoir zelf).")
     print(f"  huidig: {huidig}")
-    ontbreekt = [naam for naam in afsluiting if naam not in huidig]
+    # Vergelijk tegen de afsluiting van de huidige lijst en niet tegen de rauwe lijst:
+    # een wortel dekt haar subklassen. Op De Wolden valt dat samen -- de drie bassins
+    # hebben geen subklassen -- maar tegen de rauwe lijst vergelijken zou een te hoog
+    # "niet gedekt" geven zodra dat wel zo is. `_verschil` hieronder gebruikt al de
+    # afsluiting; dit trekt de twee gelijk.
+    gedekt = export.ontologie.afsluiting(huidig)
+    ontbreekt = [naam for naam in afsluiting if naam not in gedekt]
     print(f"  niet gedekt ({len(ontbreekt)}): {ontbreekt}")
     met_instanties = [naam for naam in afsluiting if export.instanties([naam])]
     print(f"  Reservoir-klassen met instanties in De Wolden: {met_instanties or 'geen'}")
@@ -493,7 +522,7 @@ def _uitlaat(export: Export) -> None:
     print(_klasseregel(export, "Uitlaat"))
 
 
-def _toets_regelvorm(pad: Path) -> None:
+def _toets_regelvorm(pad: Path) -> int:
     """Toetst dat de export de vlakke schrijfwijze aanhoudt die de scan aanneemt.
 
     De regelscan is alleen juist voor Turtle waarin elk subject op een eigen regel
@@ -503,20 +532,44 @@ def _toets_regelvorm(pad: Path) -> None:
     de scan die stilzwijgend aan het verkeerde object toekennen. Het handgeschreven
     voorbeeldbestand doet dat wel; de BrutIS-export van De Wolden nergens. Deze
     toets breekt af in plaats van een fout getal op te schrijven.
+
+    **Regeleinden.** Dit bestand is volledig CRLF. Dat gaat goed, maar niet door een
+    keuze van deze code: Python opent tekstbestanden standaard met universele
+    regeleinden, dus `Export.scan` ziet nooit een `\\r`. Zou iemand die stand ooit
+    omzetten -- `newline=""` bij het openen, of het bestand regel voor regel uit een
+    bytestroom halen -- dan blijft er een `\\r` aan het eind van elke regel staan en
+    zou `_TYPE` op `gwsw:Bergbezinkleiding\\r` geen enkele klasse meer herkennen: de
+    hele meting zou stil op nul komen. Deze functie leest daarom expliciet met
+    `newline=""`, telt de regeleinden en meldt ze, zodat de aanname zichtbaar is in
+    plaats van impliciet. `_STAART` en `_SUBJECT` eindigen niet toevallig op `\\s*`
+    voor hun `$`; daardoor verdragen ze een `\\r` ook als hij er wel staat.
+
+    Geeft het aantal gelezen regels terug.
     """
     verboden = ("[", "]", "_:")
-    for nummer, regel in enumerate(pad.open(encoding="utf-8", errors="replace"), start=1):
-        if not regel.strip():
-            continue
-        if any(teken in regel for teken in verboden):
-            sys.exit(f"{pad}:{nummer}: verkorte Turtle-notatie; de regelscan is hier niet geldig.")
-        if regel[0] in "#@":
-            continue
-        if regel[0] in " \t":
-            if len(regel.split(None, 2)) < 2:
-                sys.exit(f"{pad}:{nummer}: ingesprongen regel zonder predicaat en object.")
-        elif _SUBJECT.match(regel) is None:
-            sys.exit(f"{pad}:{nummer}: subjectregel met meer dan een term.")
+    einden: Counter[str] = Counter()
+    nummer = 0
+    with pad.open(encoding="utf-8", errors="replace", newline="") as bestand:
+        for nummer, rauw in enumerate(bestand, start=1):
+            einden[
+                "CRLF" if rauw.endswith("\r\n") else "LF" if rauw.endswith("\n") else "geen"
+            ] += 1
+            regel = rauw.rstrip("\r\n")
+            if not regel.strip():
+                continue
+            if any(teken in regel for teken in verboden):
+                sys.exit(
+                    f"{pad}:{nummer}: verkorte Turtle-notatie; de regelscan is hier niet geldig."
+                )
+            if regel[0] in "#@":
+                continue
+            if regel[0] in " \t":
+                if len(regel.split(None, 2)) < 2:
+                    sys.exit(f"{pad}:{nummer}: ingesprongen regel zonder predicaat en object.")
+            elif _SUBJECT.match(regel) is None:
+                sys.exit(f"{pad}:{nummer}: subjectregel met meer dan een term.")
+    print(f"  regels: {nummer}; regeleinden: {dict(einden)}")
+    return nummer
 
 
 def _uittreksel(pad: Path, vensters: Sequence[tuple[int, int]]) -> Path:
@@ -551,7 +604,50 @@ def _uittreksel(pad: Path, vensters: Sequence[tuple[int, int]]) -> Path:
     return doel
 
 
-def _controleer_parser(ontologie: Ontologie, vensters: Sequence[tuple[int, int]]) -> None:
+def _dekking_van_de_ijking(
+    volledig: Export, gescand: Export, vensters: Sequence[tuple[int, int]], regels: int
+) -> None:
+    """Meldt welk deel van de meting deze ijking wel en niet draagt.
+
+    Een ijking op een uittreksel dekt niet wat buiten dat uittreksel valt, en
+    stilzwijgen daarover leest als "alles gecontroleerd". Deze functie zet er de
+    grenzen bij: welk aandeel van het bestand, hoeveel van de klassen, en met name
+    welke klassen er buiten vallen. Dat laatste is niet theoretisch -- het enige
+    getal boven nul in deze hele meting hangt aan een klasse met een enkele
+    instantie, en die kan makkelijk buiten elk venster liggen.
+    """
+    gedekt = sum(lengte for _, lengte in vensters)
+    print("  DEKKING van deze ijking -- wat ze wel en niet draagt:")
+    print(f"    aandeel van het bestand: {gedekt} van {regels} regels ({gedekt / regels:.1%})")
+    for naam, in_uittreksel, in_geheel in (
+        (
+            "knoopklassen",
+            _klassen_van(gescand, gescand.knopen),
+            _klassen_van(volledig, volledig.knopen),
+        ),
+        (
+            "verbindingklassen",
+            _klassen_van(gescand, gescand.verbindingen),
+            _klassen_van(volledig, volledig.verbindingen),
+        ),
+    ):
+        buiten = sorted(in_geheel - in_uittreksel)
+        print(f"    {naam}: {len(in_uittreksel)} van {len(in_geheel)} geijkt")
+        print(f"      niet in het uittreksel: {buiten or 'geen'}")
+    print(
+        "    Klassen die hierboven ontbreken steunen uitsluitend op de directe telling "
+        "van de regelscan, niet op de vergelijking met de pakketlader."
+    )
+
+
+def _klassen_van(export: Export, uris: Iterable[str]) -> set[str]:
+    """De verzameling klassenamen die in deze objecten voorkomt."""
+    return {naam for uri in uris for naam in export.types.get(uri, frozenset())}
+
+
+def _controleer_parser(
+    ontologie: Ontologie, vensters: Sequence[tuple[int, int]]
+) -> tuple[Export, Sequence[tuple[int, int]]]:
     """Toetst de regelscan tegen `load_dataset` op een uittreksel van de gemeten export.
 
     Zonder deze controle steunt elk getal hierna op een handgeschreven parser. De
@@ -560,6 +656,12 @@ def _controleer_parser(ontologie: Ontologie, vensters: Sequence[tuple[int, int]]
     dezelfde structuur, en gaat er in seconden doorheen. Vergeleken worden het
     aantal knopen, het aantal verbindingen en beide klassentellingen -- precies de
     grootheden waar de meting op steunt.
+
+    **Wat ze niet dekt.** Een uittreksel is een uittreksel: klassen die alleen buiten
+    de vensters voorkomen worden niet meegeijkt. `_dekking_van_de_ijking` zet die
+    grens er expliciet bij, want zonder die regel zou de lezer aannemen dat de ijking
+    de hele meting draagt. Geeft het gescande uittreksel terug zodat de beller die
+    dekking kan afdrukken zodra ook de volledige scan klaar is.
     """
     _kop("CONTROLE -- regelscan tegen nlriochecker.dataset.load_dataset")
     from nlriochecker.dataset import load_dataset
@@ -606,7 +708,7 @@ def _controleer_parser(ontologie: Ontologie, vensters: Sequence[tuple[int, int]]
             f"  GELIJK -- ook beide klassentellingen ({len(scan_knopen)} knoopklassen, "
             f"{len(scan_verbindingen)} verbindingklassen) komen overeen."
         )
-        return
+        return gescand, vensters
     print("  VERSCHIL -- de regelscan wijkt af van de pakketlader:")
     for label, links, rechts in zip(
         ("knopen", "verbindingen", "knoopklassen", "verbindingklassen"),
@@ -627,11 +729,12 @@ def main() -> None:
     klassen = _huidige_klassen()
     print(f"  [klassen] is in beide bestanden gelijk; {len(klassen)} sleutels gelezen.")
     ontologie = Ontologie.laad(ONTOLOGIE)
-    _toets_regelvorm(EXPORT)
+    regels = _toets_regelvorm(EXPORT)
     print(f"  regelvorm van {EXPORT.name}: vlak, geen verkorte notatie -- scan is geldig.")
-    _controleer_parser(ontologie, CONTROLEVENSTERS)
+    uittreksel, vensters = _controleer_parser(ontologie, CONTROLEVENSTERS)
 
     export = Export.scan(EXPORT, ontologie)
+    _dekking_van_de_ijking(export, uittreksel, vensters, regels)
     _kop("OMVANG van de export")
     print(f"  getypeerde objecten: {len(export.types)}")
     print(f"  knopen             : {len(export.knopen)}")
