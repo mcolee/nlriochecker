@@ -157,9 +157,11 @@ def _typing_section(analyse: MetingAnalysis) -> list[str]:
     if onbeoordeelbaar:
         lines += [
             "",
-            f"> Niet beoordeeld: {', '.join(onbeoordeelbaar)}. Dat zijn verbindingsklassen; "
-            "ze staan op de orientatie van een streng en zijn niet naar objecten te "
-            "herleiden. Ze tellen niet mee in het aantal en niet in de score.",
+            f"> Niet beoordeeld: {', '.join(onbeoordeelbaar)}. Die klassen zijn niet naar "
+            "objecten in het domeinmodel te herleiden: dat kent alleen knopen en strengen, "
+            "en een verbindingsklasse staat bovendien op de orientatie van een streng en "
+            "niet op de streng zelf. Ze tellen niet mee in het aantal en niet in de score, "
+            "dus over hun objecten zegt de typeringsscore niets.",
         ]
 
     if not any(analyse.per_cfk[cfk].typing_gate.resolved for cfk in analyse.meting.cfks):

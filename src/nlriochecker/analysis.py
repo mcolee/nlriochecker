@@ -23,10 +23,11 @@ class TypingGate:
     en is er geen score te geven.
 
     `unassessable_classes` is de deelverzameling van `classes` die niet naar objecten
-    te herleiden is: verbindingsklassen staan op de orientatie van een streng en
-    zijn met het domeinmodel niet te selecteren. Ze tellen niet mee in de score, en
-    ze staan hier apart omdat het rapport ze moet noemen -- stilte over een klasse
-    die niet beoordeeld is leest als "beoordeeld en niets gevonden".
+    in het domeinmodel te herleiden is: dat model kent alleen knopen en strengen, en
+    een verbindingsklasse staat bovendien op de orientatie van een streng en niet op
+    de streng zelf. Ze tellen niet mee in de score, en ze staan hier apart omdat het
+    rapport ze moet noemen -- stilte over een klasse die niet beoordeeld is leest als
+    "beoordeeld en niets gevonden".
     """
 
     classes: list[str]
@@ -139,6 +140,16 @@ def bepaal_typeringspoort(report: ShaclReport, dataset: GwswDataset | None = Non
     `GwswDataset.is_connection_class`). Dat is geen vergissing van de gebruiker maar
     een meetuitkomst -- `Afvoerrelatie` is precies de vorm die een CFK te globaal
     kan noemen -- dus de klasse wordt onbeoordeelbaar genoemd en de run loopt door.
+
+    Diezelfde behandeling krijgt elke klasse die op nul objecten uitkomt terwijl de
+    graaf er wel instanties van draagt. Dat is niet het hypothetische geval maar het
+    werkelijke: over de drie aangeleverde SHACL-rapporten samen noemt `CfkTypes_typ`
+    drie klassen, en `Rioolstelsel` en `MechanischRioolstelsel` zijn er twee van. Die
+    staan onder `Stelsel` en zijn dus knoop noch streng, dus `of_class()` geeft er stil
+    `[]` op terug -- en zonder deze tak zou de poort er nul te globale objecten voor
+    scoren zonder een woord, terwijl de dataset de stelsels wel bevat. Nul objecten bij
+    nul instanties is iets anders: dan komt de klasse in deze dataset niet voor, en dat
+    is een echte nul.
     """
     klassen = report.too_generic_classes
     if dataset is None:
@@ -150,7 +161,11 @@ def bepaal_typeringspoort(report: ShaclReport, dataset: GwswDataset | None = Non
         if dataset.is_connection_class(klasse):
             onbeoordeelbaar.append(klasse)
             continue
-        objecten.update(dataset.of_class(klasse))
+        gevonden = dataset.of_class(klasse)
+        if not gevonden and dataset.subjects_of_class(klasse):
+            onbeoordeelbaar.append(klasse)
+            continue
+        objecten.update(gevonden)
 
     return TypingGate(
         classes=klassen,
