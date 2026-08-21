@@ -1502,6 +1502,19 @@ En `CheckRun.weggelaten` telt sindsdien ook de nulbevindingen die de afbakening 
 studiegebied wegliet. Het is nu de ene plek waar dat getal vandaan komt, zodat de
 opdrachtregel, het rapport en de synthese er niet drie kunnen noemen.
 
+**Het dashboard draagt allebei de bronnen, met lege checkkolommen.** `overzicht_checks` in
+de GeoPackage bleef aanvankelijk op `run.outcomes` staan en toonde dus alleen het register,
+terwijl de tabel zich als de checklijst presenteert (issue #24). Er staat nu een rij per
+SHACL-vorm naast de rijen per check, uit dezelfde meldingenstroom en met de kolom `cfk`
+erbij. De kolommen die alleen een `CheckOutcome` kent -- de omschrijving, `bekeken`,
+`percentage_populatie`, `skelet` -- blijven op zo'n rij **leeg**: er is geen populatie
+bekeken en er is geen titel, en een gevuld getal zou een dekking beweren die niemand
+gemeten heeft. Dat is dezelfde regel als hierboven bij de overtreding zonder object. De
+ernst is de zwaarste binnen de vorm, gelijk aan wat het rapport per vorm toont; twee
+uitvoervormen die over dezelfde vorm een andere ernst noemen zou erger zijn dan geen van
+beide. `scripts/steekproef.py` leest deze tabel op naam en filtert al op
+`bron = "register"`, dus de steekproef ziet hetzelfde als voorheen.
+
 **Het contract.** `cfk` is een achterwaarts verenigbare toevoeging, dus `schema_versie`
 gaat van `1.0` naar `1.1` en niet naar `2.0`. `docs/json-schema.md` beschrijft het veld en
 de nulmetingmeldingen; de twee drifttests bewaken dat het document de velden en de versie

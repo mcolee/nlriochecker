@@ -66,6 +66,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **`overzicht_checks` in de GeoPackage draagt nu ook de nulmeting** (issue #24). De
+  tabel presenteert zich als het overzicht van wat er gemeten is, maar haar rijen kwamen
+  uitsluitend uit `run.outcomes` met `bron` hardgecodeerd op `"register"`. SHACL-vormen
+  zijn geen `CheckOutcome`, dus wie de tabel als checklijst las, miste de tweede bron --
+  op De Wolden 105.963 meldingen. Er komt nu een rij per SHACL-vorm bij, met
+  `bron = "nulmeting"`, het aantal overtredingen, de zwaarste ernst van die vorm en de
+  nieuwe kolom `cfk` met de conformiteitsklassen die hem stellen. Wat alleen een
+  `CheckOutcome` weet -- de omschrijving, `bekeken`, `percentage_populatie`, `skelet` --
+  blijft op die rijen leeg in plaats van verzonnen. De registerrijen zijn ongewijzigd en
+  `scripts/steekproef.py` filtert al op `bron = "register"`, dus die leest hetzelfde als
+  voorheen.
 - **Vier manieren waarop het klimmen door de `hasPart`-boom stil het verkeerde
   antwoord gaf** (issue #36). Alle vier zijn latent op De Wolden en bijten bij de
   volgende aanlevering; ze falen zonder melding, met alleen een ontbrekende waarde als

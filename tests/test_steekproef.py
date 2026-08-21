@@ -216,6 +216,21 @@ def test_schrijft_een_geopackage_met_de_vier_lagen(tmp_path: Path) -> None:
         ("TOP-001", "Put zonder aansluiting", "register", "F", "TOP", "Consistentie", 4, 100, ""),
         ("NET-003", "Bodem stijgt", "register", "F", "NET", "Plausibiliteit", 1, 100, ""),
         ("BTR-001", "Inwinning", "register", "W", "BTR", "Traceerbaarheid", 0, 0, "vereist meta"),
+        # Sinds issue #24 draagt `overzicht_checks` ook de nulmeting. De steekproef
+        # gaat over de eigen checks en filtert die rijen weg; zou dat filter ooit
+        # sneuvelen, dan kreeg de dekkingstabel er honderden SHACL-vormen bij met
+        # `bekeken` leeg, en zou `reden()` van elk daarvan "niets bekeken" beweren.
+        (
+            "NULMETING-LengteLeiding_val",
+            "",
+            "nulmeting",
+            "F",
+            "NULMETING",
+            "Compliance",
+            1,
+            None,
+            "",
+        ),
     ]
     bron = _bron_geopackage(tmp_path / "run.gpkg", meldingen, checks)
     doel = tmp_path / "steekproef.gpkg"

@@ -23,6 +23,7 @@ from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import bouw_nulbevindingen
 from nlriochecker.uitvoer import schrijf_uitvoer
 from nlriochecker.uitvoer.bevindingen import FILE_CHECKS_CSV, FILE_CHECKS_JSON
+from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 SHACL_DIR = Path(__file__).parent / "fixtures" / "shacl"
@@ -30,15 +31,19 @@ RUNDATUM = date(2026, 8, 19)
 CFKS = ["MdsPlan", "MdsProj"]
 
 
-def _run() -> CheckRun:
-    """Een run over de join-fixture, met de nulbevindingen van twee CFK-rapporten."""
+def _run(check_ids: list[str] | None = None) -> CheckRun:
+    """Een run over de join-fixture, met de nulbevindingen van twee CFK-rapporten.
+
+    Zonder `check_ids` draait er geen enkele eigen check: deze tests gaan over de
+    nulmeting. Een test die de twee bronnen naast elkaar wil zien, vraagt er een.
+    """
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
     dataset = load_dataset(TTL_DIR / "nulmeting_join.ttl")
     nulmeting = laad_nulmeting(
         [SHACL_DIR / "join_mdsplan.csv", SHACL_DIR / "join_mdsproj.csv"], CFKS, CFKS
     )
-    run = run_checks(CheckContext(dataset=dataset, config=config), [])
+    run = run_checks(CheckContext(dataset=dataset, config=config), check_ids or [])
     return replace(
         run,
         nulbevindingen=tuple(
@@ -99,6 +104,55 @@ def test_de_geopackage_meldingtabel_draagt_de_kolom_cfk(tmp_path: Path) -> None:
         verbinding.close()
 
     assert rijen and all(rij[0] == "MdsPlan, MdsProj" for rij in rijen)
+
+
+def test_het_checkoverzicht_draagt_naast_het_register_ook_de_nulmeting(tmp_path: Path) -> None:
+    """Een dashboard dat zich als de checklijst presenteert, mist anders de helft."""
+    run = _run(["ATTR-008"])
+    uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM)
+
+    assert uitvoer.geopackage is not None
+    verbinding = sqlite3.connect(f"file:{uitvoer.geopackage}?mode=ro", uri=True)
+    try:
+        vormen = {
+            rij[0]
+            for rij in verbinding.execute(
+                "select check_id from overzicht_checks where bron = 'nulmeting'"
+            )
+        }
+        ((nulrijen,), (register,)) = verbinding.execute(
+            "select count(*) from overzicht_checks group by bron order by bron"
+        ).fetchall()
+        ((meldingrijen,),) = verbinding.execute("select count(*) from meldingen").fetchall()
+    finally:
+        verbinding.close()
+
+    assert vormen == {f"NULMETING-{bevinding.vorm}" for bevinding in run.nulbevindingen}
+    # Een rij per vorm, niet een rij per overtreding: de verzameling hierboven ziet
+    # een dubbele rij niet, deze telling wel.
+    assert nulrijen == len(vormen)
+    # De register-rijen blijven ongemoeid: precies de gedraaide checks, niet meer.
+    assert register == len(run.outcomes) == 1
+    # En de meldingentabel is niet veranderd door de tweede bron in het dashboard.
+    assert meldingrijen == len(bouw_meldingen(run, RUNDATUM))
+
+
+def test_een_nulmetingrij_telt_zijn_vorm_en_laat_de_checkkolommen_leeg(tmp_path: Path) -> None:
+    """Wat alleen een `CheckOutcome` weet, blijft leeg; een verzonnen getal is erger."""
+    uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM)
+
+    assert uitvoer.geopackage is not None
+    verbinding = sqlite3.connect(f"file:{uitvoer.geopackage}?mode=ro", uri=True)
+    try:
+        (rij,) = verbinding.execute(
+            "select omschrijving, ernst, categorie, dimensie, aantal_meldingen, bekeken, "
+            "percentage_populatie, systemisch, aantal_gebieden, skelet, cfk "
+            "from overzicht_checks where check_id = 'NULMETING-Put_HoogtePut_card'"
+        ).fetchall()
+    finally:
+        verbinding.close()
+
+    assert rij == ("", "F", "NULMETING", "Compliance", 4, None, None, 1, 0, "", "MdsPlan, MdsProj")
 
 
 def test_de_puttenlaag_telt_de_nulmeldingen_in_haar_eigen_kolom(tmp_path: Path) -> None:

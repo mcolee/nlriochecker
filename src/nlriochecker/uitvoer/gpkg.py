@@ -42,7 +42,7 @@ from nlriochecker.dataset import Conduit
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
-from nlriochecker.uitvoer.melding import Melding, categorie_van
+from nlriochecker.uitvoer.melding import BRON_NULMETING, BRON_REGISTER, Melding, categorie_van
 from nlriochecker.uitvoer.objectkaart import (
     Objectkop,
     bepaal_status,
@@ -880,6 +880,9 @@ OVERZICHT_KOLOMMEN = [
     _Kolom("systemisch", "integer"),
     _Kolom("aantal_gebieden", "integer"),
     _Kolom("skelet", "text"),
+    # De conformiteitsklassen die deze vorm stellen, net als in `meldingen`. Leeg op
+    # een registerrij: een eigen check toetst niet tegen een CFK.
+    _Kolom("cfk", "text"),
 ]
 
 MELDING_KOLOMMEN = [
@@ -1003,28 +1006,37 @@ def _schrijf_meldingen(verbinding: sqlite3.Connection, meldingen: list[Melding])
 def _schrijf_overzicht(
     verbinding: sqlite3.Connection, run: CheckRun, meldingen: list[Melding]
 ) -> None:
-    """Schrijft het dashboard: een rij per check, ook die zonder bevindingen.
+    """Schrijft het dashboard: een rij per check en een rij per SHACL-vorm.
 
     Ook de skeletchecks staan erin. Een check die ontbreekt leest als een check
     zonder problemen, en dat is precies het misverstand dat dit project vermijdt.
+    Om diezelfde reden staat de nulmeting erin: ze is de tweede bron in deze
+    meldingenstroom, en een dashboard dat alleen het register toont, presenteert de
+    helft van de meting als het geheel. Zie issue #24.
     """
     kolommen = OVERZICHT_KOLOMMEN
     _maak_attribuuttabel(
-        verbinding, "overzicht_checks", kolommen, "Een rij per check: het dashboard."
+        verbinding,
+        "overzicht_checks",
+        kolommen,
+        "Een rij per eigen check en een rij per SHACL-vorm uit de nulmeting; zie de kolom bron.",
     )
 
     systemisch = {melding.check_id for melding in meldingen if melding.systemisch}
     gebieden: dict[str, set[str]] = defaultdict(set)
     per_check: dict[str, list[Melding]] = defaultdict(list)
+    per_vorm: dict[str, list[Melding]] = defaultdict(list)
     for melding in meldingen:
         gebieden[melding.check_id].add(melding.gebied)
         per_check[melding.check_id].append(melding)
+        if melding.bron == BRON_NULMETING:
+            per_vorm[melding.check_id].append(melding)
 
-    rijen = [
+    rijen: list[tuple[object, ...]] = [
         (
             outcome.check_id,
             outcome.title,
-            "register",
+            BRON_REGISTER,
             outcome.severity.value,
             categorie_van(outcome.check_id),
             outcome.dimension.value,
@@ -1036,8 +1048,38 @@ def _schrijf_overzicht(
             int(outcome.check_id in systemisch),
             len({gebied for gebied in gebieden.get(outcome.check_id, set()) if gebied}),
             outcome.skeleton,
+            "",
         )
         for outcome in run.outcomes
+    ]
+    rijen += [
+        (
+            check_id,
+            # Een SHACL-vorm draagt geen titel zoals een eigen check. De kolommen die
+            # alleen een `CheckOutcome` kent -- de omschrijving, hoeveel objecten
+            # bekeken zijn, het skelet -- blijven daarom leeg; een gevulde waarde zou
+            # een dekking beweren die niemand gemeten heeft.
+            "",
+            BRON_NULMETING,
+            # De zwaarste ernst binnen de vorm, dezelfde regel als in het rapport
+            # (`bevindingen._detail_nulmeting`): twee overtredingen van dezelfde vorm
+            # kunnen in ernst verschillen, en dan hoort hier de zwaarste te staan en
+            # niet de toevallig eerste. Een meningsverschil tussen twee CFK-rapporten
+            # over dezelfde overtreding is al eerder beslecht, in `_ontdubbel`.
+            Severity.ERROR.value
+            if any(melding.ernst == Severity.ERROR.value for melding in groep)
+            else Severity.WARNING.value,
+            groep[0].categorie,
+            groep[0].dimensie,
+            len(groep),
+            None,
+            None,
+            int(check_id in systemisch),
+            len({melding.gebied for melding in groep if melding.gebied}),
+            "",
+            ", ".join(sorted({cfk for melding in groep for cfk in melding.cfk})),
+        )
+        for check_id, groep in sorted(per_vorm.items())
     ]
     velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
     plaatshouders = ", ".join("?" * len(kolommen))
