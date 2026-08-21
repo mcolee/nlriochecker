@@ -12,7 +12,7 @@ import re
 from collections.abc import Iterator
 from datetime import date
 
-from rdflib import RDF, URIRef
+from rdflib import URIRef
 
 from nlriochecker.checks.base import (
     Check,
@@ -24,7 +24,7 @@ from nlriochecker.checks.base import (
 )
 from nlriochecker.checks.selectie import leidingen, netwerkknopen
 from nlriochecker.checks.verbanden import aansluitingen
-from nlriochecker.dataset import HAS_CONNECTION, HAS_PART, Conduit, Node
+from nlriochecker.dataset import HAS_CONNECTION, Conduit, Node, part_holders_of, parts_of
 
 
 @register
@@ -259,7 +259,7 @@ class PuttypePastNietBijLeiding(Check):
         for conduit in index.strengen(node.uri):
             if any(dataset.is_a(conduit.uri, wortel) for wortel in regel.vereist_een_van):
                 return True
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
+        for deel in parts_of(dataset.graph, URIRef(node.uri)):
             if any(dataset.graph_is_a(str(deel), wortel) for wortel in regel.vereist_een_van):
                 return True
         return False
@@ -334,7 +334,7 @@ class PutonderdelenZonderVerbinding(Check):
         """De compartimenten van een put, als URI's."""
         dataset = context.dataset
         gevonden = []
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
+        for deel in parts_of(dataset.graph, URIRef(node.uri)):
             uri = str(deel)
             if uri in dataset.nodes and dataset.nodes[uri].orientation is not None:
                 gevonden.append(uri)
@@ -355,7 +355,7 @@ class PutonderdelenZonderVerbinding(Check):
             # Een verbinding loopt via een begin- of eindpunt van een onderdeel; dat
             # eindpunt hangt met hasPart aan een onderdeelorientatie.
             for buur in buren:
-                for houder in dataset.graph.subjects(HAS_PART, URIRef(buur)):
+                for houder in part_holders_of(dataset.graph, URIRef(buur)):
                     andere = self._raakt_ander_onderdeel(dataset, houder, orientaties, orientatie)
                     if andere:
                         return True
@@ -365,7 +365,7 @@ class PutonderdelenZonderVerbinding(Check):
 
     def _raakt_ander_onderdeel(self, dataset, houder, orientaties: set[str], eigen: str) -> bool:
         """Geeft aan of deze onderdeelorientatie ook een ander compartiment raakt."""
-        for deel in dataset.graph.objects(houder, HAS_PART):
+        for deel in parts_of(dataset.graph, houder):
             for buur in dataset.graph.objects(deel, HAS_CONNECTION):
                 if str(buur) in orientaties and str(buur) != eigen:
                     return True
@@ -439,13 +439,11 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
     def _compartimenten(self, context: CheckContext, node) -> list[str]:
         """De compartimenten van een put, inclusief subklassen als een pompkelder."""
         dataset = context.dataset
-        afsluiting = dataset.closure("Compartiment")
-        gevonden = []
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
-            soorten = {str(soort) for soort in dataset.graph.objects(deel, RDF.type)}
-            if soorten & afsluiting:
-                gevonden.append(str(deel))
-        return gevonden
+        return [
+            str(deel)
+            for deel in parts_of(dataset.graph, URIRef(node.uri))
+            if dataset.graph_is_a(str(deel), "Compartiment")
+        ]
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten compartimenten hebben."""

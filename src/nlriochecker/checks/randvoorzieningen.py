@@ -43,7 +43,7 @@ from nlriochecker.checks.verbanden import (
     deelstelsel_ids,
     netwerkdelen,
 )
-from nlriochecker.dataset import HAS_PART, Node
+from nlriochecker.dataset import Node, part_holders_of, parts_of
 
 
 @dataclass(frozen=True)
@@ -110,7 +110,7 @@ def _bouw_drempels(context: CheckContext) -> dict[str, list[Drempel]]:
             niveau = _waarde(context, subject, "Drempelniveau")
             breedte = _waarde(context, subject, "Drempelbreedte")
             put_uri = None
-            for houder in dataset.graph.subjects(HAS_PART, subject):
+            for houder in part_holders_of(dataset.graph, subject):
                 put_uri = dataset.resolve_network_node(str(houder), wortels)
                 if put_uri is not None:
                     break
@@ -582,7 +582,7 @@ class BbbZonderLediging(Check):
         dataset = context.dataset
         from rdflib import URIRef
 
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
+        for deel in parts_of(dataset.graph, URIRef(node.uri)):
             if any(dataset.graph_is_a(str(deel), wortel) for wortel in klassen):
                 return True
         return False

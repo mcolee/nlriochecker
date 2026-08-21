@@ -153,8 +153,18 @@ def maaiveld(naam: str, hoogte: float, wijze: str | None = None) -> str:
 """
 
 
-def deksel(naam: str, niveau: float, wijze: str | None = None, datum: str | None = None) -> str:
-    """Hangt een putdeksel met dekselniveau (en eventueel inwinning) aan een put."""
+def deksel(
+    naam: str,
+    niveau: float,
+    wijze: str | None = None,
+    datum: str | None = None,
+    klasse: str = "Putdeksel",
+) -> str:
+    """Hangt een putdeksel met dekselniveau (en eventueel inwinning) aan een put.
+
+    Met `klasse` een subklasse als `Putdeksel_ZwaarVerkeer`; de fixture moet die dan
+    zelf als subklasse van Putdeksel declareren, want de prelude kent haar niet.
+    """
     inwinning = ""
     if wijze or datum:
         delen = []
@@ -168,7 +178,7 @@ def deksel(naam: str, niveau: float, wijze: str | None = None, datum: str | None
         )
     return f"""
 :{naam} gwsw:hasPart :{naam}_dek .
-:{naam}_dek rdf:type gwsw:Putdeksel ;
+:{naam}_dek rdf:type gwsw:{klasse} ;
     gwsw:hasAspect :{naam}_dek_ori .
 :{naam}_dek_ori rdf:type gwsw:Dekselorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue {niveau}{inwinning} ] .
@@ -1324,6 +1334,91 @@ FIXTURES["geometriefout.ttl"] = (
             '<gml:posList srsDimension=\\"2\\">1050.0 2000.0</gml:posList></gml:LineString>'
         ),
     ),
+)
+
+# ---------------------------------------------------------------------------
+# Vier vormen die de lader zelf moeten bijten. De Wolden kent ze geen van vieren,
+# dus zonder deze fixtures is er geen dataset waarop de reparaties uit issue #36
+# zichtbaar zijn. Ze dragen geen defect: ze zijn conform GWSW 1.6 geschreven en
+# horen dus juist wél gelezen te worden.
+# ---------------------------------------------------------------------------
+
+FIXTURES["dataset_zwaarverkeerdeksel.ttl"] = (
+    "geen; put B draagt een Putdeksel_ZwaarVerkeer in plaats van een kaal Putdeksel",
+    "# De subklasse staat niet in de gedeelde prelude; alleen deze fixture heeft haar nodig.\n"
+    "gwsw:Putdeksel_ZwaarVerkeer rdfs:subClassOf gwsw:Putdeksel .\n\n"
+    + hoogteput("PutA", "A", A)
+    + hoogteput("PutB", "B", B, dek=None)
+    + deksel("PutB", 9.95, klasse="Putdeksel_ZwaarVerkeer")
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),
+)
+
+
+def _twee_houders(straat_eerst: bool) -> str:
+    """Een compartiment onder twee houders, in de gevraagde schrijfvolgorde.
+
+    Het GWSW staat meer dan een houder toe en rdflib levert ze in schrijfvolgorde
+    op. Staat de straat vooraan, dan loopt een wandeling die de eerste houder volgt
+    dood: een `Straat` is geen knoop en draagt zelf geen houder.
+    """
+    houders = [":PutB gwsw:hasPart :PutB_c1 .", ":Straat1 gwsw:hasPart :PutB_c1 ."]
+    if straat_eerst:
+        houders.reverse()
+    return (
+        nette_put("PutA", "A", *A)
+        + nette_put("PutB", "B", *B)
+        + nette_leiding("L1", "1", [A, B], "PutA", "PutB_c1")
+        + '\n:Straat1 rdf:type gwsw:Straat ; rdfs:label "Dorpsstraat" .\n'
+        + "\n".join(houders)
+        + '\n:PutB_c1 rdf:type gwsw:Compartiment ; rdfs:label "B/c1" ;\n'
+        "    gwsw:hasAspect :PutB_c1_ori .\n"
+        ":PutB_c1_ori rdf:type gwsw:Compartimentorientatie .\n"
+    )
+
+
+FIXTURES["dataset_twee_houders_put_eerst.ttl"] = (
+    "geen; compartiment B/c1 hangt onder put B en onder een straat, put eerst geschreven",
+    _twee_houders(straat_eerst=False),
+)
+
+FIXTURES["dataset_twee_houders_straat_eerst.ttl"] = (
+    "geen; hetzelfde compartiment onder dezelfde twee houders, straat eerst geschreven",
+    _twee_houders(straat_eerst=True),
+)
+
+# Dezelfde twee putten en streng als elders, maar met `isPartOf` en `isAspectOf`
+# geschreven. Het GWSW declareert die als de inverse van `hasPart` en `hasAspect`,
+# dus dit is een conforme export -- alleen een andere schrijfrichting.
+FIXTURES["dataset_inverse_properties.ttl"] = (
+    "geen; alle insluitingen staan als isPartOf/isAspectOf in plaats van hasPart/hasAspect",
+    """:PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" .
+:PutA_ori rdf:type gwsw:Putorientatie ; gwsw:isAspectOf :PutA .
+:PutA_pun rdf:type gwsw:Punt ; gwsw:isAspectOf :PutA_ori ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral .
+:PutB rdf:type gwsw:Inspectieput ; rdfs:label "B" .
+:PutB_ori rdf:type gwsw:Putorientatie ; gwsw:isAspectOf :PutB .
+:PutB_pun rdf:type gwsw:Punt ; gwsw:isAspectOf :PutB_ori ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral .
+:L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" .
+:L1_ori rdf:type gwsw:Leidingorientatie ; gwsw:isAspectOf :L1 .
+:L1_lij rdf:type gwsw:Lijn ; gwsw:isAspectOf :L1_ori ;
+    gwsw:hasValue "<gml:LineString xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:posList srsDimension=\\"2\\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral .
+:L1_b rdf:type gwsw:BeginpuntLeiding ; gwsw:isPartOf :L1_ori ; gwsw:hasConnection :PutA_ori .
+:L1_b_bob rdf:type gwsw:BobBeginpuntLeiding ; gwsw:isAspectOf :L1_b ; gwsw:hasValue 8.60 .
+:L1_e rdf:type gwsw:EindpuntLeiding ; gwsw:isPartOf :L1_ori ; gwsw:hasConnection :PutB_ori .
+:L1_e_bob rdf:type gwsw:BobEindpuntLeiding ; gwsw:isAspectOf :L1_e ; gwsw:hasValue 8.55 .
+""",
+)
+
+# Een uitlaatconstructie die daarnaast als bouwwerk getypeerd is. Alfabetisch wint
+# "Bouwwerk", maar dat is de algemenere van de twee: de ontologie zegt dat
+# Uitlaatconstructie een subklasse van Bouwwerk is.
+FIXTURES["dataset_meervoudig_objecttype.ttl"] = (
+    "geen; bouwwerk U draagt zowel gwsw:Bouwwerk als gwsw:Uitlaatconstructie",
+    put("Uitlaat1", "U", 1100.0, 2000.0, klasse="Uitlaatconstructie").replace(
+        "gwsw:Putorientatie", "gwsw:Bouwwerkorientatie"
+    )
+    + ":Uitlaat1 rdf:type gwsw:Bouwwerk .\n",
 )
 
 

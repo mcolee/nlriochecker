@@ -13,6 +13,33 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Vier manieren waarop het klimmen door de `hasPart`-boom stil het verkeerde
+  antwoord gaf** (issue #36). Alle vier zijn latent op De Wolden en bijten bij de
+  volgende aanlevering; ze falen zonder melding, met alleen een ontbrekende waarde als
+  spoor. (1) Het putdekselniveau werd alleen onder een *exact* `gwsw:Putdeksel`
+  gezocht. Het GWSW kent `Putdeksel_LichtVerkeer` en `Putdeksel_ZwaarVerkeer` als
+  subklassen, en zo'n put verloor dus haar dekselniveau, waarna `Node.bovenkant` op de
+  maaiveldhoogte terugviel en elke hoogtecheck op een andere hoogte rekende. De lader
+  gebruikt nu de subklasse-afsluiting, zoals overal elders. (2) Een object onthield
+  maar een houder, terwijl het GWSW er meer toestaat (`Put isPartOf` Straat *en*
+  Afwateringsgebied) en de export ze ook schrijft. Welke houder de eerste was hing af
+  van de schrijfvolgorde; viel de wandeling op de verkeerde tak, dan liep zij dood en
+  telde de streng als niet aangesloten. `Node.parents` draagt ze nu alle,
+  `GwswDataset.klim_naar_knoop()` loopt in de breedte omhoog -- zoals
+  `nulbevinding._Joiner` al deed -- en `afbakening` gaat langs diezelfde wandeling in
+  plaats van langs een eigen kopie. (3) `gwsw:isPartOf` en `gwsw:isAspectOf` werden
+  nergens gelezen, terwijl de ontologie ze als inverse van `hasPart` en `hasAspect`
+  declareert. Een conforme export die ze schrijft leverde nul knopen en nul strengen op
+  -- geen foutmelding, alleen een leeg rapport dat er goed uitziet. Beide
+  schrijfrichtingen tellen nu mee, net als bij `hasConnection`. (4) Bij meer dan een
+  `rdf:type` koos `beheerobjecttype()` de alfabetisch eerste, zodat een object dat
+  zowel `Bouwwerk` als `Uitlaatconstructie` is "Bouwwerk" ging heten. Nu wint de
+  specifiekste klasse volgens de subsumptierelatie van de ontologie; blijven er
+  onvergelijkbare typen over, dan beslist het alfabet, want de ontologie wijst daar
+  geen winnaar aan. Vijf fixtures (`dataset_*.ttl`) leggen de vier vast. Op De Wolden
+  verandert er niets: die aanlevering kent geen `Putdeksel`, geen `Putdekselniveau`,
+  geen `isPartOf`, geen `isAspectOf` en geen enkel meervoudig getypeerd subject.
+
 - **Twee checktakken die nooit konden vuren: een onderdeel dat via `hasPart` aan een
   object hangt was op klasse niet te herkennen** (issue #34). `is_a()` leest het
   domeinmodel, en dat kent alleen knopen en strengen; een `Overstortdrempel` of een

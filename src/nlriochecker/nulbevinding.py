@@ -40,7 +40,7 @@ from dataclasses import dataclass
 
 from rdflib import URIRef
 
-from nlriochecker.dataset import GWSW, GwswDataset
+from nlriochecker.dataset import GWSW, GwswDataset, aspect_holders_of, part_holders_of
 from nlriochecker.meting import Nulmeting
 
 logger = logging.getLogger(__name__)
@@ -58,8 +58,6 @@ ERNST_VIOLATION = "Violation"
 # (beginpunt, orientatie, streng); de rem is er tegen een cyclus in de brondata.
 MAX_DIEPTE = 6
 
-HAS_PART = URIRef(f"{GWSW}hasPart")
-HAS_ASPECT = URIRef(f"{GWSW}hasAspect")
 HAS_CONNECTION = URIRef(f"{GWSW}hasConnection")
 
 
@@ -354,8 +352,8 @@ class _Joiner:
         """
         knoop = URIRef(uri)
         graaf = self._dataset.graph
-        insluitend = {str(houder) for houder in graaf.subjects(HAS_PART, knoop)}
-        insluitend |= {str(houder) for houder in graaf.subjects(HAS_ASPECT, knoop)}
+        insluitend = {str(houder) for houder in part_holders_of(graaf, knoop)}
+        insluitend |= {str(houder) for houder in aspect_holders_of(graaf, knoop)}
         if insluitend or not met_verbinding:
             return insluitend
         verbonden = {str(ander) for ander in graaf.subjects(HAS_CONNECTION, knoop)}

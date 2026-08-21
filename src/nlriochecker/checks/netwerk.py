@@ -17,7 +17,7 @@ from nlriochecker.checks.base import (
 )
 from nlriochecker.checks.selectie import infiltratieleidingen, vrijvervalrioolleidingen
 from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import HAS_PART, Conduit, GwswDataset
+from nlriochecker.dataset import Conduit, GwswDataset, part_holders_of
 from nlriochecker.taal import getal, vorm
 
 
@@ -497,7 +497,7 @@ class ItStelselZonderDrempel(Check):
         knopen: set[str] = set()
         for wortel in context.config.klassen.drempel:
             for drempel in dataset.subjects_of_class(wortel):
-                for houder in dataset.graph.subjects(HAS_PART, drempel):
+                for houder in part_holders_of(dataset.graph, drempel):
                     knoop = dataset.resolve_network_node(str(houder), wortels)
                     if knoop is not None:
                         knopen.add(knoop)

@@ -182,7 +182,7 @@ def _sluit_tussenschakels(
 ) -> set[str]:
     """De compartimenten en hulpstukken die de behouden strengen nodig hebben.
 
-    `GwswDataset.resolve_network_node` loopt via `parent` omhoog tot een put en
+    `GwswDataset.resolve_network_node` loopt via `parents` omhoog tot een put en
     heeft daarbij elke tussenliggende schakel in `dataset.nodes` nodig -- in dit
     domein normaal: een streng koppelt niet altijd rechtstreeks aan een put, maar
     soms aan een compartiment of hulpstuk zonder eigen geometrie. Kern en schil
@@ -206,25 +206,14 @@ def _sluit_tussenschakels(
 def _ouderketen(dataset: GwswDataset, uri: str | None, wortels: list[str]) -> set[str]:
     """De schakels op de weg omhoog naar de herleidbare netwerkknoop, die erbij.
 
-    Loopt hetzelfde pad als `resolve_network_node`, met dezelfde cyclusbeveiliging.
-    Stopt zodra een schakel niet in `dataset.nodes` staat: op dat punt zou
-    `resolve_network_node` ook op de volledige dataset al None geven, en verder
-    toevoegen zou objecten in de analyseset zetten die niet in `dataset.nodes` of
-    `dataset.conduits` voorkomen.
+    Loopt langs `GwswDataset.klim_naar_knoop`, dezelfde wandeling als
+    `resolve_network_node` -- twee klimfuncties naast elkaar zouden op een export met
+    meervoudige houders uiteenlopen, en dan houdt de analyseset precies de schakel
+    niet vast die de resolutie nodig heeft. Schakels die niet in `dataset.nodes`
+    staan blijven eruit: die zouden objecten in de analyseset zetten die niet in
+    `dataset.nodes` of `dataset.conduits` voorkomen.
     """
-    keten: set[str] = set()
-    gezien: set[str] = set()
-    huidig = uri
-    while huidig is not None and huidig not in gezien:
-        gezien.add(huidig)
-        node = dataset.nodes.get(huidig)
-        if node is None:
-            break
-        keten.add(huidig)
-        if any(dataset.is_a(huidig, wortel) for wortel in wortels):
-            break
-        huidig = node.parent
-    return keten
+    return set(dataset.klim_naar_knoop(uri, wortels)[1])
 
 
 def _component(

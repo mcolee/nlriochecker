@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from nlriochecker.dataset import GwswDataset, load_dataset
+from nlriochecker.dataset import GWSW, GwswDataset, load_dataset
 from nlriochecker.errors import DatasetError
 
 JUINEN = "http://sparql.gwsw.nl/repositories/Juinen#"
@@ -155,6 +155,92 @@ def test_of_class_weigert_een_verbindingsklasse(juinen: GwswDataset) -> None:
     assert juinen.is_connection_class("Afvoerrelatie")
     assert not juinen.is_connection_class("Leiding")
     assert juinen.of_class("VrijvervalRioolleiding")
+
+
+def test_dekselniveau_onder_een_subklasse_van_putdeksel() -> None:
+    """Een Putdeksel_ZwaarVerkeer is een Putdeksel; zijn niveau hoort mee te komen.
+
+    Een exacte typevergelijking zou dit deksel overslaan, waarna `bovenkant` stil op
+    de maaiveldhoogte terugvalt -- geen melding, alleen een andere hoogte onder elke
+    hoogtecheck. Vandaar dat hier op de bovenkant getoetst wordt en niet alleen op
+    het kenmerk.
+    """
+    dataset = load_dataset(TTL_DIR / "dataset_zwaarverkeerdeksel.ttl")
+    put = next(node for node in dataset.nodes.values() if node.label == "B")
+
+    assert put.maaiveld == 10.0
+    assert put.dekselniveau == 9.95
+    assert put.bovenkant == 9.95
+
+
+@pytest.mark.parametrize(
+    "fixture", ["dataset_twee_houders_put_eerst.ttl", "dataset_twee_houders_straat_eerst.ttl"]
+)
+def test_klimmen_langs_meer_dan_een_houder(fixture: str) -> None:
+    """Het compartiment hangt onder de put en onder een straat; de put moet eruit komen.
+
+    Beide schrijfvolgordes staan er, want rdflib levert de houders op in de volgorde
+    waarin ze geschreven zijn. Volgt de wandeling een enkele houder, dan loopt zij op
+    de straat dood -- die is geen knoop en heeft zelf geen houder -- en telt de
+    streng ten onrechte als niet aangesloten.
+    """
+    dataset = load_dataset(TTL_DIR / fixture)
+    compartiment = next(uri for uri in dataset.nodes if uri.endswith("PutB_c1"))
+    put = next(uri for uri in dataset.nodes if uri.endswith("#PutB"))
+
+    assert len(dataset.nodes[compartiment].parents) == 2
+    assert dataset.resolve_network_node(compartiment, NETWERKWORTELS) == put
+    assert compartiment in dataset.klim_naar_knoop(compartiment, NETWERKWORTELS)[1]
+
+
+def test_inverse_properties_bouwen_hetzelfde_domeinmodel() -> None:
+    """Een export mag `isPartOf` en `isAspectOf` schrijven; dat is geen lege dataset.
+
+    Het GWSW declareert ze als de inverse van `hasPart` en `hasAspect`. Wie alleen de
+    voorwaartse richting leest, vindt hier nul knopen en nul strengen -- en dat is
+    geen melding maar een leeg rapport dat er goed uitziet.
+    """
+    dataset = load_dataset(TTL_DIR / "dataset_inverse_properties.ttl")
+    streng = next(iter(dataset.conduits.values()))
+
+    assert sorted(node.label for node in dataset.nodes.values()) == ["A", "B"]
+    assert streng.line is not None
+    assert dataset.nodes[streng.start_node or ""].label == "A"
+    assert dataset.nodes[streng.end_node or ""].label == "B"
+    assert streng.bob_start == 8.60
+
+
+def test_beheerobjecttype_kiest_de_specifiekste_klasse() -> None:
+    """Bij twee typen wint de subklasse, niet de eerste letter van het alfabet.
+
+    `Uitlaatconstructie` is volgens de ontologie een subklasse van `Bouwwerk`; een
+    alfabetische keuze zou het object "Bouwwerk" noemen en daarmee de kaartlegenda en
+    de aantallentabel op de algemenere naam zetten.
+    """
+    dataset = load_dataset(TTL_DIR / "dataset_meervoudig_objecttype.ttl")
+    uri = next(uri for uri, node in dataset.nodes.items() if node.label == "U")
+
+    assert {t.rsplit("/", 1)[-1] for t in dataset.nodes[uri].types} == {
+        "Bouwwerk",
+        "Uitlaatconstructie",
+    }
+    assert dataset.beheerobjecttype(uri) == "Uitlaatconstructie"
+
+
+def test_beheerobjecttype_bij_onvergelijkbare_typen(juinen: GwswDataset) -> None:
+    """Twee typen zonder subsumptierelatie: dan beslist het alfabet, en niets anders.
+
+    `Inspectieput_17` is zowel `Inspectieput` (onder `Rioolput`) als `VerdektePut`
+    (rechtstreeks onder `Put`). Geen van beide is een subklasse van de andere, dus de
+    ontologie wijst hier geen winnaar aan en de uitkomst is de alfabetisch eerste.
+    Deze test legt dat vast: welke van de twee een beheerobjecttype hoort te heten is
+    een domeinvraag, en de dag dat het antwoord verandert hoort dat hier te blijken.
+    """
+    uri = f"{JUINEN}Inspectieput_17"
+
+    assert f"{GWSW}VerdektePut" not in juinen.closure("Inspectieput")
+    assert f"{GWSW}Inspectieput" not in juinen.closure("VerdektePut")
+    assert juinen.beheerobjecttype(uri) == "Inspectieput"
 
 
 def test_verschil_met_de_structurele_herkenning_wordt_gemeld(juinen: GwswDataset) -> None:
