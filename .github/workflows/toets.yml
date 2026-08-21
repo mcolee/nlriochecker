@@ -30,15 +30,18 @@ jobs:
       # en is weer een grens die bijt: met 650 zou een regressie die tachtig tests
       # laat wegvallen er ongezien doorheen zijn gekomen.
       #
-      # De suite staat nu lokaal op 1312 geslaagd; 700 bijt dus niet meer. Het
-      # CI-aantal is niet geschat maar gemeten in een schone `git clone` van dev
-      # (die heeft `data/` niet, net als deze runner): 1139 geslaagd, 180
-      # overgeslagen. Daar gaan de 10 tests van tests/test_uitvoer_qgis.py nog af --
-      # de kloonmachine heeft QGIS, ubuntu-latest niet -- dus CI komt op ongeveer
-      # 1129. 1070 houdt daar dezelfde marge van circa 5% onder als 700 onder 736
-      # deed. Let op: 140 van de 142 gevallen van tests/test_gwsw_vocabulaire.py
-      # zitten in die 180 overslagen, want de GWSW-ontologie is niet getrackt.
-      NLRIOCHECKER_MIN_GESLAAGD: "1070"
+      # De suite staat nu lokaal op 1316 geslaagd; 700 bijt dus allang niet meer. Het
+      # CI-aantal is niet geschat maar gemeten in een schone `git clone` van dev (die
+      # heeft `data/` niet, net als deze runner): 1275 geslaagd, 48 overgeslagen.
+      # Daar gaan de 10 tests van tests/test_uitvoer_qgis.py nog af -- de kloonmachine
+      # heeft QGIS, ubuntu-latest niet -- dus CI komt op ongeveer 1265. 1200 houdt
+      # daar dezelfde marge van circa 5% onder als 700 onder 736 deed.
+      #
+      # Het sprong met 136 omhoog doordat data/gwsw-vocabulaire-index.json getrackt
+      # is: tests/test_gwsw_vocabulaire.py sloeg hier eerst 140 van zijn 142 gevallen
+      # over en draait nu op een na volledig mee. Die ene is de drifttest, die de
+      # ontologie zelf nodig heeft.
+      NLRIOCHECKER_MIN_GESLAAGD: "1200"
     steps:
       - uses: actions/checkout@v7
 
