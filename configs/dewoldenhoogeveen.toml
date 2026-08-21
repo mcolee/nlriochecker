@@ -31,7 +31,7 @@
 # Klassenwortels bepalen welke objecten als put, vrijvervalleiding of netwerk-
 # eindpunt tellen; de engine gebruikt de subklasse-afsluiting uit de ontologie,
 # dus een wortel dekt al haar subklassen. Drempelwaarden zijn per project aan
-# te passen; er staat niets hardgecodeerd in de code. Elk van de 53 velden van
+# te passen; er staat niets hardgecodeerd in de code. Elk veld van
 # CheckThresholds staat expliciet in [drempels] hieronder, met zijn huidige
 # waarde; een drifttest in tests/test_checkconfig.py dwingt dat af (issue #28).
 
@@ -164,8 +164,9 @@ bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkde
 [drempels]
 # Elke drempel draagt zijn check-ID en herkomst: een getal uit het checkregister,
 # of "projectkeuze, geen externe bron" als het register de check wel noemt maar
-# geen waarde geeft. Zie issue #28. Deze sectie is een letterlijke kopie van
-# [drempels] in src/nlriochecker/checks.toml, zoals de kop van dit bestand vraagt.
+# geen waarde geeft. Zie issue #28. Deze sectie is op dit moment gelijk aan
+# [drempels] in src/nlriochecker/checks.toml; een projectconfiguratie mag hier
+# afwijken, de drifttest bewaakt alleen dat beide bestanden dezelfde velden dragen.
 
 # TOP-004: hoe ver een strengeindpunt van zijn put mag liggen. Het checkregister
 # noemt alleen "afstand > tolerantie" zonder getal; projectkeuze, geen externe bron.
@@ -183,8 +184,9 @@ nul_lengte_m = 0.01
 # TOP-008: hoe ver de hartlijn van een rechte put-putverbinding mag afwijken.
 # Projectkeuze, geen externe bron.
 rechtheid_afwijking_m = 0.50
-# TOP-009: het geldige RD-bereik (EPSG:28992) in meters. Herkomst: het officiele
-# geldigheidsbereik van het Rijksdriehoeksstelsel, geen projectkeuze.
+# TOP-009: het geldige RD-bereik (EPSG:28992) in meters, een ruime omhullende om
+# Nederland. Projectkeuze, geen externe bron: dit zijn geen gepubliceerde EPSG- of
+# RDNAPTRANS-grenzen.
 rd_x_min = 0.0
 rd_x_max = 300_000.0
 rd_y_min = 300_000.0

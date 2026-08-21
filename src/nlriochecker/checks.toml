@@ -3,7 +3,7 @@
 # Klassenwortels bepalen welke objecten als put, vrijvervalleiding of netwerk-
 # eindpunt tellen; de engine gebruikt de subklasse-afsluiting uit de ontologie,
 # dus een wortel dekt al haar subklassen. Drempelwaarden zijn per project aan
-# te passen; er staat niets hardgecodeerd in de code. Elk van de 53 velden van
+# te passen; er staat niets hardgecodeerd in de code. Elk veld van
 # CheckThresholds staat expliciet in [drempels] hieronder, met zijn huidige
 # waarde; een drifttest in tests/test_checkconfig.py dwingt dat af (issue #28).
 
@@ -151,8 +151,9 @@ nul_lengte_m = 0.01
 # TOP-008: hoe ver de hartlijn van een rechte put-putverbinding mag afwijken.
 # Projectkeuze, geen externe bron.
 rechtheid_afwijking_m = 0.50
-# TOP-009: het geldige RD-bereik (EPSG:28992) in meters. Herkomst: het officiele
-# geldigheidsbereik van het Rijksdriehoeksstelsel, geen projectkeuze.
+# TOP-009: het geldige RD-bereik (EPSG:28992) in meters, een ruime omhullende om
+# Nederland. Projectkeuze, geen externe bron: dit zijn geen gepubliceerde EPSG- of
+# RDNAPTRANS-grenzen.
 rd_x_min = 0.0
 rd_x_max = 300_000.0
 rd_y_min = 300_000.0
