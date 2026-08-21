@@ -123,6 +123,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **`tests/test_gwsw_vocabulaire.py` bewaakt dat elke GWSW-naam die het pakket gebruikt
+  werkelijk in `Ontologie_GWSW_Totaal.ttl` staat** (issue #30, laag A). De termen komen
+  uit de geladen `CheckConfig` (`checks.toml` én `configs/dewoldenhoogeveen.toml`), de
+  `PlausibilityTables`, de symbolentabellen en een AST-sweep over de aspectliteralen in
+  `src/`; ze worden nergens overgeschreven. Er wordt op `rdf:type` getoetst en niet op
+  het voorkomen van de naam, want `Kunststof` bestaat wel maar niet in
+  `MateriaalPutColl`. De meldingtekst noemt vindplaats, verwachte collectie en de
+  dichtstbijzijnde bestaande naam -- die laatste regel had de twee eerdere fouten
+  voorkomen. Openstaande gevallen staan met hun reden in `BEKENDE_AFWIJKINGEN`; de test
+  valt in beide richtingen, dus zowel een nieuwe fout als een opgeruimde term maakt hem
+  rood. `dekking.toml` en `shaclrapport.py` blijven erbuiten (SHACL-vormnamen), een
+  hoofdletterafwijking krijgt een eigen soort, en er wordt tegen Totaal gevalideerd en
+  niet tegen de deelmodellen uit 2021. Kosten: circa vier seconden per testrun.
 - **`scripts/steekproef.py`** trekt uit de GeoPackage van een `toets`-run een
   gemeentebrede steekproef van tien bevindingen per eigen check, om elke check met de
   hand na te kunnen lopen. De trekking spreidt over een vast grid van 1000 m, zodat de
