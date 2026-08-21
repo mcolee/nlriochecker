@@ -116,7 +116,8 @@ conformiteitsklassen gemeten is die de projectconfiguratie eist.
 
 Een voorbehoud raakt de hele run en niet een melding: de meting liep over een deelset
 conformiteitsklassen (`--cfk`), of de dataset draagt geen klassenhierarchie
-(`--geen-ontologie`) en dan heeft de check-engine nul objecten getoetst. Er kunnen er
+(`--geen-ontologie`) en dan heeft de check-engine over een onvolledige selectie
+gedraaid. Er kunnen er
 twee tegelijk gelden; `markering` draagt ze dan allebei.
 
 Het veld is redundant voor een afnemer die `cfk_set` en `volledig` al leest -- het is

@@ -361,7 +361,7 @@ def test_klassenhierarchie_bekend_leest_de_graaf_en_niet_de_ontologielijst(
     """De fixture declareert haar eigen subklassen; die telt, ook zonder ontologiebestand.
 
     Wordt dit uit `ontologies` afgeleid, dan draagt elke fixturerun ten onrechte het
-    voorbehoud dat er niets getoetst is -- terwijl `putten()` gewoon vult.
+    voorbehoud dat haar uitkomst geen oordeel is -- terwijl `putten()` gewoon vult.
     """
     met = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
     zonder = load_dataset(

@@ -259,11 +259,13 @@ def _eis_ontologie(opdracht: Toetsopdracht) -> None:
 
     Zonder ontologie kent de lader de subklassen van Knooppunt en Verbinding niet, en
     de OroX-export typeert geen enkel object op wortelniveau: `Inspectieput` staat er
-    wel, `Put` niet. `putten()` en `leidingen()` leveren dan een lege verzameling, elke
-    check meldt `examined = 0`, en het rapport toont een managementsamenvatting vol
-    vinkjes over een dataset waarvan niets getoetst is. Stilte leest als "alles
-    gecontroleerd", dus dit hoort een fout te zijn en geen stille overslag -- hetzelfde
-    besluit als bij een ontbrekende conformiteitsklasse (BO-7).
+    wel, `Put` niet. `putten()` en `leidingen()` leveren dan een lege verzameling en de
+    checks draaien over een onvolledige selectie -- op De Wolden zien ze zo 1.874 van
+    de 23.485 knopen, via de concrete klassen die `netwerkknopen` naast de wortels
+    opsomt. Hun uitkomst draagt dan geen oordeel, terwijl het rapport dat niet zei.
+    Stilte leest als "alles gecontroleerd", dus dit hoort een fout te zijn en geen
+    stille overslag -- hetzelfde besluit als bij een ontbrekende conformiteitsklasse
+    (BO-7).
 
     Deze toets staat voor het laden, naast die op de keuzes en de bronnen: laden kost
     op De Wolden ruim drie minuten en circa 3 GB, en deze weigering is gratis.
@@ -273,10 +275,10 @@ def _eis_ontologie(opdracht: Toetsopdracht) -> None:
     raise OpdrachtError(
         "Geen ontologie opgegeven. Zonder de GWSW-klassenhierarchie herkent de lader "
         "knopen en strengen alleen aan hun geometrie en typeert de OroX-export niets "
-        "op wortelniveau; de checks draaien dan wel, maar toetsen nul putten en nul "
-        "leidingen, en het rapport ziet er schoon uit. Geef "
+        "op wortelniveau; de checks draaien dan wel, maar over een onvolledige "
+        "selectie, en hun uitkomst draagt geen oordeel. Geef "
         "--ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl mee, of kies "
-        "bewust voor die lege run met --geen-ontologie; dan draagt het rapport het "
+        "bewust voor zo'n run met --geen-ontologie; dan draagt het rapport het "
         "voorbehoud."
     )
 

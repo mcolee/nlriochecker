@@ -137,7 +137,8 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - Welke ontologie je laadt bepaalt de uitkomst; gebruik data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl. Zonder ontologie valt de lader terug op herkenning via geometrie en meldt het verschil.
 - **`toets` eist `--ontologie`.** De export draagt nul `rdfs:subClassOf` en typeert niets
   op wortelniveau (`Inspectieput` wel, `Put` niet), dus zonder klassenhierarchie draaien
-  de checks over een onvolledige selectie terwijl het rapport er schoon uitziet. `voer_toets_uit` weigert
+  de checks over een onvolledige selectie en draagt hun uitkomst geen oordeel, terwijl
+  het rapport dat nergens zei. `voer_toets_uit` weigert
   zo'n run vóór het laden; `--geen-ontologie` is de bewuste ontsnappingsvlag en levert
   een rapport dat het voorbehoud in de kop draagt en de eigen checks op `–` zet in plaats
   van op een vinkje. De testfixtures declareren hun eigen hierarchie inline: die draaien

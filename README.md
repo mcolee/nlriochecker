@@ -36,8 +36,9 @@ de trend. Elk subcommando kent `--help`.
 `toets` weigert te draaien zonder `--ontologie`. De OroX-export typeert niet op
 wortelniveau -- er staat `Inspectieput` in en geen `Put` -- en draagt zelf geen enkele
 `rdfs:subClassOf`. Zonder de klassenhierarchie leveren `putten()` en `leidingen()` dus
-een lege verzameling: de checks draaien over een onvolledige selectie en het rapport
-toont een managementsamenvatting vol vinkjes over een dataset die niet getoetst is.
+een lege verzameling. De checks draaien dan over een onvolledige selectie -- op De
+Wolden zien ze zo 1.874 van de 23.485 knopen -- en hun uitkomst draagt geen oordeel,
+terwijl het rapport dat nergens zei.
 
 Wie zo'n run bewust wil, geeft `--geen-ontologie` mee. Dan loopt hij door, maar draagt
 elk rapport het voorbehoud in de kop, blijft de regel van de eigen checks in de

@@ -2,8 +2,8 @@
 
 Een voorbehoud raakt niet een melding maar de run zelf: de meting liep over een
 deelverzameling conformiteitsklassen, of de lader kende de klassenhierarchie niet en
-heeft daardoor nul objecten getoetst. Zulke uitspraken horen boven het rapport, niet
-erin -- wie ze mist leest de stilte als "alles gecontroleerd".
+heeft de checks daardoor over een onvolledige selectie laten draaien. Zulke uitspraken
+horen boven het rapport, niet erin -- wie ze mist leest de uitkomst als een oordeel.
 
 Deze module is de plek waar ze samenkomen. Er kan er meer dan een tegelijk gelden --
 een `--cfk`-deelset zonder klassenkennis draagt er twee -- en `schrijf_markdown` heeft
@@ -20,23 +20,28 @@ from __future__ import annotations
 
 from nlriochecker.checks import CheckRun
 
+# De tekst spreekt de lezer van het rapport aan, niet de ontwikkelaar: geen
+# functienamen, wel GWSW-klassen die hij in QGIS terugvindt. En hij zegt niets over
+# waar de klassenkennis vandaan had moeten komen -- het signaal is dat de graaf geen
+# subklasserelaties draagt, en dat kan ook met een meegegeven ontologie zo zijn.
 GEEN_KLASSENHIERARCHIE = (
-    "**Geen klassenhierarchie:** er is geen ontologie geladen en de export draagt zelf "
-    "geen enkele subklasserelatie. De GWSW-wortels dekken hun subklassen dus niet, en "
-    "de export typeert niets op wortelniveau: `putten()` en `leidingen()` leveren nul "
-    "objecten en knopen en strengen zijn hier aan hun geometrie herkend. Lees de kolom "
-    "*Bekeken* in de samenvatting per check om te zien hoeveel elke check werkelijk "
-    "gezien heeft; wat er dan nog gemeld wordt komt uit een onvolledige selectie en is "
-    "geen oordeel over de dataset. Ook wat dit rapport niet meldt, zegt niets over haar "
-    "kwaliteit."
+    "**Geen klassenhierarchie:** deze dataset draagt geen enkele subklasserelatie, dus "
+    "de GWSW-wortels dekken hun subklassen niet en de export typeert niets op "
+    "wortelniveau. Een selectie op `gwsw:Put` of `gwsw:Leiding` blijft daardoor leeg, "
+    "en knopen en strengen zijn hier aan hun geometrie herkend in plaats van aan hun "
+    "GWSW-type. De eigen checks hebben over een onvolledige selectie gedraaid: de kolom "
+    "*Bekeken* in de samenvatting per check zegt per check hoeveel objecten dat waren. "
+    "Wat er gemeld wordt is daarmee geen oordeel over de dataset, en wat er niet gemeld "
+    "wordt zegt niets over haar kwaliteit."
 )
 
 
 def voorbehouden(run: CheckRun) -> list[str]:
     """De runbrede voorbehouden van deze run, in volgorde van zwaarte.
 
-    De klassenhierarchie staat voorop: ontbreekt zij, dan is er niets getoetst en doet
-    de vraag tegen welke conformiteitsklassen dat gebeurde er nauwelijks meer toe.
+    De klassenhierarchie staat voorop: ontbreekt zij, dan draagt geen enkele uitkomst
+    van deze run een oordeel, en doet de vraag tegen welke conformiteitsklassen er
+    gemeten is er nauwelijks meer toe.
     """
     gevonden = []
     if not run.dataset.klassenhierarchie_bekend:

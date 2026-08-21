@@ -536,9 +536,9 @@ class TestOntologiepoort:
     def test_zonder_ontologie_weigert_de_run(self, tmp_path: Path) -> None:
         """De melding zegt wat er misgaat en wat de gebruiker kan doen.
 
-        Zonder ontologie typeert de OroX-export niets op wortelniveau, toetst elke
-        check nul objecten en ziet het rapport er schoon uit. Stilte leest als "alles
-        gecontroleerd", dus dit is een fout en geen stille overslag.
+        Zonder ontologie typeert de OroX-export niets op wortelniveau en draaien de
+        checks over een onvolledige selectie, zonder dat het rapport dat zei. Stilte
+        leest als "alles gecontroleerd", dus dit is een fout en geen stille overslag.
         """
         with pytest.raises(OpdrachtError) as fout:
             voer_toets_uit(
@@ -551,7 +551,7 @@ class TestOntologiepoort:
 
         boodschap = str(fout.value)
         assert "--ontologie" in boodschap and "--geen-ontologie" in boodschap
-        assert "nul putten en nul leidingen" in boodschap
+        assert "onvolledige selectie" in boodschap
 
     def test_de_weigering_komt_voor_het_laden(self, tmp_path: Path) -> None:
         """Laden kost op De Wolden ruim drie minuten; deze weigering is gratis.

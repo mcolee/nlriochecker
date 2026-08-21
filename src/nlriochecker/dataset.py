@@ -486,8 +486,8 @@ class GwswDataset:
         Zonder ook maar een subklasserelatie is elke `closure()` een singleton. Dat is
         geen detail van het laden: de OroX-export typeert niet op wortelniveau --
         `Inspectieput` staat erin, `Put` niet -- dus `putten()` en `leidingen()` leveren
-        dan een lege verzameling, elke check meldt `examined = 0` en het rapport toont
-        een schone dataset waarvan niets getoetst is. De uitvoer moet dat kunnen zeggen.
+        dan een lege verzameling en draaien de checks over een onvolledige selectie. Wat
+        er dan uit komt draagt geen oordeel, en de uitvoer moet dat kunnen zeggen.
 
         Niet af te lezen aan `ontologies`: een handgeschreven fixture die haar eigen
         subklassen declareert heeft geen ontologiebestand nodig en toetst wel degelijk.
@@ -823,7 +823,7 @@ def load_dataset(
     )
     # Altijd, en juist ook zonder klassenkennis: dan laat het verschil zien dat de
     # ontologische route nul objecten oplevert en de hele lezing op geometrie rust.
-    dataset.structural_diff.update(_structural_diff(graph, knooppunt, verbinding))
+    dataset.structural_diff.update(_structural_diff(graph, subclasses))
     return dataset
 
 
@@ -932,11 +932,7 @@ def _houders(graph: Graph, orientaties: Iterable[RdfNode]) -> set[str]:
     }
 
 
-def _structural_diff(
-    graph: Graph,
-    knooppunt_klassen: frozenset[str] | None,
-    verbinding_klassen: frozenset[str] | None,
-) -> dict[str, int]:
+def _structural_diff(graph: Graph, subclasses: dict[str, frozenset[str]]) -> dict[str, int]:
     """Vergelijkt de ontologische uitkomst met de structurele herkenning.
 
     Zonder ontologie herkent de lader knopen aan een puntgeometrie en verbindingen
@@ -948,15 +944,19 @@ def _structural_diff(
     ingelezen knopen ontleend. Anders zou dit instrument juist stil blijven in het
     geval waarvoor het bedoeld is: zonder klassenkennis *zijn* die knopen de
     structurele herkenning, en vergelijkt de telling zichzelf met zichzelf. Nu valt
-    de ontologische kant terug op de kale wortelklasse -- op een OroX-export die
-    niets op wortelniveau typeert is dat nul, en dat is precies het cijfer dat de
-    lezer moet zien.
+    de ontologische kant via `_afsluiting` terug op de kale wortelklasse -- op een
+    OroX-export die niets op wortelniveau typeert is dat nul, en dat is precies het
+    cijfer dat de lezer moet zien.
+
+    Neemt `subclasses` en niet de twee afsluitingen die `load_dataset` al berekende:
+    `_bruikbare_afsluiting` levert exact `None` waar `_afsluiting` een singleton
+    oplevert, dus die twee zouden hier alleen als omweg naar dezelfde uitkomst dienen.
     """
     ontologisch_knopen = _houders(
-        graph, _orientations_of_class(graph, knooppunt_klassen or _afsluiting({}, "Knooppunt"))
+        graph, _orientations_of_class(graph, _afsluiting(subclasses, "Knooppunt"))
     )
     ontologisch_strengen = _houders(
-        graph, _orientations_of_class(graph, verbinding_klassen or _afsluiting({}, "Verbinding"))
+        graph, _orientations_of_class(graph, _afsluiting(subclasses, "Verbinding"))
     )
     structureel_knopen = _houders(graph, _orientations_with(graph, KLASSE_PUNT))
     structureel_strengen = _houders(graph, _leiding_orientations(graph))
