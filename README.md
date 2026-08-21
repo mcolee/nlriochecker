@@ -31,6 +31,20 @@ Verder: `nlriochecker dekking` toetst de nulmeting tegen het checkregister, en
 `nlriochecker vergelijk --eerder ... --later ...` zet twee meetmomenten naast elkaar voor
 de trend. Elk subcommando kent `--help`.
 
+### De ontologie is verplicht
+
+`toets` weigert te draaien zonder `--ontologie`. De OroX-export typeert niet op
+wortelniveau -- er staat `Inspectieput` in en geen `Put` -- en draagt zelf geen enkele
+`rdfs:subClassOf`. Zonder de klassenhierarchie leveren `putten()` en `leidingen()` dus
+een lege verzameling: de checks draaien over een onvolledige selectie en het rapport
+toont een managementsamenvatting vol vinkjes over een dataset die niet getoetst is.
+
+Wie zo'n run bewust wil, geeft `--geen-ontologie` mee. Dan loopt hij door, maar draagt
+elk rapport het voorbehoud in de kop, blijft de regel van de eigen checks in de
+managementsamenvatting op `–` staan (met haar tellingen in de toelichting: er is wel
+iets gevonden, maar het draagt geen oordeel), en meldt de verantwoording hoeveel
+objecten de ontologische route wel en niet opleverde.
+
 ### Toetsen op een deelverzameling conformiteitsklassen
 
 Standaard moet de dataset aan alle drie de klassen getoetst zijn en faalt de pijplijn bij
@@ -51,6 +65,11 @@ Elke afwijking van de volle set wordt gemarkeerd: een waarschuwingsregel boven e
 Markdown-rapport, en de velden `cfk_set` en `volledig` in de tabel `gwsw_run` van de
 GeoPackage en in de JSON-envelop. `vergelijk` weigert twee meetmomenten met ongelijke
 sets, want een daling die uit een kleinere getoetste set komt is geen verbetering.
+
+Gelden er meer runbrede voorbehouden tegelijk -- een deelset op een run met
+`--geen-ontologie` -- dan komen ze allebei in die kop te staan; `uitvoer/voorbehoud.py`
+stelt ze samen en de kolom `markering` in `gwsw_run` en het gelijknamige veld in de
+JSON-envelop dragen dezelfde tekst.
 
 `bevindingen.csv` draagt de markering **niet**: de CFK-set hoort bij de run en niet bij
 elke melding. Twee CSV's uit een volle en een deelrun zijn daardoor aan het bestand zelf
@@ -95,6 +114,7 @@ dan een feature, dan rapporteert `toets` per feature:
 ```bash
 nlriochecker toets \
   --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+  --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
   --studiegebied data/gis_koekangerveld/buurten.gpkg \
   --output uitvoer
 ```

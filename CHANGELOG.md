@@ -11,6 +11,26 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gewijzigd
+
+- **`toets` weigert een run zonder `--ontologie`** (issue #33). Zonder
+  klassenhierarchie typeert de OroX-export niets op wortelniveau en leveren `putten()`
+  en `leidingen()` een lege verzameling; de checks draaien dan over een onvolledige
+  selectie -- terwijl het rapport een managementsamenvatting vol vinkjes toont. Dat is nu een harde fout
+  met een melding die zegt wat er ontbreekt en wat je eraan doet, en hij valt vóór het
+  laden, dus in seconden. Wie zo'n run bewust wil, geeft `--geen-ontologie` mee; dan
+  draagt het rapport het voorbehoud in de kop, staat de regel van de eigen checks in de
+  managementsamenvatting op `–` in plaats van op een vinkje of kruisje (met de
+  tellingen in de toelichting), en is `structural_diff` juist dan gevuld -- op De
+  Wolden 23.485 knooppunten en 23.440 strengen die alleen op geometrie herkend zijn. Bestaande aanroepen zonder ontologie moeten de vlag krijgen.
+- **De runbrede voorbehouden komen samen in `uitvoer/voorbehoud.py`.** De markering
+  boven een rapport werd door precies een bron gevoed; een deelset-run zonder ontologie
+  draagt er twee, en met een enkel slot zou er een stilzwijgend verdwijnen. Markdown,
+  de kolom `markering` in `gwsw_run` en het gelijknamige optionele veld in de
+  JSON-envelop dragen nu dezelfde samengestelde tekst. De CSV bewust niet: een
+  voorbehoud hoort bij de run en niet bij elke melding. `schema_versie` blijft `1.1`;
+  het veld is optioneel en ontbreekt als er niets voor te behouden valt.
+
 ### Gerepareerd
 
 - **Vier manieren waarop het klimmen door de `hasPart`-boom stil het verkeerde

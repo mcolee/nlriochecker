@@ -135,6 +135,15 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - De koppeling wijst naar de ORIENTATIE, niet naar het object, en kan naar een compartiment of hulpstuk wijzen; loop via hasPart omhoog tot een put.
 - Klassen als Lozingspunt, Overnamepunt en UitlaatPunt zijn Knooppunt-subklassen en staan dus op de orientatie. Overnamepunt bestaat alleen in de totaal-ontologie, niet in de deelmodellen.
 - Welke ontologie je laadt bepaalt de uitkomst; gebruik data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl. Zonder ontologie valt de lader terug op herkenning via geometrie en meldt het verschil.
+- **`toets` eist `--ontologie`.** De export draagt nul `rdfs:subClassOf` en typeert niets
+  op wortelniveau (`Inspectieput` wel, `Put` niet), dus zonder klassenhierarchie draaien
+  de checks over een onvolledige selectie terwijl het rapport er schoon uitziet. `voer_toets_uit` weigert
+  zo'n run vóór het laden; `--geen-ontologie` is de bewuste ontsnappingsvlag en levert
+  een rapport dat het voorbehoud in de kop draagt en de eigen checks op `–` zet in plaats
+  van op een vinkje. De testfixtures declareren hun eigen hierarchie inline: die draaien
+  legitiem met `--geen-ontologie` en houden hun oordeel, want het voorbehoud hangt aan
+  `GwswDataset.klassenhierarchie_bekend` en niet aan de vraag of er een ontologiebestand
+  meekwam. Zie issue #33.
 
 ### Studiegebied (data/gis_koekangerveld/, data/gis_dewoldenhoogeveen/)
 - GeoPackage of GeoJSON, gelezen met stdlib sqlite3 plus shapely; geen extra afhankelijkheid. Moet in EPSG:28992 staan, net als de GWSW-coordinaten; herprojecteren doen we niet.
@@ -186,6 +195,14 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   nulmeting per SHACL-vorm, dan de eigen checks, elk met de fouten voorop. De
   aantallen komen uit `uitvoer/omvang.py`, de samenvatting uit
   `uitvoer/samenvatting.py`. Zie BO-31.
+- De runbrede markering boven een rapport wordt samengesteld in
+  `uitvoer/voorbehoud.py`, en nergens anders. Er kan meer dan een voorbehoud tegelijk
+  gelden -- een `--cfk`-deelset op een run met `--geen-ontologie` -- en
+  `schrijf_markdown` heeft maar een markeringsslot; roept een schrijver
+  `meetbereik.markering()` rechtstreeks aan, dan verdwijnt het andere voorbehoud
+  stilzwijgend. Markdown, de kolom `markering` in `gwsw_run` en het optionele veld
+  `markering` in de JSON-envelop dragen dezelfde samengestelde tekst; de CSV bewust
+  geen enkel voorbehoud.
 - Rapportage-output: Markdown, CSV, een GeoPackage en JSON naar een output-map; nooit
   invoerbestanden overschrijven. Alle vier komen uit dezelfde meldingenstroom
   (`uitvoer/melding.py`); een schrijver die zelf een `Finding` interpreteert laat ze uit

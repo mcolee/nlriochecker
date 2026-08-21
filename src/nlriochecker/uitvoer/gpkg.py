@@ -51,6 +51,7 @@ from nlriochecker.uitvoer.objectkaart import (
 from nlriochecker.uitvoer.omvang import stelseltypen
 from nlriochecker.uitvoer.stijlen.symbolen import bouw_qml
 from nlriochecker.uitvoer.tabel import prepare
+from nlriochecker.uitvoer.voorbehoud import markering
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 # De GWSW-coordinaten staan in Rijksdriehoek; herprojecteren doen we niet.
@@ -1056,6 +1057,10 @@ def _schrijf_runmetadata(
         _Kolom("dataset_objecten", "integer"),
         _Kolom("cfk_set", "text"),
         _Kolom("volledig", "integer"),
+        # De runbrede voorbehouden als een tekst, samengesteld door
+        # `uitvoer.voorbehoud`; leeg als er niets voor te behouden valt. Dezelfde
+        # string die boven het Markdown-rapport staat en in de JSON-envelop.
+        _Kolom("markering", "text"),
     ]
     _maak_attribuuttabel(verbinding, "gwsw_run", kolommen, "Herkomst en bereik van deze run.")
 
@@ -1098,6 +1103,7 @@ def _schrijf_runmetadata(
             stel.volledig_aantal if stel is not None else None,
             run.meetbereik.cfk_tekst,
             int(run.meetbereik.volledig),
+            markering(run) or "",
         ),
     )
 

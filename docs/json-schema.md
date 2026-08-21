@@ -98,6 +98,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `cfk_set` | array van string | De conformiteitsklassen waarop getoetst is, gesorteerd. Leeg als er geen nulmeting is meegegeven. |
 | `volledig` | boolean | Waar als `cfk_set` gelijk is aan de volledige set uit `checks.toml`. Onwaar bij een deelset én bij een run zonder nulmeting. |
 | `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
+| `markering` | string | *Optioneel.* De runbrede voorbehouden van deze run als een tekst voor een lezer, dezelfde die boven het Markdown-rapport staat en in de kolom `markering` van `gwsw_run`. Twee voorbehouden worden twee alinea's, gescheiden door een lege regel. Het veld ontbreekt als er niets voor te behouden valt. |
 | `aantal_meldingen` | integer | Het aantal elementen in `meldingen`. Redundant, maar zo kan een afnemer een afgekapt bestand herkennen. |
 | `meldingen` | array van object | De meldingen, gesorteerd op `melding_id`. |
 
@@ -110,6 +111,20 @@ wel, in de regel onder de herkomstregel.
 
 `volledig: true` betekent níét dat de dataset in orde is — alleen dat er tegen alle
 conformiteitsklassen gemeten is die de projectconfiguratie eist.
+
+### Over `markering`
+
+Een voorbehoud raakt de hele run en niet een melding: de meting liep over een deelset
+conformiteitsklassen (`--cfk`), of de dataset draagt geen klassenhierarchie
+(`--geen-ontologie`) en dan heeft de check-engine nul objecten getoetst. Er kunnen er
+twee tegelijk gelden; `markering` draagt ze dan allebei.
+
+Het veld is redundant voor een afnemer die `cfk_set` en `volledig` al leest -- het is
+dezelfde uitspraak, in een zin. Het staat er voor de tweede oorzaak, die niet uit de
+andere enveloppevelden af te leiden is, en voor een lezer die de JSON naast het rapport
+legt. Het kwam erbij zonder de schemaversie te verhogen, net als `gebied` en `gebieden`:
+wie het niet kent, leest het bestand zoals voorheen. De CSV draagt het bewust niet -- een
+voorbehoud hoort bij de run en niet bij elke rij.
 
 ### Over `gebied` en `gebieden`
 

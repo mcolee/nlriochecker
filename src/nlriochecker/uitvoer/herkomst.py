@@ -109,6 +109,7 @@ def schrijf_json(
     cfk_set: list[str],
     volledig: bool,
     typeringspoort_toegepast: bool,
+    markering: str | None = None,
     gebied: str | None = None,
     gebieden: list[str] | None = None,
 ) -> Path:
@@ -133,6 +134,12 @@ def schrijf_json(
     wat geen geldige JSON is en door een strikte parser geweigerd wordt. Luid falen is
     beter dan stil een onleesbaar contract wegschrijven.
 
+    `markering` is dezelfde runbrede kop die het Markdown-rapport onder de herkomst
+    draagt, samengesteld door `uitvoer.voorbehoud`. Hij staat alleen in het bestand als
+    er iets voor te behouden valt, zodat een run zonder voorbehoud byte-voor-byte
+    blijft zoals hij was -- net als bij `gebied` en `gebieden` hieronder. De CSV krijgt
+    hem niet: een voorbehoud hoort bij de run en niet bij de melding.
+
     `gebied` en `gebieden` horen bij de rapportage per studiegebied-feature: de JSON
     van een gebied noemt zijn eigen naam, die van de totaalsynthese `gebied: null`
     plus de lijst gebieden waarover hij gaat. Een run zonder gebieden krijgt geen van
@@ -155,6 +162,10 @@ def schrijf_json(
         "cfk_set": list(cfk_set),
         "volledig": volledig,
         "typeringspoort_toegepast": typeringspoort_toegepast,
+    }
+    if markering:
+        document["markering"] = markering
+    document |= {
         "aantal_meldingen": len(meldingen),
         "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),
     }

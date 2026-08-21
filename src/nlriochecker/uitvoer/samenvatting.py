@@ -63,7 +63,12 @@ class Regel:
         return f"| {self.teken} | {self.onderwerp} | {telling} |"
 
 
-def samenvatting(meldingen: Sequence[Melding], meetbereik: Meetbereik) -> list[Regel]:
+def samenvatting(
+    meldingen: Sequence[Melding],
+    meetbereik: Meetbereik,
+    *,
+    klassenhierarchie: bool = True,
+) -> list[Regel]:
     """De regels van de managementsamenvatting, in vaste volgorde.
 
     Eerst een regel per conformiteitsklasse uit de projectconfiguratie, dan een
@@ -76,10 +81,36 @@ def samenvatting(meldingen: Sequence[Melding], meetbereik: Meetbereik) -> list[R
     toestandstekst: er valt niets te oordelen. Een klasse die wél in de gekozen set zit
     krijgt haar oordeel, ook als de set een deelset was; het voorbehoud over die deelset
     staat als markering boven het rapport (BO-7).
+
+    `klassenhierarchie` gaat alleen over de eigen checks. Zonder haar leveren `putten()`
+    en `leidingen()` nul objecten en draaien de checks over een onvolledige selectie;
+    daar hoort geen oordeel bij, dus geen vinkje en geen kruisje. De CFK-regels blijven
+    wel hun oordeel dragen: hun tellingen komen uit de SHACL-nulmeting, die de dataset
+    wel degelijk gemeten heeft, en ze op "niet gemeten" zetten zou een uitgevoerde
+    meting verzwijgen.
     """
     regels = [_cfk_regel(cfk, meldingen, meetbereik) for cfk in meetbereik.volledige_set]
-    regels.append(_eigen_regel(meldingen))
+    eigen = _eigen_regel(meldingen)
+    regels.append(eigen if klassenhierarchie else _zonder_oordeel(eigen))
     return regels
+
+
+def _zonder_oordeel(regel: Regel) -> Regel:
+    """Dezelfde regel, maar zonder vinkje of kruisje: er valt niets te oordelen.
+
+    De tellingen blijven staan, in de toelichting. Ze weglaten zou een lezer laten
+    denken dat er niets gevonden is, en dat is iets anders dan dat het gevondene geen
+    oordeel draagt -- de checks hebben over een onvolledige selectie gedraaid.
+    """
+    return Regel(
+        onderwerp=regel.onderwerp,
+        gemeten=False,
+        toelichting=(
+            f"geen klassenhierarchie: {getal(regel.fouten, 'fout', 'fouten')} en "
+            f"{getal(regel.waarschuwingen, 'waarschuwing', 'waarschuwingen')} uit een "
+            f"onvolledige selectie, niet als oordeel te lezen"
+        ),
+    )
 
 
 def _cfk_regel(cfk: str, meldingen: Sequence[Melding], meetbereik: Meetbereik) -> Regel:

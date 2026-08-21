@@ -496,6 +496,15 @@ def compare_command(
     help="GWSW-ontologie (TTL) voor de klassenhierarchie; meermaals toegestaan.",
 )
 @click.option(
+    "--geen-ontologie",
+    "geen_ontologie",
+    is_flag=True,
+    help=(
+        "Draai zonder klassenhierarchie. De checks toetsen dan nul putten en nul "
+        "leidingen; het rapport draagt dat als voorbehoud."
+    ),
+)
+@click.option(
     "--shacl",
     "shacl_paths",
     multiple=True,
@@ -551,6 +560,7 @@ def compare_command(
 def check_command(
     dataset_path: Path,
     ontology_paths: tuple[Path, ...],
+    geen_ontologie: bool,
     shacl_paths: tuple[Path, ...],
     check_ids: tuple[str, ...],
     study_path: Path | None,
@@ -570,6 +580,7 @@ def check_command(
     opdracht = Toetsopdracht(
         dataset_pad=dataset_path,
         ontologieen=ontology_paths,
+        geen_ontologie=geen_ontologie,
         shacl=shacl_paths,
         check_ids=check_ids,
         studiegebied=study_path,

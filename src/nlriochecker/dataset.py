@@ -477,7 +477,23 @@ class GwswDataset:
 
     def closure(self, root: str) -> frozenset[str]:
         """De klasse zelf plus al haar subklassen, als volledige URI's."""
-        return self.subclasses.get(_uri(root), frozenset({_uri(root)}))
+        return _afsluiting(self.subclasses, root)
+
+    @property
+    def klassenhierarchie_bekend(self) -> bool:
+        """Of deze dataset uberhaupt subklasserelaties kent.
+
+        Zonder ook maar een subklasserelatie is elke `closure()` een singleton. Dat is
+        geen detail van het laden: de OroX-export typeert niet op wortelniveau --
+        `Inspectieput` staat erin, `Put` niet -- dus `putten()` en `leidingen()` leveren
+        dan een lege verzameling, elke check meldt `examined = 0` en het rapport toont
+        een schone dataset waarvan niets getoetst is. De uitvoer moet dat kunnen zeggen.
+
+        Niet af te lezen aan `ontologies`: een handgeschreven fixture die haar eigen
+        subklassen declareert heeft geen ontologiebestand nodig en toetst wel degelijk.
+        De vraag is wat de graaf over klassen weet, niet waar die kennis vandaan komt.
+        """
+        return bool(self.subclasses)
 
     def is_connection_class(self, root: str) -> bool:
         """Geeft aan of deze klasse in de Verbinding-afsluiting valt.
@@ -785,7 +801,7 @@ def load_dataset(
     verbinding = _bruikbare_afsluiting(subclasses, "Verbinding")
     # De afsluiting, niet de kale klasse: zie `_deksel_kenmerk`. Zonder klassenkennis
     # blijft het bij Putdeksel zelf, net als bij elke andere `closure()`.
-    deksel = subclasses.get(_uri("Putdeksel"), frozenset({_uri("Putdeksel")}))
+    deksel = _afsluiting(subclasses, "Putdeksel")
     nodes = _read_nodes(graph, geometry_errors, knooppunt, deksel)
     conduits = _read_conduits(graph, nodes, geometry_errors, verbinding)
 
@@ -805,8 +821,9 @@ def load_dataset(
         decode_fallback=fallback,
         ontologies=tuple(Path(pad) for pad in ontology_paths or []),
     )
-    if knooppunt or verbinding:
-        dataset.structural_diff.update(_structural_diff(graph, nodes, conduits))
+    # Altijd, en juist ook zonder klassenkennis: dan laat het verschil zien dat de
+    # ontologische route nul objecten oplevert en de hele lezing op geometrie rust.
+    dataset.structural_diff.update(_structural_diff(graph, knooppunt, verbinding))
     return dataset
 
 
@@ -888,16 +905,37 @@ def _quiet_rdflib():
         logger.setLevel(oud)
 
 
+def _afsluiting(subclasses: dict[str, frozenset[str]], wortel: str) -> frozenset[str]:
+    """De subklasse-afsluiting van een wortel; zonder klassenkennis de wortel zelf.
+
+    De enige plek waar die terugval opgeschreven staat. Stond hij er twee keer, dan
+    zou een van beide bij een wijziging achterblijven zonder dat het opvalt: een
+    afsluiting die stilzwijgend krimpt levert geen fout op maar een lege selectie.
+    """
+    return subclasses.get(_uri(wortel), frozenset({_uri(wortel)}))
+
+
 def _bruikbare_afsluiting(
     subclasses: dict[str, frozenset[str]], wortel: str
 ) -> frozenset[str] | None:
     """De subklasse-afsluiting van een wortel, of None als de ontologie ontbreekt."""
-    afsluiting = subclasses.get(_uri(wortel))
-    return afsluiting if afsluiting and len(afsluiting) > 1 else None
+    afsluiting = _afsluiting(subclasses, wortel)
+    return afsluiting if len(afsluiting) > 1 else None
+
+
+def _houders(graph: Graph, orientaties: Iterable[RdfNode]) -> set[str]:
+    """De objecten die deze orientaties dragen, als URI-teksten."""
+    return {
+        str(subject)
+        for orientation in orientaties
+        for subject in aspect_holders_of(graph, orientation)
+    }
 
 
 def _structural_diff(
-    graph: Graph, nodes: dict[str, Node], conduits: dict[str, Conduit]
+    graph: Graph,
+    knooppunt_klassen: frozenset[str] | None,
+    verbinding_klassen: frozenset[str] | None,
 ) -> dict[str, int]:
     """Vergelijkt de ontologische uitkomst met de structurele herkenning.
 
@@ -905,22 +943,28 @@ def _structural_diff(
     aan hun begin- en eindvertex. Die aanname is niet altijd waar: een knooppunt mag
     best geen geometrie hebben. Het verschil tussen beide manieren is een maat voor
     hoeveel de dataset op geometrie leunt, en hoort in het rapport te staan.
+
+    De ontologische kant wordt hier zelf uit de graaf gehaald en niet aan de al
+    ingelezen knopen ontleend. Anders zou dit instrument juist stil blijven in het
+    geval waarvoor het bedoeld is: zonder klassenkennis *zijn* die knopen de
+    structurele herkenning, en vergelijkt de telling zichzelf met zichzelf. Nu valt
+    de ontologische kant terug op de kale wortelklasse -- op een OroX-export die
+    niets op wortelniveau typeert is dat nul, en dat is precies het cijfer dat de
+    lezer moet zien.
     """
-    structureel_knopen = {
-        str(subject)
-        for orientation in _orientations_with(graph, KLASSE_PUNT)
-        for subject in aspect_holders_of(graph, orientation)
-    }
-    structureel_strengen = {
-        str(subject)
-        for orientation in _leiding_orientations(graph)
-        for subject in aspect_holders_of(graph, orientation)
-    }
+    ontologisch_knopen = _houders(
+        graph, _orientations_of_class(graph, knooppunt_klassen or _afsluiting({}, "Knooppunt"))
+    )
+    ontologisch_strengen = _houders(
+        graph, _orientations_of_class(graph, verbinding_klassen or _afsluiting({}, "Verbinding"))
+    )
+    structureel_knopen = _houders(graph, _orientations_with(graph, KLASSE_PUNT))
+    structureel_strengen = _houders(graph, _leiding_orientations(graph))
 
     verschillen: dict[str, int] = {}
     for rol, ontologisch, structureel in (
-        ("knooppunten", set(nodes), structureel_knopen),
-        ("strengen", set(conduits), structureel_strengen),
+        ("knooppunten", ontologisch_knopen, structureel_knopen),
+        ("strengen", ontologisch_strengen, structureel_strengen),
     ):
         zonder_geometrie = len(ontologisch - structureel)
         geen_knoop = len(structureel - ontologisch)
@@ -1049,7 +1093,7 @@ def _read_nodes(
     graph: Graph,
     errors: dict[str, str],
     knooppunt_klassen: frozenset[str] | None = None,
-    deksel_klassen: frozenset[str] = frozenset({_uri("Putdeksel")}),
+    deksel_klassen: frozenset[str] | None = None,
 ) -> dict[str, Node]:
     """Leest de knooppunten van het netwerk.
 
@@ -1059,6 +1103,7 @@ def _read_nodes(
     puntgeometrie), zodat een dataset ook zonder ontologie leesbaar blijft.
     """
     nodes: dict[str, Node] = {}
+    deksel_klassen = deksel_klassen or _afsluiting({}, "Putdeksel")
 
     if knooppunt_klassen:
         bron = _orientations_of_class(graph, knooppunt_klassen)

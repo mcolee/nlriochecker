@@ -62,6 +62,9 @@ class Toetsopdracht:
     plausibiliteit: Path | None = None
     bronnen: Path | None = None
     cfk: tuple[str, ...] = ()
+    # Bewust doorgaan zonder klassenhierarchie. Zonder ontologie en zonder deze vlag
+    # weigert `voer_toets_uit`; zie `_eis_ontologie`.
+    geen_ontologie: bool = False
     met_geopackage: bool = True
     met_json: bool = True
     gebruik_cache: bool = True
@@ -187,6 +190,7 @@ def voer_toets_uit(
     niet pas daarna te melden dat de run zinloos was. De dekkingspoort op de bronnen
     hangt alleen van die bronnen af en hoort om dezelfde reden vooraan.
     """
+    _eis_ontologie(opdracht)
     config = load_check_config(opdracht.projectconfig)
     kies_cfk(opdracht.cfk, config.nulmeting.vereiste_cfk)
     gebieden = _studiegebieden(opdracht, config)
@@ -247,6 +251,33 @@ def voer_toets_uit(
         bronnen=bronnen,
         studiegebieden=gebieden,
         cfk_keuze=opdracht.cfk,
+    )
+
+
+def _eis_ontologie(opdracht: Toetsopdracht) -> None:
+    """Weigert een toets zonder klassenhierarchie, tenzij de gebruiker erom vraagt.
+
+    Zonder ontologie kent de lader de subklassen van Knooppunt en Verbinding niet, en
+    de OroX-export typeert geen enkel object op wortelniveau: `Inspectieput` staat er
+    wel, `Put` niet. `putten()` en `leidingen()` leveren dan een lege verzameling, elke
+    check meldt `examined = 0`, en het rapport toont een managementsamenvatting vol
+    vinkjes over een dataset waarvan niets getoetst is. Stilte leest als "alles
+    gecontroleerd", dus dit hoort een fout te zijn en geen stille overslag -- hetzelfde
+    besluit als bij een ontbrekende conformiteitsklasse (BO-7).
+
+    Deze toets staat voor het laden, naast die op de keuzes en de bronnen: laden kost
+    op De Wolden ruim drie minuten en circa 3 GB, en deze weigering is gratis.
+    """
+    if opdracht.ontologieen or opdracht.geen_ontologie:
+        return
+    raise OpdrachtError(
+        "Geen ontologie opgegeven. Zonder de GWSW-klassenhierarchie herkent de lader "
+        "knopen en strengen alleen aan hun geometrie en typeert de OroX-export niets "
+        "op wortelniveau; de checks draaien dan wel, maar toetsen nul putten en nul "
+        "leidingen, en het rapport ziet er schoon uit. Geef "
+        "--ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl mee, of kies "
+        "bewust voor die lege run met --geen-ontologie; dan draagt het rapport het "
+        "voorbehoud."
     )
 
 

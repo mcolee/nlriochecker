@@ -129,6 +129,7 @@ def test_toets_schrijft_uitvoer(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "top001_losliggende_put.ttl"),
             "--check",
@@ -157,6 +158,7 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "top001_losliggende_put.ttl"),
             "--check",
@@ -189,6 +191,7 @@ def test_toets_meldt_bevindingen_die_in_de_schil_wegvallen(tmp_path: Path) -> No
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "top001_losliggend_in_de_schil.ttl"),
             "--check",
@@ -211,6 +214,7 @@ def test_toets_meldt_onbekende_check(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--check",
@@ -230,7 +234,7 @@ def test_toets_meldt_onleesbare_dataset(tmp_path: Path) -> None:
     stuk.write_text("dit is <geen turtle", encoding="utf-8")
 
     resultaat = CliRunner().invoke(
-        main, ["toets", "--dataset", str(stuk), "--output", str(tmp_path)]
+        main, ["toets", "--geen-ontologie", "--dataset", str(stuk), "--output", str(tmp_path)]
     )
 
     assert resultaat.exit_code == 1
@@ -331,6 +335,7 @@ def test_toets_weigert_een_studiegebied_zonder_objecten(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "top001_losliggende_put.ttl"),
             "--check",
@@ -353,6 +358,7 @@ def test_geen_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "top001_losliggende_put.ttl"),
             "--check",
@@ -377,6 +383,7 @@ def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "hgt004_bob_boven_deksel.ttl"),
             "--output",
@@ -525,6 +532,7 @@ def test_cfk_typefout_valt_ook_op_zonder_shacl(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--cfk",
@@ -546,6 +554,7 @@ def test_cfk_zonder_shacl_meldt_dat_de_vlag_niets_doet(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--cfk",
@@ -567,6 +576,7 @@ def test_toets_met_geen_json_laat_het_bestand_weg(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--geen-cache",
@@ -593,6 +603,7 @@ def test_toets_draait_met_de_voortgangsbalk(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--geen-cache",
@@ -665,6 +676,7 @@ def test_toets_schrijft_per_gebied(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "hgt010_diameterverjonging.ttl"),
             "--studiegebied",
@@ -688,6 +700,7 @@ def test_toets_onbekend_gebied_noemt_de_beschikbare(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "hgt010_diameterverjonging.ttl"),
             "--studiegebied",
@@ -708,6 +721,7 @@ def test_toets_gebied_zonder_studiegebied_faalt(tmp_path: Path) -> None:
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--gebied",
@@ -752,6 +766,7 @@ def test_gebiedsvalidatie_gaat_vooraf_aan_het_laden(tmp_path: Path, monkeypatch)
         main,
         [
             "toets",
+            "--geen-ontologie",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--studiegebied",
@@ -763,3 +778,26 @@ def test_gebiedsvalidatie_gaat_vooraf_aan_het_laden(tmp_path: Path, monkeypatch)
 
     assert resultaat.exit_code != 0
     assert "naam_gebied" in resultaat.stderr
+
+
+def test_toets_zonder_ontologie_faalt(tmp_path: Path) -> None:
+    """De standaardweg: geen --ontologie en geen --geen-ontologie is een fout.
+
+    Click mag hem niet zelf afvangen met `required=True`: dan verdwijnt de
+    ontsnappingsvlag en krijgt de gebruiker clicks eigen melding in plaats van een
+    die uitlegt wat er misgaat.
+    """
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code == 1
+    assert "--geen-ontologie" in resultaat.output
+    assert not (tmp_path / "uitvoer").exists()

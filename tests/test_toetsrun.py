@@ -35,6 +35,7 @@ from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_JSON,
     FILE_CHECKS_MARKDOWN,
 )
+from nlriochecker.uitvoer.voorbehoud import GEEN_KLASSENHIERARCHIE
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -71,7 +72,14 @@ def bronnenconfig(tmp_path: Path, tolerantie: float | None = None) -> Path:
 
 
 def toets(tmp_path: Path, bestand: str, **velden) -> Toetsuitslag:
-    """Draait een toets op een fixture, met de uitvoer in `tmp_path`."""
+    """Draait een toets op een fixture, met de uitvoer in `tmp_path`.
+
+    De fixtures declareren hun eigen klassenhierarchie en hebben dus geen
+    ontologiebestand nodig; `voer_toets_uit` wil die keuze wel expliciet horen, dus
+    staat `geen_ontologie` standaard aan. Een test die een ontologie meegeeft
+    overschrijft hem.
+    """
+    velden.setdefault("geen_ontologie", True)
     opdracht = Toetsopdracht(
         dataset_pad=TTL_DIR / bestand,
         uitvoermap=tmp_path / "uitvoer",
@@ -282,6 +290,7 @@ def test_geopackage_kan_aan(tmp_path: Path) -> None:
         dataset_pad=TTL_DIR / "schoon.ttl",
         uitvoermap=tmp_path / "uitvoer",
         check_ids=("TOP-001",),
+        geen_ontologie=True,
         cachemap=tmp_path / "cache",
     )
     uitslag = voer_toets_uit(opdracht)
@@ -397,6 +406,7 @@ def test_typeringsvoorbehoud_wordt_gemeld(tmp_path: Path) -> None:
             check_ids=("TOP-001",),
             shacl=drieluik(),
             met_geopackage=False,
+            geen_ontologie=True,
             cachemap=tmp_path / "cache",
         )
     )
@@ -518,3 +528,89 @@ class TestNulmetingInDeMeldingen:
         toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",), shacl=drieluik())
 
         assert len(gelezen) == 1
+
+
+class TestOntologiepoort:
+    """`toets` weigert een run zonder klassenhierarchie, tenzij erom gevraagd wordt."""
+
+    def test_zonder_ontologie_weigert_de_run(self, tmp_path: Path) -> None:
+        """De melding zegt wat er misgaat en wat de gebruiker kan doen.
+
+        Zonder ontologie typeert de OroX-export niets op wortelniveau, toetst elke
+        check nul objecten en ziet het rapport er schoon uit. Stilte leest als "alles
+        gecontroleerd", dus dit is een fout en geen stille overslag.
+        """
+        with pytest.raises(OpdrachtError) as fout:
+            voer_toets_uit(
+                Toetsopdracht(
+                    dataset_pad=TTL_DIR / "schoon.ttl",
+                    uitvoermap=tmp_path / "uitvoer",
+                    cachemap=tmp_path / "cache",
+                )
+            )
+
+        boodschap = str(fout.value)
+        assert "--ontologie" in boodschap and "--geen-ontologie" in boodschap
+        assert "nul putten en nul leidingen" in boodschap
+
+    def test_de_weigering_komt_voor_het_laden(self, tmp_path: Path) -> None:
+        """Laden kost op De Wolden ruim drie minuten; deze weigering is gratis.
+
+        Aangetoond met een dataset die niet te parsen is: kwam de poort na het laden,
+        dan stond hier de foutmelding van de parser.
+        """
+        stuk = tmp_path / "stuk.ttl"
+        stuk.write_text("dit is <geen turtle", encoding="utf-8")
+
+        with pytest.raises(OpdrachtError, match="--geen-ontologie"):
+            voer_toets_uit(
+                Toetsopdracht(
+                    dataset_pad=stuk,
+                    uitvoermap=tmp_path / "uitvoer",
+                    cachemap=tmp_path / "cache",
+                )
+            )
+
+    def test_met_ontologie_loopt_de_run_gewoon_door(self, tmp_path: Path) -> None:
+        """De vlag is niet nodig zodra er een ontologie meekomt."""
+        uitslag = toets(
+            tmp_path,
+            "schoon.ttl",
+            check_ids=("TOP-001",),
+            ontologieen=(TTL_DIR / "schoon.ttl",),
+            geen_ontologie=False,
+        )
+
+        assert [pad.name for pad in uitslag.dataset.ontologies] == ["schoon.ttl"]
+
+    def test_geen_ontologie_laat_de_run_door_met_voorbehoud(self, tmp_path: Path) -> None:
+        """De ontsnappingsvlag levert een run op die haar beperking zichtbaar draagt.
+
+        De fixture wordt eerst van haar subklasserelaties ontdaan; anders declareert
+        zij haar eigen hierarchie en valt er niets voor te behouden.
+        """
+        bron = (TTL_DIR / "schoon.ttl").read_text(encoding="utf-8").splitlines()
+        kaal = tmp_path / "kaal.ttl"
+        kaal.write_text(
+            "\n".join(regel for regel in bron if "rdfs:subClassOf" not in regel) + "\n",
+            encoding="utf-8",
+        )
+
+        uitslag = voer_toets_uit(
+            Toetsopdracht(
+                dataset_pad=kaal,
+                uitvoermap=tmp_path / "uitvoer",
+                check_ids=("TOP-001",),
+                geen_ontologie=True,
+                met_geopackage=False,
+                cachemap=tmp_path / "cache",
+            )
+        )
+
+        run = uitslag.runs[0].run
+        assert run.dataset.klassenhierarchie_bekend is False
+        assert run.dataset.of_class("Put") == []
+        # Het diagnostische instrument werkt juist hier, en het rapport zegt het.
+        assert run.dataset.structural_diff
+        markdown = uitslag.uitvoer.per_gebied[""].markdown.read_text(encoding="utf-8")
+        assert GEEN_KLASSENHIERARCHIE in markdown

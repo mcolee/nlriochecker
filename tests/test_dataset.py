@@ -337,3 +337,57 @@ def test_richting_van_geometrie_ziet_een_omgekeerd_getekende_lijn() -> None:
     omgekeerd, begin, eind = uitslag
     assert omgekeerd is True
     assert begin.uri != eind.uri
+
+
+def _zonder_klassenhierarchie(bron: Path, doel: Path) -> Path:
+    """Schrijft een kopie van een fixture waaruit elke subklasserelatie weg is.
+
+    Zo ziet een handgeschreven fixture eruit als de echte OroX-export: die bevat
+    nul `rdfs:subClassOf`-tripels, dus zonder ontologie weet de lader niets over
+    klassen.
+    """
+    regels = [
+        regel
+        for regel in bron.read_text(encoding="utf-8").splitlines()
+        if "rdfs:subClassOf" not in regel
+    ]
+    doel.write_text("\n".join(regels) + "\n", encoding="utf-8")
+    return doel
+
+
+def test_klassenhierarchie_bekend_leest_de_graaf_en_niet_de_ontologielijst(
+    tmp_path: Path,
+) -> None:
+    """De fixture declareert haar eigen subklassen; die telt, ook zonder ontologiebestand.
+
+    Wordt dit uit `ontologies` afgeleid, dan draagt elke fixturerun ten onrechte het
+    voorbehoud dat er niets getoetst is -- terwijl `putten()` gewoon vult.
+    """
+    met = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    zonder = load_dataset(
+        _zonder_klassenhierarchie(TTL_DIR / "top001_losliggende_put.ttl", tmp_path / "kaal.ttl")
+    )
+
+    assert met.ontologies == () and met.klassenhierarchie_bekend is True
+    assert zonder.klassenhierarchie_bekend is False
+    # Het gevolg waar het om gaat: de wortelklasse dekt niets meer.
+    assert met.of_class("Put") and zonder.of_class("Put") == []
+
+
+def test_structurele_vergelijking_wordt_juist_zonder_klassenkennis_gevuld(
+    tmp_path: Path,
+) -> None:
+    """Het diagnostische instrument hoort te werken in het geval waarvoor het bedoeld is.
+
+    Zonder klassenhierarchie levert de ontologische route nul knopen en nul strengen
+    op, terwijl de geometrie er wel degelijk vindt. Zou de vergelijking hier tegen de
+    al ingelezen knopen aanzitten, dan vergelijkt zij de geometrische herkenning met
+    zichzelf en blijft zij leeg -- precies dan stil, dus.
+    """
+    kaal = load_dataset(
+        _zonder_klassenhierarchie(TTL_DIR / "top001_losliggende_put.ttl", tmp_path / "kaal.ttl")
+    )
+
+    assert kaal.structural_diff["knooppunten_wel_geometrie_geen_rol"] == len(kaal.nodes)
+    assert kaal.structural_diff["strengen_wel_geometrie_geen_rol"] == len(kaal.conduits)
+    assert "knooppunten_zonder_geometrie" not in kaal.structural_diff

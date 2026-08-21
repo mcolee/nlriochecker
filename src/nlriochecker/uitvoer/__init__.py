@@ -33,6 +33,7 @@ from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_json, schrijf_mar
 from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
 from nlriochecker.uitvoer.synthese import GebiedsSamenvatting, totaalsynthese
 from nlriochecker.uitvoer.tabel import prepare
+from nlriochecker.uitvoer.voorbehoud import markering
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 # De naam van het bestand met de synthese over alle gebieden. De mapnaam ernaast
@@ -104,6 +105,7 @@ def schrijf_uitvoer(
             cfk_set=list(run.meetbereik.gekozen),
             volledig=run.meetbereik.volledig,
             typeringspoort_toegepast=run.typing_gate_applied,
+            markering=markering(run),
             gebied=gebied,
         )
         if met_json
@@ -218,7 +220,7 @@ def _schrijf_totaal(
         f"# Totaal ({getal(len(runs), 'gebied', 'gebieden')})",
         totaalsynthese(verzameld, beschikbaar, overgeslagen, eerste.dataset.source.name),
         run_datum,
-        markering=eerste.meetbereik.markering(),
+        markering=markering(eerste),
     )
     totaal_csv = schrijf_csv(meldingen_tabel(unieke), doel / FILE_CHECKS_CSV)
     totaal_json = (
@@ -230,6 +232,7 @@ def _schrijf_totaal(
             cfk_set=list(eerste.meetbereik.gekozen),
             volledig=eerste.meetbereik.volledig,
             typeringspoort_toegepast=eerste.typing_gate_applied,
+            markering=markering(eerste),
             gebieden=[gebiedsrun.naam for gebiedsrun in runs],
         )
         if met_json

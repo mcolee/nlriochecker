@@ -30,6 +30,7 @@ from nlriochecker.uitvoer.samenvatting import (
 )
 from nlriochecker.uitvoer.synthese import rode_draad
 from nlriochecker.uitvoer.tabel import prepare, table
+from nlriochecker.uitvoer.voorbehoud import markering
 
 FILE_CHECKS_MARKDOWN = "bevindingen.md"
 FILE_CHECKS_CSV = "bevindingen.csv"
@@ -100,7 +101,7 @@ def write_check_report(
         f"# {_titel(run)}",
         _render_checks(run, meldingen, notities),
         run_datum,
-        markering=run.meetbereik.markering(),
+        markering=markering(run),
     )
 
     csv_path = Path(output_dir) / FILE_CHECKS_CSV
@@ -246,7 +247,13 @@ def _omvang_section(run: CheckRun) -> list[str]:
 def _samenvatting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     """Voldoen we in dit gebied: een regel per conformiteitsklasse plus de eigen checks."""
     regels = ["## Voldoen we in dit gebied?", ""]
-    regels += als_tabel(samenvatting(meldingen, run.meetbereik))
+    regels += als_tabel(
+        samenvatting(
+            meldingen,
+            run.meetbereik,
+            klassenhierarchie=run.dataset.klassenhierarchie_bekend,
+        )
+    )
     regels += [
         "",
         f"> Een {VINKJE} betekent nul fouten in dit gebied; waarschuwingen blokkeren niet "
