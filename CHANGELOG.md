@@ -132,6 +132,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **`data/gwsw-vocabulaire-index.json` gaat mee in versiebeheer**, zodat de
+  vocabulairetest ook op de CI-runner draait in plaats van er 140 van zijn 142 gevallen
+  over te slaan. Het is een afgeleide van `Ontologie_GWSW_Totaal.ttl` met per GWSW-naam
+  zijn `rdf:type`s en niets meer (3.316 termen, 200 kB); de ontologie zelf blijft met
+  haar 2,6 MB buiten versiebeheer. Licentie is geen bezwaar: de GWSW-ontologie staat
+  onder CC0. Bijwerken doet `scripts/maak_gwsw_index.py`, met de hand, zoals het
+  aanleveren van een nieuwe ontologie ook handwerk van de auteur is -- er wordt niets
+  bij data.gwsw.nl opgehaald. `test_index_volgt_de_ontologie` bewaakt dat de index niet
+  achterloopt, en draait alleen waar `data/gwsw_ontologieen/` staat.
 - **`tests/test_gwsw_vocabulaire.py` bewaakt dat elke GWSW-naam die het pakket gebruikt
   werkelijk in `Ontologie_GWSW_Totaal.ttl` staat** (issue #30, laag A). De termen komen
   uit de geladen `CheckConfig` (`checks.toml` én `configs/dewoldenhoogeveen.toml`), de

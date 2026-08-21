@@ -21,37 +21,47 @@ Drie ontwerpkeuzes dragen de test:
 De test gaat *uitsluitend* over de vraag of een begrip in het model bestaat. Of er
 instanties van in een dataset voorkomen is een andere vraag met een ander antwoord.
 
-**Wat deze test op de CI-runner NIET doet.** Hij heeft `Ontologie_GWSW_Totaal.ttl`
-nodig, en `data/gwsw_ontologieen/` staat buiten versiebeheer. Op een schone kloon --
-en dus op de GitHub-runner -- slaan daarom 140 van de 142 gevallen over; alleen
-`test_de_termen_zijn_gevonden` en `test_shacl_vormnamen_horen_niet_bij_de_termen`
-draaien daar echt. De bewaking is met andere woorden **lokaal**: de CI dwingt niets
-af, en een groene bouw zegt hier niets over de GWSW-namen. Dat gat dichten vraagt om
-het herdistribueren van GWSW-data van Stichting RIONED in een publieke
-EUPL-repository (de TTL is 2,6 MB; een afgeleide index is niet minder een
-herdistributie), en dat is een beslissing van de auteur. Automatisch ophalen bij
-data.gwsw.nl is geen alternatief: `CLAUDE.md` verbiedt dat expliciet. Wie hier iets
-aan verandert, werkt deze alinea bij.
+**Wat waar draait.** De ontologie zelf is 2,6 MB en staat buiten versiebeheer, dus de
+test leest niet de TTL maar de getrackte afgeleide `data/gwsw-vocabulaire-index.json`:
+per GWSW-naam zijn `rdf:type`s, en niets meer. Daardoor draait alles hier gewoon mee
+op de CI-runner -- dat was het hele punt van #30, en eerder sloegen daar 140 van de
+142 gevallen over. Het bestand is geen invoerdata maar een afgeleide; het wordt nooit
+met de hand bijgewerkt maar met `scripts/maak_gwsw_index.py`.
+
+Eén test draait alleen lokaal: `test_index_volgt_de_ontologie` vergelijkt de getrackte
+index met een vers geparseerde ontologie, en die kan hij alleen doen op een machine
+waar `data/gwsw_ontologieen/` staat. Zonder die test zou de index stil verouderen
+zodra de auteur GWSW 1.7 neerzet, en dan bewaakte deze module een verleden dat
+niemand meer draait. Automatisch ophalen bij data.gwsw.nl is geen alternatief:
+`CLAUDE.md` verbiedt dat expliciet, en upgraden is met opzet handwerk van de auteur.
+
+Er zit met opzet **geen skip** op het inlezen van de index: ontbreekt het bestand, dan
+valt de hele module om. Een skip zou de oude stilte in een nieuwe vorm terugbrengen.
 """
 
 from __future__ import annotations
 
 import ast
 import difflib
+import importlib.util
+import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 
 import pytest
-from rdflib import RDF, Graph, URIRef
 
 from nlriochecker.checkconfig import ClassRoots, load_check_config
-from nlriochecker.dataset import GWSW, VULWAARDE_KENMERKEN
+from nlriochecker.dataset import VULWAARDE_KENMERKEN
 from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.uitvoer.stijlen.symbolen import LIJNSYMBOLEN, PUNTSYMBOLEN
 
 WORTEL = Path(__file__).resolve().parents[1]
 BRON = WORTEL / "src" / "nlriochecker"
 PROJECTCONFIG = WORTEL / "configs" / "dewoldenhoogeveen.toml"
+INDEXBESTAND = WORTEL / "data" / "gwsw-vocabulaire-index.json"
+INDEXSCRIPT = WORTEL / "scripts" / "maak_gwsw_index.py"
 
 OWL = "http://www.w3.org/2002/07/owl#"
 OWL_KLASSE = f"{OWL}Class"
@@ -301,24 +311,25 @@ TERMEN = _alle_termen()
 NAMEN = sorted({term.naam for term in TERMEN})
 
 
-@pytest.fixture(scope="session")
-def gwsw_index(ontologie: list[Path]) -> dict[str, frozenset[str]]:
-    """Per GWSW-subject de `rdf:type`-namen die de totaal-ontologie eraan geeft.
+def _laad_index() -> dict[str, frozenset[str]]:
+    """De getrackte afgeleide van de totaal-ontologie: naam naar `rdf:type`s.
 
-    Eenmaal per sessie: het parsen kost enkele seconden. Tegen Totaal en niet tegen
-    de deelmodellen, want die dragen een conversiedatum uit 2021 en missen klassen
-    die wel degelijk bestaan (`Overnamepunt`, `LozePut`, `Valput`).
+    Bewust zonder terugval en zonder skip: is het bestand er niet, dan valt de module
+    om in plaats van stil groen te worden. Uit Totaal en niet uit de deelmodellen,
+    want die dragen een conversiedatum uit 2021 en missen klassen die wel degelijk
+    bestaan (`Overnamepunt`, `LozePut`, `Valput`).
     """
-    graaf = Graph()
-    graaf.parse(ontologie[0], format="turtle")
-    index: dict[str, set[str]] = {}
-    for subject, _, soort in graaf.triples((None, RDF.type, None)):
-        if not isinstance(subject, URIRef) or not str(subject).startswith(GWSW):
-            continue
-        naam = str(subject).removeprefix(GWSW)
-        soortnaam = str(soort)
-        index.setdefault(naam, set()).add(soortnaam.removeprefix(GWSW))
-    return {naam: frozenset(soorten) for naam, soorten in index.items()}
+    document = json.loads(INDEXBESTAND.read_text(encoding="utf-8"))
+    return {naam: frozenset(soorten) for naam, soorten in document["termen"].items()}
+
+
+INDEX = _laad_index()
+
+
+@pytest.fixture(scope="session")
+def gwsw_index() -> dict[str, frozenset[str]]:
+    """De vocabulaire-index, als fixture voor de tests die hem bevragen."""
+    return INDEX
 
 
 def _schending(term: Term, index: dict[str, frozenset[str]]) -> Schending | None:
@@ -370,10 +381,34 @@ def _schendingen(naam: str, index: dict[str, frozenset[str]]) -> list[Schending]
     return [schending for schending in gevonden if schending is not None]
 
 
+SENTINELS = ("Inspectieput", "Beton", "Rond", "Begindatum")
+
+
 def test_de_termen_zijn_gevonden() -> None:
     """Zonder termen zou elke andere test hier groen zijn zonder iets te toetsen."""
     assert len(NAMEN) > 100
-    assert {"Inspectieput", "Beton", "Rond", "Begindatum"} <= set(NAMEN)
+    assert set(SENTINELS) <= set(NAMEN)
+
+
+def test_de_index_is_niet_uitgehold() -> None:
+    """De keerzijde: een index die termen kwijtraakt mag niet ongemerkt doorgaan.
+
+    Een krimpende index maakt de vocabulairetest weliswaar róder en niet groener --
+    een naam die er niet in staat heet "ontbreekt" -- maar een index die zijn
+    collectielidmaatschappen kwijtraakt zou de collectietoets uithollen zonder dat er
+    iets rood wordt. Vandaar een ondergrens op het aantal termen, de vier sentinels,
+    en het bestaan van de vier collecties waarop de rest van deze module leunt.
+    """
+    assert len(INDEX) > 3_000, f"{INDEXBESTAND.name} draagt maar {len(INDEX)} termen"
+    for naam in SENTINELS:
+        assert naam in INDEX, naam
+    for collectie in (
+        "MateriaalLeidingColl",
+        "MateriaalPutColl",
+        "VormLeidingColl",
+        "WijzeVanInwinningColl",
+    ):
+        assert [naam for naam in INDEX if collectie in INDEX[naam]], collectie
 
 
 @pytest.mark.parametrize("naam", NAMEN)
@@ -454,3 +489,36 @@ def test_hoofdletterafwijking_krijgt_een_eigen_soort(gwsw_index: dict[str, froze
     # `rdf:type`s zou anders per run in een andere volgorde in de melding staan.
     assert schending.gevonden == tuple(sorted(schending.gevonden))
     assert isinstance(schending.gevonden, tuple)
+
+
+def _laad_indexscript() -> ModuleType:
+    """Importeert `scripts/maak_gwsw_index.py` als module.
+
+    De drifttest bouwt de index met precies dezelfde code als het script; een
+    nagebouwde parser hier zou vroeg of laat iets anders opleveren dan wat er in het
+    bestand staat, en dan meet de test zichzelf.
+    """
+    specificatie = importlib.util.spec_from_file_location("maak_gwsw_index", INDEXSCRIPT)
+    assert specificatie is not None and specificatie.loader is not None
+    module = importlib.util.module_from_spec(specificatie)
+    sys.modules["maak_gwsw_index"] = module
+    specificatie.loader.exec_module(module)
+    return module
+
+
+def test_index_volgt_de_ontologie(ontologie: list[Path]) -> None:
+    """De getrackte index is bij tot en met de ontologie die er nu ligt.
+
+    Draait alleen waar `data/gwsw_ontologieen/` staat -- op de CI-runner niet. Dit is
+    de test die voorkomt dat de index stil veroudert zodra de auteur GWSW 1.7
+    neerzet; zonder haar zou deze module een verleden bewaken dat niemand meer
+    draait. De hele bestandstekst wordt vergeleken en niet alleen de termen, zodat
+    ook de meegedragen `owl:versionInfo` en de opmaak niet uit de pas kunnen lopen.
+    """
+    verwacht = _laad_indexscript().documenttekst(ontologie[0])
+
+    assert INDEXBESTAND.read_text(encoding="utf-8") == verwacht, (
+        f"{INDEXBESTAND.relative_to(WORTEL)} loopt achter op "
+        f"{ontologie[0].relative_to(WORTEL)}.\n"
+        "Draai: uv run python scripts/maak_gwsw_index.py"
+    )
