@@ -82,9 +82,11 @@ def samenvatting(
     krijgt haar oordeel, ook als de set een deelset was; het voorbehoud over die deelset
     staat als markering boven het rapport (BO-7).
 
-    `klassenhierarchie` gaat alleen over de eigen checks. Zonder haar leveren `putten()`
-    en `leidingen()` nul objecten en draaien de checks over een onvolledige selectie;
-    daar hoort geen oordeel bij, dus geen vinkje en geen kruisje. De CFK-regels blijven
+    `klassenhierarchie` gaat alleen over de eigen checks. Zonder haar is de lezing van
+    knopen en strengen op geometrie teruggevallen -- en op een OroX-export leveren
+    `putten()` en `leidingen()` bovendien nul objecten -- en draaien de checks dus over
+    een onvolledige selectie; daar hoort geen oordeel bij, dus geen vinkje en geen
+    kruisje. De CFK-regels blijven
     wel hun oordeel dragen: hun tellingen komen uit de SHACL-nulmeting, die de dataset
     wel degelijk gemeten heeft, en ze op "niet gemeten" zetten zou een uitgevoerde
     meting verzwijgen.

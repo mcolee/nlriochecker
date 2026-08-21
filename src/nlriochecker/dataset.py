@@ -65,6 +65,13 @@ KLASSE_EINDPUNT = KLASSEN_EINDPUNT[0]
 KLASSE_BOB_BEGIN = URIRef(f"{GWSW}BobBeginpuntLeiding")
 KLASSE_BOB_EIND = URIRef(f"{GWSW}BobEindpuntLeiding")
 
+# De twee wortels waarmee de lader knopen en strengen uit de graaf haalt. Blijft de
+# afsluiting van een van beide op de wortel zelf steken, dan valt dat lezen terug op
+# geometrie; `GwswDataset.klassenhierarchie_bekend` is precies die vraag.
+WORTEL_KNOOPPUNT = "Knooppunt"
+WORTEL_VERBINDING = "Verbinding"
+WORTELS_VOOR_HERKENNING = (WORTEL_KNOOPPUNT, WORTEL_VERBINDING)
+
 
 @dataclass(frozen=True)
 class Inwinning:
@@ -319,7 +326,25 @@ class GwswDataset:
     structural_diff: dict[str, int] = field(default_factory=dict)
 
     def is_a(self, uri: str, root: str) -> bool:
-        """Geeft aan of het object van het type `root` of een subklasse daarvan is."""
+        """Geeft aan of dit domeinobject van het type `root` of een subklasse is.
+
+        **Let op: dit is de smalle van de twee, en hij faalt stil.** `types_of()` kent
+        alleen knopen en strengen, dus voor een onderdeel dat via hasPart aan een put
+        hangt -- een overstortdrempel, een ledigingsvoorziening -- geeft deze methode
+        `False` en niet een fout. Wie hem daar per ongeluk gebruikt krijgt een dode
+        checktak die er groen uitziet; issue #34 vond er zo twee. `graph_is_a()` is de
+        strikte versterking (`graph_types_of ⊇ types_of`), dus de verkeerde keuze die
+        kant op is hooguit ruim -- en dat is precies waarom de kortste en algemeenst
+        klinkende naam de gevaarlijke is.
+
+        Twee redenen dat hij blijft bestaan. Hij drukt "is een gemodelleerde knoop of
+        streng van dit type" uit, en dat is wat `klim_naar_knoop` en `uitvoer/melding.py`
+        vragen: de eerste moet stoppen zodra hij een knoop uit het domeinmodel te pakken
+        heeft, de tweede weegt de prioriteit van een melding op het knoop- of
+        strengobject waaraan zij hangt. En hij spaart de
+        graafopvraging van `graph_types_of()` uit, die op elke wandeling over De Wolden
+        meetelt.
+        """
         object_types = self.types_of(uri)
         return bool(object_types & self.closure(root))
 
@@ -330,6 +355,9 @@ class GwswDataset:
         Lozingspunt, Overnamepunt en UitlaatPunt zijn subklassen van Knooppunt en
         staan dus op de orientatie, niet op de put of het bouwwerk zelf. Wie op
         zulke klassen wil selecteren, moet ze hier terugvinden.
+
+        Alleen knopen en strengen: een onderdeel dat via hasPart aan een put hangt
+        levert hier een lege verzameling op. Daarvoor is `graph_types_of()`.
         """
         if uri in self.nodes:
             node = self.nodes[uri]
@@ -405,7 +433,7 @@ class GwswDataset:
     def klim_naar_knoop(
         self, uri: str | None, roots: list[str]
     ) -> tuple[str | None, frozenset[str]]:
-        """De knoop boven dit object, plus de schakels die de weg erheen vormen.
+        """De knoop boven dit object, plus de knopen die de wandeling erheen tegenkwam.
 
         In de breedte en niet langs een enkel pad: een onderdeel kan meer dan een
         houder hebben (`Node.parents`), en de eerste die rdflib oplevert hoeft niet
@@ -420,7 +448,13 @@ class GwswDataset:
 
         De tweede uitkomst is de verzameling bezochte schakels die zelf in `nodes`
         staan; `afbakening` heeft die nodig om ze in de analyseset te houden, anders
-        loopt dezelfde wandeling op de uitgedunde dataset dood.
+        loopt dezelfde wandeling op de uitgedunde dataset dood. Bewust ruimer dan het
+        gevonden pad: het zijn alle bezochte knopen, dus ook broers op de laag waar de
+        knoop gevonden werd en takken die doodliepen. Met enkelvoudige houders vallen
+        de twee samen; met meervoudige houders is dit een superset. Dat is de veilige
+        kant -- de lezer gebruikt hem om de wandeling herhaalbaar te houden op een
+        uitgedunde dataset, en een schakel te veel bewaren kost hoogstens ruimte,
+        terwijl er een te weinig de wandeling laat doodlopen.
         """
         if uri is None:
             return None, frozenset()
@@ -481,19 +515,30 @@ class GwswDataset:
 
     @property
     def klassenhierarchie_bekend(self) -> bool:
-        """Of deze dataset uberhaupt subklasserelaties kent.
+        """Of de lader knopen en strengen aan hun GWSW-type heeft kunnen herkennen.
 
-        Zonder ook maar een subklasserelatie is elke `closure()` een singleton. Dat is
-        geen detail van het laden: de OroX-export typeert niet op wortelniveau --
-        `Inspectieput` staat erin, `Put` niet -- dus `putten()` en `leidingen()` leveren
-        dan een lege verzameling en draaien de checks over een onvolledige selectie. Wat
-        er dan uit komt draagt geen oordeel, en de uitvoer moet dat kunnen zeggen.
+        Precies dezelfde vraag die `load_dataset` stelt, en met dezelfde functie
+        gesteld: `_bruikbare_afsluiting` levert `None` waar de afsluiting van een
+        wortel op die wortel zelf blijft steken, en dan valt het lezen van die kant
+        terug op geometrie -- een knooppunt zonder punt valt dan buiten de selectie en
+        een object met een punt dat geen knooppunt is valt erbinnen. Wat er dan uit de
+        checks komt draagt geen oordeel, en de uitvoer moet dat kunnen zeggen.
+
+        `bool(self.subclasses)` was hier eerder het antwoord, en dat is een ander en
+        ruimer predicaat: een enkele subklasserelatie ergens in de export -- ook een
+        die met knopen en strengen niets te maken heeft -- zette het op `True` terwijl
+        de lader wel degelijk op geometrie terugviel. Een deel van de TTL-fixtures in
+        deze repo zit in die tussentoestand: hierarchie voor `Put` en `Leiding`, geen
+        voor `Knooppunt` en `Verbinding`.
 
         Niet af te lezen aan `ontologies`: een handgeschreven fixture die haar eigen
         subklassen declareert heeft geen ontologiebestand nodig en toetst wel degelijk.
         De vraag is wat de graaf over klassen weet, niet waar die kennis vandaan komt.
         """
-        return bool(self.subclasses)
+        return all(
+            _bruikbare_afsluiting(self.subclasses, wortel) is not None
+            for wortel in WORTELS_VOOR_HERKENNING
+        )
 
     def is_connection_class(self, root: str) -> bool:
         """Geeft aan of deze klasse in de Verbinding-afsluiting valt.
@@ -797,8 +842,11 @@ def load_dataset(
 
     subclasses = _subclass_closure(ontology or graph)
     geometry_errors: dict[str, str] = {}
-    knooppunt = _bruikbare_afsluiting(subclasses, "Knooppunt")
-    verbinding = _bruikbare_afsluiting(subclasses, "Verbinding")
+    # Dezelfde twee vragen die `GwswDataset.klassenhierarchie_bekend` stelt, met
+    # dezelfde functie: `None` hier betekent terugval op geometrie, en dat is precies
+    # wat het voorbehoud in de uitvoer zegt.
+    knooppunt = _bruikbare_afsluiting(subclasses, WORTEL_KNOOPPUNT)
+    verbinding = _bruikbare_afsluiting(subclasses, WORTEL_VERBINDING)
     # De afsluiting, niet de kale klasse: zie `_deksel_kenmerk`. Zonder klassenkennis
     # blijft het bij Putdeksel zelf, net als bij elke andere `closure()`.
     deksel = _afsluiting(subclasses, "Putdeksel")

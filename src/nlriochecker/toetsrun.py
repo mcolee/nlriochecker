@@ -132,6 +132,15 @@ class Toetsuitslag:
             regels.append(
                 f"  {len(self.dataset.geometry_errors)} objecten met onleesbare geometrie."
             )
+        if not self.dataset.klassenhierarchie_bekend:
+            # De vierde plek waar een mens de uitkomst leest. Markdown, GeoPackage en
+            # JSON dragen dit voorbehoud al; zonder deze regel ziet wie
+            # `--geen-ontologie` typt een volstrekt normale samenvatting op zijn scherm.
+            regels.append(
+                "  Let op: geen klassenhierarchie. Knopen en strengen zijn aan hun "
+                "geometrie herkend en de checks draaiden over een onvolledige "
+                "selectie; hun uitkomst draagt geen oordeel. Zie het rapport."
+            )
         return regels
 
     def _meetregels(self) -> list[str]:

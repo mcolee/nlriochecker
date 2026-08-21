@@ -374,6 +374,46 @@ def test_klassenhierarchie_bekend_leest_de_graaf_en_niet_de_ontologielijst(
     assert met.of_class("Put") and zonder.of_class("Put") == []
 
 
+def _zonder_orientatiewortels(bron: Path, doel: Path) -> Path:
+    """Schrijft een kopie waaruit alleen de twee orientatiewortels weg zijn.
+
+    De tussentoestand: `Put` en `Leiding` houden hun subklassen, `Knooppunt` en
+    `Verbinding` krijgen er geen. Een deel van de TTL-fixtures in deze repo staat er
+    zo bij; de OroX-export zonder ontologie is nog een stap kaler.
+    """
+    regels = [
+        regel
+        for regel in bron.read_text(encoding="utf-8").splitlines()
+        if "subClassOf gwsw:Knooppunt" not in regel and "subClassOf gwsw:Verbinding" not in regel
+    ]
+    doel.write_text("\n".join(regels) + "\n", encoding="utf-8")
+    return doel
+
+
+def test_de_tussentoestand_geldt_als_onbekende_klassenhierarchie(tmp_path: Path) -> None:
+    """Een halve hierarchie is geen hierarchie: het predicaat volgt de terugval.
+
+    Dit is de naad waarin de faalwijze van issue #33 overleefde. `bool(subclasses)`
+    stond op `True` zodra er ergens een `rdfs:subClassOf` stond -- ook een die met
+    knopen en strengen niets te maken heeft -- terwijl de lader wel degelijk op
+    geometrie terugviel. Dan kwam het rapport zonder voorbehoud en met een echt
+    oordeel, precies wat #33 wilde uitsluiten.
+
+    De assertie hangt aan de terugval zelf en niet aan een tweede telling: de lader
+    leest hier op geometrie, en `structural_diff` laat zien dat de ontologische route
+    nul knopen oplevert.
+    """
+    tussen = load_dataset(
+        _zonder_orientatiewortels(TTL_DIR / "top001_losliggende_put.ttl", tmp_path / "tussen.ttl")
+    )
+
+    assert tussen.klassenhierarchie_bekend is False
+    # De wortels die de checks gebruiken dekken hier nog wel; het lezen van de knopen
+    # en strengen zelf niet -- en dat is waar het voorbehoud over gaat.
+    assert tussen.of_class("Put")
+    assert tussen.structural_diff["knooppunten_wel_geometrie_geen_rol"] == len(tussen.nodes)
+
+
 def test_structurele_vergelijking_wordt_juist_zonder_klassenkennis_gevuld(
     tmp_path: Path,
 ) -> None:

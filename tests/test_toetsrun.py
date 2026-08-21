@@ -614,3 +614,5 @@ class TestOntologiepoort:
         assert run.dataset.structural_diff
         markdown = uitslag.uitvoer.per_gebied[""].markdown.read_text(encoding="utf-8")
         assert GEEN_KLASSENHIERARCHIE in markdown
+        # En de vierde plek waar een mens de uitkomst leest: het scherm.
+        assert any("geen klassenhierarchie" in regel.lower() for regel in uitslag.regels())
