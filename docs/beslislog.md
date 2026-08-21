@@ -1838,7 +1838,7 @@ netwerkgraaf. Daarom een volle `toets` op De Wolden (`--dataset dewolden_orox.tt
 vóór en na. Uitkomst: 35.370 meldingen over 48 checks, geen enkele check beweegt, en de
 35.370 rijen van `bevindingen.csv` zijn over alle kolommen behalve `RunDatum` identiek.
 
-### BO-34 Het IT-stelsel heet `Infiltratiestelsel`; NET-007 blijft voorlopig op de leidingen
+### BO-34 Met "IT-stelsel" bedoelen wij hier `Infiltratiestelsel`; NET-007 blijft voorlopig op de leidingen
 
 **De klassen bestaan.** `checks.toml` schreef dat de ontologie geen klasse "IT-stelsel" kent.
 Onjuist. `Ontologie_GWSW_Totaal.ttl` (versie 1.6) draagt vier kandidaten:
@@ -1852,7 +1852,9 @@ Onjuist. `Ontologie_GWSW_Totaal.ttl` (versie 1.6) draagt vier kandidaten:
 
 Alle vier `a owl:Class`, alle vier in `data/gwsw-vocabulaire-index.json`.
 
-**Welke klasse het register bedoelt.** NET-007 heet "IT-stelsel zonder drempel" en redeneert
+**Welke klasse wij eronder verstaan; het register zegt het niet.** Het checkregister noemt
+NET-007 alleen bij titel en definieert de term "IT-stelsel" nergens, dus dit is een
+afleiding van ons en geen registerfeit. NET-007 heet "IT-stelsel zonder drempel" en redeneert
 over een stelsel, niet over een leiding. Dat is `Infiltratiestelsel`; het
 `DrainageInfiltratieTransportStelsel` is daar een subklasse van en valt dus binnen dezelfde
 subklasse-afsluiting. `DIT_riool` en `DT_riool` zijn `VrijvervalRioolleiding`-subklassen: die
@@ -1864,15 +1866,24 @@ nu `["Infiltratieriool"]`) als IT-stelsel. Dat blijft zo, en het commentaar in `
 zegt voortaan waarom: niet omdat de klasse ontbreekt, maar omdat **de engine de stelselboom
 uit de export nergens leest.**
 
-**Waarom niet meteen overgaan.** De De Wolden-export modelleert stelsels wel degelijk als
-objecten -- 13 `rdf:type gwsw:Infiltratiestelsel`, naast 57 `Vuilwaterstelsel`, 55
-`GemengdStelsel`, 48 `Hemelwaterstelsel` en 4 `Drainagestelsel`. Er zijn daarnaast 340
-`Infiltratieriool`-instanties, en NET-007 levert 340 bevindingen met ernst F. Overgaan op de
-stelselobjecten is dus geen commentaarcorrectie maar een andere check: hij zou de graafanalyse
-inruilen voor de `hasPart`-boom, en die twee kunnen op deze data uiteenlopen zonder dat we
-vandaag kunnen zeggen welke van de twee gelijk heeft. Dat de engine de stelselhiërarchie
-negeert is een breder gat dan NET-007 alleen; het staat in #17. Deze BO legt de afleiding vast
-als bewuste keuze met een vervaldatum, niet als de laatste stand.
+**Waarom niet meteen overgaan.** Niet omdat onduidelijk zou zijn welke van de twee lezingen
+gelijk heeft: op deze data geven ze hetzelfde. De export modelleert stelsels wel degelijk als
+objecten -- 13 `rdf:type gwsw:Infiltratiestelsel` (naast 57 `Vuilwaterstelsel`, 55
+`GemengdStelsel`, 48 `Hemelwaterstelsel` en 4 `Drainagestelsel`), en die dertien dragen samen
+687 `hasPart`-leden, waaronder **alle** 340 `Infiltratieriool`-instanties en geen enkel
+infiltratieriool daarbuiten. De graafafleiding en de `hasPart`-boom wijzen hier dus dezelfde
+strengen aan. Dat NET-007 op alle 340 uitkomt heeft trouwens een derde oorzaak:
+`[klassen] drempel = ["Overstortdrempel"]`, en die klasse heeft in De Wolden nul instanties en
+in de ontologie geen subklassen, dus de drempelverzameling is leeg en elk infiltratieriool
+wordt onvoorwaardelijk gemeld. Dat is een bevinding op zichzelf en ligt buiten deze BO.
+
+De reden om te wachten is dus een engine-feit en geen datavraag: **de engine leest de
+stelselboom nergens.** Overgaan betekent NET-007 zijn graafanalyse laten inruilen voor een
+`hasPart`-boom die verder geen enkele check kent -- een verbouwing van hoe dit pakket stelsels
+leest, niet een regel in een klassenlijst. Dat bredere gat staat in #17, en omdat beide
+lezingen vandaag dezelfde 340 opleveren is de overgang daar een aparte en veilige ingreep.
+Deze BO legt de afleiding vast als bewuste keuze met een vervaldatum, niet als de laatste
+stand.
 
 **Wat dit besluit niet is.** Geen afwijking van GWSW in de zin van "wij kennen dit begrip
 niet". De begrippen zijn erkend en staan hierboven met regelnummer; wat we uitstellen is het
