@@ -9,7 +9,11 @@ Twee vragen worden hier streng gescheiden gehouden:
 
 * **Bestaat de klasse in de GWSW-ontologie?** Dat is een eigenschap van
   `Ontologie_GWSW_Totaal.ttl` en zegt iets over ons model. Het antwoord staat per
-  klasse in de kolom `bestaat`.
+  klasse in de kolom `owl:Class`. Die kolom heet zo en niet `bestaat`, omdat ze
+  precies één ding meet: draagt deze naam `rdf:type owl:Class`. Een collectielid als
+  `Muil` of `Metselwerk` krijgt er `false` en bestaat toch -- het draagt zijn
+  collectie als type. Alle klassen die dit script bevraagt zijn echte klassen, dus
+  binnen deze meting valt het samen; buiten deze meting is het dat niet.
 * **Komen er instanties van voor in deze dataset?** Dat is een eigenschap van de
   BrutIS-export van De Wolden en zegt iets over de aanlevering. Het antwoord staat
   in de kolommen `instanties`, `knopen` en `verbindingen`.
@@ -49,7 +53,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rdflib import RDFS, Graph, URIRef
+from rdflib import OWL, RDF, RDFS, Graph, URIRef
 
 WORTEL = Path(__file__).resolve().parents[2]
 ONTOLOGIE = WORTEL / "data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl"
@@ -66,11 +70,15 @@ CONFIGS = (
 # regel 1.49 miljoen de leidingen; twee vensters vangen dus beide objectsoorten.
 CONTROLEVENSTERS = ((1, 150_000), (1_450_000, 150_000))
 
-# Een Turtle-regel mag op een commentaar eindigen. De BrutIS-export van De Wolden doet
-# dat nergens, maar het handgeschreven voorbeeldbestand -- waarmee `_controleer_parser`
-# de scan ijkt -- wel: `rdf:type gwsw:VerdektePut ; # extra objecttype`. Zonder deze
-# staart mist de scan die tripels stilzwijgend. Alleen een `#` na witruimte telt als
-# commentaar, zodat een `#` binnenin een IRI blijft staan.
+# Een Turtle-regel mag op een commentaar eindigen, zoals
+# `rdf:type gwsw:VerdektePut ; # extra objecttype`; zonder deze staart mist de scan
+# zulke tripels stilzwijgend. Geen enkel gemeten bestand oefent haar uit: de
+# BrutIS-export van De Wolden schrijft nergens zo'n staart, en `_controleer_parser`
+# ijkt op een uittreksel van diezelfde export. De staart blijft staan als voorzorg voor
+# een export die het wel doet -- het handgeschreven voorbeeldbestand
+# `GwswDataset__Voorbeeld_v1_6_orox.ttl` is zo'n bestand -- niet als gemeten
+# noodzaak. Alleen een `#` na witruimte telt als commentaar, zodat een `#` binnenin een
+# IRI blijft staan.
 _STAART = r"\s*[;.]?\s*(?:#.*)?$"
 _TYPE = re.compile(r"^\s*rdf:type\s+gwsw:(\S+?)" + _STAART)
 _ASPECT = re.compile(r"^\s*gwsw:hasAspect\s+(\S+?)" + _STAART)
@@ -128,10 +136,11 @@ class Ontologie:
 
     kinderen: dict[str, frozenset[str]]
     ouders: dict[str, frozenset[str]]
+    klassen: frozenset[str]
 
     @classmethod
     def laad(cls, pad: Path) -> Ontologie:
-        """Leest `rdfs:subClassOf` uit een ontologiebestand."""
+        """Leest `rdfs:subClassOf` en de `owl:Class`-termen uit een ontologiebestand."""
         graaf = Graph()
         graaf.parse(pad, format="turtle")
         kinderen: dict[str, set[str]] = defaultdict(set)
@@ -143,11 +152,26 @@ class Ontologie:
         return cls(
             kinderen={k: frozenset(v) for k, v in kinderen.items()},
             ouders={k: frozenset(v) for k, v in ouders.items()},
+            klassen=frozenset(
+                _kort(term)
+                for term in graaf.subjects(RDF.type, OWL.Class)
+                if isinstance(term, URIRef)
+            ),
         )
 
-    def bestaat(self, klasse: str) -> bool:
-        """Of de ontologie deze klasse kent."""
-        return klasse in self.kinderen or klasse in self.ouders
+    def is_klasse(self, naam: str) -> bool:
+        """Of deze naam in de ontologie als `owl:Class` staat.
+
+        Bewust niet `bestaat` genoemd, en bewust niet afgeleid uit `kinderen`/`ouders`.
+        "Komt deze naam in een `subClassOf`-tripel voor" is een derde definitie van
+        bestaan naast die van `scripts/maak_gwsw_index.py` en die van de
+        vocabulairetest, en juist bij dit onderwerp mag een kolom niet meer beweren dan
+        ze meet. Een collectielid is geen klasse maar bestaat wel degelijk: `gwsw:Muil`
+        draagt `a gwsw:VormLeidingColl` en `gwsw:Metselwerk` draagt
+        `a gwsw:MateriaalLeidingColl`. `is_klasse=false` betekent hier dus "geen
+        `owl:Class`", niet "komt niet in het GWSW voor".
+        """
+        return naam in self.klassen
 
     def afsluiting(self, wortels: Iterable[str]) -> frozenset[str]:
         """De wortels plus al hun subklassen, net als `GwswDataset.closure`."""
@@ -270,10 +294,10 @@ def _kop(tekst: str) -> None:
 
 def _klasseregel(export: Export, klasse: str) -> str:
     """Een regel met bestaan, instanties en rol voor een enkele klasse."""
-    bestaat = export.ontologie.bestaat(klasse)
+    is_klasse = export.ontologie.is_klasse(klasse)
     kinderen = sorted(export.ontologie.afsluiting([klasse]) - {klasse})
     return (
-        f"  {klasse:<34} bestaat={str(bestaat).lower():<5} "
+        f"  {klasse:<34} owl:Class={str(is_klasse).lower():<5} "
         f"instanties={len(export.instanties([klasse])):>6} "
         f"knopen={len(export.knopen_van([klasse])):>6} "
         f"verbindingen={len(export.verbindingen_van([klasse])):>6} "
@@ -505,7 +529,7 @@ def _punt7(export: Export, klassen: dict[str, object]) -> None:
     for klasse in ("Rioolput", "Rioolleiding", "VrijvervalRioolleiding", "Aansluitleiding"):
         exact = sum(1 for soorten in export.types.values() if klasse in soorten)
         print(
-            f"  {klasse:<34} bestaat={str(export.ontologie.bestaat(klasse)).lower():<5} "
+            f"  {klasse:<34} owl:Class={str(export.ontologie.is_klasse(klasse)).lower():<5} "
             f"exacte instanties={exact}"
         )
 
@@ -533,6 +557,11 @@ def _toets_regelvorm(pad: Path) -> int:
     voorbeeldbestand doet dat wel; de BrutIS-export van De Wolden nergens. Deze
     toets breekt af in plaats van een fout getal op te schrijven.
 
+    De komma valt om dezelfde reden af. Een objectlijst (`rdf:type gwsw:A, gwsw:B ;`)
+    komt langs `_TYPE`, `_ASPECT` en `_DEEL` niet als treffer binnen -- die eindigen
+    op `_STAART` en dus op `;` of `.` -- en het tripel zou stil wegvallen. De export
+    van De Wolden bevat nul komma's; het handgeschreven voorbeeldbestand 43.
+
     **Regeleinden.** Dit bestand is volledig CRLF. Dat gaat goed, maar niet door een
     keuze van deze code: Python opent tekstbestanden standaard met universele
     regeleinden, dus `Export.scan` ziet nooit een `\\r`. Zou iemand die stand ooit
@@ -546,7 +575,7 @@ def _toets_regelvorm(pad: Path) -> int:
 
     Geeft het aantal gelezen regels terug.
     """
-    verboden = ("[", "]", "_:")
+    verboden = ("[", "]", "_:", ",")
     einden: Counter[str] = Counter()
     nummer = 0
     with pad.open(encoding="utf-8", errors="replace", newline="") as bestand:
@@ -572,8 +601,12 @@ def _toets_regelvorm(pad: Path) -> int:
     return nummer
 
 
-def _uittreksel(pad: Path, vensters: Sequence[tuple[int, int]]) -> Path:
-    """Schrijft een aantal vensters uit een export naar een tijdelijk bestand.
+def _uittreksel(pad: Path, vensters: Sequence[tuple[int, int]], map_: Path) -> Path:
+    """Schrijft een aantal vensters uit een export naar een bestand in `map_`.
+
+    De map komt van de beller en wordt daar als `TemporaryDirectory` opgeruimd: een
+    uittreksel van twee vensters is enkele megabytes, en een script dat bij elke run
+    een `/tmp`-map achterlaat vult de schijf zonder dat iemand het merkt.
 
     Een venster begint bij de eerste subjectregel op of na zijn startregel en loopt
     door tot de eerste subjectregel na zijn lengte. In deze schrijfwijze eindigt het
@@ -586,9 +619,12 @@ def _uittreksel(pad: Path, vensters: Sequence[tuple[int, int]]) -> Path:
     valt. Dat is geen bezwaar: de pakketlader en de regelscan lezen hetzelfde
     uittreksel en lopen dus tegen precies dezelfde afkapping aan.
     """
-    doel = Path(tempfile.mkdtemp(prefix="issue32-")) / f"uittreksel_{pad.name}"
+    doel = map_ / f"uittreksel_{pad.name}"
     grenzen = sorted(vensters)
-    with pad.open(encoding="utf-8", errors="replace") as bron, doel.open("w") as uit:
+    with (
+        pad.open(encoding="utf-8", errors="replace") as bron,
+        doel.open("w", encoding="utf-8") as uit,
+    ):
         actief: tuple[int, int] | None = None
         for nummer, regel in enumerate(bron, start=1):
             subjectregel = bool(regel.strip()) and regel[0] not in " \t#@"
@@ -666,10 +702,11 @@ def _controleer_parser(
     _kop("CONTROLE -- regelscan tegen nlriochecker.dataset.load_dataset")
     from nlriochecker.dataset import load_dataset
 
-    pad = _uittreksel(EXPORT, vensters)
-    print(f"  uittreksel van {EXPORT.name}, vensters (startregel, lengte): {list(vensters)}")
-    geladen = load_dataset(pad, [ONTOLOGIE])
-    gescand = Export.scan(pad, ontologie)
+    with tempfile.TemporaryDirectory(prefix="issue32-") as tijdelijk:
+        pad = _uittreksel(EXPORT, vensters, Path(tijdelijk))
+        print(f"  uittreksel van {EXPORT.name}, vensters (startregel, lengte): {list(vensters)}")
+        geladen = load_dataset(pad, [ONTOLOGIE])
+        gescand = Export.scan(pad, ontologie)
 
     lader_knopen: Counter[str] = Counter()
     for knoop in geladen.nodes.values():

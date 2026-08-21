@@ -11,7 +11,7 @@ from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.netwerk import KringloopInNetwerk, _netwerk
 from nlriochecker.checks.verbanden import deelstelsel_ids, verbonden_knopen
-from nlriochecker.dataset import load_dataset
+from nlriochecker.dataset import GWSW, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 NET_IDS = ["NET-001", "NET-002", "NET-004", "NET-007"]
@@ -37,6 +37,60 @@ def test_schoon_netwerk_geeft_geen_bevinding(check_id: str) -> None:
 def test_net001_vindt_het_losse_deelstelsel() -> None:
     # Streng "1" en "2" bereiken het gemaal; "3" ligt in een los deelstelsel.
     assert _labels("net001_geen_afvoerpad.ttl", "NET-001") == ["3"]
+
+
+def test_net001_accepteert_een_overnamepunt_op_de_orientatie(tmp_path: Path) -> None:
+    """De belofte van BO-33 nagemeten: een geleverd overnamepunt werkt meteen.
+
+    De Wolden levert er nul, dus zonder deze fixture draait de hele route
+    `_eindpunten` -> `of_class` -> `types_of` -> `orientation_types` op geen enkele
+    dataset en in geen enkele test. `gwsw:Overnamepunt` is een subklasse van
+    `Aansluitpunt` en dus van `Knooppunt`, en staat daarom op de ORIENTATIE van de
+    put; het is die weg die hier bewezen wordt.
+
+    De tweede helft van de test is de controle: haal `Overnamepunt` uit
+    `afvoer_eindpunt` en streng "1" wordt wel gemeld. Zonder die helft zou de lege
+    lijst hierboven ook groen zijn als de klasse nooit werd opgezocht.
+    """
+    bestand = "net001_overnamepunt.ttl"
+    dataset = load_dataset(TTL_DIR / bestand)
+
+    # De klasse wordt op de orientatie van put B gevonden, niet op put B zelf.
+    knoop = dataset.nodes["http://example.org/toets#PutB"]
+    assert f"{GWSW}Overnamepunt" in knoop.orientation_types
+    assert f"{GWSW}Overnamepunt" not in knoop.types
+    assert dataset.of_class("Overnamepunt") == ["http://example.org/toets#PutB"]
+
+    assert _labels(bestand, "NET-001") == []
+
+    zonder_overnamepunt = tmp_path / "zonder.toml"
+    zonder_overnamepunt.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = []\nvuilwater = ['GemengdRiool']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        encoding="utf-8",
+    )
+    gevonden = _outcome(bestand, "NET-001", load_check_config(zonder_overnamepunt))
+    assert sorted(finding.object_label for finding in gevonden.findings) == ["1"]
+
+
+def test_losse_overnamepuntorientatie_verdwijnt_uit_de_netwerkanalyse() -> None:
+    """Het restrisico bij BO-33, als feit vastgelegd in plaats van als aanname.
+
+    Levert een export een `Overnamepunt` als losstaande orientatie zonder dragend
+    object, dan bouwt het domeinmodel er geen knoop van. Gevolg is niet dat de
+    streng ernaartoe als onbereikbaar gemeld wordt, maar dat ze helemaal buiten de
+    netwerkanalyse valt: geen herleidbare put aan beide zijden. Alleen de notitie
+    van de check telt haar nog.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_overnamepunt.ttl")
+    assert "http://example.org/toets#LosOvp_ori" not in dataset.nodes
+
+    outcome = _outcome("net001_overnamepunt.ttl", "NET-001")
+
+    assert [finding.object_label for finding in outcome.findings] == []
+    notitie = next(n for n in outcome.notes if "buiten de netwerkanalyse" in n)
+    assert "2" in notitie
 
 
 def test_net002_vindt_hemelwater_zonder_lozingspunt() -> None:

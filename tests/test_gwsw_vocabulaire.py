@@ -109,13 +109,13 @@ BEKENDE_AFWIJKINGEN: dict[tuple[str, str], str] = {
     ("AHN5", "WijzeVanInwinningColl"): (
         "ontbreekt in de ontologie -- WijzeVanInwinningColl stopt bij AHN4. Weghalen of "
         "laten staan als vooruitloop op een latere GWSW-versie is een open vraag; besluit "
-        "bij de auteur, zie #31 punt 4."
+        "bij de auteur, zie vraag 1 van issue #47."
     ),
     ("Metselwerk", "MateriaalPutColl"): (
         "zit in MateriaalLeidingColl en niet in MateriaalPutColl, maar De Wolden schrijft "
-        "gwsw:Metselwerk feitelijk op 33 putten, en ADM-005 meldt dat al (33 keer per CFK "
-        "als MateriaalPut_ref). Of de tabel de export volgt of de domeinlijst is een open "
-        "vraag; besluit bij de auteur, zie #31 punt 6."
+        "gwsw:Metselwerk feitelijk op 33 putten, en de SHACL-nulmeting meldt dat al (33 keer "
+        "per CFK als MateriaalPut_ref). Een bewuste, tijdelijke afwijking van 'GWSW is "
+        "leidend'; zie BO-35 en vraag 2 van issue #47."
     ),
 }
 

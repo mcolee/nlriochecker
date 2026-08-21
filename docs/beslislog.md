@@ -1723,7 +1723,11 @@ test 140 van zijn 142 gevallen over -- precies de stilte die issue #30 wilde oph
 geschreven door `scripts/maak_gwsw_index.py`. Ze draagt per GWSW-naam zijn `rdf:type`s en zijn
 directe superklassen, en niets meer -- genoeg om te beantwoorden of een begrip bestaat, of het
 in de juiste collectie zit, en welke klassen onder een wortel hangen. Nu 285 kB bij 3.316
-termen en 2.078 subklasserelaties.
+termen en 2.078 klassen met een superklasse, samen goed voor 2.124 subklasserelaties. (Dit
+laatste getal stond hier eerst als "2.078 subklasserelaties": het script drukte het aantal
+sleutels van `subklasse_van` af onder het label van het aantal kanten. Een klasse mag meer
+dan een GWSW-ouder hebben: 42 klassen hebben er meerdere, samen goed voor 46 kanten boven
+het aantal sleutels. Script en getal zijn rechtgezet.)
 
 **Licentie is geen bezwaar.** De GWSW-ontologie staat onder CC0
 (https://stichtingrioned.github.io/GWSW_Ontologie_RDF/); herdistributie, ook van een
@@ -1828,8 +1832,8 @@ vandaag als nul verschijnt is de bedoeling van deze toevoeging, geen bijwerking.
 
 **Wat hier expliciet niet besloten wordt.** Op welk moment `Gemaal` er precies uit gaat -- bij
 het eerste overnamepunt in de data, of pas bij een af te spreken aandeel van de stelsels --
-is een domeinoordeel met 9.062 bevindingen eronder en ligt bij de auteur. Het staat als open
-vraag in #11.
+is een domeinoordeel met 9.062 bevindingen eronder en ligt bij de auteur. Het staat als vraag 3
+van issue #47.
 
 **Hoe is vastgesteld dat er niets verschoof.** Niet met een gerichte run: `afvoer_eindpunt`
 gaat behalve in NET-001 ook op in `KlassenConfig.netwerkknopen`, en die rol draagt de hele
@@ -1888,3 +1892,56 @@ stand.
 **Wat dit besluit niet is.** Geen afwijking van GWSW in de zin van "wij kennen dit begrip
 niet". De begrippen zijn erkend en staan hierboven met regelnummer; wat we uitstellen is het
 gebruik van de stelselobjecten door de engine.
+
+### BO-35 `Metselwerk` blijft voorlopig als putmateriaal staan: een bewuste, tijdelijke tolerantie
+
+**Wat er feitelijk staat.** `src/nlriochecker/plausibiliteit.toml` noemt in alle drie de
+regels van `[[leiding_put_materiaal]]` de waarde `Metselwerk` als verwacht putmateriaal.
+Die waarde bestaat in de GWSW-ontologie, maar niet als putmateriaal: `gwsw:Metselwerk`
+draagt `a gwsw:MateriaalLeidingColl` (regel 53856-53864 van
+`data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`, versie 1.6). `MateriaalPutColl` kent hem
+niet; die collectie heeft `MetselwerkBaksteen`, `MetselwerkBepleisterd` en
+`MetselwerkOnbepleisterd`. Geen legale export kan dus `gwsw:Metselwerk` op een put
+schrijven.
+
+**Waarom dit een BO is en geen configcommentaar.** Dit is een afwijking van de eerste regel
+van `CLAUDE.md` -- "GWSW is leidend" -- en die regel zegt zelf dat zo'n afwijking als
+BO-nummer in dit bestand hoort en *"niet als commentaar in een configbestand"*. Het
+onderscheid met de andere twee openstaande vragen uit de weekendrun is dat deze regel
+gedrag draagt. `AHN5` in `[vulwaarden] uit_hoogtemodel` is **inert**: `WijzeVanInwinningColl`
+stopt bij `AHN4`, geen export kan die waarde schrijven, dus de regel doet vandaag niets.
+`Metselwerk` doet wel iets, want de export schrijft de waarde wel.
+
+**De data.** In `data/gwsw_orox_ttl/dewolden_orox.ttl` dragen **33 putten** een
+`MateriaalPut` die naar `gwsw:Metselwerk` verwijst -- op 16.616 `MateriaalPut`-kenmerken,
+naast `Beton` 16.215, `PVC` 361, `GewapendBeton` 5 en `PE` 2. Dat de export daarmee buiten
+de domeinlijst valt is niet onopgemerkt: alle drie de SHACL-rapporten in
+`data/shacl_nulmeting/` tellen precies 33 `MateriaalPut_ref`-regels. De nulmeting meldt het
+dus al, per conformiteitsklasse.
+
+**De kosten van beide kanten, gemeten.** ATTR-010 staat op De Wolden vandaag op **0**
+bevindingen. Zou `Metselwerk` uit de drie rijen geschrapt worden, dan komt de check uit op
+**51 bevindingen over 37 strengen, rakend aan 27 van de 33 putten** (gemeten met de engine
+op de volledige export, ontologie `Ontologie_GWSW_Totaal.ttl`, alleen ATTR-010). Dat zijn 51
+waarschuwingen op objecten waarvan het gebrek niet in de put-leidingcombinatie zit maar in
+de gekozen domeinwaarde -- een gebrek dat de nulmeting al 33 keer per CFK meldt. Laten staan
+kost het omgekeerde: een waarde in een projecttabel die het GWSW niet kent, plus een
+permanente regel op `BEKENDE_AFWIJKINGEN` in `tests/test_gwsw_vocabulaire.py`.
+
+**Besluit: de regel blijft staan, en dit is geen eindantwoord.** De tolerantie geldt zolang
+vraag 2 van issue #47 niet beantwoord is. Dat is een domeinoordeel -- volgt deze tabel de
+export of de domeinlijst? -- en het ligt bij de auteur, niet bij de engine. Wat hier
+vastligt is alleen dat de afwijking bewust is, dat ze zichtbaar is, en op grond van welke
+getallen ze voorlopig geaccepteerd wordt. Het loslaatcriterium is de beslissing zelf, niet
+een meting: er is geen drempel die de vraag vanzelf beantwoordt.
+
+**Samenhang met #43.** `verwachte_putmaterialen` mist negen klassen die wél in
+`MateriaalPutColl` zitten, waaronder juist `MetselwerkBaksteen`, `MetselwerkBepleisterd` en
+`MetselwerkOnbepleisterd`. Worden die drie toegevoegd, dan verandert het argument om de
+niet-bestaande `Metselwerk` te laten staan -- een export die netjes `MetselwerkBaksteen`
+schrijft heeft de tolerantie niet nodig. #43 en #47 vraag 2 horen daarom in één keer
+beslist te worden.
+
+**Wat dit besluit niet is.** Geen uitspraak dat `Metselwerk` niet bestaat: hij bestaat, als
+leidingmateriaal, en op de leidingkant van dezelfde tabel staat hij volkomen terecht. De
+afwijking zit uitsluitend in het gebruik als *put*materiaal.

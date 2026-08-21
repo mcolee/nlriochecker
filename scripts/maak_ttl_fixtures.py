@@ -530,6 +530,27 @@ FIXTURES["attr004_rond_ongelijk.ttl"] = (
     ),
 )
 
+FIXTURES["attr004_muil_te_hoog.ttl"] = (
+    "streng 1 heeft een muilprofiel dat hoger is dan breed; een muil is breder dan hoog.\n"
+    "# Het muilprofiel zelf hoort bij metselwerk, dus ATTR-012 heeft hier niets te melden.",
+    nette_put("PutA", "A", *A, MateriaalPut_ref="Metselwerk")
+    + nette_put("PutB", "B", *B, MateriaalPut_ref="Metselwerk")
+    + nette_leiding(
+        "L1",
+        "1",
+        [A, B],
+        "PutA",
+        "PutB",
+        velden={
+            "BreedteLeiding": 600,
+            "HoogteLeiding": 800,
+            "MateriaalLeiding_ref": "Metselwerk",
+            "VormLeiding_ref": "Muil",
+            "Begindatum": "1930-01-01",
+        },
+    ),
+)
+
 FIXTURES["attr005_centimeters.ttl"] = (
     "streng 1 heeft breedte en hoogte 30; maal tien is dat 300 mm, een handelsmaat",
     nette_put("PutA", "A", *A)

@@ -13,10 +13,14 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
-# Mechanisch riool valt buiten scope (zie het checkregister). Deze klassen komen
-# niet in de analyse maar wel in de GIS-uitvoer, in een eigen grijze laag; een leeg
-# kaartbeeld daar zou anders als "geen gebreken" lezen. De namen zijn geverifieerd
-# tegen de export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
+# Mechanisch riool valt buiten scope (zie het checkregister). Deze lijst filtert
+# echter geen enkele check: dat mechanisch riool buiten de analyse blijft komt
+# doordat de checks op `vrijvervalleiding` selecteren en niet doordat deze klassen
+# hier staan. Haar enige lezer is `uitvoer/gpkg.py` via `selectie.mechanischeleidingen`,
+# en die bepaalt uitsluitend de kaartkleur: een mechanische streng blijft in de laag
+# `strengen` maar krijgt status `grijs` zolang er niets op staat, zodat "geen kleur"
+# daar niet als "getoetst en in orde" leest. De namen zijn geverifieerd tegen de
+# export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
 mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
 # degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
@@ -301,7 +305,7 @@ vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 # maaiveldhoogten: daar staat AHN2 op het Punt-aspect van de maaiveldorientatie.
 # `AHN5` bestaat nog niet in GWSW 1.6: WijzeVanInwinningColl stopt bij AHN4. De waarde
 # blijft voorlopig staan, maar of ze hier hoort -- als vooruitloop op een latere
-# GWSW-versie -- is een open vraag die bij de auteur ligt (#31 punt 4).
+# GWSW-versie -- is een open vraag die bij de auteur ligt: vraag 1 van issue #47.
 uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN5"]
 # Waarden die expliciet "onbekend" zeggen. Ze passeren elke kardinaliteits- en
 # collectietoets van de nulmeting maar zijn informatief leeg; het bevindingen-

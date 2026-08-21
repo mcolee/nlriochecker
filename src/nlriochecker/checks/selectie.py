@@ -87,9 +87,15 @@ def lozingspunten(context: CheckContext) -> list[Node]:
     """De punten waar het afvalwater het stelsel verlaat of binnenkomt.
 
     `gwsw:Lozingspunt` beschrijft precies dat, maar de rol is breder dan die ene
-    klasse: `Lozingspunt`, `UitlaatPunt` en `Uitlaat` staan op de orientatie, terwijl
-    `Lozingsput` (een rioolput) en `Uitlaatconstructie` (een bouwwerk) fysieke
-    objecten zijn. Welke van de twee een export gebruikt verschilt per leverancier.
+    klasse: `Lozingspunt` en `UitlaatPunt` zijn subklassen van `Aansluitpunt` en dus
+    van `Knooppunt`, en staan daarmee op de orientatie, terwijl `Lozingsput` (een
+    rioolput) en `Uitlaatconstructie` (een bouwwerk) fysieke objecten zijn. Welke van
+    de twee een export gebruikt verschilt per leverancier.
+
+    `Uitlaat` past in geen van beide bakken: die klasse hangt onder
+    `RepresentatieFysiekObject` en `TopologischElement`, niet onder `Knooppunt` en
+    niet onder `FysiekObject`. Ze staat nog in de lijst en levert op de De Wolden-export
+    nul objecten op; of ze eruit hoort is een gedragsvraag en hoort bij issue #32.
     """
     return _knopen(context, "sel:lozingspunten", context.config.klassen.lozings_eindpunt)
 

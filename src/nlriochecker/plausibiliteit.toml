@@ -139,18 +139,20 @@ toegestane_vormen = ["Rond", "Eivormig"]
 # `Metselwerk` blijft voorlopig staan, hoewel de collectie MateriaalPutColl hem niet
 # kent (die heeft MetselwerkBaksteen, MetselwerkBepleisterd en MetselwerkOnbepleisterd).
 # De Wolden schrijft `gwsw:Metselwerk` feitelijk op 33 putten; dat de export buiten de
-# domeinlijst valt meldt ADM-005 al (33 keer `MateriaalPut_ref` per CFK). Of deze tabel
-# de export volgt of de domeinlijst is een open vraag die bij de auteur ligt; zie issue
-# #31 punt 6.
+# domeinlijst valt meldt de SHACL-nulmeting al (33 keer `MateriaalPut_ref` per CFK).
+# Dit is een bewuste, tijdelijke afwijking van "GWSW is leidend" en staat als BO-35 in
+# docs/beslislog.md; de vraag of deze tabel de export volgt of de domeinlijst ligt bij
+# de auteur, als vraag 2 van issue #47.
 #
 # `Kunststof` stond hier wel en is weg: die waarde bestaat, maar in
-# MateriaalAfsluiterColl en niet in MateriaalPutColl, dus geen enkele legale export
-# schrijft hem op een put (#31 punt 3). PVC en PE zijn ervoor in de plaats gekomen, en
-# dat is minder dan "de kunststof putten": MateriaalPutColl kent daarnaast HDPE, GVK,
-# Polyester, Polypropyleen, PitchFibre en UnidentifiedTypeOfPlastics, en geen van die
-# zes staat hieronder. Een export die keurig HDPE op een put schrijft krijgt dus nog
-# steeds een ATTR-010 die er niet hoort te zijn. Dat gat staat open; ze toevoegen
-# verandert gedrag en is een beslissing voor de auteur.
+# MateriaalAfsluiterColl, MaterialOfStepsColl en Uitvoering -- niet in
+# MateriaalPutColl, dus geen enkele legale export schrijft hem op een put. Er is niets
+# voor in de plaats gekomen: PVC en PE stonden hier al. Die twee dekken de kunststofrol
+# maar deels, want MateriaalPutColl kent daarnaast HDPE, GVK, Polyester, Polypropyleen,
+# PitchFibre en UnidentifiedTypeOfPlastics, en geen van die zes staat hieronder. Een
+# export die keurig HDPE op een put schrijft krijgt dus nog steeds een ATTR-010 die er
+# niet hoort te zijn. Dat gat staat als issue #43; ze toevoegen verandert gedrag en is
+# een beslissing voor de auteur.
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "Beton"

@@ -10,8 +10,8 @@ welke typen er een delen -- en elke regel in de tabellen hieronder noemt de SLD-
 die hij vervangt.
 
 De QML's worden hier opgebouwd in plaats van als bestand meegeleverd. De
-regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 44
-knooptypen en 37 verbindingstypen in deze tabel zijn dat 220 respectievelijk 185
+regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 43
+knooptypen en 37 verbindingstypen in deze tabel zijn dat 215 respectievelijk 185
 bladregels met evenzoveel symbolen. Met de hand is dat ruim vierduizend regels XML
 waarin een tikfout de kaart stil leegtrekt, en waarin de typenlijst op twee plekken
 zou staan. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven wel gewone
@@ -19,7 +19,7 @@ bestanden: die hebben een enkel symbool en veranderen niet.
 
 Een opgebouwde stijl draagt alleen regels voor de objecttypen die werkelijk in zijn
 laag staan; die krijgt hij van de schrijver mee. Dat is niet alleen zuiniger maar
-noodzakelijk: met de volledige tabel toont de lagenboom van QGIS 225 legendaregels
+noodzakelijk: met de volledige tabel toont de lagenboom van QGIS 220 legendaregels
 voor de putten en 193 voor de strengen, op een laag met zes voorkomende typen. Dat is
 geen legenda meer maar een muur. Met de voorkomende typen zijn het er 35 en 38 --
 gemeten met PyQGIS op de echte uitvoer.

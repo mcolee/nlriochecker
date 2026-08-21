@@ -125,9 +125,15 @@ def main() -> None:
     tekst = documenttekst(ONTOLOGIE)
     DOEL.write_text(tekst, encoding="utf-8")
     document = json.loads(tekst)
+    # Twee getallen die makkelijk verward worden: `subklasse_van` heeft een sleutel per
+    # klasse met minstens een GWSW-ouder, en die klassen kunnen er meer dan een hebben.
+    # Het aantal sleutels is dus niet het aantal relaties. Beide staan er, met hun
+    # eigen naam, want het verkeerde label is eerder in BO-32 beland.
     print(
         f"{DOEL.relative_to(WORTEL)}: {len(document['termen'])} termen en "
-        f"{len(document['subklasse_van'])} subklasserelaties geschreven."
+        f"{len(document['subklasse_van'])} klassen met een superklasse "
+        f"({sum(len(ouders) for ouders in document['subklasse_van'].values())} "
+        f"subklasserelaties) geschreven."
     )
 
 

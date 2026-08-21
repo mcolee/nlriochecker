@@ -44,6 +44,27 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   keuze om NET-007 voorlopig op de infiltratieleidingen te laten draaien als BO-34. De
   uitkomst op De Wolden verandert niet: 35.370 meldingen over 48 checks, voor en na.
 
+- **De belofte onder BO-33 is nagemeten in plaats van aangenomen, en drie onware zinnen
+  zijn rechtgezet.** Een nieuwe fixture (`net001_overnamepunt.ttl`) legt vast dat NET-001
+  een `Overnamepunt` op de putorientatie als afvoereindpunt accepteert -- de route
+  `_eindpunten` -> `of_class` -> `types_of` -> `orientation_types` draaide tot nu toe op
+  geen enkele dataset en in geen enkele test, want De Wolden levert er nul. Diezelfde
+  fixture legt het restrisico vast: een `Overnamepunt` als losstaande orientatie zonder
+  dragend object wordt geen knoop, en de streng ernaartoe valt niet als onbereikbaar op
+  maar verdwijnt uit de netwerkanalyse -- alleen de notitie van de check telt haar nog.
+  Rechtgezet: `Kunststof` is uit `[[leiding_put_materiaal]]` geschrapt zonder dat er iets
+  voor in de plaats kwam (`PVC` en `PE` stonden er al), `gwsw:Uitlaat` hangt onder
+  `RepresentatieFysiekObject` en staat dus níét op de orientatie zoals `Lozingspunt` en
+  `UitlaatPunt`, en `[klassen] mechanisch` filtert geen enkele check maar bepaalt alleen
+  de kaartkleur. Dat `Metselwerk` als putmateriaal blijft staan is een bewuste, tijdelijke
+  afwijking van "GWSW is leidend" en staat voortaan als **BO-35** in `docs/beslislog.md`,
+  met de gemeten kosten van beide kanten: schrappen zou ATTR-010 van 0 op 51 bevindingen
+  brengen, over 37 strengen en 27 van de 33 `Metselwerk`-putten. Verwijzingen naar de
+  gesloten issues #31 en #11 wijzen nu naar issue #47, met de vraag erbij. Het eenmalige
+  meetwerk in `scripts/metingen/` heeft een `README.md` met zijn afspraken en legt zijn
+  uitvoer naast het script; de vormpoort van dat script weigert voortaan ook een
+  objectlijst met komma. Geen gedragswijziging: 35.370 meldingen over 48 checks.
+
 - **De bewaking rond de GWSW-vocabulairetest en de drempelconfiguratie bijt nu waar ze
   eerder groen kon blijven.** De zelfgarantie van `tests/test_gwsw_vocabulaire.py` hing
   aan vier sentinels die geen van alle uit een van de twee TOML-configuraties kwamen;
@@ -370,9 +391,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   staan als afgehandeld gemarkeerd, elk met de plek waar dat te controleren is; en van
   punt 10 wordt het restant niet opgepakt -- er is geen Mds-nulmetingrapport beschikbaar,
   en daarmee valt het buiten scope -- wat er met de inhoud bij staat. Wat er onder
-  punt 6 nog wel open stond -- dat `Overnamepunt` en een klasse voor het IT-stelsel niet in
-  de GWSW-ontologie bestaan en de engine ze zelf invult -- is een eigen issue geworden; de
-  twee verwijzingen in `checks.toml` wijzen daarheen in plaats van naar open punt 6. De
+  punt 6 nog wel open stond -- de toenmalige lezing dat `Overnamepunt` en een klasse voor
+  het IT-stelsel niet in de GWSW-ontologie zouden bestaan en de engine ze zelf invult --
+  is een eigen issue geworden; de twee verwijzingen in `checks.toml` wijzen daarheen in
+  plaats van naar open punt 6. Die lezing is inmiddels weerlegd: beide begrippen bestaan
+  wel degelijk, zie BO-33 en BO-34 in `docs/beslislog.md` en de regel hierboven onder
+  issue #11. De
   nummering van de open punten is ongemoeid gelaten, omdat `checks.toml` en twee modules er
   bij nummer naar verwijzen.
 - `bgt_waterlagen` bevat alleen nog `waterdeel`; `ondersteunendwaterdeel` valt buiten
@@ -493,11 +517,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `VormLeidingColl` `Muil` en niet `Muilprofiel`: daardoor kreeg een gemetseld
   muilprofielriool een valse ATTR-012 en vuurde de ATTR-004-regel over de
   hoogte-breedteverhouding op geen enkel muilprofiel. `Kunststof` stond als putmateriaal
-  in `[[leiding_put_materiaal]]` maar zit niet in `MateriaalPutColl`, dus geen legale
-  export kon die waarde schrijven; PVC en PE zijn ervoor in de plaats gekomen, wat de
-  overige kunststofklassen van `MateriaalPutColl` (`HDPE`, `GVK`, `Polyester`,
-  `Polypropyleen`, `PitchFibre`, `UnidentifiedTypeOfPlastics`) niet dekt -- dat gat
-  staat open. De
+  in `[[leiding_put_materiaal]]` maar zit niet in `MateriaalPutColl` (wel in
+  `MateriaalAfsluiterColl`, `MaterialOfStepsColl` en `Uitvoering`), dus geen legale
+  export kon die waarde schrijven; hij is geschrapt zonder dat er iets voor in de plaats
+  kwam. `PVC` en `PE` stonden er al en dekken de kunststofrol maar deels: de overige
+  kunststofklassen van `MateriaalPutColl` (`HDPE`, `GVK`, `Polyester`, `Polypropyleen`,
+  `PitchFibre`, `UnidentifiedTypeOfPlastics`) staan er niet bij -- dat gat staat als
+  issue #43. De
   symbolentabel schreef `Interneoverstortput` en `Verholengoot` waar de ontologie
   `InterneOverstortput` en `VerholenGoot` schrijft (de symboolkeuze werkte al, want ze
   vergelijkt hoofdletterongevoelig), en droeg een regel voor `Vacuumgemaal`, dat geen
@@ -505,7 +531,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   weg; `Vacuumpompstation` dekt het gemaal zelf. Op De Wolden verandert er niets: die
   dataset kent geen `Muil` en geen kunststof put, en ATTR-004, ATTR-010 en ATTR-012
   leveren er voor en na nul bevindingen. `AHN5` en `Metselwerk` blijven staan; dat zijn
-  open vragen voor de auteur (#31 punt 4 en 6).
+  open vragen voor de auteur (vraag 1 en 2 van issue #47). Dat `Metselwerk` blijft staan
+  is een bewuste, tijdelijke afwijking van "GWSW is leidend" en staat als BO-35 in
+  `docs/beslislog.md`.
 
 ### Verwijderd
 
