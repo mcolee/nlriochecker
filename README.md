@@ -315,7 +315,13 @@ uv run mypy             # over src/nlriochecker
 Dezelfde vier stappen draaien in CI op elke push naar `main` of `dev`
 (`.github/workflows/toets.yml`) en in `scripts/uitgave.py` bij een uitgave. Een schone
 kloon mist de niet-getrackte delen van `data/`; de tests die daarop leunen slaan dan
-over, en CI bewaakt met `NLRIOCHECKER_MIN_GESLAAGD` dat dat er niet te veel worden.
+over, en CI bewaakt met `NLRIOCHECKER_MIN_GESLAAGD` en `NLRIOCHECKER_MAX_OVERGESLAGEN`
+dat dat er niet te veel worden.
+
+Zet je een nieuwe GWSW-ontologie in `data/gwsw_ontologieen/`, draai dan
+`uv run python scripts/maak_gwsw_index.py`. Dat schrijft de getrackte afgeleide
+`data/gwsw-vocabulaire-index.json` opnieuw, waartegen de GWSW-vocabulairetest valideert;
+werk in dezelfde stap de GWSW-versie in [CLAUDE.md](CLAUDE.md) bij.
 
 Wat er per versie veranderde staat in [CHANGELOG.md](CHANGELOG.md); zet nieuwe
 wijzigingen onder `## [Unreleased]`.

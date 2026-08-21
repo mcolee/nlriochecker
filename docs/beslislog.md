@@ -1711,3 +1711,52 @@ tabellen.
 **`stelseltypen` verhuist naar `uitvoer/omvang.py`.** Zowel de aantallentabel als de
 GeoPackage heeft hem nodig; twee kopieen zouden op een dag verschillende stelsels aan
 dezelfde put toekennen.
+
+### BO-32 De GWSW-vocabulaire-index gaat mee in de repository
+
+**Context.** `tests/test_gwsw_vocabulaire.py` toetst elke GWSW-naam die dit pakket gebruikt
+tegen de ontologie. Die ontologie (`data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`, 2,6 MB)
+staat buiten versiebeheer, samen met de rest van `data/`. Gevolg: op de CI-runner sloeg die
+test 140 van zijn 142 gevallen over -- precies de stilte die issue #30 wilde opheffen.
+
+**Besluit.** Er komt een afgeleide in versiebeheer: `data/gwsw-vocabulaire-index.json`,
+geschreven door `scripts/maak_gwsw_index.py`. Ze draagt per GWSW-naam zijn `rdf:type`s en zijn
+directe superklassen, en niets meer -- genoeg om te beantwoorden of een begrip bestaat, of het
+in de juiste collectie zit, en welke klassen onder een wortel hangen. Nu 285 kB bij 3.316
+termen en 2.078 subklasserelaties.
+
+**Licentie is geen bezwaar.** De GWSW-ontologie staat onder CC0
+(https://stichtingrioned.github.io/GWSW_Ontologie_RDF/); herdistributie, ook van een
+afgeleide, is vrij en verplicht ons tot niets. De afweging gaat dus over bestandsgrootte en
+onderhoud, niet over rechten.
+
+**Bestandsgrootte.** 285 kB tekst met een regel per term is te overzien in een repository die
+verder alleen broncode draagt, en de opmaak is met opzet diffbaar: een nieuwe GWSW-versie
+levert een leesbare lijst toevoegingen op in plaats van één regel van tienduizend tekens.
+De hele TTL tracken (2,6 MB, en de ontologie is niet het enige bestand in die map) zou de
+grens over gaan waar `data/` juist voor buitengesloten is.
+
+**Onderhoudsmodel.** De index wordt nooit met de hand bijgewerkt. Zet de auteur een nieuwe
+ontologie neer, dan draait hij `uv run python scripts/maak_gwsw_index.py` en commit hij het
+resultaat; `CLAUDE.md` en `README.md` zeggen dat op de plek waar hij kijkt.
+`test_index_volgt_de_ontologie` vergelijkt de hele bestandstekst met een vers geparseerde TTL
+en `test_indexversie_staat_in_claude_md` houdt de `versie=`-regel van de index gelijk aan de
+GWSW-versie in `CLAUDE.md` -- die tweede draait ook op CI, want beide bestanden zijn getrackt.
+
+**Dat de drifttest alleen lokaal draait is geen ongedekt gat.** De enige die de index kan
+laten verouderen is de auteur die een nieuwe ontologie neerzet, en dat is dezelfde persoon op
+dezelfde machine die als enige die test draait. `scripts/uitgave.py` draait `uv run pytest -q`
+als uitgavepoort en `TAKVOORWAARDE` dwingt die poort af op `main`: een verouderde index kan
+geen uitgave overleven.
+
+**Eén restrisico, eerlijk benoemd.** Een term die een volgende GWSW-versie hernoemt of naar een
+andere collectie verplaatst blijft gewoon valideren tegen de 1.6-index tot die vervangen is.
+Nieuwe namen vallen luid om, hernoemde niet. Daarom moet `CLAUDE.md` gezaghebbend blijven over
+welke GWSW-versie leidt, en bewaakt `test_indexversie_staat_in_claude_md` dat de twee niet elk
+hun eigen versie gaan dragen.
+
+**Alternatieven.** De TTL zelf tracken (verworpen: te groot, en dan verhuist de discussie naar
+de rest van `data/`). De ontologie bij data.gwsw.nl ophalen in CI (verworpen: `CLAUDE.md`
+verbiedt een automatische versiecontrole tegen die bron expliciet, en het maakt de suite
+afhankelijk van een netwerkdienst van een derde). De test op CI laten overslaan (verworpen:
+dat wás de toestand die #30 opheft).

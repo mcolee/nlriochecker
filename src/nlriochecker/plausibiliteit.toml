@@ -145,7 +145,12 @@ toegestane_vormen = ["Rond", "Eivormig"]
 #
 # `Kunststof` stond hier wel en is weg: die waarde bestaat, maar in
 # MateriaalAfsluiterColl en niet in MateriaalPutColl, dus geen enkele legale export
-# schrijft hem op een put. PVC en PE dekken de kunststof putten (#31 punt 3).
+# schrijft hem op een put (#31 punt 3). PVC en PE zijn ervoor in de plaats gekomen, en
+# dat is minder dan "de kunststof putten": MateriaalPutColl kent daarnaast HDPE, GVK,
+# Polyester, Polypropyleen, PitchFibre en UnidentifiedTypeOfPlastics, en geen van die
+# zes staat hieronder. Een export die keurig HDPE op een put schrijft krijgt dus nog
+# steeds een ATTR-010 die er niet hoort te zijn. Dat gat staat open; ze toevoegen
+# verandert gedrag en is een beslissing voor de auteur.
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "Beton"

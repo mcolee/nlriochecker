@@ -13,6 +13,28 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De bewaking rond de GWSW-vocabulairetest en de drempelconfiguratie bijt nu waar ze
+  eerder groen kon blijven.** De zelfgarantie van `tests/test_gwsw_vocabulaire.py` hing
+  aan vier sentinels die geen van alle uit een van de twee TOML-configuraties kwamen;
+  beide bestanden konden dus stil uit de termenlijst wegvallen. Er is nu een sentinel
+  per termenbron (`BRONSENTINELS`). `BEKENDE_AFWIJKINGEN` is op `(naam, collectie)`
+  gesleuteld in plaats van op naam alleen, zodat de skip voor `Metselwerk` als
+  putmateriaal de vier legitieme leidingmateriaal-vindplaatsen niet meer meeneemt. De
+  drifttest op `[drempels]` bond alleen veldnamen; de 53 waarden zelf worden nu tegen de
+  `CheckThresholds`-defaults gehouden, voor `configs/dewoldenhoogeveen.toml` met een
+  expliciete (vandaag lege) lijst `BEWUSTE_AFWIJKINGEN`. Dezelfde presentietest loopt
+  nu over vijf modellen in plaats van één, zodat ook `[rapport]`, `[studiegebied]`,
+  `[vulwaarden]` en `[bronnen]` eronder vallen. Nieuw: een test die de GWSW-versie in
+  `data/gwsw-vocabulaire-index.json` gelijkhoudt aan die in `CLAUDE.md`, en een
+  drifttest die meldt wanneer de symbolentabellen verder achteropraken bij de klassen
+  die GWSW onder `Put`, `Bouwwerk`, `Hulpstuk` en `Knooppunt` hangt (vandaag 95 van 137
+  ongedekt). Daarvoor draagt de index ook de directe `rdfs:subClassOf`-kanten; hij groeit
+  van 196 naar 284 kB. CI bewaakt naast `NLRIOCHECKER_MIN_GESLAAGD` nu ook
+  `NLRIOCHECKER_MAX_OVERGESLAGEN`, een grens die niet met de suite mee omhoog kruipt.
+  Het besluit om de afgeleide index te tracken staat als BO-32 in `docs/beslislog.md`.
+  Geen enkele drempelwaarde is verschoven en er verandert niets aan de uitkomst van een
+  run.
+
 - **Het bevindingenrapport van `toets` is opnieuw opgebouwd** (issue #16). De volgorde
   is nu: de naam van het gebied als titel, dan wat er in dat gebied ligt, dan of het
   voldoet, dan de verantwoording, en pas daarna het detail. De rapporten van
@@ -441,7 +463,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   muilprofielriool een valse ATTR-012 en vuurde de ATTR-004-regel over de
   hoogte-breedteverhouding op geen enkel muilprofiel. `Kunststof` stond als putmateriaal
   in `[[leiding_put_materiaal]]` maar zit niet in `MateriaalPutColl`, dus geen legale
-  export kon die waarde schrijven; PVC en PE dekken de kunststof putten. De
+  export kon die waarde schrijven; PVC en PE zijn ervoor in de plaats gekomen, wat de
+  overige kunststofklassen van `MateriaalPutColl` (`HDPE`, `GVK`, `Polyester`,
+  `Polypropyleen`, `PitchFibre`, `UnidentifiedTypeOfPlastics`) niet dekt -- dat gat
+  staat open. De
   symbolentabel schreef `Interneoverstortput` en `Verholengoot` waar de ontologie
   `InterneOverstortput` en `VerholenGoot` schrijft (de symboolkeuze werkte al, want ze
   vergelijkt hoofdletterongevoelig), en droeg een regel voor `Vacuumgemaal`, dat geen

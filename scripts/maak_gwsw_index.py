@@ -3,13 +3,16 @@
 
 De vocabulairetest (`tests/test_gwsw_vocabulaire.py`) moet van elke GWSW-naam weten
 welke `rdf:type`s de ontologie eraan geeft -- dat is tegelijk het antwoord op "bestaat
-dit begrip" en op "zit het in de juiste collectie". De ontologie zelf staat buiten
-versiebeheer omdat ze 2,6 MB weegt, en zonder haar sloeg die test op de CI-runner
-vrijwel volledig over. Deze afgeleide index is klein genoeg om wel getrackt te worden
-en draagt precies dat ene gegeven, niets meer.
+dit begrip" en op "zit het in de juiste collectie". Daarnaast toetst hij de andere kant
+op -- dekken onze symbolentabellen de klassen die GWSW onder `Put`, `Bouwwerk`,
+`Hulpstuk` en `Knooppunt` hangt -- en daarvoor zijn de directe `rdfs:subClassOf`-kanten
+nodig. De ontologie zelf staat buiten versiebeheer omdat ze 2,6 MB weegt, en zonder
+haar sloeg die test op de CI-runner vrijwel volledig over. Deze afgeleide index is
+klein genoeg om wel getrackt te worden en draagt precies die twee gegevens, niets meer.
 
 De ontologie is CC0 (https://stichtingrioned.github.io/GWSW_Ontologie_RDF/), dus aan
-het opnemen van een afgeleide staat niets in de weg.
+het opnemen van een afgeleide staat niets in de weg. De afweging is bestandsgrootte en
+onderhoud, geen licentie; zie BO-32 in `docs/beslislog.md`.
 
 Upgraden blijft handwerk van de auteur, zoals `CLAUDE.md` voorschrijft: hij zet nieuwe
 ontologiebestanden in `data/gwsw_ontologieen/` en draait dit script. Er wordt met opzet
@@ -24,7 +27,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from rdflib import OWL, RDF, Graph, URIRef
+from rdflib import OWL, RDF, RDFS, Graph, URIRef
 
 from nlriochecker.dataset import GWSW
 
@@ -47,6 +50,24 @@ def termen_uit_graaf(graaf: Graph) -> dict[str, list[str]]:
             continue
         termen.setdefault(str(subject).removeprefix(GWSW), set()).add(str(soort).removeprefix(GWSW))
     return {naam: sorted(soorten) for naam, soorten in sorted(termen.items())}
+
+
+def ouders_uit_graaf(graaf: Graph) -> dict[str, list[str]]:
+    """Per GWSW-klasse haar directe GWSW-superklassen.
+
+    Alleen de *directe* kanten, niet de afsluiting: die is uit deze kanten te bouwen en
+    zou het bestand een orde van grootte groter maken. Kanten naar buiten de
+    GWSW-naamruimte (`owl:Thing`, SKOS) blijven weg -- de vraag die de test hiermee
+    beantwoordt is welke GWSW-klassen onder een GWSW-wortel hangen.
+    """
+    ouders: dict[str, set[str]] = {}
+    for kind, ouder in graaf.subject_objects(RDFS.subClassOf):
+        if not isinstance(kind, URIRef) or not isinstance(ouder, URIRef):
+            continue
+        if not str(kind).startswith(GWSW) or not str(ouder).startswith(GWSW):
+            continue
+        ouders.setdefault(str(kind).removeprefix(GWSW), set()).add(str(ouder).removeprefix(GWSW))
+    return {naam: sorted(soorten) for naam, soorten in sorted(ouders.items())}
 
 
 def versie_uit_graaf(graaf: Graph) -> str:
@@ -72,7 +93,6 @@ def documenttekst(ttl: Path) -> str:
     """
     graaf = Graph()
     graaf.parse(ttl, format="turtle")
-    termen = termen_uit_graaf(graaf)
 
     kop = {
         "bron": ttl.relative_to(WORTEL).as_posix(),
@@ -81,14 +101,20 @@ def documenttekst(ttl: Path) -> str:
     }
     regels = ["{"]
     regels += [f"  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}," for k, v in kop.items()]
-    regels.append('  "termen": {')
-    namen = list(termen)
-    for nummer, naam in enumerate(namen, start=1):
-        komma = "" if nummer == len(namen) else ","
-        sleutel = json.dumps(naam, ensure_ascii=False)
-        soorten = json.dumps(termen[naam], ensure_ascii=False)
-        regels.append(f"    {sleutel}: {soorten}{komma}")
-    regels += ["  }", "}"]
+    for blok, inhoud in (
+        ("termen", termen_uit_graaf(graaf)),
+        ("subklasse_van", ouders_uit_graaf(graaf)),
+    ):
+        komma_blok = "," if blok != "subklasse_van" else ""
+        regels.append(f'  "{blok}": {{')
+        namen = list(inhoud)
+        for nummer, naam in enumerate(namen, start=1):
+            komma = "" if nummer == len(namen) else ","
+            sleutel = json.dumps(naam, ensure_ascii=False)
+            waarden = json.dumps(inhoud[naam], ensure_ascii=False)
+            regels.append(f"    {sleutel}: {waarden}{komma}")
+        regels.append(f"  }}{komma_blok}")
+    regels.append("}")
     return "\n".join(regels) + "\n"
 
 
@@ -98,8 +124,11 @@ def main() -> None:
         raise SystemExit(f"{ONTOLOGIE} ontbreekt; zet de GWSW-ontologie in data/.")
     tekst = documenttekst(ONTOLOGIE)
     DOEL.write_text(tekst, encoding="utf-8")
-    aantal = len(json.loads(tekst)["termen"])
-    print(f"{DOEL.relative_to(WORTEL)}: {aantal} termen geschreven.")
+    document = json.loads(tekst)
+    print(
+        f"{DOEL.relative_to(WORTEL)}: {len(document['termen'])} termen en "
+        f"{len(document['subklasse_van'])} subklasserelaties geschreven."
+    )
 
 
 if __name__ == "__main__":

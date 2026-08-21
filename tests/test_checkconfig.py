@@ -6,9 +6,14 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 
 from nlriochecker.checkconfig import (
     CheckThresholds,
+    ExternalSources,
+    ReportOptions,
+    StudyAreaOptions,
+    VulwaardeOptions,
     default_check_config_path,
     load_check_config,
 )
@@ -138,29 +143,137 @@ def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
     assert "Overstortput" in load_check_config().klassen.kritiek
 
 
-@pytest.mark.parametrize(
-    ("pad", "herkomst"),
-    [
-        (default_check_config_path(), "src/nlriochecker/checks.toml"),
-        (PROJECTCONFIG, "configs/dewoldenhoogeveen.toml"),
-    ],
-)
-def test_elke_drempel_staat_expliciet_in_de_toml(pad: Path, herkomst: str) -> None:
+# De configuratiemodellen met drempelvormige velden, met de TOML-sectie waarin ze
+# horen. `CheckThresholds` was de enige die #28 afdekte; de acht velden daarbuiten
+# (`context_buffer_m`, `hoogte_band_m`, `dekking_tolerantie_m`, de vier van `[rapport]`)
+# vielen buiten elke bewaking, en een negende veld zou morgen hetzelfde gat heropenen.
+# `ClassRoots`, `NulmetingOptions` en `NamingOptions` staan er niet bij: die dragen geen
+# drempels maar klassenlijsten, en de eerste twee zijn al verplicht.
+DREMPELMODELLEN: list[tuple[str, type[BaseModel]]] = [
+    ("drempels", CheckThresholds),
+    ("rapport", ReportOptions),
+    ("studiegebied", StudyAreaOptions),
+    ("vulwaarden", VulwaardeOptions),
+    ("bronnen", ExternalSources),
+]
+
+CONFIGBESTANDEN = [
+    pytest.param(default_check_config_path(), "src/nlriochecker/checks.toml", id="checks.toml"),
+    pytest.param(PROJECTCONFIG, "configs/dewoldenhoogeveen.toml", id="dewoldenhoogeveen.toml"),
+]
+
+# Sleutels van `[drempels]` waarvoor `configs/dewoldenhoogeveen.toml` bewust van de
+# `CheckThresholds`-default afwijkt, met de reden. Vandaag leeg: De Wolden draait op de
+# standaardwaarden. Een project *mag* afwijken -- maar dan als bewuste daad die hier
+# opgeschreven staat, niet als een getal dat stilzwijgend uit elkaar loopt.
+BEWUSTE_AFWIJKINGEN: dict[str, str] = {}
+
+
+def _verplichte_velden(model: type[BaseModel]) -> set[str]:
+    """De velden die expliciet in de TOML horen te staan.
+
+    Een veld met `None` als standaardwaarde valt af: TOML kent geen null, dus zo'n veld
+    is niet expliciet op zijn default te zetten. Dat zijn de optionele bronpaden
+    (`bgt`, `ahn_dtm`) en de twee naamgevingspatronen -- geen drempels.
+    """
+    return {
+        naam
+        for naam, veld in model.model_fields.items()
+        if veld.get_default(call_default_factory=True) is not None
+    }
+
+
+@pytest.mark.parametrize(("sectie", "model"), DREMPELMODELLEN, ids=[s for s, _ in DREMPELMODELLEN])
+@pytest.mark.parametrize(("pad", "herkomst"), CONFIGBESTANDEN)
+def test_elke_drempel_staat_expliciet_in_de_toml(
+    pad: Path, herkomst: str, sectie: str, model: type[BaseModel]
+) -> None:
     """Issue #28: geen enkele drempel mag stilzwijgend op een Python-default vallen.
 
-    Vergelijkt de veldnamen van `CheckThresholds` met de sleutels die daadwerkelijk
-    onder `[drempels]` in het bestand staan (via `tomllib`, niet via de geladen
-    `CheckConfig` -- die vult ontbrekende velden juist met de default op en zou het
-    verschil verbergen). Een nieuw veld dat hier niet bij komt, of een hernoeming die
-    de TOML niet meekrijgt, maakt deze test rood.
+    Vergelijkt de veldnamen van het model met de sleutels die daadwerkelijk onder de
+    sectie in het bestand staan (via `tomllib`, niet via de geladen `CheckConfig` --
+    die vult ontbrekende velden juist met de default op en zou het verschil
+    verbergen). Een nieuw veld dat hier niet bij komt, of een hernoeming die de TOML
+    niet meekrijgt, maakt deze test rood.
     """
-    verwacht = set(CheckThresholds.model_fields)
-    aanwezig = set(tomllib.loads(pad.read_text(encoding="utf-8"))["drempels"])
+    verwacht = _verplichte_velden(model)
+    aanwezig = set(tomllib.loads(pad.read_text(encoding="utf-8"))[sectie])
 
-    assert aanwezig == verwacht, (
-        f"{herkomst} [drempels] mist {verwacht - aanwezig} en/of draagt onbekende "
-        f"velden {aanwezig - verwacht}"
+    assert verwacht and not (verwacht - aanwezig), (
+        f"{herkomst} [{sectie}] mist {sorted(verwacht - aanwezig)}"
     )
+    assert not (onbekend := aanwezig - set(model.model_fields)), (
+        f"{herkomst} [{sectie}] draagt onbekende velden {sorted(onbekend)}"
+    )
+
+
+def _drempelafwijkingen(
+    pad: Path, negeer: frozenset[str] | set[str] = frozenset()
+) -> dict[str, tuple[object, object]]:
+    """Per drempel in `[drempels]` de afwijking van de `CheckThresholds`-default.
+
+    Op type af en niet alleen op waarde: `1` en `1.0` zijn in TOML twee dingen, en een
+    int waar een float hoort valt in pydantic stil goed.
+    """
+    standaard = CheckThresholds()
+    aanwezig = tomllib.loads(pad.read_text(encoding="utf-8"))["drempels"]
+    return {
+        veld: (waarde, verwacht)
+        for veld, waarde in aanwezig.items()
+        if veld not in negeer
+        and ((verwacht := getattr(standaard, veld)) != waarde or type(waarde) is not type(verwacht))
+    }
+
+
+def test_de_meegeleverde_drempels_zijn_de_defaults() -> None:
+    """`checks.toml` *is* de standaard, dus zijn waarden horen die van Python te zijn.
+
+    De veldnamen bewaakt de test hierboven; hier gaan de 53 getallen zelf langs. Zonder
+    deze test staan er drie kopieen van dezelfde reeks -- de Python-defaults, dit
+    bestand en de projectconfiguratie -- waarvan er maar een bewaakt wordt: wie morgen
+    `bob_sprong_m` in `checkconfig.py` verlegt, ziet geen van beide TOML's volgen.
+    Op type af, niet alleen op waarde: `1` en `1.0` zijn in TOML twee dingen.
+    """
+    afwijkend = _drempelafwijkingen(default_check_config_path())
+
+    assert not afwijkend, (
+        "src/nlriochecker/checks.toml [drempels] wijkt af van de CheckThresholds-defaults "
+        f"(veld: bestand, Python): {afwijkend}. Het meegeleverde bestand is de default; "
+        "pas ze samen aan."
+    )
+
+
+def test_de_projectdrempels_wijken_alleen_bewust_af() -> None:
+    """Een projectconfiguratie mag afwijken -- maar dan opgeschreven, niet stil.
+
+    `load_check_config` voegt niets samen: een projectconfiguratie vervangt de
+    meegeleverde in haar geheel. Een drempel die daar per ongeluk achterblijft bij een
+    wijziging in `checkconfig.py` valt dus nergens op. Wie er bewust een verlegt, zet
+    hem op `BEWUSTE_AFWIJKINGEN` met de reden erbij.
+    """
+    afwijkend = _drempelafwijkingen(PROJECTCONFIG, negeer=set(BEWUSTE_AFWIJKINGEN))
+
+    assert not afwijkend, (
+        "configs/dewoldenhoogeveen.toml [drempels] wijkt onaangekondigd af van de "
+        f"CheckThresholds-defaults (veld: bestand, Python): {afwijkend}. Zet de "
+        "afwijking met haar reden op BEWUSTE_AFWIJKINGEN, of zet de waarde terug."
+    )
+
+
+def test_bewuste_afwijking_wijkt_ook_werkelijk_af() -> None:
+    """De andere richting: een afwijking die geen afwijking meer is hoort van de lijst.
+
+    Zonder deze test blijft `BEWUSTE_AFWIJKINGEN` staan als een lijst keuzes die niemand
+    meer maakt, en dekt hij stilzwijgend de volgende drift op datzelfde veld af.
+    """
+    nog_afwijkend = _drempelafwijkingen(PROJECTCONFIG)
+    aanwezig = tomllib.loads(PROJECTCONFIG.read_text(encoding="utf-8"))["drempels"]
+
+    for veld, reden in BEWUSTE_AFWIJKINGEN.items():
+        assert veld in aanwezig, f"{veld} staat op BEWUSTE_AFWIJKINGEN maar niet in [drempels]"
+        assert veld in nog_afwijkend, (
+            f"{veld} is gelijk aan de default; haal hem uit BEWUSTE_AFWIJKINGEN ({reden})"
+        )
 
 
 def test_vulwaarden_uit_de_standaardconfig() -> None:

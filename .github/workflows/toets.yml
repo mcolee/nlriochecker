@@ -42,6 +42,29 @@ jobs:
       # over en draait nu op een na volledig mee. Die ene is de drifttest, die de
       # ontologie zelf nodig heeft.
       NLRIOCHECKER_MIN_GESLAAGD: "1200"
+      # De ondergrens hierboven is nu tweemaal met de hand nagetrokken nadat hij was
+      # opgehouden te bijten, en dat blijft zo: "geslaagd" kruipt met de suite mee
+      # omhoog. Wat de poort wil vangen is stille overslag, en dat is een bovengrens op
+      # "overgeslagen" -- die beweegt niet mee met suitegroei. Bovendien levert de
+      # vocabulairemodule een geval per GWSW-naam in de configuratie, dus een
+      # configwijziging die namen schrapt zou een ondergrens op "geslaagd" ten onrechte
+      # rood laten vallen; op overslagen heeft datzelfde geen effect.
+      #
+      # Gemeten in een kopie van de werkboom met alleen de getrackte delen van data/ en
+      # met PyQGIS uitgezet (GWSW_QGIS_SITE_PACKAGES=/nonexistent) -- de toestand van
+      # deze runner: 1300 geslaagd, 44 overgeslagen. Die 44 zijn 41 tests die data/
+      # nodig hebben, 1 modulewijde skip van tests/test_uitvoer_qgis.py en de 2
+      # openstaande BEKENDE_AFWIJKINGEN uit tests/test_gwsw_vocabulaire.py. 50 laat
+      # ruimte voor een handvol nieuwe datagebonden tests en valt om zodra er zeven
+      # losse overslagen bijkomen -- een fixture die niet meekomt, een bron die op de
+      # runner ineens ontbreekt.
+      #
+      # Wat hij *niet* vangt, en dat hoort erbij: een `pytest.skip(allow_module_level=True)`
+      # telt als één overslag, hoeveel tests de module ook draagt. Gemeten: een module
+      # van 29 tests zo uitzetten laat het aantal overslagen op 44 staan en het aantal
+      # geslaagden naar 1271 zakken -- ruim boven de ondergrens. Voor dat geval hebben
+      # beide grenzen te veel lucht.
+      NLRIOCHECKER_MAX_OVERGESLAGEN: "50"
     steps:
       - uses: actions/checkout@v7
 

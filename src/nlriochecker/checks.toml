@@ -316,8 +316,10 @@ hoogte_kenmerken = ["BobBeginpuntLeiding", "BobEindpuntLeiding", "Maaiveldhoogte
 # |waarde| tot en met deze band geldt als vulwaarde; 0.01 omdat ook 0,01 voorkomt.
 hoogte_band_m = 0.01
 
-# Instellingen van het rapport en de GIS-uitvoer. Geen enkele drempel staat in de
-# code; wie ze wil verleggen doet dat hier.
+# Instellingen van het rapport en de GIS-uitvoer. Elk veld van ReportOptions staat
+# hieronder expliciet, met zijn huidige waarde; dezelfde drifttest bewaakt dat
+# (issue #28). Wie een van deze drempels wil verleggen doet dat hier -- de bereiken per
+# materiaal en profielvorm staan niet hier maar in plausibiliteit.toml.
 [rapport]
 # Boven dit aandeel strengen met stijgende bodem benoemt het rapport systematisch
 # omgekeerde registratie als gezamenlijke oorzaak.

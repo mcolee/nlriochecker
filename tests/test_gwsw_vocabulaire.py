@@ -3,14 +3,17 @@
 De aanleiding staat in issue #30: twee keer op rij is beweerd dat een GWSW-klasse
 niet bestond terwijl ze gewoon in `Ontologie_GWSW_Totaal.ttl` staat, en beide keren
 corrigeerde de auteur dat en niet een test. Deze module maakt die controle
-mechanisch: hij verzamelt elke GWSW-naam die de configuratie en de code noemen en
-houdt die naast de ontologie.
+mechanisch: hij verzamelt de GWSW-namen uit de configuratiebestanden, de
+plausibiliteitstabellen en de symbolentabellen, plus de aspectnamen die in `src/` als
+letterlijk eerste argument van een kenmerklezer staan, en houdt die naast de ontologie.
 
 Drie ontwerpkeuzes dragen de test:
 
 * **De termen worden nergens overgeschreven.** Ze komen uit de geladen `CheckConfig`,
   de `PlausibilityTables`, de symbolentabellen en een AST-sweep over `src/`. Een
-  handgeschreven kopie zou uit de pas lopen en dan toetst de test zichzelf.
+  handgeschreven kopie zou uit de pas lopen en dan toetst de test zichzelf. Elke bron
+  heeft daarom een eigen sentinel in `BRONSENTINELS`: een verzamelaar die stilvalt
+  maakt de module rood in plaats van hem leeg en groen te laten draaien.
 * **Er wordt op `rdf:type` getoetst, niet op "komt de naam voor in de TTL".**
   `Kunststof` bestaat, maar als lid van `MateriaalAfsluiterColl`; als putmateriaal is
   hij nergens legaal. Een naamvergelijking laat die fout door.
@@ -21,19 +24,38 @@ Drie ontwerpkeuzes dragen de test:
 De test gaat *uitsluitend* over de vraag of een begrip in het model bestaat. Of er
 instanties van in een dataset voorkomen is een andere vraag met een ander antwoord.
 
+**Wat de AST-sweep niet ziet.** Hij ziet de aanroep zelf, dus alleen een aspectnaam die
+als stringliteraal het eerste argument is -- op dit moment zestien van de eenentwintig
+kandidaat-aanroepen in `src/`, goed voor tien namen. Wie zijn naam eerst in een tuple of
+een modulevariabele zet en die pas daarna doorgeeft, blijft buiten beeld:
+`checks/attributen.py` (`_grootste_putmaat`), `checks/randvoorzieningen.py` (de
+bergingskenmerken) en `dataset.py` (de vertex- en BOB-klassen) dragen samen ruim een
+dozijn van zulke namen. Ze zijn met de hand tegen de index gehouden en alle geldig, maar
+deze module bewaakt ze niet; ze komen er pas onder zodra ze een directe aanroep worden.
+
 **Wat waar draait.** De ontologie zelf is 2,6 MB en staat buiten versiebeheer, dus de
 test leest niet de TTL maar de getrackte afgeleide `data/gwsw-vocabulaire-index.json`:
-per GWSW-naam zijn `rdf:type`s, en niets meer. Daardoor draait alles hier gewoon mee
-op de CI-runner -- dat was het hele punt van #30, en eerder sloegen daar 140 van de
-142 gevallen over. Het bestand is geen invoerdata maar een afgeleide; het wordt nooit
-met de hand bijgewerkt maar met `scripts/maak_gwsw_index.py`.
+per GWSW-naam zijn `rdf:type`s en zijn directe superklassen, en niets meer. Daardoor
+draait alles hier gewoon mee op de CI-runner -- dat was het hele punt van #30, en eerder
+sloegen daar 140 van de 142 gevallen over. Het bestand is geen invoerdata maar een
+afgeleide; het wordt nooit met de hand bijgewerkt maar met `scripts/maak_gwsw_index.py`.
+Zie BO-32 voor de afweging om het te tracken.
 
-Eén test draait alleen lokaal: `test_index_volgt_de_ontologie` vergelijkt de getrackte
-index met een vers geparseerde ontologie, en die kan hij alleen doen op een machine
-waar `data/gwsw_ontologieen/` staat. Zonder die test zou de index stil verouderen
-zodra de auteur GWSW 1.7 neerzet, en dan bewaakte deze module een verleden dat
-niemand meer draait. Automatisch ophalen bij data.gwsw.nl is geen alternatief:
-`CLAUDE.md` verbiedt dat expliciet, en upgraden is met opzet handwerk van de auteur.
+Eén test heeft de ontologie zelf nodig: `test_index_volgt_de_ontologie` vergelijkt de
+getrackte index met een vers geparseerde TTL, en dat kan alleen op een machine waar
+`data/gwsw_ontologieen/` staat -- op de CI-runner dus niet. Dat is geen ongedekt gat.
+De enige die de index kan laten verouderen is de auteur die GWSW 1.7 neerzet, en dat
+is dezelfde persoon op dezelfde machine die deze test wél draait. `scripts/uitgave.py`
+draait `uv run pytest -q` als uitgavepoort en `TAKVOORWAARDE` dwingt die poort af op
+`main`; een verouderde index kan dus geen uitgave overleven. Automatisch ophalen bij
+data.gwsw.nl is geen alternatief: `CLAUDE.md` verbiedt dat expliciet, en upgraden is
+met opzet handwerk van de auteur.
+
+Eén restrisico blijft, en het hoort hier genoemd: een naam die GWSW 1.7 **hernoemt** of
+naar een andere collectie verplaatst valideert gewoon door tegen de 1.6-index, tot de
+index vervangen is. Nieuwe namen vallen luid om, hernoemde niet. `versie=` uit de index
+moet daarom in `CLAUDE.md` terugkomen (`test_indexversie_staat_in_claude_md`), zodat de
+twee niet elk hun eigen GWSW-versie kunnen gaan dragen.
 
 Er zit met opzet **geen skip** op het inlezen van de index: ontbreekt het bestand, dan
 valt de hele module om. Een skip zou de oude stilte in een nieuwe vorm terugbrengen.
@@ -45,6 +67,7 @@ import ast
 import difflib
 import importlib.util
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -75,13 +98,20 @@ SUGGESTIEDREMPEL = 0.5
 # gelden, elk met de reden. De lijst is het resultaat van de audit uit #30; issue #31
 # ruimt hem op. Wie hier een term afvoert terwijl hij nog schendt, of laat staan
 # terwijl hij opgeruimd is, krijgt een rode test.
-BEKENDE_AFWIJKINGEN: dict[str, str] = {
-    "AHN5": (
+#
+# De sleutel is `(naam, collectie)` en niet de naam alleen: `Metselwerk` staat legaal
+# in `MateriaalLeidingColl` en onterecht in `MateriaalPutColl`, en een sleutel op naam
+# zou die vier legitieme vindplaatsen mee de skip in trekken. Omdat het oordeel per
+# term alleen van naam en collectie afhangt, is een groep onder deze sleutel homogeen:
+# er valt niet langer twee derde van de vindplaatsen op te ruimen met een groene test
+# als beloning.
+BEKENDE_AFWIJKINGEN: dict[tuple[str, str], str] = {
+    ("AHN5", "WijzeVanInwinningColl"): (
         "ontbreekt in de ontologie -- WijzeVanInwinningColl stopt bij AHN4. Weghalen of "
         "laten staan als vooruitloop op een latere GWSW-versie is een open vraag; besluit "
         "bij de auteur, zie #31 punt 4."
     ),
-    "Metselwerk": (
+    ("Metselwerk", "MateriaalPutColl"): (
         "zit in MateriaalLeidingColl en niet in MateriaalPutColl, maar De Wolden schrijft "
         "gwsw:Metselwerk feitelijk op 33 putten, en ADM-005 meldt dat al (33 keer per CFK "
         "als MateriaalPut_ref). Of de tabel de export volgt of de domeinlijst is een open "
@@ -286,6 +316,9 @@ def _alle_termen() -> list[Term]:
 
 TERMEN = _alle_termen()
 NAMEN = sorted({term.naam for term in TERMEN})
+# Het oordeel over een term hangt alleen van zijn naam en de collectie af waarin hij
+# gebruikt wordt; dat paar is dus de eenheid waarin deze module telt, skipt en meldt.
+SLEUTELS = sorted({(term.naam, term.collectie) for term in TERMEN})
 
 
 def _laad_index() -> dict[str, frozenset[str]]:
@@ -301,6 +334,31 @@ def _laad_index() -> dict[str, frozenset[str]]:
 
 
 INDEX = _laad_index()
+
+
+def _laad_kinderen() -> dict[str, frozenset[str]]:
+    """De omgekeerde `subklasse_van` uit de index: per klasse haar directe subklassen."""
+    document = json.loads(INDEXBESTAND.read_text(encoding="utf-8"))
+    kinderen: dict[str, set[str]] = {}
+    for kind, ouders in document["subklasse_van"].items():
+        for ouder in ouders:
+            kinderen.setdefault(ouder, set()).add(kind)
+    return {ouder: frozenset(namen) for ouder, namen in kinderen.items()}
+
+
+KINDEREN = _laad_kinderen()
+
+
+def _afsluiting(wortel: str) -> frozenset[str]:
+    """De wortel plus al haar subklassen, hoe diep ook."""
+    gevonden = {wortel}
+    stapel = [wortel]
+    while stapel:
+        for kind in KINDEREN.get(stapel.pop(), frozenset()):
+            if kind not in gevonden:
+                gevonden.add(kind)
+                stapel.append(kind)
+    return frozenset(gevonden)
 
 
 @pytest.fixture(scope="session")
@@ -352,19 +410,65 @@ def _suggestie(term: Term, index: dict[str, frozenset[str]]) -> str:
     return f"{nabij[0]} ({soorten})"
 
 
-def _schendingen(naam: str, index: dict[str, frozenset[str]]) -> list[Schending]:
-    """Elke schending van deze naam, over al zijn vindplaatsen."""
-    gevonden = (_schending(term, index) for term in TERMEN if term.naam == naam)
+def _schendingen(naam: str, collectie: str, index: dict[str, frozenset[str]]) -> list[Schending]:
+    """Elke schending van dit naam-collectiepaar, over al zijn vindplaatsen."""
+    gevonden = (
+        _schending(term, index)
+        for term in TERMEN
+        if term.naam == naam and term.collectie == collectie
+    )
     return [schending for schending in gevonden if schending is not None]
 
 
 SENTINELS = ("Inspectieput", "Beton", "Rond", "Begindatum")
+
+# Per termenbron een sentinel: het begin van de vindplaats die die bron schrijft, en
+# een naam die daar hoort te staan. Een gezamenlijke ondergrens op `NAMEN` doet dit
+# niet -- laat je beide TOML-configuraties weg, dan houd je nog 111 namen over en
+# blijft de module groen terwijl 126 van de 278 termen ongetoetst zijn. Wie een bron
+# hernoemt of eruit haalt hoort hier langs te komen; dat is de bedoeling.
+BRONSENTINELS: tuple[tuple[str, str], ...] = (
+    ("checks.toml [klassen]", "Put"),
+    ("checks.toml [klassen.stelseltypen]", "GemengdRiool"),
+    ("checks.toml [[puttyperegels]]", "Overstortput"),
+    ("checks.toml [inwinning]", "AHN4"),
+    ("checks.toml [vulwaarden]", "Maaiveldhoogte"),
+    ("configs/dewoldenhoogeveen.toml [klassen]", "Put"),
+    ("configs/dewoldenhoogeveen.toml [klassen.stelseltypen]", "GemengdRiool"),
+    ("configs/dewoldenhoogeveen.toml [[puttyperegels]]", "Overstortput"),
+    ("configs/dewoldenhoogeveen.toml [inwinning]", "AHN4"),
+    ("configs/dewoldenhoogeveen.toml [vulwaarden]", "Maaiveldhoogte"),
+    ("plausibiliteit.toml [[materiaal_diameter]]", "Beton"),
+    ("plausibiliteit.toml [[materiaal_aanlegjaar]]", "PVC"),
+    ("plausibiliteit.toml [[materiaal_vorm]]", "PVC"),
+    ("plausibiliteit.toml [[leiding_put_materiaal]]", "Beton"),
+    ("plausibiliteit.toml [[vorm_afmeting]]", "Rond"),
+    ("symbolen.py PUNTSYMBOLEN", "Inspectieput"),
+    ("symbolen.py LIJNSYMBOLEN", "Drain"),
+    ("dataset.py VULWAARDE_KENMERKEN", "Maaiveldhoogte"),
+    # De AST-sweep schrijft `<module>.py:<regel> .<methode>()`; de dubbele punt scheidt
+    # hem van de VULWAARDE_KENMERKEN-regel hierboven, en het regelnummer valt buiten
+    # het voorvoegsel zodat een verschuiving in `dataset.py` deze test niet raakt.
+    ("dataset.py:", "Begindatum"),
+)
 
 
 def test_de_termen_zijn_gevonden() -> None:
     """Zonder termen zou elke andere test hier groen zijn zonder iets te toetsen."""
     assert len(NAMEN) > 100
     assert set(SENTINELS) <= set(NAMEN)
+
+
+@pytest.mark.parametrize(("voorvoegsel", "sentinel"), BRONSENTINELS)
+def test_elke_termenbron_levert_zijn_sentinel(voorvoegsel: str, sentinel: str) -> None:
+    """Elke afzonderlijke termenbron draagt werkelijk bij aan `TERMEN`.
+
+    De gezamenlijke ondergrens hierboven is te grof: hij overleeft het wegvallen van
+    een hele bron. Deze test valt per bron om, met de bron in de testnaam.
+    """
+    assert any(
+        term.naam == sentinel and term.vindplaats.startswith(voorvoegsel) for term in TERMEN
+    ), f"{voorvoegsel} levert geen term {sentinel}; draagt die bron nog wel bij?"
 
 
 def test_de_index_is_niet_uitgehold() -> None:
@@ -375,8 +479,12 @@ def test_de_index_is_niet_uitgehold() -> None:
     collectielidmaatschappen kwijtraakt zou de collectietoets uithollen zonder dat er
     iets rood wordt. Vandaar een ondergrens op het aantal termen, de vier sentinels,
     en het bestaan van de vier collecties waarop de rest van deze module leunt.
+
+    Hetzelfde geldt voor de klassenboom: zonder `subklasse_van` is de afsluiting van
+    `Put` gelijk aan `Put` zelf, en dan wordt de dekkingstest hieronder stil groen.
     """
     assert len(INDEX) > 3_000, f"{INDEXBESTAND.name} draagt maar {len(INDEX)} termen"
+    assert len(_afsluiting("Put")) > 40, "de klassenboom in de index is uitgehold"
     for naam in SENTINELS:
         assert naam in INDEX, naam
     for collectie in (
@@ -388,36 +496,39 @@ def test_de_index_is_niet_uitgehold() -> None:
         assert [naam for naam in INDEX if collectie in INDEX[naam]], collectie
 
 
-@pytest.mark.parametrize("naam", NAMEN)
+@pytest.mark.parametrize(("naam", "collectie"), SLEUTELS, ids=_kort)
 def test_gwsw_naam_bestaat_in_de_ontologie(
-    naam: str, gwsw_index: dict[str, frozenset[str]]
+    naam: str, collectie: str, gwsw_index: dict[str, frozenset[str]]
 ) -> None:
     """Elke gebruikte GWSW-naam bestaat, en in de collectie waarin hij gebruikt wordt.
 
-    Een term op `BEKENDE_AFWIJKINGEN` slaat over met zijn reden erbij, zodat `-rs`
-    de openstaande lijst toont. Dat hij nog schendt bewaakt de test hieronder.
+    Een paar op `BEKENDE_AFWIJKINGEN` slaat over met zijn reden erbij, zodat `-rs`
+    de openstaande lijst toont. Dat het nog schendt bewaakt de test hieronder. Het
+    andere gebruik van dezelfde naam -- `Metselwerk` als leidingmateriaal -- valt onder
+    zijn eigen paar en wordt dus gewoon getoetst.
     """
-    if naam in BEKENDE_AFWIJKINGEN:
-        pytest.skip(BEKENDE_AFWIJKINGEN[naam])
+    if (naam, collectie) in BEKENDE_AFWIJKINGEN:
+        pytest.skip(BEKENDE_AFWIJKINGEN[naam, collectie])
 
-    assert not (schendingen := _schendingen(naam, gwsw_index)), "\n".join(
+    assert not (schendingen := _schendingen(naam, collectie, gwsw_index)), "\n".join(
         str(schending) for schending in schendingen
     )
 
 
-@pytest.mark.parametrize("naam", sorted(BEKENDE_AFWIJKINGEN))
+@pytest.mark.parametrize(("naam", "collectie"), sorted(BEKENDE_AFWIJKINGEN), ids=_kort)
 def test_bekende_afwijking_is_nog_niet_opgeruimd(
-    naam: str, gwsw_index: dict[str, frozenset[str]]
+    naam: str, collectie: str, gwsw_index: dict[str, frozenset[str]]
 ) -> None:
-    """De andere richting: een opgeruimde term hoort van de lijst af.
+    """De andere richting: een opgeruimd paar hoort van de lijst af.
 
     Zonder deze test zou `BEKENDE_AFWIJKINGEN` na de reparatie van #31 blijven staan
     als een lijst van problemen die er niet meer zijn, en dan dekt hij stilzwijgend
     een nieuwe fout met dezelfde naam af.
     """
-    assert _schendingen(naam, gwsw_index), (
-        f"{naam} levert geen schending meer op; haal hem uit BEKENDE_AFWIJKINGEN.\n"
-        f"  stond er om deze reden: {BEKENDE_AFWIJKINGEN[naam]}"
+    assert _schendingen(naam, collectie, gwsw_index), (
+        f"{naam} in {_kort(collectie)} levert geen schending meer op; haal het paar uit "
+        f"BEKENDE_AFWIJKINGEN.\n"
+        f"  stond er om deze reden: {BEKENDE_AFWIJKINGEN[naam, collectie]}"
     )
 
 
@@ -468,6 +579,69 @@ def test_hoofdletterafwijking_krijgt_een_eigen_soort(gwsw_index: dict[str, froze
     assert isinstance(schending.gevonden, tuple)
 
 
+# De vier GWSW-wortels waaronder de knoop- en bouwwerkklassen hangen die de laag
+# `putten` kan tegenkomen. `Verbinding` staat er bewust niet bij: LIJNSYMBOLEN is wel
+# de tegenhanger, maar die tabel volgt de SLD-indeling van de leidingsoorten en niet de
+# klassenboom, en een verschil daar zou een andere vraag stellen dan deze test.
+SYMBOOLWORTELS: tuple[str, ...] = ("Put", "Bouwwerk", "Hulpstuk", "Knooppunt")
+
+# De klassen onder die vier wortels waarvoor de symbolentabellen vandaag géén regel
+# dragen. Dit is een momentopname en geen besluitenlijst: er staat niet "deze willen we
+# niet", er staat "deze zijn nog niet gedekt". De lijst korter maken is werk dat nog
+# moet gebeuren -- issue #14 hertekent de symbolen -- en zolang het niet gebeurd is
+# hoort hij hier zichtbaar te staan in plaats van als stilte in het rapport.
+#
+# Vastgelegd tegen GWSW 1.6: 137 klassen onder de vier wortels, 42 daarvan gedekt.
+NOG_ONGEDEKTE_KLASSEN = frozenset({
+    "Aansluitput", "Afleveringspunt", "Afvoerpunt", "AfvoerpuntGebied", "Beekriool", "Beerput",
+    "Bergingsvijver", "Biofilter", "BlindeInlaat", "BlindePut", "Bochtstuk", "Bouwwerk",
+    "Bouwwerkorientatie", "Brandput", "Compartimentorientatie", "Compensator", "Dijk",
+    "Doorspuitput", "Drainagegemaal", "Duikerput", "Erfafscheidingsput", "ExplosievrijeKolk",
+    "Filterput", "Gebouw", "GecombineerdeStraat_trottoirkolk", "Gemaal",
+    "GemaalDrogeOpstelling", "GemaalNatteOpstelling", "Grindkoffer", "Hondenhokput", "Hulpstuk",
+    "Hulpstukorientatie", "IBAKlasseI", "IBAKlasseII", "IBAKlasseIIIa", "IBAKlasseIIIb",
+    "Infiltratiebassin", "Infiltratiegreppel", "Infiltratiekolk", "Infiltratiereservoir",
+    "InlaatOppervlaktewater", "InlaatRioolput", "Knooppunt", "Kruisstuk", "Kunstwerk",
+    "Lavakoffer", "Leidingbrug", "LozePut", "Lozingspunt", "LozingspuntBodem",
+    "LozingspuntOppervlaktewater", "Luchtpersgemaal", "MantoegankelijkePut", "Mof",
+    "Olie__benzineafvangput", "Ontlastput", "Ontstoppingsput", "OpenBerging",
+    "Oppervlaktewatergemaal", "Overgangsstuk", "Overkluizing", "Perceelaansluitpunt", "Put",
+    "Putbuis", "Putorientatie", "RWSKolk", "ReinigendePut", "Reservoir", "Riooleindgemaal",
+    "Rioolput", "RioolputMetGeleiding", "Slokop", "Spoelgemaal", "Spoorlijn", "Steenwolkoffer",
+    "Trottoirkolk", "Tubelure", "Tunnelgemaal", "Uitstroombak", "Valput",
+    "VerbeterdeOverstortput", "VerdektePut", "VerdieptePut", "Verloopstuk", "Vetvangput",
+    "VolgeschuimdePut", "Wadi", "Waterkering", "Werveloverstortput", "Wervelput", "Y_stuk",
+    "Zadel", "Zandkoffer", "Zinkerput", "Zuiveringsreservoir",
+})  # fmt: skip
+
+
+def test_de_symbolentabel_raakt_niet_verder_achterop() -> None:
+    """Dekken onze tabellen de knoopklassen die GWSW kent -- de andere kant van #30.
+
+    Drie vragen die makkelijk door elkaar lopen, en dit is de tweede:
+
+    1. Bestaan onze namen in GWSW? Dat is de rest van deze module.
+    2. Dekken wij de klassen van GWSW? Dat is deze test.
+    3. Krijgt elk objecttype dat in een dataset voorkomt een symbool? Dat is
+       `tests/test_uitvoer_symbolen.py`, en het antwoord daarop zegt niets over 1 en 2.
+
+    Dit is een drifttest en geen volledigheidseis: hij faalt wanneer het verschil
+    *groeit*. Een nieuwe GWSW-versie die klassen toevoegt komt zo langs, in plaats van
+    stil in de vangnetregel ("objecttype niet in de symbolentabel") te verdwijnen. Wordt
+    de lijst korter -- en dat is de bedoeling -- dan haal je de gedekte namen eruit.
+    """
+    ongedekt = set()
+    for wortel in SYMBOOLWORTELS:
+        ongedekt |= _afsluiting(wortel)
+    ongedekt -= set(PUNTSYMBOLEN) | set(LIJNSYMBOLEN)
+
+    assert not (nieuw := sorted(ongedekt - NOG_ONGEDEKTE_KLASSEN)), (
+        f"{len(nieuw)} klasse(n) onder {', '.join(SYMBOOLWORTELS)} hebben geen symbool en "
+        f"staan niet op NOG_ONGEDEKTE_KLASSEN: {', '.join(nieuw)}.\n"
+        "Geef ze een regel in symbolen.py, of zet ze op de lijst als bewuste huidige stand."
+    )
+
+
 def _laad_indexscript() -> ModuleType:
     """Importeert `scripts/maak_gwsw_index.py` als module.
 
@@ -498,4 +672,27 @@ def test_index_volgt_de_ontologie(ontologie: list[Path]) -> None:
         f"{INDEXBESTAND.relative_to(WORTEL)} loopt achter op "
         f"{ontologie[0].relative_to(WORTEL)}.\n"
         "Draai: uv run python scripts/maak_gwsw_index.py"
+    )
+
+
+def test_indexversie_staat_in_claude_md() -> None:
+    """De index en `CLAUDE.md` dragen dezelfde GWSW-versie.
+
+    De drifttest hierboven bewaakt maar één richting: `CLAUDE.md` bijwerken zonder het
+    script te draaien valt om (op een machine met de ontologie). De omgekeerde richting
+    -- het script draaien op 1.7 terwijl `CLAUDE.md` nog 1.6 zegt -- merkt niemand, en
+    dan is `CLAUDE.md` niet langer "de enige plek waar hij staat". Beide bestanden zijn
+    getrackt, dus deze test draait wél op CI.
+
+    Alleen het `versie=X.Y`-deel wordt vergeleken en niet de hele regel: de
+    conversiedatum erachter hoort bij de ontologie en niet bij de projectafspraak.
+    """
+    versieregel = json.loads(INDEXBESTAND.read_text(encoding="utf-8"))["gwsw_versie"]
+    gevonden = re.search(r"versie=[0-9]+(?:\.[0-9]+)*", versieregel)
+
+    assert gevonden is not None, f"geen versie= in {versieregel!r}"
+    assert gevonden.group() in (WORTEL / "CLAUDE.md").read_text(encoding="utf-8"), (
+        f"{INDEXBESTAND.name} draagt {gevonden.group()}, maar CLAUDE.md noemt die versie "
+        "niet. CLAUDE.md is de gezaghebbende plek; werk de alinea over de leidende "
+        "GWSW-versie bij."
     )

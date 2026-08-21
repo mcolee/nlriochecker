@@ -28,10 +28,11 @@ data/*
 # 'data/*' hierboven in plaats van 'data/'.
 !data/checkregister-*.md
 # De vocabulaire-index is geen invoerdata maar een afgeleide van de GWSW-ontologie:
-# per GWSW-naam zijn rdf:type's, en niets meer. tests/test_gwsw_vocabulaire.py draait
-# erop, en zonder versiebeheer sloeg die test op de CI-runner vrijwel volledig over --
-# dan bewaakt hij niets. De ontologie zelf blijft buiten versiebeheer (2,6 MB); de
-# index is 200 kB. Licentie is geen bezwaar: de GWSW-ontologie staat onder CC0.
+# per GWSW-naam zijn rdf:type's en zijn directe superklassen, en niets meer.
+# tests/test_gwsw_vocabulaire.py draait erop, en zonder versiebeheer sloeg die test op
+# de CI-runner vrijwel volledig over -- dan bewaakt hij niets. De ontologie zelf blijft
+# buiten versiebeheer (2,6 MB); de index is 285 kB. Licentie is geen bezwaar: de
+# GWSW-ontologie staat onder CC0. De afweging staat als BO-32 in docs/beslislog.md.
 # Bijwerken doe je met scripts/maak_gwsw_index.py, nooit met de hand.
 # Ook hier geldt: een uitzondering werkt alleen omdat hierboven 'data/*' staat en
 # niet 'data/'; met 'data/' is de map zelf uitgesloten en kijkt git er niet in.

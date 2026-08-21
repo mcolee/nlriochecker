@@ -14,6 +14,15 @@ from nlriochecker.dataset import GwswDataset, load_dataset
 # dan over, en de run blijft groen terwijl er nauwelijks iets getoetst is. Zet deze
 # variabele (CI doet dat) om een ondergrens aan het aantal geslaagde tests te eisen.
 MINIMUM_ENV = "NLRIOCHECKER_MIN_GESLAAGD"
+# De ondergrens hierboven meet "geslaagd", en dat getal kruipt met de suite mee omhoog:
+# hij is nu twee keer met de hand nagetrokken nadat hij was opgehouden te bijten. Wat
+# hij wil vangen is stille overslag, en dat is een bovengrens op "overgeslagen" -- die
+# beweegt niet mee met suitegroei. De twee vullen elkaar aan: de ondergrens vangt tests
+# die helemaal niet meer verzameld worden, de bovengrens tests die wel verzameld worden
+# maar niet draaien. Een `pytest.skip(allow_module_level=True)` valt tussen wal en
+# schip: die telt als één overslag hoeveel tests de module ook draagt. Zie het
+# commentaar bij de twee variabelen in .github/workflows/toets.yml.
+MAXIMUM_OVERGESLAGEN_ENV = "NLRIOCHECKER_MAX_OVERGESLAGEN"
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 TTL_DIR = FIXTURE_DIR / "ttl"
@@ -114,42 +123,59 @@ def mapping_zonder_bewijs(tmp_path: Path) -> Path:
     return pad
 
 
+def _grens(naam: str, rapporteur: pytest.TerminalReporter) -> int | None:
+    """De waarde van een grensvariabele, of None als hij niet gezet of onleesbaar is."""
+    waarde = os.environ.get(naam)
+    if not waarde:
+        return None
+    try:
+        return int(waarde)
+    except ValueError:
+        rapporteur.write_line(f"{naam}={waarde!r} is geen getal; grens genegeerd.", red=True)
+        return None
+
+
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Laat de run alsnog vallen als er te weinig tests echt gedraaid hebben.
 
     Zonder deze controle leest een run met een halve suite als volledig groen. Zonder
-    `MINIMUM_ENV` gebeurt er niets, zodat een lokale run op een deelselectie
+    de twee grensvariabelen gebeurt er niets, zodat een lokale run op een deelselectie
     (`pytest tests/test_dataset.py`) gewoon werkt.
 
-    De grens ligt op wat een schone kloon haalt; hij vangt dus geen ontbrekende `data/`
-    op -- die haalt de grens ruim -- maar wel het wegvallen van meer dan dat.
+    De ondergrens ligt op wat een schone kloon haalt; hij vangt dus geen ontbrekende
+    `data/` op -- die haalt de grens ruim -- maar wel het wegvallen van meer dan dat.
+    De bovengrens op de overslagen doet het omgekeerde: hij hangt niet aan de omvang van
+    de suite maar aan het aantal bekende skips, en blijft daarmee bijten terwijl de
+    suite doorgroeit.
     """
-    drempel = os.environ.get(MINIMUM_ENV)
-    if not drempel or session.config.option.collectonly:
+    if session.config.option.collectonly:
         return
 
     rapporteur = session.config.pluginmanager.get_plugin("terminalreporter")
     if rapporteur is None:
         return
 
-    try:
-        minimum = int(drempel)
-    except ValueError:
-        rapporteur.write_line(
-            f"{MINIMUM_ENV}={drempel!r} is geen getal; grens genegeerd.", red=True
-        )
-        return
-
     geslaagd = len(rapporteur.stats.get("passed", []))
-    if geslaagd >= minimum:
-        return
-
     overgeslagen = len(rapporteur.stats.get("skipped", []))
-    rapporteur.write_line(
-        f"{MINIMUM_ENV}={minimum}, maar er slaagden er {geslaagd} "
-        f"({overgeslagen} overgeslagen). Staat data/ op zijn plek?",
-        red=True,
-    )
+    minimum = _grens(MINIMUM_ENV, rapporteur)
+    maximum = _grens(MAXIMUM_OVERGESLAGEN_ENV, rapporteur)
+
+    gezakt = False
+    if minimum is not None and geslaagd < minimum:
+        rapporteur.write_line(
+            f"{MINIMUM_ENV}={minimum}, maar er slaagden er {geslaagd} "
+            f"({overgeslagen} overgeslagen). Staat data/ op zijn plek?",
+            red=True,
+        )
+        gezakt = True
+    if maximum is not None and overgeslagen > maximum:
+        rapporteur.write_line(
+            f"{MAXIMUM_OVERGESLAGEN_ENV}={maximum}, maar er sloegen er {overgeslagen} over "
+            f"({geslaagd} geslaagd). Draai met -rs om te zien welke erbij gekomen zijn.",
+            red=True,
+        )
+        gezakt = True
+
     # Een bestaande foutcode is specifieker dan de onze; die blijft staan.
-    if session.exitstatus == 0:
+    if gezakt and session.exitstatus == 0:
         session.exitstatus = 1

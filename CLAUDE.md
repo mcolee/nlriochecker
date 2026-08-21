@@ -95,6 +95,10 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
   Upgraden is handwerk van de auteur: hij levert nieuwe ontologiebestanden en dan trekt het
   pakket bij. Bouw geen automatische versiecontrole tegen data.gwsw.nl. Werk deze regel bij
   zodra de bestanden vervangen zijn -- de versie hier is de enige plek waar hij staat.
+  Draai daarbij ook `uv run python scripts/maak_gwsw_index.py`: dat schrijft de getrackte
+  afgeleide `data/gwsw-vocabulaire-index.json` opnieuw, waarmee de vocabulairetest ook op
+  CI draait (BO-32). Vergeet je het, dan valt `test_index_volgt_de_ontologie`; werk je de
+  index bij zonder deze regel, dan valt `test_indexversie_staat_in_claude_md`.
 - Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
   MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
   foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk`; zonder die
