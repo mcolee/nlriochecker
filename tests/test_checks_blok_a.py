@@ -136,6 +136,11 @@ def test_elk_defect_heeft_een_eigen_fixture() -> None:
         ("attr_schoon.ttl", "ATTR"),
         ("hgt_schoon.ttl", "HGT"),
         ("rvz_schoon.ttl", "RVZ"),
+        # De twee tegenhangers uit issue #34: hun onderdeel repareert het defect, dus
+        # hun hele groep hoort stil te zijn. Zonder deze regels bewaakt de suite
+        # alleen de ene check waar ze voor gemaakt zijn.
+        ("adm007_overstort_met_drempel.ttl", "ADM"),
+        ("rvz008_bbb_met_lediging.ttl", "RVZ"),
     ],
 )
 def test_schone_fixture_geeft_geen_bevinding(bestand: str, groep: str) -> None:

@@ -147,6 +147,21 @@ def _typing_section(analyse: MetingAnalysis) -> list[str]:
         objecten = str(gate.too_generic_count) if gate.resolved else "\u2014"
         lines.append(f"| {cfk} | {klassen} | {objecten} | {score} |")
 
+    onbeoordeelbaar = sorted(
+        {
+            klasse
+            for cfk in analyse.meting.cfks
+            for klasse in analyse.per_cfk[cfk].typing_gate.unassessable_classes
+        }
+    )
+    if onbeoordeelbaar:
+        lines += [
+            "",
+            f"> Niet beoordeeld: {', '.join(onbeoordeelbaar)}. Dat zijn verbindingsklassen; "
+            "ze staan op de orientatie van een streng en zijn niet naar objecten te "
+            "herleiden. Ze tellen niet mee in het aantal en niet in de score.",
+        ]
+
     if not any(analyse.per_cfk[cfk].typing_gate.resolved for cfk in analyse.meting.cfks):
         lines += [
             "",

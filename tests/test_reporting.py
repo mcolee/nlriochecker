@@ -34,6 +34,7 @@ from nlriochecker.reporting import (
     write_reports,
 )
 from nlriochecker.studiegebied import load_study_area
+from test_analysis import dataset_met_verbindingsklasse, meting_met_verbindingsklasse
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -62,6 +63,25 @@ def test_samenvatting_meldt_ontbrekende_dataset(analyse, tmp_path: Path) -> None
     assert "## Typeringspoort" in tekst
     # Zonder dataset hoort er geen score te staan, maar wel een uitleg waarom niet.
     assert "geen OroX-dataset meegegeven" in tekst
+
+
+def test_samenvatting_noemt_een_onbeoordeelbare_verbindingsklasse(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Een te globale verbindingsklasse is niet te wegen; dat hoort in het rapport.
+
+    Zwijgen zou lezen als "beoordeeld en niets gevonden", terwijl de klasse juist
+    niet naar objecten te herleiden is.
+    """
+    hyd, mdsplan, mdsproj = shacl_drieluik
+    aangepast = meting_met_verbindingsklasse(mdsplan, tmp_path / "verbinding.csv")
+    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"))
+    meting = laad_nulmeting([hyd, aangepast, mdsproj], VEREIST)
+
+    markdown_path, _ = write_reports(analyze(meting, dataset), tmp_path / "uitvoer")
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "Niet beoordeeld: Afvoerrelatie" in tekst
 
 
 def test_dekkingrapport(analyse, tmp_path: Path) -> None:

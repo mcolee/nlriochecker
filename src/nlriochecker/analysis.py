@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 
@@ -21,12 +21,19 @@ class TypingGate:
     De SHACL-meting noemt de te globale *klassen*, niet de objecten. Met de dataset
     erbij worden de instanties opgezocht; zonder dataset blijft het bij de klassen
     en is er geen score te geven.
+
+    `unassessable_classes` is de deelverzameling van `classes` die niet naar objecten
+    te herleiden is: verbindingsklassen staan op de orientatie van een streng en
+    zijn met het domeinmodel niet te selecteren. Ze tellen niet mee in de score, en
+    ze staan hier apart omdat het rapport ze moet noemen -- stilte over een klasse
+    die niet beoordeeld is leest als "beoordeeld en niets gevonden".
     """
 
     classes: list[str]
     objects: list[str]
     total_objects: int
     resolved: bool
+    unassessable_classes: list[str] = field(default_factory=list)
 
     @property
     def too_generic_count(self) -> int:
@@ -127,13 +134,22 @@ def bepaal_typeringspoort(report: ShaclReport, dataset: GwswDataset | None = Non
     De klassen komen uit de CfkTypes_typ-meldingen; de instanties uit de dataset.
     Zonder dataset zijn de objecten niet te bepalen en blijft de score leeg, in
     plaats van een getal te suggereren dat er niet is.
+
+    Een verbindingsklasse is hier niet naar objecten te herleiden (zie
+    `GwswDataset.is_connection_class`). Dat is geen vergissing van de gebruiker maar
+    een meetuitkomst -- `Afvoerrelatie` is precies de vorm die een CFK te globaal
+    kan noemen -- dus de klasse wordt onbeoordeelbaar genoemd en de run loopt door.
     """
     klassen = report.too_generic_classes
     if dataset is None:
         return TypingGate(classes=klassen, objects=[], total_objects=0, resolved=False)
 
     objecten: set[str] = set()
+    onbeoordeelbaar: list[str] = []
     for klasse in klassen:
+        if dataset.is_connection_class(klasse):
+            onbeoordeelbaar.append(klasse)
+            continue
         objecten.update(dataset.of_class(klasse))
 
     return TypingGate(
@@ -141,4 +157,5 @@ def bepaal_typeringspoort(report: ShaclReport, dataset: GwswDataset | None = Non
         objects=sorted(objecten),
         total_objects=len(dataset.nodes) + len(dataset.conduits),
         resolved=True,
+        unassessable_classes=onbeoordeelbaar,
     )

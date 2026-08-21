@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from nlriochecker.analysis import analyze, analyze_report
 from nlriochecker.dataset import load_dataset
+from nlriochecker.errors import DatasetError
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.shaclrapport import lees_shacl_rapport
 
@@ -54,6 +57,52 @@ def test_typeringspoort_met_dataset(mini_mdsplan_shacl: Path, tmp_path: Path) ->
     assert [uri.rsplit("#", 1)[-1] for uri in poort.objects] == ["PutB"]
     assert poort.total_objects == len(dataset.nodes) + len(dataset.conduits)
     assert poort.score is not None
+
+
+TE_GLOBALE_VERBINDINGSKLASSE = (
+    "Afvoerrelatie;CfkTypes_typ;;Violation;"
+    "Type individu wijkt af (is abstract, te globaal binnen CFK);b178037;;"
+)
+
+
+def meting_met_verbindingsklasse(bron: Path, doel: Path) -> Path:
+    """Kopieert een SHACL-rapport met een te globale verbindingsklasse erbij."""
+    regels = bron.read_text(encoding="utf-8").rstrip("\n").splitlines()
+    regels.append(TE_GLOBALE_VERBINDINGSKLASSE)
+    doel.write_text("\n".join(regels) + "\n", encoding="utf-8")
+    return doel
+
+
+def dataset_met_verbindingsklasse(doel: Path) -> Path:
+    """Een fixture-TTL waarin Afvoerrelatie als verbindingsklasse bekend is."""
+    bron = (TTL_DIR / "schoon.ttl").read_text(encoding="utf-8")
+    bron += "\ngwsw:Afvoerrelatie rdfs:subClassOf gwsw:Verbinding .\n"
+    doel.write_text(bron, encoding="utf-8")
+    return doel
+
+
+def test_typeringspoort_noemt_een_verbindingsklasse_onbeoordeelbaar(
+    mini_mdsplan_shacl: Path, tmp_path: Path
+) -> None:
+    """Een te globale verbindingsklasse laat de meting niet vallen.
+
+    De klassenlijst komt hier uit de SHACL-meting en niet uit de configuratie: een
+    verbindingsklasse is dan een meetuitkomst, geen vergissing van de gebruiker.
+    `of_class()` zou hem weigeren, dus de poort vraagt vooraf en zet hem als
+    onbeoordeelbaar opzij -- de andere klassen worden gewoon gewogen.
+    """
+    rapport = meting_met_verbindingsklasse(mini_mdsplan_shacl, tmp_path / "verbinding.csv")
+    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"))
+
+    poort = analyze_report(lees_shacl_rapport(rapport), dataset).typing_gate
+
+    assert "Afvoerrelatie" in poort.classes
+    assert poort.unassessable_classes == ["Afvoerrelatie"]
+    assert poort.resolved is True
+    assert poort.score is not None
+    # En dit is waar het om gaat: langs de configweg valt dezelfde klasse wel om.
+    with pytest.raises(DatasetError):
+        dataset.of_class("Afvoerrelatie")
 
 
 def test_analyse_van_de_hele_nulmeting(shacl_drieluik: list[Path]) -> None:

@@ -25,7 +25,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `rvz008_bbb_met_lediging.ttl`) leggen beide richtingen vast. `of_class()` weigert
   voortaan een klasse uit de Verbinding-afsluiting: die kan nooit een treffer geven,
   omdat een streng haar orientatietypen niet draagt, en een stille nul is daar de
-  slechtste uitkomst. Op De Wolden verandert er niets -- die aanlevering bevat nul
+  slechtste uitkomst. Die weigering geldt alleen voor een *geconfigureerde* rol; noemt
+  de SHACL-nulmeting zo'n klasse te globaal, dan is dat een meetuitkomst en zet de
+  typeringspoort haar als onbeoordeelbaar in het rapport in plaats van de run te laten
+  vallen. Op De Wolden verandert er niets -- die aanlevering bevat nul
   overstortdrempels, nul ledigingsvoorzieningen en nul bergbezinkvoorzieningen; ADM-007
   blijft op 181 bevindingen.
 

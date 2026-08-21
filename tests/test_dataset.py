@@ -139,12 +139,22 @@ def test_onderdeel_uit_de_graaf_is_op_klasse_te_herkennen() -> None:
     assert dataset.graph_is_a(drempel, "Overstortdrempel")
 
 
-def test_of_class_weigert_een_verbindingsklasse() -> None:
-    """Een verbindingsklasse als rol levert stil nul op; dat hoort een fout te zijn."""
-    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+def test_of_class_weigert_een_verbindingsklasse(juinen: GwswDataset) -> None:
+    """Een verbindingsklasse als rol levert stil nul op; dat hoort een fout te zijn.
 
+    Dit draait op de echte GWSW-afsluiting, niet op de klassenhierarchie die een
+    fixture zelf declareert: `Afvoerrelatie` staat in geen enkele fixture-prelude en
+    is dus alleen via de ontologie als verbindingsklasse te kennen. Een `Leiding` is
+    een `FysiekObject` en blijft gewoon selecteerbaar -- de weigering is smal.
+    """
     with pytest.raises(DatasetError, match="verbindingsklasse"):
-        dataset.of_class("Leidingorientatie")
+        juinen.of_class("Afvoerrelatie")
+    with pytest.raises(DatasetError, match="verbindingsklasse"):
+        juinen.of_class("Leidingorientatie")
+
+    assert juinen.is_connection_class("Afvoerrelatie")
+    assert not juinen.is_connection_class("Leiding")
+    assert juinen.of_class("VrijvervalRioolleiding")
 
 
 def test_verschil_met_de_structurele_herkenning_wordt_gemeld(juinen: GwswDataset) -> None:

@@ -417,17 +417,31 @@ class GwswDataset:
         """De klasse zelf plus al haar subklassen, als volledige URI's."""
         return self.subclasses.get(_uri(root), frozenset({_uri(root)}))
 
+    def is_connection_class(self, root: str) -> bool:
+        """Geeft aan of deze klasse in de Verbinding-afsluiting valt.
+
+        Zulke klassen staan op de orientatie van een streng, en `Conduit` draagt
+        haar orientatietypen niet zoals `Node` dat wel doet; een selectie erop kan
+        dus nooit een treffer geven. `of_class()` weigert er een, want daar is de
+        klassenaam configuratie. Wie een klassenaam uit een *meting* krijgt --
+        `analysis.bepaal_typeringspoort` leest ze uit de CfkTypes_typ-regels van de
+        SHACL-nulmeting -- vraagt het hier vooraf: een meetuitkomst hoort de run
+        niet te laten vallen, maar als onbeoordeelbaar in het rapport te komen.
+
+        Zonder ontologie is de afsluiting alleen `Verbinding` zelf, dus dan wordt
+        alleen die naam herkend.
+        """
+        return _uri(root) in self.closure("Verbinding")
+
     def of_class(self, root: str) -> list[str]:
         """De URI's van alle knooppunten en strengen van dit type.
 
-        Een klasse uit de Verbinding-afsluiting kan hier nooit een treffer geven:
-        zulke klassen staan op de orientatie van een streng, en `Conduit` draagt
-        haar orientatietypen niet zoals `Node` dat wel doet. De selectie zou stil
-        nul opleveren, en die nul is niet te onderscheiden van een dataset zonder
-        die objecten; daarom is het hier een harde fout. Zonder ontologie is de
-        afsluiting alleen `Verbinding` zelf, dus dan wordt alleen die naam gevangen.
+        Een klasse uit de Verbinding-afsluiting kan hier nooit een treffer geven
+        (zie `is_connection_class`). De selectie zou stil nul opleveren, en die nul
+        is niet te onderscheiden van een dataset zonder die objecten; op een
+        geconfigureerde rol is dat daarom een harde fout.
         """
-        if _uri(root) in self.closure("Verbinding"):
+        if self.is_connection_class(root):
             raise DatasetError(
                 f"{root} is een verbindingsklasse en kan als rol nooit een object opleveren: "
                 f"die klassen staan op de orientatie van een streng, en het domeinmodel "
