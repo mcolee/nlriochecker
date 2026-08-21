@@ -145,6 +145,29 @@ def test_schone_fixture_geeft_geen_bevinding(bestand: str, groep: str) -> None:
     assert gemeld == {}
 
 
+def test_adm007_ziet_een_ingebouwde_overstortdrempel() -> None:
+    """De drempel hangt als constructieonderdeel aan de put, niet als knoop in het net.
+
+    `gwsw:Overstortdrempel` is een `Wand` en dus een `Constructieonderdeel`; hij
+    draagt nooit een Knooppunt-orientatie en wordt daarom geen knoop in het
+    domeinmodel. `is_a()` gaf er altijd False op, waardoor deze tak van ADM-007
+    nooit vuurde. Beide richtingen staan hier: zonder drempel een bevinding, met
+    drempel geen -- alleen samen bewijzen ze dat de tak leeft.
+    """
+    assert labels(uitkomst("adm007_overstort_zonder_functie.ttl", "ADM-007")) == ["O"]
+    assert labels(uitkomst("adm007_overstort_met_drempel.ttl", "ADM-007")) == []
+
+
+def test_rvz008_ziet_een_geregistreerde_ledigingsvoorziening() -> None:
+    """Een `Ledigingsvoorziening` is net als de drempel een constructieonderdeel.
+
+    Zonder herkenning van zulke onderdelen meldde RVZ-008 elke bergbezinkvoorziening
+    zonder terugvoerende streng, ook als de lediging netjes in de data stond.
+    """
+    assert labels(uitkomst("rvz008_bbb_zonder_lediging.ttl", "RVZ-008")) == ["BBB"]
+    assert labels(uitkomst("rvz008_bbb_met_lediging.ttl", "RVZ-008")) == []
+
+
 def test_muilprofiel_heet_muil_in_de_ontologie() -> None:
     """Een gemetseld muilprofiel is geen ATTR-012, en zijn verhouding wordt wel getoetst.
 

@@ -260,7 +260,7 @@ class PuttypePastNietBijLeiding(Check):
             if any(dataset.is_a(conduit.uri, wortel) for wortel in regel.vereist_een_van):
                 return True
         for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
-            if any(dataset.is_a(str(deel), wortel) for wortel in regel.vereist_een_van):
+            if any(dataset.graph_is_a(str(deel), wortel) for wortel in regel.vereist_een_van):
                 return True
         return False
 

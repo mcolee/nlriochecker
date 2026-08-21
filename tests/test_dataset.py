@@ -125,6 +125,28 @@ def test_orientatietypen_zijn_selecteerbaar(tmp_path: Path) -> None:
     assert [uri.rsplit("#", 1)[-1] for uri in lozingspunten] == ["PutB"]
 
 
+def test_onderdeel_uit_de_graaf_is_op_klasse_te_herkennen() -> None:
+    """Een overstortdrempel hangt via hasPart aan de put en wordt nooit een knoop.
+
+    `types_of()` kent alleen knopen en strengen en geeft er dus niets op terug;
+    `graph_types_of()` leest het type uit de graaf en maakt de klasse toetsbaar.
+    """
+    dataset = load_dataset(TTL_DIR / "adm007_overstort_met_drempel.ttl")
+    drempel = next(str(s) for s in dataset.subjects_of_class("Overstortdrempel"))
+
+    assert dataset.types_of(drempel) == frozenset()
+    assert not dataset.is_a(drempel, "Overstortdrempel")
+    assert dataset.graph_is_a(drempel, "Overstortdrempel")
+
+
+def test_of_class_weigert_een_verbindingsklasse() -> None:
+    """Een verbindingsklasse als rol levert stil nul op; dat hoort een fout te zijn."""
+    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+
+    with pytest.raises(DatasetError, match="verbindingsklasse"):
+        dataset.of_class("Leidingorientatie")
+
+
 def test_verschil_met_de_structurele_herkenning_wordt_gemeld(juinen: GwswDataset) -> None:
     """Zonder ontologie zou de lader knopen aan hun geometrie herkennen.
 

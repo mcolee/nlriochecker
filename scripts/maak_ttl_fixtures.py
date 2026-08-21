@@ -973,6 +973,19 @@ FIXTURES["rvz008_bbb_zonder_lediging.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "BBB", bob=(8.60, 8.50)),
 )
 
+FIXTURES["rvz008_bbb_met_lediging.ttl"] = (
+    "geen; zelfde als rvz008_bbb_zonder_lediging maar de BBB draagt een "
+    "geregistreerde ledigingsvoorziening",
+    hoogteput("PutA", "A", A)
+    + bbb("BBB", "BBB", B)
+    + drempel("BBB", "DrempelBBB", niveau=9.5, breedte=2000.0)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "BBB", bob=(8.60, 8.50))
+    + """
+:BBB gwsw:hasPart :BBB_led .
+:BBB_led rdf:type gwsw:Ledigingsvoorziening ; rdfs:label "BBB/lediging" .
+""",
+)
+
 FIXTURES["rvz009_bbb_zonder_nooduitlaat.ttl"] = (
     "bergbezinkbassin BBB heeft geen overstortdrempel en geen overstortleiding",
     hoogteput("PutA", "A", A)
@@ -1035,6 +1048,15 @@ FIXTURES["adm007_overstort_zonder_functie.ttl"] = (
     "overstortput O heeft geen overstortleiding en geen drempel",
     nette_put("PutA", "A", *A)
     + put("PutO", "O", B[0], B[1], klasse="Overstortput")
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutO"),
+)
+
+FIXTURES["adm007_overstort_met_drempel.ttl"] = (
+    "geen; zelfde als adm007_overstort_zonder_functie maar put 'O' draagt een "
+    "ingebouwde overstortdrempel",
+    nette_put("PutA", "A", *A)
+    + put("PutO", "O", B[0], B[1], klasse="Overstortput")
+    + drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0)
     + nette_leiding("L1", "1", [A, B], "PutA", "PutO"),
 )
 

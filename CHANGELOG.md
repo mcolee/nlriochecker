@@ -11,6 +11,24 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gerepareerd
+
+- **Twee checktakken die nooit konden vuren: een onderdeel dat via `hasPart` aan een
+  object hangt was op klasse niet te herkennen** (issue #34). `is_a()` leest het
+  domeinmodel, en dat kent alleen knopen en strengen; een `Overstortdrempel` of een
+  `Ledigingsvoorziening` is een `Constructieonderdeel` zonder Knooppunt-orientatie en
+  werd dus nooit herkend. Daardoor zag ADM-007 een ingebouwde overstortdrempel niet en
+  meldde RVZ-008 elke bergbezinkvoorziening zonder terugvoerende streng, ook als de
+  lediging netjes geregistreerd stond. `GwswDataset.graph_is_a()` toetst nu het type uit
+  de graaf tegen de klassenafsluiting, zoals ADM-009 het al deed; beide checks gebruiken
+  die weg. Twee fixtures (`adm007_overstort_met_drempel.ttl`,
+  `rvz008_bbb_met_lediging.ttl`) leggen beide richtingen vast. `of_class()` weigert
+  voortaan een klasse uit de Verbinding-afsluiting: die kan nooit een treffer geven,
+  omdat een streng haar orientatietypen niet draagt, en een stille nul is daar de
+  slechtste uitkomst. Op De Wolden verandert er niets -- die aanlevering bevat nul
+  overstortdrempels, nul ledigingsvoorzieningen en nul bergbezinkvoorzieningen; ADM-007
+  blijft op 181 bevindingen.
+
 ### Gewijzigd
 
 - **`Overnamepunt` en het IT-stelsel bestaan wel degelijk in GWSW; de configuratie zei

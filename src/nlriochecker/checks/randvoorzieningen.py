@@ -583,7 +583,7 @@ class BbbZonderLediging(Check):
         from rdflib import URIRef
 
         for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
-            if any(dataset.is_a(str(deel), wortel) for wortel in klassen):
+            if any(dataset.graph_is_a(str(deel), wortel) for wortel in klassen):
                 return True
         return False
 

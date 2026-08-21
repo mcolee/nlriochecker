@@ -332,6 +332,23 @@ class GwswDataset:
             return self.conduits[uri].types
         return frozenset()
 
+    def graph_types_of(self, uri: str) -> frozenset[str]:
+        """De typen van een willekeurige URI, ook als hij geen knoop of streng is.
+
+        `types_of()` kent alleen het domeinmodel. Een constructieonderdeel als een
+        overstortdrempel of een ledigingsvoorziening hangt via hasPart aan een put
+        en draagt geen Knooppunt-orientatie; het wordt dus nooit een knoop en is met
+        `types_of()` niet te herkennen. Hier komt het type rechtstreeks uit de graaf,
+        met de typen uit het domeinmodel erbij, zodat een orientatieklasse als
+        Lozingspunt vindbaar blijft.
+        """
+        uit_graaf = {str(soort) for soort in self.graph.objects(URIRef(uri), RDF.type)}
+        return self.types_of(uri) | uit_graaf
+
+    def graph_is_a(self, uri: str, root: str) -> bool:
+        """Als `is_a`, maar ook voor onderdelen die alleen in de graaf staan."""
+        return bool(self.graph_types_of(uri) & self.closure(root))
+
     def beheerobjecttype(self, uri: str) -> str:
         """De korte naam van het beheerobjecttype van een object.
 
@@ -401,7 +418,22 @@ class GwswDataset:
         return self.subclasses.get(_uri(root), frozenset({_uri(root)}))
 
     def of_class(self, root: str) -> list[str]:
-        """De URI's van alle knooppunten en strengen van dit type."""
+        """De URI's van alle knooppunten en strengen van dit type.
+
+        Een klasse uit de Verbinding-afsluiting kan hier nooit een treffer geven:
+        zulke klassen staan op de orientatie van een streng, en `Conduit` draagt
+        haar orientatietypen niet zoals `Node` dat wel doet. De selectie zou stil
+        nul opleveren, en die nul is niet te onderscheiden van een dataset zonder
+        die objecten; daarom is het hier een harde fout. Zonder ontologie is de
+        afsluiting alleen `Verbinding` zelf, dus dan wordt alleen die naam gevangen.
+        """
+        if _uri(root) in self.closure("Verbinding"):
+            raise DatasetError(
+                f"{root} is een verbindingsklasse en kan als rol nooit een object opleveren: "
+                f"die klassen staan op de orientatie van een streng, en het domeinmodel "
+                f"draagt de orientatietypen van een streng niet. Configureer de klasse van "
+                f"het object zelf, bijvoorbeeld een subklasse van Leiding."
+            )
         gesloten = self.closure(root)
         return [uri for uri in (*self.nodes, *self.conduits) if self.types_of(uri) & gesloten]
 
