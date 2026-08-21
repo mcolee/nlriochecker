@@ -55,8 +55,12 @@ besluiten van de auteur op 2026-08-21.
   auteur, en hij geldt alleen voor deze run.
 - **CHANGELOG.** Elke noemenswaardige wijziging krijgt een regel onder `## [Unreleased]` in
   `CHANGELOG.md`.
-- **Afbreekdrempel: 5 %.** Beweegt het totaal aantal bevindingen op De Wolden met meer dan
-  vijf procent zonder dat het issue die beweging voorspelde, dan breekt de **hele run** af.
+- **Afbreekdrempel: 10 %.** Beweegt het totaal aantal bevindingen op De Wolden met meer dan
+  tien procent zonder dat het issue die beweging voorspelde, dan breekt de **hele run** af.
+  De drempel geldt op de **onverklaarde** beweging: trek eerst de bewegingen af die het issue
+  zelf voorspelde (#39 → +88, #37 → +1, #38 → ±962), en meet de rest. Let op de noemer: de
+  basislijnrun draait **zonder** `--shacl`, dus het totaal telt alleen de eigen checks en niet
+  de ruim 105.000 nulmetingmeldingen. NET-001 domineert dat totaal met ruim 9.000 bevindingen.
 - **`uitvoer/` staat in `.gitignore`.** Schrijf runuitvoer daarheen, niet in `docs/` of `data/`.
 - **Raak nooit een invoerbestand aan** in `data/`.
 
@@ -342,8 +346,8 @@ Breek de **hele run** af — niet alleen het lopende issue — bij elk van deze:
 
 1. `ruff`, `ruff format --check`, `mypy` of `pytest` wordt rood en is niet binnen de scope van
    het lopende issue te repareren.
-2. Het totaal aantal bevindingen beweegt met meer dan **5 %** zonder dat het issue die beweging
-   voorspelde.
+2. Het totaal aantal bevindingen beweegt met meer dan **10 %** zonder dat het issue die
+   beweging voorspelde. Meet op de onverklaarde rest, na aftrek van de voorspelde bewegingen.
 3. Een tier-A-issue blijkt toch een domeinbeslissing nodig te hebben.
 4. Een golf duurt langer dan **vier uur** wandkloktijd.
 5. `git status` toont onverwachte wijzigingen buiten de bestanden die het issue noemt.
