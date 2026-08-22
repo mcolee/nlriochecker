@@ -20,8 +20,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   tegen de ontologie te houden is; de module leest alleen en raakt geen run. Dit is de
   onderzoeksstap met een poort: de gemeten tegenspraken (ATTR-008 `maximale_strenglengte_m`
   200 m vs ontologie 75 m — +431 op De Wolden; HGT-012 6,0 m vs 500–4000 mm — latent; PE
-  `minimum_mm` 40 vs 63 mm) staan in een comment bij het issue, en het oplossen ervan
-  wacht op akkoord van de auteur (#28 en #20 dragen de plek).
+  `minimum_mm` 40 vs 63 mm) staan in een comment bij het issue.
+
+### Gewijzigd
+
+- **ATTR-008 toetst de strenglengte tegen de GWSW-ontologiegrens van 75 m** (issue #35).
+  De bovengrens `maximale_strenglengte_m` gaat van 200 m naar 75 m, de waarde die het
+  datatype `Dt_LengteLeiding` declareert (`owl:withRestrictions` 1–75 m). GWSW is leidend:
+  de oude 200 m keurde strengen goed die de SHACL-nulmeting in hetzelfde rapport afkeurt.
+  Op De Wolden loopt ATTR-008 daarmee van 12 naar 443 bevindingen (+431 vrijvervalstrengen
+  tussen 75 en 200 m). De ondergrens 1 m viel al samen met de ontologie en blijft. De
+  waarde staat in `checks.toml`, `checkconfig.py` en `configs/dewoldenhoogeveen.toml`, met
+  de ontologie als bronregel. HGT-012 (6,0 m, latent) en de PE-40-regel (`plausibiliteit.toml`,
+  #20) blijven een openstaande tegenspraak; issue #35 blijft daarvoor open.
 
 ### Gewijzigd
 

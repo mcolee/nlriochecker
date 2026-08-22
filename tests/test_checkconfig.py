@@ -31,6 +31,19 @@ def test_standaardconfig_laadt() -> None:
     assert config.drempels.dubbele_put_tolerantie_m == 0.30
 
 
+def test_maximale_strenglengte_volgt_de_ontologie() -> None:
+    """De bovengrens van ATTR-008 is de GWSW-ontologiegrens, niet 200 m (issue #35).
+
+    `Dt_LengteLeiding` declareert een bereik van 1-75 m. De oude drempel 200 keurde
+    strengen goed die de SHACL-nulmeting in hetzelfde rapport afkeurde (op De Wolden
+    431 vrijvervalstrengen); GWSW is leidend. De ondergrens 1 m valt al samen met de
+    ontologie.
+    """
+    drempels = load_check_config().drempels
+    assert drempels.maximale_strenglengte_m == 75.0
+    assert drempels.minimale_strenglengte_m == 1.0
+
+
 def test_mechanisch_riool_is_geconfigureerd() -> None:
     """Persleiding, drukleiding en vacuumleiding vallen buiten scope voor de checks.
 

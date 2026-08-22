@@ -606,7 +606,7 @@ FIXTURES["attr007_toekomstig_jaar.ttl"] = (
 )
 
 FIXTURES["attr008_lange_streng.ttl"] = (
-    "streng 1 is administratief 500 m lang, boven de bovengrens van 200 m",
+    "streng 1 is administratief 500 m lang, boven de ontologiegrens van 75 m",
     nette_put("PutA", "A", *A)
     + nette_put("PutB", "B", (1500.0, 2000.0)[0], 2000.0)
     + nette_leiding(

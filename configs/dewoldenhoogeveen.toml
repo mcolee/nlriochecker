@@ -240,10 +240,10 @@ put_diameter_marge_mm = 0.0
 # ATTR-007: geldig bereik voor het aanlegjaar. Uit het checkregister: "in de
 # toekomst of voor 1870".
 aanlegjaar_minimum = 1870
-# ATTR-008: aannemelijk bereik voor de strenglengte. Het checkregister noemt de
-# check maar laat de grenzen als "X m" open; projectkeuze, geen externe bron.
+# ATTR-008: aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
+# `Dt_LengteLeiding` declareert 1-75 m; GWSW is leidend (issue #35).
 minimale_strenglengte_m = 1.0
-maximale_strenglengte_m = 200.0
+maximale_strenglengte_m = 75.0
 # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.
 # Het checkregister laat het percentage als "X%" open; projectkeuze, geen externe
 # bron.

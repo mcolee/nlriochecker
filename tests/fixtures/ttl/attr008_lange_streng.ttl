@@ -32,7 +32,7 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: streng 1 is administratief 500 m lang, boven de bovengrens van 200 m
+# DEFECT: streng 1 is administratief 500 m lang, boven de ontologiegrens van 75 m
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .

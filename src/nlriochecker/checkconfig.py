@@ -154,9 +154,10 @@ class CheckThresholds(BaseModel):
     put_diameter_marge_mm: float = Field(default=0.0, ge=0.0)
     # ATTR-007: geldig bereik voor het aanlegjaar.
     aanlegjaar_minimum: int = Field(default=1870, ge=1)
-    # ATTR-008: aannemelijk bereik voor de strenglengte.
+    # ATTR-008: aannemelijk bereik voor de strenglengte; de grenzen volgen het
+    # GWSW-datatype Dt_LengteLeiding (1-75 m). Zie checks.toml en issue #35.
     minimale_strenglengte_m: float = Field(default=1.0, gt=0.0)
-    maximale_strenglengte_m: float = Field(default=200.0, gt=0.0)
+    maximale_strenglengte_m: float = Field(default=75.0, gt=0.0)
     # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.
     lengte_afwijking_procent: float = Field(default=5.0, gt=0.0)
     # ATTR-004: hoeveel breedte en hoogte bij een rond profiel mogen verschillen.
