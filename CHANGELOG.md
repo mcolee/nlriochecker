@@ -13,6 +13,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De dekkingspoort noemt de derde uitweg** (issue #4). Faalt een bron op dekking, dan
+  wees de melding alleen naar een ruimer extract of een hogere
+  `[bronnen] dekking_tolerantie_m`. Die tolerantie geldt voor alle lagen tegelijk, dus wie
+  hem oprekte om één laag door te laten hief de poort voor élke bron op -- precies het
+  stille falen waar BO-19 tegen bouwt. De melding zegt dat nu, en noemt de uitweg die
+  alleen in de README stond: een bron die niet te klein maar ongeschikt is zet je uit
+  (`bgt_putdeksellagen = []`), waarna de bijbehorende checks overslaan met uitleg in het
+  rapport. De poort blokkeert dezelfde gevallen als voorheen.
+
 - **ATTR-010 noemt wat onwaarschijnlijk is in plaats van wat toegestaan is** (issue #43).
   `[[leiding_put_materiaal]]` in `plausibiliteit.toml` draagt het veld
   `onwaarschijnlijke_putmaterialen` in plaats van `verwachte_putmaterialen`. Een lijst met

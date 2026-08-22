@@ -241,7 +241,14 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
             "de aangeleverde bronnen dekken het bereik niet waarvoor ze gelden; een te "
             "klein extract geeft een misleidend schone uitkomst. Trek de betreffende "
             "extracten opnieuw, ruimer dan het bereik, of verhoog "
-            "`[bronnen] dekking_tolerantie_m` als de lege rand klopt.\n" + "\n".join(tekorten)
+            "`[bronnen] dekking_tolerantie_m` als de lege rand klopt -- die tolerantie "
+            "geldt voor alle lagen tegelijk, dus een ruime waarde heft de poort ook voor "
+            "de andere bronnen op.\n"
+            "Is een bron niet te klein maar ongeschikt -- bevat hij iets "
+            "anders dan zijn naam suggereert -- zet hem dan uit "
+            "(`bgt_putdeksellagen = []`, of laat `bag_pand` weg); de bijbehorende checks "
+            "slaan dan over met uitleg in het rapport, wat een eerlijker antwoord is dan "
+            "een uitslag op een verkeerde bron.\n" + "\n".join(tekorten)
         )
 
 

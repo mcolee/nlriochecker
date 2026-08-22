@@ -62,6 +62,25 @@ def test_te_kleine_laag_faalt_met_beide_omhullenden(tmp_path: Path) -> None:
     assert "dekking_tolerantie_m" in tekst
 
 
+def test_melding_noemt_alle_drie_de_uitwegen(tmp_path: Path) -> None:
+    """Wie de poort raakt leest de melding en niet de README.
+
+    De derde uitweg -- de bron uitzetten omdat hij ongeschikt is en niet te klein --
+    stond alleen in de README. Wie alleen de melding las, kende hem niet en rekte de
+    tolerantie op, en die geldt voor alle lagen tegelijk. Zie issue #4.
+    """
+    bronnen = _bronnen(tmp_path / "b", [box(10, 10, 90, 90)])
+
+    with pytest.raises(ExternalDataError) as fout:
+        load_external_data(bronnen, tmp_path / "b", dekkingseis=Dekkingseis(0.0, 0.0))
+
+    tekst = str(fout.value)
+    assert "extracten opnieuw" in tekst
+    assert "dekking_tolerantie_m" in tekst
+    assert "bgt_putdeksellagen = []" in tekst
+    assert "alle lagen tegelijk" in tekst
+
+
 def test_dekkende_laag_slaagt(tmp_path: Path) -> None:
     bronnen = _bronnen(tmp_path / "b", [box(-10, -10, 110, 110)])
 
