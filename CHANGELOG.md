@@ -13,6 +13,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **NET-007 meldt niet langer elk infiltratieriool** (issue #42). De check bouwde zijn
+  drempelverzameling alleen uit `Overstortdrempel`-objecten; die klasse heeft op de De
+  Wolden-export nul instanties en in de ontologie geen subklassen, dus de verzameling
+  bleef leeg en elk van de 340 infiltratieriolen werd onvoorwaardelijk gemeld. NET-007
+  herkent nu ook de overstortput zelf als overstortvoorziening -- dezelfde vormen die
+  `checks/randvoorzieningen.py` al leest (BO-34, open punt 6) -- en wordt daarmee weer
+  onderscheidend.
+
 - **De CI-job heeft een tijdslimiet en legt vast waarom er geen padfilter is.**
   `.github/workflows/toets.yml` draagt `timeout-minutes: 15`; zonder grens mag een
   vastgelopen stap de volle zes uur van de runner opmaken, terwijl de run zelf circa

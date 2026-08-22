@@ -162,6 +162,13 @@ def test_net007_zwijgt_als_er_een_drempel_is() -> None:
     assert _labels("net007_it_met_drempel.ttl", "NET-007") == []
 
 
+def test_net007_zwijgt_bij_overstortput_zonder_los_drempelobject() -> None:
+    # Zoals overstorten op de De Wolden-export staan: een Overstortput met een
+    # Overstortleiding, geen los Overstortdrempel-object. NET-007 hoort die vorm te
+    # herkennen; deed hij dat niet, dan meldde hij elk infiltratieriool. Zie issue #42.
+    assert _labels("net007_it_met_overstortput.ttl", "NET-007") == []
+
+
 def test_ontbrekend_eindpunt_wordt_expliciet_gemeld() -> None:
     # In de TOP-fixture zit geen gemaal; dan is elke streng onbereikbaar en dat
     # hoort met zoveel woorden in de bevinding en in de notities te staan.

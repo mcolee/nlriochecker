@@ -15,7 +15,11 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.selectie import infiltratieleidingen, vrijvervalrioolleidingen
+from nlriochecker.checks.selectie import (
+    infiltratieleidingen,
+    overstortputten,
+    vrijvervalrioolleidingen,
+)
 from nlriochecker.checks.verbanden import deelstelsel_ids
 from nlriochecker.dataset import Conduit, GwswDataset, part_holders_of
 from nlriochecker.taal import getal, vorm
@@ -486,11 +490,27 @@ class ItStelselZonderDrempel(Check):
                 )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt wat er buiten de graaf viel."""
-        return _netwerk_notities(context)
+        """Meldt wat als drempel telt en wat er buiten de graaf viel."""
+        notities = _netwerk_notities(context)
+        if infiltratieleidingen(context):
+            notities.insert(
+                0,
+                "Een deelstelsel telt hier als voorzien van een drempel wanneer er een los "
+                "`Overstortdrempel`-onderdeel in ligt of een overstortput (`Overstortput`, "
+                "`Stuwput`); een bergbezinkvoorziening telt niet mee.",
+            )
+        return notities
 
     def _knopen_met_drempel(self, context: CheckContext) -> set[str]:
-        """De knopen die zelf een drempel bevatten of er onderdeel van zijn."""
+        """De knopen die een overstortvoorziening dragen.
+
+        Twee vormen, dezelfde als `checks/randvoorzieningen.py` leest: een los
+        `Overstortdrempel`-onderdeel, en de overstortput zelf. Op de De
+        Wolden-export staan overstorten als `Overstortput` met een
+        `Overstortleiding`, niet als los `Overstortdrempel`-object (BO-34, open
+        punt 6); alleen op `Overstortdrempel` afgaan liet de verzameling leeg en
+        meldde elk infiltratieriool onvoorwaardelijk. Zie issue #42.
+        """
         dataset = context.dataset
         wortels = context.config.klassen.netwerkknopen
 
@@ -501,6 +521,10 @@ class ItStelselZonderDrempel(Check):
                     knoop = dataset.resolve_network_node(str(houder), wortels)
                     if knoop is not None:
                         knopen.add(knoop)
+        for put in overstortputten(context):
+            knoop = dataset.resolve_network_node(put.uri, wortels)
+            if knoop is not None:
+                knopen.add(knoop)
         return knopen
 
     def examined(self, context: CheckContext) -> int:
