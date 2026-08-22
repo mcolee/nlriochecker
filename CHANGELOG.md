@@ -11,6 +11,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Toegevoegd
+
+- **`ontologie.py` leest de gedeclareerde waardebereiken (facetten) uit de GWSW-ontologie**
+  (issue #35). `facetbereik` lost de keten `Dt_X → equivalentClass → onDatatype +
+  withRestrictions → min/maxInclusive` op, `datatype_van_kenmerk` de stap `Kenmerk →
+  hasValue → allValuesFrom Dt_X`. Dit is de ontbrekende schakel waarmee een projectdrempel
+  tegen de ontologie te houden is; de module leest alleen en raakt geen run. Dit is de
+  onderzoeksstap met een poort: de gemeten tegenspraken (ATTR-008 `maximale_strenglengte_m`
+  200 m vs ontologie 75 m — +431 op De Wolden; HGT-012 6,0 m vs 500–4000 mm — latent; PE
+  `minimum_mm` 40 vs 63 mm) staan in een comment bij het issue, en het oplossen ervan
+  wacht op akkoord van de auteur (#28 en #20 dragen de plek).
+
 ### Gewijzigd
 
 - **HGT-007 toetst het minimale verhang met een diameterstaffel in plaats van één
