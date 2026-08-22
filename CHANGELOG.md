@@ -13,6 +13,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De CI-job heeft een tijdslimiet en legt vast waarom er geen padfilter is.**
+  `.github/workflows/toets.yml` draagt `timeout-minutes: 15`; zonder grens mag een
+  vastgelopen stap de volle zes uur van de runner opmaken, terwijl de run zelf circa
+  veertig seconden duurt. Daarnaast staat er nu bij dat een `paths-ignore` op Markdown
+  hier fout zou zijn -- `docs/json-schema.md`, `CLAUDE.md` en het checkregister zijn
+  invoer van de suite -- en wat de triggerfilters wel en niet uitsluiten. Aan wat CI
+  toetst verandert niets.
+
 - **De dekkingspoort noemt de derde uitweg** (issue #4). Faalt een bron op dekking, dan
   wees de melding alleen naar een ruimer extract of een hogere
   `[bronnen] dekking_tolerantie_m`. Die tolerantie geldt voor alle lagen tegelijk, dus wie
