@@ -175,8 +175,10 @@ class CheckThresholds(BaseModel):
     extreem_verhang_een_op: float = Field(default=50.0, gt=0.0)
     # HGT-009 en HGT-016: BOB-sprong waarboven een valconstructie verwacht wordt.
     bob_sprong_m: float = Field(default=0.25, gt=0.0)
-    # HGT-012: aannemelijk bereik voor de putdiepte.
-    maximale_putdiepte_m: float = Field(default=6.0, gt=0.0)
+    # HGT-012: aannemelijk bereik voor de putdiepte; de grenzen volgen het
+    # GWSW-datatype Dt_HoogtePut (500-4000 mm). Zie checks.toml en issue #35.
+    minimale_putdiepte_m: float = Field(default=0.5, gt=0.0)
+    maximale_putdiepte_m: float = Field(default=4.0, gt=0.0)
     # HGT-013: gronddekking op de buiskruin.
     minimale_gronddekking_m: float = Field(default=0.50, gt=0.0)
     maximale_gronddekking_m: float = Field(default=4.0, gt=0.0)

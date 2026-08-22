@@ -44,6 +44,19 @@ def test_maximale_strenglengte_volgt_de_ontologie() -> None:
     assert drempels.minimale_strenglengte_m == 1.0
 
 
+def test_putdiepte_volgt_de_ontologie() -> None:
+    """De grenzen van HGT-012 volgen het GWSW-datatype Dt_HoogtePut (issue #35).
+
+    `Dt_HoogtePut` declareert 500-4000 mm (0,5-4,0 m). De oude bovengrens 6,0 m keurde
+    putten goed die de ontologie afkeurt, en de ondergrens toetste alleen op `> 0` in
+    plaats van de gedeclareerde 500 mm. GWSW is leidend, dus beide grenzen volgen nu de
+    ontologie.
+    """
+    drempels = load_check_config().drempels
+    assert drempels.minimale_putdiepte_m == 0.5
+    assert drempels.maximale_putdiepte_m == 4.0
+
+
 def test_mechanisch_riool_is_geconfigureerd() -> None:
     """Persleiding, drukleiding en vacuumleiding vallen buiten scope voor de checks.
 

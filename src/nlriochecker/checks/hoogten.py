@@ -557,36 +557,39 @@ class DrempelBuitenBereik(_PutCheck):
 
 @register
 class PutdiepteBuitenBereik(_PutCheck):
-    """HGT-012: een putdiepte die negatief of onwaarschijnlijk groot is."""
+    """HGT-012: een putdiepte buiten het door de ontologie gedeclareerde bereik."""
 
     id = "HGT-012"
-    title = "Putdiepte (deksel minus bodem) negatief of groter dan X m"
+    title = "Putdiepte (deksel minus bodem) kleiner dan X m of groter dan X m"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst `HoogtePut` op een aannemelijk bereik.
+        """Toetst `HoogtePut` tegen het bereik van `Dt_HoogtePut` (0,5-4,0 m).
 
         Het GWSW kent geen bodemniveau; de putdiepte staat als `HoogtePut` in
         millimeters geregistreerd. Deksel min bodem zou hier hetzelfde getal
-        opleveren, want de bodem wordt juist uit die twee afgeleid.
+        opleveren, want de bodem wordt juist uit die twee afgeleid. Een negatieve
+        of nul-diepte valt vanzelf onder de ondergrens.
         """
+        minimum = context.config.drempels.minimale_putdiepte_m
         maximum = context.config.drempels.maximale_putdiepte_m
 
         for node in netwerkknopen(context):
             diepte = node.hoogte_m
             if diepte is None:
                 continue
-            if 0 < diepte <= maximum:
+            if minimum <= diepte <= maximum:
                 continue
-            kant = "negatief of nul" if diepte <= 0 else f"groter dan {maximum:g} m"
+            kant = "onder" if diepte < minimum else "boven"
+            grens = minimum if diepte < minimum else maximum
             yield self.finding(
                 context,
                 node.uri,
                 node.label,
-                f"Putdiepte {diepte:.3f} m is {kant}.",
+                f"Putdiepte {diepte:.3f} m ligt {kant} de grens van {grens:g} m.",
                 putdiepte_m=round(diepte, 3),
-                maximum_m=maximum,
+                grens_m=grens,
             )
 
     def notes(self, context: CheckContext) -> list[str]:

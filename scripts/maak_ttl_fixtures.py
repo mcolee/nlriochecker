@@ -801,7 +801,7 @@ FIXTURES["hgt011_drempel_onder_bob.ttl"] = (
 )
 
 FIXTURES["hgt012_putdiepte.ttl"] = (
-    "put B heeft een puthoogte van 12 m, boven de grens van 6 m",
+    "put B heeft een puthoogte van 12 m, boven de ontologiegrens van 4 m",
     hoogteput("PutA", "A", A)
     + hoogteput("PutB", "B", B, hoogte=12000)
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),

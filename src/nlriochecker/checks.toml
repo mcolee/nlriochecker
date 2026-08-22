@@ -259,9 +259,12 @@ extreem_verhang_een_op = 50.0
 # checkregister noemt "boven drempel" zonder getal; projectkeuze, geen externe
 # bron.
 bob_sprong_m = 0.25
-# HGT-012: aannemelijk bereik voor de putdiepte. Het checkregister laat de grens
-# als "X m" open; projectkeuze, geen externe bron.
-maximale_putdiepte_m = 6.0
+# HGT-012: aannemelijk bereik voor de putdiepte. Bron: het GWSW-datatype
+# `Dt_HoogtePut` declareert 500-4000 mm (owl:withRestrictions). GWSW is leidend, dus
+# beide grenzen volgen de ontologie -- niet langer de projectkeuze 6 m zonder
+# ondergrens, die putten goedkeurde die de ontologie afkeurt (issue #35).
+minimale_putdiepte_m = 0.5
+maximale_putdiepte_m = 4.0
 # HGT-013: gronddekking op de buiskruin. Uit het checkregister: "kleiner dan 0,5 m
 # of groter dan 4 m".
 minimale_gronddekking_m = 0.50

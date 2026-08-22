@@ -31,8 +31,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   Op De Wolden loopt ATTR-008 daarmee van 12 naar 443 bevindingen (+431 vrijvervalstrengen
   tussen 75 en 200 m). De ondergrens 1 m viel al samen met de ontologie en blijft. De
   waarde staat in `checks.toml`, `checkconfig.py` en `configs/dewoldenhoogeveen.toml`, met
-  de ontologie als bronregel. HGT-012 (6,0 m, latent) en de PE-40-regel (`plausibiliteit.toml`,
-  #20) blijven een openstaande tegenspraak; issue #35 blijft daarvoor open.
+  de ontologie als bronregel.
+
+- **HGT-012 toetst de putdiepte tegen het ontologiebereik 0,5–4,0 m** (issue #35). Het
+  datatype `Dt_HoogtePut` declareert 500–4000 mm. `maximale_putdiepte_m` gaat van 6,0 m
+  naar 4,0 m, en er komt een `minimale_putdiepte_m = 0,5` bij: de check toetste voorheen
+  alleen op `> 0` in plaats van de gedeclareerde ondergrens. De melding is nu symmetrisch
+  (`ligt onder/boven de grens van X m`), net als ATTR-008; een negatieve diepte valt
+  vanzelf onder de ondergrens. Op De Wolden verandert er niets — de export draagt nul
+  `HoogtePut` — maar de tegenspraak met de nulmeting is weg. De PE-40-regel
+  (`plausibiliteit.toml`, #20) blijft over en hoort bij dat issue.
 
 ### Gewijzigd
 
