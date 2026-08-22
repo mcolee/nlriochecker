@@ -318,4 +318,7 @@ De vijf standaardrollen; elke labelstring is gelijk aan de rolnaam. Zie
 
 ### Domeindocumentatie
 
-Single-context: `CONTEXT.md` in de root plus `docs/adr/`. Zie `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` in de root. `docs/adr/` bestaat niet en wordt niet leeg
+aangemaakt; `/domain-modeling` legt de map aan zodra er een eerste besluit in landt.
+Vastgelegde besluiten staan tot die tijd als BO-nummer in `docs/beslislog.md`. Zie
+`docs/agents/domain.md`.
