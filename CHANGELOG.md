@@ -13,6 +13,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **HGT-007 toetst het minimale verhang met een diameterstaffel in plaats van één
+  vlakke drempel** (issue #29). De oude drempel `minimaal_verhang_promille = 1.0`
+  (1:1000) nam precies het afschot dat volgens de RIONED Kennisbank Stedelijk Water
+  "in vuilwaterstelsels vrijwel niet voorkomt". Het minimale afschot hangt van de
+  diameter af: kleine leidingen moeten steiler liggen. De staffel staat nu als
+  `[[verhang_staffel]]` in `checks.toml` (1:250 ≤250 mm, 1:500 ≤350 mm, 1:750 ≤650 mm,
+  1:1000 daarboven) met de citaten als commentaar; `minimaal_verhang_promille` vervalt.
+  Op De Wolden loopt HGT-007 daarmee van 1559 naar 4757 bevindingen, vooral bij de
+  kleine leidingen die 1:1000 te slap toetste. De `notes()` telt nu ook de strengen die
+  niet getoetst konden worden (buiten de rol vuilwater, zonder BOB — met het aandeel dat
+  de vulwaardenregel wegneemt — of zonder diameter). De C2100-lengtecorrectie is
+  onderzocht en bewust niet ingebouwd: op De Wolden verschuift ze de uitkomst ~1,7%.
+
 - **NET-007 meldt niet langer elk infiltratieriool** (issue #42). De check bouwde zijn
   drempelverzameling alleen uit `Overstortdrempel`-objecten; die klasse heeft op de De
   Wolden-export nul instanties en in de ontologie geen subklassen, dus de verzameling

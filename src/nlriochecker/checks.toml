@@ -104,6 +104,36 @@ puttype = "Lozingsput"
 vereist_een_van = ["VrijvervalRioolleiding", "Duiker"]
 toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben."
 
+# HGT-007: het minimale afschot voor vuilwater en gemengd hangt af van de diameter.
+# Bron: RIONED Kennisbank Stedelijk Water. Kleine leidingen moeten steiler liggen dan
+# grote; een vlakke drempel voor alles zou juist de waarde nemen die "vrijwel niet
+# voorkomt". Zie issue #29.
+#
+#   "De beginstrengen die het verst bij een gemaal vandaan liggen [...] krijgen in het
+#    ontwerp ten minste een afschot van 1:250 tot 1:300. Dit zijn meestal ook de
+#    kleinste leidingen (met een diameter vanaf 200 mm)."
+#   "Bij leidingen met een diameter van 300 mm is het minimale afschot ongeveer 1:500;
+#    Bij leidingen van 400 tot 600 mm is het afschot 1:750;
+#    Bij leidingen van zo'n 700 tot 1.000 mm is het minimale afschot 1:1.000;
+#    Een afschot van 1:1.000 of flauwer komt in vuilwaterstelsels vrijwel niet voor."
+#
+# `tot_diameter_mm` is de bovengrens (inclusief) in mm; de laatste trede laat hem weg
+# en is het vangnet zonder bovengrens. `minimaal_verhang_een_op` is de noemer van 1:n.
+[[verhang_staffel]]
+tot_diameter_mm = 250
+minimaal_verhang_een_op = 250
+
+[[verhang_staffel]]
+tot_diameter_mm = 350
+minimaal_verhang_een_op = 500
+
+[[verhang_staffel]]
+tot_diameter_mm = 650
+minimaal_verhang_een_op = 750
+
+[[verhang_staffel]]
+minimaal_verhang_een_op = 1000
+
 [naamgeving]
 # ADM-003: de naamgevingsconventie is projectafhankelijk. Zonder patroon draait de
 # check niet; een verzonnen conventie zou elke dataset afkeuren.
@@ -218,10 +248,8 @@ bob_maximale_diepte_m = 3.0
 # projectkeuze, geen externe bron.
 tegenverhang_licht_m = 0.01
 tegenverhang_fors_m = 0.05
-# HGT-007: minimaal verhang per meter voor vuilwater en gemengd. Het
-# checkregister noemt een drempelwaarde zonder getal; projectkeuze, geen externe
-# bron.
-minimaal_verhang_promille = 1.0
+# HGT-007: het minimale afschot staat als diameterstaffel in [[verhang_staffel]]
+# hierboven, met de RIONED-citaten. Geen scalaire drempel meer.
 # HGT-008: steiler dan een op zoveel is verdacht. Uit het checkregister: "steiler
 # dan bijv. 1:50".
 extreem_verhang_een_op = 50.0

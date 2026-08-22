@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from nlriochecker.checkconfig import VerhangStap
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -264,47 +265,109 @@ class TegenverhangFors(_Tegenverhang):
     bovengrens = None
 
 
+def _als_helling(fractie: float) -> str:
+    """Een verhangfractie als noemer 1:n, of 'vlak' bij nul verval."""
+    if fractie <= 0:
+        return "vlak"
+    return f"1:{round(1.0 / fractie)}"
+
+
+def _staffeldrempel(staffel: list[VerhangStap], diameter_mm: float | None) -> float | None:
+    """Het minimale verhang als fractie voor deze diameter, of None als het niet kan.
+
+    Loopt de treden op oplopende bovengrens langs; de vangnettrede (`tot_diameter_mm`
+    is None) sorteert achteraan. Zonder diameter of zonder passende trede is er geen
+    drempel en blijft de streng ongetoetst.
+    """
+    if diameter_mm is None:
+        return None
+    for stap in sorted(
+        staffel, key=lambda s: (s.tot_diameter_mm is None, s.tot_diameter_mm or 0.0)
+    ):
+        if stap.tot_diameter_mm is None or diameter_mm <= stap.tot_diameter_mm:
+            return 1.0 / stap.minimaal_verhang_een_op
+    return None
+
+
 @register
 class OnvoldoendeVerhang(_StrengCheck):
     """HGT-007: te weinig verval voor zelfreiniging bij vuilwater of gemengd."""
 
     id = "HGT-007"
-    title = "Verhang vuilwater of gemengd onder drempelwaarde"
+    title = "Verhang vuilwater of gemengd onder de RIONED-staffel per diameter"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst het verval per meter van vuilwater- en gemengde strengen.
+        """Toetst het verval per meter tegen het minimale afschot per diameter.
 
-        Alleen strengen met verval naar beneden doen mee. Loopt de bodem juist
-        omhoog, dan is dat tegenverhang en melden HGT-005 en HGT-006 dat; hier nog
-        eens meetellen zou dezelfde streng dubbel laten opduiken.
+        Het minimale afschot volgt de RIONED-staffel (`verhang_staffel`): kleine
+        leidingen moeten steiler liggen dan grote. Alleen strengen met verval naar
+        beneden doen mee. Loopt de bodem juist omhoog, dan is dat tegenverhang en
+        melden HGT-005 en HGT-006 dat; hier nog eens meetellen zou dezelfde streng
+        dubbel laten opduiken.
         """
-        drempel = context.config.drempels.minimaal_verhang_promille / 1000.0
+        staffel = context.config.verhang_staffel
         soorten = {conduit.uri for conduit in vuilwaterleidingen(context)}
 
         for conduit in vrijvervalrioolleidingen(context):
             if conduit.uri not in soorten:
                 continue
             verhang = _verhang(conduit)
-            if verhang is None or verhang < 0 or verhang >= drempel:
+            if verhang is None or verhang < 0:
+                continue
+            # De staffel is diametergestuurd; voor een rond profiel is `breedte_mm`
+            # de diameter. Een streng zonder BreedteLeiding krijgt geen drempel en
+            # telt in notes() als "zonder diameter".
+            drempel = _staffeldrempel(staffel, conduit.breedte_mm)
+            if drempel is None or verhang >= drempel:
                 continue
             yield self.finding(
                 context,
                 conduit.uri,
                 conduit.label,
-                f"Verhang {verhang * 1000:.2f} promille, onder de drempel van "
-                f"{drempel * 1000:g} promille voor vuilwater en gemengd.",
+                f"Verhang {verhang * 1000:.2f} promille ({_als_helling(verhang)}), onder het "
+                f"minimale afschot {_als_helling(drempel)} dat de RIONED-staffel bij diameter "
+                f"{conduit.breedte_mm:g} mm vraagt.",
                 verhang_promille=round(verhang * 1000, 3),
-                drempel_promille=drempel * 1000,
+                drempel_promille=round(drempel * 1000, 3),
+                diameter_mm=conduit.breedte_mm,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Legt de afbakening vast."""
-        return [
+        """Legt de afbakening vast en telt wat niet getoetst kon worden."""
+        staffel = context.config.verhang_staffel
+        soorten = {conduit.uri for conduit in vuilwaterleidingen(context)}
+
+        buiten_rol = geen_bob = door_vulwaarde = geen_diameter = 0
+        for conduit in vrijvervalrioolleidingen(context):
+            if conduit.uri not in soorten:
+                buiten_rol += 1
+                continue
+            if _verhang(conduit) is None:
+                geen_bob += 1
+                if conduit.vulwaarden:
+                    door_vulwaarde += 1
+            elif _staffeldrempel(staffel, conduit.breedte_mm) is None:
+                geen_diameter += 1
+
+        notities = [
             "Alleen strengen met verval naar beneden zijn getoetst; tegenverhang meldt de "
-            "check niet, dat doen HGT-005 en HGT-006."
+            "check niet, dat doen HGT-005 en HGT-006.",
+            "Het minimale afschot volgt de RIONED-staffel per diameter (config "
+            "`verhang_staffel`); alleen de rol vuilwater (Vuilwaterriool en GemengdRiool) "
+            "doet mee, hemelwater valt er bewust buiten.",
         ]
+        if not staffel:
+            notities.append(
+                "Geen verhangstaffel geconfigureerd: HGT-007 heeft geen enkele streng getoetst."
+            )
+        notities.append(
+            f"Niet getoetst: {buiten_rol} strengen buiten de rol vuilwater, "
+            f"{geen_bob} zonder bruikbare BOB (waarvan {door_vulwaarde} door de "
+            f"vulwaardenregel), {geen_diameter} zonder diameter voor de staffel."
+        )
+        return notities
 
 
 @register

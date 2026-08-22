@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig, VerhangStap, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.verbanden import deelstelsel_ids
 from nlriochecker.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
@@ -597,3 +597,36 @@ def test_de_run_draagt_het_trefferregister_van_zijn_context() -> None:
     run = run_checks(context, ["TOP-001"])
 
     assert run.treffers is context.treffers
+
+
+def _vlakke_staffel_config() -> CheckConfig:
+    """De oude, vlakke HGT-007-drempel als staffel: overal 1:1000, ongeacht diameter."""
+    config = fixtureconfig()
+    config.verhang_staffel = [VerhangStap(minimaal_verhang_een_op=1000)]
+    return config
+
+
+def test_hgt007_staffel_meldt_de_te_vlakke_kleine_streng() -> None:
+    """Issue #29: het minimale afschot hangt van de diameter af.
+
+    L1 is 200 mm en ligt op 1:500. Onder de RIONED-staffel (200 mm vraagt 1:250) is
+    dat te vlak en hoort er een melding te komen; onder de oude vlakke 1:1000 was
+    1:500 juist steil genoeg en zweeg de check. Beide gedragingen staan hier, want
+    alleen samen bewijzen ze dat de staffel het verschil maakt.
+    """
+    assert labels(uitkomst("hgt007_staffel.ttl", "HGT-007")) == ["L1"]
+    assert labels(uitkomst("hgt007_staffel.ttl", "HGT-007", _vlakke_staffel_config())) == []
+
+
+def test_hgt007_notes_tellen_de_ongetoetste_strengen() -> None:
+    """De toelichting zegt waarom strengen buiten de toetsing vielen.
+
+    In de fixture: L3 valt buiten de rol (hemelwater), L4 mist een diameter en L5
+    mist een BOB. Stilte zou lezen als 'alles getoetst'.
+    """
+    run = run_checks(context_voor("hgt007_staffel.ttl", fixtureconfig()), ["HGT-007"])
+    tekst = " ".join(run.outcomes[0].notes)
+
+    assert "1 strengen buiten de rol vuilwater" in tekst
+    assert "1 zonder bruikbare BOB" in tekst
+    assert "1 zonder diameter" in tekst

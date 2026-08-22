@@ -128,6 +128,23 @@ puttype = "Lozingsput"
 vereist_een_van = ["VrijvervalRioolleiding", "Duiker"]
 toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben."
 
+# HGT-007: RIONED-verhangstaffel per diameter. De Wolden volgt de standaardstaffel
+# uit src/nlriochecker/checks.toml; zie issue #29 voor de citaten en onderbouwing.
+[[verhang_staffel]]
+tot_diameter_mm = 250
+minimaal_verhang_een_op = 250
+
+[[verhang_staffel]]
+tot_diameter_mm = 350
+minimaal_verhang_een_op = 500
+
+[[verhang_staffel]]
+tot_diameter_mm = 650
+minimaal_verhang_een_op = 750
+
+[[verhang_staffel]]
+minimaal_verhang_een_op = 1000
+
 [naamgeving]
 # ADM-003: de naamgevingsconventie is projectafhankelijk. Zonder patroon draait de
 # check niet; een verzonnen conventie zou elke dataset afkeuren.
@@ -247,10 +264,8 @@ bob_maximale_diepte_m = 3.0
 # projectkeuze, geen externe bron.
 tegenverhang_licht_m = 0.01
 tegenverhang_fors_m = 0.05
-# HGT-007: minimaal verhang per meter voor vuilwater en gemengd. Het
-# checkregister noemt een drempelwaarde zonder getal; projectkeuze, geen externe
-# bron.
-minimaal_verhang_promille = 1.0
+# HGT-007: het minimale afschot staat als diameterstaffel in [[verhang_staffel]]
+# hierboven, met de RIONED-citaten. Geen scalaire drempel meer.
 # HGT-008: steiler dan een op zoveel is verdacht. Uit het checkregister: "steiler
 # dan bijv. 1:50".
 extreem_verhang_een_op = 50.0

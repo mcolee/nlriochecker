@@ -100,6 +100,20 @@ class PutTypeRule(BaseModel):
     toelichting: str = ""
 
 
+class VerhangStap(BaseModel):
+    """HGT-007: één trede van de verhangstaffel per diameter.
+
+    `tot_diameter_mm` is de bovengrens (inclusief) van de trede in millimeters;
+    `None` is de vangnettrede zonder bovengrens. `minimaal_verhang_een_op` is het
+    minimale afschot als noemer van 1:n, dus 250 betekent 1:250.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tot_diameter_mm: float | None = Field(default=None, gt=0.0)
+    minimaal_verhang_een_op: float = Field(gt=0.0)
+
+
 class CheckThresholds(BaseModel):
     """Configureerbare drempelwaarden van de checks."""
 
@@ -156,8 +170,6 @@ class CheckThresholds(BaseModel):
     # HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng.
     tegenverhang_licht_m: float = Field(default=0.01, gt=0.0)
     tegenverhang_fors_m: float = Field(default=0.05, gt=0.0)
-    # HGT-007: minimaal verhang per meter voor vuilwater en gemengd.
-    minimaal_verhang_promille: float = Field(default=1.0, gt=0.0)
     # HGT-008: steiler dan een op zoveel is verdacht.
     extreem_verhang_een_op: float = Field(default=50.0, gt=0.0)
     # HGT-009 en HGT-016: BOB-sprong waarboven een valconstructie verwacht wordt.
@@ -402,6 +414,9 @@ class CheckConfig(BaseModel):
     inwinning: InwinningOptions = Field(default_factory=InwinningOptions)
     vulwaarden: VulwaardeOptions = Field(default_factory=VulwaardeOptions)
     puttyperegels: list[PutTypeRule] = Field(default_factory=list)
+    # HGT-007: de RIONED-verhangstaffel per diameter. Leeg betekent dat HGT-007 niets
+    # toetst en dat in zijn toelichting zegt; de staffel hoort in checks.toml te staan.
+    verhang_staffel: list[VerhangStap] = Field(default_factory=list)
     bronnen: ExternalSources = Field(default_factory=ExternalSources)
     rapport: ReportOptions = Field(default_factory=ReportOptions)
 

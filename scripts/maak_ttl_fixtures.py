@@ -680,7 +680,9 @@ FIXTURES["attr012_metselwerk_rond.ttl"] = (
 # --- HGT ------------------------------------------------------------------
 #
 # Het schone hoogtebeeld: maaiveld 10,00 m NAP, deksel 10,00, puthoogte 1,50 m
-# (bodem dus 8,50) en een BOB die van 8,60 naar 8,55 daalt over 50 m.
+# (bodem dus 8,50) en een BOB die van 8,70 naar 8,50 daalt over 50 m: verhang 1:250,
+# ruim boven wat de RIONED-staffel bij 300 mm vraagt (1:500, issue #29). Het beginpunt
+# ligt hoog genoeg zodat de putbodem-BOB-relatie (HGT-015) ongemoeid blijft.
 
 C = (1100.0, 2000.0)
 
@@ -721,7 +723,7 @@ FIXTURES["hgt_schoon.ttl"] = (
     "geen; hoogten en verhang zijn onderling consistent",
     hoogteput("PutA", "A", A)
     + hoogteput("PutB", "B", B)
-    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.50)),
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.70, 8.50)),
 )
 
 FIXTURES["hgt004_bob_boven_deksel.ttl"] = (
