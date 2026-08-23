@@ -152,8 +152,18 @@ class CheckThresholds(BaseModel):
     eenheidsverdenking_diameter_mm: float = Field(default=100.0, gt=0.0)
     # ATTR-006: hoeveel de strengdiameter de putafmeting mag overschrijden.
     put_diameter_marge_mm: float = Field(default=0.0, ge=0.0)
-    # ATTR-007: geldig bereik voor het aanlegjaar.
-    aanlegjaar_minimum: int = Field(default=1870, ge=1)
+    # ATTR-007: geldig bereik voor de begindatum (aanlegdatum).
+    begindatum_minimum: int = Field(default=1870, ge=1)
+    # ATTR-007: bovengrens van de begindatum. None betekent het huidige jaar
+    # (`date.today().year`); een vast jaar maakt een run reproduceerbaar, los van
+    # wanneer hij draait.
+    begindatum_maximum: int | None = Field(default=None, ge=1)
+    # ATTR-015: signaalwaarde, geen norm. Draagt een enkel jaartal meer dan dit
+    # aandeel van de gedateerde objecten, dan ruikt dat naar een vulwaarde.
+    begindatum_vulwaarde_aandeel: float = Field(default=0.20, gt=0.0, le=1.0)
+    # ATTR-015: onder zoveel gedateerde objecten zegt een aandeel niets; dan zwijgt
+    # de detector.
+    begindatum_vulwaarde_minimum_objecten: int = Field(default=30, ge=1)
     # ATTR-008: aannemelijk bereik voor de strenglengte; de grenzen volgen het
     # GWSW-datatype Dt_LengteLeiding (1-75 m). Zie checks.toml en issue #35.
     minimale_strenglengte_m: float = Field(default=1.0, gt=0.0)

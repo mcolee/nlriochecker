@@ -73,6 +73,8 @@ DEFECTEN = [
     # ATTR-014 meldt per kenmerk, niet per object: een aggregaatbevinding met de
     # kenmerknaam als label. Zie de gerichte tests onderaan dit bestand.
     ("attr014_wibon_hasvalue.ttl", "ATTR-014", ["WIBONThema"]),
+    # ATTR-015 meldt systemisch per verdacht jaar; het label is het jaartal.
+    ("attr015_vulwaardejaar.ttl", "ATTR-015", ["1900"]),
     ("hgt004_bob_boven_deksel.ttl", "HGT-004", ["1"]),
     ("hgt005_tegenverhang_licht.ttl", "HGT-005", ["1"]),
     ("hgt006_tegenverhang_fors.ttl", "HGT-006", ["1"]),
@@ -691,6 +693,69 @@ def test_attr014_meldt_een_keer_per_kenmerk_met_de_aantallen() -> None:
         bevinding.message
     )
     assert "waarvan 1 met de vulwaarde 0" in bevinding.message
+
+
+def test_attr015_meldt_het_dominante_vulwaardejaar() -> None:
+    """16 van de 40 strengen op 1900 (40%) is een systemische melding op dat jaar.
+
+    Een aggregaat over de hele meetset: het jaartal is het label, er is geen los object,
+    en het aandeel staat in de boodschap en de details.
+    """
+    outcome = uitkomst("attr015_vulwaardejaar.ttl", "ATTR-015")
+    assert len(outcome.findings) == 1
+
+    bevinding = outcome.findings[0]
+    assert bevinding.object_label == "1900"
+    assert bevinding.systemisch is True
+    assert bevinding.object_uri == ""
+    assert bevinding.details["jaar"] == 1900
+    assert bevinding.details["aantal"] == 16
+    assert bevinding.details["aandeel_procent"] == pytest.approx(40.0)
+    assert outcome.examined == 40
+    assert "40.0% van de 40 gedateerde objecten" in bevinding.message
+    assert "vulwaarde" in bevinding.message
+
+
+def test_attr015_zwijgt_zonder_piek() -> None:
+    """Genoeg gedateerde strengen, maar geen enkel jaar overheerst: geen melding.
+
+    Dit is de test die bewijst dat de detector niet overgevoelig is -- hij vuurt niet
+    op een natuurlijke verdeling, en zegt in zijn toelichting wat het drukste jaar was.
+    """
+    outcome = uitkomst("attr015_geen_piek.ttl", "ATTR-015")
+
+    assert outcome.findings == []
+    assert any("drukste jaar" in note and "signaalwaarde" in note for note in outcome.notes), (
+        outcome.notes
+    )
+
+
+def test_attr015_zwijgt_bij_te_weinig_gedateerde_objecten() -> None:
+    """Onder het minimum zegt een aandeel niets; de detector zwijgt met een toelichting.
+
+    `attr_schoon.ttl` draagt maar een gedateerd object; zonder deze ondergrens zou dat
+    ene jaar 100% halen en vals aanslaan.
+    """
+    outcome = uitkomst("attr_schoon.ttl", "ATTR-015")
+
+    assert outcome.findings == []
+    assert any("te weinig" in note and "minimum van 30" in note for note in outcome.notes), (
+        outcome.notes
+    )
+
+
+def test_attr007_verantwoordt_de_objecten_zonder_begindatum() -> None:
+    """De putten zonder begindatum en het bredere dekkingsgat horen in de toelichting.
+
+    De fixture heeft twee putten zonder begindatum en een streng met een (te toekomstige)
+    datum; zonder deze toelichting leest ATTR-007 als "alle aanlegdatums gecontroleerd".
+    """
+    outcome = uitkomst("attr007_toekomstig_jaar.ttl", "ATTR-007")
+
+    assert any("2 van de 2 putten in deze toets" in note for note in outcome.notes), outcome.notes
+    assert any("meetset" in note and "geen begindatum" in note for note in outcome.notes), (
+        outcome.notes
+    )
 
 
 def test_attr014_zwijgt_bij_de_juiste_property() -> None:

@@ -295,8 +295,8 @@ class Conduit(_MetAspecten):
         return self.reference("VormLeiding")
 
     @property
-    def aanlegjaar(self) -> int | None:
-        """Het jaartal uit de begindatum."""
+    def begindatum_jaar(self) -> int | None:
+        """Het jaartal uit de begindatum (GWSW-kenmerk `Begindatum`)."""
         datum = self.date("Begindatum")
         return datum.year if datum is not None else None
 

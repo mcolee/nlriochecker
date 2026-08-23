@@ -241,9 +241,13 @@ eenheidsverdenking_diameter_mm = 100.0
 # ATTR-006: hoeveel de strengdiameter de putafmeting mag overschrijden.
 # Projectkeuze, geen externe bron.
 put_diameter_marge_mm = 0.0
-# ATTR-007: geldig bereik voor het aanlegjaar. Uit het checkregister: "in de
-# toekomst of voor 1870".
-aanlegjaar_minimum = 1870
+# ATTR-007: geldig bereik voor de begindatum (aanlegdatum). Uit het checkregister:
+# "in de toekomst of voor 1870".
+begindatum_minimum = 1870
+# ATTR-015: signaalwaarde voor een vulwaardejaar; De Wolden en Hoogeveen draait op
+# de standaard (hoogste natuurlijke piek 4,5%, ruim onder 20%).
+begindatum_vulwaarde_aandeel = 0.20
+begindatum_vulwaarde_minimum_objecten = 30
 # ATTR-008: aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
 # `Dt_LengteLeiding` declareert 1-75 m; GWSW is leidend (issue #35).
 minimale_strenglengte_m = 1.0

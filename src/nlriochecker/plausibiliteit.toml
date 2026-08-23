@@ -77,33 +77,33 @@ materiaal = "Staal"
 minimum_mm = 80
 maximum_mm = 2000
 
-# ATTR-003: materiaal past niet bij aanlegjaar (W, Plausibiliteit).
+# ATTR-003: materiaal past niet bij begindatum (W, Plausibiliteit).
 # Het register noemt PVC voor 1955 en PE voor 1970 als voorbeeld.
 
-[[materiaal_aanlegjaar]]
+[[materiaal_begindatum]]
 materiaal = "PVC"
 vanaf_jaar = 1955
 toelichting = "PVC-rioolbuis is in Nederland pas na 1955 toegepast."
 
-[[materiaal_aanlegjaar]]
+[[materiaal_begindatum]]
 materiaal = "PE"
 vanaf_jaar = 1970
 
-[[materiaal_aanlegjaar]]
+[[materiaal_begindatum]]
 materiaal = "Polypropyleen"
 vanaf_jaar = 1975
 
-[[materiaal_aanlegjaar]]
+[[materiaal_begindatum]]
 materiaal = "GewapendBeton"
 vanaf_jaar = 1920
 
-[[materiaal_aanlegjaar]]
+[[materiaal_begindatum]]
 materiaal = "Asbestcement"
 vanaf_jaar = 1930
 tot_jaar = 1993
 toelichting = "Asbestcement is sinds 1993 in Nederland verboden."
 
-[[materiaal_aanlegjaar]]
+[[materiaal_begindatum]]
 materiaal = "Metselwerk"
 tot_jaar = 1960
 toelichting = "Na 1960 is er in Nederland geen riool meer gemetseld."

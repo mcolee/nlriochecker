@@ -224,11 +224,11 @@ def _termen_uit_plausibiliteit() -> list[Term]:
                 "MateriaalLeidingColl",
             )
         )
-    for regel in tabellen.materiaal_aanlegjaar:
+    for regel in tabellen.materiaal_begindatum:
         termen.append(
             Term(
                 regel.materiaal,
-                "plausibiliteit.toml [[materiaal_aanlegjaar]]",
+                "plausibiliteit.toml [[materiaal_begindatum]]",
                 "MateriaalLeidingColl",
             )
         )
@@ -440,7 +440,7 @@ BRONSENTINELS: tuple[tuple[str, str], ...] = (
     ("configs/dewoldenhoogeveen.toml [inwinning]", "AHN4"),
     ("configs/dewoldenhoogeveen.toml [vulwaarden]", "Maaiveldhoogte"),
     ("plausibiliteit.toml [[materiaal_diameter]]", "Beton"),
-    ("plausibiliteit.toml [[materiaal_aanlegjaar]]", "PVC"),
+    ("plausibiliteit.toml [[materiaal_begindatum]]", "PVC"),
     ("plausibiliteit.toml [[materiaal_vorm]]", "PVC"),
     # Een naam die alleen aan de leidingkant staat: `PVC` en `PE` staan sinds issue #43
     # in `onwaarschijnlijke_putmaterialen` en zouden deze sentinel ook groen houden als

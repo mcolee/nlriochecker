@@ -520,7 +520,7 @@ FIXTURES["attr002_kleine_diameter.ttl"] = (
 )
 
 FIXTURES["attr003_pvc_te_vroeg.ttl"] = (
-    "streng 1 is PVC met aanlegjaar 1940; PVC bestaat pas vanaf 1955",
+    "streng 1 is PVC met begindatum 1940; PVC bestaat pas vanaf 1955",
     nette_put("PutA", "A", *A)
     + nette_put("PutB", "B", *B)
     + nette_leiding(
@@ -677,6 +677,35 @@ FIXTURES["attr012_metselwerk_rond.ttl"] = (
             "Begindatum": "1930-01-01",
         },
     ),
+)
+
+
+def _begindatum_reeks(jaren: list[int]) -> str:
+    """Een losse streng per jaartal, elk met een eigen begindatum en geometrie."""
+    return "".join(
+        nette_leiding(
+            f"L{i}",
+            str(i),
+            [(1000.0 + i * 10, 2000.0), (1000.0 + i * 10 + 5, 2000.0)],
+            None,
+            None,
+            velden={"Begindatum": f"{jaar}-01-01"},
+        )
+        for i, jaar in enumerate(jaren)
+    )
+
+
+# ATTR-015: 16 van de 40 strengen (40%) op begindatum 1900, ruim boven de signaaldrempel
+# van 20%; de overige 24 elk een eigen jaar, zodat alleen 1900 opvalt.
+FIXTURES["attr015_vulwaardejaar.ttl"] = (
+    "16 van de 40 strengen dragen begindatum 1900 (40%); dat ruikt naar een vulwaarde",
+    _begindatum_reeks([1900] * 16 + list(range(1980, 2004))),
+)
+
+# De tegenhanger: genoeg gedateerde strengen, maar geen enkel jaar overheerst.
+FIXTURES["attr015_geen_piek.ttl"] = (
+    "40 strengen met elk een eigen begindatumjaar; geen enkel jaar overheerst",
+    _begindatum_reeks(list(range(1964, 2004))),
 )
 
 # --- HGT ------------------------------------------------------------------

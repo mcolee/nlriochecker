@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Begindatumdekking en een detector voor een vulwaardejaar** (issue #21). ATTR-007
+  verantwoordt nu in zijn toelichting hoeveel strengen en putten geen begindatum dragen
+  en dus niet getoetst zijn -- stilte las eerder als "alle aanlegdatums gecontroleerd".
+  De nieuwe check **ATTR-015** (W, Compleetheid) meldt systemisch wanneer een enkel
+  jaartal een onevenredig deel van de begindatums draagt, een signaal voor een vuljaar;
+  de drempel (`begindatum_vulwaarde_aandeel`, standaard 20%) is een signaalwaarde en geen
+  norm, en op De Wolden en Hoogeveen meldt hij niets. De bovengrens van ATTR-007 is
+  instelbaar gemaakt (`begindatum_maximum`, standaard het huidige jaar) zodat een run
+  reproduceerbaar vast te zetten is.
+
 - **Vier wortelklassen een symbool, en een drifttest voor de lijnkant** (issue #55). De
   symbolentabel dekt nu ook de generieke wortelklassen: `Rioolput` (een cirkel in de
   puttenlaag) en `Rioolleiding`, `VrijvervalRioolleiding` en `Aansluitleiding` (het
@@ -86,6 +96,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `minimum_mm` 40 vs 63 mm) staan in een comment bij het issue.
 
 ### Gewijzigd
+
+- **"aanlegjaar" heet nu overal "begindatum"** (issue #21; breaking change voor
+  projectconfiguraties). De GWSW-term is leidend, ook in de identifiers: de drempelsleutel
+  `aanlegjaar_minimum` heet nu `begindatum_minimum`, de plausibiliteitstabel
+  `[[materiaal_aanlegjaar]]` heet `[[materiaal_begindatum]]`, `Conduit.aanlegjaar` heet
+  `Conduit.begindatum_jaar` en de bevindingsdetail `aanlegjaar` heet `begindatum_jaar`. Een
+  oude projectconfiguratie met de oude sleutels faalt luid (`extra="forbid"`). De check-ID's
+  ATTR-003 en ATTR-007 en hun ernst blijven; alleen hun titel verandert.
 
 - **De dekkingclaim van ADM-004 is beperkt tot de CFK waar hij op rust** (issue #7). De
   put-vormen `MateriaalPut` en `Maaiveldschematisering` (hasAspect exact=1) leveren op De

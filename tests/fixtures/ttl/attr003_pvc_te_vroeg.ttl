@@ -34,7 +34,7 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: streng 1 is PVC met aanlegjaar 1940; PVC bestaat pas vanaf 1955
+# DEFECT: streng 1 is PVC met begindatum 1940; PVC bestaat pas vanaf 1955
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .

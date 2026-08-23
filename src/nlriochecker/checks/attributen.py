@@ -1,6 +1,6 @@
 """ATTR-checks: plausibiliteit van de attribuutwaarden van strengen en putten.
 
-De plausibiliteitstabellen (materiaal versus diameter, aanlegjaar en profielvorm)
+De plausibiliteitstabellen (materiaal versus diameter, begindatum en profielvorm)
 staan in `plausibiliteit.toml`; deze module bevat alleen de redenering. Een
 materiaal dat niet in de tabel staat wordt niet getoetst, en elke check meldt in
 haar toelichting hoeveel strengen daardoor buiten beeld bleven.
@@ -222,21 +222,21 @@ class DiameterOnderMinimum(_StrengCheck):
 
 
 @register
-class MateriaalPastNietBijAanlegjaar(_StrengCheck):
-    """ATTR-003: een materiaal dat in het aanlegjaar nog niet of niet meer bestond."""
+class MateriaalPastNietBijBegindatum(_StrengCheck):
+    """ATTR-003: een materiaal dat op de begindatum nog niet of niet meer bestond."""
 
     id = "ATTR-003"
-    title = "Materiaal past niet bij aanlegjaar"
+    title = "Materiaal past niet bij begindatum"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Vergelijkt het aanlegjaar met het tijdvak waarin het materiaal bestond."""
+        """Vergelijkt het begindatumjaar met het tijdvak waarin het materiaal bestond."""
         tabel = context.plausibiliteit
 
         for conduit in vrijvervalrioolleidingen(context):
-            regel = tabel.aanlegjaar(conduit.materiaal)
-            jaar = conduit.aanlegjaar
+            regel = tabel.begindatum(conduit.materiaal)
+            jaar = conduit.begindatum_jaar
             if regel is None or jaar is None:
                 continue
             if regel.vanaf_jaar is not None and jaar < regel.vanaf_jaar:
@@ -250,33 +250,43 @@ class MateriaalPastNietBijAanlegjaar(_StrengCheck):
             context,
             conduit.uri,
             conduit.label,
-            f"Materiaal {conduit.materiaal} met aanlegjaar {jaar}, {kant} {grens}. "
+            f"Materiaal {conduit.materiaal} met begindatum {jaar}, {kant} {grens}. "
             f"{regel.toelichting}".strip(),
             materiaal=conduit.materiaal,
-            aanlegjaar=jaar,
+            begindatum_jaar=jaar,
             grensjaar=grens,
         )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen aanlegjaar of geen regel hebben."""
+        """Meldt hoeveel strengen geen begindatum of geen regel hebben, plus de renovatiegrens."""
         strengen = vrijvervalrioolleidingen(context)
-        zonder_jaar = sum(1 for conduit in strengen if conduit.aanlegjaar is None)
+        zonder_jaar = sum(1 for conduit in strengen if conduit.begindatum_jaar is None)
         zonder_regel = sum(
             1
             for conduit in strengen
-            if context.plausibiliteit.aanlegjaar(conduit.materiaal) is None
+            if context.plausibiliteit.begindatum(conduit.materiaal) is None
         )
         notities = []
         if zonder_jaar:
             notities.append(
                 f"{zonder_jaar} van de {len(strengen)} strengen hebben geen begindatum en "
-                "zijn niet op aanlegjaar getoetst."
+                "zijn niet op begindatum getoetst."
             )
         if zonder_regel:
             notities.append(
                 f"{zonder_regel} strengen hebben een materiaal zonder tijdvakregel in "
                 "`plausibiliteit.toml`."
             )
+        # De grens van wat deze check kan weten: GWSW legt een ingreep vast met een eigen
+        # `DatumMaatregel`, terwijl `Begindatum` de oorspronkelijke aanleg blijft. Is bij
+        # een renovatie het materiaal bijgewerkt en de begindatum niet -- en draagt de
+        # export geen `DatumMaatregel` -- dan is zo'n bevinding niet te onderscheiden van
+        # een echte fout (issue #21).
+        notities.append(
+            "Een bevinding kan ook een gerenoveerd riool zijn waarvan het materiaal is "
+            "bijgewerkt maar de begindatum niet; zonder `DatumMaatregel` in de export is "
+            "dat niet van een echte fout te onderscheiden."
+        )
         return notities
 
 
@@ -465,18 +475,23 @@ class DiameterGroterDanPut(_StrengCheck):
 
 
 @register
-class AanlegjaarBuitenBereik(_StrengCheck):
-    """ATTR-007: een aanlegjaar in de toekomst of voor het riooltijdperk."""
+class BegindatumBuitenBereik(_StrengCheck):
+    """ATTR-007: een begindatum in de toekomst of voor het riooltijdperk."""
 
     id = "ATTR-007"
-    title = "Aanlegjaar in de toekomst of voor 1870"
+    title = "Begindatum in de toekomst of voor 1870"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst het aanlegjaar van strengen en putten op een aannemelijk bereik."""
-        minimum = context.config.drempels.aanlegjaar_minimum
-        dit_jaar = date.today().year
+        """Toetst de begindatum van strengen en putten op een aannemelijk bereik."""
+        drempels = context.config.drempels
+        minimum = drempels.begindatum_minimum
+        maximum = (
+            drempels.begindatum_maximum
+            if drempels.begindatum_maximum is not None
+            else date.today().year
+        )
 
         alle_putten = putten(context)
         alles: list[Node | Conduit] = [*vrijvervalrioolleidingen(context), *alle_putten]
@@ -484,23 +499,149 @@ class AanlegjaarBuitenBereik(_StrengCheck):
             datum = object_.date("Begindatum")
             if datum is None:
                 continue
-            if minimum <= datum.year <= dit_jaar:
+            if minimum <= datum.year <= maximum:
                 continue
             kant = "voor" if datum.year < minimum else "na"
-            grens = minimum if datum.year < minimum else dit_jaar
+            grens = minimum if datum.year < minimum else maximum
             yield self.finding(
                 context,
                 object_.uri,
                 object_.label,
                 f"Begindatum {datum.isoformat()} ligt {kant} {grens}.",
-                aanlegjaar=datum.year,
+                begindatum_jaar=datum.year,
                 grensjaar=grens,
             )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de objecten zonder begindatum, uitgesplitst naar strengen en putten.
+
+        Geen melding en geen drempel: een grens voor "te weinig gedateerd" hebben we
+        niet en zouden we verzinnen. Zonder deze regel leest een schone ATTR-007 als
+        "alle aanlegdatums gecontroleerd", terwijl een groot deel van de objecten er
+        geen draagt (issue #21). De tweede regel telt de hele meetset -- ook de objecten
+        die ATTR-007 niet toetst (persleidingen, drains, niet-put-knopen) -- want het gat
+        in de aanlevering is breder dan wat deze check aanraakt.
+        """
+        strengen = vrijvervalrioolleidingen(context)
+        alle_putten = putten(context)
+        zonder_streng = sum(1 for conduit in strengen if conduit.date("Begindatum") is None)
+        zonder_put = sum(1 for node in alle_putten if node.date("Begindatum") is None)
+
+        objecten = [*context.dataset.nodes.values(), *context.dataset.conduits.values()]
+        zonder_totaal = sum(1 for object_ in objecten if object_.date("Begindatum") is None)
+        totaal = len(objecten)
+
+        notities = []
+        if zonder_streng or zonder_put:
+            notities.append(
+                f"{zonder_streng} van de {len(strengen)} strengen en {zonder_put} van de "
+                f"{len(alle_putten)} putten in deze toets dragen geen begindatum en zijn niet "
+                "getoetst."
+            )
+        if zonder_totaal and totaal:
+            notities.append(
+                f"In deze meetset hebben {zonder_totaal} van de {totaal} objecten "
+                f"({zonder_totaal / totaal * 100:.1f}%) geen begindatum; daarin tellen ook de "
+                "objecten buiten deze toets mee (persleidingen, drains, niet-put-knopen)."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen plus putten."""
         alle_putten = putten(context)
         return len(vrijvervalrioolleidingen(context)) + len(alle_putten)
+
+
+@register
+class BegindatumVulwaardejaar(Check):
+    """ATTR-015: een enkel jaartal draagt een onevenredig deel van de begindatums.
+
+    Een export die een ontbrekende aanlegdatum met een vast vuljaar opvult (bijvoorbeeld
+    1900 op alle strengen) laat dat zien als een piek in de verdeling. Dit is een
+    signaaldetector, geen norm: hij meldt per verdacht jaar een keer, systemisch over de
+    hele meetset, en zwijgt bij een natuurlijke verdeling of bij te weinig gedateerde
+    objecten. Op De Wolden en Hoogeveen meldt hij niets -- de hoogste piek is daar 4,5%
+    -- en dat is een geldige uitkomst, geen mislukking (issue #21).
+    """
+
+    id = "ATTR-015"
+    title = "Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde)"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    id_sleutels = ("jaar",)
+    # Een vulwaardejaar is een eigenschap van de hele export, niet van een studiegebied:
+    # net als ATTR-014 rekent deze detector daarom over de volledige export, zodat het
+    # aandeel niet per gebied verschilt.
+    volledig_bereik = True
+
+    def _jaren(self, context: CheckContext) -> Counter[int]:
+        """Telt per jaartal de gedateerde strengen en putten samen (een keer per context)."""
+
+        def bouw() -> Counter[int]:
+            objecten: list[Node | Conduit] = [*vrijvervalrioolleidingen(context), *putten(context)]
+            teller: Counter[int] = Counter()
+            for object_ in objecten:
+                datum = object_.date("Begindatum")
+                if datum is not None:
+                    teller[datum.year] += 1
+            return teller
+
+        return context.cached("attr015:jaren", bouw)
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt per jaartal boven de signaaldrempel een systemische aggregaatbevinding."""
+        drempels = context.config.drempels
+        teller = self._jaren(context)
+        totaal = sum(teller.values())
+        if totaal < drempels.begindatum_vulwaarde_minimum_objecten:
+            return
+        drempel = drempels.begindatum_vulwaarde_aandeel
+        for jaar, aantal in sorted(teller.items()):
+            aandeel = aantal / totaal
+            if aandeel <= drempel:
+                continue
+            yield Finding(
+                check_id=self.id,
+                severity=self.severity,
+                dimension=self.dimension,
+                object_uri="",
+                object_label=str(jaar),
+                message=(
+                    f"Begindatum {jaar} draagt {aandeel * 100:.1f}% van de {totaal} gedateerde "
+                    f"objecten ({aantal}); boven de signaaldrempel van {drempel * 100:g}% en "
+                    "mogelijk een vulwaarde in plaats van een echte aanlegdatum."
+                ),
+                typing_reliable=True,
+                details={
+                    "jaar": jaar,
+                    "aandeel_procent": round(aandeel * 100, 1),
+                    "aantal": aantal,
+                },
+                systemisch=True,
+            )
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal gedateerde objecten (strengen plus putten met een begindatum)."""
+        return sum(self._jaren(context).values())
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Zegt waartegen getoetst is, of dat er te weinig gedateerde objecten zijn."""
+        drempels = context.config.drempels
+        teller = self._jaren(context)
+        totaal = sum(teller.values())
+        minimum = drempels.begindatum_vulwaarde_minimum_objecten
+        if totaal < minimum:
+            return [
+                f"Slechts {totaal} gedateerde objecten (minder dan het minimum van {minimum}); "
+                "te weinig om een vulwaardepatroon in de begindatums vast te stellen."
+            ]
+        drempel_pct = drempels.begindatum_vulwaarde_aandeel * 100
+        jaar, aantal = teller.most_common(1)[0]
+        return [
+            f"Getoetst of een enkel jaartal meer dan {drempel_pct:g}% van de {totaal} "
+            "gedateerde objecten draagt (signaalwaarde, geen norm). Het drukste jaar is "
+            f"{jaar} met {aantal / totaal * 100:.1f}%."
+        ]
 
 
 @register

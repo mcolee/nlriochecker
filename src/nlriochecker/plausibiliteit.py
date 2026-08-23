@@ -1,6 +1,6 @@
 """Inlezen van de plausibiliteitstabellen voor de ATTR-checks.
 
-De tabellen materiaal-versus-diameter, materiaal-versus-aanlegjaar,
+De tabellen materiaal-versus-diameter, materiaal-versus-begindatum,
 materiaal-versus-profielvorm en leidingmateriaal-versus-putmateriaal staan in een
 apart TOML-bestand. Het zijn vakinhoudelijke aannames die per project verschillen
 (een gemeente met veel oud metselwerk hanteert andere grenzen dan een nieuwbouwkern),
@@ -86,7 +86,7 @@ class PlausibilityTables(BaseModel):
 
     bron: str = ""
     materiaal_diameter: list[MaterialDiameter] = Field(default_factory=list)
-    materiaal_aanlegjaar: list[MaterialYear] = Field(default_factory=list)
+    materiaal_begindatum: list[MaterialYear] = Field(default_factory=list)
     materiaal_vorm: list[MaterialShape] = Field(default_factory=list)
     leiding_put_materiaal: list[ConduitManholeMaterial] = Field(default_factory=list)
     vorm_afmeting: list[ShapeDimensions] = Field(default_factory=list)
@@ -96,9 +96,9 @@ class PlausibilityTables(BaseModel):
         """De diameterregel voor dit materiaal, of None."""
         return _zoek(self.materiaal_diameter, "materiaal", materiaal)
 
-    def aanlegjaar(self, materiaal: str | None) -> MaterialYear | None:
-        """De aanlegjaarregel voor dit materiaal, of None."""
-        return _zoek(self.materiaal_aanlegjaar, "materiaal", materiaal)
+    def begindatum(self, materiaal: str | None) -> MaterialYear | None:
+        """De begindatumregel (tijdvak) voor dit materiaal, of None."""
+        return _zoek(self.materiaal_begindatum, "materiaal", materiaal)
 
     def vorm(self, materiaal: str | None) -> MaterialShape | None:
         """De profielvormregel voor dit materiaal, of None."""

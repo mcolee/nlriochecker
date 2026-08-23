@@ -8,13 +8,13 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | ---: | ---: | ---: | ---: | ---: |
 | TOP | 21 | 21 | 0 | 0 | 0 |
 | ADM | 9 | 6 | 0 | 0 | 3 |
-| ATTR | 14 | 13 | 0 | 0 | 1 |
+| ATTR | 15 | 14 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 8 | 8 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **94** | **90** | **0** | **0** | **4** |
+| **totaal** | **95** | **91** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -62,11 +62,11 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | --- | --- | --- | --- | --- |
 | ATTR-001 | Diameter past niet bij materiaal | F | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-002 | Diameter kleiner dan rond 200 mm (de nulmeting toetst alleen de extreme ondergrens van 63 mm) | W | Plausibiliteit | geimplementeerd met test | — |
-| ATTR-003 | Materiaal past niet bij aanlegjaar (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit | geimplementeerd met test | — |
+| ATTR-003 | Materiaal past niet bij begindatum (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-004 | Vorm versus afmetingen inconsistent (eivorm zonder hoogte, rond met breedte ongelijk hoogte); NB het MDSTOP-deelmodel dwingt de aanwezigheid van bree… | F | Consistentie | geimplementeerd met test | — |
 | ATTR-005 | Eenhedenfouten die binnen de GWSW-waardebereiken vallen (bijv. diameter 300 genoteerd in cm); fouten buiten bereik dekt de nulmeting | F | Nauwkeurigheid | geimplementeerd met test | — |
 | ATTR-006 | Strengdiameter groter dan afmeting van de aangesloten put | W | Plausibiliteit | geimplementeerd met test | — |
-| ATTR-007 | Aanlegjaar in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit | geimplementeerd met test | — |
+| ATTR-007 | Begindatum in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-008 | Strenglengte korter dan X m of langer dan X m | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-009 | Geometrische lengte wijkt meer dan X% af van administratieve lengte | W | Consistentie | geimplementeerd met test | — |
 | ATTR-010 | Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past | W | Plausibiliteit | geimplementeerd met test | — |
@@ -74,6 +74,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ATTR-012 | Materiaal past niet bij profielvorm (bijv. metselwerk met rond profiel in plaats van ei- of muilprofiel) | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-013 | Hoogtekenmerk (BOB, maaiveldhoogte, putdekselniveau) op een vulwaarde rond 0 m NAP dat als meting geregistreerd staat; de band en de kenmerken zijn p… | W | Compleetheid | geimplementeerd met test | — |
 | ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmetin… | F | Consistentie | geimplementeerd met test | — |
+| ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum… | W | Compleetheid | geimplementeerd met test | — |
 
 ## HGT
 

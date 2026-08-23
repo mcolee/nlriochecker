@@ -75,17 +75,18 @@ gebreken" leest.
 |---|---|---|---|
 | ATTR-001 | Diameter past niet bij materiaal | F | Plausibiliteit |
 | ATTR-002 | Diameter kleiner dan rond 200 mm (de nulmeting toetst alleen de extreme ondergrens van 63 mm) | W | Plausibiliteit |
-| ATTR-003 | Materiaal past niet bij aanlegjaar (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit |
+| ATTR-003 | Materiaal past niet bij begindatum (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit |
 | ATTR-004 | Vorm versus afmetingen inconsistent (eivorm zonder hoogte, rond met breedte ongelijk hoogte); NB het MDSTOP-deelmodel dwingt de aanwezigheid van breedte en hoogte per leiding af (someValuesFrom in de Top-laag), Hyd verplicht breedte exact=1; de consistentietoets vorm versus afmetingen doet geen van beide | F | Consistentie |
 | ATTR-005 | Eenhedenfouten die binnen de GWSW-waardebereiken vallen (bijv. diameter 300 genoteerd in cm); fouten buiten bereik dekt de nulmeting | F | Nauwkeurigheid |
 | ATTR-006 | Strengdiameter groter dan afmeting van de aangesloten put | W | Plausibiliteit |
-| ATTR-007 | Aanlegjaar in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit |
+| ATTR-007 | Begindatum in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit |
 | ATTR-008 | Strenglengte korter dan X m of langer dan X m | W | Plausibiliteit |
 | ATTR-009 | Geometrische lengte wijkt meer dan X% af van administratieve lengte | W | Consistentie |
 | ATTR-010 | Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past | W | Plausibiliteit |
 | ATTR-012 | Materiaal past niet bij profielvorm (bijv. metselwerk met rond profiel in plaats van ei- of muilprofiel) | W | Plausibiliteit |
 | ATTR-013 | Hoogtekenmerk (BOB, maaiveldhoogte, putdekselniveau) op een vulwaarde rond 0 m NAP dat als meting geregistreerd staat; de band en de kenmerken zijn projectconfiguratie (`[vulwaarden]`), de leesregel zet het kenmerk op ontbrekend en de hoogtechecks slaan het object over | W | Compleetheid |
 | ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmeting per constructie mist (issue #37). Generiek over alle kenmerktypen, uit de ontologische `owl:onProperty`/`owl:allValuesFrom`-keten; een systemische melding per kenmerk, niet per object | F | Consistentie |
+| ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum_vulwaarde_aandeel`); een systemische melding per verdacht jaar, zwijgt bij een natuurlijke verdeling of bij te weinig gedateerde objecten (issue #21) | W | Compleetheid |
 
 ## HGT: Hoogten en verhang
 
@@ -213,6 +214,17 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-23): ATTR-015 toegevoegd (W, Compleetheid): een systemische
+melding wanneer een enkel jaartal een onevenredig deel van de begindatums draagt -- een
+signaaldetector voor een vulwaardejaar, met een instelbare drempel
+(`begindatum_vulwaarde_aandeel`) en geen norm; op De Wolden en Hoogeveen meldt hij niets.
+ATTR-003 en ATTR-007 zijn hernoemd van "aanlegjaar" naar "begindatum" (de GWSW-term is
+leidend, ook in de titels en de identifiers); het check-ID en de ernst blijven. ATTR-007
+verantwoordt nu in zijn toelichting hoeveel objecten geen begindatum dragen en dus niet
+getoetst zijn, en zijn bovengrens is instelbaar (`begindatum_maximum`, standaard het huidige
+jaar) zodat een run reproduceerbaar te maken is. Zie
+[#21](https://github.com/mcolee/nlriochecker/issues/21).
 
 Versie 0.9, addendum (2026-08-23): geen checks toegevoegd, geschrapt of van ernst of
 dimensie veranderd; het contract is ongewijzigd. Redactioneel: de dekkingclaim van ADM-004
