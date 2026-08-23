@@ -136,6 +136,54 @@ def test_ontbrekende_laag_raakt_de_poort_niet(tmp_path: Path) -> None:
     assert any("bgt_water" in ontbreekt for ontbreekt in data.missing)
 
 
+def test_lege_rollijst_op_eenlaags_bestand_zet_de_rol_uit(tmp_path: Path) -> None:
+    """Een lege rollijst betekent 'uit', ook als het bestand precies een laag heeft.
+
+    Vroeger koos de terugval `beschikbaar[:1]` alsnog de enige laag, waardoor drie
+    uitgezette rollen als de pand-laag gelezen werden en de dekkingspoort ze noemde.
+    Zie issue #53.
+    """
+    bronnen = _bronnen(tmp_path / "b", [box(-10, -10, 110, 110)])
+
+    data = load_external_data(bronnen, tmp_path / "b", dekkingseis=Dekkingseis(0.0, 0.0))
+
+    assert data.layer("bgt_pand") is not None
+    for rol in ("bgt_water", "bgt_putdeksel", "bgt_bouwwerk"):
+        assert data.layer(rol) is None
+        assert any(rol in ontbreekt for ontbreekt in data.missing)
+
+
+def test_eenlaags_bron_zonder_rolconfig_wordt_wel_gelezen(tmp_path: Path) -> None:
+    """bag_pand/nwb_wegvak dragen nooit een laagnaam en pakken de enige laag."""
+    map_pad = tmp_path / "b"
+    bronnen = _bronnen(map_pad, [box(-10, -10, 110, 110)])
+    schrijf_vlakken(
+        map_pad / "bag.gpkg",
+        "output",
+        [({"lokaal_id": "pand1"}, box(-10, -10, 110, 110))],
+    )
+    bronnen = bronnen.model_copy(update={"bag_pand": "bag.gpkg"})
+
+    data = load_external_data(bronnen, map_pad, dekkingseis=Dekkingseis(0.0, 0.0))
+
+    assert data.layer("bag_pand") is not None
+
+
+def test_eenlaags_bron_met_meer_lagen_wordt_niet_gegokt(tmp_path: Path) -> None:
+    """Ook een `enige_laag`-rol gokt niet: bij meer dan een laag gaat hij naar `missing`."""
+    map_pad = tmp_path / "b"
+    bronnen = _bronnen(map_pad, [box(-10, -10, 110, 110)])
+    dek = box(-10, -10, 110, 110)
+    schrijf_vlakken(map_pad / "bag.gpkg", "output", [({"lokaal_id": "a"}, dek)])
+    schrijf_vlakken(map_pad / "bag.gpkg", "extra", [({"lokaal_id": "b"}, dek)])
+    bronnen = bronnen.model_copy(update={"bag_pand": "bag.gpkg"})
+
+    data = load_external_data(bronnen, map_pad, dekkingseis=Dekkingseis(0.0, 0.0))
+
+    assert data.layer("bag_pand") is None
+    assert any("bag_pand" in ontbreekt for ontbreekt in data.missing)
+
+
 def test_zonder_dekkingseis_geen_poort(tmp_path: Path) -> None:
     """Een beller die de eis niet kent, krijgt geen verzonnen oordeel."""
     bronnen = _bronnen(tmp_path / "b", [box(10, 10, 90, 90)])

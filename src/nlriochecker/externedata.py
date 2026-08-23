@@ -177,7 +177,7 @@ def load_external_data(
             lagen[rol] = laag
 
     for rol, bestand in (("bag_pand", bronnen.bag_pand), ("nwb_wegvak", bronnen.nwb_wegvakken)):
-        laag = _lees_rol(map_pad, bestand, rol, [], ontbrekend, notities)
+        laag = _lees_rol(map_pad, bestand, rol, [], ontbrekend, notities, enige_laag=True)
         if laag is not None:
             lagen[rol] = laag
 
@@ -347,8 +347,16 @@ def _lees_rol(
     laagnamen: list[str],
     ontbrekend: list[str],
     notities: list[str],
+    *,
+    enige_laag: bool = False,
 ) -> VectorLayer | None:
-    """Leest de lagen die een rol vervullen en voegt ze samen tot een laag."""
+    """Leest de lagen die een rol vervullen en voegt ze samen tot een laag.
+
+    `enige_laag` scheidt de twee aanroepplekken: `bag_pand`/`nwb_wegvak` leveren een
+    eenlaagsbestand aan en pakken de enige laag, ook zonder laagnaam. De BGT-rollen
+    dragen hun laagnaam per rol; daar is een lege lijst een uitschakeling en wordt de
+    rol niet gelezen -- ongeacht het aantal lagen. Zie issue #53.
+    """
     if bestand is None:
         ontbrekend.append(rol)
         return None
@@ -358,14 +366,20 @@ def _lees_rol(
         return None
 
     beschikbaar = _laagnamen(pad)
-    if not laagnamen and len(beschikbaar) > 1:
-        # Een bestand met meerdere lagen zonder rolconfiguratie: gokken welke laag
-        # bedoeld is levert stille onzin op (de eerste BGT-laag is `bak`).
-        ontbrekend.append(
-            f"{rol} ({pad.name} heeft {len(beschikbaar)} lagen en er is geen laagnaam "
-            f"geconfigureerd voor deze rol)"
-        )
-        return None
+    if not laagnamen:
+        if not enige_laag:
+            # Een rol zonder laagnaam is uitgezet of niet ingevuld; hem alsnog aan de
+            # enige laag koppelen is dezelfde gok die we bij meerdere lagen afwijzen.
+            ontbrekend.append(f"{rol} (geen laagnaam geconfigureerd voor deze rol)")
+            return None
+        if len(beschikbaar) > 1:
+            # Een eenlaagsbron met meer dan een laag: gokken welke bedoeld is levert
+            # stille onzin op (de eerste BGT-laag is `bak`).
+            ontbrekend.append(
+                f"{rol} ({pad.name} heeft {len(beschikbaar)} lagen en er is geen laagnaam "
+                f"geconfigureerd voor deze rol)"
+            )
+            return None
     gekozen = laagnamen or beschikbaar[:1]
     bestaan = [naam for naam in gekozen if naam in beschikbaar]
     if not bestaan:

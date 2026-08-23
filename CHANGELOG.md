@@ -24,6 +24,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Een lege rollijst zet een externe-bron-rol altijd uit, ook bij een eenlaagsbestand**
+  (issue #53). `_lees_rol` koos de terugval `beschikbaar[:1]` voorheen alsnog wanneer een
+  BGT-rol met `bgt_...lagen = []` naar een bestand met precies een laag wees, waardoor een
+  uitgezette rol tóch gelezen werd en de dekkingspoort hem noemde. De terugval hoort alleen
+  bij de eenlaagsbronnen `bag_pand`/`nwb_wegvak` (nieuwe parameter `enige_laag`); voor de
+  BGT-rollen is een lege lijst nu onvoorwaardelijk "niet gelezen". Op De Wolden verandert
+  geen uitkomst of aantal bevindingen (`BGT.gpkg` heeft 48 lagen), alleen de meldingstekst
+  voor die uitgezette rollen wordt korter ("geen laagnaam geconfigureerd" zonder het
+  misleidende laagaantal).
 - **ATTR-001, ATTR-004 en ATTR-012 splitsen de ongetoetste strengen naar reden** (issue
   #19). Het ene getal "materiaal zonder regel (of geen materiaal)" viel twee verschillende
   problemen samen: een gat in de aanlevering (geen attribuut) en een gat in
