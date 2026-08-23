@@ -179,6 +179,11 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   merge je `dev` in `main` en draai je daar `scripts/uitgave.py` -- in die volgorde,
   want het script eist `main` (`TAKVOORWAARDE`) en breekt af op elke andere tak. Zet
   `dev` daarna weer gelijk aan `main`, anders mist hij de bumpcommit.
+- Eén sessie = één issue, en het issue is de enige plek waar de voortgang staat. Eindig je
+  een issue niet af, zet dan een comment met de echte toestand: wat gecommit is en wat de
+  poort nog mist. Beweer nooit "klaar/gepusht" als het dat niet is, en laat geen half
+  bewerkt bestand achter zonder die comment -- anders herontdekt de volgende sessie het gat
+  (of doet werk over dat al gedaan was). Zie `docs/agents/issue-tracker.md`.
 - Kleine stappen; na elke werkende stap een commit. De **mechanische poort** --
   `uv run ruff check` en `uv run ruff format`, `uv run mypy`, `uv run pytest` (zonder
   `zwaar`) -- draait bij elke commit die `src/**.py` raakt. Kies daarbovenop de review
@@ -211,6 +216,12 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
     JSON-contract;
   - GeoPackage/QGIS: objectlagen, `status` en popup, stijlen, EXT-lagen, brondekking;
   - cache en het voortgangsprotocol, en de PyQGIS-test.
+- **`docs/agents/analyse-harness.md`** verzamelt de vaste feiten voor een De Wolden-analyse:
+  de dataset-/config-/registry-API voor scratch-scripts, de verrassende maar correcte
+  aantallen (ATTR-001 vrijverval-subset, HGT-012 nul `HoogtePut`), de gegenereerde bestanden
+  die je nooit met de hand bewerkt, en het drempelrecept over vijf gekoppelde plekken. Lees
+  het vóór je zelf een telling of een scratch-script tegen de dataset schrijft -- het
+  bespaart de ~4-min/3-GB herlaadronde op een verkeerde gok.
 - Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
   `gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
   niemand een openstaand punt in twee toestanden aantreft.

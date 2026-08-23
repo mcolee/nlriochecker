@@ -12,5 +12,11 @@
         "repo": "karanb192/claude-code-hooks"
       }
     }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff check *)",
+      "Bash(uv run mypy *)"
+    ]
   }
 }
