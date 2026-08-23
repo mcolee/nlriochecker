@@ -137,8 +137,10 @@ class Afvoer:
 
     `eindpunt` is de URI van het dichtstbijzijnde uitstroompunt, `stappen` het aantal
     strengen in het pad ernaartoe (0 voor het uitstroompunt zelf), en `meters` de
-    padlengte langs de getekende lijnen. `meters` is None zodra een streng op het pad
-    geen bruikbare lijngeometrie heeft: de stap telt dan wel mee, maar de lengte niet.
+    padlengte langs de getekende lijnen van het gekozen pad. `meters` is None zodra een
+    streng op dat pad geen bruikbare lijngeometrie heeft: de stap telt dan wel mee, maar
+    de lengte niet. `meters` slaat op het gekozen pad, niet op "enig kortste pad": ligt
+    er een tweede even kort pad zonder dat gat, dan telt dat hier niet mee.
     """
 
     eindpunt: str
@@ -239,13 +241,27 @@ def _lijnlengte(conduit: Conduit) -> float | None:
     return None
 
 
+def _netwerkstrengen(context: CheckContext) -> frozenset[str]:
+    """De URI's van de aangesloten vrijvervalstrengen in de graaf; een keer per context."""
+    return context.cached(
+        "netwerkstrengen", lambda: frozenset(c.uri for c in _netwerk(context).conduits)
+    )
+
+
 def afvoerpad_van_streng(context: CheckContext, conduit: Conduit) -> Afvoer | None:
     """Het afvoerpad van een streng: de streng zelf plus het pad vanaf haar eindpunt.
 
-    None als de streng geen herleidbaar eindpunt heeft of vanaf daar geen uitstroompunt
-    bereikt. De streng telt als eerste stap; haar eigen lengte telt bij de meters, en
-    ontbreekt die (geen bruikbare lijngeometrie) dan valt de hele padlengte weg.
+    Alleen voor aangesloten vrijvervalstrengen: een afvoerpad is een vrijverval-begrip.
+    Mechanisch riool (persleidingen) en strengen die niet aan beide zijden op een put
+    uitkomen, horen er niet in en leveren None -- ook al komen ze op een uitstroompunt
+    uit, gepompt riool is geen vrijverval-afvoerpad.
+
+    Verder None als de streng geen herleidbaar eindpunt heeft of vanaf daar geen
+    uitstroompunt bereikt. De streng telt als eerste stap; haar eigen lengte telt bij de
+    meters, en ontbreekt die (geen bruikbare lijngeometrie) dan valt de hele padlengte weg.
     """
+    if conduit.uri not in _netwerkstrengen(context):
+        return None
     dataset = context.dataset
     wortels = context.config.klassen.netwerkknopen
     eind = dataset.resolve_network_node(conduit.end_node, wortels)

@@ -543,11 +543,21 @@ FIXTURES["attr002_stelseltype.ttl"] = (
     + nette_put("PutB", "B", *B)
     + nette_put("PutC", "C", *C)
     + nette_leiding(
-        "G", "G", [A, B], "PutA", "PutB", klasse="GemengdRiool",
+        "G",
+        "G",
+        [A, B],
+        "PutA",
+        "PutB",
+        klasse="GemengdRiool",
         velden={"BreedteLeiding": 220, "HoogteLeiding": 220},
     )
     + nette_leiding(
-        "V", "V", [B, C], "PutB", "PutC", klasse="Vuilwaterriool",
+        "V",
+        "V",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
         velden={"BreedteLeiding": 220, "HoogteLeiding": 220},
     ),
 )
@@ -562,20 +572,48 @@ FIXTURES["attr001_diameterbesluit.ttl"] = (
     + nette_put("PutD", "D", *D)
     + nette_put("PutE", "E", *E)
     + nette_leiding(
-        "PP", "PP", [A, B], "PutA", "PutB", klasse="Vuilwaterriool",
+        "PP",
+        "PP",
+        [A, B],
+        "PutA",
+        "PutB",
+        klasse="Vuilwaterriool",
         velden={"BreedteLeiding": 80, "HoogteLeiding": 80, "MateriaalLeiding_ref": "Polypropyleen"},
     )
     + nette_leiding(
-        "GB", "GB", [B, C], "PutB", "PutC", klasse="Vuilwaterriool",
-        velden={"BreedteLeiding": 300, "HoogteLeiding": 300, "MateriaalLeiding_ref": "GewapendBeton"},
+        "GB",
+        "GB",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        velden={
+            "BreedteLeiding": 300,
+            "HoogteLeiding": 300,
+            "MateriaalLeiding_ref": "GewapendBeton",
+        },
     )
     + nette_leiding(
-        "GR", "GR", [C, D], "PutC", "PutD", klasse="Vuilwaterriool",
+        "GR",
+        "GR",
+        [C, D],
+        "PutC",
+        "PutD",
+        klasse="Vuilwaterriool",
         velden={"BreedteLeiding": 1200, "HoogteLeiding": 1200, "MateriaalLeiding_ref": "Gres"},
     )
     + nette_leiding(
-        "AC", "AC", [D, E], "PutD", "PutE", klasse="Vuilwaterriool",
-        velden={"BreedteLeiding": 1500, "HoogteLeiding": 1500, "MateriaalLeiding_ref": "Asbestcement"},
+        "AC",
+        "AC",
+        [D, E],
+        "PutD",
+        "PutE",
+        klasse="Vuilwaterriool",
+        velden={
+            "BreedteLeiding": 1500,
+            "HoogteLeiding": 1500,
+            "MateriaalLeiding_ref": "Asbestcement",
+        },
     ),
 )
 
@@ -587,15 +625,30 @@ FIXTURES["attr003_begindatum_besluit.ttl"] = (
     + nette_put("PutC", "C", *C)
     + nette_put("PutD", "D", *D)
     + nette_leiding(
-        "PVC56", "PVC56", [A, B], "PutA", "PutB", klasse="Vuilwaterriool",
+        "PVC56",
+        "PVC56",
+        [A, B],
+        "PutA",
+        "PutB",
+        klasse="Vuilwaterriool",
         velden={"MateriaalLeiding_ref": "PVC", "Begindatum": "1956-01-01"},
     )
     + nette_leiding(
-        "PE65", "PE65", [B, C], "PutB", "PutC", klasse="Vuilwaterriool",
+        "PE65",
+        "PE65",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
         velden={"MateriaalLeiding_ref": "PE", "Begindatum": "1965-01-01"},
     )
     + nette_leiding(
-        "GB15", "GB15", [C, D], "PutC", "PutD", klasse="Vuilwaterriool",
+        "GB15",
+        "GB15",
+        [C, D],
+        "PutC",
+        "PutD",
+        klasse="Vuilwaterriool",
         velden={
             "BreedteLeiding": 400,
             "HoogteLeiding": 400,
@@ -1137,6 +1190,40 @@ FIXTURES["net_afvoerpad_zonder_lijn.ttl"] = (
     put("PutA", "A", 1000.0, 2000.0)
     + gemaal("Gem", "G", (1050.0, 2000.0))
     + leiding("L1", "1", [(1000.0, 2000.0)], "PutA", "Gem"),
+)
+
+# NET (#18, fase 1): put A bereikt twee gemalen in evenveel stappen. Het dichtstbijzijnde
+# in stappen is een gelijkspel, dus wint de kleinste URI (GemA < GemB) -- het determinisme.
+FIXTURES["net_afvoerpad_twee_eindpunten.ttl"] = (
+    "geen; put A bereikt gemaal A en gemaal B beide in een stap",
+    put("PutA", "A", 1000.0, 2000.0)
+    + gemaal("GemA", "GA", (1050.0, 2010.0))
+    + gemaal("GemB", "GB", (1050.0, 1990.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2010.0)], "PutA", "GemA")
+    + leiding("L2", "2", [(1000.0, 2000.0), (1050.0, 1990.0)], "PutA", "GemB"),
+)
+
+# NET (#18, fase 1): twee parallelle strengen van A naar het gemaal, met verschillende
+# getekende lengte (La recht = 100 m, Lb met knik = ~141 m). De knoop A leest de lengte
+# van de kleinste-URI streng (La); elke streng leest haar eigen lengte.
+FIXTURES["net_afvoerpad_parallel.ttl"] = (
+    "geen; twee parallelle strengen A->gemaal met verschillende lengte",
+    put("PutA", "A", 1000.0, 2000.0)
+    + gemaal("Gem", "G", (1100.0, 2000.0))
+    + leiding("La", "a", [(1000.0, 2000.0), (1100.0, 2000.0)], "PutA", "Gem")
+    + leiding("Lb", "b", [(1000.0, 2000.0), (1050.0, 2050.0), (1100.0, 2000.0)], "PutA", "Gem"),
+)
+
+# NET (#18, fase 1): een persleiding (mechanisch, geen vrijverval) naar het gemaal. Ze
+# hoort niet in de vrijverval-afvoerpadanalyse: een streng-afvoerpad is er alleen voor
+# vrijvervalstrengen, niet voor gepompt riool.
+FIXTURES["net_afvoerpad_mechanisch.ttl"] = (
+    "geen; naast de vrijvervalstreng 1 loopt een persleiding p naar hetzelfde gemaal",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutX", "X", 1000.0, 2100.0)
+    + gemaal("Gem", "G", (1050.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Gem")
+    + leiding("P1", "p", [(1000.0, 2100.0), (1050.0, 2000.0)], "PutX", "Gem", klasse="Persleiding"),
 )
 
 

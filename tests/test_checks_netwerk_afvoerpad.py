@@ -84,6 +84,53 @@ def test_streng_zonder_lijn_krijgt_stappen_maar_geen_meters() -> None:
     assert afvoerpaden(context)[_uri(dataset, "A")].meters is None
 
 
+def test_bij_gelijk_aantal_stappen_wint_het_eindpunt_met_de_kleinste_uri() -> None:
+    """Determinisme: twee even dichtbije eindpunten, de kleinste URI beslist."""
+    context = _context("net_afvoerpad_twee_eindpunten.ttl")
+    dataset = context.dataset
+    gemaal_a = _uri(dataset, "GA")
+    gemaal_b = _uri(dataset, "GB")
+
+    pad = afvoerpaden(context)[_uri(dataset, "A")]
+
+    assert pad.stappen == 1
+    assert pad.eindpunt == min(gemaal_a, gemaal_b)
+
+
+def test_parallelle_strengen_gebruiken_deterministisch_dezelfde_lengte() -> None:
+    """Op parallelle strengen leest de knoop de lengte van de kleinste-URI streng.
+
+    De streng zelf leest haar eigen lengte, zodat de rechte (100 m) en de geknikte
+    (~141 m) streng elk hun eigen padlengte houden.
+    """
+    context = _context("net_afvoerpad_parallel.ttl")
+    dataset = context.dataset
+    la, lb = _streng(dataset, "a"), _streng(dataset, "b")
+    representant = min((la, lb), key=lambda streng: streng.uri)
+
+    knoop = afvoerpaden(context)[_uri(dataset, "A")]
+    assert knoop.meters == representant.line.length
+
+    assert afvoerpad_van_streng(context, la).meters == la.line.length
+    assert afvoerpad_van_streng(context, lb).meters == lb.line.length
+
+
+def test_mechanische_streng_krijgt_geen_afvoerpad() -> None:
+    """Een persleiding hoort niet in de vrijverval-afvoerpadanalyse.
+
+    De vrijvervalstreng ernaast bereikt het gemaal wel; de persleiding niet, ook al
+    komt ze op hetzelfde gemaal uit -- gepompt riool is geen vrijverval-afvoerpad.
+    """
+    context = _context("net_afvoerpad_mechanisch.ttl")
+    dataset = context.dataset
+
+    vrijverval = afvoerpad_van_streng(context, _streng(dataset, "1"))
+    assert vrijverval is not None
+    assert vrijverval.eindpunt == _uri(dataset, "G")
+
+    assert afvoerpad_van_streng(context, _streng(dataset, "p")) is None
+
+
 def test_knoop_zonder_afvoerpad_staat_niet_in_de_uitkomst() -> None:
     # In het losse deelstelsel C-D watert alles af op put D, en dat is geen eindpunt.
     context = _context("net001_geen_afvoerpad.ttl")
