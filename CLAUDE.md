@@ -69,6 +69,13 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
+## Communicatie met de auteur
+- Schrijf kort en concreet. Herhaal niet wat al vaststaat en som geen opties op die je
+  toch niet volgt. Een echte tweesprong benoem je wél (Gouden regel 1), maar geef er je
+  aanbeveling bij in plaats van de keuze open te laten.
+- Gebruik gewone woorden. Vermijd jargon en zelfbedachte termen; is een vakterm nodig,
+  leg hem één keer uit.
+
 ## Harde regels
 Nooit breken. Domeinregels komen uit het checkregister v0.9; de techniekregels bewaken de
 uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
