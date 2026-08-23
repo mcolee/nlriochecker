@@ -123,7 +123,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | RVZ-003 | Overstort zonder geregistreerde drempelbreedte (Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt | W | Compleetheid | geimplementeerd met test | — |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit | geimplementeerd met test | — |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie | geimplementeerd met test | — |
-| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB | W | Plausibiliteit | geimplementeerd met test | — |
+| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal, pompunit of overnamepunt) | F | Plausibiliteit | geimplementeerd met test | — |
 | RVZ-007 | BBB zonder geregistreerde bergingsinhoud of afmetingen | W | Compleetheid | geimplementeerd met test | — |
 | RVZ-008 | BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel | W | Compleetheid | geimplementeerd met test | — |
 | RVZ-009 | BBB zonder nooduitlaat of externe overstortdrempel | W | Compleetheid | geimplementeerd met test | — |

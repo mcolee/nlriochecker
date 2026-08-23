@@ -131,6 +131,25 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **RVZ-006 eist nu ook een afvoereindpunt** (issue #23). De check
+  `GemengdDeelstelselZonderOverstort` meldde een gemengd deelstelsel zonder externe overstort
+  of BBB; hij meldt nu ook een gemengd deelstelsel zonder afvoereindpunt (gemaal, pompunit of
+  overnamepunt), want het vuilwater moet in de gewone toestand ergens heen. De eindpuntklassen
+  komen uit `klassen.afvoer_eindpunt`, dezelfde die NET-001 gebruikt; de deelstelsels uit
+  `netwerkdelen()`, gedeeld met NET-001/002. De meldingtekst onderscheidt welke van de twee
+  eisen faalt (geen overstort, geen afvoereindpunt, of geen van beide). De ernst gaat daarbij
+  van W naar **F**: een gemengd stelsel dat zijn vuilwater nergens kwijt kan, is een fout, geen
+  waarschuwing (auteursbesluit, wijkt af van de oorspronkelijke issue-tekst). De dimensie blijft
+  Plausibiliteit. Op De Wolden en Hoogeveen gaat RVZ-006 van 87 naar 98 bevindingen: 11 gemengde
+  deelstelsels dragen wel een overstort maar geen afvoereindpunt.
+
+- **`AHN6` in plaats van `AHN5` als vooruitloop-inwinningswaarde** (issue #47, vraag 1). De
+  lijst `uit_hoogtemodel` in `checks.toml` en `configs/dewoldenhoogeveen.toml` noemt nu `AHN6`,
+  de inwinningsbron die het project werkelijk gebruikt; `AHN5` was noch de gebruikte bron noch
+  een bestaande GWSW-waarde. `AHN6` bestaat evenmin in GWSW 1.6 (`WijzeVanInwinningColl` stopt
+  bij `AHN4`) en blijft daarom als bewuste afwijking op de vocabulaire-uitzonderingslijst staan
+  (BO-40).
+
 - **"aanlegjaar" heet nu overal "begindatum"** (issue #21; breaking change voor
   projectconfiguraties). De GWSW-term is leidend, ook in de identifiers: de drempelsleutel
   `aanlegjaar_minimum` heet nu `begindatum_minimum`, de plausibiliteitstabel

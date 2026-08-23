@@ -360,10 +360,10 @@ vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 # ingewonnen, vergelijken HGT-001 en HGT-002 met haar eigen bron; de bevinding
 # krijgt daarom een kanttekening. In De Wolden geldt dat voor 5104 van de 22363
 # maaiveldhoogten: daar staat AHN2 op het Punt-aspect van de maaiveldorientatie.
-# `AHN5` bestaat nog niet in GWSW 1.6: WijzeVanInwinningColl stopt bij AHN4. De waarde
-# blijft voorlopig staan, maar of ze hier hoort -- als vooruitloop op een latere
-# GWSW-versie -- is een open vraag die bij de auteur ligt: vraag 1 van issue #47.
-uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN5"]
+# `AHN6` is de gebruikte inwinningsbron, maar bestaat nog niet in GWSW 1.6:
+# WijzeVanInwinningColl stopt bij AHN4. De waarde blijft bewust staan als vooruitloop op
+# een latere GWSW-versie; zo besloten in vraag 1 van issue #47 (BO-40).
+uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN6"]
 # Waarden die expliciet "onbekend" zeggen. Ze passeren elke kardinaliteits- en
 # collectietoets van de nulmeting maar zijn informatief leeg; het bevindingen-
 # rapport telt ze apart zodat een compleetheidscijfer niet te rooskleurig leest.

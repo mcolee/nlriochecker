@@ -106,19 +106,20 @@ SUGGESTIEDREMPEL = 0.5
 # er valt niet langer twee derde van de vindplaatsen op te ruimen met een groene test
 # als beloning.
 BEKENDE_AFWIJKINGEN: dict[tuple[str, str], str] = {
-    ("AHN5", "WijzeVanInwinningColl"): (
-        "ontbreekt in de ontologie -- WijzeVanInwinningColl stopt bij AHN4. Weghalen of "
-        "laten staan als vooruitloop op een latere GWSW-versie is een open vraag; besluit "
-        "bij de auteur, zie vraag 1 van issue #47."
+    ("AHN6", "WijzeVanInwinningColl"): (
+        "ontbreekt in de ontologie -- WijzeVanInwinningColl stopt bij AHN4. AHN6 is de "
+        "gebruikte inwinningsbron en blijft bewust staan als vooruitloop op een latere "
+        "GWSW-versie; zo besloten in vraag 1 van issue #47, zie BO-40."
     ),
 }
 # `("Metselwerk", "MateriaalPutColl")` stond hier tot issue #43. Die afwijking heeft geen
 # drager meer: `[[leiding_put_materiaal]]` noemt sinds de omkering alleen nog
 # onwaarschijnlijke putmaterialen, en `Metselwerk` staat op geen van die twee lijsten.
-# Dat is geen antwoord op vraag 2 van issue #47 -- de 33 gemetselde putten
-# van De Wolden en Hoogeveen
-# werden ook voorheen niet gemeld -- maar het pakket claimt niet langer dat `Metselwerk`
-# een putmateriaal is. Zie BO-35 en BO-36.
+# Vraag 2 van issue #47 is hiermee beantwoord: de omkering naar een verbodslijst
+# accepteert de drie `MetselwerkBaksteen/Bepleisterd/Onbepleisterd`-putklassen al, en de
+# 33 gemetselde putten van De Wolden en Hoogeveen werden voorheen niet gemeld en worden
+# dat nu evenmin -- maar het pakket claimt niet langer dat `Metselwerk` een putmateriaal
+# is. Er is dus niets meer toe te voegen op de putkant. Zie BO-35 en BO-36.
 
 
 @dataclass(frozen=True)

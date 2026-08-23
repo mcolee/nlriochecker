@@ -1038,9 +1038,22 @@ def _overstortstelsel(drempelregel: str) -> str:
     )
 
 
+def gemaal(naam: str, label: str, punt: tuple[float, float]) -> str:
+    """Een rioolgemaal als afvoereindpunt in het netwerk (subklasse van Gemaal)."""
+    return put(naam, label, punt[0], punt[1], klasse="Rioolgemaal")
+
+
+# Het afvoereindpunt van de schone stelsels: net onder de overstort-/BBB-put.
+GEM = (1050.0, 1950.0)
+
 FIXTURES["rvz_schoon.ttl"] = (
-    "geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost",
-    _overstortstelsel(drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0)),
+    "geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost en "
+    "een gemaal als afvoereindpunt, dus het voldoet aan beide eisen van RVZ-006",
+    _overstortstelsel(drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0))
+    + gemaal("Gem", "G", GEM)
+    # Aan de gemengde trunk (vanaf PutO), bewust niet achter de overstortleiding L2: dan
+    # zou L2 tussen twee gemengde zijden komen te liggen en RVZ-010 vuren.
+    + hoogteleiding("L3", "3", [B, GEM], "PutO", "Gem", bob=(8.50, 8.45)),
 )
 
 # RVZ-002: de drempel draagt geen Drempelniveau.
@@ -1099,6 +1112,15 @@ FIXTURES["rvz006_gemengd_zonder_overstort.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),
 )
 
+# RVZ-006, tweede tak (issue #23): wel een overstort, geen afvoereindpunt.
+FIXTURES["rvz006_gemengd_zonder_afvoereindpunt.ttl"] = (
+    "een gemengd deelstelsel met overstort maar zonder afvoereindpunt (gemaal of overnamepunt)",
+    hoogteput("PutA", "A", A)
+    + put("PutO", "O", B[0], B[1], klasse="Overstortput", extra=kenmerken("PutO", **STANDAARDPUT))
+    + drempel("PutO", "DrempelO", niveau=9.0, breedte=2000.0)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55)),
+)
+
 
 def bbb(naam: str, label: str, punt, met_maten: bool = True) -> str:
     """Een bergbezinkbassin, desgewenst met afmetingen."""
@@ -1134,7 +1156,7 @@ FIXTURES["rvz008_bbb_zonder_lediging.ttl"] = (
 
 FIXTURES["rvz008_bbb_met_lediging.ttl"] = (
     "geen; zelfde als rvz008_bbb_zonder_lediging maar de BBB draagt een "
-    "geregistreerde ledigingsvoorziening",
+    "geregistreerde ledigingsvoorziening en het stelsel voert af op een gemaal",
     hoogteput("PutA", "A", A)
     + bbb("BBB", "BBB", B)
     + drempel("BBB", "DrempelBBB", niveau=9.5, breedte=2000.0)
@@ -1142,7 +1164,10 @@ FIXTURES["rvz008_bbb_met_lediging.ttl"] = (
     + """
 :BBB gwsw:hasPart :BBB_led .
 :BBB_led rdf:type gwsw:Ledigingsvoorziening ; rdfs:label "BBB/lediging" .
-""",
+"""
+    # Een afvoereindpunt, anders vuurt RVZ-006 op dit gemengde deel (issue #23).
+    + gemaal("Gem", "G", GEM)
+    + hoogteleiding("L2", "2", [B, GEM], "BBB", "Gem", bob=(8.40, 8.35)),
 )
 
 FIXTURES["rvz009_bbb_zonder_nooduitlaat.ttl"] = (

@@ -1849,6 +1849,12 @@ het eerste overnamepunt in de data, of pas bij een af te spreken aandeel van de 
 is een domeinoordeel met 9.062 bevindingen eronder en ligt bij de auteur. Het staat als vraag 3
 van issue #47.
 
+**Nagekomen (issue #47, vraag 3).** De auteur heeft het criterium bevestigd: `Gemaal` (en
+`Pompunit`) blijven in `afvoer_eindpunt` zolang `Overnamepunt` nul instanties heeft, en gaan
+eruit zodra dat aantal boven nul komt -- niet eerder, niet op een aandeel van de stelsels. Het
+meetbare criterium uit deze BO is daarmee ook het besliscriterium. RVZ-006 (issue #23) bouwt
+op deze ongewijzigde lijst voort.
+
 **Hoe is vastgesteld dat er niets verschoof.** Niet met een gerichte run: `afvoer_eindpunt`
 gaat behalve in NET-001 ook op in `KlassenConfig.netwerkknopen`, en die rol draagt de hele
 netwerkgraaf. Daarom een volle `toets` op De Wolden (`--dataset dewolden_orox.ttl
@@ -1966,6 +1972,13 @@ die twee lijsten; de regel op `BEKENDE_AFWIJKINGEN` is daarmee vervallen. Dat is
 antwoord op vraag 2 van #47 -- de 33 gemetselde putten van De Wolden werden voorheen niet
 gemeld en worden dat nu evenmin -- maar het pakket claimt niet langer dat `Metselwerk` een
 putmateriaal is, en dat was de afwijking van "GWSW is leidend".
+
+**Nagekomen (issue #47, vraag 2).** De auteur heeft bevestigd dat hiermee niets meer op de
+putkant hoeft te gebeuren: de verbodslijst accepteert de drie officiële put-varianten
+`MetselwerkBaksteen`, `MetselwerkBepleisterd` en `MetselwerkOnbepleisterd` al, en de
+niet-bestaande `Metselwerk` als putmateriaal is met deze BO en BO-36 afgehandeld. Wat open
+blijft is uitsluitend de leidingkant (de whitelist op exacte naam, zie BO-36, "Wat deze BO niet
+repareert"); dat is een aparte uitbreiding en valt buiten #47.
 
 ### BO-36 ATTR-010 noemt wat onwaarschijnlijk is, niet wat toegestaan is
 
@@ -2169,3 +2182,33 @@ af, tenzij het project hem overschrijft -- de data-afleiding doet dat vanzelf). 
 hardcoderen op tienden (verworpen: strijdig met "geen hardcoded drempels" en niet overdraagbaar
 naar een andere gemeente). PP meenemen op 0,4 mm (verworpen zonder bron; als nevenbevinding aan
 de auteur voorgelegd).
+
+### BO-40 `AHN6` staat in `uit_hoogtemodel` als vooruitloop op een latere GWSW-versie
+
+**Wat.** `uit_hoogtemodel` in `src/nlriochecker/checks.toml` en
+`configs/dewoldenhoogeveen.toml` noemt `AHN6` in plaats van `AHN5`. Op
+`BEKENDE_AFWIJKINGEN` in `tests/test_gwsw_vocabulaire.py` staat het paar
+`("AHN6", "WijzeVanInwinningColl")`.
+
+**Waarom.** `AHN6` is de inwinningsbron die dit project gebruikt -- de maaiveldraster is
+`AHN6_DeWoldenHoogeveen_DTM.tif` (`configs/dewoldenhoogeveen.toml`, `ahn_dtm`). De GWSW
+1.6-ontologie kent hem nog niet: `WijzeVanInwinningColl` stopt bij `AHN4` (geverifieerd,
+`Ontologie_GWSW_Totaal.ttl` bevat `AHN`, `AHN1`--`AHN4`, geen `AHN5` of `AHN6`). De waarde
+die er tot nu toe stond, `AHN5`, was een even niet-bestaande vooruitloop én bovendien niet
+de bron die het project gebruikt.
+
+**Beslissing (issue #47, vraag 1).** De auteur heeft gekozen: het moet `AHN6` zijn, en de
+waarde blijft staan als bewuste vooruitloop op een latere GWSW-versie. Dat houdt één
+permanent rode term op de uitzonderingslijst, met zijn reden erbij; de drifttest
+`test_bekende_afwijking_is_nog_niet_opgeruimd` bewaakt dat de term daar pas afgaat zodra een
+GWSW-versie hem kent.
+
+**Waarom een afwijking van "GWSW is leidend" mag.** De hoofdregel is dat GWSW leidend is;
+een afwijking mag alleen als de auteur ze expliciet en onderbouwd maakt, en dan hoort ze
+hier. Deze afwijking is niet "een begrip verzinnen dat GWSW niet kent voor de toetsing",
+maar "de feitelijke inwinningsbron van dit project benoemen terwijl de ontologie nog niet is
+bijgewerkt". `uit_hoogtemodel` bepaalt alleen welke inwinningswaarden HGT-001/HGT-002 een
+kanttekening geven; een waarde die geen enkel object draagt, verandert geen bevinding.
+
+**Alternatief.** `AHN5` laten staan (verworpen: bestaat evenmin en is niet de gebruikte
+bron). `AHN6` weghalen (verworpen: verliest de vermelding van de werkelijk gebruikte bron).

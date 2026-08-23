@@ -34,7 +34,7 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: geen; zelfde als rvz008_bbb_zonder_lediging maar de BBB draagt een geregistreerde ledigingsvoorziening en het stelsel voert af op een gemaal
+# DEFECT: een gemengd deelstelsel met overstort maar zonder afvoereindpunt (gemaal of overnamepunt)
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .
@@ -55,28 +55,19 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
     gwsw:hasAspect :PutA_dek_ori .
 :PutA_dek_ori rdf:type gwsw:Dekselorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
-:BBB rdf:type gwsw:Bergbezinkbassin ; rdfs:label "BBB" ;
-    gwsw:hasAspect :BBB_ori .
-:BBB gwsw:hasAspect [ rdf:type gwsw:BreedteBouwwerk ; gwsw:hasValue 4000 ] ,
-    [ rdf:type gwsw:LengteBouwwerk ; gwsw:hasValue 8000 ] ,
-    [ rdf:type gwsw:Inhoud ; gwsw:hasValue 120 ] .
-:BBB_ori rdf:type gwsw:Putorientatie ;
+:PutO rdf:type gwsw:Overstortput ; rdfs:label "O" ;
+    gwsw:hasAspect :PutO_ori .
+:PutO gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+:PutO_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 
-:BBB_ori gwsw:hasConnection :BBB_maa .
-:BBB_maa rdf:type gwsw:Maaiveldorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.0 ] .
-
-:BBB gwsw:hasPart :BBB_dek .
-:BBB_dek rdf:type gwsw:Putdeksel ;
-    gwsw:hasAspect :BBB_dek_ori .
-:BBB_dek_ori rdf:type gwsw:Dekselorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
-
-:BBB gwsw:hasPart :DrempelBBB .
-:DrempelBBB rdf:type gwsw:Overstortdrempel ; rdfs:label "DrempelBBB" .
-:DrempelBBB gwsw:hasAspect [ rdf:type gwsw:Drempelniveau ; gwsw:hasValue 9.5 ] ,
+:PutO gwsw:hasPart :DrempelO .
+:DrempelO rdf:type gwsw:Overstortdrempel ; rdfs:label "DrempelO" .
+:DrempelO gwsw:hasAspect [ rdf:type gwsw:Drempelniveau ; gwsw:hasValue 9.0 ] ,
     [ rdf:type gwsw:Drempelbreedte ; gwsw:hasValue 2000.0 ] .
 :L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
     gwsw:hasAspect :L1_ori .
@@ -93,32 +84,6 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :L1_b rdf:type gwsw:BeginpuntLeiding .
 :L1_e rdf:type gwsw:EindpuntLeiding .
 :L1_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 8.6 ] .
-:L1_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 8.5 ] .
+:L1_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 8.55 ] .
 :L1_b gwsw:hasConnection :PutA_ori .
-:L1_e gwsw:hasConnection :BBB_ori .
-
-:BBB gwsw:hasPart :BBB_led .
-:BBB_led rdf:type gwsw:Ledigingsvoorziening ; rdfs:label "BBB/lediging" .
-:Gem rdf:type gwsw:Rioolgemaal ; rdfs:label "G" ;
-    gwsw:hasAspect :Gem_ori .
-:Gem_ori rdf:type gwsw:Putorientatie ;
-    gwsw:hasAspect [ rdf:type gwsw:Punt ;
-        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 1950.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
-:L2 rdf:type gwsw:GemengdRiool ; rdfs:label "2" ;
-    gwsw:hasAspect :L2_ori .
-:L2 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
-    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
-    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
-    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
-    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] ,
-    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date ] .
-:L2_ori rdf:type gwsw:Leidingorientatie ;
-    gwsw:hasPart :L2_b , :L2_e ;
-    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
-        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1050.0 2000.0 1050.0 1950.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
-:L2_b rdf:type gwsw:BeginpuntLeiding .
-:L2_e rdf:type gwsw:EindpuntLeiding .
-:L2_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 8.4 ] .
-:L2_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 8.35 ] .
-:L2_b gwsw:hasConnection :BBB_ori .
-:L2_e gwsw:hasConnection :Gem_ori .
+:L1_e gwsw:hasConnection :PutO_ori .

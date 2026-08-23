@@ -211,6 +211,30 @@ def _stelseltypen_van(context: CheckContext, knopen: set[str]) -> set[str]:
     return soorten
 
 
+def _afvoereindpunten(context: CheckContext) -> set[str]:
+    """De knopen die als afvoereindpunt gelden: gemaal, pompunit of overnamepunt.
+
+    Dezelfde klassen als NET-001 gebruikt (`klassen.afvoer_eindpunt`), zodat de twee
+    checks over hetzelfde begrip oordelen. `of_class` sluit de subklassen in, dus
+    `Gemaal` dekt de 893 `Rioolgemaal` van De Wolden zonder ze los op te sommen.
+    """
+    dataset = context.dataset
+    return {
+        uri for wortel in context.config.klassen.afvoer_eindpunt for uri in dataset.of_class(wortel)
+    }
+
+
+def _rvz006_gebrek(heeft_overstort: bool, heeft_eindpunt: bool) -> str:
+    """De deelreden voor RVZ-006: welke van de twee eisen het deelstelsel mist."""
+    zonder_overstort = "zonder enige externe overstort of bergbezinkvoorziening"
+    zonder_eindpunt = "zonder afvoereindpunt (gemaal, pompunit of overnamepunt)"
+    if not heeft_overstort and not heeft_eindpunt:
+        return f"{zonder_overstort} en {zonder_eindpunt}"
+    if not heeft_overstort:
+        return zonder_overstort
+    return zonder_eindpunt
+
+
 @register
 class RandvoorzieningNietAangesloten(Check):
     """RVZ-001: een randvoorziening die topologisch nergens op uitkomt."""
@@ -445,23 +469,32 @@ class OverstortOpVerkeerdStelsel(Check):
 
 @register
 class GemengdDeelstelselZonderOverstort(Check):
-    """RVZ-006: een gemengd deelstelsel zonder overstort of BBB."""
+    """RVZ-006: een gemengd deelstelsel zonder overstort/BBB of zonder afvoereindpunt."""
 
     id = "RVZ-006"
-    title = "Gemengd deelstelsel zonder enige externe overstort of BBB"
-    severity = Severity.WARNING
+    title = "Gemengd deelstelsel zonder externe overstort/BBB of zonder afvoereindpunt"
+    severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Zoekt samenhangende gemengde deelstelsels zonder noodafvoer."""
+        """Zoekt gemengde deelstelsels zonder overstort of zonder afvoereindpunt.
+
+        Een gemengd stelsel moet zijn vuilwater ergens kwijt kunnen -- via een
+        externe overstort/BBB bij hoogwater, en via een afvoereindpunt (gemaal of
+        overnamepunt) in de gewone toestand. Ontbreekt een van beide, dan is het
+        stelsel onvolledig geregistreerd; de melding noemt welke eis faalt.
+        """
         randvoorzieningen = {node.uri for node in overstortputten(context)}
         randvoorzieningen |= {node.uri for node in bergbezinkvoorzieningen(context)}
+        afvoereindpunten = _afvoereindpunten(context)
         clusters = deelstelsel_ids(context)
 
         for deel in _stelseldelen(context):
             if "gemengd" not in _stelseltypen_van(context, deel):
                 continue
-            if deel & randvoorzieningen:
+            heeft_overstort = bool(deel & randvoorzieningen)
+            heeft_eindpunt = bool(deel & afvoereindpunten)
+            if heeft_overstort and heeft_eindpunt:
                 continue
             knopen = sorted(deel)
             uri = knopen[0]
@@ -470,8 +503,8 @@ class GemengdDeelstelselZonderOverstort(Check):
                 context,
                 uri,
                 node.label if node is not None else uri,
-                f"Ligt in een gemengd deelstelsel van {len(deel)} knopen zonder enige "
-                "externe overstort of bergbezinkvoorziening.",
+                f"Ligt in een gemengd deelstelsel van {len(deel)} knopen "
+                f"{_rvz006_gebrek(heeft_overstort, heeft_eindpunt)}.",
                 knopen_in_deelstelsel=len(deel),
                 cluster_id=clusters.get(uri, ""),
                 foutlocatie=_zwaartepunt(context, deel),

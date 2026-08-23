@@ -694,6 +694,38 @@ def test_rvz006_zet_het_zwaartepunt_van_het_deelstelsel_als_foutlocatie() -> Non
     assert y == pytest.approx(verwacht_y)
 
 
+def test_rvz006_zonder_afvoereindpunt_noemt_alleen_die_reden() -> None:
+    """Een gemengd deel met overstort maar zonder gemaal mist alleen het afvoereindpunt.
+
+    De melding noemt dan die ene reden en niet de overstort, die er wel is (issue #23).
+    """
+    outcome = uitkomst("rvz006_gemengd_zonder_afvoereindpunt.ttl", "RVZ-006")
+
+    assert len(outcome.findings) == 1
+    boodschap = outcome.findings[0].message
+    assert "zonder afvoereindpunt (gemaal, pompunit of overnamepunt)" in boodschap
+    assert "externe overstort" not in boodschap
+
+
+def test_rvz006_zonder_beide_noemt_beide_redenen() -> None:
+    """Een gemengd deel zonder overstort en zonder afvoereindpunt noemt beide redenen."""
+    outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+
+    assert len(outcome.findings) == 1
+    boodschap = outcome.findings[0].message
+    assert "zonder enige externe overstort of bergbezinkvoorziening" in boodschap
+    assert "en zonder afvoereindpunt (gemaal, pompunit of overnamepunt)" in boodschap
+
+
+def test_rvz006_met_overstort_en_afvoereindpunt_zwijgt() -> None:
+    """Met een overstort en een gemaal is het gemengde stelsel compleet: geen RVZ-006.
+
+    `rvz_schoon.ttl` draagt beide; de bredere `test_schone_fixture_geeft_geen_bevinding`
+    bewaakt de hele RVZ-groep, deze wijst de RVZ-006-tak expliciet aan (issue #23).
+    """
+    assert labels(uitkomst("rvz_schoon.ttl", "RVZ-006")) == []
+
+
 def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
     """Anders herrekent elk gebied de karakteristiek van de volledige export.
 
