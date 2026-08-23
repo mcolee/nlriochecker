@@ -24,6 +24,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **ATTR-001, ATTR-004 en ATTR-012 splitsen de ongetoetste strengen naar reden** (issue
+  #19). Het ene getal "materiaal zonder regel (of geen materiaal)" viel twee verschillende
+  problemen samen: een gat in de aanlevering (geen attribuut) en een gat in
+  `plausibiliteit.toml` (geen regel). De helper `_ongetoetst` telt ze nu apart, en ATTR-001
+  meldt daarnaast de strengen zonder bruikbare profielmaat (met daarbinnen de als 0
+  geregistreerde maten) plus een tabel met per materiaal het aantal, het aantal buiten
+  bereik en de feitelijke min/max-diameter. Het aantal bevindingen verandert niet; alleen de
+  toelichting. Op De Wolden blijft ATTR-001 op 19 bevindingen en is de emmer "materiaal
+  zonder diameterregel" nul.
+
 - **ATTR-008 toetst de strenglengte tegen de GWSW-ontologiegrens van 75 m** (issue #35).
   De bovengrens `maximale_strenglengte_m` gaat van 200 m naar 75 m, de waarde die het
   datatype `Dt_LengteLeiding` declareert (`owl:withRestrictions` 1–75 m). GWSW is leidend:

@@ -1,0 +1,88 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie, zodat de fixture zonder de volle ontologie werkt.
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput rdfs:subClassOf gwsw:Put .
+gwsw:Putorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Leidingorientatie rdfs:subClassOf gwsw:Verbinding .
+gwsw:GemengdRiool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
+gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
+
+# Vier strengen, elk met precies een reden waarom ATTR-001 ze niet toetst -- plus
+# een schone streng. Het doel is de uitsplitsing van de ongetoetste populatie:
+#   L_geen     : geen MateriaalLeiding                  -> zonder materiaal
+#   L_onbekend : MateriaalLeiding GVK (geen regel)      -> materiaal zonder regel
+#   L_nul      : maat 0 geregistreerd als meting         -> zonder bruikbare maat (0)
+#   L_goed     : Beton 500 mm, binnen bereik             -> getoetst, geen bevinding
+
+:PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
+    gwsw:hasAspect :PutA_ori .
+:PutA_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:PutB rdf:type gwsw:Inspectieput ; rdfs:label "B" ;
+    gwsw:hasAspect :PutB_ori .
+:PutB_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:L_geen rdf:type gwsw:GemengdRiool ; rdfs:label "geen" ;
+    gwsw:hasAspect :L_geen_ori .
+:L_geen gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 500 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 500 ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] .
+:L_geen_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_geen_b , :L_geen_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_geen_b rdf:type gwsw:BeginpuntLeiding ; gwsw:hasConnection :PutA_ori .
+:L_geen_e rdf:type gwsw:EindpuntLeiding ; gwsw:hasConnection :PutB_ori .
+
+:L_onbekend rdf:type gwsw:GemengdRiool ; rdfs:label "onbekend" ;
+    gwsw:hasAspect :L_onbekend_ori .
+:L_onbekend gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 500 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 500 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:GVK ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] .
+:L_onbekend_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_onbekend_b , :L_onbekend_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2001.0 1050.0 2001.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_onbekend_b rdf:type gwsw:BeginpuntLeiding ; gwsw:hasConnection :PutA_ori .
+:L_onbekend_e rdf:type gwsw:EindpuntLeiding ; gwsw:hasConnection :PutB_ori .
+
+:L_nul rdf:type gwsw:GemengdRiool ; rdfs:label "nul" ;
+    gwsw:hasAspect :L_nul_ori .
+:L_nul gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 0 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 0 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] .
+:L_nul_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_nul_b , :L_nul_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2002.0 1050.0 2002.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_nul_b rdf:type gwsw:BeginpuntLeiding ; gwsw:hasConnection :PutA_ori .
+:L_nul_e rdf:type gwsw:EindpuntLeiding ; gwsw:hasConnection :PutB_ori .
+
+:L_goed rdf:type gwsw:GemengdRiool ; rdfs:label "goed" ;
+    gwsw:hasAspect :L_goed_ori .
+:L_goed gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 500 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 500 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] .
+:L_goed_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L_goed_b , :L_goed_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2003.0 1050.0 2003.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L_goed_b rdf:type gwsw:BeginpuntLeiding ; gwsw:hasConnection :PutA_ori .
+:L_goed_e rdf:type gwsw:EindpuntLeiding ; gwsw:hasConnection :PutB_ori .

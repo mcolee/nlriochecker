@@ -353,6 +353,41 @@ def test_attr001_noemt_het_bereik_en_het_materiaal() -> None:
     assert bevinding.details["maximum_mm"] == pytest.approx(800)
 
 
+def test_attr001_splitst_de_ongetoetste_populatie_in_drie() -> None:
+    """Geen materiaal, materiaal zonder regel en ontbrekende maat zijn drie getallen."""
+    outcome = uitkomst("attr001_ongetoetste_uitsplitsing.ttl", "ATTR-001")
+
+    # De uitsplitsing verandert de telling, niet het gedrag: geen enkele streng valt
+    # buiten haar bereik, dus geen bevinding.
+    assert outcome.findings == []
+
+    def regel_met(term: str) -> str:
+        treffers = [note for note in outcome.notes if term in note]
+        assert len(treffers) == 1, outcome.notes
+        return treffers[0]
+
+    assert "1 van de 4 strengen" in regel_met("geen materiaal")
+    zonder_regel = regel_met("zonder diameterregel")
+    assert "1 van de 4 strengen" in zonder_regel
+    maat = regel_met("geen bruikbare profielmaat")
+    assert "1 van de 4 strengen" in maat
+    assert "1 met een geregistreerde 0" in maat
+
+
+def test_attr001_verdeelt_de_diameter_per_materiaal() -> None:
+    """De verdelingstabel toont per materiaal het aantal en de feitelijke min/max."""
+    outcome = uitkomst("attr001_ongetoetste_uitsplitsing.ttl", "ATTR-001")
+
+    tabel = [note for note in outcome.notes if "| Materiaal |" in note]
+    assert len(tabel) == 1, outcome.notes
+    rijen = tabel[0].splitlines()
+
+    beton = [r for r in rijen if r.startswith("| Beton ")]
+    assert beton == ["| Beton | 2 | 0 | 500 | 500 |"]
+    gvk = [r for r in rijen if r.startswith("| GVK ")]
+    assert gvk == ["| GVK | 1 | 0 | 500 | 500 |"]
+
+
 def test_attr005_noemt_de_vermoedelijke_waarde() -> None:
     bevinding = uitkomst("attr005_centimeters.ttl", "ATTR-005").findings[0]
 

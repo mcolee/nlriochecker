@@ -8,8 +8,9 @@ haar toelichting hoeveel strengen daardoor buiten beeld bleven.
 
 from __future__ import annotations
 
-from collections import Counter
-from collections.abc import Iterator
+from collections import Counter, defaultdict
+from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
 from datetime import date
 
 from nlriochecker import taal
@@ -24,12 +25,56 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import netwerkknopen, putten, vrijvervalrioolleidingen
 from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
+from nlriochecker.plausibiliteit import MaterialDiameter, PlausibilityTables
 
 
-def _zonder_regel(context: CheckContext, kies) -> tuple[int, int]:
-    """Telt hoeveel strengen geen plausibiliteitsregel hebben, en hoeveel er zijn."""
+@dataclass(frozen=True)
+class OngetoetstePopulatie:
+    """Uitsplitsing van de strengen die een plausibiliteitscheck niet kon toetsen.
+
+    Twee redenen die makkelijk op een hoop belanden maar om verschillende acties
+    vragen: `zonder_attribuut` is een gat in de aanlevering (geen materiaal, geen
+    vorm), `zonder_regel` een gat in `plausibiliteit.toml`.
+    """
+
+    totaal: int
+    zonder_attribuut: int
+    zonder_regel: int
+
+
+def _ongetoetst(
+    context: CheckContext,
+    attribuut: Callable[[Conduit], object | None],
+    regel: Callable[[Conduit], object | None],
+) -> OngetoetstePopulatie:
+    """Splitst de ongetoetste strengen naar de reden: attribuut ontbreekt of geen regel."""
     strengen = vrijvervalrioolleidingen(context)
-    return sum(1 for conduit in strengen if kies(conduit) is None), len(strengen)
+    zonder_attribuut = 0
+    zonder_regel = 0
+    for conduit in strengen:
+        if attribuut(conduit) is None:
+            zonder_attribuut += 1
+        elif regel(conduit) is None:
+            zonder_regel += 1
+    return OngetoetstePopulatie(len(strengen), zonder_attribuut, zonder_regel)
+
+
+def _ongetoetst_notes(
+    populatie: OngetoetstePopulatie, zonder_attribuut: str, zonder_regel: str
+) -> list[str]:
+    """De twee toelichtingsregels voor een ongetoetste populatie, elk alleen bij >0."""
+    regels = []
+    if populatie.zonder_attribuut:
+        regels.append(
+            f"{populatie.zonder_attribuut} van de {populatie.totaal} strengen dragen "
+            f"{zonder_attribuut} en zijn niet getoetst."
+        )
+    if populatie.zonder_regel:
+        regels.append(
+            f"{populatie.zonder_regel} van de {populatie.totaal} strengen dragen "
+            f"{zonder_regel} en zijn niet getoetst."
+        )
+    return regels
 
 
 class _StrengCheck(Check):
@@ -58,10 +103,9 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
             maat = _grootste_maat(conduit)
             if regel is None or maat is None:
                 continue
-            if regel.minimum_mm is not None and maat < regel.minimum_mm:
-                yield self._bevinding(context, conduit, maat, regel, "onder")
-            elif regel.maximum_mm is not None and maat > regel.maximum_mm:
-                yield self._bevinding(context, conduit, maat, regel, "boven")
+            kant = _kant_van_bereik(regel, maat)
+            if kant is not None:
+                yield self._bevinding(context, conduit, maat, regel, kant)
 
     def _bevinding(self, context, conduit: Conduit, maat: float, regel, kant: str) -> Finding:
         """Bouwt de bevinding met het overschreden bereik erbij."""
@@ -79,16 +123,44 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
         )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen materiaalregel hebben."""
-        zonder, totaal = _zonder_regel(
-            context, lambda conduit: context.plausibiliteit.diameter(conduit.materiaal)
+        """Verantwoordt de ongetoetste strengen en de diameterverdeling per materiaal.
+
+        Drie redenen waarom een streng buiten de toets valt, elk een eigen getal:
+        geen materiaal (gat in de aanlevering), een materiaal zonder diameterregel
+        (gat in `plausibiliteit.toml`) en een ontbrekende profielmaat -- die laatste
+        met daarbinnen de strengen die een 0 als meting registreerden. De tabel toont
+        per materiaal de feitelijke min- en max-diameter, zodat een onzinnige grens in
+        de tabel opvalt.
+        """
+        tabel = context.plausibiliteit
+        strengen = vrijvervalrioolleidingen(context)
+        totaal = len(strengen)
+        populatie = _ongetoetst(
+            context,
+            lambda conduit: conduit.materiaal,
+            lambda conduit: tabel.diameter(conduit.materiaal),
         )
-        if not zonder:
-            return []
-        return [
-            f"{zonder} van de {totaal} strengen hebben een materiaal zonder regel in "
-            f"`plausibiliteit.toml` (of geen materiaal) en zijn niet getoetst."
-        ]
+        regels = _ongetoetst_notes(
+            populatie,
+            "geen materiaal",
+            "een materiaal zonder diameterregel in `plausibiliteit.toml`",
+        )
+        zonder_maat = [conduit for conduit in strengen if _grootste_maat(conduit) is None]
+        if zonder_maat:
+            nul = sum(1 for conduit in zonder_maat if _registreert_nulmaat(conduit))
+            staart = (
+                f", waarvan {nul} met een geregistreerde 0 in plaats van een ontbrekend kenmerk"
+                if nul
+                else ""
+            )
+            regels.append(
+                f"{len(zonder_maat)} van de {totaal} strengen hebben geen bruikbare "
+                f"profielmaat{staart}; ze zijn niet getoetst."
+            )
+        verdeling = _diameterverdeling(tabel, strengen)
+        if verdeling is not None:
+            regels.append(verdeling)
+        return regels
 
 
 @register
@@ -267,16 +339,17 @@ class VormVersusAfmetingen(_StrengCheck):
         return None
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen vormregel hebben."""
-        zonder, totaal = _zonder_regel(
-            context, lambda conduit: context.plausibiliteit.afmetingen(conduit.vorm)
+        """Meldt hoeveel strengen geen vorm dragen en hoeveel geen vormregel hebben."""
+        populatie = _ongetoetst(
+            context,
+            lambda conduit: conduit.vorm,
+            lambda conduit: context.plausibiliteit.afmetingen(conduit.vorm),
         )
-        if not zonder:
-            return []
-        return [
-            f"{zonder} van de {totaal} strengen hebben een profielvorm zonder regel in "
-            "`plausibiliteit.toml` (of geen vorm) en zijn niet getoetst."
-        ]
+        return _ongetoetst_notes(
+            populatie,
+            "geen profielvorm",
+            "een profielvorm zonder regel in `plausibiliteit.toml`",
+        )
 
 
 @register
@@ -608,16 +681,17 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen vormregel hebben."""
-        zonder, totaal = _zonder_regel(
-            context, lambda conduit: context.plausibiliteit.vorm(conduit.materiaal)
+        """Meldt hoeveel strengen geen materiaal dragen en hoeveel geen vormregel hebben."""
+        populatie = _ongetoetst(
+            context,
+            lambda conduit: conduit.materiaal,
+            lambda conduit: context.plausibiliteit.vorm(conduit.materiaal),
         )
-        if not zonder:
-            return []
-        return [
-            f"{zonder} van de {totaal} strengen hebben een materiaal zonder vormregel in "
-            "`plausibiliteit.toml` (of geen materiaal) en zijn niet getoetst."
-        ]
+        return _ongetoetst_notes(
+            populatie,
+            "geen materiaal",
+            "een materiaal zonder vormregel in `plausibiliteit.toml`",
+        )
 
 
 @register
@@ -728,6 +802,62 @@ def _grootste_maat(conduit: Conduit) -> float | None:
     """De grootste profielmaat van een streng in millimeters."""
     maten = [maat for maat in (conduit.breedte_mm, conduit.hoogte_mm) if maat and maat > 0]
     return max(maten) if maten else None
+
+
+def _kant_van_bereik(regel: MaterialDiameter, maat: float) -> str | None:
+    """'onder' of 'boven' als de maat buiten het diameterbereik valt, anders None."""
+    if regel.minimum_mm is not None and maat < regel.minimum_mm:
+        return "onder"
+    if regel.maximum_mm is not None and maat > regel.maximum_mm:
+        return "boven"
+    return None
+
+
+def _registreert_nulmaat(conduit: Conduit) -> bool:
+    """True als een profielmaat als 0 geregistreerd staat in plaats van te ontbreken.
+
+    `_grootste_maat` filtert de 0 weg net als een ontbrekend kenmerk; deze regel maakt
+    de twee weer uit elkaar door het kenmerk zelf op te vragen.
+    """
+    for kind in ("BreedteLeiding", "HoogteLeiding"):
+        aspect = conduit.aspect(kind)
+        if aspect is not None and aspect.number == 0:
+            return True
+    return False
+
+
+def _diameterverdeling(tabel: PlausibilityTables, strengen: Sequence[Conduit]) -> str | None:
+    """Een Markdown-tabel met per materiaal het aantal, het aantal buiten bereik en de
+    feitelijke min- en max-diameter uit de data.
+
+    Het aantal telt alle strengen met dat materiaal; de min en max komen alleen uit de
+    strengen met een bruikbare profielmaat, en het aantal buiten bereik is 0 voor een
+    materiaal zonder regel -- zonder grens valt er niets te overschrijden. Geeft None als
+    geen streng een materiaal draagt.
+    """
+    per_materiaal: dict[str, list[Conduit]] = defaultdict(list)
+    for conduit in strengen:
+        if conduit.materiaal is not None:
+            per_materiaal[conduit.materiaal].append(conduit)
+    if not per_materiaal:
+        return None
+    regels = [
+        "| Materiaal | Aantal | Buiten bereik | Min mm | Max mm |",
+        "|---|---|---|---|---|",
+    ]
+    for materiaal in sorted(per_materiaal):
+        groep = per_materiaal[materiaal]
+        regel = tabel.diameter(materiaal)
+        maten = [maat for conduit in groep if (maat := _grootste_maat(conduit)) is not None]
+        buiten = (
+            sum(1 for maat in maten if _kant_van_bereik(regel, maat) is not None)
+            if regel is not None
+            else 0
+        )
+        min_mm = f"{min(maten):g}" if maten else "–"
+        max_mm = f"{max(maten):g}" if maten else "–"
+        regels.append(f"| {materiaal} | {len(groep)} | {buiten} | {min_mm} | {max_mm} |")
+    return "\n".join(regels)
 
 
 def _grootste_putmaat(node) -> float | None:
