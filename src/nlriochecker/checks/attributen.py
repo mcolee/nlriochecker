@@ -474,6 +474,81 @@ class DiameterGroterDanPut(_StrengCheck):
         ]
 
 
+class _PutCheck(Check):
+    """Basis voor de ATTR-checks die per put redeneren."""
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal putten."""
+        return len(putten(context))
+
+
+@register
+class VormPutVersusAfmetingen(_PutCheck):
+    """ATTR-016: een ronde put waarvan breedte en lengte verschillen.
+
+    De tegenhanger van ATTR-004 (vorm versus afmetingen) voor putten in plaats van
+    leidingen. Een eigen ID en geen uitbreiding van ATTR-004: `vergelijk` zet twee
+    meetmomenten naast elkaar op check-ID, en dan mag de betekenis van een ID tussen
+    twee metingen niet verschuiven (issue #39).
+
+    De nulmeting toetst alleen de *aanwezigheid* van de vorm (`Put_VormPut_card`), niet
+    de samenhang met de afmetingen; dit gat is dus echt.
+    """
+
+    id = "ATTR-016"
+    title = "Vorm put versus afmetingen inconsistent"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke ronde put waarvan breedte en lengte meer dan de tolerantie schelen.
+
+        Alleen `Rond`: een rechthoekige put mag ongelijke maten hebben. Ontbreekt
+        breedte of lengte, dan is er geen tegenspraak vast te stellen en zwijgt de
+        check; `notes()` verantwoordt die putten. De tolerantie is dezelfde als bij
+        ATTR-004 (`rondheid_tolerantie_mm`, default 0): het is dezelfde soort fout.
+        """
+        tolerantie = context.config.drempels.rondheid_tolerantie_mm
+
+        for node in putten(context):
+            if node.reference("VormPut") != "Rond":
+                continue
+            breedte, lengte = node.number("BreedtePut"), node.number("LengtePut")
+            if breedte is None or lengte is None:
+                continue
+            if abs(breedte - lengte) <= tolerantie:
+                continue
+            yield self.finding(
+                context,
+                node.uri,
+                node.label,
+                f"Putvorm Rond met breedte {breedte:g} mm en lengte {lengte:g} mm; een "
+                "ronde put heeft een diameter, dus breedte en lengte horen gelijk te zijn.",
+                vorm="Rond",
+                breedte_mm=breedte,
+                lengte_mm=lengte,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de ronde putten zonder breedte of lengte.
+
+        Zonder een van beide maten is de verhouding niet te toetsen; stilte zou lezen
+        als "alle ronde putten gecontroleerd".
+        """
+        rond = [node for node in putten(context) if node.reference("VormPut") == "Rond"]
+        zonder = sum(
+            1
+            for node in rond
+            if node.number("BreedtePut") is None or node.number("LengtePut") is None
+        )
+        if not zonder:
+            return []
+        return [
+            f"{zonder} van de {len(rond)} ronde putten missen een breedte of een lengte en "
+            "zijn niet op de verhouding getoetst."
+        ]
+
+
 @register
 class BegindatumBuitenBereik(_StrengCheck):
     """ATTR-007: een begindatum in de toekomst of voor het riooltijdperk."""

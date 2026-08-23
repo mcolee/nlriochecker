@@ -563,6 +563,18 @@ FIXTURES["attr004_muil_te_hoog.ttl"] = (
     ),
 )
 
+FIXTURES["attr016_ronde_put_ongelijk.ttl"] = (
+    "put A heet rond maar heeft breedte 800 en lengte 1000; een ronde put heeft een diameter.\n"
+    "# Put B is rond met 800 bij 800 (geen bevinding), put C is rechthoekig met 800 bij 1000\n"
+    "# (een rechthoekige put mag ongelijke maten hebben, dus ook geen bevinding).",
+    nette_put("PutA", "A", *A, VormPut_ref="Rond", BreedtePut=800, LengtePut=1000)
+    + nette_put("PutB", "B", *B, VormPut_ref="Rond", BreedtePut=800, LengtePut=800)
+    + nette_put(
+        "PutC", "C", 1100.0, 2000.0, VormPut_ref="Rechthoekig", BreedtePut=800, LengtePut=1000
+    )
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
+)
+
 FIXTURES["attr005_centimeters.ttl"] = (
     "streng 1 heeft breedte en hoogte 30; maal tien is dat 300 mm, een handelsmaat",
     nette_put("PutA", "A", *A)

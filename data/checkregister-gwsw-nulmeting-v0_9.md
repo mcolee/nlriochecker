@@ -87,6 +87,7 @@ gebreken" leest.
 | ATTR-013 | Hoogtekenmerk (BOB, maaiveldhoogte, putdekselniveau) op een vulwaarde rond 0 m NAP dat als meting geregistreerd staat; de band en de kenmerken zijn projectconfiguratie (`[vulwaarden]`), de leesregel zet het kenmerk op ontbrekend en de hoogtechecks slaan het object over | W | Compleetheid |
 | ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmeting per constructie mist (issue #37). Generiek over alle kenmerktypen, uit de ontologische `owl:onProperty`/`owl:allValuesFrom`-keten; een systemische melding per kenmerk, niet per object | F | Consistentie |
 | ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum_vulwaarde_aandeel`); een systemische melding per verdacht jaar, zwijgt bij een natuurlijke verdeling of bij te weinig gedateerde objecten (issue #21) | W | Compleetheid |
+| ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De tegenhanger van ATTR-004 voor putten in plaats van leidingen, met dezelfde tolerantie (`rondheid_tolerantie_mm`); de nulmeting toetst alleen de aanwezigheid van de vorm (`Put_VormPut_card`), niet de samenhang met de afmetingen (issue #39) | F | Consistentie |
 
 ## HGT: Hoogten en verhang
 
@@ -214,6 +215,15 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-23): ATTR-016 toegevoegd (F, Consistentie): een ronde put
+(`VormPut = Rond`) waarvan breedte en lengte verschillen -- een ronde put heeft een diameter.
+De tegenhanger van ATTR-004 voor putten in plaats van leidingen, met dezelfde tolerantie
+(`rondheid_tolerantie_mm`); een eigen check-ID en geen uitbreiding van ATTR-004, want
+`vergelijk` zet meetmomenten op check-ID naast elkaar en dan mag de betekenis van een ID niet
+verschuiven. Het aanbevolen ID uit het issue (ATTR-015) was inmiddels vergeven; ATTR-016 is
+het eerstvolgende vrije. Op De Wolden meldt hij 88 ronde putten. Zie
+[#39](https://github.com/mcolee/nlriochecker/issues/39).
 
 Versie 0.9, addendum (2026-08-23): ATTR-015 toegevoegd (W, Compleetheid): een systemische
 melding wanneer een enkel jaartal een onevenredig deel van de begindatums draagt -- een

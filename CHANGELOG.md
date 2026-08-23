@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Vorm versus afmetingen voor putten** (issue #39). De nieuwe check **ATTR-016** (F,
+  Consistentie) meldt een ronde put (`VormPut = Rond`) waarvan breedte en lengte
+  verschillen -- een ronde put heeft een diameter. De export droeg 13.972 `VormPut`-kenmerken
+  die het pakket nergens las; ATTR-016 is de tegenhanger van ATTR-004 (vorm versus afmetingen
+  voor leidingen), met dezelfde tolerantie (`rondheid_tolerantie_mm`, standaard 0). Een eigen
+  check-ID en geen uitbreiding van ATTR-004, want `vergelijk` zet meetmomenten op check-ID
+  naast elkaar en dan mag de betekenis van een ID niet tussen twee metingen verschuiven; het
+  door het issue aanbevolen ID (ATTR-015) was inmiddels vergeven. Op De Wolden meldt hij
+  88 ronde putten.
+
 - **Een ondergrens op de testdekking, en een vindbaar meetcommando** (issue #54). Beide
   poorten -- de CI (`.github/workflows/toets.yml`) en de uitgavepoort
   (`scripts/uitgave.py`) -- dwingen nu een dekking van minstens 95% af (`--cov-fail-under`,

@@ -64,6 +64,9 @@ DEFECTEN = [
     ("attr005_centimeters.ttl", "ATTR-005", ["1", "1"]),
     ("attr006_te_grote_streng.ttl", "ATTR-006", ["1"]),
     ("attr006_twee_te_kleine_putten.ttl", "ATTR-006", ["1", "1"]),
+    # Alleen put A (rond, 800x1000) telt; put B (rond, 800x800) en put C (rechthoekig,
+    # 800x1000) blijven stil -- de drie verificatiegevallen uit issue #39 in een fixture.
+    ("attr016_ronde_put_ongelijk.ttl", "ATTR-016", ["A"]),
     ("attr007_toekomstig_jaar.ttl", "ATTR-007", ["1"]),
     ("attr008_lange_streng.ttl", "ATTR-008", ["1"]),
     ("attr009_lengte_wijkt_af.ttl", "ATTR-009", ["1"]),
@@ -405,6 +408,37 @@ def test_attr006_onderscheidt_de_twee_zijden() -> None:
 
     assert sorted(b.details["zijde"] for b in bevindingen) == ["beginpunt", "eindpunt"]
     assert sorted(b.details["put"] for b in bevindingen) == ["A", "B"]
+
+
+def test_attr016_noemt_de_vorm_en_de_twee_maten() -> None:
+    """De bevinding draagt de vorm en beide maten, zoals ATTR-004 dat voor leidingen doet."""
+    bevinding = uitkomst("attr016_ronde_put_ongelijk.ttl", "ATTR-016").findings[0]
+
+    assert bevinding.details["vorm"] == "Rond"
+    assert bevinding.details["breedte_mm"] == pytest.approx(800)
+    assert bevinding.details["lengte_mm"] == pytest.approx(1000)
+    assert bevinding.severity.value == "F"
+
+
+def test_attr016_verantwoordt_de_ronde_putten_zonder_maat() -> None:
+    """Een ronde put zonder breedte of lengte is niet te toetsen; dat hoort in de toelichting.
+
+    De fixture kent zulke putten niet -- alle drie dragen beide maten -- dus put A wordt
+    hier van zijn lengte ontdaan, zodat de verantwoordingsregel zichtbaar wordt.
+    """
+    config = fixtureconfig()
+    ruw = load_dataset(TTL_DIR / "attr016_ronde_put_ongelijk.ttl")
+    put = next(node for node in ruw.nodes.values() if node.label == "A")
+    nodes = dict(ruw.nodes)
+    nodes[put.uri] = replace(put, aspects=tuple(a for a in put.aspects if a.kind != "LengtePut"))
+    context = CheckContext(dataset=replace(ruw, nodes=nodes), config=config)
+
+    outcome = run_checks(context, ["ATTR-016"]).outcomes[0]
+
+    assert labels(outcome) == []
+    assert any(
+        "1 van de 2 ronde putten missen een breedte of een lengte" in note for note in outcome.notes
+    ), outcome.notes
 
 
 def test_attr009_meldt_beide_lengten() -> None:
