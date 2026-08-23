@@ -119,7 +119,7 @@ def test_de_weggezette_vulwaarden_staan_onder_de_inwinningstabel(tmp_path: Path)
     """De vulwaarde-leesregel verlaagt de noemers van deze tabel; het rapport zegt het erbij.
 
     `bepaal_karakteristiek` draait op de gemarkeerde dataset, dus een hoogte binnen de
-    band telt niet meer als registratie. Op De Wolden scheelt dat bijna 15.000 waarden
+    band telt niet meer als registratie. Op De Wolden en Hoogeveen scheelt dat bijna 15.000 waarden
     (BO-27); een noemer die zonder uitleg verspringt leest als een meetfout.
     """
     config = load_check_config()

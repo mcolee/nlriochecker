@@ -1,7 +1,7 @@
 """Externe geodata uit `data/gis_koekangerveld/` voor de EXT- en AHN-checks.
 
 De aangeleverde bronnen dekken alleen het studiegebied Koekangerveld, terwijl de
-GWSW-dataset de hele gemeente De Wolden beslaat. Een GWSW-object buiten dat gebied
+GWSW-dataset de gemeenten De Wolden en Hoogeveen beslaat. Een GWSW-object buiten dat gebied
 mag daarom nooit een check-uitslag krijgen: dat er geen BGT-deksel of BAG-pand in de
 buurt ligt zegt daar niets over de datakwaliteit en alles over de dekking van de
 bron. Alle EXT- en AHN-checks vragen daarom eerst `binnen_bereik()` en laten de rest

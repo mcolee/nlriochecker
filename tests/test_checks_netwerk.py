@@ -42,7 +42,7 @@ def test_net001_vindt_het_losse_deelstelsel() -> None:
 def test_net001_accepteert_een_overnamepunt_op_de_orientatie(tmp_path: Path) -> None:
     """De belofte van BO-33 nagemeten: een geleverd overnamepunt werkt meteen.
 
-    De Wolden levert er nul, dus zonder deze fixture draait de hele route
+    De Wolden en Hoogeveen levert er nul, dus zonder deze fixture draait de hele route
     `_eindpunten` -> `of_class` -> `types_of` -> `orientation_types` op geen enkele
     dataset en in geen enkele test. `gwsw:Overnamepunt` is een subklasse van
     `Aansluitpunt` en dus van `Knooppunt`, en staat daarom op de ORIENTATIE van de
@@ -163,7 +163,7 @@ def test_net007_zwijgt_als_er_een_drempel_is() -> None:
 
 
 def test_net007_zwijgt_bij_overstortput_zonder_los_drempelobject() -> None:
-    # Zoals overstorten op de De Wolden-export staan: een Overstortput met een
+    # Zoals overstorten op de De Wolden en Hoogeveen-export staan: een Overstortput met een
     # Overstortleiding, geen los Overstortdrempel-object. NET-007 hoort die vorm te
     # herkennen; deed hij dat niet, dan meldde hij elk infiltratieriool. Zie issue #42.
     assert _labels("net007_it_met_overstortput.ttl", "NET-007") == []
@@ -364,7 +364,7 @@ def test_net001_laat_de_clusterduiding_aan_het_rapport() -> None:
     """De check kent de afbakening niet, dus telt hij de deelstelsels niet zelf.
 
     Zou hij dat wel doen, dan meldde een tot een buurt afgebakend rapport het
-    aantal deelstelsels van de hele dataset -- op De Wolden 174 bij 24 bevindingen.
+    aantal deelstelsels van de hele dataset -- op De Wolden en Hoogeveen 174 bij 24 bevindingen.
     """
     outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
 

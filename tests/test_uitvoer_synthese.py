@@ -111,7 +111,7 @@ def _melding(object_label: str, check_id: str) -> Melding:
 def test_lijst_met_verdachte_objecten_wordt_afgekapt() -> None:
     """Zeventien objecten uitschrijven maakt de synthese onleesbaar.
 
-    Op De Wolden droegen 17 objecten meldingen uit drie of meer checks; die alle
+    Op De Wolden en Hoogeveen droegen 17 objecten meldingen uit drie of meer checks; die alle
     in een zin noemen verdrinkt de boodschap.
     """
     meldingen = [
@@ -166,7 +166,7 @@ class TestRodeDraadEnDeNulmeting:
     def test_nulmetingmeldingen_maken_geen_verdacht_object(self) -> None:
         """Drie SHACL-vormen op een put zijn geen drie onafhankelijke checks.
 
-        Op De Wolden dragen 23.296 focusnodes drie of meer vormen; zouden die
+        Op De Wolden en Hoogeveen dragen 23.296 focusnodes drie of meer vormen; zouden die
         meetellen, dan wijst deze sectie vrijwel elke put aan als verdacht.
         """
         from nlriochecker.uitvoer.melding import BRON_NULMETING

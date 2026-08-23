@@ -178,7 +178,7 @@ def _titel(run: CheckRun) -> str:
     """De titel van het rapport: de naam van het gebied waar het over gaat.
 
     De lezer moet aan de titel kunnen zien waar dit rapport over gaat; "Checkbevindingen
-    dewolden_orox.ttl" zei dat niet zodra er per buurt gerapporteerd werd.
+    dewoldenhoogeveen_orox.ttl" zei dat niet zodra er per buurt gerapporteerd werd.
 
     Bij een gebied zonder `naam_gebied` -- een bestand met een enkele feature -- valt de
     titel terug op de aanduiding die `StudyArea` zelf samenstelt uit het bestand en de
@@ -448,7 +448,7 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     """Het detail van de GWSW-nulmeting: per SHACL-vorm, eerst fouten dan waarschuwingen.
 
     Per vorm en niet per melding. De vormen zijn er honderden en de meldingen op De
-    Wolden ruim honderdduizend; een lijst daarvan is geen rapport maar een CSV. Wat
+    Wolden en Hoogeveen ruim honderdduizend; een lijst daarvan is geen rapport maar een CSV. Wat
     een lezer hier nodig heeft is welke eis waar de mist in gaat, hoe vaak, en welke
     conformiteitsklassen hem stellen. De losse meldingen staan in `bevindingen.csv`
     en op de kaart.

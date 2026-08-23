@@ -63,6 +63,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De De Wolden-dataset heet overal "De Wolden en Hoogeveen"**. De zware integratietest
+  laadt de volledige OroX-export die niet alleen De Wolden maar ook Hoogeveen beslaat; de
+  oude naam suggereerde ten onrechte één gemeente. Het aangeleverde OroX-bestand heet nu
+  `dewoldenhoogeveen_orox.ttl`, en identifiers, testnamen en proza volgen. De geleverde
+  SHACL-nulmeting blijft `dewolden_orox.ttl` melden: dat is de naam waarmee die validatie
+  destijds draaide, en aangeleverde invoer wijzigen we niet.
 - **Twee klassenlijsten in `checks.toml` doen weer wat ze zeggen** (issue #56). `[klassen]
   mechanisch` noemt nu de twee ontologische wortels `MechanischeRioolleiding` en
   `MechanischeTransportleiding` in plaats van de drie losse bladen; dat sluit het gat met de

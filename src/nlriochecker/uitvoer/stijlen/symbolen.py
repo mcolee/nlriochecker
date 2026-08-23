@@ -101,7 +101,7 @@ class Lijnsymbool:
 # Knooppunttypen. De GWSW-namen zijn de korte klassenamen zoals
 # `GwswDataset.beheerobjecttype` ze oplevert; de filters vergelijken
 # hoofdletterongevoelig, want exports schrijven ze niet allemaal gelijk
-# (De Wolden heeft `DwaPerceelaansluitleiding` waar de SLD `DWAPerceelaansluitleiding`
+# (De Wolden en Hoogeveen heeft `DwaPerceelaansluitleiding` waar de SLD `DWAPerceelaansluitleiding`
 # noemt).
 PUNTSYMBOLEN: dict[str, Puntsymbool] = {
     # Putten (PDOK; Put.sld)
@@ -148,7 +148,7 @@ PUNTSYMBOLEN: dict[str, Puntsymbool] = {
     "IBA": Puntsymbool("square", 3.0, "Bouwwerk.sld: IBA"),
     "Septictank": Puntsymbool("square", 3.0, "Bouwwerk.sld: IBA"),
     "RWZI": Puntsymbool("square", 4.0, "Bouwwerk.sld: RWZI"),
-    # Hulpstukken. De SLD's kennen ze niet als eigen regel, maar De Wolden telt er
+    # Hulpstukken. De SLD's kennen ze niet als eigen regel, maar De Wolden en Hoogeveen telt er
     # 1.122; ze stil in het vangnet laten vallen zou de kaart onnodig laten schreeuwen
     # over objecten die gewoon zijn wat ze zijn.
     "T_stuk": Puntsymbool("cross2", 2.4, "geen SLD-regel; hulpstuk"),
@@ -434,7 +434,7 @@ def _statusregels() -> list[tuple[str, str, str]]:
 def _filter_type(objecttype: str) -> str:
     """Een hoofdletterongevoelige vergelijking op `objecttype`.
 
-    Exports schrijven de klassenaam niet allemaal gelijk: De Wolden heeft
+    Exports schrijven de klassenaam niet allemaal gelijk: De Wolden en Hoogeveen heeft
     `DwaPerceelaansluitleiding` waar de PDOK-SLD `DWAPerceelaansluitleiding` noemt.
     Hoofdlettergevoelig filteren zou zulke objecten stil in het vangnet laten vallen.
     """

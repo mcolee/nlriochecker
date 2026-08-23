@@ -306,7 +306,7 @@ def test_hgt001_meldt_een_maaiveld_uit_hetzelfde_hoogtemodel(
 def test_hgt001_valt_terug_op_de_wijze_van_het_punt(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
-    """Put E heeft geen putdekselniveau, net als elke put in De Wolden.
+    """Put E heeft geen putdekselniveau, net als elke put in De Wolden en Hoogeveen.
 
     De check valt dan terug op de maaiveldhoogte, en die draagt haar
     inwinningswijze niet zelf maar op het Punt van de maaiveldorientatie. Zonder
@@ -346,7 +346,7 @@ def test_lege_lijst_zet_de_kanttekening_uit(config: CheckConfig, bronnen: Extern
 def test_hgt001_en_hgt002_claimen_geen_dekselhoogte() -> None:
     """De titel mag niet meer onvoorwaardelijk over de dekselhoogte spreken.
 
-    In De Wolden ontbreekt `Putdekselniveau` en toetst de check de maaiveldhoogte;
+    In De Wolden en Hoogeveen ontbreekt `Putdekselniveau` en toetst de check de maaiveldhoogte;
     de titel voedt ook de dekkingsmatrix en het registeroverzicht, dus hij hoort
     beide kenmerken te dekken in plaats van er een te claimen.
     """

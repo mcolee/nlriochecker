@@ -154,7 +154,7 @@ def test_maaiveldorientatie_herleidt_via_hasconnection(
 ) -> None:
     """De maaiveldorientatie hangt via hasConnection onder de putorientatie.
 
-    Op De Wolden zijn dat 1.605 overtredingen die anders geen put zouden vinden,
+    Op De Wolden en Hoogeveen zijn dat 1.605 overtredingen die anders geen put zouden vinden,
     terwijl ze wel over het maaiveld van een bestaande put gaan.
     """
     bevinding = _een(bevindingen, "Maaiveldorientatie_Putorientatie_card", "PutC_ori_maa")

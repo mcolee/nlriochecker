@@ -70,7 +70,7 @@ class TestStatus:
         assert bepaal_status([_melding("F", systemisch=True)], geanalyseerd=False) == STATUS_GRIJS
 
     def test_systemische_meldingen_tellen_niet_mee(self) -> None:
-        """Anders is op De Wolden vrijwel elke put rood en zegt de kaart niets meer.
+        """Anders is op De Wolden en Hoogeveen vrijwel elke put rood en zegt de kaart niets meer.
 
         Dezelfde regel als `ergste_ernst`, `n_fout` en `n_waarschuwing` al volgen.
         """

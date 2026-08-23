@@ -1,8 +1,8 @@
 """EXT-checks en de AHN-hoogtechecks: toetsing tegen externe bronnen.
 
 Alle bronnen in `data/gis_koekangerveld/` dekken uitsluitend het studiegebied
-Koekangerveld, terwijl de GWSW-dataset de hele gemeente De Wolden beslaat. Een GWSW-object daar
-buiten krijgt daarom geen uitslag maar de status *buiten studiegebied*: dat er geen
+Koekangerveld, terwijl de GWSW-dataset de gemeenten De Wolden en Hoogeveen beslaat. Een
+GWSW-object daar buiten krijgt daarom geen uitslag maar de status *buiten studiegebied*: dat er geen
 BGT-deksel of BAG-pand naast ligt zegt daar niets over de datakwaliteit en alles
 over de dekking van de bron. Elke check meldt in haar toelichting hoeveel objecten
 om die reden buiten beschouwing bleven.
@@ -846,7 +846,7 @@ class _DekselAfwijking(_AhnCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de geregistreerde maaiveldhoogte met het AHN.
 
-        De De Wolden-export bevat geen `Putdekselniveau`; de `Maaiveldhoogte` bij de
+        De De Wolden en Hoogeveen-export bevat geen `Putdekselniveau`; de `Maaiveldhoogte` bij de
         put is dan de dichtstbijzijnde benadering van de dekselhoogte. Welke van de
         twee gebruikt is staat in de melding.
         """
@@ -921,7 +921,7 @@ def _kenmerknotitie(vergeleken: list[Node]) -> list[str]:
 
     Het register spreekt van de dekselhoogte, maar de check valt terug op de
     maaiveldhoogte als `Putdekselniveau` ontbreekt — zoals in de hele De
-    Wolden-export. Zonder deze regel claimt het rapport iets anders te hebben
+    Wolden en Hoogeveen-export. Zonder deze regel claimt het rapport iets anders te hebben
     getoetst dan het deed.
     """
     if not vergeleken:

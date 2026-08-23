@@ -35,7 +35,7 @@ def test_maximale_strenglengte_volgt_de_ontologie() -> None:
     """De bovengrens van ATTR-008 is de GWSW-ontologiegrens, niet 200 m (issue #35).
 
     `Dt_LengteLeiding` declareert een bereik van 1-75 m. De oude drempel 200 keurde
-    strengen goed die de SHACL-nulmeting in hetzelfde rapport afkeurde (op De Wolden
+    strengen goed die de SHACL-nulmeting in hetzelfde rapport afkeurde (op De Wolden en Hoogeveen
     431 vrijvervalstrengen); GWSW is leidend. De ondergrens 1 m valt al samen met de
     ontologie.
     """
@@ -191,7 +191,7 @@ CONFIGBESTANDEN = [
 ]
 
 # Sleutels van `[drempels]` waarvoor `configs/dewoldenhoogeveen.toml` bewust van de
-# `CheckThresholds`-default afwijkt, met de reden. Vandaag leeg: De Wolden draait op de
+# `CheckThresholds`-default afwijkt, met de reden. Vandaag leeg: De Wolden en Hoogeveen draait op de
 # standaardwaarden. Een project *mag* afwijken -- maar dan als bewuste daad die hier
 # opgeschreven staat, niet als een getal dat stilzwijgend uit elkaar loopt.
 BEWUSTE_AFWIJKINGEN: dict[str, str] = {}
@@ -305,7 +305,7 @@ def test_bewuste_afwijking_wijkt_ook_werkelijk_af() -> None:
 
 
 # Sleutels van `[klassen]` waarvoor `configs/dewoldenhoogeveen.toml` bewust van
-# `src/nlriochecker/checks.toml` afwijkt, met de reden. Vandaag leeg: De Wolden draait
+# `src/nlriochecker/checks.toml` afwijkt, met de reden. Vandaag leeg: De Wolden en Hoogeveen draait
 # op dezelfde klassenlijsten. Een project *mag* afwijken -- dat is juist waar een
 # projectconfiguratie voor dient -- maar dan als bewuste daad die hier opgeschreven
 # staat, niet als een lijst die stilzwijgend uit elkaar loopt.

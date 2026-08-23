@@ -16,7 +16,7 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 - Een regel per overtreding; er is geen aggregatiegewicht.
 
 ### OroX-dataset (data/gwsw_orox_ttl/)
-- Turtle hoort utf-8 te zijn, maar de BrutIS-export van De Wolden bevat een handvol CP850-bytes in straatnamen. De lader valt terug op een instelbare codering en meldt dat expliciet; nooit stilzwijgend tekens vervangen.
+- Turtle hoort utf-8 te zijn, maar de BrutIS-export van De Wolden en Hoogeveen bevat een handvol CP850-bytes in straatnamen. De lader valt terug op een instelbare codering en meldt dat expliciet; nooit stilzwijgend tekens vervangen.
 - Een knoop is een object met een orientatie van het type `Knooppunt` (Putorientatie, Bouwwerkorientatie, Compartimentorientatie, Hulpstukorientatie, Aansluitpunt, Afvoerpunt en verder). Een verbinding is een orientatie van het type `Verbinding`. Herken ze daaraan, niet aan hun geometrie: een knooppunt mag geen punt hebben.
 - `gwsw:hasConnection` is een owl:SymmetricProperty zonder inverse; lees beide schrijfrichtingen.
 - De koppeling wijst naar de ORIENTATIE, niet naar het object, en kan naar een compartiment of hulpstuk wijzen; loop via hasPart omhoog tot een put.
@@ -130,7 +130,7 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 - De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
   over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
   `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
-  De cachemap groeit per sleutel (op De Wolden ruim 450 MB); oude sleutels worden niet
+  De cachemap groeit per sleutel (op De Wolden en Hoogeveen ruim 450 MB); oude sleutels worden niet
   automatisch opgeruimd.
 - Voortgang bij de zware stappen loopt via het protocol in `voortgang.py`, met
   `NUL_VOORTGANG` als standaardwaarde. Geinstrumenteerd zijn `load_dataset`,

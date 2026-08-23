@@ -854,7 +854,7 @@ class PropertyTegenOntologie(Check):
     constructie: een `allValuesFrom` over een afwezige property is vacuously true (issue
     #37). De check is generiek over alle kenmerktypen en meldt per kenmerk een keer, als
     systemische melding over de hele export -- niet per object, want dat zijn er op De
-    Wolden 23.440.
+    Wolden en Hoogeveen 23.440.
     """
 
     id = "ATTR-014"

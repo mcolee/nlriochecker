@@ -1,7 +1,7 @@
 """Voortgang van de zware stappen, als protocol.
 
 De pijplijn heeft stappen die minuten kosten: het inlezen van de TTL's (op de
-De Wolden-export ruim drie minuten), het draaien van de checks en het wegschrijven
+De Wolden en Hoogeveen-export ruim drie minuten), het draaien van de checks en het wegschrijven
 van de GeoPackage. Zonder terugkoppeling is er geen verschil te zien tussen
 "rekent" en "hangt".
 

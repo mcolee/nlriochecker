@@ -115,7 +115,8 @@ BEKENDE_AFWIJKINGEN: dict[tuple[str, str], str] = {
 # `("Metselwerk", "MateriaalPutColl")` stond hier tot issue #43. Die afwijking heeft geen
 # drager meer: `[[leiding_put_materiaal]]` noemt sinds de omkering alleen nog
 # onwaarschijnlijke putmaterialen, en `Metselwerk` staat op geen van die twee lijsten.
-# Dat is geen antwoord op vraag 2 van issue #47 -- de 33 gemetselde putten van De Wolden
+# Dat is geen antwoord op vraag 2 van issue #47 -- de 33 gemetselde putten
+# van De Wolden en Hoogeveen
 # werden ook voorheen niet gemeld -- maar het pakket claimt niet langer dat `Metselwerk`
 # een putmateriaal is. Zie BO-35 en BO-36.
 

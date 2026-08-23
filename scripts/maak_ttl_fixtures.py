@@ -134,7 +134,7 @@ def maaiveld(naam: str, hoogte: float, wijze: str | None = None) -> str:
     """Hangt een maaiveldorientatie met maaiveldhoogte aan een putorientatie.
 
     Met `wijze` krijgt de orientatie ook een puntgeometrie met inwinning erop, zoals
-    de BrutIS-export van De Wolden die schrijft: de inwinningswijze hangt daar aan
+    de BrutIS-export van De Wolden en Hoogeveen die schrijft: de inwinningswijze hangt daar aan
     het Punt-aspect en niet aan de maaiveldhoogte zelf.
     """
     if wijze is None:
@@ -694,7 +694,7 @@ def hoogteput(
 ):
     """Een put met maaiveld, putdeksel en puthoogte.
 
-    Met `dek=None` krijgt de put geen putdeksel. Zo ziet de De Wolden-export eruit:
+    Met `dek=None` krijgt de put geen putdeksel. Zo ziet de De Wolden en Hoogeveen-export eruit:
     daarin komt `Putdekselniveau` geen enkele keer voor, zodat de hoogtechecks op de
     maaiveldhoogte terugvallen.
     """
@@ -1228,7 +1228,7 @@ FIXTURES["ext_scenario.ttl"] = (
     # Put D ligt buiten het studiegebied en mag geen enkele uitslag krijgen.
     + hoogteput("PutD", "D", EXT_D, mv=99.00, dek=99.00)
     # Put F ligt op de nodata-vlek van het raster.
-    # Put E heeft geen putdekselniveau, net als elke put in De Wolden. De hoogtechecks
+    # Put E heeft geen putdekselniveau, net als elke put in De Wolden en Hoogeveen. De hoogtechecks
     # vallen dan terug op de maaiveldhoogte, en die komt hier uit AHN2. Zijn afwijking
     # is 0,08 m, dus hij komt in HGT-001 terecht.
     + hoogteput("PutE", "E", EXT_E, mv=10.08, dek=None, mv_wijze="AHN2")
@@ -1352,7 +1352,7 @@ FIXTURES["geometriefout.ttl"] = (
 )
 
 # ---------------------------------------------------------------------------
-# Vier vormen die de lader zelf moeten bijten. De Wolden kent ze geen van vieren,
+# Vier vormen die de lader zelf moeten bijten. De Wolden en Hoogeveen kent ze geen van vieren,
 # dus zonder deze fixtures is er geen dataset waarop de reparaties uit issue #36
 # zichtbaar zijn. Ze dragen geen defect: ze zijn conform GWSW 1.6 geschreven en
 # horen dus juist wél gelezen te worden.

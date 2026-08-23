@@ -118,7 +118,7 @@ def test_put_aan_alleen_een_persleiding_is_niet_losliggend() -> None:
     """TOP-001 vraagt of er enige streng aansluit, niet of er vrijverval aansluit.
 
     Zou alleen op vrijvervalleidingen gekeken worden, dan zou elke put van de
-    drukriolering als losliggend gelden; in De Wolden zijn dat er duizenden.
+    drukriolering als losliggend gelden; in De Wolden en Hoogeveen zijn dat er duizenden.
     """
     bevindingen = _bevindingen(TTL_DIR / "top001_put_aan_persleiding.ttl", "TOP-001")
 

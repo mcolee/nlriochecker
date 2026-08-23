@@ -12,7 +12,7 @@ Drie dingen gebeuren hier, en nergens anders:
    `lei2806-2807-1_lei2706_beg2706` is een `BeginpuntLeiding` die via `hasPart` onder
    de leidingorientatie hangt en via `hasAspect` onder de streng. Er wordt daarom
    omhooggelopen tot een knoop of streng -- dezelfde beweging als
-   `dataset.resolve_network_node`. Op De Wolden herleidt 98% van de overtredingen zo
+   `dataset.resolve_network_node`. Op De Wolden en Hoogeveen herleidt 98% van de overtredingen zo
    tot een object: 103.780 van de 105.963. Wat overblijft zijn de stelsels
    (`vw_geb_6`, 575 stuks) en drie klassenamen uit `CfkTypes_typ` -- objecten die
    geen put en geen streng zijn, en dat ook niet horen te worden.
@@ -145,7 +145,7 @@ def _ontdubbel(nulmeting: Nulmeting) -> dict[tuple[str, str, str], _Gegevens]:
     """Groepeert de meldingen van alle rapporten op (vorm, focusnode, boodschap).
 
     De eerste CFK op alfabet levert de ernst, de waarde, het objecttype en het label.
-    Op de drie meegeleverde De Wolden-rapporten zijn die over alle 105.963 sleutels
+    Op de drie meegeleverde De Wolden en Hoogeveen-rapporten zijn die over alle 105.963 sleutels
     gelijk, en dat is ook wat je verwacht zodra de boodschap gelijk is. Maar niets
     dwingt het af, dus wijken ze toch af, dan wordt dat gelogd in plaats van
     stilzwijgend de eerste te nemen -- zwijgen zou hier betekenen dat een CFK een
@@ -247,7 +247,7 @@ def _systemisch(
 class _Joiner:
     """Herleidt een SHACL-focusnode tot de knoop of streng waar hij bij hoort.
 
-    Houdt zijn antwoorden vast: op De Wolden komen dertigduizend focusnodes langs,
+    Houdt zijn antwoorden vast: op De Wolden en Hoogeveen komen dertigduizend focusnodes langs,
     en de opgaande wandeling raakt de rdflib-graaf.
     """
 
@@ -335,7 +335,7 @@ class _Joiner:
         `hasConnection` is geen insluiting maar een symmetrische netwerkverbinding.
         Hij doet daarom alleen mee bij de eerste stap en alleen als laatste. Die twee
         beperkingen samen zijn wat het veilig maakt: een `Maaiveldorientatie` hangt in
-        de De Wolden-export via `hasConnection` onder haar putorientatie en heeft
+        de De Wolden en Hoogeveen-export via `hasConnection` onder haar putorientatie en heeft
         verder geen houder, dus die wordt zo alsnog aan zijn put toegewezen (1.605
         overtredingen). Een `BeginpuntLeiding` heeft ook een `hasConnection`, naar de
         put aan die kant, maar heeft daarnaast een `hasPart`-houder in zijn
@@ -346,7 +346,7 @@ class _Joiner:
 
         Beide schrijfrichtingen van `hasConnection` worden gelezen. Het GWSW noemt hem
         een `owl:SymmetricProperty` zonder inverse, dus welke van de twee objecten
-        subject is, is een keuze van de exporteur. De De Wolden-export schrijft
+        subject is, is een keuze van de exporteur. De De Wolden en Hoogeveen-export schrijft
         `:knp1_put gwsw:hasConnection :knp1_put_maa`; een export die het andersom doet
         zou anders stil 1.605 meldingen van de kaart laten vallen.
         """

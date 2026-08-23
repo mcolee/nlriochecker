@@ -113,7 +113,9 @@ def test_vergelijkingsrapport(analyse, tmp_path: Path) -> None:
     markdown_path, csv_path, objects_path = write_comparison_reports(comparison, tmp_path)
 
     assert markdown_path.name == FILE_COMPARISON_MARKDOWN
-    assert "# Trendvergelijking dewolden_orox.ttl" in markdown_path.read_text(encoding="utf-8")
+    assert "# Trendvergelijking dewolden_orox.ttl" in markdown_path.read_text(
+        encoding="utf-8"
+    )
     verschillen = pd.read_csv(csv_path, sep=";", encoding="utf-8")
     assert set(verschillen["Niveau"]) == {"vorm", "objecttype"}
     objecten = pd.read_csv(objects_path, sep=";", encoding="utf-8")
@@ -396,7 +398,7 @@ def test_clusterduiding_telt_de_getoonde_bevindingen(tmp_path: Path) -> None:
 
     Dataset-breed liggen er twee losse deelstelsels; het studiegebied dekt er een.
     Een telling over de volledige dataset zou hier 2 melden bij 1 bevinding -- op De
-    Wolden werd dat "174 deelstelsels" bij 24 bevindingen.
+    Wolden en Hoogeveen werd dat "174 deelstelsels" bij 24 bevindingen.
     """
     run = _checkrun("net001_twee_losse_deelstelsels.ttl", "NET-001")
     assert len(run.findings) == 2
@@ -443,7 +445,7 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
     """Zwijgen hierover leest als "alles staat op de kaart".
 
     De GeoPackage telt ze in gwsw_run; wie alleen het rapport leest moet het daar
-    ook zien. Op de fixtures en op De Wolden komt dit niet voor -- daarom wordt het
+    ook zien. Op de fixtures en op De Wolden en Hoogeveen komt dit niet voor -- daarom wordt het
     hier met een aangepaste meldingenstroom afgedwongen.
     """
     import dataclasses

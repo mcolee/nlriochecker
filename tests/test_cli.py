@@ -642,7 +642,7 @@ def test_balkvoortgang_laat_geen_schrijffout_ontsnappen(
 
     `nlriochecker toets ... 2>&1 | head -1` laat de lezer van stderr wegvallen.
     Zonder afscherming sloeg de BrokenPipeError dwars door `run_checks` heen:
-    exitcode 1 en geen enkel uitvoerbestand -- op De Wolden ruim drie minuten
+    exitcode 1 en geen enkel uitvoerbestand -- op De Wolden en Hoogeveen ruim drie minuten
     laadwerk kwijt omdat een balk niet getekend kon worden.
 
     Getoetst op de adapter zelf en niet via een pijplijn: of een echte pijp op tijd
@@ -736,7 +736,7 @@ def test_toets_gebied_zonder_studiegebied_faalt(tmp_path: Path) -> None:
 
 
 def test_gebiedsvalidatie_gaat_vooraf_aan_het_laden(tmp_path: Path, monkeypatch) -> None:
-    """Op De Wolden kost laden ruim drie minuten; een defect gebiedsbestand hoort
+    """Op De Wolden en Hoogeveen kost laden ruim drie minuten; een defect gebiedsbestand hoort
     dat niet af te wachten."""
 
     def val(*args, **kwargs):

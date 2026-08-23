@@ -310,7 +310,8 @@ class VulwaardeOptions(BaseModel):
     hoogte_kenmerken: list[str] = Field(default_factory=list)
     # |waarde| kleiner dan of gelijk aan deze band telt als vulwaarde. De bovengrens is
     # geen drempel maar een invoertoets: een halve meter is als vulwaardeband al veel
-    # ruimer dan enig project nodig heeft (De Wolden komt uit op 0,01), en wie de eenheid
+    # ruimer dan enig project nodig heeft (De Wolden en Hoogeveen komt uit op 0,01),
+    # en wie de eenheid
     # mist en centimeters of millimeters invult (1 of 10 in plaats van 0,01) leest zonder
     # die grens elke BOB en elke maaiveldhoogte als ontbrekend: dertien checks vallen dan
     # stil en ATTR-013 meldt elk object dat een hoogte draagt.

@@ -546,7 +546,7 @@ class TestNulmetingInDeMeldingen:
     ) -> None:
         """De typeringspoort en de meldingen delen dezelfde ingelezen nulmeting.
 
-        Twee keer lezen zou op De Wolden ruim tweehonderdduizend regels dubbel
+        Twee keer lezen zou op De Wolden en Hoogeveen ruim tweehonderdduizend regels dubbel
         parsen, en de twee zouden bij een wijziging uit elkaar kunnen lopen.
         """
         gelezen: list[int] = []
@@ -586,7 +586,7 @@ class TestOntologiepoort:
         assert "onvolledige selectie" in boodschap
 
     def test_de_weigering_komt_voor_het_laden(self, tmp_path: Path) -> None:
-        """Laden kost op De Wolden ruim drie minuten; deze weigering is gratis.
+        """Laden kost op De Wolden en Hoogeveen ruim drie minuten; deze weigering is gratis.
 
         Aangetoond met een dataset die niet te parsen is: kwam de poort na het laden,
         dan stond hier de foutmelding van de parser.

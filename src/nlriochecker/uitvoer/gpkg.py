@@ -763,7 +763,7 @@ def _samenvatting(
 
     `reden` is gevuld als dit object niet beoordeeld is; dan is de status grijs en
     noemt de popup waarom. De status volgt verder dezelfde regel als `ergste_ernst`:
-    systemische meldingen tellen niet mee, want anders is op De Wolden vrijwel elke
+    systemische meldingen tellen niet mee, want anders is op De Wolden en Hoogeveen vrijwel elke
     put rood. Zie `objectkaart.bepaal_status`.
     """
     niet_systemisch = [melding for melding in eigen if not melding.systemisch]
@@ -1215,7 +1215,7 @@ def _schrijf_stijlen(verbinding: sqlite3.Connection) -> None:
 
 
 # De lagen waarvan de stijl opgebouwd wordt in plaats van uit een bestand te komen.
-# Hun regelstructuur is objecttype x status; op De Wolden zijn dat samen ruim honderd
+# Hun regelstructuur is objecttype x status; op De Wolden en Hoogeveen zijn dat samen ruim honderd
 # bladregels met evenzoveel symbolen, en die met de hand in XML onderhouden zou de
 # typenlijst op twee plekken zetten. Zie `stijlen/symbolen.py`.
 OPGEBOUWDE_STIJLEN = ("putten", "strengen")

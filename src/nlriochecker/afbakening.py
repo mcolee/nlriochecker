@@ -215,7 +215,7 @@ def _ouderketen(dataset: GwswDataset, uri: str | None, wortels: list[str]) -> se
 
     Dit is bewust een superset van het gevonden pad: `klim_naar_knoop` loopt in de
     breedte en geeft *elke* bezochte knoop terug, dus ook broers op de laatste laag en
-    doodgelopen takken. Met enkelvoudige houders (De Wolden) is dat dezelfde
+    doodgelopen takken. Met enkelvoudige houders (De Wolden en Hoogeveen) is dat dezelfde
     verzameling; met meervoudige houders groeit de schil met knopen die geen enkele
     resolutie nodig heeft. Veilig, want dit vult alleen de contextschil aan en die
     wordt nooit kern: wat erbij komt kan geen bevinding in het gebied opleveren. Het

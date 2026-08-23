@@ -21,7 +21,7 @@ De eigen checks uit het checkregister op de OroX-dataset draaien:
 
 ```bash
 nlriochecker toets \
-  --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+  --dataset data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl \
   --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
   --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv \
   --output uitvoer
@@ -105,13 +105,13 @@ klassen ligt hoger dan het totaal.
 De focusnode van een SHACL-melding is meestal een put of een streng, en anders een
 onderdeel daarvan: het eindpunt van een leiding, de maaiveldorientatie van een put. Zo'n
 onderdeel wordt via `hasPart`, `hasAspect` en als laatste `hasConnection` omhooggelopen
-tot het object waar het bij hoort. Op De Wolden herleidt daarmee 99,5% van de
+tot het object waar het bij hoort. Op De Wolden en Hoogeveen herleidt daarmee 99,5% van de
 overtredingen tot een put of een streng. Komt de focusnode nergens op uit -- een
 klassenaam uit `CfkTypes_typ`, een stelsel dat geen kaartobject is -- dan blijft de
 melding staan zonder object, zonder plek op de kaart en met een leeg gebied. Het rapport
 telt die gevallen expliciet, ook als het er nul zijn.
 
-Op de De Wolden-export leveren de drie rapporten samen 213.500 regels, en na ontdubbeling
+Op de De Wolden en Hoogeveen-export leveren de drie rapporten samen 213.500 regels, en na ontdubbeling
 105.963 meldingen: 87.017 fouten en 18.946 waarschuwingen. Dat is geen modelleerfout maar
 de uitslag van de nulmeting zelf; de zwaarste posten zijn drie kardinaliteitsvormen die
 vrijwel elke inspectieput raken. Precies daarvoor is de systemisch-vlag: die zegt dat het
@@ -124,7 +124,7 @@ dan een feature, dan rapporteert `toets` per feature:
 
 ```bash
 nlriochecker toets \
-  --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+  --dataset data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl \
   --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
   --studiegebied data/gis_koekangerveld/buurten.gpkg \
   --output uitvoer

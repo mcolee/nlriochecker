@@ -190,11 +190,11 @@ def test_elk_objecttype_in_de_voorbeelddataset_staat_in_de_tabel(juinen) -> None
     assert not strengen - set(LIJNSYMBOLEN)
 
 
-# De typen die de De Wolden-export bevat, geteld op 2026-08-19. Ze staan hier als
+# De typen die de De Wolden en Hoogeveen-export bevat, geteld op 2026-08-19. Ze staan hier als
 # lijst en niet als run over het bestand: dat laden kost ruim drie minuten en 3 GB, en
 # deze test hoort in elke suite mee te draaien. Wijzigt de export, dan hoort deze
 # lijst mee te wijzigen.
-DEWOLDEN_KNOPEN = (
+DEWOLDENHOOGEVEEN_KNOPEN = (
     "Inspectieput",
     "Pompunit",
     "T_stuk",
@@ -209,7 +209,7 @@ DEWOLDEN_KNOPEN = (
     "Drainageput",
     "Kolk",
 )
-DEWOLDEN_STRENGEN = (
+DEWOLDENHOOGEVEEN_STRENGEN = (
     "GemengdRiool",
     "Vuilwaterriool",
     "Hemelwaterriool",
@@ -231,8 +231,8 @@ DEWOLDEN_STRENGEN = (
 
 def test_elk_objecttype_uit_de_wolden_staat_in_de_tabel() -> None:
     """De acceptatie-eis van issue #14, zonder de export te hoeven laden."""
-    assert not set(DEWOLDEN_KNOPEN) - set(PUNTSYMBOLEN)
-    assert not set(DEWOLDEN_STRENGEN) - set(LIJNSYMBOLEN)
+    assert not set(DEWOLDENHOOGEVEEN_KNOPEN) - set(PUNTSYMBOLEN)
+    assert not set(DEWOLDENHOOGEVEEN_STRENGEN) - set(LIJNSYMBOLEN)
 
 
 def test_de_mechanische_lijnen_staan_als_streepjeslijn_in_de_tabel() -> None:

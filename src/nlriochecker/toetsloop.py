@@ -1,6 +1,6 @@
 """De toetsloop: dezelfde checks over nul, een of veel studiegebieden.
 
-Het laden van de dataset kost op de De Wolden-export ruim drie minuten en circa
+Het laden van de dataset kost op de De Wolden en Hoogeveen-export ruim drie minuten en circa
 3 GB; N keer laden is uitgesloten. Deze module laadt daarom niets zelf, maar krijgt
 de geladen dataset mee en bouwt er per gebied een eigen analyseset op. De
 schilsemantiek blijft daarmee per gebied gelijk aan die van een losse run: dat is de

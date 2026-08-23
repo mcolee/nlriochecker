@@ -194,7 +194,7 @@ def voer_toets_uit(
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset.
 
     De volgorde is niet vrij. De keuzes, de studiegebieden en de externe bronnen
-    worden getoetst voordat de dataset geladen wordt: op De Wolden kost dat laden
+    worden getoetst voordat de dataset geladen wordt: op De Wolden en Hoogeveen kost dat laden
     ruim drie minuten en circa 3 GB, en een typefout in `cfk` of `gebieden` hoort
     niet pas daarna te melden dat de run zinloos was. De dekkingspoort op de bronnen
     hangt alleen van die bronnen af en hoort om dezelfde reden vooraan.
@@ -270,7 +270,7 @@ def _eis_ontologie(opdracht: Toetsopdracht) -> None:
     Zonder ontologie kent de lader de subklassen van Knooppunt en Verbinding niet, en
     de OroX-export typeert geen enkel object op wortelniveau: `Inspectieput` staat er
     wel, `Put` niet. `putten()` en `leidingen()` leveren dan een lege verzameling en de
-    checks draaien over een onvolledige selectie -- op De Wolden zien 62 van de 89
+    checks draaien over een onvolledige selectie -- op De Wolden en Hoogeveen zien 62 van de 89
     checks er nul, en de achttien die via `netwerkknopen` gaan er 1.874 van de 23.485,
     want die selectie somt naast de wortels ook klassen op die de export wel
     rechtstreeks typeert. Hun uitkomst draagt dan geen oordeel, terwijl het rapport dat
@@ -280,7 +280,7 @@ def _eis_ontologie(opdracht: Toetsopdracht) -> None:
     (BO-7).
 
     Deze toets staat voor het laden, naast die op de keuzes en de bronnen: laden kost
-    op De Wolden ruim drie minuten en circa 3 GB, en deze weigering is gratis.
+    op De Wolden en Hoogeveen ruim drie minuten en circa 3 GB, en deze weigering is gratis.
     """
     if opdracht.ontologieen or opdracht.geen_ontologie:
         return
@@ -352,7 +352,7 @@ def _nulmeting(
     De overtredingen zelf worden bevindingen (`nulbevinding.py`), zodat elke
     uitvoervorm kan tonen welk gebrek uit de nulmeting komt en uit welke
     conformiteitsklasse. Beide komen uit hetzelfde ingelezen rapport: twee keer lezen
-    zou op De Wolden ruim tweehonderdduizend regels dubbel parsen, en de twee zouden
+    zou op De Wolden en Hoogeveen ruim tweehonderdduizend regels dubbel parsen, en de twee zouden
     bij een wijziging uit elkaar kunnen lopen.
 
     De niet-beoordeelde klassen (`TypingGate.unassessable_classes`) worden over de

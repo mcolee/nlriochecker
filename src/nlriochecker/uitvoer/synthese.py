@@ -127,7 +127,7 @@ def _multi_melding(meldingen: list[Melding], config: CheckConfig) -> list[str]:
     waarde" -- gaat niet op voor de nulmeting: haar vormen zijn niet onafhankelijk
     maar per kenmerk gesplitst, dus `Put_HoogtePut_card`,
     `Rioolput_Maaiveldschematisering_card` en `Rioolput_BergendOppervlak_card` slaan
-    per constructie samen aan. Op De Wolden dragen 23.296 van de 32.389 focusnodes
+    per constructie samen aan. Op De Wolden en Hoogeveen dragen 23.296 van de 32.389 focusnodes
     drie of meer verschillende vormen; die alle als "verdacht object" aanwijzen maakt
     van deze sectie ruis en geeft advies dat nergens toe leidt.
 

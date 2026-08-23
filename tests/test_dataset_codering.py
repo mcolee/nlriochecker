@@ -19,7 +19,7 @@ def test_utf8_bestand_meldt_geen_terugval() -> None:
 
 
 def test_cp850_bestand_wordt_gelezen_en_vastgelegd() -> None:
-    # Turtle hoort UTF-8 te zijn; de BrutIS-export van De Wolden is dat niet.
+    # Turtle hoort UTF-8 te zijn; de BrutIS-export van De Wolden en Hoogeveen is dat niet.
     dataset = load_dataset(TTL_DIR / "codering_cp850.ttl")
     fallback = dataset.decode_fallback
 

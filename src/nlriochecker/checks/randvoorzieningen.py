@@ -2,7 +2,7 @@
 
 Hoe overstorten in een export verschijnen ligt niet vast; het checkregister noemde
 dat als open punt 6, inmiddels afgehandeld op grond van wat hieronder staat.
-Empirisch op de De Wolden-export (zie
+Empirisch op de De Wolden en Hoogeveen-export (zie
 docs/beslislog.md): overstorten staan er als `Overstortput` met een
 `Overstortleiding` eraan. Losse `Overstortdrempel`-onderdelen met `Drempelniveau`
 en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel

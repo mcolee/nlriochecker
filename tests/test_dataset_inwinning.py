@@ -1,8 +1,8 @@
 """Tests voor de herkomst van de maaiveldhoogte.
 
-De BrutIS-export van De Wolden hangt een record-brede inwinningswijze aan het
+De BrutIS-export van De Wolden en Hoogeveen hangt een record-brede inwinningswijze aan het
 Punt-aspect van een orientatie en herhaalt hem op het kenmerk zelf. Bij AHN2
-blijft die herhaling uit: in de hele De Wolden-export komt AHN2 5104 keer voor op
+blijft die herhaling uit: in de hele De Wolden en Hoogeveen-export komt AHN2 5104 keer voor op
 het Punt van een maaiveldorientatie en geen enkele keer op de maaiveldhoogte.
 Zonder terugval op het Punt zou de helft van de maaiveldhoogten als herkomstloos
 gelden, terwijl juist die helft uit hetzelfde hoogtemodel komt als het AHN.

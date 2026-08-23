@@ -3,7 +3,7 @@
 De vaste fixtures (`buurten_twee.gpkg` en de twee losse buurten) komen uit
 `scripts/maak_gis_fixtures.py` en staan onder versiebeheer. Wat hier staat is voor
 de gevallen die niet als bestand willen bestaan: een gebiedsbestand dat uit de echte
-De Wolden-buurt afgeleid wordt, en de tachtig kunstmatige buurten van de schaaltest.
+De Wolden en Hoogeveen-buurt afgeleid wordt, en de tachtig kunstmatige buurten van de schaaltest.
 Die laatste zou als bestand alleen maar meeslepen, en met geopandas erbij zou hij een
 zware afhankelijkheid aan een test hangen die hem verder niet nodig heeft.
 

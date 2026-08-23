@@ -1,6 +1,6 @@
 """De geparseerde dataset bewaren, zodat een tweede run niet opnieuw hoeft te parsen.
 
-Gemeten op De Wolden: het TTL parsen kost circa 180 s, de structuren teruglezen 1,4 s
+Gemeten op De Wolden en Hoogeveen: het TTL parsen kost circa 180 s, de structuren teruglezen 1,4 s
 en de rdflib-graaf teruglezen 58 s. De graaf wordt daarom pas ingelezen als een check
 hem aanraakt; wie alleen geometrie- en netwerkchecks draait, betaalt hem niet.
 

@@ -44,7 +44,7 @@ class HoogteZonderInwinningsmetagegevens(_Metagegevensskelet):
     severity = Severity.WARNING
     dimension = Dimension.TRACEABILITY
     reden = (
-        "Niet gebouwd in deze fase. De De Wolden-export bevat 25.546 keer "
+        "Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat 25.546 keer "
         "`WijzeVanInwinning` en geen enkele `DatumInwinning`, dus de datumhelft van deze "
         "check is er sowieso niet. De wijze is er wel, maar zo dun dat een toets vrijwel "
         "alles zou melden: 266 van de 23.440 BOB's aan het beginpunt en 271 aan het "
@@ -65,7 +65,7 @@ class InwinningNietGemeten(_Metagegevensskelet):
     severity = Severity.WARNING
     dimension = Dimension.TRACEABILITY
     reden = (
-        "Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden wel op de "
+        "Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden en Hoogeveen wel op de "
         "kritieke hoogtekenmerken, maar op te weinig ervan om een uitslag op te baseren: "
         "537 van de 46.880 BOB's en 10.050 van de 22.363 maaiveldhoogten. Van die laatste "
         "zijn er 5.104 uit het AHN afgeleid en 1.351 met de waarde NietAchterhaald, dus "
@@ -84,7 +84,7 @@ class InwinningsdatumTeOud(_Metagegevensskelet):
     dimension = Dimension.TIMELINESS
     reden = (
         "Niet gebouwd in deze fase. Er is geen enkele `DatumInwinning` in de "
-        "De Wolden-export, en er is geen grondsoortenkaart aangeleverd om de drempel "
+        "De Wolden en Hoogeveen-export, en er is geen grondsoortenkaart aangeleverd om de drempel "
         "(zand 40 jaar, veen 10 jaar) op te differentieren."
     )
 
@@ -98,7 +98,7 @@ class GrondwaterstandBuitenBereik(_Metagegevensskelet):
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
     reden = (
-        "Niet gebouwd in deze fase. De De Wolden-export bevat geen enkel "
+        "Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat geen enkel "
         "`Grondwaterniveau`-kenmerk; er valt niets te toetsen."
     )
 

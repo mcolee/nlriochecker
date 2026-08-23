@@ -348,7 +348,7 @@ class GwswDataset:
         vragen: de eerste moet stoppen zodra hij een knoop uit het domeinmodel te pakken
         heeft, de tweede weegt de prioriteit van een melding op het knoop- of
         strengobject waaraan zij hangt. En hij spaart de
-        graafopvraging van `graph_types_of()` uit, die op elke wandeling over De Wolden
+        graafopvraging van `graph_types_of()` uit, die op elke wandeling over De Wolden en Hoogeveen
         meetelt.
         """
         object_types = self.types_of(uri)
@@ -765,7 +765,7 @@ def _maaiveld_kenmerk(graph: Graph, orientation: RdfNode) -> tuple[Aspect | None
 def _herkomst(graph: Graph, orientation: RdfNode, aspect: Aspect) -> Inwinning | None:
     """De inwinning van een kenmerk, met terugval op die van de puntgeometrie.
 
-    De BrutIS-export van De Wolden hangt een record-brede inwinningswijze aan het
+    De BrutIS-export van De Wolden en Hoogeveen hangt een record-brede inwinningswijze aan het
     Punt-aspect van de orientatie en herhaalt hem op het kenmerk zelf. Bij AHN2
     blijft die herhaling uit: dan staat de wijze uitsluitend op het Punt. Zonder
     deze terugval zou juist de uit het AHN afgeleide helft van de maaiveldhoogten
@@ -889,7 +889,7 @@ def markeer_vulwaarden(
 ) -> GwswDataset:
     """Leest een hoogtekenmerk binnen de vulwaardeband als niet geregistreerd.
 
-    Sommige exports schrijven 0,000 waar het kenmerk leeg hoort te zijn (De Wolden:
+    Sommige exports schrijven 0,000 waar het kenmerk leeg hoort te zijn (De Wolden en Hoogeveen:
     een kwart van de BOB's). De checks zouden die nul als meting lezen en er duizenden
     hoogtefouten van maken. Deze stap zet zo'n kenmerk op `None` en onthoudt op het
     object dat en welke waarde er stond, zodat ATTR-013 het een keer kan melden en de

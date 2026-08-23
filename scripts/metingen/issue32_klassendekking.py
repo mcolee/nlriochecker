@@ -1,8 +1,8 @@
-"""Meting bij issue #32: wat zouden de voorgestelde klassenlijsten op De Wolden doen?
+"""Meting bij issue #32: wat zouden de voorgestelde klassenlijsten op De Wolden en Hoogeveen doen?
 
 Issue #32 stelt per punt een uitbreiding van een `[klassen]`-lijst in `checks.toml`
 voor. Dit script wijzigt niets; het telt alleen hoeveel objecten in
-`data/gwsw_orox_ttl/dewolden_orox.ttl` door zo'n uitbreiding van categorie zouden
+`data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl` door zo'n uitbreiding van categorie zouden
 veranderen, zodat de auteur per punt kan zien of de ingreep gedragsneutraal is.
 
 Twee vragen worden hier streng gescheiden gehouden:
@@ -15,7 +15,7 @@ Twee vragen worden hier streng gescheiden gehouden:
   collectie als type. Alle klassen die dit script bevraagt zijn echte klassen, dus
   binnen deze meting valt het samen; buiten deze meting is het dat niet.
 * **Komen er instanties van voor in deze dataset?** Dat is een eigenschap van de
-  BrutIS-export van De Wolden en zegt iets over de aanlevering. Het antwoord staat
+  BrutIS-export van De Wolden en Hoogeveen en zegt iets over de aanlevering. Het antwoord staat
   in de kolommen `instanties`, `knopen` en `verbindingen`.
 
 Een klasse die wel bestaat maar nul instanties heeft, verandert op deze dataset
@@ -57,7 +57,7 @@ from rdflib import OWL, RDF, RDFS, Graph, URIRef
 
 WORTEL = Path(__file__).resolve().parents[2]
 ONTOLOGIE = WORTEL / "data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl"
-EXPORT = WORTEL / "data/gwsw_orox_ttl/dewolden_orox.ttl"
+EXPORT = WORTEL / "data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl"
 # De twee bestanden waarin `[klassen]` staat. De huidige lijsten worden hieruit
 # gelezen en niet overgeschreven uit het issue: anders zou de meting stil verouderen
 # zodra iemand een lijst aanpast.
@@ -73,7 +73,7 @@ CONTROLEVENSTERS = ((1, 150_000), (1_450_000, 150_000))
 # Een Turtle-regel mag op een commentaar eindigen, zoals
 # `rdf:type gwsw:VerdektePut ; # extra objecttype`; zonder deze staart mist de scan
 # zulke tripels stilzwijgend. Geen enkel gemeten bestand oefent haar uit: de
-# BrutIS-export van De Wolden schrijft nergens zo'n staart, en `_controleer_parser`
+# BrutIS-export van De Wolden en Hoogeveen schrijft nergens zo'n staart, en `_controleer_parser`
 # ijkt op een uittreksel van diezelfde export. De staart blijft staan als voorzorg voor
 # een export die het wel doet -- het handgeschreven voorbeeldbestand
 # `GwswDataset__Voorbeeld_v1_6_orox.ttl` is zo'n bestand -- niet als gemeten
@@ -373,7 +373,7 @@ def _punt3(export: Export, klassen: dict[str, object]) -> None:
     _kop("PUNT 3 -- klassen.stelseltypen: VrijvervalRioolleiding-subklassen zonder stelseltype")
     wortels = _stelselwortels(klassen)
     # De afsluiting en niet de rauwe lijst: een wortel dekt haar subklassen, dus die
-    # tellen als gedekt. Op De Wolden valt dat samen -- geen van deze wortels heeft
+    # tellen als gedekt. Op De Wolden en Hoogeveen valt dat samen -- geen van deze wortels heeft
     # subklassen -- maar tegen de rauwe lijst vergelijken geeft een te hoog aantal
     # zodra dat wel zo is.
     gedekt = export.ontologie.afsluiting(wortels)
@@ -449,7 +449,7 @@ def _punt6(export: Export, klassen: dict[str, object]) -> None:
     print(f"  Reservoir-afsluiting telt {len(afsluiting)} klassen (inclusief Reservoir zelf).")
     print(f"  huidig: {huidig}")
     # Vergelijk tegen de afsluiting van de huidige lijst en niet tegen de rauwe lijst:
-    # een wortel dekt haar subklassen. Op De Wolden valt dat samen -- de drie bassins
+    # een wortel dekt haar subklassen. Op De Wolden en Hoogeveen valt dat samen -- de drie bassins
     # hebben geen subklassen -- maar tegen de rauwe lijst vergelijken zou een te hoog
     # "niet gedekt" geven zodra dat wel zo is. `_verschil` hieronder gebruikt al de
     # afsluiting; dit trekt de twee gelijk.
@@ -457,7 +457,9 @@ def _punt6(export: Export, klassen: dict[str, object]) -> None:
     ontbreekt = [naam for naam in afsluiting if naam not in gedekt]
     print(f"  niet gedekt ({len(ontbreekt)}): {ontbreekt}")
     met_instanties = [naam for naam in afsluiting if export.instanties([naam])]
-    print(f"  Reservoir-klassen met instanties in De Wolden: {met_instanties or 'geen'}")
+    print(
+        f"  Reservoir-klassen met instanties in De Wolden en Hoogeveen: {met_instanties or 'geen'}"
+    )
     _verschil(
         "bergbezinkvoorzieningen",
         export.knopen_van(huidig),
@@ -554,13 +556,13 @@ def _toets_regelvorm(pad: Path) -> int:
     blanke knopen gebruikt (`gwsw:hasAspect [ rdf:type gwsw:Punt ; ... ]`) hoort een
     binnenste `rdf:type` bij de blanke knoop en niet bij het subject erboven, en zou
     de scan die stilzwijgend aan het verkeerde object toekennen. Het handgeschreven
-    voorbeeldbestand doet dat wel; de BrutIS-export van De Wolden nergens. Deze
+    voorbeeldbestand doet dat wel; de BrutIS-export van De Wolden en Hoogeveen nergens. Deze
     toets breekt af in plaats van een fout getal op te schrijven.
 
     De komma valt om dezelfde reden af. Een objectlijst (`rdf:type gwsw:A, gwsw:B ;`)
     komt langs `_TYPE`, `_ASPECT` en `_DEEL` niet als treffer binnen -- die eindigen
     op `_STAART` en dus op `;` of `.` -- en het tripel zou stil wegvallen. De export
-    van De Wolden bevat nul komma's; het handgeschreven voorbeeldbestand 43.
+    van De Wolden en Hoogeveen bevat nul komma's; het handgeschreven voorbeeldbestand 43.
 
     **Regeleinden.** Dit bestand is volledig CRLF. Dat gaat goed, maar niet door een
     keuze van deze code: Python opent tekstbestanden standaard met universele

@@ -15,7 +15,7 @@ tienduizenden keren in het bestand.
 
 Om dezelfde reden zijn de klassenamen kort. De markup staat per object in de
 GeoPackage, de stijl staat er een keer in de QML; wat hier een teken scheelt, scheelt
-op de volledige De Wolden-export tienduizenden keren zoveel. Gemeten op de
+op de volledige De Wolden en Hoogeveen-export tienduizenden keren zoveel. Gemeten op de
 Koekangerveld-run: 1.284 bytes per object met lange namen, 1.085 met korte, en dat
 schaalt op de 46.925 objecten van de volledige export naar circa 60 tegen circa 51 MB.
 De rest is de boodschaptekst zelf, en die valt niet in te korten zonder er informatie
@@ -90,7 +90,7 @@ def bepaal_status(meldingen: Sequence[Melding], *, geanalyseerd: bool) -> str:
     is kleurt het object, en de popup zegt erbij dat het maar deels beoordeeld is.
 
     Systemische meldingen tellen niet mee, net als in `ergste_ernst`, `n_fout` en
-    `n_waarschuwing`. Op De Wolden draagt de nulmeting 68.882 systemische meldingen
+    `n_waarschuwing`. Op De Wolden en Hoogeveen draagt de nulmeting 68.882 systemische meldingen
     op 105.963; zouden die meetellen, dan is vrijwel elke put rood en zegt de kaart
     niets meer. Gevolg: een object waarvan *alle* meldingen systemisch zijn krijgt
     groen (of grijs). Dat betekent hier "geen gebrek dat dit object van zijn buren

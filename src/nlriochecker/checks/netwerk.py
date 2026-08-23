@@ -110,7 +110,7 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     """De knopen die stroomafwaarts een van deze eindpunten bereiken.
 
     Een enkele doorloop over de omgekeerde graaf vanaf alle eindpunten tegelijk.
-    Per eindpunt afzonderlijk zoeken kost O(eindpunten x graaf): De Wolden heeft
+    Per eindpunt afzonderlijk zoeken kost O(eindpunten x graaf): De Wolden en Hoogeveen heeft
     893 gemalen op ruim 20.000 knopen, en dat loopt in de tientallen miljoenen
     stappen. Zo blijft het een enkele O(knopen + kanten)-doorloop.
     """
@@ -506,7 +506,7 @@ class ItStelselZonderDrempel(Check):
 
         Twee vormen, dezelfde als `checks/randvoorzieningen.py` leest: een los
         `Overstortdrempel`-onderdeel, en de overstortput zelf. Op de De
-        Wolden-export staan overstorten als `Overstortput` met een
+        Wolden en Hoogeveen-export staan overstorten als `Overstortput` met een
         `Overstortleiding`, niet als los `Overstortdrempel`-object (BO-34, open
         punt 6); alleen op `Overstortdrempel` afgaan liet de verzameling leeg en
         meldde elk infiltratieriool onvoorwaardelijk. Zie issue #42.

@@ -16,7 +16,7 @@
 #
 # Gebruik:
 #   uv run nlriochecker toets \
-#     --dataset data/gwsw_orox_ttl/dewolden_orox.ttl \
+#     --dataset data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl \
 #     --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
 #     --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv \
 #     --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_MdsPlan.csv \
@@ -46,20 +46,20 @@ streng = ["Leiding"]
 # kaartbeeld daar zou anders als "geen gebreken" lezen. De twee ontologische wortels in
 # plaats van de losse bladen (issue #56): `MechanischeRioolleiding` dekt Druk-, Lucht-
 # pers- en Vacuumleiding, `MechanischeTransportleiding` dekt Pers-, Leidingsegment- en
-# Spoelleiding, en dat sluit het gat met de symbolentabel. De Wolden telt eronder alleen
+# Spoelleiding, en dat sluit het gat met de symbolentabel. De Wolden en Hoogeveen telt eronder alleen
 # Persleiding 3548, Vacuumleiding 147, Drukleiding 25; nul van de rest.
 mechanisch = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
 # degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
-# ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden.
+# ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden en Hoogeveen.
 # Gemaal en Pompunit staan erbij als erkend noodverband: een vrijvervalstreng die
 # op een drukrioleringspomp eindigt gaat daar het mechanische stelsel in. Zonder
-# die regel geldt heel de drukriolering van De Wolden als onbereikbaar. Het
+# die regel geldt heel de drukriolering van De Wolden en Hoogeveen als onbereikbaar. Het
 # noodverband en het criterium om het los te laten staan in BO-33.
 afvoer_eindpunt = ["Overnamepunt", "Gemaal", "Pompunit"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
-# (een Bouwwerk) fysieke objecten zijn. De Wolden gebruikt alleen die laatste twee.
+# (een Bouwwerk) fysieke objecten zijn. De Wolden en Hoogeveen gebruikt alleen die laatste twee.
 # De losse klasse `Uitlaat` hoort er niet bij: die hangt onder RepresentatieFysiekObject
 # en belandt in geen van de twee selectiebakken; ze voegde niets toe (issue #56).
 lozings_eindpunt = [
@@ -86,7 +86,7 @@ drempel = ["Overstortdrempel"]
 functieloze_knoop = ["LozePut", "BlindePut", "Ontstoppingsstuk", "Verbindingsstuk"]
 
 # RVZ: hoe randvoorzieningen in de export verschijnen. Empirisch vastgesteld op de
-# De Wolden-export: overstorten staan er als Overstortput met een Overstortleiding
+# De Wolden en Hoogeveen-export: overstorten staan er als Overstortput met een Overstortleiding
 # eraan; losse Overstortdrempel-objecten met Drempelniveau komen er niet in voor.
 # Zie docs/beslislog.md.
 overstortput = ["Overstortput", "Stuwput"]
@@ -132,7 +132,7 @@ puttype = "Lozingsput"
 vereist_een_van = ["VrijvervalRioolleiding", "Duiker"]
 toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben."
 
-# HGT-007: RIONED-verhangstaffel per diameter. De Wolden volgt de standaardstaffel
+# HGT-007: RIONED-verhangstaffel per diameter. De Wolden en Hoogeveen volgt de standaardstaffel
 # uit src/nlriochecker/checks.toml; zie issue #29 voor de citaten en onderbouwing.
 [[verhang_staffel]]
 tot_diameter_mm = 250
@@ -350,7 +350,7 @@ vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 #
 # Wijzen die uit een landelijk hoogtemodel komen. Een maaiveldhoogte die zo is
 # ingewonnen, vergelijken HGT-001 en HGT-002 met haar eigen bron; de bevinding
-# krijgt daarom een kanttekening. In De Wolden geldt dat voor 5104 van de 22363
+# krijgt daarom een kanttekening. In De Wolden en Hoogeveen geldt dat voor 5104 van de 22363
 # maaiveldhoogten: daar staat AHN2 op het Punt-aspect van de maaiveldorientatie.
 # `AHN5` bestaat nog niet in GWSW 1.6: WijzeVanInwinningColl stopt bij AHN4. De waarde
 # blijft voorlopig staan, maar of ze hier hoort -- als vooruitloop op een latere
@@ -363,7 +363,7 @@ onbekend = ["NietAchterhaald"]
 
 [vulwaarden]
 # Hoogtekenmerken waarin deze bronexport 0,000 schrijft voor "niet geregistreerd".
-# In De Wolden is 25% van de BOB's en 14% van de maaiveldhoogten exact 0,00 bij een
+# In De Wolden en Hoogeveen is 25% van de BOB's en 14% van de maaiveldhoogten exact 0,00 bij een
 # maaiveld van 5 tot 17 m NAP. Zo'n waarde wordt na het laden als ontbrekend gelezen
 # en door ATTR-013 een keer per object gemeld; de hoogtechecks slaan het object over
 # en zeggen dat in hun toelichting. Een lege lijst zet de leesregel uit (laag
