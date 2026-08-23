@@ -2,19 +2,15 @@
   "enabledPlugins": {
     "python-library-complete@dev-skills": true,
     "superpowers@claude-plugins-official": true,
-    "mattpocock-skills@claude-plugins-official": true
+    "mattpocock-skills@claude-plugins-official": true,
+    "guard-pack@claude-code-hooks": true
   },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/guard-pack.js"
-          }
-        ]
+  "extraKnownMarketplaces": {
+    "claude-code-hooks": {
+      "source": {
+        "source": "github",
+        "repo": "karanb192/claude-code-hooks"
       }
-    ]
+    }
   }
 }
