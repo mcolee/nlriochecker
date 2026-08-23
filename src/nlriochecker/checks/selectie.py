@@ -92,10 +92,11 @@ def lozingspunten(context: CheckContext) -> list[Node]:
     rioolput) en `Uitlaatconstructie` (een bouwwerk) fysieke objecten zijn. Welke van
     de twee een export gebruikt verschilt per leverancier.
 
-    `Uitlaat` past in geen van beide bakken: die klasse hangt onder
-    `RepresentatieFysiekObject` en `TopologischElement`, niet onder `Knooppunt` en
-    niet onder `FysiekObject`. Ze staat nog in de lijst en levert op de De Wolden-export
-    nul objecten op; of ze eruit hoort is een gedragsvraag en hoort bij issue #32.
+    De losse klasse `Uitlaat` stond hier tot issue #56 en is geschrapt: die hangt onder
+    `RepresentatieFysiekObject` en `TopologischElement`, niet onder `Knooppunt` en niet
+    onder `FysiekObject`, en belandt dus in geen van beide bakken. Zelfs een object met
+    dubbele typering (`Uitlaatconstructie` én `Uitlaat`) matcht al via `Uitlaatconstructie`,
+    dus de regel voegde niets toe en las als dekking die er niet was.
     """
     return _knopen(context, "sel:lozingspunten", context.config.klassen.lozings_eindpunt)
 

@@ -24,6 +24,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Twee klassenlijsten in `checks.toml` doen weer wat ze zeggen** (issue #56). `[klassen]
+  mechanisch` noemt nu de twee ontologische wortels `MechanischeRioolleiding` en
+  `MechanischeTransportleiding` in plaats van de drie losse bladen; dat sluit het gat met de
+  symbolentabel, die `Leidingsegment` en `Luchtpersleiding` al als mechanische streepjeslijn
+  tekende terwijl de kaartstatus ze als getoetste vrijvervalstreng kleurde. De nieuwe set
+  `MECHANISCHE_LIJNEN` in `symbolen.py` maakt de mechanische lijnfamilie expliciet, en een
+  drifttest houdt hem naast de afsluiting van `[klassen] mechanisch`. Daarnaast is de losse
+  klasse `Uitlaat` uit `lozings_eindpunt` geschrapt: die hangt onder
+  `RepresentatieFysiekObject` en belandt in geen selectiebak, dus de regel voegde niets toe
+  (een stille nul). Op De Wolden verandert geen enkele bevinding — `mechanisch` stuurt alleen
+  de kaartkleur, niet de checkselectie, en de dataset telt nul `Uitlaat`, `Leidingsegment`,
+  `Luchtpersleiding` of `Spoelleiding`.
 - **Een lege rollijst zet een externe-bron-rol altijd uit, ook bij een eenlaagsbestand**
   (issue #53). `_lees_rol` koos de terugval `beschikbaar[:1]` voorheen alsnog wanneer een
   BGT-rol met `bgt_...lagen = []` naar een bestand met precies een laag wees, waardoor een

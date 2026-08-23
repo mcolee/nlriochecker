@@ -78,7 +78,7 @@ import pytest
 from nlriochecker.checkconfig import ClassRoots, load_check_config
 from nlriochecker.dataset import VULWAARDE_KENMERKEN
 from nlriochecker.plausibiliteit import load_plausibility
-from nlriochecker.uitvoer.stijlen.symbolen import LIJNSYMBOLEN, PUNTSYMBOLEN
+from nlriochecker.uitvoer.stijlen.symbolen import LIJNSYMBOLEN, MECHANISCHE_LIJNEN, PUNTSYMBOLEN
 
 WORTEL = Path(__file__).resolve().parents[1]
 BRON = WORTEL / "src" / "nlriochecker"
@@ -642,6 +642,30 @@ def test_de_symbolentabel_raakt_niet_verder_achterop() -> None:
         f"{len(nieuw)} klasse(n) onder {', '.join(SYMBOOLWORTELS)} hebben geen symbool en "
         f"staan niet op NOG_ONGEDEKTE_KLASSEN: {', '.join(nieuw)}.\n"
         "Geef ze een regel in symbolen.py, of zet ze op de lijst als bewuste huidige stand."
+    )
+
+
+def test_symbolen_en_checks_zijn_het_eens_over_mechanisch() -> None:
+    """symbolen.py en checks.toml spreken elkaar niet tegen over wat mechanisch is.
+
+    symbolen.py tekent `MECHANISCHE_LIJNEN` als streepjeslijn -- het beeld van een
+    leiding zonder vrij verval. checks.toml bepaalt via `[klassen] mechanisch` welke
+    strengen op de kaart grijs blijven zolang er niets op staat. Lopen de twee uiteen,
+    dan tekent de kaart een leiding als mechanisch terwijl de status hem als getoetste
+    vrijvervalstreng kleurt (issue #56). Elke mechanisch getekende klasse hoort dus in de
+    afsluiting van de mechanisch-wortels te vallen -- de subklasse-afsluiting, want
+    checks.toml noemt de wortels (`MechanischeRioolleiding`, `MechanischeTransportleiding`)
+    en niet elk blad.
+    """
+    wortels = load_check_config().klassen.mechanisch
+    afsluiting: set[str] = set()
+    for wortel in wortels:
+        afsluiting |= _afsluiting(wortel)
+
+    ontbreekt = MECHANISCHE_LIJNEN - afsluiting
+    assert not ontbreekt, (
+        f"{', '.join(sorted(ontbreekt))} wordt in symbolen.py als mechanisch getekend maar "
+        f"valt niet onder [klassen] mechanisch = {wortels}."
     )
 
 

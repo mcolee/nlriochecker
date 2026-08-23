@@ -219,6 +219,22 @@ LIJNSYMBOLEN: dict[str, Lijnsymbool] = {
     "Pomp": Lijnsymbool(0.6, "dot", "geen SLD-regel; onderdeel"),
 }
 
+# De leidingklassen die hierboven de mechanische (streepjes)lijn krijgen: het beeld van
+# een leiding zonder vrij verval. Expliciet, zodat een test hem naast `[klassen]
+# mechanisch` in checks.toml kan houden -- lopen de twee uiteen, dan tekent de kaart een
+# leiding als mechanisch terwijl de status hem als getoetste vrijvervalstreng kleurt
+# (issue #56). `Zinker` valt hier bewust buiten: die is óók een streepjeslijn maar een
+# vrijvervalleiding onder een watergang, geen mechanisch riool.
+MECHANISCHE_LIJNEN = frozenset(
+    {
+        "Persleiding",
+        "Leidingsegment",
+        "Drukleiding",
+        "Vacuumleiding",
+        "Luchtpersleiding",
+    }
+)
+
 VANGNET_LIJN = Lijnsymbool(0.9, "dash dot dot", "geen; vangnet")
 VANGNET_LIJN_LABEL = "objecttype niet in de symbolentabel"
 

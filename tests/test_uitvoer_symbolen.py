@@ -16,6 +16,7 @@ from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.objectkaart import STATUSSEN
 from nlriochecker.uitvoer.stijlen.symbolen import (
     LIJNSYMBOLEN,
+    MECHANISCHE_LIJNEN,
     PIJLKLEUR_TEGEN,
     PUNTSYMBOLEN,
     STATUSKLEUR,
@@ -232,6 +233,26 @@ def test_elk_objecttype_uit_de_wolden_staat_in_de_tabel() -> None:
     """De acceptatie-eis van issue #14, zonder de export te hoeven laden."""
     assert not set(DEWOLDEN_KNOPEN) - set(PUNTSYMBOLEN)
     assert not set(DEWOLDEN_STRENGEN) - set(LIJNSYMBOLEN)
+
+
+def test_de_mechanische_lijnen_staan_als_streepjeslijn_in_de_tabel() -> None:
+    """`MECHANISCHE_LIJNEN` mag niet van de tabel afdrijven die hij benoemt.
+
+    De set is de expliciete tegenhanger van `[klassen] mechanisch` (issue #56). Wie een
+    klasse als mechanisch benoemt maar in de tabel doorgetrokken tekent, laat de twee
+    alsnog uiteenlopen; deze test bindt de set aan de streepjeslijn in de tabel.
+    """
+    for naam in MECHANISCHE_LIJNEN:
+        assert naam in LIJNSYMBOLEN, f"{naam} staat niet in LIJNSYMBOLEN"
+        assert "dash" in LIJNSYMBOLEN[naam].streep, f"{naam} is geen streepjeslijn"
+
+    # En de andere richting, zodat een nieuwe mechanische klasse die als streepjeslijn
+    # wordt toegevoegd maar `MECHANISCHE_LIJNEN` mist niet stil het gat van #56 heropent.
+    # `Zinker` is de enige uitzondering: streepjeslijn maar vrijverval, geen mechanisch riool.
+    gestreept = {naam for naam, sym in LIJNSYMBOLEN.items() if sym.streep == "dash"}
+    assert gestreept - MECHANISCHE_LIJNEN == {"Zinker"}, (
+        f"streepjeslijnen zonder mechanisch-etiket: {sorted(gestreept - MECHANISCHE_LIJNEN)}"
+    )
 
 
 def test_de_filters_zijn_hoofdletterongevoelig() -> None:

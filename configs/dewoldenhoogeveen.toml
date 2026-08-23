@@ -43,9 +43,12 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 streng = ["Leiding"]
 # Mechanisch riool valt buiten scope (zie het checkregister). Deze klassen komen
 # niet in de analyse maar wel in de GIS-uitvoer, in een eigen grijze laag; een leeg
-# kaartbeeld daar zou anders als "geen gebreken" lezen. De namen zijn geverifieerd
-# tegen de export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
-mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
+# kaartbeeld daar zou anders als "geen gebreken" lezen. De twee ontologische wortels in
+# plaats van de losse bladen (issue #56): `MechanischeRioolleiding` dekt Druk-, Lucht-
+# pers- en Vacuumleiding, `MechanischeTransportleiding` dekt Pers-, Leidingsegment- en
+# Spoelleiding, en dat sluit het gat met de symbolentabel. De Wolden telt eronder alleen
+# Persleiding 3548, Vacuumleiding 147, Drukleiding 25; nul van de rest.
+mechanisch = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
 # degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
 # ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden.
@@ -57,10 +60,11 @@ afvoer_eindpunt = ["Overnamepunt", "Gemaal", "Pompunit"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
 # (een Bouwwerk) fysieke objecten zijn. De Wolden gebruikt alleen die laatste twee.
+# De losse klasse `Uitlaat` hoort er niet bij: die hangt onder RepresentatieFysiekObject
+# en belandt in geen van de twee selectiebakken; ze voegde niets toe (issue #56).
 lozings_eindpunt = [
   "Lozingspunt",
   "UitlaatPunt",
-  "Uitlaat",
   "Lozingsput",
   "Uitlaatconstructie",
 ]
