@@ -13,6 +13,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Een drifttest die een getal bindt** (issue #51). Geen van de vier bestaande drifttests bond
+  een getal, terwijl elke onwaarheid uit de weekendrun van 2026-08-21 er een was. `tests/test_beweringen.py`
+  bouwt de getalzinnen in de docstrings van `uitvoer/stijlen/symbolen.py` op uit de gemeten
+  waarde (aantal knoop- en verbindingstypen, blad- en legendaregels) en eist dat ze letterlijk in
+  de docstring staan; wijzigt de symbolentabel, dan valt de proza in plaats van stil te verouderen.
+  Meteen betrapt: `bouw_qml` noemde 225 legendaregels voor de putten waar het er 220 zijn.
+
 - **Vijf ontbrekende bewakingen plus een tegenstrijdige documentatieregel** (issue #52), stuk
   voor stuk hetzelfde patroon: iets wat waar hoort te zijn werd door niets afgedwongen, of een
   document zei iets anders dan de code deed.

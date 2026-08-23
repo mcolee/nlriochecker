@@ -282,7 +282,7 @@ def bouw_qml(laag: str, objecttypen: Collection[str] | None = None) -> str:
     `objecttypen` zijn de typen die in deze laag voorkomen. De stijl reist mee in het
     bestand waar hij bij hoort, dus hij hoeft alleen regels te dragen voor de data die
     erin staat. Dat scheelt niet alleen bytes maar vooral **legenda**: met de volledige
-    tabel krijgt de lagenboom van QGIS 225 regels voor de putten en 193 voor de
+    tabel krijgt de lagenboom van QGIS 220 regels voor de putten en 193 voor de
     strengen, op een laag met zes voorkomende typen. Onbruikbaar, en precies wat een
     blik op het scherm zou hebben laten zien. Met de voorkomende typen zijn het er een
     stuk of dertig.
