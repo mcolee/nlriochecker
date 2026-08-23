@@ -113,9 +113,7 @@ def test_vergelijkingsrapport(analyse, tmp_path: Path) -> None:
     markdown_path, csv_path, objects_path = write_comparison_reports(comparison, tmp_path)
 
     assert markdown_path.name == FILE_COMPARISON_MARKDOWN
-    assert "# Trendvergelijking dewolden_orox.ttl" in markdown_path.read_text(
-        encoding="utf-8"
-    )
+    assert "# Trendvergelijking dewolden_orox.ttl" in markdown_path.read_text(encoding="utf-8")
     verschillen = pd.read_csv(csv_path, sep=";", encoding="utf-8")
     assert set(verschillen["Niveau"]) == {"vorm", "objecttype"}
     objecten = pd.read_csv(objects_path, sep=";", encoding="utf-8")
@@ -428,7 +426,9 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
     run = _checkrun("top013_parallel.ttl", "TOP-013")
-    volledig = bouw_meldingen(run, date(2026, 8, 16))
+    # Alleen de checkmeldingen; de datasetsignalen (bron "dataset", issue #22) staan
+    # los van wat deze test over het volgen van de meegegeven stroom aantoont.
+    volledig = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
     assert len(volledig) == 3
 
     markdown_path, csv_path = write_check_report(
@@ -453,7 +453,9 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
     run = _checkrun("top013_parallel.ttl", "TOP-013")
-    meldingen = bouw_meldingen(run, date(2026, 8, 16))
+    # Alleen de checkmeldingen: de datasetsignalen hebben zelf geen plek op de kaart en
+    # zouden de telling die deze test afdwingt vertroebelen.
+    meldingen = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
     zonder = [dataclasses.replace(meldingen[0], foutlocatie=None), *meldingen[1:]]
 
     markdown_path, _ = write_check_report(run, tmp_path, date(2026, 8, 16), meldingen=zonder)
@@ -464,9 +466,14 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
 
 
 def test_rapport_zwijgt_als_elke_melding_een_plek_heeft(tmp_path: Path) -> None:
-    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    markdown_path, _ = write_check_report(run, tmp_path, date(2026, 8, 16))
+    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    # De checkmeldingen hebben alle een plek; de datasetsignalen (issue #22) horen per
+    # definitie geen plek te hebben en staan hier los van.
+    meldingen = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
+
+    markdown_path, _ = write_check_report(run, tmp_path, date(2026, 8, 16), meldingen=meldingen)
 
     assert "geen plek op de kaart" not in markdown_path.read_text(encoding="utf-8")
 

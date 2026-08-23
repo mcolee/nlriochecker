@@ -225,6 +225,28 @@ Wat je van zo'n melding moet weten:
   instanties van dat type in de dataset. Zonder objecttype in het rapport of zonder
   instanties van dat type is er geen noemer en is de melding niet systemisch.
 
+### Datasetsignalen
+
+Naast het register en de nulmeting draagt de stroom een derde bron: signalen over de
+dataset zelf, te herkennen aan `bron: "dataset"` en `categorie: "SIG"`. Nu is er één
+soort, de nul-bewaking van issue #22: een klasse of rol waar een check op leunt maar
+die nul keer voorkomt in de export. Hun `check_id` is `SIG-nulklasse`, hun `dimensie`
+`Compleetheid`, hun `ernst` altijd `W`.
+
+Wat je van zo'n melding moet weten:
+
+- **Geen object.** Het is een signaal over de export als geheel, geen gebrek aan een
+  los object: `object_uri` is leeg, `foutlocatie` is `null`, `gebied` is leeg. Bij een
+  run over meerdere gebieden staat hij daarom in de JSON van elk gebied.
+- **Altijd `systemisch: true`.** Hij telt daarom niet mee in `status` en `ergste_ernst`
+  van de GeoPackage (BO-29) en verschijnt niet in `overzicht_checks`; hij hoort bij de
+  omvangtabel van het rapport, niet bij de per-check-boekhouding.
+- **`object_label`** draagt de aanduiding: een klassenaam (`Overnamepunt`) bij het
+  afvoereindpunt, een rolnaam (`lozingseindpunt`) bij de andere rollen.
+- **Alleen met klassenhierarchie.** Zonder ontologie herkent de lader geen klassen en
+  worden er geen datasetsignalen geschreven; het rapport draagt daarvoor al zijn
+  voorbehoud.
+
 ### Over `typering_betrouwbaar`
 
 Elke melding draagt `typering_betrouwbaar`. Dat veld is onwaar als de SHACL-nulmeting
@@ -249,8 +271,8 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 |---|---|---|
 | `melding_id` | string | Identiteit van deze melding: dezelfde check op hetzelfde object geeft hetzelfde ID, ook tussen runs. De sorteersleutel van het bestand. Eén uitzondering: botsen twee meldingen binnen één check op dezelfde ID, dan krijgt de tweede een volgnummer (`…-2`) dat tussen runs kan verschuiven. Dat is een gebrek in de `id_sleutels` van die check en het wordt als waarschuwing gelogd; zolang het optreedt is het bestand op dat punt niet diffbaar. |
 | `check_id` | string | Check-ID uit het checkregister, bijvoorbeeld `TOP-009`. ID's zijn stabiel en worden nooit hergebruikt. |
-| `categorie` | string | Het voorvoegsel van het check-ID: `TOP`, `NET`, `HGT`, `ATTR`, `ADM`, `RVZ`, `BTR`, `EXT` of `NULMETING`. |
-| `bron` | string | Waar de melding uit komt. `register` voor de eigen check-engine, `nulmeting` voor een overtreding uit de GWSW SHACL-nulmeting. |
+| `categorie` | string | Het voorvoegsel van het check-ID: `TOP`, `NET`, `HGT`, `ATTR`, `ADM`, `RVZ`, `BTR`, `EXT`, `NULMETING` of `SIG` (datasetsignaal). |
+| `bron` | string | Waar de melding uit komt. `register` voor de eigen check-engine, `nulmeting` voor een overtreding uit de GWSW SHACL-nulmeting, `dataset` voor een signaal over de export zelf (zie [Datasetsignalen](#datasetsignalen)). |
 | `ernst` | string | `F` voor fout, `W` voor waarschuwing. |
 | `dimensie` | string | Dimensietag uit het kwaliteitsraamwerk: `Consistentie`, `Compleetheid`, `Plausibiliteit`, `Actualiteit`, `Traceerbaarheid`, `Precisie`, `Nauwkeurigheid` of `Compliance`. |
 | `object_uri` | string | Volledige GWSW-URI van het object waarop de melding staat. |

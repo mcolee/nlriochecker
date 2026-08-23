@@ -25,6 +25,14 @@ logger = logging.getLogger(__name__)
 BRON_REGISTER = "register"
 # De tweede bron naast het register: de GWSW SHACL-nulmeting. Zie `nulbevinding.py`.
 BRON_NULMETING = "nulmeting"
+# De derde bron: een signaal over de dataset zelf, geen gebrek aan een los object. Nu
+# alleen de nul-bewaking van issue #22: een klasse waar een check op leunt maar die
+# nul keer voorkomt. Systemisch, ernst W, zonder object -- telt dus niet mee in de
+# GeoPackage-status (BO-29).
+BRON_DATASET = "dataset"
+# De check-ID van die nul-bewaking. Geen checkregister-ID: dit is geen check maar een
+# datasetsignaal. `categorie_van` maakt er de categorie `SIG` van.
+CHECK_NULKLASSE = "SIG-nulklasse"
 
 # De dimensietag van elke nulmetingmelding. Een SHACL-nulmeting toetst of de dataset
 # aan een conformiteitsklasse voldoet, en dat is voor elke vorm dezelfde vraag; een
@@ -131,6 +139,59 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
             )
 
     meldingen += _nulmeldingen(run, run_datum, scope, gebied, kritiek, gebruikte_ids)
+    meldingen += _signaalmeldingen(run, run_datum, scope, gebruikte_ids)
+    return meldingen
+
+
+def _signaalmeldingen(
+    run: CheckRun,
+    run_datum: date,
+    scope: str,
+    gebruikte_ids: set[str],
+) -> list[Melding]:
+    """Een systemische waarschuwing per klasse die op nul staat terwijl een check ervan afhangt.
+
+    Geen gebrek aan een object maar een signaal over de export: geen object-URI, geen
+    plek op de kaart, en systemisch, zodat het de GeoPackage-status niet raakt (BO-29).
+    Zonder gebied, net als een nulmetingbevinding die nergens op uitkwam: het is aan
+    geen enkel studiegebied toe te wijzen. Zie issue #22.
+    """
+    from nlriochecker.uitvoer.omvang import klassen_op_nul
+
+    meldingen = []
+    for signaal in klassen_op_nul(run):
+        kenmerk = _uniek_id(
+            CHECK_NULKLASSE, "", "", {"klasse": signaal.label}, signaal.label, gebruikte_ids
+        )
+        gebruikte_ids.add(kenmerk)
+        meldingen.append(
+            Melding(
+                melding_id=kenmerk,
+                check_id=CHECK_NULKLASSE,
+                categorie=categorie_van(CHECK_NULKLASSE),
+                bron=BRON_DATASET,
+                ernst=Severity.WARNING.value,
+                dimensie=Dimension.COMPLETENESS.value,
+                object_uri="",
+                object_id="",
+                object_label=signaal.label,
+                object2_uri="",
+                object2_id="",
+                object2_label="",
+                boodschap=signaal.boodschap,
+                waarde="0",
+                drempel="",
+                typering_betrouwbaar=True,
+                cluster_id="",
+                scope=scope,
+                gebied="",
+                prioriteit=3,
+                systemisch=True,
+                foutlocatie=None,
+                run_datum=run_datum.isoformat(),
+                dataset=run.dataset.source.name,
+            )
+        )
     return meldingen
 
 

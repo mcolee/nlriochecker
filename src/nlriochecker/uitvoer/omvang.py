@@ -17,13 +17,19 @@ put toekennen.
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 
 import pandas as pd
 
-from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckRun
+from nlriochecker.dataset import GwswDataset
 
 KOLOMMEN = ["Objecttype", "Stelsel", "Aantal", "Lengte (m)"]
+
+# De kolommen van de rollentelling en de afvoereindpuntregel; de tests lezen ze.
+KLASSENTELLING_KOLOMMEN = ["Rol", "Klassen", "Aantal"]
+EINDPUNT_KOLOMMEN = ["Klasse", "Aantal"]
 
 # Wat er in de kolom Stelsel staat als een object er geen heeft. Een leeg veld leest
 # als een ontbrekende waarde in de tabel; dit zegt wat het is.
@@ -132,3 +138,153 @@ def zonder_geometrie(run: CheckRun) -> int:
 def _leeg(geometrie: object) -> bool:
     """Of een geometrie ontbreekt of leeg is."""
     return geometrie is None or geometrie.is_empty  # type: ignore[attr-defined]
+
+
+@dataclass(frozen=True)
+class _Rol:
+    """Een klassenlijst waar een check op leunt, en hoe hij geteld en bewaakt wordt.
+
+    `via_onderdeel` kiest de teller: de meeste rollen selecteren hun objecten zoals
+    de checks dat doen, via `of_class` op de knopen en strengen; de drempel telt via
+    `subjects_of_class`, want een `Overstortdrempel` is een onderdeel zonder eigen
+    geometrie dat NET-007 zo leest. Wie via `of_class` zou tellen, zou hem missen en
+    een valse nul melden.
+
+    `per_klasse` kiest het niveau van de nul-bewaking. Bij het afvoereindpunt draagt
+    elke klasse een eigen betekenis -- `Gemaal` en `Pompunit` zijn het noodverband,
+    `Overnamepunt` het echte overdrachtspunt (BO-33) -- dus daar telt elke lege klasse
+    als een signaal. De andere rollen bevatten alternatieve schrijfwijzen van dezelfde
+    rol (een export gebruikt `Lozingsput` OF `Lozingspunt`, niet allebei); daar zou een
+    signaal per klasse elke ongebruikte schrijfwijze als gebrek melden. Zij waarschuwen
+    daarom pas als de hele rol leeg is.
+    """
+
+    label: str
+    klassen: tuple[str, ...]
+    via_onderdeel: bool
+    per_klasse: bool = False
+
+
+def _rollen(config: CheckConfig) -> list[_Rol]:
+    """De klassenlijsten uit `checks.toml` waar de zwaarste checks van afhangen.
+
+    Geen eigen configlijst: precies de bestaande rollen, zodat een klasse die iemand
+    later aan een lijst toevoegt vanzelf in de telling en de nul-bewaking verschijnt.
+    """
+    klassen = config.klassen
+    return [
+        _Rol("afvoereindpunt", tuple(klassen.afvoer_eindpunt), False, per_klasse=True),
+        _Rol("lozingseindpunt", tuple(klassen.lozings_eindpunt), False),
+        _Rol("bergbezinkvoorziening", tuple(klassen.bergbezinkvoorziening), False),
+        _Rol("overstortdrempel", tuple(klassen.drempel), True),
+        _Rol("infiltratieleiding", tuple(klassen.infiltratie), False),
+        _Rol("mechanische leiding", tuple(klassen.mechanisch), False),
+    ]
+
+
+def _config(run: CheckRun) -> CheckConfig:
+    """De projectconfiguratie van de run, of de standaard als hij er geen draagt."""
+    return run.config if run.config is not None else load_check_config()
+
+
+def _aantal_klasse(dataset: GwswDataset, klasse: str, via_onderdeel: bool) -> int:
+    """Hoeveel objecten van deze klasse de bijbehorende check ziet."""
+    if via_onderdeel:
+        return len({str(subject) for subject in dataset.subjects_of_class(klasse)})
+    return len(dataset.of_class(klasse))
+
+
+def _aantal_rol(dataset: GwswDataset, rol: _Rol) -> int:
+    """Hoeveel objecten deze rol samen telt, ontdubbeld over haar klassen."""
+    if rol.via_onderdeel:
+        uris = {
+            str(subject) for klasse in rol.klassen for subject in dataset.subjects_of_class(klasse)
+        }
+    else:
+        uris = {uri for klasse in rol.klassen for uri in dataset.of_class(klasse)}
+    return len(uris)
+
+
+def klassentelling(run: CheckRun) -> pd.DataFrame:
+    """Een rij per rol waar een check op leunt, met haar totaal.
+
+    De telling gaat over de volledige geanalyseerde export (`run.dataset`), niet over
+    de kern van een studiegebied: of een klasse voorkomt is een eigenschap van de
+    aanlevering, net als de datakarakteristiek, en verandert niet met de afbakening
+    van de rapportage.
+    """
+    config = _config(run)
+    dataset = run.dataset
+    rijen = [
+        {
+            "Rol": rol.label,
+            "Klassen": ", ".join(rol.klassen),
+            "Aantal": _aantal_rol(dataset, rol),
+        }
+        for rol in _rollen(config)
+    ]
+    return pd.DataFrame(rijen, columns=KLASSENTELLING_KOLOMMEN)
+
+
+def eindpunttelling(run: CheckRun) -> pd.DataFrame:
+    """Een rij per afvoereindpuntklasse, met hoeveel instanties de check ervan ziet.
+
+    Het is de betrouwbaarheidsregel voor NET-001: zolang `Overnamepunt` op nul staat,
+    leunt de bereikbaarheid op het noodverband `Gemaal`/`Pompunit` (BO-33). Zodra hij
+    een getal boven nul toont, kan dat noodverband weg. Zie issue #22.
+    """
+    config = _config(run)
+    dataset = run.dataset
+    rijen = [
+        {"Klasse": klasse, "Aantal": _aantal_klasse(dataset, klasse, False)}
+        for klasse in config.klassen.afvoer_eindpunt
+    ]
+    return pd.DataFrame(rijen, columns=EINDPUNT_KOLOMMEN)
+
+
+@dataclass(frozen=True)
+class NulSignaal:
+    """Een klasse of rol die op nul staat terwijl een check erop leunt.
+
+    `label` is de aanduiding in het rapport en op de melding (een klassenaam bij het
+    afvoereindpunt, een rolnaam bij de andere rollen); `boodschap` is de tekst van de
+    systemische waarschuwing.
+    """
+
+    label: str
+    boodschap: str
+
+
+def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
+    """De klassen en rollen die op nul staan terwijl een check erop leunt.
+
+    Het afvoereindpunt per klasse, de andere rollen als geheel (zie `_Rol.per_klasse`);
+    nul is nul en vraagt geen drempel. Zonder klassenhierarchie herkent `of_class` geen
+    klassen -- dan zou elke telling nul zijn en elke waarschuwing vals -- dus dan valt er
+    niets te bewaken; het rapport draagt daarvoor al zijn eigen voorbehoud (issue #33).
+    """
+    dataset = run.dataset
+    if not dataset.klassenhierarchie_bekend:
+        return []
+    signalen: list[NulSignaal] = []
+    for rol in _rollen(_config(run)):
+        if rol.per_klasse:
+            signalen += [
+                NulSignaal(
+                    klasse,
+                    f"Geen enkele {klasse} in de export, terwijl de afvoereindpuntrol "
+                    "(NET-001) erop leunt. Wat op deze klasse toetst, heeft niets te beoordelen.",
+                )
+                for klasse in rol.klassen
+                if _aantal_klasse(dataset, klasse, rol.via_onderdeel) == 0
+            ]
+        elif _aantal_rol(dataset, rol) == 0:
+            signalen.append(
+                NulSignaal(
+                    rol.label,
+                    f"Geen enkel object in de rol {rol.label} ({', '.join(rol.klassen)}) in de "
+                    "export, terwijl een check erop leunt. Wat op deze rol toetst, heeft niets "
+                    "te beoordelen.",
+                )
+            )
+    return signalen

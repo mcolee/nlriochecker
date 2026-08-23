@@ -13,6 +13,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Tel de klassen waar checks van afhangen, en waarschuw bij nul** (issue #22). De
+  omvangsectie van het bevindingenrapport draagt nu een telling per rol waar de zwaarste
+  checks op leunen (afvoereindpunt, lozingseindpunt, bergbezinkvoorziening,
+  overstortdrempel, infiltratieleiding, mechanische leiding) en een aparte regel met de
+  afvoereindpunten per klasse -- het criterium om het `Gemaal`/`Pompunit`-noodverband van
+  NET-001 los te laten zodra `Overnamepunt` boven nul komt (BO-33). Staat een klasse of
+  rol op nul terwijl een check erop leunt, dan komt er een systemische waarschuwing
+  (ernst W, bron `dataset`, categorie `SIG`) in de meldingenstroom; systemisch, dus buiten
+  `status` en `ergste_ernst` van de GeoPackage (BO-29). Het afvoereindpunt bewaakt per
+  klasse, de andere rollen per rol -- een ongebruikte alternatieve schrijfwijze is geen
+  gebrek. Zonder klassenhierarchie vervalt de bewaking, want dan herkent de lader geen
+  klassen. De telling gaat over de volledige geanalyseerde export, niet over de kern van
+  een studiegebied.
+
 - **Een drifttest die een getal bindt** (issue #51). Geen van de vier bestaande drifttests bond
   een getal, terwijl elke onwaarheid uit de weekendrun van 2026-08-21 er een was. `tests/test_beweringen.py`
   bouwt de getalzinnen in de docstrings van `uitvoer/stijlen/symbolen.py` op uit de gemeten

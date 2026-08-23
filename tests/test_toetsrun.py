@@ -301,11 +301,20 @@ def test_geopackage_kan_aan(tmp_path: Path) -> None:
 
 
 def test_de_csv_en_de_uitslag_tellen_hetzelfde(tmp_path: Path) -> None:
-    """Het archief en de uitslag komen uit dezelfde meldingenstroom."""
+    """Het archief en de uitslag komen uit dezelfde meldingenstroom.
+
+    Niet tegen `run.findings`: dat zijn alleen de checkbevindingen, terwijl de CSV de
+    volledige meldingenstroom draagt -- ook de datasetsignalen van issue #22 en de
+    nulmetingmeldingen. De vergelijking gaat daarom tegen `bouw_meldingen`.
+    """
+    from datetime import date
+
+    from nlriochecker.uitvoer.melding import bouw_meldingen
+
     uitslag = toets(tmp_path, "hgt010_diameterverjonging.ttl")
 
     tabel = pd.read_csv(uitslag.uitvoer.per_gebied[""].csv, sep=";", encoding="utf-8")
-    assert len(tabel) == len(uitslag.runs[0].run.findings)
+    assert len(tabel) == len(bouw_meldingen(uitslag.runs[0].run, date.today()))
 
 
 def test_regels_beginnen_met_de_omvang_en_eindigen_met_de_bestanden(tmp_path: Path) -> None:

@@ -53,6 +53,13 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   wordt via `hasPart`, `hasAspect` en als laatste `hasConnection` omhooggelopen tot een
   put of streng; komt hij nergens op uit, dan blijft de melding staan zonder object en
   met een leeg gebied, en het rapport telt die gevallen. Zie BO-28.
+- Een derde bron in dezelfde stroom is het datasetsignaal (`bron = "dataset"`, categorie
+  `SIG`): `bouw_meldingen` leest `uitvoer/omvang.klassen_op_nul` en maakt één systemische
+  waarschuwing per klasse of rol waar een check op leunt maar die nul keer voorkomt
+  (issue #22). Zonder object en zonder gebied, net als een onherleide nulmelding;
+  systemisch, dus buiten `status` en `ergste_ernst` (BO-29). Het afvoereindpunt bewaakt
+  per klasse (`Overnamepunt` is het criterium van BO-33), de andere rollen per rol.
+  Vervalt zonder klassenhierarchie, want dan herkent `of_class` geen klassen.
 - Het bevindingenrapport van `toets` leest van gebied naar detail: gebiedsnaam als
   titel, aantallen (objecttype x stelseltype over de kern, leidingen ook in meters),
   managementsamenvatting (een regel per CFK plus de eigen checks; vinkje = nul fouten),

@@ -20,8 +20,14 @@ import pandas as pd
 from nlriochecker.checks import REGISTRY, CheckRun, Severity
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
-from nlriochecker.uitvoer.melding import BRON_NULMETING, Melding, bouw_meldingen
-from nlriochecker.uitvoer.omvang import omvangtabel, zonder_geometrie
+from nlriochecker.uitvoer.melding import BRON_DATASET, BRON_NULMETING, Melding, bouw_meldingen
+from nlriochecker.uitvoer.omvang import (
+    eindpunttelling,
+    klassen_op_nul,
+    klassentelling,
+    omvangtabel,
+    zonder_geometrie,
+)
 from nlriochecker.uitvoer.samenvatting import (
     NIET_GEMETEN,
     VINKJE,
@@ -240,7 +246,54 @@ def _omvang_section(run: CheckRun) -> list[str]:
             "nodig om de netwerkchecks hun antwoord te laten houden; daar wordt niet over "
             "gerapporteerd.",
         ]
+    regels += _afhankelijkheden_section(run)
     regels += [""]
+    return regels
+
+
+def _afhankelijkheden_section(run: CheckRun) -> list[str]:
+    """De klassen waar de zwaarste checks van afhangen, en de nul-bewaking (issue #22).
+
+    De omvangtabel erboven telt object- en stelseltype maar zwijgt over overstorten,
+    gemalen, overnamepunten en bergbezinkvoorzieningen -- juist de objecten waar de
+    netwerkchecks op leunen. Deze telling maakt zichtbaar of ze er zijn. De
+    afvoereindpuntregel apart, want zij is het criterium om het `Gemaal`/`Pompunit`-
+    noodverband van NET-001 los te laten (BO-33): zodra `Overnamepunt` boven nul komt.
+
+    Zonder klassenhierarchie herkent `of_class` geen klassen; elke telling zou dan nul
+    zijn. De sectie vervalt in dat geval -- het rapport draagt daarvoor al zijn
+    voorbehoud (issue #33).
+    """
+    if not run.dataset.klassenhierarchie_bekend:
+        return []
+    regels = ["", "**Objecten waar de checks van afhangen**", ""]
+    if run.study_area is not None:
+        regels += [
+            "> Geteld over de **geanalyseerde export** (kern plus contextschil), niet "
+            "alleen de kern: of een klasse voorkomt is een eigenschap van de aanlevering "
+            "en verandert niet met de afbakening van de rapportage.",
+            "",
+        ]
+    regels += table(klassentelling(run), "Per rol")
+    regels += [""]
+    regels += table(eindpunttelling(run), "Afvoereindpunten per klasse")
+    regels += [
+        "",
+        "> `Gemaal` en `Pompunit` staan als noodverband voor `Overnamepunt` in de "
+        "bereikbaarheidstoets (NET-001, BO-33). Toont `Overnamepunt` een getal boven "
+        "nul, dan kan dat noodverband weg.",
+    ]
+
+    op_nul = klassen_op_nul(run)
+    if op_nul:
+        namen = ", ".join(f"`{signaal.label}`" for signaal in op_nul)
+        staat = vorm(len(op_nul), "staat", "staan")
+        regels += [
+            "",
+            f"> **Nul waar een check op leunt:** {namen} {staat} op nul terwijl een check "
+            "erop toetst; wat daarop toetst heeft niets te beoordelen. Elk geval staat als "
+            "systemische waarschuwing in de meldingenstroom.",
+        ]
     return regels
 
 
@@ -844,7 +897,15 @@ def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
     de ene alinea 578 meldingen aan een ontbrekende geometrie weet en in de andere
     telde dat er nul zo'n geval was.
     """
-    zonder = [melding for melding in meldingen if melding.foutlocatie is None]
+    # Datasetsignalen (bron "dataset") horen hier niet: ze zijn geen bevinding die niet
+    # te plaatsen viel maar een signaal over de export, dat de omvangsectie al noemt. Ze
+    # meetellen zou `SIG-nulklasse` in deze telling zetten alsof een check zijn objecten
+    # niet op de kaart kreeg.
+    zonder = [
+        melding
+        for melding in meldingen
+        if melding.foutlocatie is None and melding.bron != BRON_DATASET
+    ]
     if not zonder:
         return []
 

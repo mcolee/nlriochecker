@@ -198,7 +198,9 @@ def test_zonder_nulmeting_schrijft_het_rapport_geen_nulmetingblok(tmp_path: Path
 
     assert "**GWSW-nulmeting**" not in tekst
     assert "SHACL-nulmeting" not in tekst
-    assert list(tabel["Bron"]) == [] or set(tabel["Bron"]) == {"register"}
+    # Zonder meting geen nulmetingmeldingen; register en de datasetsignalen (issue #22)
+    # mogen er wel zijn.
+    assert "nulmeting" not in set(tabel["Bron"])
 
 
 def test_een_gemeten_run_zonder_overtredingen_zegt_dat_met_zoveel_woorden(

@@ -82,9 +82,12 @@ def test_scope_en_gebied_met_studiegebied() -> None:
 
     meldingen = bouw_meldingen(run.beperk_tot_studiegebied(gebied), RUNDATUM)
 
-    assert meldingen
-    assert all(melding.scope == "binnen_studiegebied" for melding in meldingen)
-    assert all(melding.gebied == "rond_de_fixture" for melding in meldingen)
+    # De datasetsignalen (bron "dataset") zijn niet aan een gebied gebonden; het
+    # scope-en-gebied-contract geldt de gelokaliseerde meldingen.
+    gelokaliseerd = [melding for melding in meldingen if melding.bron != "dataset"]
+    assert gelokaliseerd
+    assert all(melding.scope == "binnen_studiegebied" for melding in gelokaliseerd)
+    assert all(melding.gebied == "rond_de_fixture" for melding in gelokaliseerd)
 
 
 def test_waarschuwing_krijgt_de_laagste_prioriteit() -> None:
@@ -231,6 +234,11 @@ def _run_met_nulbevindingen(bestand: str, *bevindingen: Nulbevinding) -> CheckRu
     return replace(run, nulbevindingen=tuple(bevindingen))
 
 
+def _uit_nulmeting(meldingen: list) -> list:
+    """De meldingen uit de nulmeting, los van de datasetsignalen (issue #22)."""
+    return [melding for melding in meldingen if melding.bron == "nulmeting"]
+
+
 def test_eigen_checkmelding_noemt_geen_conformiteitsklasse() -> None:
     """`cfk` hoort bij de nulmeting; een eigen check heeft er niets mee te maken."""
     meldingen = bouw_meldingen(_run("top001_losliggende_put.ttl", "TOP-001"), RUNDATUM)
@@ -242,7 +250,7 @@ def test_nulbevinding_wordt_een_melding_uit_de_nulmeting() -> None:
     """Bron, categorie en dimensie liggen vast; de CFK's komen van de bevinding."""
     run = _run_met_nulbevindingen("nulmeting_join.ttl", _nulbevinding())
 
-    (melding,) = bouw_meldingen(run, RUNDATUM)
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
     assert melding.bron == "nulmeting"
     assert melding.categorie == "NULMETING"
@@ -254,7 +262,7 @@ def test_nulbevinding_wordt_een_melding_uit_de_nulmeting() -> None:
 def test_nulmelding_op_een_object_met_geometrie_krijgt_een_plek_op_de_kaart() -> None:
     run = _run_met_nulbevindingen("nulmeting_join.ttl", _nulbevinding())
 
-    (melding,) = bouw_meldingen(run, RUNDATUM)
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
     assert melding.foutlocatie is not None
 
@@ -272,7 +280,7 @@ def test_onherleide_nulmelding_heeft_geen_object_en_geen_gebied() -> None:
     )
     run = _run_met_nulbevindingen("nulmeting_join.ttl", onherleid)
 
-    (melding,) = bouw_meldingen(run, RUNDATUM)
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
     assert melding.object_uri == ""
     assert melding.gebied == ""
@@ -290,7 +298,7 @@ def test_twee_nulmeldingen_op_hetzelfde_object_krijgen_een_eigen_id() -> None:
         _nulbevinding(focus_node="L1_e", object_uri="http://example.org/toets#L1"),
     )
 
-    eerste, tweede = bouw_meldingen(run, RUNDATUM)
+    eerste, tweede = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
     assert eerste.melding_id != tweede.melding_id
 
@@ -302,6 +310,6 @@ def test_prioriteit_volgt_dezelfde_regel_als_bij_een_eigen_check() -> None:
         _nulbevinding(ernst="W", focus_node="L1_e"),
     )
 
-    (melding,) = bouw_meldingen(run, RUNDATUM)
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
     assert melding.prioriteit == 3

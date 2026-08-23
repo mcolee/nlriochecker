@@ -174,7 +174,9 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
     assert "Studiegebied" in resultaat.output
     assert "0 bevindingen buiten het gebied weggelaten" in resultaat.output
     tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
-    assert tabel.empty
+    # Geen checkbevindingen; de datasetsignalen (bron "dataset", issue #22) staan er los
+    # van en gaan over de export als geheel, niet over dit gebied.
+    assert tabel[tabel["Bron"] == "register"].empty
 
 
 def test_toets_meldt_bevindingen_die_in_de_schil_wegvallen(tmp_path: Path) -> None:
@@ -393,13 +395,19 @@ def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
     assert resultaat.exit_code == 0, resultaat.output
 
     tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
-    per_check_csv = tabel["Check"].value_counts().to_dict()
+    # De datasetsignalen (bron "dataset", issue #22) zijn geen check en horen niet in
+    # het per-check-overzicht of in de detailsecties; ze staan in de omvangsectie. Deze
+    # test vergelijkt de check-boekhouding, dus zonder die bron.
+    eigen = tabel[tabel["Bron"] != "dataset"]
+    per_check_csv = eigen["Check"].value_counts().to_dict()
 
     gpkg = next(uitvoer.glob("dq_*.gpkg"))
     con = sqlite3.connect(f"file:{gpkg}?mode=ro", uri=True)
     try:
         per_check_gpkg = dict(
-            con.execute("select check_id, count(*) from meldingen group by check_id")
+            con.execute(
+                "select check_id, count(*) from meldingen where bron != 'dataset' group by check_id"
+            )
         )
         overzicht = dict(
             con.execute(
