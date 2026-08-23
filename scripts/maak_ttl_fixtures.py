@@ -452,6 +452,77 @@ FIXTURES["net008_veel_lozingspunten.ttl"] = (
 )
 
 
+# NET-009: een streng die omgekeerd getekend is terwijl de BOB de administratie volgt.
+# Geometrie tegen, BOB mee: de drie richtingssignalen spreken elkaar tegen.
+FIXTURES["net009_omgekeerd_getekend.ttl"] = (
+    "streng 1 is van B naar A getekend terwijl de administratie en de BOB A->B zeggen",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1050.0, 2000.0), (1000.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.5, 10.0),
+    ),
+)
+
+# NET-009: een vlakke streng. De BOB is gelijk aan begin en eind (verval 0), dus de BOB
+# zegt niets over de richting: geen bevinding, wel "geen uitspraak".
+FIXTURES["net009_vlakke_streng.ttl"] = (
+    "streng 1 ligt vlak (BOB begin en eind gelijk), dus de richting is niet uit de BOB te lezen",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1050.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.0, 10.0),
+    ),
+)
+
+# NET-009: een streng met een BOB van 0,00 aan beide zijden. De vulwaardenregel leest die
+# als niet geregistreerd; zonder BOB kan de richting niet op de bodem getoetst worden.
+FIXTURES["net009_bob_vulwaarde.ttl"] = (
+    "streng 1 draagt een BOB van 0,00 die als vulwaarde wordt gelezen en dus ontbreekt",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1050.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(0.0, 0.0),
+    ),
+)
+
+
+# NET-009: twee tegenspraken met andere signaalcombinaties. Streng 1 is omgekeerd
+# getekend maar ligt vlak (geometrie tegen, BOB vlak); streng 2 mist een bruikbare lijn
+# maar heeft een stijgende BOB (geometrie onbekend, BOB tegen). Beide worden gemeld.
+FIXTURES["net009_signaalvarianten.ttl"] = (
+    "streng 1 is omgekeerd getekend en vlak; streng 2 mist geometrie en heeft een "
+    "stijgende BOB",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1000.0, 2100.0)
+    + put("PutD", "D", 1050.0, 2100.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1050.0, 2000.0), (1000.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.0, 10.0),
+    )
+    + leiding("L2", "2", [(1000.0, 2100.0)], "PutC", "PutD", bob=(10.0, 10.5)),
+)
+
+
 # ---------------------------------------------------------------------------
 # Blok A: ATTR, HGT, RVZ, ADM en BTR
 # ---------------------------------------------------------------------------

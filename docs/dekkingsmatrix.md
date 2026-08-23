@@ -10,11 +10,11 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ADM | 9 | 6 | 0 | 0 | 3 |
 | ATTR | 17 | 16 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
-| NET | 8 | 8 | 0 | 0 | 0 |
+| NET | 9 | 9 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **97** | **93** | **0** | **0** | **4** |
+| **totaal** | **98** | **94** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -113,6 +113,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit | geimplementeerd met test | — |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid | geimplementeerd met test | — |
 | NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit | geimplementeerd met test | — |
+| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | F | Consistentie | geimplementeerd met test | — |
 
 ## RVZ
 

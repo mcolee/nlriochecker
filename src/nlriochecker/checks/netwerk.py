@@ -747,6 +747,179 @@ class OrientatieTegenAfvoerrichting(Check):
         )
 
 
+_RICHTING_MEE = "mee"
+_RICHTING_TEGEN = "tegen"
+_RICHTING_VLAK = "vlak"
+_RICHTING_ONBEKEND = "onbekend"
+
+
+@dataclass(frozen=True)
+class _Richtingsdiagnose:
+    """De drie richtingssignalen van een streng, elk ten opzichte van de administratie.
+
+    `geometrie` en `bob` zeggen of dat signaal met de administratieve van-naar-richting
+    meeloopt (`mee`), er tegenin (`tegen`), niet te bepalen is (`onbekend`) of -- alleen
+    de BOB -- vlak ligt (`vlak`). De administratie zelf is de referentie: van
+    `begin_label` naar `eind_label`.
+    """
+
+    conduit: Conduit
+    begin_label: str
+    eind_label: str
+    geometrie: str
+    bob: str
+    bob_verval: float | None
+
+
+def _knooplabel(context: CheckContext, uri: str | None) -> str:
+    """Het label van de knoop boven een strengkoppeling, of de URI als er geen label is."""
+    dataset = context.dataset
+    knoop = dataset.resolve_network_node(uri, context.config.klassen.netwerkknopen)
+    node = dataset.nodes.get(knoop or "")
+    return node.label if node is not None and node.label else (knoop or "")
+
+
+def _geometrie_richting(context: CheckContext, conduit: Conduit) -> str:
+    """De tekenrichting van de lijn ten opzichte van de van-naar-richting."""
+    uitslag = context.dataset.richting_van_geometrie(conduit, context.config.klassen.netwerkknopen)
+    if uitslag is None:
+        return _RICHTING_ONBEKEND
+    omgekeerd, _, _ = uitslag
+    return _RICHTING_TEGEN if omgekeerd else _RICHTING_MEE
+
+
+def _bob_richting(conduit: Conduit, drempel: float) -> str:
+    """De BOB-richting: daalt (mee), stijgt (tegen), ligt vlak, of ontbreekt."""
+    verval = conduit.bob_verval
+    if verval is None:
+        return _RICHTING_ONBEKEND
+    if verval > drempel:
+        return _RICHTING_MEE
+    if verval < -drempel:
+        return _RICHTING_TEGEN
+    return _RICHTING_VLAK
+
+
+def _richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
+    """De richtingssignalen per streng in de graaf; een keer per context."""
+    return context.cached("net009", lambda: _bouw_richtingsdiagnoses(context))
+
+
+def _bouw_richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
+    """Bepaalt per aangesloten vrijvervalstreng haar drie richtingssignalen."""
+    drempel = context.config.drempels.tegenverhang_licht_m
+    return [
+        _Richtingsdiagnose(
+            conduit=conduit,
+            begin_label=_knooplabel(context, conduit.start_node),
+            eind_label=_knooplabel(context, conduit.end_node),
+            geometrie=_geometrie_richting(context, conduit),
+            bob=_bob_richting(conduit, drempel),
+            bob_verval=conduit.bob_verval,
+        )
+        for conduit in _netwerk(context).conduits
+    ]
+
+
+def _tegenspraak(diagnose: _Richtingsdiagnose) -> bool:
+    """Geeft aan of een van de signalen tegen de administratie in wijst.
+
+    De administratie is de referentie (altijd 'mee'), dus er is tegenspraak zodra de
+    geometrie of de BOB de andere kant op wijst. Twee tegen-signalen die het onderling
+    eens zijn spreken de administratie nog steeds tegen -- de streng lijkt dan omgekeerd
+    geregistreerd.
+    """
+    return _RICHTING_TEGEN in (diagnose.geometrie, diagnose.bob)
+
+
+def _geometrie_zin(richting: str) -> str:
+    """De geometrieregel van de melding."""
+    if richting == _RICHTING_TEGEN:
+        return "De lijn is omgekeerd getekend, van eind naar begin."
+    if richting == _RICHTING_MEE:
+        return "De lijn is in de van-naar-richting getekend."
+    return "De tekenrichting van de lijn is niet te bepalen."
+
+
+def _bob_zin(richting: str, verval: float | None) -> str:
+    """De BOB-regel van de melding."""
+    if richting == _RICHTING_MEE and verval is not None:
+        return f"De BOB daalt {verval:.3f} m van begin naar eind."
+    if richting == _RICHTING_TEGEN and verval is not None:
+        return f"De BOB stijgt {abs(verval):.3f} m van begin naar eind."
+    if richting == _RICHTING_VLAK and verval is not None:
+        return f"De BOB ligt vlak ({verval:.3f} m)."
+    return "De BOB ontbreekt."
+
+
+@register
+class RichtingssignalenSprekenElkaarTegen(Check):
+    """NET-009: administratie, geometrie en BOB wijzen niet dezelfde kant op."""
+
+    id = "NET-009"
+    title = "Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke streng waarvan de drie richtingssignalen elkaar tegenspreken.
+
+        De administratieve van-naar-richting is de referentie; de melding noemt alle
+        drie de waarden, zodat de beheerder zelf ziet welke fout is. NET-003 en TOP-020
+        melden elk een van de signalen apart; NET-009 leest ze samen en maakt beide tot
+        een deelgeval.
+        """
+        for diagnose in _richtingsdiagnoses(context):
+            if not _tegenspraak(diagnose):
+                continue
+            boodschap = (
+                "De richtingssignalen spreken elkaar tegen. Administratief loopt de "
+                f"streng van {diagnose.begin_label!r} naar {diagnose.eind_label!r}. "
+                f"{_geometrie_zin(diagnose.geometrie)} "
+                f"{_bob_zin(diagnose.bob, diagnose.bob_verval)}"
+            )
+            yield self.finding(
+                context,
+                diagnose.conduit.uri,
+                diagnose.conduit.label,
+                boodschap,
+                geometrie=diagnose.geometrie,
+                bob=diagnose.bob,
+                bob_verval_m=round(diagnose.bob_verval, 3)
+                if diagnose.bob_verval is not None
+                else None,
+                administratief_begin=diagnose.begin_label,
+                administratief_eind=diagnose.eind_label,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt de vlakke strengen ('geen uitspraak') en de BOB's die als vulwaarde wegvielen."""
+        diagnoses = _richtingsdiagnoses(context)
+        notities = _netwerk_notities(context)
+
+        vlak = sum(1 for d in diagnoses if not _tegenspraak(d) and d.bob == _RICHTING_VLAK)
+        if vlak:
+            drempel = context.config.drempels.tegenverhang_licht_m
+            notities.append(
+                f"{getal(vlak, 'streng', 'strengen')} {vorm(vlak, 'ligt', 'liggen')} vlak "
+                f"(|verval| ≤ {drempel} m): de BOB zegt niets over de richting, dus deze toets "
+                f"doet daar geen uitspraak over."
+            )
+
+        vulwaarde = sum(1 for d in diagnoses if d.conduit.vulwaarden)
+        if vulwaarde:
+            notities.append(
+                f"{getal(vulwaarde, 'streng', 'strengen')} {vorm(vulwaarde, 'heeft', 'hebben')} "
+                "een BOB die als vulwaarde (rond 0 m NAP) is gelezen en daardoor ontbreekt; "
+                "hun richting kon niet op de BOB getoetst worden."
+            )
+        return notities
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal strengen in de graaf."""
+        return len(_netwerk(context).conduits)
+
+
 @register
 class StelseltypeWijktAfVanBuren(Check):
     """NET-005: een streng met een ander stelseltype dan al haar buren."""

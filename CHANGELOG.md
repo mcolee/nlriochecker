@@ -13,6 +13,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Richtingsdiagnose NET-009** (issue #18, fase 2). De nieuwe check **NET-009** (F,
+  Consistentie) meldt per vrijvervalstreng waar de drie richtingssignalen elkaar
+  tegenspreken: de administratieve van-naar-richting (de referentie), de tekenrichting
+  van de lijn (als TOP-020) en de BOB-richting (als NET-003/HGT-005/006). De melding
+  noemt alle drie de waarden, zodat de beheerder zelf ziet welke fout is; NET-003 en
+  TOP-020 blijven bestaan als deelgeval. Een streng die vlak ligt (|verval| ≤ de
+  drempel `tegenverhang_licht_m`) krijgt geen bevinding maar een expliciete "geen
+  uitspraak", geteld in de toelichting; ook het aantal strengen waarvan de BOB als
+  vulwaarde (rond 0 m NAP) wegviel staat daar.
 - **Afvoerpad naar het benedenstroomse uitstroompunt** (issue #18, fase 1). De GeoPackage
   draagt op de lagen `putten` en `strengen` drie nieuwe kolommen: `afvoer_eindpunt` (het
   dichtstbijzijnde bereikte gemaal/overname- of lozingspunt, label of anders URI),
