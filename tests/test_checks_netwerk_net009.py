@@ -96,6 +96,20 @@ def test_signaalvarianten_verwoorden_vlakke_bob_en_ontbrekende_geometrie() -> No
     assert "stijgt" in per_label["2"].message
 
 
+def test_streng_zonder_enig_signaal_wordt_niet_stil_overgeslagen() -> None:
+    """Een streng zonder bruikbare lijn en zonder BOB is met geen signaal te toetsen.
+
+    Ze levert geen bevinding, maar mag niet stil verdwijnen: de toelichting telt haar en
+    `examined` rekent haar niet mee, want er viel niets aan te beoordelen.
+    """
+    outcome = _outcome("net009_geen_signaal.ttl")
+
+    assert outcome.findings == []
+    assert any("geen enkel richtingssignaal" in note for note in outcome.notes)
+    # Alleen de schone streng 1 is te beoordelen; streng 2 valt buiten.
+    assert outcome.examined == 1
+
+
 def test_net009_severity_en_dimensie() -> None:
     outcome = _outcome("net009_omgekeerd_getekend.ttl")
 

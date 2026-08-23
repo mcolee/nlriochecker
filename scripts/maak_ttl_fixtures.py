@@ -505,8 +505,7 @@ FIXTURES["net009_bob_vulwaarde.ttl"] = (
 # getekend maar ligt vlak (geometrie tegen, BOB vlak); streng 2 mist een bruikbare lijn
 # maar heeft een stijgende BOB (geometrie onbekend, BOB tegen). Beide worden gemeld.
 FIXTURES["net009_signaalvarianten.ttl"] = (
-    "streng 1 is omgekeerd getekend en vlak; streng 2 mist geometrie en heeft een "
-    "stijgende BOB",
+    "streng 1 is omgekeerd getekend en vlak; streng 2 mist geometrie en heeft een stijgende BOB",
     put("PutA", "A", 1000.0, 2000.0)
     + put("PutB", "B", 1050.0, 2000.0)
     + put("PutC", "C", 1000.0, 2100.0)
@@ -520,6 +519,27 @@ FIXTURES["net009_signaalvarianten.ttl"] = (
         bob=(10.0, 10.0),
     )
     + leiding("L2", "2", [(1000.0, 2100.0)], "PutC", "PutD", bob=(10.0, 10.5)),
+)
+
+
+# NET-009: streng 2 draagt geen bruikbare lijn (enkel punt) en geen BOB, dus geen enkel
+# richtingssignaal. Ze wordt niet gemeld, maar mag ook niet stil verdwijnen: de
+# toelichting telt haar. Streng 1 is schoon en zorgt dat er wel iets te bekijken valt.
+FIXTURES["net009_geen_signaal.ttl"] = (
+    "streng 2 mist zowel een bruikbare lijn als een BOB, dus geen enkel richtingssignaal",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1000.0, 2100.0)
+    + put("PutD", "D", 1050.0, 2100.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1050.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.5, 10.0),
+    )
+    + leiding("L2", "2", [(1000.0, 2100.0)], "PutC", "PutD"),
 )
 
 

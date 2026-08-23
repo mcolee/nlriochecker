@@ -832,6 +832,11 @@ def _tegenspraak(diagnose: _Richtingsdiagnose) -> bool:
     return _RICHTING_TEGEN in (diagnose.geometrie, diagnose.bob)
 
 
+def _geen_signaal(diagnose: _Richtingsdiagnose) -> bool:
+    """Geeft aan of noch de geometrie noch de BOB iets over de richting zegt."""
+    return diagnose.geometrie == _RICHTING_ONBEKEND and diagnose.bob == _RICHTING_ONBEKEND
+
+
 def _geometrie_zin(richting: str) -> str:
     """De geometrieregel van de melding."""
     if richting == _RICHTING_TEGEN:
@@ -913,11 +918,20 @@ class RichtingssignalenSprekenElkaarTegen(Check):
                 "een BOB die als vulwaarde (rond 0 m NAP) is gelezen en daardoor ontbreekt; "
                 "hun richting kon niet op de BOB getoetst worden."
             )
+
+        geen_signaal = sum(1 for d in diagnoses if _geen_signaal(d))
+        if geen_signaal:
+            notities.append(
+                f"{getal(geen_signaal, 'streng', 'strengen')} "
+                f"{vorm(geen_signaal, 'draagt', 'dragen')} geen bruikbare tekenrichting en geen "
+                "BOB, dus met geen enkel richtingssignaal te toetsen; deze strengen zijn niet "
+                "beoordeeld."
+            )
         return notities
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen in de graaf."""
-        return len(_netwerk(context).conduits)
+        """De strengen met minstens een richtingssignaal; de rest kon niet beoordeeld worden."""
+        return sum(1 for d in _richtingsdiagnoses(context) if not _geen_signaal(d))
 
 
 @register
