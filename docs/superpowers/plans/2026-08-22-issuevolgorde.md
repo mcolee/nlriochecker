@@ -22,8 +22,11 @@ sporen. Peildatum 2026-08-22; 26 open issues.
      uitkomst tonen, geen claims zonder bewijs.
 5. **Afronden**: CHANGELOG-regel onder Unreleased, commit op `dev`, issue sluiten met
    een korte verwijzing naar de commit. Beknopt verslag: wat gedaan, wat bewust niet.
-6. **Startprompt volgende sessie**: `Los issue #N op volgens
-   docs/superpowers/plans/2026-08-22-issuevolgorde.md`.
+6. **Startprompt volgende sessie**: geef die als laatste stap van de sessie, ná het
+   afronden, de commit én het sluiten van het issue, zodat de volgende sessie meteen
+   met een `/clear` erop kan starten. De vorm is steeds:
+   `Los issue #N op volgens docs/superpowers/plans/2026-08-22-issuevolgorde.md`, met
+   `#N` het eerstvolgende issue uit de volgorde hieronder.
 
 ## Volgorde
 
@@ -81,7 +84,6 @@ Elk een eigen ontwerpstap (`superpowers:writing-plans`) binnen de sessie.
 | 19 | #23 | RVZ-006 uitbreiden met afvoereindpunt (na de Gemaal-vraag uit #47) |
 | 20 | #18 | afvoerpad naar benedenstrooms eindpunt, NET-009 |
 | 21 | #25 | stelselvlakken als GeoPackage-laag |
-| 22 | #40 | EXT-009 straatnaam tegen BGT/NWB |
 
 ### Blok E — prestaties
 
