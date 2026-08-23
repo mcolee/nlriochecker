@@ -584,18 +584,22 @@ def test_hoofdletterafwijking_krijgt_een_eigen_soort(gwsw_index: dict[str, froze
 
 
 # De vier GWSW-wortels waaronder de knoop- en bouwwerkklassen hangen die de laag
-# `putten` kan tegenkomen. `Verbinding` staat er bewust niet bij: LIJNSYMBOLEN is wel
-# de tegenhanger, maar die tabel volgt de SLD-indeling van de leidingsoorten en niet de
-# klassenboom, en een verschil daar zou een andere vraag stellen dan deze test.
+# `putten` kan tegenkomen, en de wortel waaronder de leidingklassen van de laag
+# `strengen` hangen. De knoopkant (`PUNTSYMBOLEN`) en de lijnkant (`LIJNSYMBOLEN`) worden
+# allebei gemeten; issue #55 voegde de lijnkant toe, die daarvoor buiten elke drifttest
+# viel. `Verbinding` staat er bewust niet bij: dat zijn de bouwwerkonderdelen
+# (`Overstortdrempel`, `Pomp`, ...) die LIJNSYMBOLEN wél draagt maar die niet onder
+# `Leiding` hangen; hun dekking is een andere vraag dan deze test stelt.
 SYMBOOLWORTELS: tuple[str, ...] = ("Put", "Bouwwerk", "Hulpstuk", "Knooppunt")
+LIJNWORTELS: tuple[str, ...] = ("Leiding",)
 
-# De klassen onder die vier wortels waarvoor de symbolentabellen vandaag géén regel
-# dragen. Dit is een momentopname en geen besluitenlijst: er staat niet "deze willen we
-# niet", er staat "deze zijn nog niet gedekt". De lijst korter maken is werk dat nog
-# moet gebeuren -- issue #14 hertekent de symbolen -- en zolang het niet gebeurd is
-# hoort hij hier zichtbaar te staan in plaats van als stilte in het rapport.
+# De klassen onder die wortels waarvoor de symbolentabellen vandaag géén regel dragen.
+# Dit is een momentopname en geen besluitenlijst: er staat niet "deze willen we niet", er
+# staat "deze zijn nog niet gedekt". De lijst korter maken is werk dat nog moet gebeuren
+# -- issue #14 hertekent de symbolen -- en zolang het niet gebeurd is hoort hij hier
+# zichtbaar te staan in plaats van als stilte in het rapport.
 #
-# Vastgelegd tegen GWSW 1.6: 137 klassen onder de vier wortels, 42 daarvan gedekt.
+# Vastgelegd tegen GWSW 1.6: 137 klassen onder de vier knoopwortels, 43 daarvan gedekt.
 NOG_ONGEDEKTE_KLASSEN = frozenset({
     "Aansluitput", "Afleveringspunt", "Afvoerpunt", "AfvoerpuntGebied", "Beekriool", "Beerput",
     "Bergingsvijver", "Biofilter", "BlindeInlaat", "BlindePut", "Bochtstuk", "Bouwwerk",
@@ -611,38 +615,68 @@ NOG_ONGEDEKTE_KLASSEN = frozenset({
     "Olie__benzineafvangput", "Ontlastput", "Ontstoppingsput", "OpenBerging",
     "Oppervlaktewatergemaal", "Overgangsstuk", "Overkluizing", "Perceelaansluitpunt", "Put",
     "Putbuis", "Putorientatie", "RWSKolk", "ReinigendePut", "Reservoir", "Riooleindgemaal",
-    "Rioolput", "RioolputMetGeleiding", "Slokop", "Spoelgemaal", "Spoorlijn", "Steenwolkoffer",
+    "RioolputMetGeleiding", "Slokop", "Spoelgemaal", "Spoorlijn", "Steenwolkoffer",
     "Trottoirkolk", "Tubelure", "Tunnelgemaal", "Uitstroombak", "Valput",
     "VerbeterdeOverstortput", "VerdektePut", "VerdieptePut", "Verloopstuk", "Vetvangput",
     "VolgeschuimdePut", "Wadi", "Waterkering", "Werveloverstortput", "Wervelput", "Y_stuk",
     "Zadel", "Zandkoffer", "Zinkerput", "Zuiveringsreservoir",
 })  # fmt: skip
 
+# En de lijnkant, in dezelfde vorm. Vastgelegd tegen GWSW 1.6: 59 klassen onder
+# `Leiding`, 36 daarvan gedekt (issue #55; #32 telde 16 verbindingklassen in de export,
+# dus de lijst blijft hanteerbaar). De drie wortelleidingen die #55 een symbool gaf
+# (`Rioolleiding`, `VrijvervalRioolleiding`, `Aansluitleiding`) staan hier niet meer op.
+NOG_ONGEDEKTE_LIJNKLASSEN = frozenset({
+    "BenedenstroomsEindriool", "Blusriool", "DCAbc", "DIT_riool", "DT_riool",
+    "Drainaansluitleiding", "GeboordeLeiding", "Infiltratiegoot", "Leiding",
+    "MechanischeRioolleiding", "MechanischeTransportleiding", "Molgoot", "Ontluchtingsleiding",
+    "OpenLeiding", "Parallelriool", "Pendelstuk", "Spoelleiding", "Standpijp",
+    "Stuwrioolleiding", "Tandemriool", "Transportleiding", "VrijvervalTransportleiding",
+    "Weesleiding",
+})  # fmt: skip
 
-def test_de_symbolentabel_raakt_niet_verder_achterop() -> None:
-    """Dekken onze tabellen de knoopklassen die GWSW kent -- de andere kant van #30.
+
+@pytest.mark.parametrize(
+    ("wortels", "ongedekte_lijst"),
+    [
+        (SYMBOOLWORTELS, NOG_ONGEDEKTE_KLASSEN),
+        (LIJNWORTELS, NOG_ONGEDEKTE_LIJNKLASSEN),
+    ],
+    ids=["knoop", "lijn"],
+)
+def test_de_symbolentabel_raakt_niet_verder_achterop(
+    wortels: tuple[str, ...], ongedekte_lijst: frozenset[str]
+) -> None:
+    """Dekken onze tabellen de klassen die GWSW kent -- de andere kant van #30.
 
     Drie vragen die makkelijk door elkaar lopen, en dit is de tweede:
 
     1. Bestaan onze namen in GWSW? Dat is de rest van deze module.
-    2. Dekken wij de klassen van GWSW? Dat is deze test.
+    2. Dekken wij de klassen van GWSW? Dat is deze test, voor de knoopkant
+       (`PUNTSYMBOLEN` onder `SYMBOOLWORTELS`) én de lijnkant (`LIJNSYMBOLEN` onder
+       `LIJNWORTELS`).
     3. Krijgt elk objecttype dat in een dataset voorkomt een symbool? Dat is
        `tests/test_uitvoer_symbolen.py`, en het antwoord daarop zegt niets over 1 en 2.
 
-    Dit is een drifttest en geen volledigheidseis: hij faalt wanneer het verschil
-    *groeit*. Een nieuwe GWSW-versie die klassen toevoegt komt zo langs, in plaats van
-    stil in de vangnetregel ("objecttype niet in de symbolentabel") te verdwijnen. Wordt
-    de lijst korter -- en dat is de bedoeling -- dan haal je de gedekte namen eruit.
+    Dit is een drifttest en geen volledigheidseis, en hij bewaakt twee richtingen. De
+    eerste: het gat mag niet *groeien* -- een nieuwe GWSW-versie die klassen toevoegt
+    komt zo langs in plaats van stil in de vangnetregel te verdwijnen. De tweede: een
+    naam op de lijst die inmiddels een symbool kreeg (of uit de klassenboom verdween)
+    hoort eraf -- anders veroudert de lijst stil terwijl de test groen blijft.
     """
-    ongedekt = set()
-    for wortel in SYMBOOLWORTELS:
+    ongedekt: set[str] = set()
+    for wortel in wortels:
         ongedekt |= _afsluiting(wortel)
     ongedekt -= set(PUNTSYMBOLEN) | set(LIJNSYMBOLEN)
 
-    assert not (nieuw := sorted(ongedekt - NOG_ONGEDEKTE_KLASSEN)), (
-        f"{len(nieuw)} klasse(n) onder {', '.join(SYMBOOLWORTELS)} hebben geen symbool en "
-        f"staan niet op NOG_ONGEDEKTE_KLASSEN: {', '.join(nieuw)}.\n"
+    assert not (nieuw := sorted(ongedekt - ongedekte_lijst)), (
+        f"{len(nieuw)} klasse(n) onder {', '.join(wortels)} hebben geen symbool en staan "
+        f"niet op de ongedekte-lijst: {', '.join(nieuw)}.\n"
         "Geef ze een regel in symbolen.py, of zet ze op de lijst als bewuste huidige stand."
+    )
+    assert not (gedekt := sorted(ongedekte_lijst - ongedekt)), (
+        f"{len(gedekt)} naam/namen op de ongedekte-lijst zijn inmiddels gedekt of vielen uit "
+        f"de klassenboom: {', '.join(gedekt)}.\nHaal ze van de lijst."
     )
 
 

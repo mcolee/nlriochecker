@@ -10,8 +10,8 @@ welke typen er een delen -- en elke regel in de tabellen hieronder noemt de SLD-
 die hij vervangt.
 
 De QML's worden hier opgebouwd in plaats van als bestand meegeleverd. De
-regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 43
-knooptypen en 37 verbindingstypen in deze tabel zijn dat 215 respectievelijk 185
+regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 44
+knooptypen en 40 verbindingstypen in deze tabel zijn dat 220 respectievelijk 200
 bladregels met evenzoveel symbolen. Met de hand is dat ruim vierduizend regels XML
 waarin een tikfout de kaart stil leegtrekt, en waarin de typenlijst op twee plekken
 zou staan. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven wel gewone
@@ -19,8 +19,8 @@ bestanden: die hebben een enkel symbool en veranderen niet.
 
 Een opgebouwde stijl draagt alleen regels voor de objecttypen die werkelijk in zijn
 laag staan; die krijgt hij van de schrijver mee. Dat is niet alleen zuiniger maar
-noodzakelijk: met de volledige tabel toont de lagenboom van QGIS 220 legendaregels
-voor de putten en 193 voor de strengen, op een laag met zes voorkomende typen. Dat is
+noodzakelijk: met de volledige tabel toont de lagenboom van QGIS 225 legendaregels
+voor de putten en 208 voor de strengen, op een laag met zes voorkomende typen. Dat is
 geen legenda meer maar een muur. Met de voorkomende typen zijn het er 35 en 38 --
 gemeten met PyQGIS op de echte uitvoer.
 
@@ -160,6 +160,11 @@ PUNTSYMBOLEN: dict[str, Puntsymbool] = {
     # en komen dus in de puttenlaag terecht; het Juinen-voorbeeld bevat ze.
     "Compartiment": Puntsymbool("square", 2.4, "geen SLD-regel; onderdeel"),
     "InlaatLeiding": Puntsymbool("circle", 2.2, "Aansluitpunt.sld: Inlaat"),
+    # Wortelklasse. De SLD's kennen er geen regel voor -- ze tekenen de bladtypen -- maar
+    # een export die generiek `gwsw:Rioolput` schrijft in plaats van een blad als
+    # `Inspectieput` zou anders de hele puttenlaag in het vangnet laten vallen (#55). Een
+    # gewone cirkel, zoals de inspectieput: het is de generieke put.
+    "Rioolput": Puntsymbool("circle", 2.6, "geen SLD-regel; wortelklasse"),
 }
 
 # Het vangnet. Een asterisk: zichtbaar anders dan elk symbool uit de tabel, zodat een
@@ -217,6 +222,14 @@ LIJNSYMBOLEN: dict[str, Lijnsymbool] = {
     "Stuwmuur": Lijnsymbool(0.6, "dot", "geen SLD-regel; onderdeel"),
     "OpeningInWand": Lijnsymbool(0.4, "dot", "geen SLD-regel; onderdeel"),
     "Pomp": Lijnsymbool(0.6, "dot", "geen SLD-regel; onderdeel"),
+    # Wortelklassen. Geen SLD-regel -- de SLD's tekenen de leidingsoorten -- maar een
+    # export die generiek een van deze wortels schrijft in plaats van een blad zou anders
+    # de hele strengenlaag in het vangnet laten vallen (#55). Elk krijgt het generieke
+    # beeld van zijn familie: de vrijverval- en de allesomvattende rioolleiding een
+    # doorgetrokken normale lijn, de aansluitleiding de dunne lijn van zijn soort.
+    "Rioolleiding": Lijnsymbool(0.9, "solid", "geen SLD-regel; wortelklasse"),
+    "VrijvervalRioolleiding": Lijnsymbool(0.9, "solid", "geen SLD-regel; wortelklasse"),
+    "Aansluitleiding": Lijnsymbool(0.4, "solid", "geen SLD-regel; wortelklasse"),
 }
 
 # De leidingklassen die hierboven de mechanische (streepjes)lijn krijgen: het beeld van
@@ -282,7 +295,7 @@ def bouw_qml(laag: str, objecttypen: Collection[str] | None = None) -> str:
     `objecttypen` zijn de typen die in deze laag voorkomen. De stijl reist mee in het
     bestand waar hij bij hoort, dus hij hoeft alleen regels te dragen voor de data die
     erin staat. Dat scheelt niet alleen bytes maar vooral **legenda**: met de volledige
-    tabel krijgt de lagenboom van QGIS 220 regels voor de putten en 193 voor de
+    tabel krijgt de lagenboom van QGIS 225 regels voor de putten en 208 voor de
     strengen, op een laag met zes voorkomende typen. Onbruikbaar, en precies wat een
     blik op het scherm zou hebben laten zien. Met de voorkomende typen zijn het er een
     stuk of dertig.

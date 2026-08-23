@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Vier wortelklassen een symbool, en een drifttest voor de lijnkant** (issue #55). De
+  symbolentabel dekt nu ook de generieke wortelklassen: `Rioolput` (een cirkel in de
+  puttenlaag) en `Rioolleiding`, `VrijvervalRioolleiding` en `Aansluitleiding` (het
+  familiebeeld in de strengenlaag). Een export die generiek een wortel schrijft in plaats
+  van een blad valt daarmee niet meer in het vangnet. De drifttest die de knoopklassen
+  tegen de ontologie houdt meet nu ook de lijnkant (wortel `Leiding`, 23 nog ongedekte
+  klassen) en bewaakt een tweede richting: een naam die inmiddels gedekt is of uit de
+  klassenboom verdween moet van de lijst af. De Wolden en Hoogeveen verandert niet -- de
+  vier wortels komen er nul keer voor.
+
 - **Tel de klassen waar checks van afhangen, en waarschuw bij nul** (issue #22). De
   omvangsectie van het bevindingenrapport draagt nu een telling per rol waar de zwaarste
   checks op leunen (afvoereindpunt, lozingseindpunt, bergbezinkvoorziening,
