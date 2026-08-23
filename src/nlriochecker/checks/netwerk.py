@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 import networkx as nx
+from shapely.geometry import LineString
 
 from nlriochecker.checks.base import (
     Check,
@@ -127,6 +129,134 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
                 bereikt.add(buur)
                 stapel.append(buur)
     return bereikt
+
+
+@dataclass(frozen=True)
+class Afvoer:
+    """Het benedenstroomse uitstroompunt dat een knoop of streng bereikt.
+
+    `eindpunt` is de URI van het dichtstbijzijnde uitstroompunt, `stappen` het aantal
+    strengen in het pad ernaartoe (0 voor het uitstroompunt zelf), en `meters` de
+    padlengte langs de getekende lijnen. `meters` is None zodra een streng op het pad
+    geen bruikbare lijngeometrie heeft: de stap telt dan wel mee, maar de lengte niet.
+    """
+
+    eindpunt: str
+    stappen: int
+    meters: float | None
+
+
+def _uitstroompunten(context: CheckContext) -> set[str]:
+    """De knopen die als uitstroompunt gelden: afvoer- en lozingseindpunten samen."""
+    return _eindpunten(context, "afvoer_eindpunt") | _eindpunten(context, "lozings_eindpunt")
+
+
+def afvoerpaden(context: CheckContext) -> dict[str, Afvoer]:
+    """Per knoop het dichtstbijzijnde benedenstroomse uitstroompunt.
+
+    De uitstroompunten zijn de knopen in de rollen `afvoer_eindpunt` en
+    `lozings_eindpunt` samen; welke klassen dat zijn staat in de projectconfig. Een
+    knoop zonder pad naar enig uitstroompunt staat niet in de uitkomst.
+
+    Bij meer dan een bereikbaar uitstroompunt wint het dichtstbijzijnde in stappen, en
+    bij een gelijk aantal stappen de kleinste URI -- determinisme is een harde eis, twee
+    runs op dezelfde data moeten dezelfde uitkomst geven.
+    """
+    return context.cached(
+        "afvoerpaden", lambda: _afvoerpaden(_netwerk(context), _uitstroompunten(context))
+    )
+
+
+def _afvoerpaden(netwerk: _Netwerk, uitstroompunten: set[str]) -> dict[str, Afvoer]:
+    """Rekent de afvoerpaden uit op de gerichte graaf; zie `afvoerpaden`."""
+    graph = netwerk.graph
+    bron = {uri for uri in uitstroompunten if uri in graph}
+    if not bron:
+        return {}
+
+    stappen = _stappen_tot_uitstroom(graph, bron)
+    eindpunt: dict[str, str] = {}
+    meters: dict[str, float | None] = {}
+    # Van dichtbij naar ver: een knoop leunt op zijn benedenstroomse buur een stap
+    # dichterbij, en die is dan al bepaald.
+    for knoop in sorted(stappen, key=lambda uri: (stappen[uri], uri)):
+        if stappen[knoop] == 0:
+            eindpunt[knoop] = knoop
+            meters[knoop] = 0.0
+            continue
+        dichterbij = [
+            buur for buur in graph.successors(knoop) if stappen.get(buur) == stappen[knoop] - 1
+        ]
+        eindpunt[knoop] = min(eindpunt[buur] for buur in dichterbij)
+        # De volgende stap: de kleinste-URI buur die naar datzelfde uitstroompunt leidt.
+        # De keuze bepaalt welke padlengte we optellen; kleinste URI houdt hem
+        # deterministisch, ook bij parallelle takken naar hetzelfde eindpunt.
+        volgende = min(buur for buur in dichterbij if eindpunt[buur] == eindpunt[knoop])
+        kant = _kantlengte(netwerk, knoop, volgende)
+        vervolg = meters[volgende]
+        meters[knoop] = None if kant is None or vervolg is None else kant + vervolg
+
+    return {
+        knoop: Afvoer(eindpunt=eindpunt[knoop], stappen=stappen[knoop], meters=meters[knoop])
+        for knoop in stappen
+    }
+
+
+def _stappen_tot_uitstroom(graph: nx.DiGraph, bron: set[str]) -> dict[str, int]:
+    """Het minste aantal strengen van elke knoop naar een uitstroompunt.
+
+    Een enkele doorloop over de omgekeerde graaf vanaf alle uitstroompunten tegelijk,
+    net als `_bereikbaar_vanaf`, maar nu met de afstand erbij. Knopen zonder pad naar
+    enig uitstroompunt komen niet in de uitkomst.
+    """
+    omgekeerd = graph.reverse(copy=False)
+    stappen = {uri: 0 for uri in bron}
+    rij: deque[str] = deque(sorted(bron))
+    while rij:
+        knoop = rij.popleft()
+        for buur in omgekeerd[knoop]:
+            if buur not in stappen:
+                stappen[buur] = stappen[knoop] + 1
+                rij.append(buur)
+    return stappen
+
+
+def _kantlengte(netwerk: _Netwerk, begin: str, eind: str) -> float | None:
+    """De lengte van de streng op de kant begin->eind, of None zonder lijngeometrie.
+
+    Bij parallelle strengen op dezelfde kant telt de kleinste-URI streng (de eerste in
+    `strengen_per_kant`), zodat de lengte niet van de invoervolgorde afhangt.
+    """
+    strengen = netwerk.strengen_per_kant.get((begin, eind), ())
+    return _lijnlengte(strengen[0]) if strengen else None
+
+
+def _lijnlengte(conduit: Conduit) -> float | None:
+    """De lengte van de getekende lijn van een streng, of None zonder bruikbare lijn."""
+    lijn = conduit.line
+    if isinstance(lijn, LineString) and not lijn.is_empty:
+        return lijn.length
+    return None
+
+
+def afvoerpad_van_streng(context: CheckContext, conduit: Conduit) -> Afvoer | None:
+    """Het afvoerpad van een streng: de streng zelf plus het pad vanaf haar eindpunt.
+
+    None als de streng geen herleidbaar eindpunt heeft of vanaf daar geen uitstroompunt
+    bereikt. De streng telt als eerste stap; haar eigen lengte telt bij de meters, en
+    ontbreekt die (geen bruikbare lijngeometrie) dan valt de hele padlengte weg.
+    """
+    dataset = context.dataset
+    wortels = context.config.klassen.netwerkknopen
+    eind = dataset.resolve_network_node(conduit.end_node, wortels)
+    if eind is None:
+        return None
+    vervolg = afvoerpaden(context).get(eind)
+    if vervolg is None:
+        return None
+    eigen = _lijnlengte(conduit)
+    meters = None if eigen is None or vervolg.meters is None else eigen + vervolg.meters
+    return Afvoer(eindpunt=vervolg.eindpunt, stappen=vervolg.stappen + 1, meters=meters)
 
 
 def _eindknoop_notitie(context: CheckContext, netwerk: _Netwerk, rol: str) -> list[str]:

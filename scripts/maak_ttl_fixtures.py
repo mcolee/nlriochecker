@@ -1115,6 +1115,31 @@ def gemaal(naam: str, label: str, punt: tuple[float, float]) -> str:
     return put(naam, label, punt[0], punt[1], klasse="Rioolgemaal")
 
 
+# NET (#18, fase 1): een keten van drie strengen naar een gemaal. Elke streng bereikt
+# hetzelfde eindpunt en telt een aflopend aantal stappen; de afstanden zijn 50 m per
+# streng, zodat de meters netjes optellen.
+FIXTURES["net_afvoerpad_keten.ttl"] = (
+    "geen; drie strengen A->B->C->gemaal, invoer voor de afvoerpadanalyse",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + gemaal("Gem", "G", (1150.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC")
+    + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutC", "Gem"),
+)
+
+# NET (#18, fase 1): een streng met een lijngeometrie van een enkel punt. Die is niet
+# als lijn te lezen (line=None), maar de netwerkkoppelingen blijven staan: de streng
+# krijgt wel een afvoerpad in stappen en geen padlengte in meters.
+FIXTURES["net_afvoerpad_zonder_lijn.ttl"] = (
+    "streng 1 heeft een lijngeometrie van een enkel punt en dus geen bruikbare lengte",
+    put("PutA", "A", 1000.0, 2000.0)
+    + gemaal("Gem", "G", (1050.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0)], "PutA", "Gem"),
+)
+
+
 # Het afvoereindpunt van de schone stelsels: net onder de overstort-/BBB-put.
 GEM = (1050.0, 1950.0)
 

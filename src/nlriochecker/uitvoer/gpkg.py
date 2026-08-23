@@ -36,6 +36,7 @@ from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, Severity
+from nlriochecker.checks.netwerk import Afvoer, afvoerpad_van_streng, afvoerpaden
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer
 from nlriochecker.dataset import Conduit
@@ -367,6 +368,13 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("stelsel", "text"),
         _Kolom("richting_bob", "text"),
         _Kolom("bob_verval_m", "real"),
+        # Het benedenstroomse uitstroompunt dat dit object bereikt, met de padmaat
+        # ernaartoe (#18, fase 1). `afvoer_eindpunt` draagt het label of anders de URI;
+        # leeg als er geen pad is. `afvoer_meters` is leeg zonder bruikbare lijn op het
+        # pad, `afvoer_stappen` telt de strengen erin.
+        _Kolom("afvoer_eindpunt", "text"),
+        _Kolom("afvoer_meters", "real"),
+        _Kolom("afvoer_stappen", "integer"),
         _Kolom("gebied", "text"),
         _Kolom("status", "text"),
         _Kolom("ergste_ernst", "text"),
@@ -457,6 +465,10 @@ def _schrijf_features(
     mechanisch = _mechanische_uris(run, config)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
+    # Het afvoerpad per knoop, een keer gerekend; de strengen leunen erop via
+    # `afvoerpad_van_streng`, dat dezelfde gecachte uitkomst leest.
+    afvoercontext = CheckContext(dataset=run.dataset, config=config)
+    afvoer_per_knoop = afvoerpaden(afvoercontext)
 
     tellingen: dict[str, int] = {}
     mechanisch_geschreven = 0
@@ -479,6 +491,9 @@ def _schrijf_features(
             richting, verval = (
                 _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
             )
+            afvoer_eindpunt, afvoer_meters, afvoer_stappen = _afvoer_velden(
+                afvoercontext, afvoer_per_knoop, uri, object_
+            )
             reden = _reden_niet_beoordeeld(uri, binnen, mechanisch, geen_hierarchie)
             if uri in mechanisch:
                 mechanisch_geschreven += 1
@@ -494,6 +509,9 @@ def _schrijf_features(
                         stelsels.get(uri, ""),
                         richting,
                         verval,
+                        afvoer_eindpunt,
+                        afvoer_meters,
+                        afvoer_stappen,
                         reden,
                     ),
                 )
@@ -517,6 +535,30 @@ def _schrijf_features(
         bouwwerken=bouwwerken,
         waterdelen=waterdelen,
     )
+
+
+def _afvoer_velden(
+    context: CheckContext,
+    afvoer_per_knoop: dict[str, Afvoer],
+    uri: str,
+    object_: object,
+) -> tuple[str, float | None, int | None]:
+    """De drie afvoerpadvelden van een object: uitstroompunt, meters en stappen.
+
+    Een streng leest het pad vanaf haar eigen eindpunt (`afvoerpad_van_streng`), een
+    put het pad vanaf zichzelf. Zonder pad naar enig uitstroompunt zijn alle drie leeg.
+    Het uitstroompunt draagt het label, en anders de URI als er geen label is.
+    """
+    pad = (
+        afvoerpad_van_streng(context, object_)
+        if isinstance(object_, Conduit)
+        else afvoer_per_knoop.get(uri)
+    )
+    if pad is None:
+        return "", None, None
+    node = context.dataset.nodes.get(pad.eindpunt)
+    label = node.label if node is not None and node.label else pad.eindpunt
+    return label, pad.meters, pad.stappen
 
 
 def _reden_niet_beoordeeld(
@@ -757,6 +799,9 @@ def _samenvatting(
     stelsel: str = "",
     richting_bob: str = "",
     bob_verval_m: float | None = None,
+    afvoer_eindpunt: str = "",
+    afvoer_meters: float | None = None,
+    afvoer_stappen: int | None = None,
     reden: str = "",
 ) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen.
@@ -793,6 +838,9 @@ def _samenvatting(
         stelsel,
         richting_bob,
         bob_verval_m,
+        afvoer_eindpunt,
+        afvoer_meters,
+        afvoer_stappen,
         _gebied(run),
         status,
         ernst,

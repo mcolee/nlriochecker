@@ -938,3 +938,46 @@ class TestStatusEnPopup:
         assert any(statussen.get(uri) != "grijs" for uri in run.analyseset.kern)
         buiten_de_ring = run.analyseset.schil - run.analyseset.buffer
         assert all(uri not in statussen for uri in buiten_de_ring)
+
+
+def test_afvoerpad_kolommen_op_putten_en_strengen(tmp_path: Path) -> None:
+    """#18 fase 1: elke put en streng draagt het bereikte uitstroompunt met padmaat.
+
+    De keten A->B->C->gemaal levert per streng hetzelfde eindpunt en een aflopend
+    aantal stappen; de meters (50 m per streng) tellen op.
+    """
+    pad = _schrijf(_run("net_afvoerpad_keten.ttl", "NET-001"), tmp_path)
+
+    strengen = dict(
+        (label, (eindpunt, stappen, meters))
+        for label, eindpunt, stappen, meters in _rijen(
+            pad, "select label, afvoer_eindpunt, afvoer_stappen, afvoer_meters from strengen"
+        )
+    )
+    assert strengen["1"] == ("G", 3, 150.0)
+    assert strengen["2"] == ("G", 2, 100.0)
+    assert strengen["3"] == ("G", 1, 50.0)
+
+    putten = dict(
+        (label, (eindpunt, stappen, meters))
+        for label, eindpunt, stappen, meters in _rijen(
+            pad, "select label, afvoer_eindpunt, afvoer_stappen, afvoer_meters from putten"
+        )
+    )
+    assert putten["A"] == ("G", 3, 150.0)
+    assert putten["G"] == ("G", 0, 0.0)
+
+
+def test_afvoerpad_zonder_lijn_geeft_stappen_zonder_meters(tmp_path: Path) -> None:
+    """Een pad over een streng zonder bruikbare lijn krijgt wel stappen, geen meters.
+
+    De streng zelf heeft geen lijngeometrie en valt daarom buiten de LINESTRING-laag;
+    put A ligt er wel in en erft het gat: het bereikt het gemaal in een stap, maar de
+    padlengte in meters is niet te geven.
+    """
+    pad = _schrijf(_run("net_afvoerpad_zonder_lijn.ttl", "NET-001"), tmp_path)
+
+    ((eindpunt, stappen, meters),) = _rijen(
+        pad, "select afvoer_eindpunt, afvoer_stappen, afvoer_meters from putten where label = 'A'"
+    )
+    assert (eindpunt, stappen, meters) == ("G", 1, None)

@@ -13,6 +13,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Afvoerpad naar het benedenstroomse uitstroompunt** (issue #18, fase 1). De GeoPackage
+  draagt op de lagen `putten` en `strengen` drie nieuwe kolommen: `afvoer_eindpunt` (het
+  dichtstbijzijnde bereikte gemaal/overname- of lozingspunt, label of anders URI),
+  `afvoer_meters` (padlengte langs de getekende lijnen) en `afvoer_stappen` (aantal
+  strengen in het pad). De uitstroompunten komen uit de rollen `afvoer_eindpunt` en
+  `lozings_eindpunt` samen; bij meerdere bereikbare punten wint het dichtstbijzijnde in
+  stappen en bij gelijkspel de kleinste URI. Een streng zonder bruikbare lijngeometrie op
+  het pad laat de meters leeg maar telt wel als stap. Dit is nog geen check.
 - **Wandruwheid versus leidingmateriaal** (issue #38). De nieuwe check **ATTR-017** (W,
   Plausibiliteit) meldt een leiding waarvan de wandruwheid
   (`WandruwheidBinnenboven`/`-onder`, de k-Nikuradse waarde van de buiswand) niet bij het
