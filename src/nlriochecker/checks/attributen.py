@@ -13,6 +13,8 @@ from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date
 
+from rdflib import RDF, URIRef
+
 from nlriochecker import taal
 from nlriochecker.checks.base import (
     Check,
@@ -24,7 +26,7 @@ from nlriochecker.checks.base import (
 )
 from nlriochecker.checks.selectie import netwerkknopen, putten, vrijvervalrioolleidingen
 from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
-from nlriochecker.dataset import Conduit, Node
+from nlriochecker.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
 from nlriochecker.plausibiliteit import MaterialDiameter, PlausibilityTables
 
 
@@ -790,6 +792,126 @@ class HoogteOpVulwaarde(Check):
     def examined(self, context: CheckContext) -> int:
         """Netwerkknopen plus vrijvervalstrengen."""
         return len(self._objecten(context))
+
+
+@dataclass(frozen=True)
+class _PropertyTelling:
+    """Per kenmerktype hoeveel instanties de verkeerde waardeproperty gebruiken."""
+
+    verwacht: str
+    totaal: int
+    fout: int
+    vulwaarde_nul: int
+
+
+def _is_vulwaarde_nul(waarde: object) -> bool:
+    """Of een waarde de numerieke vulwaarde 0 is (0, 0.0, "0"), en geen tekstlabel.
+
+    De BrutIS-export vult een ontbrekend WIBONThema met de literal 0; een tekstlabel
+    als "riool vrijverval" is een ander soort fout en telt hier niet mee.
+    """
+    try:
+        return float(str(waarde)) == 0.0
+    except ValueError:
+        return False
+
+
+def _property_tellingen(context: CheckContext) -> dict[str, _PropertyTelling]:
+    """Telt per kenmerktype de instanties die de door de ontologie geeiste property missen.
+
+    De verwachte property komt uit `dataset.kenmerk_property` (de `owl:onProperty`-keten,
+    afgeleid bij het laden); de daadwerkelijke property leest deze functie rechtstreeks uit
+    de datagraaf. Een fout is een instantie die de geeiste property mist maar de andere wel
+    draagt -- `hasValue` waar `hasReference` hoort, of andersom. Een instantie zonder beide
+    is geen property-fout maar een leeg kenmerk en telt niet mee.
+    """
+    graph = context.dataset.graph
+    tellingen: dict[str, _PropertyTelling] = {}
+    for kenmerk, verwacht in context.dataset.kenmerk_property.items():
+        totaal = fout = vulwaarde_nul = 0
+        for instantie in graph.subjects(RDF.type, URIRef(GWSW + kenmerk)):
+            totaal += 1
+            waarde = graph.value(instantie, HAS_VALUE)
+            referentie = graph.value(instantie, HAS_REFERENCE)
+            if verwacht == "hasReference" and referentie is None and waarde is not None:
+                fout += 1
+                if _is_vulwaarde_nul(waarde):
+                    vulwaarde_nul += 1
+            elif verwacht == "hasValue" and waarde is None and referentie is not None:
+                fout += 1
+        tellingen[kenmerk] = _PropertyTelling(verwacht, totaal, fout, vulwaarde_nul)
+    return tellingen
+
+
+@register
+class PropertyTegenOntologie(Check):
+    """ATTR-014: een kenmerk gebruikt de verkeerde waardeproperty tegenover de ontologie.
+
+    De ontologie bindt de waarde van een kenmerk via een restrictie aan `hasReference`
+    (naar een domeinlijstcollectie) of aan `hasValue`. Een export die de verkeerde
+    property schrijft -- `WIBONThema` met `hasValue 0` waar `hasReference` hoort -- is een
+    consistentiefout tegen de ontologie zelf, en de SHACL-nulmeting mist hem per
+    constructie: een `allValuesFrom` over een afwezige property is vacuously true (issue
+    #37). De check is generiek over alle kenmerktypen en meldt per kenmerk een keer, als
+    systemische melding over de hele export -- niet per object, want dat zijn er op De
+    Wolden 23.440.
+    """
+
+    id = "ATTR-014"
+    title = "Kenmerk gebruikt de verkeerde waardeproperty tegenover de ontologie"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+    id_sleutels = ("kenmerk",)
+    volledig_bereik = True
+
+    def _tellingen(self, context: CheckContext) -> dict[str, _PropertyTelling]:
+        return context.cached("attr014:tellingen", lambda: _property_tellingen(context))
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt per kenmerktype met een property-fout een aggregaatbevinding."""
+        for kenmerk, telling in sorted(self._tellingen(context).items()):
+            if telling.fout == 0:
+                continue
+            yield Finding(
+                check_id=self.id,
+                severity=self.severity,
+                dimension=self.dimension,
+                object_uri="",
+                object_label=kenmerk,
+                message=_property_boodschap(kenmerk, telling),
+                typing_reliable=True,
+                details={"kenmerk": kenmerk},
+                systemisch=True,
+            )
+
+    def examined(self, context: CheckContext) -> int:
+        """Alle kenmerkinstanties die tegen een property-restrictie gehouden zijn."""
+        return sum(telling.totaal for telling in self._tellingen(context).values())
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Zegt hoeveel kenmerktypen een voorgeschreven property hadden, of dat er geen zijn."""
+        aantal = len(context.dataset.kenmerk_property)
+        if aantal == 0:
+            return [
+                "Geen enkel kenmerktype droeg een ontologische property-restrictie "
+                "(geen klassenhierarchie geladen); er is niets tegen de ontologie gehouden."
+            ]
+        return [
+            f"{taal.getal(aantal, 'kenmerktype', 'kenmerktypen')} met een voorgeschreven "
+            "property (`hasValue` of `hasReference`) getoetst. Kenmerken zonder zo'n "
+            "restrictie -- zoals Straatnaam -- kennen geen voorgeschreven property en "
+            "vallen buiten deze toets."
+        ]
+
+
+def _property_boodschap(kenmerk: str, telling: _PropertyTelling) -> str:
+    """De aggregaattekst voor een kenmerk dat de verkeerde waardeproperty gebruikt."""
+    if telling.verwacht == "hasReference":
+        kern = f"{kenmerk} gebruikt hasValue in plaats van hasReference op {telling.fout} objecten"
+        if telling.vulwaarde_nul:
+            kern += f", waarvan {telling.vulwaarde_nul} met de vulwaarde 0"
+        return kern + "."
+    return f"{kenmerk} gebruikt hasReference in plaats van hasValue op {telling.fout} objecten."
 
 
 def _soortnaam(object_) -> str:

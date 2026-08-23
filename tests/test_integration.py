@@ -165,6 +165,32 @@ def test_checks_op_de_wolden_met_typeringspoort(meting, tmp_path: Path) -> None:
 
 @pytest.mark.zwaar
 @pytest.mark.skipif(
+    not (OROX_DE_WOLDEN.exists() and ONTOLOGIE_TOTAAL.exists()),
+    reason="de De Wolden-OroX staat niet in data/",
+)
+def test_attr014_op_de_wolden_meldt_alleen_wibonthema() -> None:
+    """ATTR-014 vindt precies een property-tegenspraak op De Wolden: WIBONThema.
+
+    De verificatie-eis uit issue #37: meer dan een melding zou betekenen dat de check
+    te breed staat. De aantallen (23.440 objecten, 18.363 met de vulwaarde 0) komen
+    rechtstreeks uit de audit in het issue.
+    """
+    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    outcome = run_checks(context, ["ATTR-014"]).outcomes[0]
+
+    assert len(outcome.findings) == 1
+    bevinding = outcome.findings[0]
+    assert bevinding.details["kenmerk"] == "WIBONThema"
+    assert bevinding.systemisch is True
+    assert bevinding.message == (
+        "WIBONThema gebruikt hasValue in plaats van hasReference op 23440 objecten, "
+        "waarvan 18363 met de vulwaarde 0."
+    )
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
     not (OROX_DE_WOLDEN.exists() and STUDIEGEBIED.exists()),
     reason="de De Wolden-OroX of het studiegebied staat niet in data/",
 )

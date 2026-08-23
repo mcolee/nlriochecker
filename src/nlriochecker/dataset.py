@@ -324,6 +324,12 @@ class GwswDataset:
     decode_fallback: DecodeFallback | None = None
     ontologies: tuple[Path, ...] = ()
     structural_diff: dict[str, int] = field(default_factory=dict)
+    # Per kenmerktype de property die de ontologie voor zijn waarde voorschrijft
+    # (`hasValue` of `hasReference`), afgeleid uit de `owl:onProperty`-restricties.
+    # Dit is de ontologische kennis die ATTR-014 nodig heeft en die anders na het
+    # berekenen van `subclasses` verloren gaat; het is een klein afgeleid woordenboek
+    # zoals `subclasses`, niet de hele ontologiegraaf. Leeg zonder klassenkennis.
+    kenmerk_property: dict[str, str] = field(default_factory=dict)
 
     def is_a(self, uri: str, root: str) -> bool:
         """Geeft aan of dit domeinobject van het type `root` of een subklasse is.
@@ -840,7 +846,9 @@ def load_dataset(
     finally:
         voortgang.einde_fase()
 
-    subclasses = _subclass_closure(ontology or graph)
+    restrictiebron = ontology if len(ontology) else graph
+    subclasses = _subclass_closure(restrictiebron)
+    kenmerk_property = _kenmerk_properties(restrictiebron, subclasses)
     geometry_errors: dict[str, str] = {}
     # Dezelfde twee vragen die `GwswDataset.klassenhierarchie_bekend` stelt, met
     # dezelfde functie: `None` hier betekent terugval op geometrie, en dat is precies
@@ -868,6 +876,7 @@ def load_dataset(
         geometry_errors=geometry_errors,
         decode_fallback=fallback,
         ontologies=tuple(Path(pad) for pad in ontology_paths or []),
+        kenmerk_property=kenmerk_property,
     )
     # Altijd, en juist ook zonder klassenkennis: dan laat het verschil zien dat de
     # ontologische route nul objecten oplevert en de hele lezing op geometrie rust.
@@ -1108,6 +1117,25 @@ def _subclass_closure(graph: Graph) -> dict[str, frozenset[str]]:
                     stapel.append(afstammeling)
         afsluiting[klasse] = frozenset(gezien)
     return afsluiting
+
+
+def _kenmerk_properties(graph: Graph, subclasses: dict[str, frozenset[str]]) -> dict[str, str]:
+    """Per kenmerktype de property die de ontologie voor zijn waarde voorschrijft.
+
+    Loopt over de subklassen van `Kenmerk` en houdt alleen de types die een
+    `hasValue`- of `hasReference`-restrictie dragen. Leest uit dezelfde graaf als
+    `subclasses` (de ontologie, of bij een fixture de dataset zelf), zodat het met
+    `--geen-ontologie` en inline-hierarchieen meebeweegt. Zonder klassenkennis blijft
+    de afsluiting op `Kenmerk` zelf steken en levert dit een leeg woordenboek.
+    """
+    from nlriochecker.ontologie import verwachte_property
+
+    gevonden: dict[str, str] = {}
+    for uri in _afsluiting(subclasses, "Kenmerk"):
+        property_ = verwachte_property(graph, URIRef(uri))
+        if property_ is not None:
+            gevonden[_short(uri)] = property_
+    return gevonden
 
 
 def _label(graph: Graph, subject: RdfNode) -> str:

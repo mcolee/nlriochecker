@@ -88,3 +88,30 @@ def kenmerkbereik(graph: Graph, kenmerk: URIRef) -> Facetbereik | None:
     if datatype is None:
         return None
     return facetbereik(graph, datatype)
+
+
+def verwachte_property(graph: Graph, kenmerk: URIRef) -> str | None:
+    """De property die de ontologie voor de waarde van een kenmerk voorschrijft.
+
+    De ontologie hangt onder een kenmerk een `owl:Restriction` die de waarde aan een
+    property bindt: `owl:onProperty gwsw:hasReference` met `owl:allValuesFrom` een
+    domeinlijstcollectie (zoals `WIONThemaColl`), of `owl:onProperty gwsw:hasValue`
+    voor een vrije of getalswaarde. Dit levert `"hasReference"`, `"hasValue"`, of
+    `None` als het kenmerk geen van beide restricties draagt (zoals `Straatnaam`).
+
+    De verwijzende restrictie wint van de waarderestrictie: zij is het sterkste
+    signaal, want zij bindt aan een concrete collectie. Dit is de schakel die
+    ATTR-014 nodig heeft om te zien dat een export `hasValue` schrijft waar de
+    ontologie `hasReference` eist; de SHACL-nulmeting mist die fout per constructie
+    (issue #37).
+    """
+    has_value = URIRef(GWSW + "hasValue")
+    has_reference = URIRef(GWSW + "hasReference")
+    waarde: str | None = None
+    for restrictie in graph.objects(kenmerk, RDFS.subClassOf):
+        op = graph.value(restrictie, OWL.onProperty)
+        if op == has_reference and graph.value(restrictie, OWL.allValuesFrom) is not None:
+            return "hasReference"
+        if op == has_value:
+            waarde = "hasValue"
+    return waarde

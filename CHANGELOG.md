@@ -13,6 +13,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **ATTR-014 toetst de waardeproperty van elk kenmerk tegen de ontologie** (issue #37). Een
+  kenmerk dat `hasValue` gebruikt waar de ontologie via een `owl:onProperty`/`allValuesFrom`-
+  restrictie `hasReference` naar een collectie eist (of andersom) is een consistentiefout die
+  de SHACL-nulmeting per constructie mist: een `allValuesFrom` over een afwezige property is
+  vacuously true. De check is generiek over alle kenmerktypen en meldt per kenmerk één
+  systemische bevinding over de hele export (op De Wolden: `WIBONThema`, dat 23.440× `hasValue`
+  draagt in plaats van `hasReference`). De ontologische property komt uit `ontologie.verwachte_property`,
+  bij het laden afgeleid tot `GwswDataset.kenmerk_property` — hetzelfde soort afgeleide als
+  `subclasses`, geen tweede ontologiegraaf in het geheugen. `Finding` draagt nu een veld
+  `systemisch` dat een check zelf kan zetten; de meldingenlaag OR't het met de bestaande
+  populatieratio. Zie BO-37.
 - **`ontologie.py` leest de gedeclareerde waardebereiken (facetten) uit de GWSW-ontologie**
   (issue #35). `facetbereik` lost de keten `Dt_X → equivalentClass → onDatatype +
   withRestrictions → min/maxInclusive` op, `datatype_van_kenmerk` de stap `Kenmerk →

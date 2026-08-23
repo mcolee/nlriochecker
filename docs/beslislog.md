@@ -2031,3 +2031,58 @@ maken). De `Beton`-regel helemaal schrappen omdat hij `PVC` en `PE` toestond (ve
 de codereview, en terecht: die redenering stelt "kunststof" gelijk aan "PVC en PE", precies
 de denkfout die #43 aanwees. `MateriaalPutColl` kent zes andere kunststoffen, en de check
 zou van 11.969 naar 8 vergeleken strengen zijn gevallen zonder dat het rapport dat zei).
+
+### BO-37 ATTR-014 meldt per kenmerk, niet per object; `Finding.systemisch` is een eigen vlag
+
+**Wat.** `checks/attributen.py` heeft een nieuwe check ATTR-014 (F, Consistentie): een kenmerk
+dat `hasValue` gebruikt waar de ontologie via een `owl:onProperty`/`owl:allValuesFrom`-restrictie
+`hasReference` naar een collectie eist, of andersom. De verwachte property komt uit
+`ontologie.verwachte_property`; bij het laden wordt dat over de subklassen van `Kenmerk`
+afgeleid tot `GwswDataset.kenmerk_property` -- een klein woordenboek per kenmerktype, hetzelfde
+soort afgeleide als `subclasses`, uit `ontology or graph` (dus werkt met inline-fixtures en
+`--geen-ontologie`; leeg zonder klassenkennis). De hele ontologiegraaf wordt niet bewaard.
+`Finding` draagt nu een veld `systemisch` dat een check zelf kan zetten; `uitvoer/melding.py`
+OR't het met de bestaande populatieratio (`_is_systemisch`).
+
+**Waarom generiek, geen WIBONThema-check.** De fout die dit vindt is precies het soort dat de
+SHACL-nulmeting per constructie mist: `allValuesFrom` over een property die er niet staat is
+vacuously true, en er is geen minimum-kardinaliteit. Een check die alleen naar WIBONThema kijkt
+mist dezelfde fout op het volgende kenmerk in de volgende export. De generieke vorm onderhoudt
+zichzelf: op De Wolden zijn 509 kenmerktypen tegen hun voorgeschreven property gehouden en is
+`WIBONThema` de enige met een tegenspraak -- 23.440 objecten, waarvan 18.363 met de vulwaarde 0.
+Nul valse positieven. Was er meer dan een melding geweest, dan stond de check te breed en was
+dat gemeld, niet weggedraaid.
+
+**Twee keuzes die het issue expliciet aan de auteur liet.**
+
+- **Een systemische melding per kenmerk, niet 23.440 losse bevindingen.** De fout is per
+  kenmerktype hetzelfde verhaal; 23.440 rijen in CSV en JSON zetten zou het kaartbeeld en de
+  meldingenstroom overspoelen zonder een scherper signaal. De bevinding wijst geen los object
+  aan (`object_uri=""`), draagt de kenmerknaam als label en `systemisch=True`. Objectloze
+  meldingen kleuren de kaart al niet en het rapport telt ze al apart (`_zonder_locatie`), dus
+  dit sluit aan op bestaand gedrag. `Finding.systemisch` is nieuw omdat de bestaande
+  systemisch-vlag een populatieratio is (bevindingen/bekeken > 0,80) die bij een
+  aggregaatbevinding niet vuurt; een aggregaat over een heel kenmerk is systemisch van vorm,
+  niet van ratio.
+- **ATTR-014, geen nieuwe categorie.** De fout gaat over een attribuut, alleen over hoe het
+  geschreven is in plaats van over zijn waarde -- een lichte rek van ATTR. Een nieuwe categorie
+  had `CATEGORIEEN` in `gpkg.py`, de registerkoppen en de samenvatting geraakt voor een enkele
+  check; dat oppervlak weegt niet op tegen de zuiverheid. ATTR-011 is geschrapt en wordt nooit
+  hergebruikt; ATTR-014 is het volgende vrije nummer.
+
+**Meebewegende plumbing.** `beperk_tot_studiegebied` liet een bevinding zonder object en zonder
+locatie vallen; nu blijft zo'n dataset-brede bevinding in elk gebiedsrapport staan -- dezelfde
+regel als `_nul_hoort_erbij` voor een nulmetingbevinding die nergens op uitkwam (BO-12). De
+check draait `volledig_bereik`, zodat de telling de hele export beslaat en niet met het
+studiegebied meebeweegt. De sleutel van de datasetcache dekt sinds deze BO ook de broncode van
+`ontologie.py`, want `kenmerk_property` wordt mee gecachet.
+
+**Wat deze BO niet doet.** Geen tweede laag (thema versus leidingklasse: een duiker die "riool
+vrijverval" draagt). Dat is inhoudelijker en discutabeler, en het issue liet het los ("apart of
+niet"); het valt buiten deze sessie.
+
+**Gemeten op De Wolden** (volledige export, `Ontologie_GWSW_Totaal.ttl`, alleen ATTR-014):
+459.108 kenmerkinstanties met een property-restrictie bekeken, precies een bevinding --
+`WIBONThema gebruikt hasValue in plaats van hasReference op 23440 objecten, waarvan 18363 met de
+vulwaarde 0`. Op de handgeschreven fixtures: de defectfixtures (beide richtingen) geven een
+melding, de correcte (`hasReference`) geeft er geen.

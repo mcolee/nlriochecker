@@ -93,9 +93,12 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
     meldingen: list[Melding] = []
     gebruikte_ids: set[str] = set()
     for outcome in run.outcomes:
-        systemisch = _is_systemisch(outcome, config)
+        outcome_systemisch = _is_systemisch(outcome, config)
         sleutels = _id_sleutels(outcome.check_id)
         for finding in outcome.findings:
+            # Een check kan een losse bevinding als systemisch merken (ATTR-014 meldt
+            # per kenmerk, over de hele export); dat OR't met de populatieratio.
+            systemisch = outcome_systemisch or finding.systemisch
             kenmerk = _uniek_id_van_finding(finding, sleutels, gebruikte_ids)
             gebruikte_ids.add(kenmerk)
             meldingen.append(

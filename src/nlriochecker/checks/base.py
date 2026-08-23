@@ -65,6 +65,10 @@ class Finding:
     # BGT-putdeksel zonder put, een BAG-pand zonder riolering). Die hebben geen
     # dataset-URI om op af te bakenen; hun eigen RD-coordinaat neemt die rol over.
     location: tuple[float, float] | None = None
+    # Een bevinding die niet over een los object maar over de export als geheel gaat
+    # (ATTR-014 meldt per kenmerk, over alle objecten samen). De meldingenlaag OR't
+    # dit met de bestaande populatieratio; zie `melding._is_systemisch`.
+    systemisch: bool = False
 
 
 # Het type van een afgeleide structuur in de contextcache: wat `bouw` oplevert,
@@ -314,6 +318,12 @@ class CheckRun:
                 return True
             if finding.location is not None:
                 return area.bevat(Point(*finding.location))
+            # Een dataset-brede bevinding zonder object en zonder locatie (ATTR-014
+            # meldt per kenmerk) is aan geen enkel gebied toe te wijzen en blijft in
+            # elk gebiedsrapport staan -- dezelfde regel als `_nul_hoort_erbij` voor
+            # een nulmetingbevinding die nergens op uitkwam (BO-12).
+            if not finding.object_uri:
+                return True
             return False
 
         outcomes = []

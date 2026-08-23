@@ -70,6 +70,9 @@ DEFECTEN = [
     ("attr010_materiaal_put.ttl", "ATTR-010", ["1"]),
     ("attr012_metselwerk_rond.ttl", "ATTR-012", ["1"]),
     ("attr013_vulwaarde_hoogte.ttl", "ATTR-013", ["1", "A", "B"]),
+    # ATTR-014 meldt per kenmerk, niet per object: een aggregaatbevinding met de
+    # kenmerknaam als label. Zie de gerichte tests onderaan dit bestand.
+    ("attr014_wibon_hasvalue.ttl", "ATTR-014", ["WIBONThema"]),
     ("hgt004_bob_boven_deksel.ttl", "HGT-004", ["1"]),
     ("hgt005_tegenverhang_licht.ttl", "HGT-005", ["1"]),
     ("hgt006_tegenverhang_fors.ttl", "HGT-006", ["1"]),
@@ -665,3 +668,48 @@ def test_hgt007_notes_tellen_de_ongetoetste_strengen() -> None:
     assert "1 strengen buiten de rol vuilwater" in tekst
     assert "1 zonder bruikbare BOB" in tekst
     assert "1 zonder diameter" in tekst
+
+
+def test_attr014_meldt_een_keer_per_kenmerk_met_de_aantallen() -> None:
+    """De WIBONThema-fout wordt een aggregaatbevinding, geen bevinding per object.
+
+    De fixture draagt twee WIBONThema-kenmerken die hasValue gebruiken waar de
+    ontologie hasReference eist -- een met de vulwaarde 0, een met een tekstlabel.
+    Precies een bevinding, met de aantallen in de boodschap en de kenmerknaam als
+    onderscheidende sleutel.
+    """
+    outcome = uitkomst("attr014_wibon_hasvalue.ttl", "ATTR-014")
+    assert len(outcome.findings) == 1
+
+    bevinding = outcome.findings[0]
+    assert bevinding.details["kenmerk"] == "WIBONThema"
+    assert bevinding.systemisch is True
+    # Een aggregaat over een heel kenmerk wijst geen los object aan.
+    assert bevinding.object_uri == ""
+    assert bevinding.location is None
+    assert "WIBONThema gebruikt hasValue in plaats van hasReference op 2 objecten" in (
+        bevinding.message
+    )
+    assert "waarvan 1 met de vulwaarde 0" in bevinding.message
+
+
+def test_attr014_zwijgt_bij_de_juiste_property() -> None:
+    """Dezelfde kenmerken, nu met hasReference geschreven -- geen bevinding."""
+    assert labels(uitkomst("attr014_wibon_correct.ttl", "ATTR-014")) == []
+
+
+def test_attr014_meldt_ook_de_omgekeerde_richting() -> None:
+    """hasReference op een kenmerk dat de ontologie aan hasValue bindt, is ook een fout.
+
+    Het issue omvat 'of andersom' expliciet; deze fixture heeft een LengteLeiding met
+    hasReference waar hasValue hoort.
+    """
+    outcome = uitkomst("attr014_reference_op_waardekenmerk.ttl", "ATTR-014")
+    assert len(outcome.findings) == 1
+
+    bevinding = outcome.findings[0]
+    assert bevinding.details["kenmerk"] == "LengteLeiding"
+    assert (
+        bevinding.message == "LengteLeiding gebruikt hasReference in plaats van hasValue op "
+        "1 objecten."
+    )

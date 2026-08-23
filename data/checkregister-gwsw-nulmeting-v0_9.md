@@ -85,6 +85,7 @@ gebreken" leest.
 | ATTR-010 | Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past | W | Plausibiliteit |
 | ATTR-012 | Materiaal past niet bij profielvorm (bijv. metselwerk met rond profiel in plaats van ei- of muilprofiel) | W | Plausibiliteit |
 | ATTR-013 | Hoogtekenmerk (BOB, maaiveldhoogte, putdekselniveau) op een vulwaarde rond 0 m NAP dat als meting geregistreerd staat; de band en de kenmerken zijn projectconfiguratie (`[vulwaarden]`), de leesregel zet het kenmerk op ontbrekend en de hoogtechecks slaan het object over | W | Compleetheid |
+| ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmeting per constructie mist (issue #37). Generiek over alle kenmerktypen, uit de ontologische `owl:onProperty`/`owl:allValuesFrom`-keten; een systemische melding per kenmerk, niet per object | F | Consistentie |
 
 ## HGT: Hoogten en verhang
 

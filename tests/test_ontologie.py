@@ -17,7 +17,12 @@ import pytest
 from rdflib import Graph, URIRef
 
 from nlriochecker.dataset import GWSW
-from nlriochecker.ontologie import datatype_van_kenmerk, facetbereik, kenmerkbereik
+from nlriochecker.ontologie import (
+    datatype_van_kenmerk,
+    facetbereik,
+    kenmerkbereik,
+    verwachte_property,
+)
 
 ONTOLOGIE_TTL = (
     Path(__file__).resolve().parents[1] / "data" / "gwsw_ontologieen" / "Ontologie_GWSW_Totaal.ttl"
@@ -63,6 +68,15 @@ gwsw:Dt_AlleenOndergrens a rdfs:Datatype ;
     ] .
 
 gwsw:Dt_ZonderFacet a rdfs:Datatype .
+
+gwsw:WIBONThema a owl:Class ;
+    rdfs:subClassOf gwsw:Kenmerk ,
+        [ a owl:Restriction ;
+          owl:onProperty gwsw:hasReference ;
+          owl:allValuesFrom gwsw:WIONThemaColl ] .
+
+gwsw:Straatnaam a owl:Class ;
+    rdfs:subClassOf gwsw:Kenmerk .
 """
 
 
@@ -122,6 +136,31 @@ def test_kenmerkbereik_loopt_de_hele_keten(graaf: Graph) -> None:
     bereik = kenmerkbereik(graaf, _dt("LengteLeiding"))
     assert bereik is not None
     assert (bereik.minimum, bereik.maximum) == (Decimal("1"), Decimal("75"))
+
+
+def test_verwachte_property_leest_hasreference(graaf: Graph) -> None:
+    """Een kenmerk dat via een restrictie aan hasReference bindt, eist hasReference."""
+    assert verwachte_property(graaf, _dt("WIBONThema")) == "hasReference"
+
+
+def test_verwachte_property_leest_hasvalue(graaf: Graph) -> None:
+    assert verwachte_property(graaf, _dt("LengteLeiding")) == "hasValue"
+
+
+def test_verwachte_property_zonder_restrictie_is_none(graaf: Graph) -> None:
+    """Straatnaam draagt geen property-restrictie; de check heeft er geen mening over."""
+    assert verwachte_property(graaf, _dt("Straatnaam")) is None
+
+
+def test_verwachte_property_uit_de_echte_ontologie() -> None:
+    """De drie herkenbare gevallen uit issue #37, rechtstreeks uit de totaal-ontologie."""
+    if not ONTOLOGIE_TTL.exists():
+        pytest.skip("de GWSW-ontologie staat niet in data/")
+    graph = Graph()
+    graph.parse(ONTOLOGIE_TTL, format="turtle")
+    assert verwachte_property(graph, _dt("WIBONThema")) == "hasReference"
+    assert verwachte_property(graph, _dt("HoogtePut")) == "hasValue"
+    assert verwachte_property(graph, _dt("Straatnaam")) is None
 
 
 @pytest.mark.parametrize(

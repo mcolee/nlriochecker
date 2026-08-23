@@ -8,13 +8,13 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | ---: | ---: | ---: | ---: | ---: |
 | TOP | 21 | 21 | 0 | 0 | 0 |
 | ADM | 9 | 6 | 0 | 0 | 3 |
-| ATTR | 13 | 12 | 0 | 0 | 1 |
+| ATTR | 14 | 13 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 8 | 8 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **93** | **89** | **0** | **0** | **4** |
+| **totaal** | **94** | **90** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -73,6 +73,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ATTR-011 | Absurde lengtewaarde boven harde bovengrens | — | — | geschrapt (gedekt door nulmeting) | Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype Dt_LengteLeiding) |
 | ATTR-012 | Materiaal past niet bij profielvorm (bijv. metselwerk met rond profiel in plaats van ei- of muilprofiel) | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-013 | Hoogtekenmerk (BOB, maaiveldhoogte, putdekselniveau) op een vulwaarde rond 0 m NAP dat als meting geregistreerd staat; de band en de kenmerken zijn p… | W | Compleetheid | geimplementeerd met test | — |
+| ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmetin… | F | Consistentie | geimplementeerd met test | — |
 
 ## HGT
 

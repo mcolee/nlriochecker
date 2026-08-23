@@ -30,6 +30,7 @@ from rdflib import Graph
 
 from nlriochecker import dataset as dataset_module
 from nlriochecker import geometry as geometry_module
+from nlriochecker import ontologie as ontologie_module
 from nlriochecker.dataset import FALLBACK_ENCODING, GwswDataset, load_dataset
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
@@ -129,7 +130,10 @@ def cachesleutel(
     haas.update(LADER_VERSIE.encode("utf-8"))
     haas.update(f"rdflib{rdflib.__version__}shapely{shapely.__version__}".encode())
     haas.update(fallback_encoding.encode("utf-8"))
-    for module in (dataset_module, geometry_module):
+    # `ontologie` staat erbij sinds `load_dataset` er `kenmerk_property` uit afleidt
+    # (ATTR-014): die waarde wordt mee gecachet, dus een wijziging aan de afleiding
+    # moet net als bij de andere twee de sleutel veranderen.
+    for module in (dataset_module, geometry_module, ontologie_module):
         # `__file__` is alleen None bij een namespace-pakket; dit zijn gewone modules.
         haas.update(Path(cast(str, module.__file__)).read_bytes())
     for pad in [Path(dataset_path), *sorted(Path(p) for p in ontology_paths)]:
