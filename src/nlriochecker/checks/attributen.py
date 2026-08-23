@@ -32,7 +32,12 @@ from nlriochecker.checks.selectie import (
 )
 from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
 from nlriochecker.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
-from nlriochecker.plausibiliteit import MaterialDiameter, MaterialRoughness, PlausibilityTables
+from nlriochecker.plausibiliteit import (
+    MaterialDiameter,
+    MaterialRoughness,
+    MinimumDiameter,
+    PlausibilityTables,
+)
 
 
 @dataclass(frozen=True)
@@ -180,35 +185,60 @@ class DiameterOnderMinimum(_StrengCheck):
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt strengen waarvan de grootste profielmaat onder het minimum ligt."""
-        minimum = context.config.drempels.minimale_diameter_mm
-
+        """Meldt strengen waarvan de grootste profielmaat onder het stelselminimum ligt."""
         for conduit in vrijvervalrioolleidingen(context):
             maat = _grootste_maat(conduit)
-            if maat is None or maat >= minimum:
+            if maat is None:
                 continue
+            regel = _diameterondergrens(context, conduit)
+            if regel is None or maat >= regel.minimum_mm:
+                continue
+            waarvoor = (
+                "een vrijvervalriool"
+                if regel.stelseltype == "overig"
+                else f"het stelseltype {regel.stelseltype}"
+            )
             yield self.finding(
                 context,
                 conduit.uri,
                 conduit.label,
                 f"Profielmaat {maat:g} mm ligt onder de gangbare ondergrens van "
-                f"{minimum:g} mm voor een vrijvervalriool.",
+                f"{regel.minimum_mm:g} mm voor {waarvoor}.",
                 maat_mm=maat,
-                minimum_mm=minimum,
+                minimum_mm=regel.minimum_mm,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Wijst op de grens met de nulmeting en op de aard van de kleine leidingen."""
-        minimum = context.config.drempels.minimale_diameter_mm
-        klein = [
-            conduit
-            for conduit in vrijvervalrioolleidingen(context)
-            if (_grootste_maat(conduit) or minimum) < minimum
-        ]
+        """Wijst op de grens met de nulmeting, de minima per stelseltype en de kleine leidingen."""
+        tabel = context.plausibiliteit.minimale_diameter
+        if not tabel:
+            return [
+                "Er zijn geen ondergrenzen per stelseltype geconfigureerd "
+                "(`minimale_diameter`); deze check heeft niets kunnen toetsen."
+            ]
+        klein = []
+        ongetoetst = 0
+        for conduit in vrijvervalrioolleidingen(context):
+            maat = _grootste_maat(conduit)
+            regel = _diameterondergrens(context, conduit)
+            if maat is not None and regel is None:
+                # Een stelseltype zonder eigen regel en zonder `overig`-vangnet: niet
+                # getoetst. Kan alleen bij een eigen `plausibiliteit.toml`; zwijgen zou
+                # als "getoetst en in orde" lezen.
+                ongetoetst += 1
+            elif maat is not None and regel is not None and maat < regel.minimum_mm:
+                klein.append(conduit)
+        grenzen = ", ".join(f"{regel.stelseltype} {regel.minimum_mm:g} mm" for regel in tabel)
         notities = [
             "De nulmeting toetst alleen de harde ondergrens van 63 mm uit de "
             "GWSW-waardebereiken; deze check gaat over het gat daarboven.",
+            f"De ondergrens verschilt per stelseltype: {grenzen}.",
         ]
+        if ongetoetst:
+            notities.append(
+                f"{ongetoetst} strengen hebben een stelseltype zonder ondergrensregel en "
+                "geen `overig`-vangnet; ze zijn niet getoetst."
+            )
         if klein:
             telling: dict[str, int] = {}
             for conduit in klein:
@@ -220,7 +250,7 @@ class DiameterOnderMinimum(_StrengCheck):
             )
             notities.append(
                 f"De bevindingen verdelen zich over deze klassen: {top}. Drains en "
-                "perceel- of kolkaansluitleidingen zijn van nature dunner dan 200 mm; die "
+                "perceel- of kolkaansluitleidingen zijn van nature dunner dan een riool; die "
                 "bevindingen zeggen meer over de klasse-indeling dan over een gebrek."
             )
         return notities
@@ -1316,6 +1346,12 @@ def _grootste_maat(conduit: Conduit) -> float | None:
     """De grootste profielmaat van een streng in millimeters."""
     maten = [maat for maat in (conduit.breedte_mm, conduit.hoogte_mm) if maat and maat > 0]
     return max(maten) if maten else None
+
+
+def _diameterondergrens(context: CheckContext, conduit: Conduit) -> MinimumDiameter | None:
+    """De ondergrensregel voor deze streng, op grond van haar stelseltype (met terugval)."""
+    stelseltype = context.config.klassen.stelseltype(conduit.types, context.dataset.closure)
+    return context.plausibiliteit.ondergrens(stelseltype)
 
 
 def _kant_van_bereik(regel: MaterialDiameter, maat: float) -> str | None:

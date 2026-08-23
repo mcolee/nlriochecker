@@ -59,6 +59,9 @@ def ids_van(groep: str) -> list[str]:
 DEFECTEN = [
     ("attr001_diameter_bij_materiaal.ttl", "ATTR-001", ["1"]),
     ("attr002_kleine_diameter.ttl", "ATTR-002", ["1"]),
+    # De ondergrens is nu stelselafhankelijk (issue #20): G (gemengd, Ø220) valt onder
+    # 250 mm, V (vuilwater, Ø220) blijft boven 200 mm en is geen bevinding.
+    ("attr002_stelseltype.ttl", "ATTR-002", ["G"]),
     ("attr003_pvc_te_vroeg.ttl", "ATTR-003", ["1"]),
     ("attr004_rond_ongelijk.ttl", "ATTR-004", ["1"]),
     ("attr005_centimeters.ttl", "ATTR-005", ["1", "1"]),
@@ -160,6 +163,30 @@ def test_schone_fixture_geeft_geen_bevinding(bestand: str, groep: str) -> None:
 
     gemeld = {outcome.check_id: labels(outcome) for outcome in run.outcomes if outcome.findings}
     assert gemeld == {}
+
+
+def test_attr001_bereikcorrecties_uit_issue20() -> None:
+    """De vier gecorrigeerde diameterbereiken geven geen valse ATTR-001 meer (issue #20).
+
+    PP Ø80, GewapendBeton Ø300, Gres Ø1200 en Asbestcement Ø1500 vielen onder de oude
+    tabel buiten hun bereik; onder de gecorrigeerde tabel passen ze er alle vier in.
+    """
+    assert labels(uitkomst("attr001_diameterbesluit.ttl", "ATTR-001")) == []
+
+
+def test_attr002_ondergrens_per_stelseltype() -> None:
+    """Een gemengd riool van Ø220 valt onder 250 mm; een vuilwaterriool van Ø220 niet."""
+    assert labels(uitkomst("attr002_stelseltype.ttl", "ATTR-002")) == ["G"]
+
+
+def test_attr003_begindatumbesluit_uit_issue20() -> None:
+    """Alleen PVC vóór 1958 is een bevinding; PE en GewapendBeton hebben geen regel meer.
+
+    De tijdvakregels voor PE (1970), Polypropyleen (1975), GewapendBeton (1920) en
+    Metselwerk (1960) zijn geschrapt omdat geen bron ze draagt (issue #20), dus ATTR-003
+    toetst die materialen niet meer op begindatum.
+    """
+    assert labels(uitkomst("attr003_begindatum_besluit.ttl", "ATTR-003")) == ["PVC56"]
 
 
 def test_adm007_ziet_een_ingebouwde_overstortdrempel() -> None:

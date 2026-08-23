@@ -221,9 +221,8 @@ spike_hoek_graden = 5.0
 # snappen. Projectkeuze, geen externe bron.
 put_op_streng_tolerantie_m = 0.50
 
-# ATTR-002: diameters onder deze waarde zijn onaannemelijk voor een riool. Uit het
-# checkregister: "kleiner dan rond 200 mm".
-minimale_diameter_mm = 200.0
+# ATTR-002: de ondergrens per stelseltype staat in `plausibiliteit.toml`
+# (`[[minimale_diameter]]`), met een bron per regel -- niet meer als losse drempel.
 # ATTR-005: eenheidsfout binnen bereik; een diameter onder deze waarde in
 # combinatie met een deelbaar-door-tien-patroon wijst op centimeters.
 # Projectkeuze, geen externe bron.

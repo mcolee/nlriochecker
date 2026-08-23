@@ -483,6 +483,9 @@ def nette_leiding(naam: str, label: str, punten, begin, eind, **extra) -> str:
 
 A = (1000.0, 2000.0)
 B = (1050.0, 2000.0)
+C = (1100.0, 2000.0)
+D = (1150.0, 2000.0)
+E = (1200.0, 2000.0)
 
 FIXTURES["attr_schoon.ttl"] = (
     "geen; alle attributen zijn aannemelijk en onderling consistent",
@@ -530,6 +533,75 @@ FIXTURES["attr003_pvc_te_vroeg.ttl"] = (
         "PutA",
         "PutB",
         velden={"MateriaalLeiding_ref": "PVC", "Begindatum": "1940-01-01"},
+    ),
+)
+
+FIXTURES["attr002_stelseltype.ttl"] = (
+    "G (gemengd, Ø220) valt onder de gemengd-ondergrens van 250 mm; "
+    "V (vuilwater, Ø220) blijft boven de vuilwater-ondergrens van 200 mm (issue #20)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_leiding(
+        "G", "G", [A, B], "PutA", "PutB", klasse="GemengdRiool",
+        velden={"BreedteLeiding": 220, "HoogteLeiding": 220},
+    )
+    + nette_leiding(
+        "V", "V", [B, C], "PutB", "PutC", klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 220, "HoogteLeiding": 220},
+    ),
+)
+
+FIXTURES["attr001_diameterbesluit.ttl"] = (
+    "geen; de vier door issue #20 gecorrigeerde bereiken passen nu -- PP Ø80 (min 100->80), "
+    "GewapendBeton Ø300 (min 400->300), Gres Ø1200 (max 1000->1400), "
+    "Asbestcement Ø1500 (max 1000->1800)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_put("PutD", "D", *D)
+    + nette_put("PutE", "E", *E)
+    + nette_leiding(
+        "PP", "PP", [A, B], "PutA", "PutB", klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 80, "HoogteLeiding": 80, "MateriaalLeiding_ref": "Polypropyleen"},
+    )
+    + nette_leiding(
+        "GB", "GB", [B, C], "PutB", "PutC", klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 300, "HoogteLeiding": 300, "MateriaalLeiding_ref": "GewapendBeton"},
+    )
+    + nette_leiding(
+        "GR", "GR", [C, D], "PutC", "PutD", klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 1200, "HoogteLeiding": 1200, "MateriaalLeiding_ref": "Gres"},
+    )
+    + nette_leiding(
+        "AC", "AC", [D, E], "PutD", "PutE", klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 1500, "HoogteLeiding": 1500, "MateriaalLeiding_ref": "Asbestcement"},
+    ),
+)
+
+FIXTURES["attr003_begindatum_besluit.ttl"] = (
+    "PVC56 (PVC, 1956) valt vóór 1958; PE65 en GB15 hebben geen tijdvakregel meer "
+    "en zijn geen bevinding (issue #20)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_put("PutD", "D", *D)
+    + nette_leiding(
+        "PVC56", "PVC56", [A, B], "PutA", "PutB", klasse="Vuilwaterriool",
+        velden={"MateriaalLeiding_ref": "PVC", "Begindatum": "1956-01-01"},
+    )
+    + nette_leiding(
+        "PE65", "PE65", [B, C], "PutB", "PutC", klasse="Vuilwaterriool",
+        velden={"MateriaalLeiding_ref": "PE", "Begindatum": "1965-01-01"},
+    )
+    + nette_leiding(
+        "GB15", "GB15", [C, D], "PutC", "PutD", klasse="Vuilwaterriool",
+        velden={
+            "BreedteLeiding": 400,
+            "HoogteLeiding": 400,
+            "MateriaalLeiding_ref": "GewapendBeton",
+            "Begindatum": "1915-01-01",
+        },
     ),
 )
 

@@ -12,12 +12,26 @@ from __future__ import annotations
 import tomllib
 from importlib import resources
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from nlriochecker.errors import ConfigError
 
 DEFAULT_PLAUSIBILITY_NAME = "plausibiliteit.toml"
+
+# De herkomst van een tabelregel. De vier eerste zijn harde projectankers; komt een
+# waarde uit geen van die vier -- een fabrikantmaattabel, een NEN-norm, wetgeving of
+# een expertaanname -- dan is `ervaringsregel` de eerlijke bak en staat de specifieke
+# bron in `toelichting`. Zie issue #20; de sweep staat in
+# `tests/test_plausibiliteit_herkomst.py`.
+Bron = Literal[
+    "ontologie",
+    "checkregister",
+    "RIONED Kennisbank",
+    "Leidraad C2100",
+    "ervaringsregel",
+]
 
 
 class MaterialDiameter(BaseModel):
@@ -26,8 +40,26 @@ class MaterialDiameter(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     materiaal: str
+    bron: Bron
     minimum_mm: float | None = None
     maximum_mm: float | None = None
+    toelichting: str = ""
+
+
+class MinimumDiameter(BaseModel):
+    """ATTR-002: de gangbare ondergrens per stelseltype, in mm.
+
+    Vervangt de ene drempel `minimale_diameter_mm`: een gemengd of hemelwaterriool
+    begint hoger dan een vuilwaterriool. Het stelseltype volgt uit de eigen
+    GWSW-klasse van de streng (`klassen.stelseltypen`); een streng zonder herkenbaar
+    type valt op de regel `overig` terug.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    stelseltype: str
+    bron: Bron
+    minimum_mm: float = Field(gt=0.0)
     toelichting: str = ""
 
 
@@ -42,6 +74,7 @@ class MaterialRoughness(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     materiaal: str
+    bron: Bron
     minimum_mm: float | None = None
     maximum_mm: float | None = None
     toelichting: str = ""
@@ -53,6 +86,7 @@ class MaterialYear(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     materiaal: str
+    bron: Bron
     vanaf_jaar: int | None = None
     tot_jaar: int | None = None
     toelichting: str = ""
@@ -64,6 +98,7 @@ class MaterialShape(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     materiaal: str
+    bron: Bron
     toegestane_vormen: list[str] = Field(min_length=1)
     toelichting: str = ""
 
@@ -79,6 +114,7 @@ class ConduitManholeMaterial(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     leidingmateriaal: str
+    bron: Bron
     onwaarschijnlijke_putmaterialen: list[str] = Field(min_length=1)
     toelichting: str = ""
 
@@ -89,6 +125,7 @@ class ShapeDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     vorm: str
+    bron: Bron
     breedte_gelijk_hoogte: bool = False
     hoogte_groter_dan_breedte: bool = False
     hoogte_kleiner_dan_breedte: bool = False
@@ -102,6 +139,7 @@ class PlausibilityTables(BaseModel):
 
     bron: str = ""
     materiaal_diameter: list[MaterialDiameter] = Field(default_factory=list)
+    minimale_diameter: list[MinimumDiameter] = Field(default_factory=list)
     materiaal_wandruwheid: list[MaterialRoughness] = Field(default_factory=list)
     materiaal_begindatum: list[MaterialYear] = Field(default_factory=list)
     materiaal_vorm: list[MaterialShape] = Field(default_factory=list)
@@ -112,6 +150,13 @@ class PlausibilityTables(BaseModel):
     def diameter(self, materiaal: str | None) -> MaterialDiameter | None:
         """De diameterregel voor dit materiaal, of None."""
         return _zoek(self.materiaal_diameter, "materiaal", materiaal)
+
+    def ondergrens(self, stelseltype: str | None) -> MinimumDiameter | None:
+        """De ondergrensregel voor dit stelseltype, met terugval op `overig`."""
+        regel = _zoek(self.minimale_diameter, "stelseltype", stelseltype)
+        if regel is not None:
+            return regel
+        return _zoek(self.minimale_diameter, "stelseltype", "overig")
 
     def wandruwheid(self, materiaal: str | None) -> MaterialRoughness | None:
         """De wandruwheidsband voor dit materiaal, of None."""

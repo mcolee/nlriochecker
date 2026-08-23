@@ -8,15 +8,56 @@
 #
 # Een materiaal dat hier niet in staat wordt niet getoetst; de betreffende check
 # meldt in haar toelichting hoeveel strengen daardoor buiten beeld bleven.
+#
+# HERKOMST. Elke regel draagt een `bron`-veld (issue #20). Toegestaan zijn vier harde
+# projectankers -- `ontologie`, `checkregister`, `RIONED Kennisbank`, `Leidraad C2100`
+# -- en `ervaringsregel`. Die laatste is de eerlijke bak voor een waarde die uit geen
+# van de vier volgt (een fabrikantmaattabel, een NEN-norm, wetgeving of een
+# expertaanname); de specifieke bron staat dan in `toelichting`. De diameterbereiken
+# per materiaal hieronder zijn stuk voor stuk zulke ervaringsregels: geen van de vier
+# ankers geeft een handelsmaatreeks per buismateriaal.
 
 bron = "Werkafspraak project nlriochecker, fase 4; te herzien per gemeente."
 
 # ATTR-005: eenhedenfouten binnen bereik. Een breedte- of hoogtemaat die zelf geen
 # handelsmaat is maar maal tien wel, is vrijwel zeker in centimeters genoteerd.
+# (Deze lijst staat als losse sleutel boven de tabellen, want in TOML horen
+# top-level-sleutels vóór elke [[tabel]].)
 standaarddiameters_mm = [
   63, 75, 80, 90, 100, 110, 125, 150, 160, 200, 250, 300, 315, 400, 500, 600,
   700, 800, 900, 1000, 1100, 1200, 1250, 1400, 1500, 1600, 1800, 2000, 2500, 3000,
 ]
+
+# ATTR-002: gangbare ondergrens van de diameter, per stelseltype (W, Plausibiliteit).
+# Vervangt de ene drempel `minimale_diameter_mm`. Een gemengd of hemelwaterriool
+# begint hoger dan een vuilwaterriool. Het stelseltype volgt uit de eigen GWSW-klasse
+# van de streng (`[klassen.stelseltypen]`); een streng zonder herkenbaar type valt op
+# `overig` terug. De harde ondergrens van 63 mm uit de GWSW-waardebereiken toetst de
+# nulmeting zelf; deze tabel gaat over het gat daarboven.
+
+[[minimale_diameter]]
+stelseltype = "gemengd"
+minimum_mm = 250
+bron = "RIONED Kennisbank"
+toelichting = "Kennisbank Stedelijk Water: gebruikelijke minimale diameter voor gemengde riolen is 250 mm."
+
+[[minimale_diameter]]
+stelseltype = "hemelwater"
+minimum_mm = 250
+bron = "RIONED Kennisbank"
+toelichting = "Kennisbank Stedelijk Water: minimaal 250 mm voor hemelwaterriolen; 300 mm is gangbaar."
+
+[[minimale_diameter]]
+stelseltype = "vuilwater"
+minimum_mm = 200
+bron = "checkregister"
+toelichting = "Checkregister (regel ATTR-002) en Kennisbank Stedelijk Water: vuilwater vrijverval vanaf 200 mm."
+
+[[minimale_diameter]]
+stelseltype = "overig"
+minimum_mm = 200
+bron = "ervaringsregel"
+toelichting = "Vangnet voor strengen zonder herkenbaar stelseltype (infiltratie, drainage, transport, onbekend); 200 mm was de vroegere enkele ondergrens."
 
 # ATTR-001: diameter past niet bij materiaal (F, Plausibiliteit).
 # Ondergrenzen volgen de kleinst gangbare handelsmaat, bovengrenzen de grootste
@@ -24,56 +65,68 @@ standaarddiameters_mm = [
 
 [[materiaal_diameter]]
 materiaal = "Beton"
+bron = "ervaringsregel"
 minimum_mm = 200
 maximum_mm = 3000
-toelichting = "Ongewapend beton begint bij 200 mm; daaronder wordt PVC toegepast."
+toelichting = "Ongewapend beton begint bij 200 mm; daaronder wordt PVC toegepast. De VPB-maattabel geeft 250-1500, maar riolen tot 3000 mm bestaan aantoonbaar (issue #20), dus de bovengrens blijft 3000."
 
 [[materiaal_diameter]]
 materiaal = "GewapendBeton"
-minimum_mm = 400
+bron = "ervaringsregel"
+minimum_mm = 300
 maximum_mm = 3000
-toelichting = "Wapening wordt pas vanaf de zwaardere maten toegepast."
+toelichting = "Ondergrens 300 mm volgens de VPB-maattabel, De Hamer en LBN (issue #20); 6 gewapend-betonstrengen in De Wolden liggen op Ø300."
 
 [[materiaal_diameter]]
 materiaal = "PVC"
+bron = "ervaringsregel"
 minimum_mm = 100
 maximum_mm = 800
 toelichting = "Boven 800 mm is PVC in de vrijverval niet gangbaar."
 
 [[materiaal_diameter]]
 materiaal = "PE"
+bron = "ervaringsregel"
 minimum_mm = 40
 maximum_mm = 1200
 
 [[materiaal_diameter]]
 materiaal = "Polypropyleen"
-minimum_mm = 100
+bron = "ervaringsregel"
+minimum_mm = 80
 maximum_mm = 1200
+toelichting = "Ondergrens 80 mm volgens de VPB en Pipelife (issue #20); de VPB noemt Ø80 PP juist voor kleine aansluitleidingen, en 38 PP-strengen in De Wolden liggen op Ø80."
 
 [[materiaal_diameter]]
 materiaal = "Gres"
+bron = "ervaringsregel"
 minimum_mm = 100
-maximum_mm = 1000
-toelichting = "Gres is een oud materiaal met beperkte maatvoering."
+maximum_mm = 1400
+toelichting = "Gres is een oud materiaal met beperkte maatvoering; bovengrens 1400 mm volgens EN 295-1 / Steinzeug-Keramo (issue #20)."
 
 [[materiaal_diameter]]
 materiaal = "Metselwerk"
+bron = "ervaringsregel"
 minimum_mm = 300
 maximum_mm = 4000
 toelichting = "Gemetselde riolen zijn per definitie groot en handgemaakt."
 
 [[materiaal_diameter]]
 materiaal = "Asbestcement"
+bron = "ervaringsregel"
 minimum_mm = 100
-maximum_mm = 1000
+maximum_mm = 1800
+toelichting = "Bovengrens 1800 mm volgens Wagenmaker, Cement 1968 (issue #20)."
 
 [[materiaal_diameter]]
 materiaal = "Gietijzer"
+bron = "ervaringsregel"
 minimum_mm = 80
 maximum_mm = 1000
 
 [[materiaal_diameter]]
 materiaal = "Staal"
+bron = "ervaringsregel"
 minimum_mm = 80
 maximum_mm = 2000
 
@@ -88,106 +141,111 @@ maximum_mm = 2000
 
 [[materiaal_wandruwheid]]
 materiaal = "Beton"
+bron = "Leidraad C2100"
 minimum_mm = 1.5
 maximum_mm = 5.0
 toelichting = "C2100 tabel B2.1: beton 3,0 mm."
 
 [[materiaal_wandruwheid]]
 materiaal = "GewapendBeton"
+bron = "Leidraad C2100"
 minimum_mm = 1.5
 maximum_mm = 5.0
 toelichting = "C2100 tabel B2.1: beton 3,0 mm."
 
 [[materiaal_wandruwheid]]
 materiaal = "PVC"
+bron = "Leidraad C2100"
 minimum_mm = 0.1
 maximum_mm = 1.0
 toelichting = "C2100 tabel B2.1: pvc 0,4 mm."
 
 [[materiaal_wandruwheid]]
 materiaal = "PE"
+bron = "Leidraad C2100"
 minimum_mm = 0.1
 maximum_mm = 1.0
 toelichting = "C2100 tabel B2.1: HPE en LDPE 0,4 mm."
 
 [[materiaal_wandruwheid]]
 materiaal = "Gres"
+bron = "Leidraad C2100"
 minimum_mm = 0.1
 maximum_mm = 1.5
 toelichting = "C2100 tabel B2.1: gres 0,5 mm."
 
 [[materiaal_wandruwheid]]
 materiaal = "Gietijzer"
+bron = "Leidraad C2100"
 minimum_mm = 1.0
 maximum_mm = 3.0
 toelichting = "C2100 tabel B2.1: gietijzer 2,0 mm."
 
 [[materiaal_wandruwheid]]
 materiaal = "Staal"
+bron = "Leidraad C2100"
 minimum_mm = 0.5
 maximum_mm = 3.0
 toelichting = "C2100 tabel B2.1: staal 1,5 mm."
 
 [[materiaal_wandruwheid]]
 materiaal = "Metselwerk"
+bron = "Leidraad C2100"
 minimum_mm = 2.0
 maximum_mm = 8.0
 toelichting = "C2100 tabel B2.1: metselwerk 5,0 mm."
 
 # ATTR-003: materiaal past niet bij begindatum (W, Plausibiliteit).
-# Het register noemt PVC voor 1955 en PE voor 1970 als voorbeeld.
+#
+# De jaartallen zijn per regel nagelopen tegen wetgeving, vaktijdschriften en
+# fabrikanten (bronnenonderzoek issue #20). Vier claims uit de oude tabel zijn
+# geschrapt omdat geen bron ze draagt: PE (1970), Polypropyleen (1975), GewapendBeton
+# (1920 -- wapening volgt uit belasting, niet uit bouwjaar) en Metselwerk (tot 1960 --
+# een verkeerd gelezen bron over betonbuizen). ATTR-003 toetst die vier materialen
+# daardoor niet meer op begindatum; hoeveel strengen daardoor buiten beeld vallen meldt
+# de check in haar toelichting. Een eerlijk gat is beter dan een verzonnen grens.
 
 [[materiaal_begindatum]]
 materiaal = "PVC"
-vanaf_jaar = 1955
-toelichting = "PVC-rioolbuis is in Nederland pas na 1955 toegepast."
-
-[[materiaal_begindatum]]
-materiaal = "PE"
-vanaf_jaar = 1970
-
-[[materiaal_begindatum]]
-materiaal = "Polypropyleen"
-vanaf_jaar = 1975
-
-[[materiaal_begindatum]]
-materiaal = "GewapendBeton"
-vanaf_jaar = 1920
+bron = "ervaringsregel"
+vanaf_jaar = 1958
+toelichting = "PVC-rioolbuis is in Nederland eind jaren vijftig toegepast (Wavin, Technisch Handboek Straatriolering); normatief anker NEN 7045:1977. 1958 is een synthese: geen bron noemt een exact jaar."
 
 [[materiaal_begindatum]]
 materiaal = "Asbestcement"
-vanaf_jaar = 1930
+bron = "ervaringsregel"
+vanaf_jaar = 1967
 tot_jaar = 1993
-toelichting = "Asbestcement is sinds 1993 in Nederland verboden."
-
-[[materiaal_begindatum]]
-materiaal = "Metselwerk"
-tot_jaar = 1960
-toelichting = "Na 1960 is er in Nederland geen riool meer gemetseld."
+toelichting = "Verbod sinds 1 juli 1993 (Productenbesluit asbest, normatief hard). Voor vrijverval noemt Wagenmaker (Cement 1968) 1967 als begin; dezelfde bron meldt tegelijk een areaal dat daarmee botst, dus het beginjaar is onzeker."
 
 # ATTR-012: materiaal past niet bij profielvorm (W, Plausibiliteit).
 # Het register noemt metselwerk met rond profiel als voorbeeld.
 
 [[materiaal_vorm]]
 materiaal = "Metselwerk"
+bron = "checkregister"
 toegestane_vormen = ["Eivormig", "Muil", "Heul", "Rechthoekig", "Ovaal"]
 toelichting = "Gemetselde riolen zijn ei-, muil- of heulprofiel, niet rond."
 
 [[materiaal_vorm]]
 materiaal = "PVC"
+bron = "ervaringsregel"
 toegestane_vormen = ["Rond"]
 toelichting = "PVC-rioolbuis wordt alleen rond geleverd."
 
 [[materiaal_vorm]]
 materiaal = "PE"
+bron = "ervaringsregel"
 toegestane_vormen = ["Rond"]
 
 [[materiaal_vorm]]
 materiaal = "Polypropyleen"
+bron = "ervaringsregel"
 toegestane_vormen = ["Rond"]
 
 [[materiaal_vorm]]
 materiaal = "Gres"
+bron = "ervaringsregel"
 toegestane_vormen = ["Rond", "Eivormig"]
 
 # ATTR-010: leidingmateriaal beton of metselwerk terwijl het putmateriaal daar
@@ -209,7 +267,8 @@ toegestane_vormen = ["Rond", "Eivormig"]
 # putmaterialen en blijven dus toegestaan. Dat is geen nieuw domeinoordeel maar de
 # bestaande tolerantie, ongewijzigd overgenomen -- De Wolden telt 361 PVC-putten, vrijwel
 # alle onder betonnen strengen. Of een kunststof put onder een betonnen streng uberhaupt
-# een waarschuwing verdient is een vraag met een bron nodig; die hoort bij issue #20.
+# een waarschuwing verdient is een vraag met een bron nodig; issue #20 vond er geen, dus
+# deze regels blijven een `ervaringsregel` en de tolerantie blijft ongewijzigd.
 #
 # `Metselwerk` staat hiermee niet langer als putmateriaal in dit bestand; de tolerantie
 # uit BO-35 heeft geen drager meer. Dat is geen antwoord op vraag 2 van issue #47 -- op
@@ -234,6 +293,7 @@ toegestane_vormen = ["Rond", "Eivormig"]
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "Beton"
+bron = "ervaringsregel"
 onwaarschijnlijke_putmaterialen = [
     "HDPE", "GVK", "Polyester", "Polypropyleen", "PitchFibre",
     "UnidentifiedTypeOfPlastics",
@@ -241,6 +301,7 @@ onwaarschijnlijke_putmaterialen = [
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "GewapendBeton"
+bron = "ervaringsregel"
 onwaarschijnlijke_putmaterialen = [
     "PVC", "PE", "HDPE", "GVK", "Polyester", "Polypropyleen", "PitchFibre",
     "UnidentifiedTypeOfPlastics",
@@ -248,6 +309,7 @@ onwaarschijnlijke_putmaterialen = [
 
 [[leiding_put_materiaal]]
 leidingmateriaal = "Metselwerk"
+bron = "ervaringsregel"
 onwaarschijnlijke_putmaterialen = [
     "PVC", "PE", "HDPE", "GVK", "Polyester", "Polypropyleen", "PitchFibre",
     "UnidentifiedTypeOfPlastics",
@@ -261,23 +323,28 @@ toelichting = "Een gemetselde streng op een kunststof put is bouwhistorisch onmo
 
 [[vorm_afmeting]]
 vorm = "Rond"
+bron = "ervaringsregel"
 breedte_gelijk_hoogte = true
 toelichting = "Bij een rond profiel zijn breedte en hoogte per definitie gelijk."
 
 [[vorm_afmeting]]
 vorm = "Eivormig"
+bron = "ervaringsregel"
 hoogte_groter_dan_breedte = true
 toelichting = "Een eiprofiel staat rechtop: de hoogte is groter dan de breedte."
 
 [[vorm_afmeting]]
 vorm = "Muil"
+bron = "ervaringsregel"
 hoogte_kleiner_dan_breedte = true
 toelichting = "Een muilprofiel is breder dan hoog."
 
 [[vorm_afmeting]]
 vorm = "Rechthoekig"
+bron = "ervaringsregel"
 toelichting = "Rechthoekig legt geen verhouding vast; alleen beide maten zijn nodig."
 
 [[vorm_afmeting]]
 vorm = "Heul"
+bron = "ervaringsregel"
 toelichting = "Een heulprofiel legt geen vaste verhouding vast."

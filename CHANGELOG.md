@@ -131,6 +131,42 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`plausibiliteit.toml` onderbouwd met bronnen, en de minimale diameter per stelseltype**
+  (issue #20). Elke regel in de plausibiliteitstabellen draagt nu een verplicht `bron`-veld:
+  een van de vier harde projectankers (`ontologie`, `checkregister`, `RIONED Kennisbank`,
+  `Leidraad C2100`) of, eerlijk gemarkeerd, `ervaringsregel` -- met de specifieke bron in de
+  toelichting. `tests/test_plausibiliteit_herkomst.py` dwingt dat af, zodat een nieuwe tabel
+  of regel zonder herkomst opvalt. **Breaking voor een eigen `plausibiliteit`-bestand:** een
+  regel zonder `bron` wordt geweigerd (`extra="forbid"`).
+  - *ATTR-002 (diameter onder de ondergrens)* leest de ondergrens niet meer als één drempel
+    `minimale_diameter_mm` (200 mm voor alles), maar per stelseltype uit de nieuwe tabel
+    `[[minimale_diameter]]`: gemengd 250 en hemelwater 250 (RIONED Kennisbank; 300 mm is
+    gangbaar), vuilwater 200 (checkregister), en een vangnet `overig` 200 voor infiltratie,
+    drainage en onbekend. Het stelseltype volgt uit de eigen GWSW-klasse van de streng
+    (`[klassen.stelseltypen]`). Op De Wolden en Hoogeveen stijgt ATTR-002 van 1047 naar 2289
+    bevindingen: de +1242 zijn gemengd- en hemelwaterstrengen met Ø200-249, die onder de
+    RIONED-ondergrens van 250 mm vallen (Ø200 is een gangbare maat, dus dit is een grote maar
+    verklaarde stijging). `drempels.minimale_diameter_mm` is vervallen uit `checkconfig.py`,
+    `checks.toml` en `configs/dewoldenhoogeveen.toml`.
+  - *ATTR-001 (diameter versus materiaal)* neemt vier geciteerde bereikcorrecties over uit het
+    bronnenonderzoek: GewapendBeton min 400->300 (VPB/De Hamer/LBN), Polypropyleen min
+    100->80 (VPB/Pipelife), Gres max 1000->1400 (EN 295-1) en Asbestcement max 1000->1800
+    (Wagenmaker 1968). Beton blijft 200-3000: de VPB geeft 250-1500, maar riolen tot 3000 mm
+    bestaan aantoonbaar. Op De Wolden en Hoogeveen daalt ATTR-001 van 19 naar 13.
+  - *ATTR-003 (materiaal versus begindatum)* volgt het auteursbesluit over de jaartallen: PVC
+    1955->1958 (Wavin, NEN 7045:1977), Asbestcement-begin 1930->1967 (Wagenmaker; einde 1993
+    blijft, Productenbesluit asbest). De ongedekte tijdvakken van PE, Polypropyleen,
+    GewapendBeton en Metselwerk zijn geschrapt; ATTR-003 toetst die materialen daardoor niet
+    meer op begindatum en meldt dat in haar toelichting. Op De Wolden en Hoogeveen stijgt
+    ATTR-003 van 27 naar 40: de +13 zijn PVC-strengen met een begindatum in 1955-1957 (het gat
+    dat de nieuwe drempel opent); de geschrapte materialen kennen in deze dataset geen
+    strengen vóór hun oude grens, dus daar verandert niets.
+  - *Bewust niet gedaan (deel 3 van het issue):* de ~15 ontbrekende GWSW-materiaalklassen
+    (HDPE, Kunststof, Polymeerbeton, ...) zijn niet als lege `ervaringsregel`-regels
+    toegevoegd. Sinds #19 meldt ATTR-001 het gat al expliciet ("N strengen met een materiaal
+    zonder regel"); lege regels zouden dat gerapporteerde gat juist maskeren. In De Wolden en
+    Hoogeveen komt geen van die klassen voor.
+
 - **RVZ-006 eist nu ook een afvoereindpunt** (issue #23). De check
   `GemengdDeelstelselZonderOverstort` meldde een gemengd deelstelsel zonder externe overstort
   of BBB; hij meldt nu ook een gemengd deelstelsel zonder afvoereindpunt (gemaal, pompunit of

@@ -145,8 +145,8 @@ class CheckThresholds(BaseModel):
     # TOP-021: hoe dicht een put bij een doorlopende streng mag liggen.
     put_op_streng_tolerantie_m: float = Field(default=0.50, gt=0.0)
 
-    # ATTR-002: diameters onder deze waarde zijn onaannemelijk voor een riool.
-    minimale_diameter_mm: float = Field(default=200.0, gt=0.0)
+    # ATTR-002: de ondergrens staat per stelseltype in `plausibiliteit.toml`
+    # (`[[minimale_diameter]]`), niet als losse drempel -- ze draagt een bron per regel.
     # ATTR-005: eenheidsfout binnen bereik; een diameter onder deze waarde in
     # combinatie met een deelbaar-door-tien-patroon wijst op centimeters.
     eenheidsverdenking_diameter_mm: float = Field(default=100.0, gt=0.0)
