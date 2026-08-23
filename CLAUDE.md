@@ -230,7 +230,7 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 - De licentie is EUPL-1.2 (copyleft, en 'toegang tot de wezenlijke functionaliteit'
   telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
   zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
-- Voordat je commit, doe je eerst /superpowers:requesting-code-review, dan /python-library-complete:reviewing-python-libraries, en verbeter je met de uitkomsten van beide testen de codebase. 
+- Voordat je commit, doe je eerst /superpowers:requesting-code-review en verbeter je met de uitkomsten van de test de code. 
 - Voortgang bij de zware stappen loopt via het protocol in `voortgang.py`, met
   `NUL_VOORTGANG` als standaardwaarde. Geinstrumenteerd zijn `load_dataset`,
   `laad_nulmeting`, `run_checks` en `schrijf_geopackage`; bij een cachetreffer start er

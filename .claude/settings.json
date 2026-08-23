@@ -3,5 +3,18 @@
     "python-library-complete@dev-skills": true,
     "superpowers@claude-plugins-official": true,
     "mattpocock-skills@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/guard-pack.js"
+          }
+        ]
+      }
+    ]
   }
 }
