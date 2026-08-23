@@ -13,6 +13,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Wandruwheid versus leidingmateriaal** (issue #38). De nieuwe check **ATTR-017** (W,
+  Plausibiliteit) meldt een leiding waarvan de wandruwheid
+  (`WandruwheidBinnenboven`/`-onder`, de k-Nikuradse waarde van de buiswand) niet bij het
+  materiaal past. Elke leiding droeg deze kenmerken, maar geen enkele nulmeting toetst hun
+  waarde. De aannemelijke band per materiaal komt uit Leidraad Riolering C2100 tabel B2.1 en
+  staat in `plausibiliteit.toml`. Het GWSW-datatype is een geheel getal in mm en kan de
+  kunststofwaarden (pvc en HPE 0,4 mm) niet uitdrukken, dus een export noteert de waarde soms
+  in tienden van een mm; de schaal wordt daarom uit de data afgeleid (`wandruwheid_schalen`,
+  de lezing met de minste afwijkingen) en in de toelichting benoemd, zodat een export in hele
+  mm net zo goed getoetst wordt (BO-39). Polypropyleen en Asbestcement kennen geen
+  C2100-waarde en blijven ongetoetst. Een eigen check-ID en geen hergebruik van ATTR-014, het
+  door het issue aanbevolen maar inmiddels vergeven ID. Op De Wolden en Hoogeveen meldt hij de
+  PE-leidingen die de betonwaarde dragen.
+
 - **Vorm versus afmetingen voor putten** (issue #39). De nieuwe check **ATTR-016** (F,
   Consistentie) meldt een ronde put (`VormPut = Rond`) waarvan breedte en lengte
   verschillen -- een ronde put heeft een diameter. De export droeg 13.972 `VormPut`-kenmerken

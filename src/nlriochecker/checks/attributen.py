@@ -24,10 +24,15 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.selectie import netwerkknopen, putten, vrijvervalrioolleidingen
+from nlriochecker.checks.selectie import (
+    leidingen,
+    netwerkknopen,
+    putten,
+    vrijvervalrioolleidingen,
+)
 from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
 from nlriochecker.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
-from nlriochecker.plausibiliteit import MaterialDiameter, PlausibilityTables
+from nlriochecker.plausibiliteit import MaterialDiameter, MaterialRoughness, PlausibilityTables
 
 
 @dataclass(frozen=True)
@@ -472,6 +477,177 @@ class DiameterGroterDanPut(_StrengCheck):
             f"{zonder} van de {len(alle_putten)} putten hebben geen breedte of lengte; "
             "strengen die daaraan hangen zijn niet getoetst."
         ]
+
+
+class _LeidingCheck(Check):
+    """Basis voor de ATTR-checks die over alle leidingen redeneren.
+
+    Breder dan `_StrengCheck`: niet alleen de vrijvervalstrengen maar ook de pers-,
+    druk- en vacuumleidingen. Een kenmerk als de wandruwheid staat op elke leiding.
+    """
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal leidingen."""
+        return len(leidingen(context))
+
+
+def _wandruwheid(conduit: Conduit) -> float | None:
+    """De geregistreerde wandruwheid van een leiding, in de eenheid van de export.
+
+    `WandruwheidBinnenboven` gaat voor, en anders `WandruwheidBinnenonder`. De
+    ontologie kent de twee als aparte kenmerken; in De Wolden en Hoogeveen zijn ze
+    altijd gelijk, maar een verschil (aanslag op de bodem) zou fysiek betekenisvol zijn.
+    """
+    boven = conduit.number("WandruwheidBinnenboven")
+    return boven if boven is not None else conduit.number("WandruwheidBinnenonder")
+
+
+def _buiten_band(waarde: float, regel: MaterialRoughness) -> bool:
+    """True als de waarde onder het minimum of boven het maximum van de band valt."""
+    if regel.minimum_mm is not None and waarde < regel.minimum_mm:
+        return True
+    if regel.maximum_mm is not None and waarde > regel.maximum_mm:
+        return True
+    return False
+
+
+def _gekozen_schaal(context: CheckContext) -> float:
+    """De schaal waarmee de wandruwheid gelezen wordt: de kandidaat met de minste
+    afwijkingen op de data.
+
+    Het GWSW-datatype `Dt_Wandruwheid` is een geheel getal in mm (0-99) en kan de
+    kunststofwaarden uit C2100 (pvc en HPE 0,4 mm) niet uitdrukken; een export noteert
+    de waarde daarom soms in tienden van een mm. Door de schaal uit de data af te
+    leiden keurt de check een export in hele mm niet af. Bij gelijke afwijkingen wint de
+    eerste kandidaat -- doorgaans 1:1, de lezing zonder herschaling.
+    """
+    tabel = context.plausibiliteit
+    schalen = context.config.drempels.wandruwheid_schalen
+    testbaar = [
+        (ruw, regel)
+        for conduit in leidingen(context)
+        if (regel := tabel.wandruwheid(conduit.materiaal)) is not None
+        and (ruw := _wandruwheid(conduit)) is not None
+    ]
+    if not testbaar:
+        return schalen[0]
+
+    def afwijkingen(schaal: float) -> int:
+        """Het aantal leidingen dat bij deze schaal buiten zijn band valt."""
+        return sum(1 for ruw, regel in testbaar if _buiten_band(ruw / schaal, regel))
+
+    return min(schalen, key=afwijkingen)
+
+
+@register
+class WandruwheidPastNietBijMateriaal(_LeidingCheck):
+    """ATTR-017: de wandruwheid past niet bij het leidingmateriaal.
+
+    Elke leiding draagt een `WandruwheidBinnenboven` en `WandruwheidBinnenonder` (de
+    k-Nikuradse waarde van de buiswand); geen enkele nulmeting toetst of die waarde bij
+    het materiaal past. De aannemelijke band per materiaal komt uit Leidraad Riolering
+    C2100 tabel B2.1 en staat in `plausibiliteit.toml`.
+
+    De eenheid is subtiel: het GWSW-datatype is een geheel getal in mm en kan de
+    kunststofwaarden niet uitdrukken, dus een export noteert de waarde soms in tienden
+    van een mm. De schaal komt daarom uit de data zelf (`_gekozen_schaal`) en staat in
+    de toelichting; zie BO-39 en issue #38. Een materiaal zonder band (Polypropyleen,
+    Asbestcement) wordt niet getoetst; `notes()` verantwoordt hoeveel dat er zijn.
+    """
+
+    id = "ATTR-017"
+    title = "Wandruwheid past niet bij materiaal"
+    severity = Severity.WARNING
+    dimension = Dimension.PLAUSIBILITY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke leiding waarvan de wandruwheid buiten de band van haar materiaal valt."""
+        tabel = context.plausibiliteit
+        schaal = _gekozen_schaal(context)
+
+        for conduit in leidingen(context):
+            regel = tabel.wandruwheid(conduit.materiaal)
+            ruw = _wandruwheid(conduit)
+            if regel is None or ruw is None:
+                continue
+            waarde = ruw / schaal
+            if not _buiten_band(waarde, regel):
+                continue
+            bereik = f"{regel.minimum_mm or 0:g}-{regel.maximum_mm or 0:g} mm"
+            yield self.finding(
+                context,
+                conduit.uri,
+                conduit.label,
+                f"Wandruwheid {ruw:g} (gelezen als {waarde:g} mm bij schaal 1:{schaal:g}) valt "
+                f"buiten de band {bereik} die bij materiaal {conduit.materiaal} hoort. "
+                f"{regel.toelichting}".strip(),
+                materiaal=conduit.materiaal,
+                wandruwheid=ruw,
+                wandruwheid_mm=waarde,
+                schaal=schaal,
+                minimum_mm=regel.minimum_mm,
+                maximum_mm=regel.maximum_mm,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de gekozen schaal en de leidingen die buiten de toets vielen.
+
+        Drie redenen waarom een leiding niet getoetst is, elk een eigen getal: geen
+        wandruwheid (gat in de aanlevering), een materiaal zonder band in
+        `plausibiliteit.toml` (Polypropyleen en Asbestcement kennen geen C2100-waarde),
+        en een wandruwheid zonder materiaal. Stilte zou lezen als "alle leidingen
+        gecontroleerd".
+        """
+        tabel = context.plausibiliteit
+        alle = leidingen(context)
+        totaal = len(alle)
+        met_wandruwheid = [conduit for conduit in alle if _wandruwheid(conduit) is not None]
+        # De schaal is gekozen op de leidingen met een wandruwheid *en* een band; de
+        # rest telt niet mee (er valt niets tegen af te wegen). De toelichtingsregel
+        # moet dus dat kleinere getal noemen, niet alle leidingen met een wandruwheid.
+        getoetst = [
+            conduit
+            for conduit in met_wandruwheid
+            if tabel.wandruwheid(conduit.materiaal) is not None
+        ]
+
+        regels = []
+        if getoetst:
+            schaal = _gekozen_schaal(context)
+            regels.append(
+                f"De wandruwheid is gelezen op schaal 1:{schaal:g}: de lezing met de minste "
+                f"afwijkingen op de {len(getoetst)} van de {totaal} leidingen met een getoetst "
+                "materiaal."
+            )
+
+        zonder_wandruwheid = totaal - len(met_wandruwheid)
+        if zonder_wandruwheid:
+            regels.append(
+                f"{zonder_wandruwheid} van de {totaal} leidingen dragen geen wandruwheid en "
+                "zijn niet getoetst."
+            )
+
+        zonder_materiaal = sum(1 for conduit in met_wandruwheid if conduit.materiaal is None)
+        if zonder_materiaal:
+            regels.append(
+                f"{zonder_materiaal} van de {totaal} leidingen dragen een wandruwheid maar geen "
+                "materiaal en zijn niet getoetst."
+            )
+
+        zonder_band = sorted(
+            {
+                conduit.materiaal
+                for conduit in met_wandruwheid
+                if conduit.materiaal is not None and tabel.wandruwheid(conduit.materiaal) is None
+            }
+        )
+        if zonder_band:
+            aantal = sum(1 for conduit in met_wandruwheid if conduit.materiaal in zonder_band)
+            regels.append(
+                f"{aantal} van de {totaal} leidingen dragen een materiaal zonder wandruwheidsband "
+                f"in `plausibiliteit.toml` ({', '.join(zonder_band)}) en zijn niet getoetst."
+            )
+        return regels
 
 
 class _PutCheck(Check):

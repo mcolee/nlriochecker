@@ -255,6 +255,12 @@ lengte_afwijking_procent = 5.0
 # ATTR-004: hoeveel breedte en hoogte bij een rond profiel mogen verschillen.
 # Projectkeuze, geen externe bron.
 rondheid_tolerantie_mm = 0.0
+# ATTR-017: de schalen waarmee de wandruwheid gelezen kan worden. Het GWSW-datatype
+# is een geheel getal in mm en kan de kunststofwaarden uit C2100 niet uitdrukken, dus
+# een export noteert de waarde soms in tienden van een mm. ATTR-017 kiest de schaal
+# met de minste afwijkingen; met een tweede kandidaat blijft een export in hele mm ook
+# goed getoetst. Zie BO-39.
+wandruwheid_schalen = [1.0, 10.0]
 
 # HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN. Uit het
 # checkregister: "meer dan 5 cm" (waarschuwing) en "meer dan 25 cm" (fout).

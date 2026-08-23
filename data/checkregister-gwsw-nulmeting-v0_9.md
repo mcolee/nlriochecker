@@ -88,6 +88,7 @@ gebreken" leest.
 | ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmeting per constructie mist (issue #37). Generiek over alle kenmerktypen, uit de ontologische `owl:onProperty`/`owl:allValuesFrom`-keten; een systemische melding per kenmerk, niet per object | F | Consistentie |
 | ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum_vulwaarde_aandeel`); een systemische melding per verdacht jaar, zwijgt bij een natuurlijke verdeling of bij te weinig gedateerde objecten (issue #21) | W | Compleetheid |
 | ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De tegenhanger van ATTR-004 voor putten in plaats van leidingen, met dezelfde tolerantie (`rondheid_tolerantie_mm`); de nulmeting toetst alleen de aanwezigheid van de vorm (`Put_VormPut_card`), niet de samenhang met de afmetingen (issue #39) | F | Consistentie |
+| ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2100 tabel B2.1 (`plausibiliteit.toml`). Het GWSW-datatype is een geheel getal in mm en kan de kunststofwaarden niet uitdrukken, dus de schaal wordt uit de data afgeleid (`wandruwheid_schalen`); de nulmeting toetst de wandruwheid nergens (issue #38, BO-39) | W | Plausibiliteit |
 
 ## HGT: Hoogten en verhang
 
@@ -215,6 +216,17 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-23): ATTR-017 toegevoegd (W, Plausibiliteit): de wandruwheid
+(`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal. De aannemelijke band
+per materiaal komt uit Leidraad Riolering C2100 tabel B2.1 en staat in `plausibiliteit.toml`;
+het GWSW-datatype `Dt_Wandruwheid` is een geheel getal in mm (0-99) en kan de kunststofwaarden
+niet uitdrukken, dus de export noteert de waarde in tienden van een mm en de check leidt die
+schaal uit de data af (`wandruwheid_schalen`). Polypropyleen en Asbestcement kennen geen
+C2100-waarde en blijven ongetoetst. Het aanbevolen ID uit het issue (ATTR-014) was inmiddels
+vergeven; ATTR-017 is het eerstvolgende vrije. Op De Wolden en Hoogeveen meldt hij de
+PE-leidingen die de betonwaarde dragen. Zie
+[#38](https://github.com/mcolee/nlriochecker/issues/38) en BO-39.
 
 Versie 0.9, addendum (2026-08-23): ATTR-016 toegevoegd (F, Consistentie): een ronde put
 (`VormPut = Rond`) waarvan breedte en lengte verschillen -- een ronde put heeft een diameter.

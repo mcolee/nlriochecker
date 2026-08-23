@@ -172,6 +172,20 @@ class CheckThresholds(BaseModel):
     lengte_afwijking_procent: float = Field(default=5.0, gt=0.0)
     # ATTR-004: hoeveel breedte en hoogte bij een rond profiel mogen verschillen.
     rondheid_tolerantie_mm: float = Field(default=0.0, ge=0.0)
+    # ATTR-017: de kandidaat-schalen waarmee de wandruwheid gelezen kan worden. Het
+    # GWSW-datatype `Dt_Wandruwheid` is een geheel getal in mm (0-99) en kan de
+    # kunststofwaarden uit C2100 niet uitdrukken, dus een export noteert de waarde soms
+    # in tienden van een mm. ATTR-017 kiest de schaal die de minste afwijkingen oplevert;
+    # met een tweede kandidaat blijft ook een export in hele mm goed getoetst. Zie BO-39.
+    wandruwheid_schalen: list[float] = Field(default_factory=lambda: [1.0, 10.0], min_length=1)
+
+    @field_validator("wandruwheid_schalen")
+    @classmethod
+    def _positieve_schalen(cls, schalen: list[float]) -> list[float]:
+        """Weigert een schaalfactor van nul of minder; erdoor delen zou onzin geven."""
+        if any(schaal <= 0 for schaal in schalen):
+            raise ValueError("wandruwheid_schalen moet uit positieve getallen bestaan")
+        return schalen
 
     # HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN.
     ahn_afwijking_waarschuwing_m: float = Field(default=0.05, gt=0.0)

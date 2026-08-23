@@ -31,6 +31,22 @@ class MaterialDiameter(BaseModel):
     toelichting: str = ""
 
 
+class MaterialRoughness(BaseModel):
+    """ATTR-017: de aannemelijke wandruwheid per leidingmateriaal, in mm.
+
+    De band omsluit de door RIONED geautoriseerde defaultwaarde uit Leidraad
+    Riolering C2100 tabel B2.1, met ruimte voor een beter gefundeerde projectwaarde;
+    de bron staat in `toelichting`. Dezelfde vorm als `MaterialDiameter`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    materiaal: str
+    minimum_mm: float | None = None
+    maximum_mm: float | None = None
+    toelichting: str = ""
+
+
 class MaterialYear(BaseModel):
     """ATTR-003: vanaf (en eventueel tot) welk jaar een materiaal voorkomt."""
 
@@ -86,6 +102,7 @@ class PlausibilityTables(BaseModel):
 
     bron: str = ""
     materiaal_diameter: list[MaterialDiameter] = Field(default_factory=list)
+    materiaal_wandruwheid: list[MaterialRoughness] = Field(default_factory=list)
     materiaal_begindatum: list[MaterialYear] = Field(default_factory=list)
     materiaal_vorm: list[MaterialShape] = Field(default_factory=list)
     leiding_put_materiaal: list[ConduitManholeMaterial] = Field(default_factory=list)
@@ -95,6 +112,10 @@ class PlausibilityTables(BaseModel):
     def diameter(self, materiaal: str | None) -> MaterialDiameter | None:
         """De diameterregel voor dit materiaal, of None."""
         return _zoek(self.materiaal_diameter, "materiaal", materiaal)
+
+    def wandruwheid(self, materiaal: str | None) -> MaterialRoughness | None:
+        """De wandruwheidsband voor dit materiaal, of None."""
+        return _zoek(self.materiaal_wandruwheid, "materiaal", materiaal)
 
     def begindatum(self, materiaal: str | None) -> MaterialYear | None:
         """De begindatumregel (tijdvak) voor dit materiaal, of None."""

@@ -78,6 +78,9 @@ DEFECTEN = [
     ("attr014_wibon_hasvalue.ttl", "ATTR-014", ["WIBONThema"]),
     # ATTR-015 meldt systemisch per verdacht jaar; het label is het jaartal.
     ("attr015_vulwaardejaar.ttl", "ATTR-015", ["1900"]),
+    # Alleen streng 2 (PE met de betonwaarde 30) telt; de schaal 1:10 volgt uit de
+    # data, waardoor streng 1 (beton 30) en streng 3 (PE 4) wel bij hun materiaal passen.
+    ("attr017_wandruwheid_pe_betonwaarde.ttl", "ATTR-017", ["2"]),
     ("hgt004_bob_boven_deksel.ttl", "HGT-004", ["1"]),
     ("hgt005_tegenverhang_licht.ttl", "HGT-005", ["1"]),
     ("hgt006_tegenverhang_fors.ttl", "HGT-006", ["1"]),
@@ -439,6 +442,64 @@ def test_attr016_verantwoordt_de_ronde_putten_zonder_maat() -> None:
     assert any(
         "1 van de 2 ronde putten missen een breedte of een lengte" in note for note in outcome.notes
     ), outcome.notes
+
+
+def test_attr017_noemt_materiaal_schaal_en_band() -> None:
+    """De bevinding draagt de ruwe waarde, de gelezen schaal en de band per materiaal."""
+    bevinding = uitkomst("attr017_wandruwheid_pe_betonwaarde.ttl", "ATTR-017").findings[0]
+
+    assert bevinding.details["materiaal"] == "PE"
+    assert bevinding.details["wandruwheid"] == pytest.approx(30)
+    assert bevinding.details["schaal"] == pytest.approx(10)
+    assert bevinding.details["wandruwheid_mm"] == pytest.approx(3.0)
+    assert bevinding.details["minimum_mm"] == pytest.approx(0.1)
+    assert bevinding.details["maximum_mm"] == pytest.approx(1.0)
+    assert bevinding.severity.value == "W"
+
+
+def test_attr017_leest_hele_millimeters() -> None:
+    """Een export in hele mm keurt de check niet af: de schaal komt uit de data.
+
+    De betonleiding draagt wandruwheid 3; op schaal 1:1 is dat 3,0 mm, de C2100-waarde.
+    Zou de schaal op tienden vastgezet zijn, dan las de check 0,3 mm en gaf een
+    bevinding. Dit is de tegenproef bij `attr017_wandruwheid_pe_betonwaarde.ttl`.
+    """
+    outcome = uitkomst("attr017_wandruwheid_hele_mm.ttl", "ATTR-017")
+
+    assert labels(outcome) == []
+    assert any("schaal 1:1" in note for note in outcome.notes), outcome.notes
+
+
+def test_attr017_verantwoordt_de_ongetoetste_leidingen() -> None:
+    """Een materiaal zonder band en een leiding zonder wandruwheid horen in de toelichting.
+
+    Streng 3 (PE) krijgt hier materiaal Polypropyleen -- dat kent geen C2100-band -- en
+    streng 1 (beton) wordt van zijn wandruwheid ontdaan. Beide horen als niet getoetst
+    in de toelichting te staan; de PE-30-streng blijft de enige bevinding.
+    """
+    config = fixtureconfig()
+    ruw = load_dataset(TTL_DIR / "attr017_wandruwheid_pe_betonwaarde.ttl")
+    conduits = dict(ruw.conduits)
+    streng3 = next(c for c in ruw.conduits.values() if c.label == "3")
+    conduits[streng3.uri] = replace(
+        streng3,
+        aspects=tuple(
+            replace(a, reference="Polypropyleen") if a.kind == "MateriaalLeiding" else a
+            for a in streng3.aspects
+        ),
+    )
+    streng1 = next(c for c in ruw.conduits.values() if c.label == "1")
+    conduits[streng1.uri] = replace(
+        streng1,
+        aspects=tuple(a for a in streng1.aspects if not a.kind.startswith("Wandruwheid")),
+    )
+    context = CheckContext(dataset=replace(ruw, conduits=conduits), config=config)
+
+    outcome = run_checks(context, ["ATTR-017"]).outcomes[0]
+
+    assert labels(outcome) == ["2"]
+    assert any("dragen geen wandruwheid" in note for note in outcome.notes), outcome.notes
+    assert any("Polypropyleen" in note for note in outcome.notes), outcome.notes
 
 
 def test_attr009_meldt_beide_lengten() -> None:

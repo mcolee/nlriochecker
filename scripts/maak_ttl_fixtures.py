@@ -575,6 +575,78 @@ FIXTURES["attr016_ronde_put_ongelijk.ttl"] = (
     + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
 )
 
+# ATTR-017: wandruwheid past niet bij het leidingmateriaal. De schaal wordt uit de
+# data zelf bepaald (de lezing met de minste afwijkingen). Hier winnen tienden van
+# een mm: bij schaal 1:10 valt maar een streng buiten zijn band, bij schaal 1:1 alle
+# drie.
+_P1, _P2, _P3, _P4 = (1000.0, 2000.0), (1050.0, 2000.0), (1100.0, 2000.0), (1150.0, 2000.0)
+FIXTURES["attr017_wandruwheid_pe_betonwaarde.ttl"] = (
+    "streng 2 is van PE met wandruwheid 30 (3,0 mm bij schaal 1:10), de betonwaarde;\n"
+    "# PE hoort rond 0,4 mm te liggen. Streng 1 (beton, 30 = 3,0 mm) en streng 3 (PE, 4 =\n"
+    "# 0,4 mm) passen wel bij hun materiaal en blijven stil.",
+    nette_put("PutA", "A", *_P1)
+    + nette_put("PutB", "B", *_P2)
+    + nette_put("PutC", "C", *_P3)
+    + nette_put("PutD", "D", *_P4)
+    + nette_leiding(
+        "L1",
+        "1",
+        [_P1, _P2],
+        "PutA",
+        "PutB",
+        velden={
+            "MateriaalLeiding_ref": "Beton",
+            "WandruwheidBinnenboven": 30,
+            "WandruwheidBinnenonder": 30,
+        },
+    )
+    + nette_leiding(
+        "L2",
+        "2",
+        [_P2, _P3],
+        "PutB",
+        "PutC",
+        velden={
+            "MateriaalLeiding_ref": "PE",
+            "WandruwheidBinnenboven": 30,
+            "WandruwheidBinnenonder": 30,
+        },
+    )
+    + nette_leiding(
+        "L3",
+        "3",
+        [_P3, _P4],
+        "PutC",
+        "PutD",
+        velden={
+            "MateriaalLeiding_ref": "PE",
+            "WandruwheidBinnenboven": 4,
+            "WandruwheidBinnenonder": 4,
+        },
+    ),
+)
+
+# ATTR-017 met een export in hele millimeters: een betonleiding met wandruwheid 3
+# hoort geen bevinding te geven. Bewijst dat de schaallezing niet op tienden is
+# vastgezet -- hier wint schaal 1:1 (nul afwijkingen tegen een afwijking bij 1:10).
+FIXTURES["attr017_wandruwheid_hele_mm.ttl"] = (
+    "geen; de betonleiding draagt wandruwheid 3, wat in hele mm precies de C2100-waarde is",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_leiding(
+        "L1",
+        "1",
+        [A, B],
+        "PutA",
+        "PutB",
+        velden={
+            "MateriaalLeiding_ref": "Beton",
+            "WandruwheidBinnenboven": 3,
+            "WandruwheidBinnenonder": 3,
+        },
+    ),
+)
+
 FIXTURES["attr005_centimeters.ttl"] = (
     "streng 1 heeft breedte en hoogte 30; maal tien is dat 300 mm, een handelsmaat",
     nette_put("PutA", "A", *A)

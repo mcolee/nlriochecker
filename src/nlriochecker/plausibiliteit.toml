@@ -77,6 +77,63 @@ materiaal = "Staal"
 minimum_mm = 80
 maximum_mm = 2000
 
+# ATTR-017: wandruwheid past niet bij het leidingmateriaal (W, Plausibiliteit).
+# De band omsluit de door RIONED geautoriseerde defaultwaarde uit Leidraad Riolering
+# module C2100, tabel B2.1 (p. 58) -- k-Nikuradse in mm -- met ruimte voor een beter
+# gefundeerde projectwaarde. De export van De Wolden en Hoogeveen noteert de waarde in
+# tienden van een mm; ATTR-017 leidt die schaal uit de data zelf af (zie
+# `wandruwheid_schalen` in [drempels]), zodat de band hier in hele mm blijft staan.
+# Een materiaal zonder band wordt niet getoetst; Polypropyleen en Asbestcement staan er
+# bewust niet in, want C2100 noemt er geen waarde voor. Zie issue #38 en BO-39.
+
+[[materiaal_wandruwheid]]
+materiaal = "Beton"
+minimum_mm = 1.5
+maximum_mm = 5.0
+toelichting = "C2100 tabel B2.1: beton 3,0 mm."
+
+[[materiaal_wandruwheid]]
+materiaal = "GewapendBeton"
+minimum_mm = 1.5
+maximum_mm = 5.0
+toelichting = "C2100 tabel B2.1: beton 3,0 mm."
+
+[[materiaal_wandruwheid]]
+materiaal = "PVC"
+minimum_mm = 0.1
+maximum_mm = 1.0
+toelichting = "C2100 tabel B2.1: pvc 0,4 mm."
+
+[[materiaal_wandruwheid]]
+materiaal = "PE"
+minimum_mm = 0.1
+maximum_mm = 1.0
+toelichting = "C2100 tabel B2.1: HPE en LDPE 0,4 mm."
+
+[[materiaal_wandruwheid]]
+materiaal = "Gres"
+minimum_mm = 0.1
+maximum_mm = 1.5
+toelichting = "C2100 tabel B2.1: gres 0,5 mm."
+
+[[materiaal_wandruwheid]]
+materiaal = "Gietijzer"
+minimum_mm = 1.0
+maximum_mm = 3.0
+toelichting = "C2100 tabel B2.1: gietijzer 2,0 mm."
+
+[[materiaal_wandruwheid]]
+materiaal = "Staal"
+minimum_mm = 0.5
+maximum_mm = 3.0
+toelichting = "C2100 tabel B2.1: staal 1,5 mm."
+
+[[materiaal_wandruwheid]]
+materiaal = "Metselwerk"
+minimum_mm = 2.0
+maximum_mm = 8.0
+toelichting = "C2100 tabel B2.1: metselwerk 5,0 mm."
+
 # ATTR-003: materiaal past niet bij begindatum (W, Plausibiliteit).
 # Het register noemt PVC voor 1955 en PE voor 1970 als voorbeeld.
 

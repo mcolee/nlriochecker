@@ -224,6 +224,14 @@ def _termen_uit_plausibiliteit() -> list[Term]:
                 "MateriaalLeidingColl",
             )
         )
+    for regel in tabellen.materiaal_wandruwheid:
+        termen.append(
+            Term(
+                regel.materiaal,
+                "plausibiliteit.toml [[materiaal_wandruwheid]]",
+                "MateriaalLeidingColl",
+            )
+        )
     for regel in tabellen.materiaal_begindatum:
         termen.append(
             Term(

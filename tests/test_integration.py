@@ -191,6 +191,31 @@ def test_attr014_op_dewoldenhoogeveen_meldt_alleen_wibonthema() -> None:
 
 @pytest.mark.zwaar
 @pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and ONTOLOGIE_TOTAAL.exists()),
+    reason="de De Wolden en Hoogeveen-OroX staat niet in data/",
+)
+def test_attr017_op_dewoldenhoogeveen_meldt_de_pe_leidingen() -> None:
+    """ATTR-017 meldt de 962 PE-leidingen die de betonwaarde 30 (3,0 mm) dragen.
+
+    De verificatie-eis uit issue #38: de schaal 1:10 volgt uit de data (23.440
+    leidingen dragen alle een wandruwheid), en dan valt precies de PE-groep buiten zijn
+    band -- beton (30), pvc (4) en gres (5) passen wel. Loopt het aantal op naar
+    duizenden, dan is de schaallezing misgegaan. De 49 Polypropyleen-leidingen en de
+    1.362 zonder materiaal blijven ongetoetst en staan in de toelichting.
+    """
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    outcome = run_checks(context, ["ATTR-017"]).outcomes[0]
+
+    assert len(outcome.findings) == 962
+    assert {finding.details["materiaal"] for finding in outcome.findings} == {"PE"}
+    assert all(finding.details["schaal"] == 10 for finding in outcome.findings)
+    assert any("schaal 1:10" in note for note in outcome.notes), outcome.notes
+    assert any("Polypropyleen" in note for note in outcome.notes), outcome.notes
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
     not (OROX_DEWOLDENHOOGEVEEN.exists() and STUDIEGEBIED.exists()),
     reason="de De Wolden en Hoogeveen-OroX of het studiegebied staat niet in data/",
 )

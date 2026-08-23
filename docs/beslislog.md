@@ -2130,3 +2130,42 @@ uitgavepoort (verworpen nadat de meting liet zien dat CI hem net zo goed haalt: 
 invariant breken en een regressie pas bij de uitgave vangen, voor geen winst). Alleen het
 commando vindbaar maken zonder ondergrens (verworpen: dan blijft de dekking een meting en
 geen belofte -- de kern van issue #54).
+
+### BO-39 De wandruwheid wordt gelezen op een uit de data afgeleide schaal, niet in hele mm
+
+**Wat.** ATTR-017 leest de kenmerken `WandruwheidBinnenboven` en `WandruwheidBinnenonder`
+niet als het gehele aantal millimeters dat het GWSW-datatype voorschrijft, maar op een schaal
+die uit de data zelf volgt: de lezing (uit `wandruwheid_schalen`, default `[1.0, 10.0]`) met
+de minste afwijkingen tegen de C2100-banden per materiaal. Op De Wolden en Hoogeveen wint
+schaal 1:10 -- de export noteert de waarde in tienden van een millimeter.
+
+**Waarom dit een afwijking van GWSW is, en waarom ze toch mag.** De hoofdregel in `CLAUDE.md`
+is dat GWSW leidend is; een afwijking mag alleen als de auteur ze expliciet en onderbouwd
+maakt, en dan hoort ze hier. `gwsw:Wandruwheid hasUnit "mm"` en `Dt_Wandruwheid` is een
+`xsd:integer` van 0 tot 99 (`Ontologie_GWSW_Totaal.ttl:29402-29413`, `44106`). Een geheel
+getal in millimeters kán de door RIONED geautoriseerde defaultwaarden uit Leidraad Riolering
+C2100 tabel B2.1 niet uitdrukken: pvc 0,4 · HPE 0,4 · gres 0,5 worden als integer allemaal 0
+of 1. De tienden-conventie is dus geen slordigheid van de leverancier maar de enige uitweg uit
+een datatype dat de voorgeschreven waarden niet kan dragen. De auteur heeft beslist dat de
+Leidraad hier leidend is (issue #38); onder de tienden-lezing volgt de export van De Wolden en
+Hoogeveen die Leidraad exact voor 21.067 van de 22.078 leidingen, en blijven de PE-leidingen
+over die de betonwaarde dragen in plaats van de kunststofwaarde.
+
+**Waarom uit de data afgeleid en niet vast op tienden.** Een andere gemeente kan wél in hele
+millimeters exporteren, en een vaste deling door tien zou dan elke leiding afkeuren. Door de
+schaal per dataset te kiezen (de lezing met de minste afwijkingen) toetst de check beide
+conventies correct; bij gelijke afwijkingen wint de eerste kandidaat (1:1, de lezing zonder
+herschaling). De gekozen lezing staat in `notes()`, zodat de lezer van het rapport weet welke
+schaal gold.
+
+**Wat buiten beeld blijft.** Polypropyleen en Asbestcement kennen geen C2100-waarde en krijgen
+dus geen band; hun leidingen worden niet getoetst en `notes()` telt ze. De 49 PP-leidingen die
+op De Wolden dezelfde betonwaarde dragen als de PE-leidingen blijven daarmee ongemeld -- een
+band bij analogie (0,4 mm, als HPE en LDPE) zou een nieuw domeinoordeel zijn zonder bron, en
+dat is aan de auteur.
+
+**Alternatieven.** Een vaste schaalfactor in de config (verworpen: keurt een export in hele mm
+af, tenzij het project hem overschrijft -- de data-afleiding doet dat vanzelf). De schaal
+hardcoderen op tienden (verworpen: strijdig met "geen hardcoded drempels" en niet overdraagbaar
+naar een andere gemeente). PP meenemen op 0,4 mm (verworpen zonder bron; als nevenbevinding aan
+de auteur voorgelegd).
