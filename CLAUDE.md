@@ -171,8 +171,17 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - Codekwaliteit: ruff (lint en format), mypy schoon over `src/nlriochecker`
   (`uv run mypy`; `scripts/` en `tests/` vallen er nog buiten), type hints overal,
   Nederlandse docstrings, Engelse code-identifiers. De poort staat in
-  `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien hetzelfde.
+  `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien dezelfde
+  vijf stappen (ruff lint, ruff format, mypy, pytest en een dekkingsondergrens).
   De package levert `py.typed`, dus haar hints komen bij een importeur aan.
+- **Testdekking meet je met `uv run --with pytest-cov pytest --cov=nlriochecker`.**
+  `pytest-cov` staat bewust niet in de dev-groep (afhankelijkheden minimaal); `--with`
+  lost hem per run op. Beide poorten dwingen een ondergrens van 95% af
+  (`DEKKINGSONDERGRENS` in `scripts/uitgave.py`, gelijk in de CI; `--cov-fail-under`).
+  Laatst gemeten: 97% mét `data/` (dev, 2026-08-23) en 96% in de CI-conditie zonder
+  `data/` -- beide ruim boven de grens, dus 95% raakt normale schommeling niet maar wel
+  een echte regressie. Alleen een totaalgrens; de per-module-cijfers blijven een
+  observatie in de rondeverslagen. Zie BO-38.
 - CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
 - Werk op `dev`, niet op `main`. Elke wijziging gaat naar `dev`; `main` draagt alleen
   uitgebrachte, getagde versies. Pas als de auteur zegt dat het een nieuwe versie is,

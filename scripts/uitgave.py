@@ -25,6 +25,10 @@ from pathlib import Path
 
 SOORTEN = ("patch", "minor", "major")
 TAKVOORWAARDE = "main"
+# De ondergrens op de testdekking (percentage), afgedwongen met `--cov-fail-under`. Dezelfde
+# grens draait op CI (`.github/workflows/toets.yml`); dit is het enige getal in code, en
+# tests/test_uitgave.py bindt CI, deze poort en `CLAUDE.md` eraan (BO-38, issue #54).
+DEKKINGSONDERGRENS = 95
 VERSIEPATROON = re.compile(r"^\d+\.\d+\.\d+$")
 CHANGELOG = "CHANGELOG.md"
 # Deze drie gaan mee in de versiecommit en worden bij het terugdraaien hersteld.
@@ -146,15 +150,30 @@ def controleer_tag_vrij(tag: str) -> None:
 
 
 def toets() -> None:
-    """Draait dezelfde poort als de CI: ruff, mypy en pytest."""
+    """Draait dezelfde poort als de CI: ruff, mypy, pytest en een dekkingsondergrens.
+
+    `pytest-cov` staat bewust niet in de dev-groep en wordt per run met `--with` opgelost;
+    `--cov-fail-under=DEKKINGSONDERGRENS` laat de run vallen zodra de dekking eronder zakt.
+    Zowel deze poort (met de volledige `data/`) als de CI (zonder) meet ruim boven die
+    grens; zie BO-38.
+    """
     _draai("uv", "run", "ruff", "check", ".")
     _meld("ruff check")
     _draai("uv", "run", "ruff", "format", "--check", ".")
     _meld("ruff format")
     _draai("uv", "run", "mypy")
     _meld("mypy")
-    _draai("uv", "run", "pytest", "-q")
-    _meld("pytest")
+    _draai(
+        "uv",
+        "run",
+        "--with",
+        "pytest-cov",
+        "pytest",
+        "-q",
+        "--cov=nlriochecker",
+        f"--cov-fail-under={DEKKINGSONDERGRENS}",
+    )
+    _meld(f"pytest + dekking >={DEKKINGSONDERGRENS}%")
 
 
 def _secties(tekst: str) -> tuple[str, str, str]:

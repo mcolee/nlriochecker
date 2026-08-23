@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Een ondergrens op de testdekking, en een vindbaar meetcommando** (issue #54). Beide
+  poorten -- de CI (`.github/workflows/toets.yml`) en de uitgavepoort
+  (`scripts/uitgave.py`) -- dwingen nu een dekking van minstens 95% af (`--cov-fail-under`,
+  `DEKKINGSONDERGRENS`); de meting doe je met
+  `uv run --with pytest-cov pytest --cov=nlriochecker`, nu vermeld in `CLAUDE.md` en
+  `README.md` in plaats van alleen in de rondeverslagen. `pytest-cov` blijft bewust buiten
+  de dev-groep en wordt per run met `--with` opgelost. Gemeten: 97% mét `data/`, 96% in de
+  CI-conditie zonder -- beide ruim boven de grens (BO-38). Geen enkele bevinding verandert
+  -- dit raakt de poort, niet de engine.
+
 - **Begindatumdekking en een detector voor een vulwaardejaar** (issue #21). ATTR-007
   verantwoordt nu in zijn toelichting hoeveel strengen en putten geen begindatum dragen
   en dus niet getoetst zijn -- stilte las eerder als "alle aanlegdatums gecontroleerd".

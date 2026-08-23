@@ -509,7 +509,8 @@ doorgestuurd, de CSV, hem niet).
 
 **Wat.** `.github/workflows/toets.yml` draait `ruff check`, `ruff format --check`, `mypy`
 en `pytest` op elke push naar `main` of `dev` en op elke pull request.
-`scripts/uitgave.py` draait dezelfde vier bij een uitgave. Mypy staat schoon op
+`scripts/uitgave.py` draait dezelfde vier bij een uitgave, en beide draaien sinds BO-38
+ook een dekkingsondergrens. Mypy staat schoon op
 `src/nlriochecker`, met `ignore_missing_imports` omdat rdflib, shapely, geopandas en
 rasterio geen bruikbare stubs leveren.
 
@@ -2086,3 +2087,46 @@ niet"); het valt buiten deze sessie.
 `WIBONThema gebruikt hasValue in plaats van hasReference op 23440 objecten, waarvan 18363 met de
 vulwaarde 0`. Op de handgeschreven fixtures: de defectfixtures (beide richtingen) geven een
 melding, de correcte (`hasReference`) geeft er geen.
+
+### BO-38 Een dekkingsondergrens van 95%, in beide poorten
+
+**Wat.** De testdekking krijgt een ondergrens van 95% op het totaal, afgedwongen met
+`pytest --cov=nlriochecker --cov-fail-under=95`. Die stap draait op CI
+(`.github/workflows/toets.yml`) én in de uitgavepoort (`scripts/uitgave.py`,
+`DEKKINGSONDERGRENS`) -- de twee blijven "dezelfde poort" (BO-5), nu vijf stappen. Het
+meetcommando `uv run --with pytest-cov pytest --cov=nlriochecker` staat nu in `CLAUDE.md`
+en `README.md`; `pytest-cov` blijft bewust buiten de dev-groep en wordt per run met
+`--with` opgelost (MIT, dus geen licentiebezwaar; het is geen vaste afhankelijkheid).
+
+**Waarom 95%, en waarom ook op CI.** De keuze ging eerst uit van "CI kan de dekking zonder
+`data/` niet betekenisvol meten"; dat is nagemeten en bleek onwaar. In de runner-conditie
+(een `git worktree` van dev zonder untracked `data/`, `GWSW_QGIS_SITE_PACKAGES` uitgezet)
+haalt de suite **96,46%** (287 van 8102 regels gemist), tegen **96,69%** met de volledige
+`data/` -- een verschil van circa 0,2 procentpunt en zo'n 58 tests, niet "honderden". De
+handgeschreven fixtures dekken vrijwel alle regels; de data-afhankelijke integratietests
+voegen nauwelijks unieke dekking toe. 95% ligt dus ruim onder beide getallen en bijt op
+een echte regressie, niet op normale schommeling -- op CI net zo goed als lokaal. Daarmee
+vervalt de reden om de grens tot de uitgave te beperken, en blijft de invariant uit BO-5
+overeind: de grens vangt een regressie meteen bij de dev-commit.
+
+**Een kanttekening voor later.** CI telt regels die alléén data-afhankelijke tests raken
+als ongedekt (die tests slaan er over). Vandaag scheelt dat 0,2pp, maar groeit de
+EXT/`externedata`-laag met code die alleen met de GIS-bronnen te toetsen is, dan zakt het
+CI-getal sneller dan het lokale. Komt CI ooit tegen de 95% aan terwijl een volledige run
+ruim boven zit, verlaag dan de CI-grens of splits de twee -- niet vóór dat gebeurt.
+
+**Alleen een totaalgrens.** Geen grens per module: `externedata.py` staat op 87% en zou
+meteen ongepland werk vragen. De per-module-cijfers blijven een observatie in de
+rondeverslagen.
+
+**Drift bewaakt.** `tests/test_uitgave.py` bindt het getal in de CI-workflow, de
+uitgavepoort en `CLAUDE.md` aan `DEKKINGSONDERGRENS`, zodat de drie niet stil uiteen kunnen
+lopen en de belofte in de documentatie niet afwijkt van wat de poort afdwingt.
+
+**Alternatieven.** `pytest-cov` in de dev-groep (verworpen: dat overrulet de vastgelegde
+keuze om hem eruit te houden, voor iets wat we een paar keer per ronde doen; `--with` lost
+hem net zo goed op, ook op CI, met de setup-uv-cache erachter). De grens alleen in de
+uitgavepoort (verworpen nadat de meting liet zien dat CI hem net zo goed haalt: dat zou de
+invariant breken en een regressie pas bij de uitgave vangen, voor geen winst). Alleen het
+commando vindbaar maken zonder ondergrens (verworpen: dan blijft de dekking een meting en
+geen belofte -- de kern van issue #54).

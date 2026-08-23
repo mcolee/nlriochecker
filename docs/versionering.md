@@ -28,7 +28,9 @@ Het script doorloopt:
 2. het volgende nummer berekenen met `uv version --bump --dry-run`, dat niets schrijft,
    en controleren dat de bijbehorende tag nog niet bestaat;
 3. pas dan echt bumpen met `uv version --bump`, wat `pyproject.toml` en `uv.lock` raakt;
-4. `ruff check .`, `ruff format --check .` en `pytest -q` draaien;
+4. `ruff check .`, `ruff format --check .`, `mypy` en `pytest -q` draaien, dat laatste met
+   `--cov=nlriochecker --cov-fail-under=95` -- dezelfde dekkingsondergrens die ook de CI
+   afdwingt (BO-38);
 5. committen als `Versie X.Y.Z` -- alleen `pyproject.toml` en `uv.lock` bij naam, nooit
    wat de toets toevallig in de werkboom achterliet;
 6. taggen als `vX.Y.Z`.

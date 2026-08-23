@@ -110,5 +110,10 @@ jobs:
       - name: Mypy
         run: uv run mypy
 
-      - name: Pytest
-        run: uv run pytest -q
+      - name: Pytest en dekking
+        # De dekkingsondergrens (95%) draait hier en in scripts/uitgave.py met hetzelfde
+        # getal; tests/test_uitgave.py bindt de twee aan `DEKKINGSONDERGRENS`. Gemeten in
+        # deze runner-conditie (geen untracked data/, geen QGIS): 96%, dus 95% bijt niet
+        # op normale schommeling maar wel op een echte regressie. `pytest-cov` staat bewust
+        # buiten de dev-groep en wordt per run met `--with` opgelost (BO-38).
+        run: uv run --with pytest-cov pytest -q --cov=nlriochecker --cov-fail-under=95

@@ -126,6 +126,32 @@ def test_kop_in_de_inleiding_verschuift_de_sectie_niet() -> None:
     assert "## [0.3.0] - 2026-09-01\n\n### Toegevoegd\n\n- Iets nieuws." in nieuw
 
 
+def test_de_dekkingsondergrens_is_overal_hetzelfde_getal() -> None:
+    """De CI, de uitgavepoort en `CLAUDE.md` dwingen dezelfde dekkingsondergrens af
+    (issue #54, BO-38). Het getal staat in code maar op een plek (`DEKKINGSONDERGRENS`);
+    deze test bindt de drie eraan, zodat ze niet stil uiteen kunnen lopen en de
+    documentatie niet iets anders belooft dan de poorten bewaken.
+    """
+    module = _laad_script()
+    grens = module.DEKKINGSONDERGRENS
+
+    # De uitgavepoort dwingt de dekking af via de constante.
+    bron = SCRIPT.read_text(encoding="utf-8")
+    assert "--cov-fail-under={DEKKINGSONDERGRENS}" in bron
+    assert "--cov=nlriochecker" in bron
+
+    # De CI-workflow draait dezelfde grens (daar een letterlijk getal, geen constante).
+    workflow = (WORTEL / ".github" / "workflows" / "toets.yml").read_text(encoding="utf-8")
+    assert f"--cov-fail-under={grens}" in workflow
+    assert "--cov=nlriochecker" in workflow
+
+    # En CLAUDE.md noemt hetzelfde getal en het meetcommando.
+    claude = (WORTEL / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "uv run --with pytest-cov pytest --cov=nlriochecker" in claude
+    # Anker op de ondergrens-zin, niet op het losse "97%" van de laatste meting.
+    assert f"ondergrens van {grens}%" in claude
+
+
 def test_het_echte_wijzigingslog_is_verwerkbaar() -> None:
     """Het bestand in de repository moet de vorm hebben die het script verwacht."""
     module = _laad_script()

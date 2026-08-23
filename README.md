@@ -341,13 +341,20 @@ uv run pytest          # zware tests draaien niet mee; `-m zwaar` wel
 uv run ruff check
 uv run ruff format --check .
 uv run mypy             # over src/nlriochecker
+uv run --with pytest-cov pytest --cov=nlriochecker   # testdekking
 ```
 
-Dezelfde vier stappen draaien in CI op elke push naar `main` of `dev`
-(`.github/workflows/toets.yml`) en in `scripts/uitgave.py` bij een uitgave. Een schone
-kloon mist de niet-getrackte delen van `data/`; de tests die daarop leunen slaan dan
-over, en CI bewaakt met `NLRIOCHECKER_MIN_GESLAAGD` en `NLRIOCHECKER_MAX_OVERGESLAGEN`
-dat dat er niet te veel worden.
+Dezelfde vijf stappen (ruff lint, ruff format, mypy, pytest en een dekkingsondergrens)
+draaien in CI op elke push naar `main` of `dev` (`.github/workflows/toets.yml`) en in
+`scripts/uitgave.py` bij een uitgave. Een schone kloon mist de niet-getrackte delen van
+`data/`; de tests die daarop leunen slaan dan over, en CI bewaakt met
+`NLRIOCHECKER_MIN_GESLAAGD` en `NLRIOCHECKER_MAX_OVERGESLAGEN` dat dat er niet te veel
+worden.
+
+Testdekking meet je met het commando hierboven; `pytest-cov` staat bewust niet in de
+dev-groep en wordt per run met `--with` opgelost. Beide poorten dwingen een ondergrens van
+95% af (`--cov-fail-under`). Gemeten: 97% mét `data/` en 96% in de CI-conditie zonder
+`data/` -- beide ruim boven de grens.
 
 Zet je een nieuwe GWSW-ontologie in `data/gwsw_ontologieen/`, draai dan
 `uv run python scripts/maak_gwsw_index.py`. Dat schrijft de getrackte afgeleide
