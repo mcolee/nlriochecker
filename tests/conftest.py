@@ -19,10 +19,16 @@ MINIMUM_ENV = "NLRIOCHECKER_MIN_GESLAAGD"
 # hij wil vangen is stille overslag, en dat is een bovengrens op "overgeslagen" -- die
 # beweegt niet mee met suitegroei. De twee vullen elkaar aan: de ondergrens vangt tests
 # die helemaal niet meer verzameld worden, de bovengrens tests die wel verzameld worden
-# maar niet draaien. Een `pytest.skip(allow_module_level=True)` valt tussen wal en
-# schip: die telt als één overslag hoeveel tests de module ook draagt. Zie het
-# commentaar bij de twee variabelen in .github/workflows/toets.yml.
+# maar niet draaien. Zie het commentaar bij de variabelen in .github/workflows/toets.yml.
 MAXIMUM_OVERGESLAGEN_ENV = "NLRIOCHECKER_MAX_OVERGESLAGEN"
+# Een `pytest.skip(allow_module_level=True)` viel tussen wal en schip (issue #52): die
+# telt als één overslag hoeveel tests de module ook draagt, dus laat de bovengrens
+# hierboven een hele weggevallen module lopen en zou de ondergrens op een zeer krappe,
+# brosse waarde moeten staan om hem te vangen. Deze derde grens telt uitsluitend de
+# modulewijde overslagen, hangt niet aan de omvang van de suite en veroudert dus niet
+# mee. Modulewijde overslagen zijn in `stats["skipped"]` te herkennen: ze komen als
+# `CollectReport`, test-overslagen als `TestReport`.
+MAXIMUM_MODULE_OVERGESLAGEN_ENV = "NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN"
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 TTL_DIR = FIXTURE_DIR / "ttl"
@@ -123,6 +129,17 @@ def mapping_zonder_bewijs(tmp_path: Path) -> Path:
     return pad
 
 
+def _modulewijde_overslagen(overgeslagen: list[object]) -> int:
+    """Telt de overslagen die een hele module afhaken, niet de losse test-skips.
+
+    Een `pytest.skip(allow_module_level=True)` levert een `CollectReport`, een
+    test-skip een `TestReport`; beide belanden in `rapporteur.stats["skipped"]`. Alleen
+    de eerste soort telt hier mee, zodat de grens niet meebeweegt met het aantal tests
+    dat in zo'n module zit.
+    """
+    return sum(1 for rapport in overgeslagen if isinstance(rapport, pytest.CollectReport))
+
+
 def _grens(naam: str, rapporteur: pytest.TerminalReporter) -> int | None:
     """De waarde van een grensvariabele, of None als hij niet gezet of onleesbaar is."""
     waarde = os.environ.get(naam)
@@ -155,10 +172,13 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if rapporteur is None:
         return
 
+    overgeslagen_rapporten = rapporteur.stats.get("skipped", [])
     geslaagd = len(rapporteur.stats.get("passed", []))
-    overgeslagen = len(rapporteur.stats.get("skipped", []))
+    overgeslagen = len(overgeslagen_rapporten)
+    modulewijd = _modulewijde_overslagen(overgeslagen_rapporten)
     minimum = _grens(MINIMUM_ENV, rapporteur)
     maximum = _grens(MAXIMUM_OVERGESLAGEN_ENV, rapporteur)
+    maximum_module = _grens(MAXIMUM_MODULE_OVERGESLAGEN_ENV, rapporteur)
 
     gezakt = False
     if minimum is not None and geslaagd < minimum:
@@ -172,6 +192,15 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         rapporteur.write_line(
             f"{MAXIMUM_OVERGESLAGEN_ENV}={maximum}, maar er sloegen er {overgeslagen} over "
             f"({geslaagd} geslaagd). Draai met -rs om te zien welke erbij gekomen zijn.",
+            red=True,
+        )
+        gezakt = True
+    if maximum_module is not None and modulewijd > maximum_module:
+        rapporteur.write_line(
+            f"{MAXIMUM_MODULE_OVERGESLAGEN_ENV}={maximum_module}, maar er haakten er "
+            f"{modulewijd} modulewijd af (pytest.skip(allow_module_level=True)). Een hele "
+            "module die overslaat telt in de gewone grens als één; kwam er een bij, dan is "
+            "een fixture of bron weggevallen. Draai met -rs om te zien welke.",
             red=True,
         )
         gezakt = True

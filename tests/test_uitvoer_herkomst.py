@@ -498,6 +498,35 @@ def test_json_schemadocument_beschrijft_elk_meldingveld() -> None:
     assert ontbreekt == []
 
 
+def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> None:
+    """`docs/json-schema.md` beschrijft ook de envelop, niet alleen de meldingvelden.
+
+    De drifttest hierboven loopt over `fields(Melding)`; de enveloppevelden vielen
+    erbuiten. Daardoor kon een niet-gedocumenteerd enveloppeveld ongemerkt bijkomen
+    zonder dat een test omviel (issue #52). Deze test schrijft een envelop met alle
+    optionele velden erin en eist dat elk topniveauveld in het document beschreven staat.
+    """
+    pad = schrijf_json(
+        tmp_path / "envelop.json",
+        [{"melding_id": "a"}],
+        run_datum=RUNDATUM,
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=False,
+        typeringspoort_toegepast=True,
+        markering="een voorbehoud",
+        gebieden=["Koekange", "Ruinen"],
+    )
+    document = json.loads(pad.read_text(encoding="utf-8"))
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "json-schema.md").read_text(
+        encoding="utf-8"
+    )
+
+    ontbreekt = [veld for veld in document if f"`{veld}`" not in doc]
+
+    assert ontbreekt == []
+
+
 def test_json_schemadocument_noemt_de_geschreven_schemaversie() -> None:
     """De versie in het document en die in de code horen dezelfde te zijn."""
     doc = (Path(__file__).resolve().parents[1] / "docs" / "json-schema.md").read_text(

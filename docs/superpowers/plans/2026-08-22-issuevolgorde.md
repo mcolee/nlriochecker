@@ -15,8 +15,9 @@ sporen. Peildatum 2026-08-22; 26 open issues.
    - `superpowers:brainstorming` bij ontwerpruimte, `superpowers:systematic-debugging`
      bij een bug;
    - `superpowers:test-driven-development`: eerst de falende test;
-   - vóór commit: `/superpowers:requesting-code-review` én
-     `/python-library-complete:reviewing-python-libraries`, bevindingen verwerken;
+   - vóór commit: de review naar het **risico** van de wijziging, zoals CLAUDE.md
+     onder `## Werkwijze` voorschrijft (de reviewregel bij de mechanische poort:
+     docs/config, klein, of substantieel); bevindingen verwerken;
    - `superpowers:verification-before-completion`: ruff, mypy, pytest draaien en de
      uitkomst tonen, geen claims zonder bewijs.
 5. **Afronden**: CHANGELOG-regel onder Unreleased, commit op `dev`, issue sluiten met

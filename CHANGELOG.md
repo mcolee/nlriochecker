@@ -13,6 +13,27 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Vijf ontbrekende bewakingen plus een tegenstrijdige documentatieregel** (issue #52), stuk
+  voor stuk hetzelfde patroon: iets wat waar hoort te zijn werd door niets afgedwongen, of een
+  document zei iets anders dan de code deed.
+  - De `[klassen]`-blokken van `checks.toml` en `configs/dewoldenhoogeveen.toml` worden nu
+    gelijkgehouden door een drifttest, met een `BEWUSTE_KLASSEN_AFWIJKINGEN`-lijst (vandaag
+    leeg) plus een omgekeerde test — hetzelfde patroon als de bestaande drempelbewaking uit #28.
+  - De CI-poort kreeg een derde grens, `NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN` (vandaag 1). Een
+    `pytest.skip(allow_module_level=True)` telt in de bestaande grenzen als één overslag, hoeveel
+    tests de module ook draagt; `conftest.py` onderscheidt nu modulewijde overslagen
+    (`CollectReport`) van test-skips (`TestReport`), zodat een weggevallen fixturemap opvalt.
+  - Het rapport van `toets` noemt nu de klassen die de nulmeting te globaal noemt maar die de
+    typeringspoort niet naar objecten kon herleiden (`Niet beoordeeld: …`) — dezelfde mededeling
+    die `analyseer` al gaf. `CheckRun` draagt daarvoor `niet_beoordeelde_klassen` als runmetadata,
+    naast `meetbereik`; het is geen melding. Stilte over een niet-beoordeelde klasse las als
+    "beoordeeld en niets gevonden".
+  - `docs/json-schema.md` sprak zichzelf tegen over `schema_versie`: een puur optioneel, additief
+    veld verhoogt het tweede nummer níét (afnemers pinnen op het hoofdnummer). `schema_versie`
+    blijft `1.1`; een nieuwe drifttest bewaakt dat elk enveloppeveld in het document beschreven
+    staat, niet alleen elk meldingveld.
+  - Eén CLI-test draagt nu `--ontologie` en stelt vast dat de klassenhiërarchie werkelijk
+    gebruikt is — de standaardweg van het gereedschap liep op CLI-niveau door geen enkele test.
 - **ATTR-014 toetst de waardeproperty van elk kenmerk tegen de ontologie** (issue #37). Een
   kenmerk dat `hasValue` gebruikt waar de ontologie via een `owl:onProperty`/`allValuesFrom`-
   restrictie `hasReference` naar een collectie eist (of andersom) is een consistentiefout die

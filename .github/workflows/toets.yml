@@ -75,12 +75,20 @@ jobs:
       # losse overslagen bijkomen -- een fixture die niet meekomt, een bron die op de
       # runner ineens ontbreekt.
       #
-      # Wat hij *niet* vangt, en dat hoort erbij: een `pytest.skip(allow_module_level=True)`
+      # Wat deze twee grenzen *niet* vingen: een `pytest.skip(allow_module_level=True)`
       # telt als één overslag, hoeveel tests de module ook draagt. Gemeten: een module
       # van 29 tests zo uitzetten laat het aantal overslagen op 44 staan en het aantal
-      # geslaagden naar 1271 zakken -- ruim boven de ondergrens. Voor dat geval hebben
-      # beide grenzen te veel lucht.
+      # geslaagden naar 1271 zakken -- ruim boven de ondergrens. Voor dat geval hadden
+      # beide grenzen te veel lucht; de derde grens hieronder vangt het wel (issue #52).
       NLRIOCHECKER_MAX_OVERGESLAGEN: "50"
+      # De bovengrens op modulewijde overslagen. Anders dan de twee hierboven beweegt hij
+      # niet mee met suitegroei: een hele module die met `allow_module_level=True`
+      # afhaakt is precies "een fixturemap die niet meekomt", en dat is wat de poort wil
+      # vangen. Vandaag 1 op deze runner -- tests/test_uitvoer_qgis.py, want ubuntu-latest
+      # heeft geen PyQGIS. Komt er een tweede bij, dan is er een module weggevallen.
+      # `conftest.py` onderscheidt modulewijde overslagen (CollectReport) van test-skips
+      # (TestReport) in rapporteur.stats["skipped"].
+      NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN: "1"
     steps:
       - uses: actions/checkout@v7
 

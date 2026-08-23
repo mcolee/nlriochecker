@@ -67,6 +67,7 @@ def toets_gebieden(
     typing_gate_applied: bool = False,
     meetbereik: Meetbereik,
     nulbevindingen: tuple[Nulbevinding, ...] = (),
+    niet_beoordeelde_klassen: tuple[str, ...] = (),
     voortgang: Voortgang = NUL_VOORTGANG,
 ) -> list[GebiedsRun]:
     """Draait de checks per studiegebied en levert een run per gebied.
@@ -94,6 +95,7 @@ def toets_gebieden(
                     typing_gate_applied,
                     meetbereik,
                     nulbevindingen,
+                    niet_beoordeelde_klassen,
                     voortgang,
                     "Checks",
                 ),
@@ -116,6 +118,7 @@ def toets_gebieden(
             typing_gate_applied=typing_gate_applied,
             meetbereik=meetbereik,
             nulbevindingen=nulbevindingen,
+            niet_beoordeelde_klassen=niet_beoordeelde_klassen,
             voortgang=voortgang,
             met_submap=not gebieden.enkel,
         )
@@ -134,6 +137,7 @@ def _per_gebied(
     typing_gate_applied: bool,
     meetbereik: Meetbereik,
     nulbevindingen: tuple[Nulbevinding, ...],
+    niet_beoordeelde_klassen: tuple[str, ...],
     voortgang: Voortgang,
     met_submap: bool,
 ) -> GebiedsRun:
@@ -154,7 +158,14 @@ def _per_gebied(
     naam = area.gebied or area.name
     fase = f"Checks {naam}" if met_submap else "Checks"
     run = _draai(
-        context, check_ids, typing_gate_applied, meetbereik, nulbevindingen, voortgang, fase
+        context,
+        check_ids,
+        typing_gate_applied,
+        meetbereik,
+        nulbevindingen,
+        niet_beoordeelde_klassen,
+        voortgang,
+        fase,
     )
     return GebiedsRun(
         gebied=area,
@@ -172,6 +183,7 @@ def _draai(
     typing_gate_applied: bool,
     meetbereik: Meetbereik,
     nulbevindingen: tuple[Nulbevinding, ...],
+    niet_beoordeelde_klassen: tuple[str, ...],
     voortgang: Voortgang,
     fase: str,
 ) -> CheckRun:
@@ -190,4 +202,9 @@ def _draai(
         voortgang=voortgang,
         fase=fase,
     )
-    return replace(run, meetbereik=meetbereik, nulbevindingen=nulbevindingen)
+    return replace(
+        run,
+        meetbereik=meetbereik,
+        nulbevindingen=nulbevindingen,
+        niet_beoordeelde_klassen=niet_beoordeelde_klassen,
+    )

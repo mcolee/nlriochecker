@@ -231,6 +231,13 @@ class CheckRun:
     # een rapport dat wel afbakent maar niet zegt hoeveel er buiten viel, leest als
     # "dit is alles".
     nulbevindingen_weggelaten: int = 0
+    # De klassen die de nulmeting te globaal noemt maar die de typeringspoort niet naar
+    # objecten in het domeinmodel kon herleiden (`TypingGate.unassessable_classes`,
+    # gebundeld over de conformiteitsklassen). Runmetadata zoals `meetbereik`, geen
+    # melding: `analyseer` noemt ze al, en het toets-rapport zou er anders over zwijgen
+    # -- stilte over een klasse die niet beoordeeld is leest als "beoordeeld en niets
+    # gevonden". Zie `uitvoer/bevindingen.py` en issue #52.
+    niet_beoordeelde_klassen: tuple[str, ...] = ()
     # Het trefferregister van de context waarop deze run gedraaid heeft; de
     # GeoPackage-schrijver joint de meldingen erop om de lagen met externe objecten te
     # vullen. Zie `checks/treffers.py`.

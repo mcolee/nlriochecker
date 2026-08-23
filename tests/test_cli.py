@@ -780,6 +780,51 @@ def test_gebiedsvalidatie_gaat_vooraf_aan_het_laden(tmp_path: Path, monkeypatch)
     assert "naam_gebied" in resultaat.stderr
 
 
+def test_toets_met_ontologie_gebruikt_de_klassenhierarchie(tmp_path: Path) -> None:
+    """De standaardweg loopt door click heen tot de klassenhierarchie werkelijk telt.
+
+    Achttien testaanroepen droegen `--geen-ontologie`, nul droegen `--ontologie`; de
+    standaardweg van het gereedschap liep op CLI-niveau door geen enkele test (issue
+    #52). Niets bond `cli.py` (`ontologieen=ontology_paths`) aan `Toetsopdracht`.
+
+    De dataset is hier van haar eigen subklasserelaties ontdaan, zodat de meegegeven
+    ontologie de *enige* bron van de hierarchie is. Dat de bare dataset toch twee
+    knooppunten en een streng oplevert -- in plaats van nul -- bewijst dat de
+    hierarchie uit `--ontologie` daadwerkelijk gebruikt is, niet enkel geaccepteerd.
+    Zou de doorgifte breken, dan weigert `_eis_ontologie` de run (geen ontologie,
+    geen `--geen-ontologie`) en valt de exitcode op 1.
+    """
+    bron = (TTL_DIR / "schoon.ttl").read_text(encoding="utf-8").splitlines()
+    kaal = tmp_path / "kaal.ttl"
+    kaal.write_text(
+        "\n".join(regel for regel in bron if "rdfs:subClassOf" not in regel) + "\n",
+        encoding="utf-8",
+    )
+    uitvoer = tmp_path / "uitvoer"
+
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--ontologie",
+            str(TTL_DIR / "schoon.ttl"),
+            "--dataset",
+            str(kaal),
+            "--check",
+            "TOP-001",
+            "--output",
+            str(uitvoer),
+            "--geen-gpkg",
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "2 knooppunten, 1 strengen" in resultaat.output
+    rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert "Klassenhierarchie uit `schoon.ttl`." in rapport
+    assert "geen ontologie geladen" not in rapport
+
+
 def test_toets_zonder_ontologie_faalt(tmp_path: Path) -> None:
     """De standaardweg: geen --ontologie en geen --geen-ontologie is een fout.
 

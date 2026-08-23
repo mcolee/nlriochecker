@@ -304,6 +304,65 @@ def test_bewuste_afwijking_wijkt_ook_werkelijk_af() -> None:
         )
 
 
+# Sleutels van `[klassen]` waarvoor `configs/dewoldenhoogeveen.toml` bewust van
+# `src/nlriochecker/checks.toml` afwijkt, met de reden. Vandaag leeg: De Wolden draait
+# op dezelfde klassenlijsten. Een project *mag* afwijken -- dat is juist waar een
+# projectconfiguratie voor dient -- maar dan als bewuste daad die hier opgeschreven
+# staat, niet als een lijst die stilzwijgend uit elkaar loopt.
+BEWUSTE_KLASSEN_AFWIJKINGEN: dict[str, str] = {}
+
+
+def _klassenafwijkingen(
+    negeer: frozenset[str] | set[str] = frozenset(),
+) -> dict[str, tuple[object, object]]:
+    """Per sleutel in `[klassen]` de afwijking tussen checks.toml en de projectconfig.
+
+    Vergelijkt de twee `[klassen]`-blokken sleutel voor sleutel; het nest
+    `[klassen.stelseltypen]` gaat als deelwoordenboek mee. Een sleutel die maar in een
+    van beide bestanden staat telt ook als afwijking.
+    """
+    standaard = tomllib.loads(default_check_config_path().read_text(encoding="utf-8"))["klassen"]
+    project = tomllib.loads(PROJECTCONFIG.read_text(encoding="utf-8"))["klassen"]
+    return {
+        sleutel: (project.get(sleutel), standaard.get(sleutel))
+        for sleutel in standaard.keys() | project.keys()
+        if sleutel not in negeer and project.get(sleutel) != standaard.get(sleutel)
+    }
+
+
+def test_de_klassenlijsten_zijn_in_beide_bestanden_gelijk() -> None:
+    """De `[klassen]`-blokken van beide configbestanden horen gelijk te blijven.
+
+    Niets dwong dat af (issue #52): wie een klasse aan de een toevoegt en de ander
+    vergeet, krijgt een projectrun die stil andere objecten selecteert dan de
+    meegeleverde configuratie. `test_checkconfig` bewaakt sinds #28 de drempels op
+    waarde en type, maar de klassenlijsten vielen erbuiten. Een bewuste afwijking
+    hoort met haar reden op `BEWUSTE_KLASSEN_AFWIJKINGEN`.
+    """
+    afwijkend = _klassenafwijkingen(negeer=set(BEWUSTE_KLASSEN_AFWIJKINGEN))
+
+    assert not afwijkend, (
+        "configs/dewoldenhoogeveen.toml [klassen] wijkt onaangekondigd af van "
+        f"src/nlriochecker/checks.toml (sleutel: project, standaard): {afwijkend}. Zet de "
+        "afwijking met haar reden op BEWUSTE_KLASSEN_AFWIJKINGEN, of maak de lijsten gelijk."
+    )
+
+
+def test_bewuste_klassenafwijking_wijkt_ook_werkelijk_af() -> None:
+    """De andere richting: een afwijking die geen afwijking meer is hoort van de lijst.
+
+    Zonder deze test blijft `BEWUSTE_KLASSEN_AFWIJKINGEN` staan als een lijst keuzes die
+    niemand meer maakt, en dekt hij stilzwijgend de volgende drift op datzelfde veld af.
+    """
+    nog_afwijkend = _klassenafwijkingen()
+
+    for sleutel, reden in BEWUSTE_KLASSEN_AFWIJKINGEN.items():
+        assert sleutel in nog_afwijkend, (
+            f"{sleutel} staat op BEWUSTE_KLASSEN_AFWIJKINGEN maar is gelijk in beide "
+            f"bestanden; haal hem eruit ({reden})"
+        )
+
+
 def test_vulwaarden_uit_de_standaardconfig() -> None:
     """De vulwaarde-leesregel staat als projectconfiguratie in `[vulwaarden]`."""
     config = load_check_config()

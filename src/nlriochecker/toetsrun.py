@@ -215,7 +215,7 @@ def voer_toets_uit(
     dataset = markeer_vulwaarden(
         dataset, config.vulwaarden.hoogte_kenmerken, config.vulwaarden.hoogte_band_m
     )
-    onbetrouwbaar, poort_toegepast, meetbereik, nulbevindingen = _nulmeting(
+    onbetrouwbaar, poort_toegepast, meetbereik, nulbevindingen, niet_beoordeeld = _nulmeting(
         opdracht, config, dataset, voortgang
     )
 
@@ -231,6 +231,7 @@ def voer_toets_uit(
             typing_gate_applied=poort_toegepast,
             meetbereik=meetbereik,
             nulbevindingen=nulbevindingen,
+            niet_beoordeelde_klassen=niet_beoordeeld,
             voortgang=voortgang,
         )
     except KeyError as error:
@@ -340,8 +341,9 @@ def _nulmeting(
     config: CheckConfig,
     dataset: GwswDataset,
     voortgang: Voortgang,
-) -> tuple[frozenset[str], bool, Meetbereik, tuple[Nulbevinding, ...]]:
-    """Leest de nulmeting en haalt er twee dingen uit: de poort en de overtredingen.
+) -> tuple[frozenset[str], bool, Meetbereik, tuple[Nulbevinding, ...], tuple[str, ...]]:
+    """Leest de nulmeting en haalt er drie dingen uit: de poort, de overtredingen en
+    de klassen die de poort niet kon beoordelen.
 
     De typeringspoort levert de te globaal getypeerde objecten. De SHACL-meting
     noemt de te globale klassen; de instanties komen uit de dataset. Dat geeft een
@@ -353,6 +355,10 @@ def _nulmeting(
     zou op De Wolden ruim tweehonderdduizend regels dubbel parsen, en de twee zouden
     bij een wijziging uit elkaar kunnen lopen.
 
+    De niet-beoordeelde klassen (`TypingGate.unassessable_classes`) worden over de
+    conformiteitsklassen gebundeld en gaan als runmetadata mee, zodat het toets-rapport
+    ze kan noemen in plaats van erover te zwijgen (issue #52).
+
     Zonder SHACL-rapporten is er geen meting. Het meetbereik zegt dat dan expliciet,
     in plaats van de vereiste set te noemen alsof die gehaald is -- stilte over een
     niet-uitgevoerde meting leest als "alles gecontroleerd".
@@ -360,18 +366,26 @@ def _nulmeting(
     volledig = config.nulmeting.vereiste_cfk
     gekozen = kies_cfk(opdracht.cfk, volledig)
     if not opdracht.shacl:
-        return frozenset(), False, Meetbereik.niet_gemeten(volledig), ()
+        return frozenset(), False, Meetbereik.niet_gemeten(volledig), (), ()
 
     nulmeting = laad_nulmeting(list(opdracht.shacl), gekozen, volledig, voortgang=voortgang)
     analyse = analyze(nulmeting, dataset)
     objecten: set[str] = set()
+    niet_beoordeeld: set[str] = set()
     for deel in analyse.per_cfk.values():
         objecten.update(deel.typing_gate.objects)
+        niet_beoordeeld.update(deel.typing_gate.unassessable_classes)
     onbetrouwbaar = frozenset(objecten)
     bevindingen = bouw_nulbevindingen(
         nulmeting, dataset, config.rapport.systemisch_drempel, onbetrouwbaar
     )
-    return onbetrouwbaar, True, nulmeting.meetbereik, tuple(bevindingen)
+    return (
+        onbetrouwbaar,
+        True,
+        nulmeting.meetbereik,
+        tuple(bevindingen),
+        tuple(sorted(niet_beoordeeld)),
+    )
 
 
 def _gebied_kort(gebiedsrun: GebiedsRun) -> str:

@@ -297,9 +297,14 @@ versie 1.x.
 hierop en niet op de packageversie: de checks mogen veranderen zonder dat het formaat
 dat doet.
 
-Het tweede nummer telt op bij een achterwaarts verenigbare toevoeging: `"1.0"` werd
-`"1.1"` toen het veld `cfk` erbij kwam. Pin daarom op het **hoofdnummer**
-(`schema_versie.split(".")[0] == "1"`), niet op de volledige string.
+Het tweede nummer telt op bij een achterwaarts verenigbare *wijziging* die een bestaande
+afnemer merkt -- niet bij een puur optioneel, additief veld. Zo'n veld laat een afnemer die
+het niet kent het bestand lezen zoals voorheen; het valt daarom onder de lijst hieronder en
+verhoogt de versie niet. Het nummer staat op `1.1`: die stap van `1.0` viel samen met het
+veld `cfk`, maar de latere velden `gebied`, `gebieden` en `markering` -- alle optioneel en
+additief -- kwamen er binnen `1.1` bij, zonder verhoging. Pin daarom op het **hoofdnummer**
+(`schema_versie.split(".")[0] == "1"`), niet op de volledige string: `1.1` duidt niet één
+vaste enveloppevorm aan.
 
 **Binnen een hoofdversie mag:**
 

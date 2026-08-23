@@ -386,6 +386,38 @@ class TestExterneBronnen:
             )
 
 
+def test_niet_beoordeelde_klasse_komt_in_het_toetsrapport(tmp_path: Path) -> None:
+    """Een te globale klasse die de poort niet kon beoordelen hoort in het rapport.
+
+    `bepaal_typeringspoort` slaat een klasse over die niet naar objecten in het
+    domeinmodel te herleiden is, en `analyseer` meldt dat als "Niet beoordeeld". In het
+    rapport van `toets` ontbrak die mededeling -- precies de stilte die dit project
+    verbiedt (issue #52). `Rioolstelsel` is zo'n geval: de nulmeting noemt hem te globaal,
+    maar hij staat onder Stelsel en is dus knoop noch streng, dus `of_class()` geeft `[]`.
+    """
+    bron = (TTL_DIR / "top001_losliggende_put.ttl").read_text(encoding="utf-8")
+    bron += "\n:Stelsel1 rdf:type gwsw:Rioolstelsel .\n"
+    dataset = tmp_path / "met_stelsel.ttl"
+    dataset.write_text(bron, encoding="utf-8")
+
+    uitslag = voer_toets_uit(
+        Toetsopdracht(
+            dataset_pad=dataset,
+            uitvoermap=tmp_path / "uitvoer",
+            check_ids=("TOP-001",),
+            shacl=drieluik(),
+            met_geopackage=False,
+            geen_ontologie=True,
+            cachemap=tmp_path / "cache",
+        )
+    )
+
+    run = uitslag.runs[0].run
+    assert run.niet_beoordeelde_klassen == ("Rioolstelsel",)
+    markdown = uitslag.uitvoer.per_gebied[""].markdown.read_text(encoding="utf-8")
+    assert "Niet beoordeeld: Rioolstelsel" in markdown
+
+
 def test_typeringsvoorbehoud_wordt_gemeld(tmp_path: Path) -> None:
     """Een object waarvan de typering te globaal is, komt met voorbehoud in de uitslag.
 

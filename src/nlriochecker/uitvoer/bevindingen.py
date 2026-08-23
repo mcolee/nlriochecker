@@ -303,6 +303,16 @@ def _verantwoording(
                 "bestanden en hoeven niet uit dezelfde momentopname te komen.",
                 "",
             ]
+        if run.niet_beoordeelde_klassen:
+            klassen = ", ".join(run.niet_beoordeelde_klassen)
+            lines += [
+                f"> Niet beoordeeld: {klassen}. Die klassen noemt de nulmeting te globaal, maar "
+                "ze zijn niet naar objecten in het domeinmodel te herleiden: dat kent alleen "
+                "knopen en strengen, en een verbindingsklasse staat bovendien op de orientatie "
+                "van een streng en niet op de streng zelf. Ze tellen niet mee in het "
+                "typeringsvoorbehoud hierboven; over hun objecten valt hier niets te zeggen.",
+                "",
+            ]
     else:
         lines += [
             "> **Let op:** er is geen typeringspoort toegepast. Zonder de nulmeting-"
