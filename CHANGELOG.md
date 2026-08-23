@@ -87,6 +87,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De dekkingclaim van ADM-004 is beperkt tot de CFK waar hij op rust** (issue #7). De
+  put-vormen `MateriaalPut` en `Maaiveldschematisering` (hasAspect exact=1) leveren op De
+  Wolden uitsluitend in Hyd meldingen op (4142 resp. 20756), nul in MdsPlan en MdsProj op
+  hetzelfde RDF-bestand; het register schreef die twee attributen ten onrechte aan Mds toe.
+  Register, de sentineltabel `dekking.toml` en de gegenereerde `docs/dekkingsmatrix.md`
+  zijn bijgetrokken. De tweede claim uit #7 (ADM-001, de put-strengkoppeling) raakt de
+  onderbouwing van de harde CFK-eis (BO-7) en is bewust ongemoeid gelaten in afwachting
+  van akkoord.
 - **De De Wolden-dataset heet overal "De Wolden en Hoogeveen"**. De zware integratietest
   laadt de volledige OroX-export die niet alleen De Wolden maar ook Hoogeveen beslaat; de
   oude naam suggereerde ten onrechte één gemeente. Het aangeleverde OroX-bestand heet nu

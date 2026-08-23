@@ -179,7 +179,7 @@ Alle drie de voorwaarden worden machinaal gehandhaafd (2026-08-16). Voorwaarde 1
 | ID | Check | Gedekt door |
 |---|---|---|
 | ADM-001 | Streng verwijst naar niet-bestaande begin- of eindput | Generieke melding gerefereerd object onbekend (CFK-onafhankelijk); verplichte aanwezigheid van de koppeling alleen via Hyd (hasConnection Knooppunt exact=1); Mds eist slechts max=1 |
-| ADM-004 | Verplichte GWSW-MdS-attributen niet gevuld | Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, maaiveldhoogte); Hyd aanvullend inclusief BOB's en afmetingen exact=1 |
+| ADM-004 | Verplichte GWSW-MdS-attributen niet gevuld | Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, maaiveldhoogte); Hyd aanvullend inclusief BOB's, afmetingen exact=1 en de put-vormen materiaal (MateriaalPut) en maaiveldschematisering (Maaiveldschematisering) — die twee hasAspect-eisen (exact=1) leveren uitsluitend in Hyd meldingen op (4142 resp. 20756 op De Wolden, nul in MdsPlan en MdsProj op hetzelfde RDF-bestand), dus de dekking van díé twee attributen rust op Hyd en niet op Mds (mechanisch na te lopen via [#41](https://github.com/mcolee/nlriochecker/issues/41)) |
 | ADM-005 | Attribuutwaarden buiten de GWSW-domeinlijsten | Beide CFK's: collectietoetsing hasReference |
 | ATTR-011 | Absurde lengtewaarde boven harde bovengrens | Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype Dt_LengteLeiding) |
 
@@ -213,6 +213,16 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-23): geen checks toegevoegd, geschrapt of van ernst of
+dimensie veranderd; het contract is ongewijzigd. Redactioneel: de dekkingclaim van ADM-004
+is beperkt tot de conformiteitsklasse waar hij aantoonbaar op rust. De put-vormen MateriaalPut
+en Maaiveldschematisering (hasAspect exact=1) leveren op De Wolden uitsluitend in Hyd meldingen
+op, niet in MdsPlan of MdsProj op hetzelfde RDF-bestand; de dekking van die twee attributen
+rust dus op Hyd. De sentineltabel `dekking.toml` en de gegenereerde `docs/dekkingsmatrix.md`
+volgen. De tweede claim uit issue #7 (ADM-001, de put-strengkoppeling) is bewust ongemoeid
+gelaten: die raakt de onderbouwing van de harde CFK-eis (BO-7) en wacht op akkoord van de
+auteur. Zie [#7](https://github.com/mcolee/nlriochecker/issues/7).
 
 Versie 0.9 (2026-08-19): RVZ-002 en RVZ-003 zijn uit de tabel Geschrapte checks gehaald
 en gebouwd (W, Compleetheid): in geen van de drie SHACL-rapporten bestaat een vorm op
