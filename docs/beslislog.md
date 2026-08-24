@@ -855,6 +855,10 @@ alleen het sterkste (en het eerste) is de voor de hand liggende volgende stap. H
 staat niet gepland; wie hem oppakt, moet weten dat de meldingaantallen erdoor
 veranderen en dat elke trendvergelijking over die grens heen breekt.
 
+**Achterhaald (deels).** De `break`-na-eerste-waterdeel voor de watergangkruisingen is
+door [[BO-43]] opgepakt: `_WatergangKruising.kruisingen()` loopt voortaan alle
+kandidaat-waterdelen per streng langs. De EXT-001-beperking (sterkste bouwwerk) blijft.
+
 ### BO-18 De sleutel van een extern object, met een geometriehash als terugval
 
 **Wat.** `object2_uri` van een EXT-melding is `bgt:pand/<id>`, `bag:pand/<id>`,
@@ -2295,3 +2299,42 @@ byte-/inhoudsgelijk aan die van vóór de omzetting, koud én warm.
 **Cache-invalidatie.** `graaf.py` telt mee in de cachesleutel, naast `dataset.py`,
 `geometry.py` en `ontologie.py`: een wijziging aan de termconversie of de volgordegarantie
 is net zo goed een andere lader en dus een andere sleutel.
+
+### BO-43 Een watergangkruising is een echte doorkruising van een actueel BGT-waterdeel, zonder drempels
+
+**Wat.** De twee kruisingschecks op BGT-waterdelen (EXT-002, EXT-003) melden voortaan
+alleen een *echte doorkruising*. Per (vrijvervalstreng `L`, BGT-waterdeel-polygoon `W`):
+doorkruising ⟺ `L` snijdt `W` én beide eindpunten van `L` liggen buiten `W` (`e=0`) én
+`L` kruist de rand van `W` minstens twee keer (`k≥2`). EXT-002 meldt die doorkruisingen,
+EXT-003 de doorkruisingen waarvan de streng geen kruisingsconstructie (`Zinker`/`Duiker`)
+is. Een leiding die alleen binnen de buffer ligt maar `W` niet snijdt (raakt niet), of
+die in `W` eíndigt (lozingspunt, `e≥1`), is geen bevinding. De BGT-invoer wordt vooraf
+op de actuele versie gefilterd (`eind_registratie IS NULL`); vervallen waterdelen tellen
+niet mee. Uitgewerkt in issues #58 (invoerfilter) en #59 (meetkunde).
+
+**Waarom.** De oude toets was `distance ≤ ext_watergang_buffer_m` (1,0 m) — nabijheid,
+geen doorkruising. Handmatig geclassificeerd op de laatste volledige De Wolden-run (638
+gemelde waterdelen): 181 raakten de leiding niet eens, 155 waren lozingspunten, 58 waren
+vervallen BGT-versies; slechts 234 waren echte doorkruisingen. De check meldde er 638 waar
+er 234 terecht zijn. Een zinker is bovendien een vrijvervalbegrip: mechanisch riool
+(pers/druk/vacuüm) gaat onder druk zonder zinker onderdoor, dus die populatie hoort er niet
+in — de engine selecteert al op `VrijvervalRioolleiding` (`Infiltratieriool` en
+`Overstortleiding` blíjven erin; die zijn vrijverval).
+
+**Geen drempels.** Tien handmatig gelabelde grensgevallen (doorsnijding 0,30–0,50 m,
+allemaal "goed") wezen uit dat een minimum-doorsnijding echte doorkruisingen van smalle
+greppels wegfiltert, en dat een oevertolerantie overbodig is zodra "moet écht snijden" de
+eis is. `e=0 ∧ k≥2` draagt de hele beslissing; `ext_watergang_buffer_m` blijft alleen de
+zoekstraal voor kandidaten.
+
+**Alternatieven.** Een oevertolerantie/straddle-correctie voor leidingen die door bronoffset
+net náást het waterdeel liggen (verworpen: geen offset-correctie — raakt de leiding het
+waterdeel niet, dan valt het eruit). Een minimum-doorsnijding tegen hoek-aantikkingen
+(verworpen: filtert smalle-greppel-doorkruisingen weg, gemeten). Historie per check afhandelen
+(verworpen: het actualiteitsfilter hoort in het BGT-leespad, zodat álle EXT-checks schone
+invoer krijgen — #58).
+
+**Herziening van [[BO-17]].** De daar bewust geaccepteerde `break`-na-eerste-waterdeel in
+`_WatergangKruising.kruisingen()` vervalt: de nieuwe toets loopt alle kandidaat-waterdelen per
+streng langs en geeft elke echte doorkruising terug. De EXT-001-beperking (alleen het sterkste
+bouwwerk) uit BO-17 blijft staan.
