@@ -147,8 +147,9 @@ studiegebiedbestand dat de run meekreeg.
 
 De meeste checks laten deze twee leeg. Ze zijn gevuld bij een melding die twee objecten
 tegen elkaar afzet: de TOP-checks (twee GWSW-objecten, dus twee dataset-URI's) en sinds
-deze versie EXT-001 en EXT-003, die een extern object aanwijzen. Dat is een
-achterwaarts verenigbare toevoeging: de velden bestonden al.
+deze versie EXT-001, EXT-002 en EXT-003, die een extern object aanwijzen -- bij EXT-002
+en EXT-003 het doorkruiste BGT-waterdeel. Dat is een achterwaarts verenigbare
+toevoeging: de velden bestonden al.
 
 De URI's van externe objecten volgen een vaste conventie:
 
@@ -167,10 +168,10 @@ Zo'n sleutel is stabiel over runs op hetzelfde bestand, maar verandert zodra de
 geometrie in de bron wijzigt.
 
 Let op bij het vergelijken van meetmomenten: `melding_id` is een hash over onder meer
-`object2_uri`. Doordat EXT-001 en EXT-003 dat veld sinds deze versie vullen, hebben hun
-meldingen een ander ID dan in de vorige versie, en verschijnen ze in een diff eenmalig
-als opgelost plus nieuw. Een `geo:`-sleutel verschuift bovendien mee zodra de geometrie
-in de bron wijzigt.
+`object2_uri`. Doordat EXT-001, EXT-002 en EXT-003 dat veld sinds deze versie vullen,
+hebben hun meldingen een ander ID dan in de vorige versie, en verschijnen ze in een
+diff eenmalig als opgelost plus nieuw. Een `geo:`-sleutel verschuift bovendien mee
+zodra de geometrie in de bron wijzigt.
 
 Sinds deze versie verschuiven er nog drie dingen, alle drie zonder dat `schema_versie`
 verandert -- de vorm van het contract blijft gelijk, alleen de meldingen die het draagt
@@ -192,6 +193,11 @@ bewegen:
 De geometrie van het externe object zit **niet** in de JSON -- die zou als WKB in het
 contract belanden. Wie hem wil, vindt het object in de GeoPackage: de lagen
 `bouwwerken` en `waterdelen_zonder_zinker` dragen dezelfde sleutel in hun kolom `id`.
+
+Voor EXT-002 geldt daarbij een voorbehoud: de laag `waterdelen_zonder_zinker` volgt
+alleen EXT-003. Een waterdeel dat wél doorkruist wordt maar door een geregistreerde
+zinker levert dus een EXT-002-melding met `object2_uri` en géén rij in die laag; de
+sleutel is dan alleen in de JSON te vinden.
 
 ### Meldingen uit de nulmeting
 

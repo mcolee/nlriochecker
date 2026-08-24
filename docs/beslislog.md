@@ -930,8 +930,9 @@ gebouwd: het zou een tweede drempelbegrip introduceren voor precies één bron, 
 bestaande tolerantie het geval al afvangt. Wie het alsnog wil, heeft aan de celgrootte
 uit `RasterSampler` genoeg.
 
-**Gevolg voor de meldingidentiteit.** Nu EXT-001 en EXT-003 hun `object2_uri` vullen,
-verschuift hun `melding_id` eenmalig -- die hash bevat dat veld. Een trendvergelijking
+**Gevolg voor de meldingidentiteit.** Nu EXT-001 en EXT-003 -- en sinds [[BO-43]]
+(#59) ook EXT-002 -- hun `object2_uri` vullen, verschuift hun `melding_id` eenmalig --
+die hash bevat dat veld. Een trendvergelijking
 over die grens heen laat de meldingen als opgelost plus nieuw zien. Dat staat in het
 wijzigingslog en in `docs/json-schema.md`; het alternatief (het veld buiten de hash
 houden) zou twee meldingen over verschillende panden dezelfde identiteit geven.
@@ -2339,3 +2340,18 @@ invoer krijgen — #58).
 `_WatergangKruising.kruisingen()` vervalt: de nieuwe toets loopt alle kandidaat-waterdelen per
 streng langs en geeft elke echte doorkruising terug. De EXT-001-beperking (alleen het sterkste
 bouwwerk) uit BO-17 blijft staan.
+
+**Gemeten uitkomst (2026-08-24).** EXT-002 en EXT-003 melden op De Wolden 319 doorkruisingen op
+281 strengen, over 302 unieke waterdelen. Binnen de zoekstraal lagen 924 (streng, waterdeel)-paren:
+319 doorkruisingen, 362 die het waterdeel niet raken, 243 lozingspunten en 0 tangentiële gevallen.
+244 strengen kruisen één waterdeel, 36 er twee en 1 er drie. De vergelijking met de 234 handmatig
+gevalideerde doorkruisingen hierboven gaat niet op: door de `break` droeg de oude run precies één
+waterdeel per streng, dus die handmatige ronde beoordeelde een steekproef van één per streng en
+nooit de volledige parenpopulatie. Van de 302 waterdelen zaten er 226 in de oude 638 (waarvan er
+234 handmatig als doorkruising waren gelabeld) en 76 kwamen door de `break` nooit bovendrijven.
+Alle 281 strengen stonden al in de oude run: geen enkele streng is nieuw. Dat de oude verzameling
+volgordeafhankelijk was, bleek ook uit de tussenrun met alleen #58: die wisselde 70 waterdelen in
+en 119 uit de 638. Het restverschil van 8 (226 tegen 234) is niet verklaard; de waarschijnlijkste
+oorzaak is dat een eindpunt precies op de oever als "erin" telt en het paar dus lozingspunt wordt.
+Dat is een bewuste, behoudende afwijking van de letterlijke eis "beide eindpunten buiten `W`":
+liever een doorkruising missen dan er een melden die er geen is.

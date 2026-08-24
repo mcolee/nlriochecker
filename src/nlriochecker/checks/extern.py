@@ -616,7 +616,7 @@ class KruisingMetWatergang(_WatergangKruising):
                 kruising.conduit.label,
                 f"Doorkruist een BGT-waterdeel van het type {soort!r} "
                 f"(zoekstraal {kruising.buffer:g} m).",
-                watertype=soort,
+                watertype=str(soort),
                 bron=kruising.laag.source.name,
                 buffer_m=kruising.buffer,
                 object2_uri=sleutel,

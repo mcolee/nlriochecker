@@ -133,7 +133,7 @@ def test_een_enkel_historieveld_filtert_op_dat_veld(tmp_path: Path) -> None:
     assert [rij["lokaal_id"] for rij in water.attributes] == ["actueel"]
     assert (
         "`bgt.gpkg` laag 'waterdeel': 1 verlopen objectversie overgeslagen "
-        "(eind_registratie of termination_date gevuld); 1 actuele feature gelezen."
+        "(eind_registratie gevuld); 1 actuele feature gelezen."
     ) in data.notes
 
 

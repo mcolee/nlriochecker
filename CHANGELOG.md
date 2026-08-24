@@ -18,7 +18,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   over; verlopen versies telden tot nu toe in elke ruimtelijke toets mee (op De Wolden
   97.148 waterdelen waarvan 44.601 actueel). Het filter werkt alleen op lagen die de
   historievelden dragen en meldt per laag hoeveel rijen vervielen onder *Externe
-  bronnen* in het rapport. Zie BO-43.
+  bronnen* in het rapport. Gemeten op De Wolden: `bgt_water` 97.148 → 44.601 features,
+  `bgt_pand` 133.279 → 81.661, `bgt_bouwwerk` 39.789 → 19.045. Per check zakt EXT-001
+  van 493 naar 455 meldingen en zakken EXT-002 en EXT-003 van 859 naar 770. EXT-007
+  stíjgt van 58 naar 71: 13 lozingspunten liggen bij water dat in de BGT geen actuele
+  versie meer heeft. Die stijging is terecht -- het zijn kandidaten voor "water gedempt,
+  lozingspunt niet meegemuteerd", geen fout in het filter. Zie BO-43.
 - **EXT-002 en EXT-003 melden een doorkruising, geen nabijheid** (issue #59). Een
   vrijvervalstreng meldt alleen als zij het BGT-waterdeel echt doorkruist: erin door
   de ene oever, eruit door de andere, zonder erin te eindigen (`e = 0`, `k >= 2`,
@@ -27,12 +32,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   gevallen. Elke doorkruising per streng telt, de stop na het eerste waterdeel is
   vervallen. Op De Wolden zakt EXT-003 van 859 meldingen op 859 strengen (638
   waterdelen) naar 319 doorkruisingen op 281 strengen (302 unieke waterdelen); 362
-  paren raken het waterdeel niet en 243 eindigen erin. Dat zijn er meer dan de 234
-  handmatig gevalideerde doorkruisingen uit BO-43; de herbeoordeling staat in issue
-  #59. EXT-002 draagt voortaan het doorkruiste waterdeel als tweede object
-  (`Object2`), zodat twee doorkruisingen van één streng een eigen, stabiele
-  melding-ID houden. `ext_watergang_buffer_m` is voortaan alleen de zoekstraal.
-  Zie BO-43.
+  paren raken het waterdeel niet en 243 eindigen erin. Van die daling komen 89
+  meldingen (859 → 770) uit het actualiteitsfilter van #58 en de rest uit de nieuwe
+  regel. Dat zijn er meer dan de 234 handmatig gevalideerde doorkruisingen uit BO-43;
+  de herbeoordeling staat in issue #59 en de meetuitkomst in BO-43. EXT-002 draagt
+  voortaan het doorkruiste waterdeel als tweede object (`Object2`), zodat twee
+  doorkruisingen van één streng een eigen, stabiele melding-ID houden. **De
+  melding-ID's van EXT-002 verschuiven eenmalig**: de ID hangt mede aan
+  `object2_uri`, dat EXT-002 nu vult; `vergelijk` leest de oude EXT-002-meldingen
+  daardoor één keer als opgelost én nieuw. `schema_versie` blijft 1.0.
+  `ext_watergang_buffer_m` is voortaan alleen de zoekstraal. Zie BO-43.
 
 ## [0.3.0] - 2026-08-24
 
