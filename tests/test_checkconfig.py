@@ -31,6 +31,15 @@ def test_standaardconfig_laadt() -> None:
     assert config.drempels.dubbele_put_tolerantie_m == 0.30
 
 
+def test_stelselvlak_buffer_heeft_een_default() -> None:
+    """De bufferafstand van de cartografische stelsellaag (#25).
+
+    Projectkeuze zonder externe bron; 10 m buffert elke strenglijn tot een lint van
+    20 m breed, zodat de strengen van een stelsel langs een straat samenvloeien.
+    """
+    assert load_check_config().drempels.stelselvlak_buffer_m == 10.0
+
+
 def test_maximale_strenglengte_volgt_de_ontologie() -> None:
     """De bovengrens van ATTR-008 is de GWSW-ontologiegrens, niet 200 m (issue #35).
 

@@ -1318,6 +1318,44 @@ FIXTURES["net_afvoerpad_mechanisch.ttl"] = (
 )
 
 
+# De subklassehierarchie van de stelselfamilie, inline: de gedeelde prelude kent haar
+# niet, en haar aan de prelude toevoegen zou alle 140 fixtures herschrijven.
+STELSEL_HIERARCHIE = """gwsw:Vuilwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:GemengdStelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:Hemelwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:Rioolstelsel rdfs:subClassOf gwsw:Stelsel .
+"""
+
+
+def stelsel(naam: str, label: str, klasse: str, leden: list[str]) -> str:
+    """Een geregistreerd stelselobject dat zijn leden via `hasPart` draagt (#17, #25)."""
+    delen = " , ".join(f":{lid}" for lid in leden)
+    return f':{naam} rdf:type gwsw:{klasse} ; rdfs:label "{label}" ;\n    gwsw:hasPart {delen} .\n'
+
+
+# #25: de geregistreerde stelselboom die #17 blootlegde. Twee stelsels met strengen --
+# een vuilwaterstelsel dat een gemaal bereikt en een gemengd stelsel zonder afvoerroute
+# -- en een hemelwaterstelsel dat alleen een put bevat (de gemeentebrede put-bucket uit
+# #17), dat geen strengen heeft en dus geen vlak krijgt.
+FIXTURES["stelsels_registratie.ttl"] = (
+    "geen; drie geregistreerde stelsels: vuilwater (bereikt gemaal), gemengd (geen "
+    "afvoerroute) en een hemelwaterbucket met alleen een put",
+    STELSEL_HIERARCHIE
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + gemaal("Gem", "G", (1100.0, 2000.0))
+    + put("PutC", "C", 1000.0, 2100.0)
+    + put("PutD", "D", 1050.0, 2100.0)
+    + put("PutE", "E", 1000.0, 2200.0)
+    + leiding("LV1", "V1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", klasse="Vuilwaterriool")
+    + leiding("LV2", "V2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "Gem", klasse="Vuilwaterriool")
+    + leiding("LG1", "G1", [(1000.0, 2100.0), (1050.0, 2100.0)], "PutC", "PutD")
+    + stelsel("stelV", "vuilwater-1", "Vuilwaterstelsel", ["LV1", "LV2"])
+    + stelsel("stelG", "gemengd-1", "GemengdStelsel", ["LG1"])
+    + stelsel("stelH", "hemelwater-bucket", "Hemelwaterstelsel", ["PutE"]),
+)
+
+
 # Het afvoereindpunt van de schone stelsels: net onder de overstort-/BBB-put.
 GEM = (1050.0, 1950.0)
 

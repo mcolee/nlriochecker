@@ -239,6 +239,10 @@ class CheckThresholds(BaseModel):
     ext_lozingspunt_water_afstand_m: float = Field(default=10.0, gt=0.0)
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
 
+    # #25: bufferafstand om de strengen van een stelsel voor de cartografische
+    # stelsellaag in de GeoPackage. Geen check-drempel; alleen de kaartlaag leest hem.
+    stelselvlak_buffer_m: float = Field(default=10.0, gt=0.0)
+
     @property
     def ext_zoekafstand_max_m(self) -> float:
         """De verste blik van de EXT-checks in de externe lagen.

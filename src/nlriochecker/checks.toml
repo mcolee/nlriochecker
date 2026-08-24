@@ -337,6 +337,12 @@ ext_putdeksel_afstand_m = 2.0
 ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0
 
+# #25: bufferafstand om de strengen van een stelsel, voor de cartografische laag
+# `stelsels` in de GeoPackage. Projectkeuze, geen externe bron: 10 m buffert elke
+# strenglijn tot een lint van 20 m breed, zodat de strengen van een stelsel langs
+# een straat samenvloeien tot één vlak zonder een langgerekt stelsel op te blazen.
+stelselvlak_buffer_m = 10.0
+
 [netwerk]
 # Hoe de afvoerrichting van een vrijvervalstreng bepaald wordt.
 #   administratief - de van-naar-richting uit het GWSW-model (standaard; dat is wat
