@@ -108,9 +108,10 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   `waterdelen_zonder_zinker` (EXT-003): de externe objecten waarnaar de meldingen van
   díé uitvoer verwijzen, gejoind op het trefferregister (`checks/treffers.py`) via
   `object2_uri`. De schrijver bevraagt zelf nooit een externe bron -- dan zouden laag en
-  uitslag uit elkaar kunnen lopen. Twee beperkingen erven mee en blijven staan: EXT-001
-  meldt alleen het sterkste bouwwerk, en de watergangcheck stopt na het eerste waterdeel
-  per streng. Zie BO-17 en BO-18.
+  uitslag uit elkaar kunnen lopen. Eén beperking erft mee en blijft staan: EXT-001
+  meldt alleen het sterkste bouwwerk (BO-17). De watergangcheck geeft elke echte
+  doorkruising per streng terug; de `break` na het eerste waterdeel is met BO-43
+  vervallen. Zie ook BO-18.
 - Aangeleverde externe bronnen worden bij het laden getoetst op dekking van
   `bronnen.studiegebied` (vectorlagen plus de grootste EXT-zoekafstand, het raster
   zonder marge). Een tekort boven `[bronnen] dekking_tolerantie_m` (standaard 0) is een

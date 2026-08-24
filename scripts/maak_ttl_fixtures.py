@@ -1724,7 +1724,30 @@ FIXTURES["ext_scenario.ttl"] = (
     + "# BTR-tests niet raken.\n"
     + put("PutP", "P", 1022.0, 2000.0)
     + put("PutQ", "Q", 1028.0, 2000.0)
-    + leiding("L5", "4", [(1022.0, 2000.0), (1028.0, 2000.0)], "PutP", "PutQ"),
+    + leiding("L5", "4", [(1022.0, 2000.0), (1028.0, 2000.0)], "PutP", "PutQ")
+    + "\n"
+    # De grensgevallen van issue #59, allemaal in de vrije strook y 1982-1995. Kale
+    # putten en strengen (geen hoogte, BOB of inwinning), zodat alleen de
+    # kruisingschecks ze zien. Streng 7 eindigt in water-3: lozingspunt, geen
+    # bevinding. Streng 8 ligt 0,5 m naast water-4: binnen de zoekstraal, snijdt
+    # niet, geen bevinding. Streng 9 doorkruist de 0,3 m smalle greppel water-5:
+    # echte doorkruising, wel een bevinding. Streng 10 loopt over de oostrand van
+    # water-6 (x = 1103): tangentieel, geen bevinding.
+    + "# Grensgevallen van issue #59: streng 7 eindigt in een waterdeel (lozingspunt),\n"
+    + "# streng 8 ligt 0,5 m naast een waterdeel, streng 9 doorkruist een 0,3 m smalle\n"
+    + "# greppel, streng 10 loopt over de rand van een waterdeel. Alleen 9 is een bevinding.\n"
+    + put("PutR", "R", 1060.0, 1988.0)
+    + put("PutS", "S", 1082.0, 1988.0)
+    + leiding("L7", "7", [(1060.0, 1988.0), (1082.0, 1988.0)], "PutR", "PutS")
+    + put("PutT", "T", 1088.0, 1992.5)
+    + put("PutU", "U", 1097.0, 1992.5)
+    + leiding("L8", "8", [(1088.0, 1992.5), (1097.0, 1992.5)], "PutT", "PutU")
+    + put("PutV", "V", 1045.0, 1988.0)
+    + put("PutW", "W", 1055.0, 1988.0)
+    + leiding("L9", "9", [(1045.0, 1988.0), (1055.0, 1988.0)], "PutV", "PutW")
+    + put("PutX", "X", 1103.0, 1984.0)
+    + put("PutY", "Y", 1103.0, 1994.0)
+    + leiding("L10", "10", [(1103.0, 1984.0), (1103.0, 1994.0)], "PutX", "PutY"),
 )
 
 

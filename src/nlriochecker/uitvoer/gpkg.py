@@ -650,9 +650,9 @@ def _schrijf_treffers(
     vanzelf: per gebied alleen de treffers van dat gebied, en een pand op de
     buurtgrens in beide bestanden.
 
-    Twee beperkingen erven mee uit de detectie en worden bewust niet gerepareerd:
-    EXT-001 meldt per object alleen het sterkste bouwwerk, en de watergangcheck stopt
-    na het eerste gevonden waterdeel per streng. Zie de beslislog.
+    Eén beperking erft mee uit de detectie en wordt bewust niet gerepareerd: EXT-001
+    meldt per object alleen het sterkste bouwwerk (BO-17). De watergangcheck geeft
+    sinds BO-43 elke echte doorkruising terug, ook meerdere per streng.
     """
     _maak_featurelaag(
         verbinding,

@@ -77,16 +77,24 @@ def main() -> None:
         "pand",
     )
     # W1 kruist streng 2 (gemengd), W2 kruist streng 3 (een zinker) en streng 6
-    # (een duiker, en dus geen rioolleiding).
+    # (een duiker, en dus geen rioolleiding). De vier onderste zijn de grensgevallen
+    # van issue #59: streng 7 eindigt in water-3 (lozingspunt), streng 8 ligt 0,5 m
+    # naast water-4 (raakt niet), streng 9 doorkruist de 0,3 m smalle greppel
+    # water-5 (echte doorkruising, geen drempel) en streng 10 loopt precies over de
+    # oostrand van water-6 (tangentieel).
     schrijf(
         gpd.GeoDataFrame(
             {
-                "lokaal_id": ["water-1", "water-2"],
-                "type": ["waterloop", "greppel"],
+                "lokaal_id": ["water-1", "water-2", "water-3", "water-4", "water-5", "water-6"],
+                "type": ["waterloop", "greppel", "waterloop", "waterloop", "greppel", "waterloop"],
             },
             geometry=[
                 box(1070.0, 1995.0, 1075.0, 2005.0),
                 box(1015.0, 2005.0, 1020.0, 2015.0),
+                box(1080.0, 1985.0, 1085.0, 1992.0),
+                box(1090.0, 1985.0, 1095.0, 1992.0),
+                box(1050.0, 1985.0, 1050.3, 1992.0),
+                box(1100.0, 1985.0, 1103.0, 1992.0),
             ],
         ),
         bgt,

@@ -607,7 +607,8 @@ def test_waterdelenlaag_volgt_ext003_en_niet_ext002(tmp_path: Path) -> None:
 
     rijen = _laagrijen(pad, "waterdelen_zonder_zinker")
 
-    assert [rij["id"] for rij in rijen] == ["bgt:waterdeel/water-1"]
+    # Water-5 komt erbij: streng 9 doorkruist die greppel (issue #59).
+    assert [rij["id"] for rij in rijen] == ["bgt:waterdeel/water-1", "bgt:waterdeel/water-5"]
     assert rijen[0]["watertype"] == "waterloop"
     assert rijen[0]["aantal_meldingen"] == 1
     assert rijen[0]["check_ids"] == "EXT-003"
@@ -718,7 +719,8 @@ def test_runmetadata_telt_de_trefferlagen_mee(tmp_path: Path) -> None:
 
     rij = _rijen(pad, "select n_bouwwerken, n_waterdelen from gwsw_run")[0]
 
-    assert rij == (1, 1)
+    # Twee waterdelen: EXT-003 meldt sinds issue #59 ook de doorkruising van water-5.
+    assert rij == (1, 2)
 
 
 @pytest.mark.skipif(

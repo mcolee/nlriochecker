@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checks.base import (
@@ -392,12 +393,14 @@ class KruisingMetBouwwerk(_ExterneCheck):
 
 @dataclass(frozen=True)
 class _Kruising:
-    """Een streng die binnen de buffer van een BGT-waterdeel ligt.
+    """Een vrijvervalstreng die een BGT-waterdeel echt doorkruist.
 
     De geometrie van het waterdeel gaat mee omdat EXT-003 er de treffer voor de
-    GIS-uitvoer mee registreert; de detectie verandert er niet door. Een dataclass in
-    plaats van een tuple: beide checks pakten hem uit op positie, en een veld erbij of
-    een andere volgorde zou daar pas tijdens het draaien opvallen.
+    GIS-uitvoer mee registreert; de detectie verandert er niet door. `buffer` is de
+    zoekstraal waarbinnen het waterdeel als kandidaat gevonden is, niet het
+    criterium (BO-43). Een dataclass in plaats van een tuple: beide checks pakten
+    hem uit op positie, en een veld erbij of een andere volgorde zou daar pas
+    tijdens het draaien opvallen.
     """
 
     conduit: Conduit
@@ -407,27 +410,89 @@ class _Kruising:
     buffer: float
 
 
+@dataclass(frozen=True)
+class _Kruisingen:
+    """De doorkruisingen plus de telling van wat binnen de zoekstraal viel maar afviel.
+
+    De tellingen zijn per paar (streng, kandidaat-waterdeel); een streng die twee
+    waterdelen nadert telt twee keer.
+    """
+
+    doorkruisingen: tuple[_Kruising, ...]
+    raakt_niet: int
+    lozingspunt: int
+    tangentieel: int
+
+    @property
+    def kandidaten(self) -> int:
+        """Het aantal paren dat binnen de zoekstraal viel."""
+        return len(self.doorkruisingen) + self.raakt_niet + self.lozingspunt + self.tangentieel
+
+
+DOORKRUISING = "doorkruising"
+RAAKT_NIET = "raakt niet"
+LOZINGSPUNT = "lozingspunt"
+TANGENTIEEL = "tangentieel"
+
+
+def _verhouding(lijn: BaseGeometry, waterdeel: BaseGeometry) -> str:
+    """Hoe een streng zich tot een waterdeel verhoudt (BO-43).
+
+    Een doorkruising gaat het waterdeel in door de ene oever en eruit door de andere:
+    de lijn snijdt het waterdeel, geen van haar eindpunten ligt in of op het waterdeel
+    (`e = 0`) en zij kruist de rand in minstens twee punten (`k >= 2`). Een streng die
+    erin eindigt is een lozingspunt (overstort, inlaat); een streng die de rand alleen
+    aanraakt of ernaast ligt raakt het waterdeel niet; een streng die een stuk óver de
+    rand loopt is tangentieel. Geen van die drie is een bevinding, en er is bewust geen
+    drempel: een minimum-doorsnijding zou echte doorkruisingen van smalle greppels
+    (0,3-0,5 m) wegfilteren.
+    """
+    if not lijn.intersects(waterdeel):
+        return RAAKT_NIET
+    rand = lijn.intersection(waterdeel.boundary)
+    if rand.length > 0:
+        return TANGENTIEEL
+    # `boundary` van een lijn zijn haar twee eindpunten; `intersects` telt ook een
+    # eindpunt dat precies op de oever ligt als erin.
+    if waterdeel.intersects(lijn.boundary):
+        return LOZINGSPUNT
+    if isinstance(rand, MultiPoint) and len(rand.geoms) >= 2:
+        return DOORKRUISING
+    return RAAKT_NIET
+
+
 def _zoek_kruisingen(
     strengen: list[Conduit], laag: VectorLayer | None, buffer: float
-) -> Iterator[_Kruising]:
-    """Loopt de toetsbare strengen langs de waterdeellaag.
+) -> _Kruisingen:
+    """Loopt de toetsbare strengen langs alle kandidaat-waterdelen binnen de zoekstraal.
 
     Vrije functie zonder `self`: de uitkomst hangt alleen van deze drie argumenten af,
     zodat de gedeelde cache-ingang van `_WatergangKruising.kruisingen` niet aan de
-    eerste aanroepende subklasse vastzit.
+    eerste aanroepende subklasse vastzit. Elke kandidaat wordt beoordeeld; er is geen
+    `break` na de eerste (de herziening van BO-17 in BO-43).
     """
-    if laag is None:
-        return
-    for conduit in strengen:
-        # `_selecteer` liet alleen strengen met een geometrie door; deze functie leunt
-        # daar niet op, zodat ze ook los van die selectie te lezen is.
-        if conduit.line is None:
-            continue
-        for geometrie, rij in laag.nabij(conduit.line, buffer):
-            if conduit.line.distance(geometrie) > buffer:
+    doorkruisingen: list[_Kruising] = []
+    telling = {RAAKT_NIET: 0, LOZINGSPUNT: 0, TANGENTIEEL: 0}
+    if laag is not None:
+        for conduit in strengen:
+            # `_selecteer` liet alleen strengen met een geometrie door; deze functie
+            # leunt daar niet op, zodat ze ook los van die selectie te lezen is.
+            if conduit.line is None:
                 continue
-            yield _Kruising(conduit, geometrie, rij, laag, buffer)
-            break
+            for geometrie, rij in laag.nabij(conduit.line, buffer):
+                if conduit.line.distance(geometrie) > buffer:
+                    continue
+                verhouding = _verhouding(conduit.line, geometrie)
+                if verhouding == DOORKRUISING:
+                    doorkruisingen.append(_Kruising(conduit, geometrie, rij, laag, buffer))
+                else:
+                    telling[verhouding] += 1
+    return _Kruisingen(
+        doorkruisingen=tuple(doorkruisingen),
+        raakt_niet=telling[RAAKT_NIET],
+        lozingspunt=telling[LOZINGSPUNT],
+        tangentieel=telling[TANGENTIEEL],
+    )
 
 
 class _WatergangKruising(_ExterneCheck):
@@ -446,32 +511,31 @@ class _WatergangKruising(_ExterneCheck):
         """De vrijvervalstrengen."""
         return vrijvervalrioolleidingen(context)
 
-    def kruisingen(self, context: CheckContext) -> tuple[_Kruising, ...]:
-        """De strengen die een waterdeel raken, met het waterdeel erbij.
+    def kruisingstoets(self, context: CheckContext) -> _Kruisingen:
+        """De doorkruisingen en de afvaltellingen, een keer per context berekend.
 
-        De lijst wordt een keer per context berekend en door EXT-002 en EXT-003 gedeeld.
-        Dat mag omdat de drie ingredienten van deze basisklasse zijn en niet van de
-        aanroepende check: de populatie (`objecten()` levert voor beide
-        `vrijvervalrioolleidingen(context)`, door dezelfde `selectie()` gefilterd), de
-        laag `bgt_water` en de buffer. De twee deden dus tweemaal dezelfde ruimtelijke
-        toets.
+        De lijst wordt door EXT-002 en EXT-003 gedeeld. Dat mag omdat de drie
+        ingredienten van deze basisklasse zijn en niet van de aanroepende check: de
+        populatie (`objecten()` levert voor beide `vrijvervalrioolleidingen(context)`,
+        door dezelfde `selectie()` gefilterd), de laag `bgt_water` en de zoekstraal.
+        De twee deden dus tweemaal dezelfde ruimtelijke toets.
 
         De bouwer is daarom een vrije functie: hij krijgt die drie mee en kent geen
         `self`, zodat de gedeelde ingang niet stilzwijgend van de eerste aanroeper kan
         gaan afhangen. Wie hier ooit een derde subklasse met een eigen populatie onder
         hangt (BO-25 verwierp dat voor EXT-003), moet haar dus een eigen sleutel geven.
-
-        De `break` na het eerste gevonden waterdeel per streng blijft staan: een streng
-        die twee waterdelen kruist levert er een, en welke hangt van de volgorde af. Dat
-        is een bewust geaccepteerde beperking (BO-17).
         """
         toetsbaar = self.selectie(context).toetsbaar
         laag = self.laag(context)
         buffer = context.config.drempels.ext_watergang_buffer_m
         return context.cached(
             "ext:watergangkruisingen",
-            lambda: tuple(_zoek_kruisingen(toetsbaar, laag, buffer)),
+            lambda: _zoek_kruisingen(toetsbaar, laag, buffer),
         )
+
+    def kruisingen(self, context: CheckContext) -> tuple[_Kruising, ...]:
+        """De echte doorkruisingen, met het waterdeel erbij."""
+        return self.kruisingstoets(context).doorkruisingen
 
     def buiten_populatie(self, context: CheckContext) -> dict[str, int]:
         """Per kruisingsklasse die geen vrijvervalleiding is: hoeveel strengen erbuiten vallen."""
@@ -491,6 +555,24 @@ class _WatergangKruising(_ExterneCheck):
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt de strengen die wel kruisingsklasse zijn maar buiten de populatie vallen."""
         notities = super().notes(context)
+        if self.bruikbaar(context):
+            toets = self.kruisingstoets(context)
+            buffer = context.config.drempels.ext_watergang_buffer_m
+            raakt_niet = getal(
+                toets.raakt_niet, "raakt het waterdeel niet", "raken het waterdeel niet"
+            )
+            lozingspunt = getal(
+                toets.lozingspunt, "eindigt erin (lozingspunt)", "eindigen erin (lozingspunt)"
+            )
+            notities.append(
+                "Alleen een echte doorkruising is een bevinding: de streng gaat het "
+                "waterdeel in door de ene oever en eruit door de andere, zonder erin te "
+                f"eindigen (BO-43). Binnen de zoekstraal van {buffer:g} m vielen "
+                f"{getal(toets.kandidaten, 'paar', 'paren')} streng-waterdeel: "
+                f"{getal(len(toets.doorkruisingen), 'doorkruising', 'doorkruisingen')}, "
+                f"{raakt_niet}, {lozingspunt} "
+                f"en {getal(toets.tangentieel, 'loopt over de rand', 'lopen over de rand')}."
+            )
         for klasse, aantal in self.buiten_populatie(context).items():
             notities.append(
                 "Buiten de populatie (geen vrijvervalleiding) en dus niet bekeken: "
@@ -510,7 +592,7 @@ class KruisingMetWatergang(_WatergangKruising):
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke streng die binnen de buffer van een BGT-waterdeel komt.
+        """Meldt elke streng die een BGT-waterdeel echt doorkruist.
 
         Het register laat BGT als watergangbron toe; waterschapsdata is niet
         aangeleverd en valt in deze fase buiten scope.
@@ -521,7 +603,8 @@ class KruisingMetWatergang(_WatergangKruising):
                 context,
                 kruising.conduit.uri,
                 kruising.conduit.label,
-                f"Kruist een BGT-waterdeel van het type {soort!r} (buffer {kruising.buffer:g} m).",
+                f"Doorkruist een BGT-waterdeel van het type {soort!r} "
+                f"(zoekstraal {kruising.buffer:g} m).",
                 watertype=soort,
                 bron=kruising.laag.source.name,
                 buffer_m=kruising.buffer,
@@ -553,7 +636,7 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
     dimension = Dimension.COMPLETENESS
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt kruisingen waarvan de streng geen kruisingsconstructie is."""
+        """Meldt doorkruisingen waarvan de streng geen kruisingsconstructie is."""
         dataset = context.dataset
         wortels = context.config.klassen.kruisingsleiding
 
@@ -581,7 +664,7 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
                 context,
                 conduit.uri,
                 conduit.label,
-                f"Kruist een BGT-waterdeel ({soort}) maar staat niet geregistreerd als zinker.",
+                f"Doorkruist een BGT-waterdeel ({soort}) maar staat niet geregistreerd als zinker.",
                 watertype=soort,
                 buffer_m=kruising.buffer,
                 object2_uri=sleutel,

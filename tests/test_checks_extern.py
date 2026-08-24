@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from shapely.geometry import LineString, box
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
@@ -79,7 +80,7 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
     assert bronnen.extent is not None
     assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
         "bgt_pand": 1,
-        "bgt_water": 2,
+        "bgt_water": 6,
         "bgt_putdeksel": 3,
         "bgt_bouwwerk": 1,
         "bag_pand": 2,
@@ -99,9 +100,9 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
     ("check_id", "verwacht"),
     [
         ("EXT-001", ["1", "4", "P", "Q"]),
-        ("EXT-002", ["2", "3"]),
-        ("EXT-003", ["2"]),
-        ("EXT-005", ["C", "E", "F", "L1", "L2", "P", "Q"]),
+        ("EXT-002", ["2", "3", "9"]),
+        ("EXT-003", ["2", "9"]),
+        ("EXT-005", ["C", "E", "F", "L1", "L2", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y"]),
         ("EXT-006", ["deksel-los"]),
         ("EXT-007", ["L1"]),
         ("HGT-001", ["B", "E"]),
@@ -141,7 +142,8 @@ def test_buiten_studiegebied_wordt_geteld_in_de_toelichting(
     outcome = uitkomst("HGT-001", config, bronnen)
 
     # Putten P en Q liggen binnen het fixturegebied; alleen D valt erbuiten.
-    assert any("Buiten studiegebied: 1 van de 10 putten" in note for note in outcome.notes)
+    # 18 putten: de tien van voorheen plus de acht van de grensgevallen (issue #59).
+    assert any("Buiten studiegebied: 1 van de 18 putten" in note for note in outcome.notes)
 
 
 def test_nodata_cellen_worden_gemeld(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -427,7 +429,10 @@ def test_ext003_wijst_het_geraakte_waterdeel_aan(
         for finding in outcome.findings
     }
 
-    assert verwijzingen == {("bgt:waterdeel/water-1", "waterloop")}
+    assert verwijzingen == {
+        ("bgt:waterdeel/water-1", "waterloop"),
+        ("bgt:waterdeel/water-5", "greppel"),
+    }
 
 
 def test_ext002_registreert_geen_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -442,4 +447,64 @@ def test_ext002_registreert_geen_treffer(config: CheckConfig, bronnen: ExternalD
 
 
 def test_ext003_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:
-    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2"]
+    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2", "9"]
+
+
+def test_kruisingscheck_telt_wat_binnen_de_zoekstraal_afviel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 7 (lozingspunt), 8 (raakt niet) en 10 (over de rand) zijn geen bevinding.
+
+    Ze vielen wel binnen de zoekstraal; de toelichting hoort ze te tellen, anders
+    leest stilte als "alles is een doorkruising of ligt ver van het water".
+    """
+    for check_id in ("EXT-002", "EXT-003"):
+        outcome = uitkomst(check_id, config, bronnen)
+        notitie = next(note for note in outcome.notes if "doorkruis" in note.lower())
+        assert "3 doorkruisingen" in notitie
+        assert "1 raakt het waterdeel niet" in notitie
+        assert "1 eindigt erin (lozingspunt)" in notitie
+        assert "1 loopt over de rand" in notitie
+
+
+def test_ext002_noemt_de_zoekstraal_niet_als_criterium(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    bevinding = next(
+        f for f in uitkomst("EXT-002", config, bronnen).findings if f.object_label == "9"
+    )
+
+    assert bevinding.message.startswith("Doorkruist een BGT-waterdeel")
+    assert bevinding.details["buffer_m"] == config.drempels.ext_watergang_buffer_m
+
+
+@pytest.mark.parametrize(
+    ("lijn", "verwacht"),
+    [
+        # Erin door de westoever, eruit door de oostoever. Het eindpunt ligt voorbij
+        # x = 20 en dus niet op de oever: een eindpunt op de oever telt als erin
+        # (het geval hieronder), en zou deze lijn een lozingspunt maken.
+        (LineString([(0.0, 5.0), (25.0, 5.0)]), "doorkruising"),
+        # Eindigt midden in het water.
+        (LineString([(0.0, 5.0), (15.0, 5.0)]), "lozingspunt"),
+        # Eindigt precies op de oever: telt als erin.
+        (LineString([(0.0, 5.0), (10.0, 5.0)]), "lozingspunt"),
+        # Ligt ernaast.
+        (LineString([(0.0, 11.0), (20.0, 11.0)]), "raakt niet"),
+        # Raakt met een knik alleen het hoekpunt (10, 10) aan, van buiten.
+        (LineString([(0.0, 20.0), (10.0, 10.0), (0.0, 0.0)]), "raakt niet"),
+        # Loopt over de noordrand.
+        (LineString([(5.0, 10.0), (25.0, 10.0)]), "tangentieel"),
+        # Twee keer erin en eruit (k = 4): nog steeds een doorkruising.
+        (
+            LineString(
+                [(0.0, 5.0), (12.0, 5.0), (12.0, -5.0), (15.0, -5.0), (15.0, 5.0), (25.0, 5.0)]
+            ),
+            "doorkruising",
+        ),
+    ],
+)
+def test_verhouding_tussen_streng_en_waterdeel(lijn: LineString, verwacht: str) -> None:
+    from nlriochecker.checks.extern import _verhouding
+
+    assert _verhouding(lijn, box(10.0, 0.0, 20.0, 10.0)) == verwacht
