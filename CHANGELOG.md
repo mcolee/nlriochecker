@@ -19,9 +19,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `Kruisstuk` 4); geteld naar verschillende buurknopen, zodat een dubbel gelegde
   richting een keer telt. TOP-022 (F) meldt te weinig, TOP-023 (W) te veel; klassen
   zonder aantal in hun functie (afsluitstuk, ontstoppingsstuk, tubelure) vallen buiten
-  de toets en staan geteld in de toelichting. Nieuwe rol `[klassen] hulpstuk`. Op De
-  Wolden en Hoogeveen: TOP-022 224 en TOP-023 37 op 1054 T-stukken (Task 3 meet het).
-  Zie BO-46.
+  de toets en staan geteld in de toelichting. Nieuwe rol `[klassen] hulpstuk`. Gemeten
+  op De Wolden en Hoogeveen: TOP-022 224 (94 met een richting, 130 met twee) en
+  TOP-023 37 (36 met vier, 1 met vijf) op 1054 T-stukken; 68 hulpstukken (58
+  afsluitstuk, 10 ontstoppingsstuk) vielen buiten de toets. Zie BO-46.
 
 - **ATTR-018: ontbrekende begindatum wordt per object gemeld** (issue #61). Een
   vrijvervalrioolleiding of put zonder `Begindatum` krijgt een fout (Compleetheid); tot nu
@@ -51,6 +52,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   in `GwswDataset.koppelingsherstel` en meldt het als datasetsignaal
   `SIG-hulpstukkoppeling` (W, systemisch, zonder object), met een regel in de
   omvangsectie van het rapport. Stil repareren zou de aanlevering uit beeld halen.
+  Gemeten op De Wolden en Hoogeveen: 3024 koppelingen naar 1122 hulpstukken hersteld,
+  strengeinden zonder knoop 3024 → 0 over 2165 strengen. Geen enkele bestaande check
+  verschuift erdoor: een hulpstuk is geen netwerkknoop, dus de herstelde einden komen
+  niet in `verbonden_knopen` terecht. Zie BO-46.
 
 - **BGT-lagen worden op de actuele objectversie gefilterd** (issue #58). Elke ingelezen
   BGT-laag houdt alleen de rijen met `eind_registratie` én `termination_date` leeg

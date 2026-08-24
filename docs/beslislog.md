@@ -2454,7 +2454,10 @@ hetzelfde (`Knooppunt_Netwerk_conn` 1123×, `EindpuntLeiding_Knooppunt_card` 184
 `BeginpuntLeiding_Knooppunt_card` 1178×). Zonder herstel meet een T-stukcheck niets; met een
 stil herstel zou het rapport het gebrek in de aanlevering verzwijgen. Richtingen in plaats van
 strengen: in Alteveer ligt elke vacuümrichting dubbel (108 knoopparen met meer dan een streng
-ertussen, 266 strengen), en per streng geteld zouden 17 hulpstukken ten onrechte melden.
+ertussen, 266 strengen -- nagemeten en juist), en per streng geteld zouden 17 hulpstukken een
+ander getal krijgen. Nagemeten valt dat uiteen: negen daarvan (zes strengen, drie richtingen)
+zouden ten onrechte melden, de andere acht melden terecht maar met het verkeerde aantal (zes
+strengen bij vier of vijf richtingen).
 
 **Twee ID's, niet een.** Het issue nam een ID met F voor te weinig en W voor te veel aan. De
 engine en het register kennen per check precies een ernst (`Check.severity`;
@@ -2466,3 +2469,24 @@ klasse).
 verwachte aantal in `checks.toml` (verworpen: het staat in de ontologie en zou een tweede
 waarheid worden). Een losse streng zonder eind niet meetellen (verworpen: die leiding hangt
 wel degelijk aan het hulpstuk; dat haar andere eind los is, is een TOP-002/003-zaak).
+
+**Gemeten uitkomst (2026-08-25).** Na het herstel: 3024 koppelingen naar 1122 hulpstukken
+hersteld (1054 T_stuk, 58 Afsluitstuk, 10 Ontstoppingsstuk), strengeinden zonder knoop
+3024 → 0 over 2165 strengen, strengen met beide einden los 859 → 0, T-stukken met minstens
+een aansluiting 0 → 1054. TOP-022 meldt 224 T-stukken (94 met een richting, 130 met twee),
+TOP-023 37 (36 met vier, 1 met vijf); de verdeling over alle 1054 telbare hulpstukken is
+1: 94, 2: 130, 3: 793, 4: 36, 5: 1 -- precies de tabel uit issue #60. Losse einden komen
+niet voor: alle 3024 herstelde einden hangen aan een hulpstuk. 68 hulpstukken vielen buiten
+de toets (58 Afsluitstuk, 10 Ontstoppingsstuk), geteld in de toelichting van beide checks.
+Verschuivingen in de andere checks: **geen enkele**. Alleen de drie nieuwe regels kwamen erbij
+(TOP-022 +224, TOP-023 +37, SIG-hulpstukkoppeling +1; 167255 → 167517 bevindingen). Dat is
+geen toeval en geen fout: de bestaande checks navigeren via `verbonden_knopen` →
+`resolve_network_node`, en een hulpstuk is geen netwerkknoop en klimt via `hasPart` ook niet
+naar een put -- van de 3024 herstelde einden herleidt er 0 tot een netwerkknoop. De 2165
+strengen kregen hun knoop dus terug voor de hulpstuktelling, niet voor de netwerkgraaf.
+Daarmee is ook de opmerking uit de review van taak 2 bevestigd: TOP-019 (0 bevindingen voor
+en na) krijgt de T-stukken niet als kandidaat. `len(dataset.conduits)` en
+`len(leidingen(context))` zijn op deze dataset allebei 23440; het verschil dat de docstring
+van `_bouw_hulpstuktelling` noemt (25 om 19) is een eigenschap van het Juinen-voorbeeld, niet
+van De Wolden. Onverklaard: niets. Vergelijkingsrun: `uitvoer/issue61/bevindingen.csv`
+(2026-08-24 23:42, vóór a975d8d) tegen `uitvoer/issue60/bevindingen.csv`.
