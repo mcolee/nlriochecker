@@ -1888,8 +1888,11 @@ FIXTURES["selectie_rollen.ttl"] = (
 # Issue #60, stap 1: de BrutIS-export koppelt elk leidingeinde op een hulpstuk aan
 # `<hulpstuk>_put`, een URI zonder type of aspect, terwijl de orientatie `<hulpstuk>_ori`
 # heet (in De Wolden `_put<n>`). Streng 1 heeft zo'n fantoomdoel en hoort na het herstel
-# aan T1 te hangen; streng 2 koppelt netjes; streng 3 wijst naar een stam die geen
-# hulpstuk is en blijft los.
+# aan T1 te hangen. De andere drie zijn de tegenproeven: streng 2 koppelt netjes aan de
+# orientatie, streng 3 wijst naar een stam die helemaal geen knoop is, en streng 4 naar
+# `:PutB_put` -- put B bestaat en is een knoop, maar draagt een Putorientatie en geen
+# Hulpstukorientatie. Zonder die vierde is de guard `stam in hulpstukken` niet te
+# onderscheiden van een zwakkere `stam in nodes`.
 FIXTURES["dataset_fantoomkoppeling.ttl"] = (
     "streng 1 koppelt haar eindpunt aan :T1_put, een URI die niet bestaat; de orientatie "
     "van T-stuk T1 heet :T1_ori (issue #60)",
@@ -1902,7 +1905,10 @@ FIXTURES["dataset_fantoomkoppeling.ttl"] = (
     + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "PutB")
     + put("PutC", "C", 1050.0, 2050.0)
     + leiding("L3", "3", [(1050.0, 2050.0), (1050.0, 2000.0)], "PutC", None)
-    + ":L3_e gwsw:hasConnection :Onbekend_put .\n",
+    + ":L3_e gwsw:hasConnection :Onbekend_put .\n"
+    + put("PutD", "D", 1100.0, 2050.0)
+    + leiding("L4", "4", [(1100.0, 2050.0), (1100.0, 2000.0)], "PutD", None)
+    + ":L4_e gwsw:hasConnection :PutB_put .\n",
 )
 
 

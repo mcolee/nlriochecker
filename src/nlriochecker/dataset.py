@@ -1468,6 +1468,9 @@ def _read_conduits(
             uri = str(subject)
             if uri in conduits:
                 continue
+            # Draagt één orientatie twee leidingen, dan telt hetzelfde herstelde eind
+            # twee keer in `koppelingen`; `hulpstukken` klopt wel, want dat gaat via een
+            # set. Het referentievoorbeeld heeft nul van zulke orientaties.
             conduits[uri] = Conduit(
                 uri=uri,
                 label=_label(graph, subject),

@@ -97,3 +97,18 @@ gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,
 :L3_e rdf:type gwsw:EindpuntLeiding .
 :L3_b gwsw:hasConnection :PutC_ori .
 :L3_e gwsw:hasConnection :Onbekend_put .
+:PutD rdf:type gwsw:Inspectieput ; rdfs:label "D" ;
+    gwsw:hasAspect :PutD_ori .
+:PutD_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1100.0 2050.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:L4 rdf:type gwsw:GemengdRiool ; rdfs:label "4" ;
+    gwsw:hasAspect :L4_ori .
+:L4_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L4_b , :L4_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1100.0 2050.0 1100.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L4_b rdf:type gwsw:BeginpuntLeiding .
+:L4_e rdf:type gwsw:EindpuntLeiding .
+:L4_b gwsw:hasConnection :PutD_ori .
+:L4_e gwsw:hasConnection :PutB_put .

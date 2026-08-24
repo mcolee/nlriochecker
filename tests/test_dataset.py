@@ -506,8 +506,12 @@ TOETS = "http://example.org/toets#"
 def test_fantoomkoppeling_naar_een_hulpstuk_wordt_op_naamstam_hersteld() -> None:
     """`:L1_e hasConnection :T1_put` bestaat nergens; de stam `:T1` is een T-stuk (issue #60).
 
-    Streng 2 koppelt netjes aan de orientatie en telt niet als herstel; streng 3 wijst
-    naar `:Onbekend_put`, waarvan de stam geen hulpstukknoop is, en blijft los.
+    Drie tegenproeven houden het herstel smal. Streng 2 koppelt netjes aan de orientatie
+    en telt dus niet als herstel. Streng 3 wijst naar `:Onbekend_put`, waarvan de stam
+    helemaal geen knoop is. Streng 4 wijst naar `:PutB_put`: put B bestaat en is een
+    knoop, maar draagt een Putorientatie en geen Hulpstukorientatie -- die laatste
+    scheidt de guard `stam in hulpstukken` van een zwakkere `stam in nodes`. Alle drie
+    blijven los.
     """
     from nlriochecker.dataset import Koppelingsherstel
 
@@ -516,6 +520,7 @@ def test_fantoomkoppeling_naar_een_hulpstuk_wordt_op_naamstam_hersteld() -> None
     assert dataset.conduits[f"{TOETS}L1"].end_node == f"{TOETS}T1"
     assert dataset.conduits[f"{TOETS}L2"].start_node == f"{TOETS}T1"
     assert dataset.conduits[f"{TOETS}L3"].end_node is None
+    assert dataset.conduits[f"{TOETS}L4"].end_node is None
     assert dataset.koppelingsherstel == Koppelingsherstel(koppelingen=1, hulpstukken=1)
 
 

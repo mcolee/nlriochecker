@@ -156,9 +156,10 @@ def _signaalmeldingen(
     Geen gebrek aan een object maar een signaal over de export: geen object-URI, geen
     plek op de kaart, en systemisch, zodat het de GeoPackage-status niet raakt (BO-29).
     Zonder gebied, net als een nulmetingbevinding die nergens op uitkwam: het is aan
-    geen enkel studiegebied toe te wijzen. Twee soorten: een klasse of rol op nul waar
-    een check op leunt (issue #22) en de herstelde fantoomkoppeling naar hulpstukken
-    (issue #60).
+    geen enkel studiegebied toe te wijzen. Twee soorten, elk met een eigen dimensie: een
+    klasse of rol op nul waar een check op leunt is een gat in de aanlevering
+    (Compleetheid, issue #22); een `hasConnection` naar een URI die niet bestaat is een
+    innerlijke tegenspraak in de export (Consistentie, issue #60).
     """
     meldingen = [
         _signaalmelding(
@@ -167,6 +168,7 @@ def _signaalmeldingen(
             scope,
             gebruikte_ids,
             CHECK_NULKLASSE,
+            Dimension.COMPLETENESS,
             {"klasse": signaal.label},
             signaal.label,
             signaal.boodschap,
@@ -183,6 +185,7 @@ def _signaalmeldingen(
                 scope,
                 gebruikte_ids,
                 CHECK_HULPSTUKKOPPELING,
+                Dimension.CONSISTENCY,
                 {"signaal": "hulpstukkoppeling"},
                 "hulpstukkoppeling",
                 herstel.boodschap,
@@ -198,12 +201,17 @@ def _signaalmelding(
     scope: str,
     gebruikte_ids: set[str],
     check_id: str,
+    dimensie: Dimension,
     onderscheid: dict[str, str],
     label: str,
     boodschap: str,
     waarde: str,
 ) -> Melding:
-    """Eén datasetsignaal als melding; registreert zijn ID in `gebruikte_ids`."""
+    """Eén datasetsignaal als melding; registreert zijn ID in `gebruikte_ids`.
+
+    De dimensie komt van de aanroeper: de twee signalen delen de vorm, niet de vraag
+    die zij stellen.
+    """
     kenmerk = _uniek_id(check_id, "", "", onderscheid, label, gebruikte_ids)
     gebruikte_ids.add(kenmerk)
     return Melding(
@@ -212,7 +220,7 @@ def _signaalmelding(
         categorie=categorie_van(check_id),
         bron=BRON_DATASET,
         ernst=Severity.WARNING.value,
-        dimensie=Dimension.COMPLETENESS.value,
+        dimensie=dimensie.value,
         object_uri="",
         object_id="",
         object_label=label,

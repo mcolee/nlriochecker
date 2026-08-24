@@ -234,6 +234,9 @@ class TestKoppelingsherstel:
         assert len(signaal) == 1
         assert signaal[0].bron == BRON_DATASET
         assert signaal[0].ernst == "W" and signaal[0].systemisch is True
+        # Een hasConnection naar een URI die niet bestaat is een consistentiegebrek,
+        # geen compleetheidsgebrek zoals de nul-bewaking ernaast.
+        assert signaal[0].dimensie == "Consistentie"
         assert signaal[0].object_uri == "" and signaal[0].foutlocatie is None
         assert signaal[0].waarde == "1"
         assert "1 leidingeind" in signaal[0].boodschap and "1 hulpstuk" in signaal[0].boodschap

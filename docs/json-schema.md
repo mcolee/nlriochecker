@@ -240,8 +240,9 @@ soorten: de nul-bewaking van issue #22 (een klasse of rol waar een check op leun
 die nul keer voorkomt; `check_id` `SIG-nulklasse`, `waarde` `"0"`) en het
 koppelingsherstel van issue #60 (de lader heeft `hasConnection`-doelen
 `<hulpstuk>_put` op naamstam naar het hulpstuk herleid; `check_id`
-`SIG-hulpstukkoppeling`, `waarde` het aantal herstelde koppelingen). Hun `dimensie` is
-`Compleetheid`, hun `ernst` altijd `W`.
+`SIG-hulpstukkoppeling`, `waarde` het aantal herstelde koppelingen). De nul-bewaking
+draagt `dimensie` `Compleetheid`, het koppelingsherstel `Consistentie`; hun `ernst` is
+altijd `W`.
 
 Wat je van zo'n melding moet weten:
 

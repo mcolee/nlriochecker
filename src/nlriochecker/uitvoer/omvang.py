@@ -309,8 +309,8 @@ def koppelingsherstel(run: CheckRun) -> HerstelSignaal | None:
         herstel.koppelingen,
         herstel.hulpstukken,
         f"De export koppelt {getal(herstel.koppelingen, 'leidingeind', 'leidingeinden')} aan "
-        "een orientatie-URI die niet bestaat (`<hulpstuk>_put`, waar de Hulpstukorientatie van "
-        f"{getal(herstel.hulpstukken, 'hulpstuk', 'hulpstukken')} anders heet). De lader heeft "
+        "een `<hulpstuk>_put`-URI die niet bestaat, waar de Hulpstukorientatie van "
+        f"{getal(herstel.hulpstukken, 'hulpstuk', 'hulpstukken')} anders heet. De lader heeft "
         "die koppelingen op naamstam hersteld zodat de netwerkchecks ze zien; de aanlevering "
         "zelf is daar niet op verbeterd.",
     )
