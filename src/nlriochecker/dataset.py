@@ -623,6 +623,11 @@ class GwswDataset:
         of streng zijn, zoals een overstortdrempel. De volgorde is de graafvolgorde
         van `parts_of`, ongewijzigd; sorteren zou de uitvoer van de checks die hierop
         leunen veranderen.
+
+        Voorbehoud: het wortelfilter loopt via `graph_types_of`, dat zijn subject nog
+        met een vaste `URIRef(uri)` opzoekt -- een BNode-onderdeel valt daar dus uit
+        het gefilterde antwoord, terwijl de ongefilterde lijst (en `onderdeel_label`/
+        `onderdeel_aspecten`, via `_subject_term`) hem wel ziet.
         """
         delen = [str(deel) for deel in parts_of(self.graph, self._subject_term(uri))]
         if wortel is None:

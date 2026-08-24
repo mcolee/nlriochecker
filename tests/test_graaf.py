@@ -49,14 +49,40 @@ def _triples() -> list[tuple]:
     ]
 
 
-@pytest.fixture
-def paar() -> tuple[Graph, GraafIndex]:
-    """Dezelfde triples in een rdflib-graaf en in de eigen index."""
+def _naar_pyoxigraph(term) -> pyoxigraph.NamedNode | pyoxigraph.BlankNode | pyoxigraph.Literal:
+    """De pyoxigraph-tegenhanger van een rdflib-term, voor de vul_uit-route."""
+    if isinstance(term, URIRef):
+        return pyoxigraph.NamedNode(str(term))
+    if isinstance(term, BNode):
+        return pyoxigraph.BlankNode(str(term))
+    if term.language is not None:
+        return pyoxigraph.Literal(str(term), language=term.language)
+    if term.datatype is not None:
+        return pyoxigraph.Literal(str(term), datatype=pyoxigraph.NamedNode(str(term.datatype)))
+    return pyoxigraph.Literal(str(term))
+
+
+@pytest.fixture(params=["voeg_toe", "vul_uit"])
+def paar(request: pytest.FixtureRequest) -> tuple[Graph, GraafIndex]:
+    """Dezelfde triples in een rdflib-graaf en in de eigen index.
+
+    Geparametriseerd over beide vulroutes: `voeg_toe` (de leesbare referentie) en
+    `vul_uit` (de inline-productieroute uit de pyoxigraph-stream). Zo draait elke
+    volgorde-, dedupe- en membershipvergelijking hieronder tweemaal en kunnen de
+    twee implementaties niet uit elkaar groeien.
+    """
     graf = Graph()
-    index = GraafIndex()
     for s, p, o in _triples():
         graf.add((s, p, o))
-        index.voeg_toe(s, p, o)
+    index = GraafIndex()
+    if request.param == "voeg_toe":
+        for s, p, o in _triples():
+            index.voeg_toe(s, p, o)
+    else:
+        index.vul_uit(
+            pyoxigraph.Quad(_naar_pyoxigraph(s), _naar_pyoxigraph(p), _naar_pyoxigraph(o))
+            for s, p, o in _triples()
+        )
     return graf, index
 
 

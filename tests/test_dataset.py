@@ -178,6 +178,34 @@ def test_onderdeel_aspecten_geeft_dezelfde_kenmerken_als_de_private_lezing() -> 
     }
 
 
+def test_onderdeel_lezers_vinden_ook_een_bnode_onderdeel(tmp_path: Path) -> None:
+    """Een anoniem (`[ ... ]`) onderdeel houdt zijn label en kenmerken.
+
+    De `onderdeel_*`-lezers krijgen hun subject als tekst; voor een BNode-onderdeel
+    verloor de vaste `URIRef(uri)`-omweg dan het label en de kenmerken (bevinding uit
+    de Taak 3-review van issue #26). `_subject_term` herstelt dat: staat de tekst niet
+    als URIRef in de graaf, dan telt de gelijknamige BNode.
+    """
+    bron = (TTL_DIR / "adm007_overstort_met_drempel.ttl").read_text(encoding="utf-8")
+    bron += (
+        "\n:PutO gwsw:hasPart [ rdf:type gwsw:Overstortdrempel ;"
+        ' rdfs:label "AnoniemeDrempel" ;'
+        ' gwsw:hasAspect [ rdf:type gwsw:Drempelniveau ; gwsw:hasValue "8.5" ] ] .\n'
+    )
+    pad = tmp_path / "bnode_onderdeel.ttl"
+    pad.write_text(bron, encoding="utf-8")
+
+    dataset = load_dataset(pad)
+    put = "http://example.org/toets#PutO"
+    bnode = next((deel for deel in dataset.onderdelen(put) if not deel.startswith("http")), None)
+
+    assert bnode is not None, "de fixture hoort een BNode-onderdeel aan de put te hangen"
+    assert dataset.onderdeel_label(bnode) == "AnoniemeDrempel"
+    assert {(a.kind, a.number) for a in dataset.onderdeel_aspecten(bnode)} == {
+        ("Drempelniveau", 8.5)
+    }
+
+
 def test_of_class_weigert_een_verbindingsklasse(juinen: GwswDataset) -> None:
     """Een verbindingsklasse als rol levert stil nul op; dat hoort een fout te zijn.
 

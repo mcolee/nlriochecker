@@ -134,6 +134,27 @@ def test_de_sleutel_verandert_mee_met_de_broncode_van_de_ontologielezer(
     assert cachesleutel(VOORBEELD, []) != eerste
 
 
+def test_de_sleutel_verandert_mee_met_de_broncode_van_de_graafindex(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """`graaf.py` draagt de termconversie en de volgordegarantie van de gecachete graaf.
+
+    De graafpickle is een `GraafIndex`; wijzigt de indexmodule, dan is de gepicklede
+    graaf van een andere lader en hoort de sleutel te veranderen -- anders serveert de
+    cache stil een index met de oude volgorde- of conversieregels.
+    """
+    import nlriochecker.cache as cache_module
+
+    origineel = Path(cache_module.graaf_module.__file__)
+    kopie = tmp_path / origineel.name
+    kopie.write_bytes(origineel.read_bytes() + b"\n# gewijzigd voor de test\n")
+
+    eerste = cachesleutel(VOORBEELD, [])
+    monkeypatch.setattr(cache_module.graaf_module, "__file__", str(kopie))
+
+    assert cachesleutel(VOORBEELD, []) != eerste
+
+
 def test_een_beschadigde_cache_leidt_tot_opnieuw_inlezen(tmp_path: Path) -> None:
     laad_met_cache(VOORBEELD, [], cache_dir=tmp_path)
     for bestand in tmp_path.rglob("*.pickle"):

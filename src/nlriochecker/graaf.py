@@ -14,15 +14,17 @@ interne lezers in `dataset.py`) -- dit is het volledige leescontract, en de test
 inclusief volgorde:
 
 - ``objects(subject, predicate)`` -- beide gebonden. `dataset.py` (`graph_types_of`,
-  `parts_of`/`aspects_of`/`part_holders_of`/`aspect_holders_of`, `_read_aspects`,
-  `_types`, `_connections`), `checks/administratief.py` (hasConnection),
-  `nulbevinding.py` (`_ouders`), `uitvoer/stelsels.py` (`_label`) en
+  `parts_of`/`aspects_of`/`part_holders_of`/`aspect_holders_of` -- met als externe
+  aanroepers ook `checks/netwerk.py` en `checks/randvoorzieningen.py` -- ,
+  `_read_aspects`, `_types`, `_connections`), `checks/administratief.py`
+  (hasConnection), `nulbevinding.py` (`_ouders`), `uitvoer/stelsels.py` (`_label`) en
   `ontologie.verwachte_property` (de restrictiebron kan deze index zijn).
 - ``subjects(predicate, object)`` -- beide gebonden. `dataset.py`
-  (`subjects_of_class`, de vier hasPart/hasAspect-lezers, `_orientations_of_class`,
-  `_orientations_with`, `_leiding_orientations`, `_connections`, `_subclass_closure`
-  niet -- die gebruikt `subject_objects`), `checks/administratief.py`,
-  `checks/attributen.py` (`_property_tellingen`), `nulbevinding.py`.
+  (`subjects_of_class`, de vier hasPart/hasAspect-lezers -- zie hierboven voor hun
+  externe aanroepers -- , `_orientations_of_class`, `_orientations_with`,
+  `_leiding_orientations`, `_connections`, `_subclass_closure` niet -- die gebruikt
+  `subject_objects`), `checks/administratief.py`, `checks/attributen.py`
+  (`_property_tellingen`), `nulbevinding.py`.
 - ``value(subject, predicate)`` -- het eerste object of None. `dataset.py`
   (`onderdeel_label`, `_read_aspects`, `_read_inwinning`, `_aspect_van_klasse`,
   `_label`, `_geometry`, `_is_multipart`), `checks/attributen.py`,
@@ -35,6 +37,9 @@ inclusief volgorde:
   `_geometry`, `_is_multipart`, `_endpoint`).
 - ``len(graaf)`` -- het aantal triples. `load_dataset` (restrictiebron-keuze),
   `cache.py` (logregel) en de cachetests.
+- ``heeft_subject(term)`` -- geen rdflib-`Graph`-bewerking maar een eigen aanvulling:
+  `GwswDataset._subject_term` kijkt ermee of een URI-tekst als URIRef dan wel als
+  gelijknamige BNode in de graaf staat (de `onderdeel_*`-lezers).
 
 Niet gebruikt en dus niet aangeboden: `triples()`, patronen met andere ongebonden
 argumenten, iteratie over de hele graaf, en elke schrijfbewerking na het vullen.
