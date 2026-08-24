@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from nlriochecker.checkconfig import VerhangStap
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -23,7 +24,13 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.verbanden import aansluitingen, objecten_van_klassen, verbonden_knopen
+from nlriochecker.checks.selectie import (
+    netwerkknopen,
+    valconstructies,
+    vrijvervalrioolleidingen,
+    vuilwaterleidingen,
+)
+from nlriochecker.checks.verbanden import aansluitingen, verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
 
 
@@ -38,22 +45,6 @@ class _Uiteinde:
     stroomafwaarts: bool
 
 
-def _vrijverval(context: CheckContext) -> list[Conduit]:
-    """De vrijvervalstrengen waarop de HGT-checks draaien."""
-    return context.cached(
-        "hgt:strengen",
-        lambda: objecten_van_klassen(context, context.config.klassen.vrijvervalleiding, "conduits"),
-    )
-
-
-def _putten(context: CheckContext) -> list[Node]:
-    """De putten van het netwerk."""
-    return context.cached(
-        "hgt:putten",
-        lambda: objecten_van_klassen(context, context.config.klassen.netwerkknopen, "nodes"),
-    )
-
-
 def _uiteinden(context: CheckContext) -> list[_Uiteinde]:
     """Elk strengeinde met zijn put en BOB, een keer per context opgebouwd."""
     return context.cached("hgt:uiteinden", lambda: _bouw_uiteinden(context))
@@ -63,7 +54,7 @@ def _bouw_uiteinden(context: CheckContext) -> list[_Uiteinde]:
     """Loopt de strengen langs en koppelt elk uiteinde aan zijn put."""
     dataset = context.dataset
     gevonden: list[_Uiteinde] = []
-    for conduit in _vrijverval(context):
+    for conduit in vrijvervalrioolleidingen(context):
         begin, eind = verbonden_knopen(context, conduit)
         for uri, bob, zijde, afwaarts in (
             (begin, conduit.bob_start, "beginpunt", False),
@@ -87,7 +78,7 @@ def _ontbreekt(
     De telling gaat over de objecten die de check zelf bekijkt; een strengcheck die
     over putten telt zou een getal noemen dat niet bij haar eenheid past.
     """
-    objecten = _putten(context) if objecten is None else objecten
+    objecten = netwerkknopen(context) if objecten is None else objecten
     if not objecten:
         return []
     zonder = sum(1 for object_ in objecten if kies(object_) is None)
@@ -124,7 +115,7 @@ class _StrengCheck(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal vrijvervalstrengen."""
-        return len(_vrijverval(context))
+        return len(vrijvervalrioolleidingen(context))
 
 
 class _PutCheck(Check):
@@ -132,7 +123,7 @@ class _PutCheck(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten."""
-        return len(_putten(context))
+        return len(netwerkknopen(context))
 
 
 @register
@@ -180,9 +171,9 @@ class BobBuitenDePut(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt welk deel van de toets niet uitgevoerd kon worden."""
-        putten = _putten(context)
-        zonder_boven = sum(1 for node in putten if node.bovenkant is None)
-        zonder_bodem = sum(1 for node in putten if node.bodem is None)
+        knopen = netwerkknopen(context)
+        zonder_boven = sum(1 for node in knopen if node.bovenkant is None)
+        zonder_bodem = sum(1 for node in knopen if node.bodem is None)
         notities = [
             "Het GWSW kent geen kenmerk `Putbodemniveau`; de bodem volgt uit het "
             "bovenkantniveau min `HoogtePut`. Ontbreekt een van die twee, dan blijft de "
@@ -190,12 +181,12 @@ class BobBuitenDePut(_StrengCheck):
         ]
         if zonder_boven:
             notities.append(
-                f"{zonder_boven} van de {len(putten)} putten hebben geen putdekselniveau en "
+                f"{zonder_boven} van de {len(knopen)} putten hebben geen putdekselniveau en "
                 "geen maaiveldhoogte; daar is de bovenkant niet te toetsen."
             )
         if zonder_bodem:
             notities.append(
-                f"{zonder_bodem} van de {len(putten)} putten hebben geen afleidbaar "
+                f"{zonder_bodem} van de {len(knopen)} putten hebben geen afleidbaar "
                 "bodemniveau; daar is de bodemtoets overgeslagen."
             )
         return notities
@@ -213,7 +204,7 @@ class _Tegenverhang(_StrengCheck):
         onder = getattr(drempels, self.ondergrens)
         boven = getattr(drempels, self.bovengrens) if self.bovengrens else None
 
-        for conduit in _vrijverval(context):
+        for conduit in vrijvervalrioolleidingen(context):
             if conduit.bob_start is None or conduit.bob_end is None:
                 continue
             stijging = conduit.bob_end - conduit.bob_start
@@ -234,7 +225,7 @@ class _Tegenverhang(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel strengen geen BOB-paar hebben en waar de overlap zit."""
-        strengen = _vrijverval(context)
+        strengen = vrijvervalrioolleidingen(context)
         zonder = sum(
             1 for conduit in strengen if conduit.bob_start is None or conduit.bob_end is None
         )
@@ -274,53 +265,109 @@ class TegenverhangFors(_Tegenverhang):
     bovengrens = None
 
 
+def _als_helling(fractie: float) -> str:
+    """Een verhangfractie als noemer 1:n, of 'vlak' bij nul verval."""
+    if fractie <= 0:
+        return "vlak"
+    return f"1:{round(1.0 / fractie)}"
+
+
+def _staffeldrempel(staffel: list[VerhangStap], diameter_mm: float | None) -> float | None:
+    """Het minimale verhang als fractie voor deze diameter, of None als het niet kan.
+
+    Loopt de treden op oplopende bovengrens langs; de vangnettrede (`tot_diameter_mm`
+    is None) sorteert achteraan. Zonder diameter of zonder passende trede is er geen
+    drempel en blijft de streng ongetoetst.
+    """
+    if diameter_mm is None:
+        return None
+    for stap in sorted(
+        staffel, key=lambda s: (s.tot_diameter_mm is None, s.tot_diameter_mm or 0.0)
+    ):
+        if stap.tot_diameter_mm is None or diameter_mm <= stap.tot_diameter_mm:
+            return 1.0 / stap.minimaal_verhang_een_op
+    return None
+
+
 @register
 class OnvoldoendeVerhang(_StrengCheck):
     """HGT-007: te weinig verval voor zelfreiniging bij vuilwater of gemengd."""
 
     id = "HGT-007"
-    title = "Verhang vuilwater of gemengd onder drempelwaarde"
+    title = "Verhang vuilwater of gemengd onder de RIONED-staffel per diameter"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst het verval per meter van vuilwater- en gemengde strengen.
+        """Toetst het verval per meter tegen het minimale afschot per diameter.
 
-        Alleen strengen met verval naar beneden doen mee. Loopt de bodem juist
-        omhoog, dan is dat tegenverhang en melden HGT-005 en HGT-006 dat; hier nog
-        eens meetellen zou dezelfde streng dubbel laten opduiken.
+        Het minimale afschot volgt de RIONED-staffel (`verhang_staffel`): kleine
+        leidingen moeten steiler liggen dan grote. Alleen strengen met verval naar
+        beneden doen mee. Loopt de bodem juist omhoog, dan is dat tegenverhang en
+        melden HGT-005 en HGT-006 dat; hier nog eens meetellen zou dezelfde streng
+        dubbel laten opduiken.
         """
-        dataset = context.dataset
-        drempel = context.config.drempels.minimaal_verhang_promille / 1000.0
-        soorten = {
-            uri
-            for wortel in context.config.klassen.vuilwater
-            for uri in dataset.of_class(wortel)
-            if uri in dataset.conduits
-        }
+        staffel = context.config.verhang_staffel
+        soorten = {conduit.uri for conduit in vuilwaterleidingen(context)}
 
-        for conduit in _vrijverval(context):
+        for conduit in vrijvervalrioolleidingen(context):
             if conduit.uri not in soorten:
                 continue
             verhang = _verhang(conduit)
-            if verhang is None or verhang < 0 or verhang >= drempel:
+            if verhang is None or verhang < 0:
+                continue
+            # De staffel is diametergestuurd; voor een rond profiel is `breedte_mm`
+            # de diameter. Een streng zonder BreedteLeiding krijgt geen drempel en
+            # telt in notes() als "zonder diameter".
+            drempel = _staffeldrempel(staffel, conduit.breedte_mm)
+            if drempel is None or verhang >= drempel:
                 continue
             yield self.finding(
                 context,
                 conduit.uri,
                 conduit.label,
-                f"Verhang {verhang * 1000:.2f} promille, onder de drempel van "
-                f"{drempel * 1000:g} promille voor vuilwater en gemengd.",
+                f"Verhang {verhang * 1000:.2f} promille ({_als_helling(verhang)}), onder het "
+                f"minimale afschot {_als_helling(drempel)} dat de RIONED-staffel bij diameter "
+                f"{conduit.breedte_mm:g} mm vraagt.",
                 verhang_promille=round(verhang * 1000, 3),
-                drempel_promille=drempel * 1000,
+                drempel_promille=round(drempel * 1000, 3),
+                diameter_mm=conduit.breedte_mm,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Legt de afbakening vast."""
-        return [
+        """Legt de afbakening vast en telt wat niet getoetst kon worden."""
+        staffel = context.config.verhang_staffel
+        soorten = {conduit.uri for conduit in vuilwaterleidingen(context)}
+
+        buiten_rol = geen_bob = door_vulwaarde = geen_diameter = 0
+        for conduit in vrijvervalrioolleidingen(context):
+            if conduit.uri not in soorten:
+                buiten_rol += 1
+                continue
+            if _verhang(conduit) is None:
+                geen_bob += 1
+                if conduit.vulwaarden:
+                    door_vulwaarde += 1
+            elif _staffeldrempel(staffel, conduit.breedte_mm) is None:
+                geen_diameter += 1
+
+        notities = [
             "Alleen strengen met verval naar beneden zijn getoetst; tegenverhang meldt de "
-            "check niet, dat doen HGT-005 en HGT-006."
+            "check niet, dat doen HGT-005 en HGT-006.",
+            "Het minimale afschot volgt de RIONED-staffel per diameter (config "
+            "`verhang_staffel`); alleen de rol vuilwater (Vuilwaterriool en GemengdRiool) "
+            "doet mee, hemelwater valt er bewust buiten.",
         ]
+        if not staffel:
+            notities.append(
+                "Geen verhangstaffel geconfigureerd: HGT-007 heeft geen enkele streng getoetst."
+            )
+        notities.append(
+            f"Niet getoetst: {buiten_rol} strengen buiten de rol vuilwater, "
+            f"{geen_bob} zonder bruikbare BOB (waarvan {door_vulwaarde} door de "
+            f"vulwaardenregel), {geen_diameter} zonder diameter voor de staffel."
+        )
+        return notities
 
 
 @register
@@ -337,7 +384,7 @@ class ExtreemVerhang(_StrengCheck):
         een_op = context.config.drempels.extreem_verhang_een_op
         drempel = 1.0 / een_op
 
-        for conduit in _vrijverval(context):
+        for conduit in vrijvervalrioolleidingen(context):
             verhang = _verhang(conduit)
             if verhang is None or verhang <= drempel:
                 continue
@@ -386,10 +433,10 @@ class BobSprongZonderValput(_KnoopVergelijking):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de BOB van aanvoer en afvoer op elke put."""
         drempel = context.config.drempels.bob_sprong_m
-        valconstructies = _valconstructies(context)
+        valput_uris = {node.uri for node in valconstructies(context)}
 
         for node, aanvoer, afvoer in self.paren(context):
-            if node.uri in valconstructies:
+            if node.uri in valput_uris:
                 continue
             binnen = [c.bob_end for c in aanvoer if c.bob_end is not None]
             uit = [c.bob_start for c in afvoer if c.bob_start is not None]
@@ -431,8 +478,8 @@ class DiameterverjongingInAfvoerrichting(_KnoopVergelijking):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de grootste aanvoerdiameter met de grootste afvoerdiameter."""
         for node, aanvoer, afvoer in self.paren(context):
-            binnen = [_maat(c) for c in aanvoer if _maat(c) is not None]
-            uit = [_maat(c) for c in afvoer if _maat(c) is not None]
+            binnen = [maat for c in aanvoer if (maat := _maat(c)) is not None]
+            uit = [maat for c in afvoer if (maat := _maat(c)) is not None]
             if not binnen or not uit:
                 continue
             if max(uit) >= max(binnen):
@@ -510,36 +557,39 @@ class DrempelBuitenBereik(_PutCheck):
 
 @register
 class PutdiepteBuitenBereik(_PutCheck):
-    """HGT-012: een putdiepte die negatief of onwaarschijnlijk groot is."""
+    """HGT-012: een putdiepte buiten het door de ontologie gedeclareerde bereik."""
 
     id = "HGT-012"
-    title = "Putdiepte (deksel minus bodem) negatief of groter dan X m"
+    title = "Putdiepte (deksel minus bodem) kleiner dan X m of groter dan X m"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst `HoogtePut` op een aannemelijk bereik.
+        """Toetst `HoogtePut` tegen het bereik van `Dt_HoogtePut` (0,5-4,0 m).
 
         Het GWSW kent geen bodemniveau; de putdiepte staat als `HoogtePut` in
         millimeters geregistreerd. Deksel min bodem zou hier hetzelfde getal
-        opleveren, want de bodem wordt juist uit die twee afgeleid.
+        opleveren, want de bodem wordt juist uit die twee afgeleid. Een negatieve
+        of nul-diepte valt vanzelf onder de ondergrens.
         """
+        minimum = context.config.drempels.minimale_putdiepte_m
         maximum = context.config.drempels.maximale_putdiepte_m
 
-        for node in _putten(context):
+        for node in netwerkknopen(context):
             diepte = node.hoogte_m
             if diepte is None:
                 continue
-            if 0 < diepte <= maximum:
+            if minimum <= diepte <= maximum:
                 continue
-            kant = "negatief of nul" if diepte <= 0 else f"groter dan {maximum:g} m"
+            kant = "onder" if diepte < minimum else "boven"
+            grens = minimum if diepte < minimum else maximum
             yield self.finding(
                 context,
                 node.uri,
                 node.label,
-                f"Putdiepte {diepte:.3f} m is {kant}.",
+                f"Putdiepte {diepte:.3f} m ligt {kant} de grens van {grens:g} m.",
                 putdiepte_m=round(diepte, 3),
-                maximum_m=maximum,
+                grens_m=grens,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -617,7 +667,7 @@ class VerhangVolgtMaaiveldNiet(_StrengCheck):
         drempel = context.config.drempels.maaiveldvolging_afwijking_m
         dataset = context.dataset
 
-        for conduit in _vrijverval(context):
+        for conduit in vrijvervalrioolleidingen(context):
             if conduit.bob_start is None or conduit.bob_end is None:
                 continue
             begin_uri, eind_uri = verbonden_knopen(context, conduit)
@@ -662,7 +712,7 @@ class VerhangVolgtMaaiveldNiet(_StrengCheck):
             context,
             "maaiveldhoogte aan beide putten",
             maaiveldpaar,
-            objecten=_vrijverval(context),
+            objecten=vrijvervalrioolleidingen(context),
             soort="strengen",
         )
 
@@ -689,7 +739,7 @@ class PutbodemBuitenMarge(_PutCheck):
             uri = uiteinde.node.uri
             laagste[uri] = min(laagste.get(uri, uiteinde.bob), uiteinde.bob)
 
-        for node in _putten(context):
+        for node in netwerkknopen(context):
             bodem = node.bodem
             bob = laagste.get(node.uri)
             if bodem is None or bob is None:
@@ -734,12 +784,12 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen die hoog in de put binnenkomen zonder verklaring."""
         drempel = context.config.drempels.bob_sprong_m
-        valconstructies = _valconstructies(context)
+        valput_uris = {node.uri for node in valconstructies(context)}
 
         for uiteinde in _uiteinden(context):
             node = uiteinde.node
             bodem = node.bodem
-            if uiteinde.bob is None or bodem is None or node.uri in valconstructies:
+            if uiteinde.bob is None or bodem is None or node.uri in valput_uris:
                 continue
             verschil = uiteinde.bob - bodem
             if verschil <= drempel:
@@ -774,7 +824,7 @@ class ZWaardeWijktAf(_StrengCheck):
         """Vergelijkt de z uit de GML met de BOB's en met het dekselniveau."""
         drempel = context.config.drempels.z_afwijking_m
 
-        for conduit in _vrijverval(context):
+        for conduit in vrijvervalrioolleidingen(context):
             for zijde, z_waarde, bob in (
                 ("beginpunt", conduit.z_start, conduit.bob_start),
                 ("eindpunt", conduit.z_end, conduit.bob_end),
@@ -793,7 +843,7 @@ class ZWaardeWijktAf(_StrengCheck):
                     drempel_m=drempel,
                 )
 
-        for node in _putten(context):
+        for node in netwerkknopen(context):
             niveau = node.dekselniveau
             if node.z is None or niveau is None or abs(node.z - niveau) <= drempel:
                 continue
@@ -810,7 +860,7 @@ class ZWaardeWijktAf(_StrengCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel geometrieen tweedimensionaal zijn."""
-        strengen = _vrijverval(context)
+        strengen = vrijvervalrioolleidingen(context)
         plat = sum(1 for conduit in strengen if conduit.z_start is None)
         if not plat:
             return []
@@ -824,7 +874,7 @@ class ZWaardeWijktAf(_StrengCheck):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen plus putten."""
-        return len(_vrijverval(context)) + len(_putten(context))
+        return len(vrijvervalrioolleidingen(context)) + len(netwerkknopen(context))
 
 
 @register
@@ -860,16 +910,32 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
                 put=uiteinde.node.label,
             )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt per ontbrekend kenmerk hoeveel strengeinden zijn overgeslagen.
 
-def _valconstructies(context: CheckContext) -> set[str]:
-    """De knopen die als val- of zandvangconstructie geregistreerd staan."""
-    dataset = context.dataset
-    return {
-        uri
-        for wortel in context.config.klassen.valconstructie
-        for uri in dataset.of_class(wortel)
-        if uri in dataset.nodes
-    }
+        `run` heeft alle drie de kenmerken nodig -- BOB, profielmaat en bovenkant --
+        en slaat een uiteinde over zodra er een ontbreekt. Alle drie staan hier
+        daarom apart, zodat een lezer ziet welke van de drie de dekking beperkt en
+        niet alleen dat er iets overgeslagen is.
+        """
+        uiteinden = _uiteinden(context)
+        return [
+            *_ontbreekt(context, "BOB", lambda u: u.bob, objecten=uiteinden, soort="strengeinden"),
+            *_ontbreekt(
+                context,
+                "profielmaat (hoogte of breedte) van de streng",
+                lambda u: u.conduit.hoogte_mm or u.conduit.breedte_mm,
+                objecten=uiteinden,
+                soort="strengeinden",
+            ),
+            *_ontbreekt(
+                context,
+                "bovenkant (dekselniveau of maaiveld) aan de put",
+                lambda u: u.node.bovenkant,
+                objecten=uiteinden,
+                soort="strengeinden",
+            ),
+        ]
 
 
 def _maat(conduit: Conduit) -> float | None:

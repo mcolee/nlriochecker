@@ -3,86 +3,253 @@
 ## Doel
 Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen:
 1. Inlezen en analyseren van de GWSW-nulmeting, aangeleverd als SHACL-validatierapporten (apps.gwsw.nl/item_validate_shacl).
-2. Eigen aanvullende checks conform het checkregister (data/checkregister-gwsw-nulmeting-v0_8.md) op de GWSW-dataset (OroX/TTL) en later externe bronnen.
+2. Eigen aanvullende checks conform het checkregister (data/checkregister-gwsw-nulmeting-v0_9.md) op de GWSW-dataset (OroX/TTL) en later externe bronnen.
 
-We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis/.
+We bouwen gefaseerd; implementeer nooit meer dan de actuele fase vraagt. Fase 1 en 2 (nulmeting inlezen, dekkinganalyse, trendvergelijking) en de kernset van fase 3 (TOP- en NET-checks) staan. Fase 4 is EXT: BGT, BAG, BRK en waterschapsdata uit data/gis_koekangerveld/ (Koekangerveld) en data/gis_dewoldenhoogeveen/ (het hele OroX-gebied).
 
-## Domeinregels (hard, uit het checkregister v0.8)
-- De dataset moet ALTIJD aan alle conformiteitsklassen (CFK's) getoetst zijn: Hyd, MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke foutmelding. De lijst staat in checks.toml, niet in de code.
+## Gouden regels van Karpathy
+
+Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+1. Think Before Coding
+
+Don't assume. Don't hide confusion. Surface tradeoffs.
+
+Before implementing:
+
+    State your assumptions explicitly. If uncertain, ask.
+    If multiple interpretations exist, present them - don't pick silently.
+    If a simpler approach exists, say so. Push back when warranted.
+    If something is unclear, stop. Name what's confusing. Ask.
+
+2. Simplicity First
+
+Minimum code that solves the problem. Nothing speculative.
+
+    No features beyond what was asked.
+    No abstractions for single-use code.
+    No "flexibility" or "configurability" that wasn't requested.
+    No error handling for impossible scenarios.
+    If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+3. Surgical Changes
+
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code:
+
+    Don't "improve" adjacent code, comments, or formatting.
+    Don't refactor things that aren't broken.
+    Match existing style, even if you'd do it differently.
+    If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+    Remove imports/variables/functions that YOUR changes made unused.
+    Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+4. Goal-Driven Execution
+
+Define success criteria. Loop until verified.
+
+Transform tasks into verifiable goals:
+
+    "Add validation" → "Write tests for invalid inputs, then make them pass"
+    "Fix the bug" → "Write a test that reproduces it, then make it pass"
+    "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## Communicatie met de auteur
+- Schrijf kort en concreet. Herhaal niet wat al vaststaat en som geen opties op die je
+  toch niet volgt. Een echte tweesprong benoem je wél (Gouden regel 1), maar geef er je
+  aanbeveling bij in plaats van de keuze open te laten.
+- Gebruik gewone woorden. Vermijd jargon en zelfbedachte termen; is een vakterm nodig,
+  leg hem één keer uit.
+
+## Harde regels
+Nooit breken. Domeinregels komen uit het checkregister v0.9; de techniekregels bewaken de
+uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
+`docs/architectuur.md` — hier staan alleen de regels zelf.
+
+### Domein
+- **GWSW IS LEIDEND.** Dit is de eerste regel en hij overstemt alle andere bronnen. Bestaat
+  een begrip in de GWSW-ontologie, dan bestaat het -- ongeacht wat de Leidraad Riolering, de
+  RIONED Kennisbank, een NEN-norm of je eigen aanname zegt. Externe bronnen leveren
+  uitsluitend bereiken, drempels en periodes; nooit de vraag WELKE begrippen bestaan.
+  Afwijken mag alleen als de auteur dat expliciet en onderbouwd heeft gedaan, en dan staat
+  de afwijking als BO-nummer in `docs/beslislog.md` -- niet als commentaar in een
+  configbestand.
+  Voordat je beweert dat een klasse of property niet bestaat, grep je
+  `data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`. Let op inconsistent hoofdlettergebruik:
+  een regex als `[A-Za-z]*Stelsel` mist `Vuilwaterstelsel` met kleine s. Scheid twee vragen
+  die makkelijk door elkaar lopen: "bestaat de klasse in de ontologie" en "komen er
+  instanties voor in deze dataset" hebben verschillende antwoorden en vragen om
+  tegengestelde ingrepen -- een ontbrekende klasse is een gat in ons model, ontbrekende
+  instanties zijn een gat in de aanlevering. Zie de correctie op issue #11
+  (`Overnamepunt` en `VerbeterdGescheidenStelsel` bestaan wél; De Wolden levert er nul).
+- **Leidende GWSW-versie: 1.6**, uit `Ontologie_GWSW_Totaal.ttl` (`owl:versionInfo` op regel
+  10: *"Deelmodel Totaal, filter op CoFs BAS DMO EN HYD LDR MDS NLCS PLI RRB TOP, versie=1.6
+  (2025-11-18T14:53:33)"*). Dat is het enige bestand dat de code laadt; `Mds` en `Hyd` komen
+  alleen in een integratietest voor en dragen geen versienummer maar een conversiedatum van
+  **20210920** -- ruim vier jaar ouder. Wees daarom voorzichtig met de uitspraak dat een
+  klasse "alleen in de totaal-ontologie" zit: dat kan net zo goed ouderdom van de
+  deelmodellen zijn als een modelleerkeuze.
+  Upgraden is handwerk van de auteur: hij levert nieuwe ontologiebestanden en dan trekt het
+  pakket bij. Bouw geen automatische versiecontrole tegen data.gwsw.nl. Werk deze regel bij
+  zodra de bestanden vervangen zijn -- de versie hier is de enige plek waar hij staat.
+  Draai daarbij ook `uv run python scripts/maak_gwsw_index.py`: dat schrijft de getrackte
+  afgeleide `data/gwsw-vocabulaire-index.json` opnieuw, waarmee de vocabulairetest ook op
+  CI draait (BO-32). Vergeet je het, dan valt `test_index_volgt_de_ontologie`; werk je de
+  index bij zonder deze regel, dan valt `test_indexversie_staat_in_claude_md`.
+- Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
+  MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
+  foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk`; zonder die
+  optie verandert er niets. De afwijking staat in het Markdown-rapport (een regel onder
+  de herkomst), in `gwsw_run` van de GeoPackage (`cfk_set`, `volledig`) en in de
+  JSON-envelop. NIET in de CSV: de CFK-set hoort bij de run en niet bij de melding, dus
+  hij wordt geen kolom op elke rij. Gevolg dat je moet kennen: twee `bevindingen.csv`
+  uit een volle en een deelrun zijn aan het bestand zelf niet te onderscheiden; lees ze
+  naast het rapport of de JSON. Een
+  rapport voor een niet-gekozen CFK is een fout, geen stille overslag, en `vergelijk`
+  weigert twee meetmomenten met ongelijke sets. Een `toets` zonder `--shacl` is een
+  eigen toestand ("niet gemeten"), los van volledig en van deelset. De drie toestanden
+  en hun markeringstekst komen uit `Meetbereik` in `meting.py`, nergens anders. De lijst
+  staat in `checks.toml` en is daar verplicht -- geen default in Python. Zie BO-7 in de
+  beslislog.
 - Typeringspoort: de SHACL-meting benoemt via de vorm `CfkTypes_typ` welke KLASSEN binnen een CFK te globaal zijn (niet welke objecten). De instanties volgen uit de OroX-dataset. Zonder dataset is er wel een klassenlijst maar geen score; verzin er dan geen.
 - Alle drempelwaarden (toleranties, min/max-waarden, bufferafstanden) zijn configureerbaar per project via een configbestand (TOML). Geen hardcoded drempels.
 - Check-ID's uit het checkregister (TOP-001 enz.) zijn stabiel; vervallen ID's worden nooit hergebruikt.
-- Ernstniveaus: F = fout, W = waarschuwing. Elke check heeft een dimensietag (Consistentie, Compleetheid, Plausibiliteit, Actualiteit, Traceerbaarheid, Precisie). In de SHACL-rapporten komt de ernst uit de kolom Severity: Violation = F, Warning = W.
+- Ernstniveaus: F = fout, W = waarschuwing. Elke check heeft een dimensietag (Consistentie, Compleetheid, Plausibiliteit, Actualiteit, Traceerbaarheid, Precisie, Nauwkeurigheid, Compliance; de enum `Dimension` is de bron). In de SHACL-rapporten komt de ernst uit de kolom Severity: Violation = F, Warning = W.
 
-## Feiten over de invoerbestanden (geverifieerd)
-
-### SHACL-nulmetingrapporten (data/shacl_nulmeting/)
-- CSV met puntkomma (;) als scheidingsteken, encoding utf-8.
-- Kopblok van sleutel;waarde-paren met onder meer "SHACL-meting op basis CFK", "Gevalideerd RDF-bestand" en "Rapport 'conforms'". Daaronder de kolomkop; zoek die op de regel die met `Focus node` begint, niet op een vast regelnummer.
-- Kolommen: Focus node;Source;Value;Severity;Message;Path;Detail-message;Detail-value
-- `Focus node` is het URI-fragment uit de dataset en joint direct op de OroX-TTL. `Source` is de naam van de geschonden SHACL-vorm (bijvoorbeeld `LengteLeiding_val`). Uit `Detail-value` zijn `type=` en `label=` te halen; die ontbreken soms, en dan blijven ze leeg.
-- Een regel per overtreding; er is geen aggregatiegewicht.
-
-### OroX-dataset (data/gwsw_orox_ttl/)
-- Turtle hoort utf-8 te zijn, maar de BrutIS-export van De Wolden bevat een handvol CP850-bytes in straatnamen. De lader valt terug op een instelbare codering en meldt dat expliciet; nooit stilzwijgend tekens vervangen.
-- Een knoop is een object met een orientatie van het type `Knooppunt` (Putorientatie, Bouwwerkorientatie, Compartimentorientatie, Hulpstukorientatie, Aansluitpunt, Afvoerpunt en verder). Een verbinding is een orientatie van het type `Verbinding`. Herken ze daaraan, niet aan hun geometrie: een knooppunt mag geen punt hebben.
-- `gwsw:hasConnection` is een owl:SymmetricProperty zonder inverse; lees beide schrijfrichtingen.
-- De koppeling wijst naar de ORIENTATIE, niet naar het object, en kan naar een compartiment of hulpstuk wijzen; loop via hasPart omhoog tot een put.
-- Klassen als Lozingspunt, Overnamepunt en UitlaatPunt zijn Knooppunt-subklassen en staan dus op de orientatie. Overnamepunt bestaat alleen in de totaal-ontologie, niet in de deelmodellen.
-- Welke ontologie je laadt bepaalt de uitkomst; gebruik data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl. Zonder ontologie valt de lader terug op herkenning via geometrie en meldt het verschil.
-
-### Studiegebied (data/gis/)
-- GeoPackage of GeoJSON, gelezen met stdlib sqlite3 plus shapely; geen extra afhankelijkheid. Moet in EPSG:28992 staan, net als de GWSW-coordinaten; herprojecteren doen we niet.
-- Analyseer de kern plus een contextschil, rapporteer de kern. De schil is de
-  samenhangende vrijvervalcomponent waar de kern in ligt plus een buffer om het gebied;
-  precies zo groot dat NET-001 en NET-002 geen valse bevindingen geven. Zonder
-  studiegebied draait alles op de volledige dataset. Meld altijd hoeveel bevindingen
-  buiten het gebied vielen en hoe groot kern, schil en export zijn.
-
-## Technische afspraken
-- Maak expliciet gebruik van de superpowers en dev-skills skills
-- Python 3.12+, src-layout (src/nlriochecker/), pyproject.toml, beheer met uv.
-- Afhankelijkheden minimaal houden: pandas, click, pydantic, rdflib, shapely, networkx. Voeg er niets aan toe zonder noodzaak.
-- Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost ruim drie minuten en circa 3 GB).
-- Codekwaliteit: ruff (lint en format), type hints overal, Nederlandse docstrings, Engelse code-identifiers.
-- CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
-- Rapportage-output: Markdown, CSV en een GeoPackage naar een output-map; nooit invoerbestanden
-  overschrijven. Alle drie komen uit dezelfde meldingenstroom (`uitvoer/melding.py`); een
-  schrijver die zelf een `Finding` interpreteert laat de drie uit elkaar lopen.
-- De uitvoermap heet `uitvoer/` en staat in `.gitignore` — met een leidende slash, anders
-  sluit die regel ook `src/nlriochecker/uitvoer/` uit en verdwijnt de package stilzwijgend
-  uit de repository (en uit het zicht van ruff).
-- Het versienummer staat alleen in `pyproject.toml`; `__version__` leest het via
+### Techniek
+- **`toets` eist `--ontologie`.** De export draagt nul `rdfs:subClassOf` en typeert niets
+  op wortelniveau (`Inspectieput` wel, `Put` niet), dus zonder klassenhierarchie draaien
+  de checks over een onvolledige selectie en draagt hun uitkomst geen oordeel, terwijl
+  het rapport dat nergens zei. `voer_toets_uit` weigert
+  zo'n run vóór het laden; `--geen-ontologie` is de bewuste ontsnappingsvlag en levert
+  een rapport dat het voorbehoud in de kop draagt en de eigen checks op `–` zet in plaats
+  van op een vinkje. De testfixtures declareren hun eigen hierarchie inline: die draaien
+  legitiem met `--geen-ontologie` en houden hun oordeel, want het voorbehoud hangt aan
+  `GwswDataset.klassenhierarchie_bekend` en niet aan de vraag of er een ontologiebestand
+  meekwam. Zie issue #33.
+- **Eén uitvoerschrijver.** Alle vier uitvoervormen (Markdown, CSV, GeoPackage, JSON)
+  komen uit dezelfde meldingenstroom (`uitvoer/melding.py`) en dragen hun herkomst uit
+  `uitvoer/herkomst.py` -- de enige schrijver in `src/`. Roep nooit zelf `to_csv`,
+  `write_text` of `json.dump` aan; `tests/test_uitvoer_herkomst.py` verbiedt een tweede
+  schrijver. Overschrijf nooit invoerbestanden. Mechaniek, herkomstvelden, JSON-contract
+  en het samengestelde voorbehoud: `docs/architectuur.md`.
+- **De uitvoermap heet `uitvoer/`** en staat in `.gitignore` — met een leidende slash,
+  anders sluit die regel ook `src/nlriochecker/uitvoer/` uit en verdwijnt de package
+  stilzwijgend uit de repository (en uit het zicht van ruff).
+- **Het versienummer staat alleen in `pyproject.toml`;** `__version__` leest het via
   `importlib.metadata` en `tests/test_versie.py` bewaakt dat de twee gelijk blijven.
   Schrijf het nummer nergens een tweede keer op. Uitbrengen doe je met
   `uv run python scripts/uitgave.py patch|minor|major`, dat bumpt, toetst, commit en
   `vX.Y.Z` tagt; pushen blijft handwerk. Zie `docs/versionering.md`.
+
+## Werkwijze
+- Maak expliciet gebruik van de superpowers en dev-skills skills.
+- Python 3.12+, src-layout (src/nlriochecker/), pyproject.toml, beheer met uv.
+- Afhankelijkheden minimaal houden: pandas, click, pydantic, rdflib, shapely, networkx,
+  plus geopandas en rasterio voor de EXT-checks op de externe bronnen (`externedata.py`).
+  Voeg er niets aan toe zonder noodzaak; een nieuwe dep moet permissief of
+  EUPL-verenigbaar zijn (BO-3) en hoort in de beslislog.
 - De licentie is EUPL-1.2 (copyleft, en 'toegang tot de wezenlijke functionaliteit'
   telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
   zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
-- Voordat je commit, doe je /superpowers:requesting-code-review en verbeter je met de uitkomsten de codebase. 
-- De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
-  `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
-  los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
-- De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
-  over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
-  `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
-  De cachemap groeit per sleutel (op De Wolden ruim 450 MB); oude sleutels worden niet
-  automatisch opgeruimd.
-- `tests/test_uitvoer_qgis.py` vindt PyQGIS door de systeem-site-packages achter
-  deze (van het systeem afgeschermde) venv aan `sys.path` te plakken; zonder QGIS
-  op de machine slaat hij gewoon over. Zie de moduledocstring van dat bestand voor
-  hoe dat pad afgeleid wordt en `GWSW_QGIS_SITE_PACKAGES` om het te overschrijven.
-
-## Werkwijze
-- Kleine stappen, na elke werkende stap een git-commit met een duidelijke boodschap.
-- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_8.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
-- Voer na elke wijziging pytest en ruff uit voordat je afrondt.
+- Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost sinds de eigen graafindexen circa een halve minuut koud en de volledige toetsrun piekt onder de 2 GB; zie BO-41 en BO-42).
+- Codekwaliteit: ruff (lint en format), mypy schoon over `src/nlriochecker`
+  (`uv run mypy`; `scripts/` en `tests/` vallen er nog buiten), type hints overal,
+  Nederlandse docstrings, Engelse code-identifiers. De poort staat in
+  `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien dezelfde
+  vijf stappen (ruff lint, ruff format, mypy, pytest en een dekkingsondergrens).
+  De package levert `py.typed`, dus haar hints komen bij een importeur aan.
+- **Testdekking meet je met `uv run --with pytest-cov pytest --cov=nlriochecker`.**
+  `pytest-cov` staat bewust niet in de dev-groep (afhankelijkheden minimaal); `--with`
+  lost hem per run op. Beide poorten dwingen een ondergrens van 95% af
+  (`DEKKINGSONDERGRENS` in `scripts/uitgave.py`, gelijk in de CI; `--cov-fail-under`).
+  Laatst gemeten: 97% mét `data/` (dev, 2026-08-23) en 96% in de CI-conditie zonder
+  `data/` -- beide ruim boven de grens, dus 95% raakt normale schommeling niet maar wel
+  een echte regressie. Alleen een totaalgrens; de per-module-cijfers blijven een
+  observatie in de rondeverslagen. Zie BO-38.
+- CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
+- Werk op `dev`, niet op `main`. Elke wijziging gaat naar `dev`; `main` draagt alleen
+  uitgebrachte, getagde versies. Pas als de auteur zegt dat het een nieuwe versie is,
+  merge je `dev` in `main` en draai je daar `scripts/uitgave.py` -- in die volgorde,
+  want het script eist `main` (`TAKVOORWAARDE`) en breekt af op elke andere tak. Zet
+  `dev` daarna weer gelijk aan `main`, anders mist hij de bumpcommit.
+- Eén sessie = één issue, en het issue is de enige plek waar de voortgang staat. Eindig je
+  een issue niet af, zet dan een comment met de echte toestand: wat gecommit is en wat de
+  poort nog mist. Beweer nooit "klaar/gepusht" als het dat niet is, en laat geen half
+  bewerkt bestand achter zonder die comment -- anders herontdekt de volgende sessie het gat
+  (of doet werk over dat al gedaan was). Zie `docs/agents/issue-tracker.md`.
+- Kleine stappen; na elke werkende stap een commit. De **mechanische poort** --
+  `uv run ruff check` en `uv run ruff format`, `uv run mypy`, `uv run pytest` (zonder
+  `zwaar`) -- draait bij elke commit die `src/**.py` raakt. Kies daarbovenop de review
+  naar het **risico** van de wijziging, niet naar de omvang:
+  - **Docs/config** (geen `src/**.py`, bv. deze regel): geen poort en geen review, alleen
+    de drifttests die de wijziging raakt (bv. `test_indexversie_staat_in_claude_md`).
+  - **Klein** (code buiten de kritieke paden, geen nieuwe feature): `/code-review` --
+    `low` bij een triviale one-liner, anders `medium`.
+  - **Substantieel** (een nieuwe check/feature, óf de wijziging raakt een kritiek pad:
+    `checks/`, de engine `dataset.py`/`geometry.py`/de graf, de meldingenstroom
+    `uitvoer/`, of de ontologie): `/superpowers:requesting-code-review`; verwerk de
+    uitkomsten en draai de poort daarna opnieuw.
+  - **Altijd Substantieel**, ongeacht je inschatting: vlak vóór een merge naar `main` of
+    een uitgave, en bij elke wijziging aan een Harde regel of aan een publiek contract
+    (JSON-schema, CLI-opties, GeoPackage-structuur).
+  Pas na een groene gate committen, met een duidelijke boodschap.
+- Elke noemenswaardige wijziging krijgt een regel onder `## [Unreleased]` in
+  `CHANGELOG.md`. `scripts/uitgave.py` weigert een uitgave met een lege sectie.
+- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_9.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
 - Geloof onwaarschijnlijke uitkomsten niet. Duizenden bevindingen op een dataset wijzen meestal op een modelleerfout in de engine, niet op duizenden gebreken; zoek de oorzaak voordat je het cijfer rapporteert.
 - Wat een check NIET heeft bekeken hoort in het rapport: objecten buiten de graaf, weggelaten bevindingen, ontbrekende typeringspoort. Stilte leest als "alles gecontroleerd".
 
-## Open punten
-- 1773 doodlopende eindknopen in De Wolden: het vrijverval watert af op 2148 knopen waarvan er maar 375 als uitstroompunt gelden. Bepaalt of NET-001 zinvolle uitkomsten geeft. Bij een afgebakende run raakt dit alleen de kern; de contextschil voorkomt dat de grens van het studiegebied zelf als doodlopend eindpunt meetelt.
-- Bij de SHACL-meting komt de put-strengkoppeling in alle drie de CFK's voor, terwijl het register stelt dat die alleen uit Hyd komt (ADM-001).
-- Er is geen SHACL-vorm voor Drempelniveau of Drempelbreedte; RVZ-002 en RVZ-003 gelden daardoor als niet geraakt terwijl ze juist geschrapt zijn omdat de nulmeting ze zou dekken.
-- Negentien TOP- en NET-checks uit het register zijn nog niet gebouwd.
+## Naslag
+- **`docs/architectuur.md`** draagt de geverifieerde feiten en de engine/uitvoer-interna.
+  Lees het vóór je aan het betreffende deel werkt:
+  - invoerbestanden lezen of parsen: SHACL-CSV-kolommen, OroX-grafmodel (knoop is een
+    orientatie, niet zijn geometrie; `hasConnection` symmetrisch; via `hasPart` omhoog tot
+    een put), studiegebied-validatie en de kern/schil-afbakening;
+  - uitvoer schrijven: meldingenstroom, rapportstructuur, voorbehoud/markering, herkomst,
+    JSON-contract;
+  - GeoPackage/QGIS: objectlagen, `status` en popup, stijlen, EXT-lagen, brondekking;
+  - cache en het voortgangsprotocol, en de PyQGIS-test.
+- **`docs/agents/analyse-harness.md`** verzamelt de vaste feiten voor een De Wolden-analyse:
+  de dataset-/config-/registry-API voor scratch-scripts, de verrassende maar correcte
+  aantallen (ATTR-001 vrijverval-subset, HGT-012 nul `HoogtePut`), de gegenereerde bestanden
+  die je nooit met de hand bewerkt, en het drempelrecept over vijf gekoppelde plekken. Lees
+  het vóór je zelf een telling of een scratch-script tegen de dataset schrijft -- het
+  bespaart de ~1,5-min/3-GB herlaadronde op een verkeerde gok.
+- Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
+  `gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
+  niemand een openstaand punt in twee toestanden aantreft.
+
+## Agent skills
+
+### Issuetracker
+
+Issues leven als GitHub-issues op `mcolee/nlriochecker`, bediend met de `gh` CLI. Zie
+`docs/agents/issue-tracker.md`.
+
+### Triage-labels
+
+De vijf standaardrollen; elke labelstring is gelijk aan de rolnaam. Zie
+`docs/agents/triage-labels.md`.
+
+### Domeindocumentatie
+
+Single-context: `CONTEXT.md` in de root. `docs/adr/` bestaat niet en wordt niet leeg
+aangemaakt; `/domain-modeling` legt de map aan zodra er een eerste besluit in landt.
+Vastgelegde besluiten staan tot die tijd als BO-nummer in `docs/beslislog.md`. Zie
+`docs/agents/domain.md`.

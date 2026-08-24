@@ -12,7 +12,9 @@ gwsw:Putorientatie rdfs:subClassOf gwsw:Knooppunt .
 gwsw:Leidingorientatie rdfs:subClassOf gwsw:Verbinding .
 gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 
 # DEFECT: geen; deze fixture toetst de scheiding tussen vrijverval en mechanisch
 # riool. PutA/PutB met streng L1 is een gewone vrijvervalstreng (zoals schoon.ttl);

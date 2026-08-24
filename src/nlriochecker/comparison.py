@@ -82,6 +82,15 @@ def compare_metingen(
             f"{earlier.meting.dataset_file!r} tegenover {later.meting.dataset_file!r}."
         )
 
+    if earlier.meting.meetbereik.gekozen != later.meting.meetbereik.gekozen:
+        raise ComparisonError(
+            f"De nulmetingen zijn op verschillende conformiteitsklassen getoetst: "
+            f"{', '.join(earlier.meting.meetbereik.gekozen)} tegenover "
+            f"{', '.join(later.meting.meetbereik.gekozen)}. Een verschil in het aantal "
+            f"meldingen zegt dan niets over de dataset, alleen over wat er gemeten is. "
+            f"Toets beide meetmomenten op dezelfde set."
+        )
+
     gedeeld = [cfk for cfk in earlier.meting.cfks if cfk in later.meting.cfks]
     if not gedeeld:
         raise ComparisonError(
@@ -176,7 +185,7 @@ def _coverage_changes(earlier: CoverageResult, later: CoverageResult) -> pd.Data
                 "Onderwerp": check.mapping.onderwerp,
                 "Eerder": check.verdict.value,
                 "Later": ander.verdict.value if ander else "",
-                "Gewijzigd": bool(ander) and ander.verdict is not check.verdict,
+                "Gewijzigd": ander is not None and ander.verdict is not check.verdict,
             }
         )
     return pd.DataFrame(rijen, columns=["Check", "Onderwerp", "Eerder", "Later", "Gewijzigd"])

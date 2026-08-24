@@ -22,16 +22,19 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Overstortleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
-gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
+gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost
+# DEFECT: geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost en een gemaal als afvoereindpunt, dus het voldoet aan beide eisen van RVZ-006
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .
@@ -136,3 +139,26 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :Sloot1_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1062.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:Gem rdf:type gwsw:Rioolgemaal ; rdfs:label "G" ;
+    gwsw:hasAspect :Gem_ori .
+:Gem_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 1950.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:L3 rdf:type gwsw:GemengdRiool ; rdfs:label "3" ;
+    gwsw:hasAspect :L3_ori .
+:L3 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
+    [ rdf:type gwsw:MateriaalLeiding ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:VormLeiding ; gwsw:hasReference gwsw:Rond ] ,
+    [ rdf:type gwsw:LengteLeiding ; gwsw:hasValue 50.0 ] ,
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date ] .
+:L3_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L3_b , :L3_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1050.0 2000.0 1050.0 1950.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L3_b rdf:type gwsw:BeginpuntLeiding .
+:L3_e rdf:type gwsw:EindpuntLeiding .
+:L3_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 8.5 ] .
+:L3_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 8.45 ] .
+:L3_b gwsw:hasConnection :PutO_ori .
+:L3_e gwsw:hasConnection :Gem_ori .

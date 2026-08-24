@@ -2,12 +2,113 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from nlriochecker.errors import NulmetingError
+from nlriochecker.errors import NulmetingError, OpdrachtError
 from nlriochecker.shaclrapport import ShaclReport, lees_shacl_rapport
+from nlriochecker.taal import vorm
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
+
+
+@dataclass(frozen=True)
+class Meetbereik:
+    """Tegen welke conformiteitsklassen deze run getoetst is, en of dat de volle set was.
+
+    Drie toestanden, want een run zonder nulmeting is iets anders dan een deelset:
+    volledig (alle klassen uit de projectconfiguratie), deelset (een expliciete
+    keuze via `--cfk`) en niet gemeten (`toets` zonder `--shacl`). Alleen deze
+    klasse kent dat verschil; de schrijvers nemen de tekst en de velden over zoals
+    ze hier staan, zodat Markdown, GeoPackage en JSON niet uit elkaar kunnen lopen.
+    """
+
+    volledige_set: tuple[str, ...]
+    gekozen: tuple[str, ...]
+    gemeten: bool
+
+    @classmethod
+    def van(cls, volledige_set: Sequence[str], gekozen: Sequence[str]) -> Meetbereik:
+        """Een gemeten bereik, met beide verzamelingen gesorteerd en ontdubbeld.
+
+        De keuze moet binnen de volle set vallen. Zonder die toets levert een klasse
+        erbuiten een onzinnige markering op -- "getoetst op Extra, Hyd, MdsPlan,
+        MdsProj;  ontbreken." -- met een lege opsomming en de verkeerde vervoeging.
+        De CLI schermt dit af, maar `laad_nulmeting` is publieke API en zijn twee
+        lijsten komen ongecontroleerd binnen.
+        """
+        volledig = tuple(sorted(set(volledige_set)))
+        keuze = tuple(sorted(set(gekozen)))
+        buiten = [cfk for cfk in keuze if cfk not in volledig]
+        if buiten:
+            raise NulmetingError(
+                f"Conformiteitsklasse(n) {', '.join(buiten)} vallen buiten de bekende set "
+                f"{', '.join(volledig) or '(leeg)'}. Vul `vereiste_cfk` in de "
+                f"projectconfiguratie aan of corrigeer de keuze."
+            )
+        return cls(volledig, keuze, True)
+
+    @classmethod
+    def niet_gemeten(cls, volledige_set: Sequence[str]) -> Meetbereik:
+        """Het bereik van een run zonder nulmeting: niets gekozen, niets gemeten."""
+        return cls(tuple(sorted(set(volledige_set))), (), False)
+
+    @property
+    def volledig(self) -> bool:
+        """Waar als er gemeten is, en op de volle set."""
+        return self.gemeten and self.gekozen == self.volledige_set
+
+    @property
+    def ontbreekt(self) -> tuple[str, ...]:
+        """De klassen uit de volle set waarop niet getoetst is."""
+        return tuple(cfk for cfk in self.volledige_set if cfk not in self.gekozen)
+
+    @property
+    def cfk_tekst(self) -> str:
+        """De gekozen set als kommagescheiden tekst, voor de GeoPackage."""
+        return ", ".join(self.gekozen)
+
+    def markering(self) -> str | None:
+        """De waarschuwingsregel voor de rapporten, of None als er niets te melden is.
+
+        Deze ene plek bepaalt de tekst voor alle uitvoervormen. Zou elke schrijver
+        hem zelf samenstellen, dan zeggen Markdown en JSON op een dag iets anders
+        over dezelfde run.
+        """
+        if self.volledig:
+            return None
+        if not self.gemeten:
+            return (
+                "**Geen nulmeting:** deze run is niet tegen de conformiteitsklassen "
+                "getoetst; de typeringspoort is niet toegepast."
+            )
+        ontbreekt = ", ".join(self.ontbreekt)
+        return (
+            f"**Onvolledige meting:** getoetst op {self.cfk_tekst}; {ontbreekt} "
+            f"{vorm(len(self.ontbreekt), 'ontbreekt', 'ontbreken')}."
+        )
+
+
+def kies_cfk(keuze: Sequence[str], volledig: Sequence[str]) -> list[str]:
+    """Toetst de gevraagde conformiteitsklassen tegen de vereiste set.
+
+    Zonder keuze gelden ze alle; dat is de standaard uit het checkregister. Een
+    onbekende waarde is een fout en geen stille overslag -- een typefout in de keuze
+    zou anders een run opleveren die minder toetst dan de gebruiker denkt.
+
+    Neemt twee reeksen en geen `CheckConfig`: zo blijft deze module los van de
+    configuratielaag, en kunnen zowel de opdrachtregel als `toetsrun` hem aanroepen.
+    """
+    if not keuze:
+        return list(volledig)
+    onbekend = sorted({item for item in keuze if item not in volledig})
+    if onbekend:
+        raise OpdrachtError(
+            f"Onbekende conformiteitsklasse(n): {', '.join(onbekend)}. "
+            f"Toegestaan: {', '.join(volledig)}."
+        )
+    return sorted(set(keuze))
 
 
 @dataclass(frozen=True)
@@ -16,6 +117,7 @@ class Nulmeting:
 
     dataset_file: str
     reports: dict[str, ShaclReport]
+    meetbereik: Meetbereik
 
     @property
     def cfks(self) -> list[str]:
@@ -38,26 +140,51 @@ class Nulmeting:
         return self.reports[cfk]
 
 
-def laad_nulmeting(paden: list[Path], vereiste_cfk: list[str]) -> Nulmeting:
+def laad_nulmeting(
+    paden: list[Path],
+    vereiste_cfk: list[str],
+    volledige_cfk: list[str] | None = None,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
+) -> Nulmeting:
     """Leest de SHACL-rapporten en toetst de harde eisen.
 
     Alle vereiste conformiteitsklassen moeten aanwezig zijn en alle rapporten
     moeten over hetzelfde RDF-bestand gaan; anders zeggen de uitkomsten niets over
     dezelfde dataset.
+
+    `vereiste_cfk` is wat deze run eist, `volledige_cfk` wat de projectconfiguratie
+    als volle set kent. Zijn ze ongelijk, dan is dit een deelset en zegt het
+    `Meetbereik` dat tegen elke uitvoervorm. Zonder `volledige_cfk` gelden ze als
+    gelijk, zodat bestaande aanroepen een volledig bereik houden.
     """
     if not paden:
         raise NulmetingError("Geef minstens een SHACL-rapport op.")
 
     rapporten: dict[str, ShaclReport] = {}
-    for pad in paden:
-        rapport = lees_shacl_rapport(Path(pad))
-        eerder = rapporten.get(rapport.cfk)
-        if eerder is not None:
-            raise NulmetingError(
-                f"Twee rapporten voor CFK {rapport.cfk!r}: {eerder.source_file} en "
-                f"{rapport.source_file}. Geef er per conformiteitsklasse een."
-            )
-        rapporten[rapport.cfk] = rapport
+    voortgang.start_fase("SHACL-rapporten", len(paden))
+    try:
+        for pad in paden:
+            rapport = lees_shacl_rapport(Path(pad))
+            eerder = rapporten.get(rapport.cfk)
+            if eerder is not None:
+                raise NulmetingError(
+                    f"Twee rapporten voor CFK {rapport.cfk!r}: {eerder.source_file} en "
+                    f"{rapport.source_file}. Geef er per conformiteitsklasse een."
+                )
+            rapporten[rapport.cfk] = rapport
+            voortgang.stap(label=Path(pad).name)
+    finally:
+        voortgang.einde_fase()
+
+    overtollig = sorted(cfk for cfk in rapporten if cfk not in vereiste_cfk)
+    if overtollig:
+        bestanden = ", ".join(f"{cfk}={rapporten[cfk].source_file}" for cfk in overtollig)
+        raise NulmetingError(
+            f"Rapport(en) voor niet-gekozen conformiteitsklasse(n) {', '.join(overtollig)} "
+            f"({bestanden}). Deze run toetst op {', '.join(vereiste_cfk)}; laat ze weg of "
+            f"breid de keuze uit."
+        )
 
     ontbreekt = [cfk for cfk in vereiste_cfk if cfk not in rapporten]
     if ontbreekt:
@@ -77,4 +204,8 @@ def laad_nulmeting(paden: list[Path], vereiste_cfk: list[str]) -> Nulmeting:
             f"Toets ze op dezelfde dataset."
         )
 
-    return Nulmeting(dataset_file=datasets.pop(), reports=rapporten)
+    return Nulmeting(
+        dataset_file=datasets.pop(),
+        reports=rapporten,
+        meetbereik=Meetbereik.van(volledige_cfk or vereiste_cfk, vereiste_cfk),
+    )

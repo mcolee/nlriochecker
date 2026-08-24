@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 
-from rdflib import RDF, RDFS, Graph, URIRef
+import pyoxigraph
+from rdflib import RDF, RDFS, BNode, URIRef
 from rdflib.term import Node as RdfNode
 from shapely.geometry import LineString, Point
 
@@ -21,6 +22,8 @@ from nlriochecker.geometry import (
     parse_gml,
     parse_gml_z,
 )
+from nlriochecker.graaf import GraafIndex
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 GWSW = "http://data.gwsw.nl/1.6/totaal/"
 
@@ -30,6 +33,12 @@ FALLBACK_ENCODING = "cp850"
 
 HAS_ASPECT = URIRef(f"{GWSW}hasAspect")
 HAS_PART = URIRef(f"{GWSW}hasPart")
+# Het GWSW declareert `isPartOf owl:inverseOf hasPart` en `isAspectOf owl:inverseOf
+# hasAspect`. Een conforme export mag dus de inverse schrijven; wie alleen de
+# voorwaartse richting leest, krijgt van zo'n export een leeg domeinmodel zonder een
+# enkele melding. Lees daarom beide, net als bij hasConnection.
+IS_PART_OF = URIRef(f"{GWSW}isPartOf")
+IS_ASPECT_OF = URIRef(f"{GWSW}isAspectOf")
 HAS_CONNECTION = URIRef(f"{GWSW}hasConnection")
 HAS_VALUE = URIRef(f"{GWSW}hasValue")
 HAS_REFERENCE = URIRef(f"{GWSW}hasReference")
@@ -57,6 +66,13 @@ KLASSE_BEGINPUNT = KLASSEN_BEGINPUNT[0]
 KLASSE_EINDPUNT = KLASSEN_EINDPUNT[0]
 KLASSE_BOB_BEGIN = URIRef(f"{GWSW}BobBeginpuntLeiding")
 KLASSE_BOB_EIND = URIRef(f"{GWSW}BobEindpuntLeiding")
+
+# De twee wortels waarmee de lader knopen en strengen uit de graaf haalt. Blijft de
+# afsluiting van een van beide op de wortel zelf steken, dan valt dat lezen terug op
+# geometrie; `GwswDataset.klassenhierarchie_bekend` is precies die vraag.
+WORTEL_KNOOPPUNT = "Knooppunt"
+WORTEL_VERBINDING = "Verbinding"
+WORTELS_VOOR_HERKENNING = (WORTEL_KNOOPPUNT, WORTEL_VERBINDING)
 
 
 @dataclass(frozen=True)
@@ -101,6 +117,24 @@ class Aspect:
         return _as_date(self.value)
 
 
+@dataclass(frozen=True)
+class Vulwaarde:
+    """Een hoogtekenmerk dat een vulwaarde droeg en bij het lezen als ontbrekend geldt."""
+
+    kind: str
+    value: float
+
+
+# De kenmerken waarop `markeer_vulwaarden` werkt: precies de vier velden die zij
+# inspecteert (KLASSE_MAAIVELDHOOGTE, KLASSE_PUTDEKSELNIVEAU, KLASSE_BOB_BEGIN en
+# KLASSE_BOB_EIND). Een andere naam in `[vulwaarden] hoogte_kenmerken` -- een tikfout,
+# of een kenmerk dat de pijplijn niet inleest -- zou stil niets doen terwijl ATTR-013
+# meldt dat de regel is toegepast; `checkconfig.VulwaardeOptions` weigert hem daarom.
+VULWAARDE_KENMERKEN: frozenset[str] = frozenset(
+    {"Maaiveldhoogte", "Putdekselniveau", "BobBeginpuntLeiding", "BobEindpuntLeiding"}
+)
+
+
 class _MetAspecten:
     """Toegang tot de kenmerken van een object, per GWSW-klassenaam."""
 
@@ -140,13 +174,14 @@ class Node(_MetAspecten):
     orientation_types: frozenset[str]
     point: Point | None
     z: float | None
-    parent: str | None
+    parents: tuple[str, ...]
     aspects: tuple[Aspect, ...] = ()
     maaiveld_aspect: Aspect | None = None
     maaiveld_inwinning: Inwinning | None = None
     deksel_aspect: Aspect | None = None
     deksel_inwinning: Inwinning | None = None
     multipart: bool = False
+    vulwaarden: tuple[Vulwaarde, ...] = ()
 
     @property
     def maaiveld(self) -> float | None:
@@ -203,6 +238,7 @@ class Conduit(_MetAspecten):
     aspects: tuple[Aspect, ...] = ()
     multipart: bool = False
     z_values: tuple[float | None, ...] = ()
+    vulwaarden: tuple[Vulwaarde, ...] = ()
 
     @property
     def z_start(self) -> float | None:
@@ -261,8 +297,8 @@ class Conduit(_MetAspecten):
         return self.reference("VormLeiding")
 
     @property
-    def aanlegjaar(self) -> int | None:
-        """Het jaartal uit de begindatum."""
+    def begindatum_jaar(self) -> int | None:
+        """Het jaartal uit de begindatum (GWSW-kenmerk `Begindatum`)."""
         datum = self.date("Begindatum")
         return datum.year if datum is not None else None
 
@@ -282,7 +318,7 @@ class GwswDataset:
     """De ingelezen dataset met de knooppunten, strengen en de klassenhierarchie."""
 
     source: Path
-    graph: Graph
+    graph: GraafIndex
     nodes: dict[str, Node]
     conduits: dict[str, Conduit]
     subclasses: dict[str, frozenset[str]]
@@ -290,9 +326,43 @@ class GwswDataset:
     decode_fallback: DecodeFallback | None = None
     ontologies: tuple[Path, ...] = ()
     structural_diff: dict[str, int] = field(default_factory=dict)
+    # Per kenmerktype de property die de ontologie voor zijn waarde voorschrijft
+    # (`hasValue` of `hasReference`), afgeleid uit de `owl:onProperty`-restricties.
+    # Dit is de ontologische kennis die ATTR-014 nodig heeft en die anders na het
+    # berekenen van `subclasses` verloren gaat; het is een klein afgeleid woordenboek
+    # zoals `subclasses`, niet de hele ontologiegraaf. Leeg zonder klassenkennis.
+    kenmerk_property: dict[str, str] = field(default_factory=dict)
+    # Memo voor `resolve_network_node`: de klim door hasPart is deterministisch en
+    # wordt in een run ruim een miljoen keer met dezelfde argumenten gevraagd.
+    # Bewust `init=False`: zo krijgt elke instantie -- ook een `replace()`-afgeleide
+    # zoals `subset()` -- een eigen, lege memo. Een uitgedunde dataset kan anders
+    # resolven dan de volle export (de wandeling ziet minder knopen), en een via
+    # `replace()` gedeelde dict zou antwoorden tussen de twee laten lekken.
+    # `cache._schrijf` slaat dit veld bij het picklen over.
+    _resolved_nodes: dict[tuple[str, tuple[str, ...]], str | None] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
 
     def is_a(self, uri: str, root: str) -> bool:
-        """Geeft aan of het object van het type `root` of een subklasse daarvan is."""
+        """Geeft aan of dit domeinobject van het type `root` of een subklasse is.
+
+        **Let op: dit is de smalle van de twee, en hij faalt stil.** `types_of()` kent
+        alleen knopen en strengen, dus voor een onderdeel dat via hasPart aan een put
+        hangt -- een overstortdrempel, een ledigingsvoorziening -- geeft deze methode
+        `False` en niet een fout. Wie hem daar per ongeluk gebruikt krijgt een dode
+        checktak die er groen uitziet; issue #34 vond er zo twee. `graph_is_a()` is de
+        strikte versterking (`graph_types_of ⊇ types_of`), dus de verkeerde keuze die
+        kant op is hooguit ruim -- en dat is precies waarom de kortste en algemeenst
+        klinkende naam de gevaarlijke is.
+
+        Twee redenen dat hij blijft bestaan. Hij drukt "is een gemodelleerde knoop of
+        streng van dit type" uit, en dat is wat `klim_naar_knoop` en `uitvoer/melding.py`
+        vragen: de eerste moet stoppen zodra hij een knoop uit het domeinmodel te pakken
+        heeft, de tweede weegt de prioriteit van een melding op het knoop- of
+        strengobject waaraan zij hangt. En hij spaart de
+        graafopvraging van `graph_types_of()` uit, die op elke wandeling over De Wolden en Hoogeveen
+        meetelt.
+        """
         object_types = self.types_of(uri)
         return bool(object_types & self.closure(root))
 
@@ -303,6 +373,9 @@ class GwswDataset:
         Lozingspunt, Overnamepunt en UitlaatPunt zijn subklassen van Knooppunt en
         staan dus op de orientatie, niet op de put of het bouwwerk zelf. Wie op
         zulke klassen wil selecteren, moet ze hier terugvinden.
+
+        Alleen knopen en strengen: een onderdeel dat via hasPart aan een put hangt
+        levert hier een lege verzameling op. Daarvoor is `graph_types_of()`.
         """
         if uri in self.nodes:
             node = self.nodes[uri]
@@ -310,6 +383,23 @@ class GwswDataset:
         if uri in self.conduits:
             return self.conduits[uri].types
         return frozenset()
+
+    def graph_types_of(self, uri: str) -> frozenset[str]:
+        """De typen van een willekeurige URI, ook als hij geen knoop of streng is.
+
+        `types_of()` kent alleen het domeinmodel. Een constructieonderdeel als een
+        overstortdrempel of een ledigingsvoorziening hangt via hasPart aan een put
+        en draagt geen Knooppunt-orientatie; het wordt dus nooit een knoop en is met
+        `types_of()` niet te herkennen. Hier komt het type rechtstreeks uit de graaf,
+        met de typen uit het domeinmodel erbij, zodat een orientatieklasse als
+        Lozingspunt vindbaar blijft.
+        """
+        uit_graaf = {str(soort) for soort in self.graph.objects(URIRef(uri), RDF.type)}
+        return self.types_of(uri) | uit_graaf
+
+    def graph_is_a(self, uri: str, root: str) -> bool:
+        """Als `is_a`, maar ook voor onderdelen die alleen in de graaf staan."""
+        return bool(self.graph_types_of(uri) & self.closure(root))
 
     def beheerobjecttype(self, uri: str) -> str:
         """De korte naam van het beheerobjecttype van een object.
@@ -320,11 +410,33 @@ class GwswDataset:
         knoop heet Uitlaatconstructie, niet Bouwwerkorientatie. De typen van het
         object zelf gaan daarom voor; alleen als die ontbreken valt de naam terug
         op het aspect.
+
+        Draagt een object meer dan een type, dan wint het meest specifieke: een type
+        waarvan een ander type uit dezelfde verzameling een subklasse is, is de
+        algemenere van de twee en valt af. Die rangorde komt uit de
+        subsumptierelatie van de ontologie en nergens anders vandaan. Blijven er
+        onvergelijkbare typen over -- het GWSW is een meervoudige hierarchie, dus
+        dat kan -- dan wint alfabetisch de eerste; willekeurig, maar deterministisch.
         """
         node = self.nodes.get(uri)
         types = node.types if node is not None and node.types else self.types_of(uri)
-        namen = sorted(naam.rsplit("/", 1)[-1] for naam in types)
+        namen = sorted(_short(naam) for naam in self._meest_specifiek(types))
         return namen[0] if namen else ""
+
+    def _meest_specifiek(self, types: frozenset[str]) -> frozenset[str]:
+        """De typen waarvan geen ander type uit dezelfde verzameling een subklasse is."""
+        if len(types) < 2:
+            return types
+        algemener = {
+            soort
+            for soort in types
+            # `closure` is zelf-insluitend; het type zelf mag zichzelf niet wegstrepen.
+            for ander in types & self.subclasses.get(soort, frozenset())
+            if ander != soort
+        }
+        # `or types`: bij een cyclus in de ontologie (A subklasse van B en andersom)
+        # zou alles wegvallen, en een object zonder soortnaam is de slechtste uitkomst.
+        return (types - algemener) or types
 
     def resolve_network_node(self, uri: str | None, roots: list[str]) -> str | None:
         """Herleidt een gekoppeld object naar het knooppunt waar het onderdeel van is.
@@ -333,16 +445,67 @@ class GwswDataset:
         koppeling ook naar een compartiment of een hulpstuk. Voor de netwerkanalyse
         telt de put eromheen, dus wordt via hasPart omhooggelopen tot een object van
         een van de opgegeven wortelklassen.
+
+        Gememoiseerd per (uri, wortels): de wandeling is deterministisch en de
+        checks stellen dezelfde vraag ruim een miljoen keer per run. De wortels
+        horen in de sleutel -- in de praktijk zijn ze constant binnen een run, maar
+        een memo die dat stilzwijgend aanneemt zou bij een afwijkende aanroep het
+        verkeerde antwoord teruggeven.
         """
-        gezien: set[str] = set()
-        huidig = uri
-        while huidig is not None and huidig not in gezien:
-            gezien.add(huidig)
-            if any(self.is_a(huidig, root) for root in roots):
-                return huidig
-            node = self.nodes.get(huidig)
-            huidig = node.parent if node is not None else None
-        return None
+        if uri is None:
+            return None
+        sleutel = (uri, tuple(roots))
+        if sleutel not in self._resolved_nodes:
+            self._resolved_nodes[sleutel] = self.klim_naar_knoop(uri, roots)[0]
+        return self._resolved_nodes[sleutel]
+
+    def klim_naar_knoop(
+        self, uri: str | None, roots: list[str]
+    ) -> tuple[str | None, frozenset[str]]:
+        """De knoop boven dit object, plus de knopen die de wandeling erheen tegenkwam.
+
+        In de breedte en niet langs een enkel pad: een onderdeel kan meer dan een
+        houder hebben (`Node.parents`), en de eerste die rdflib oplevert hoeft niet
+        de houder te zijn die op een knoop uitkomt. Een enkelpadswandeling zou dan
+        leeg teruggeven terwijl er wel degelijk een put boven hangt, en welke houder
+        "de eerste" is hangt af van de schrijfvolgorde van de export.
+        `nulbevinding._Joiner` loopt om diezelfde reden al in de breedte omhoog.
+
+        Bij gelijke diepte wint de kleinste URI: willekeurig maar deterministisch,
+        en dat is wat telt -- twee runs op dezelfde bestanden moeten dezelfde
+        meldingen opleveren.
+
+        De tweede uitkomst is de verzameling bezochte schakels die zelf in `nodes`
+        staan; `afbakening` heeft die nodig om ze in de analyseset te houden, anders
+        loopt dezelfde wandeling op de uitgedunde dataset dood. Bewust ruimer dan het
+        gevonden pad: het zijn alle bezochte knopen, dus ook broers op de laag waar de
+        knoop gevonden werd en takken die doodliepen. Met enkelvoudige houders vallen
+        de twee samen; met meervoudige houders is dit een superset. Dat is de veilige
+        kant -- de lezer gebruikt hem om de wandeling herhaalbaar te houden op een
+        uitgedunde dataset, en een schakel te veel bewaren kost hoogstens ruimte,
+        terwijl er een te weinig de wandeling laat doodlopen.
+        """
+        if uri is None:
+            return None, frozenset()
+        gezien = {uri}
+        laag = [uri]
+        while laag:
+            for huidig in laag:
+                if any(self.is_a(huidig, root) for root in roots):
+                    return huidig, self._schakels(gezien)
+            hoger: set[str] = set()
+            for huidig in laag:
+                node = self.nodes.get(huidig)
+                if node is not None:
+                    hoger.update(node.parents)
+            volgende = sorted(hoger - gezien)
+            gezien.update(volgende)
+            laag = volgende
+        return None, self._schakels(gezien)
+
+    def _schakels(self, bezocht: set[str]) -> frozenset[str]:
+        """De bezochte URI's die een knoop zijn; de rest hoort niet in een analyseset."""
+        return frozenset(uri for uri in bezocht if uri in self.nodes)
 
     def richting_van_geometrie(
         self, conduit: Conduit, roots: list[str]
@@ -377,10 +540,66 @@ class GwswDataset:
 
     def closure(self, root: str) -> frozenset[str]:
         """De klasse zelf plus al haar subklassen, als volledige URI's."""
-        return self.subclasses.get(_uri(root), frozenset({_uri(root)}))
+        return _afsluiting(self.subclasses, root)
+
+    @property
+    def klassenhierarchie_bekend(self) -> bool:
+        """Of de lader knopen en strengen aan hun GWSW-type heeft kunnen herkennen.
+
+        Precies dezelfde vraag die `load_dataset` stelt, en met dezelfde functie
+        gesteld: `_bruikbare_afsluiting` levert `None` waar de afsluiting van een
+        wortel op die wortel zelf blijft steken, en dan valt het lezen van die kant
+        terug op geometrie -- een knooppunt zonder punt valt dan buiten de selectie en
+        een object met een punt dat geen knooppunt is valt erbinnen. Wat er dan uit de
+        checks komt draagt geen oordeel, en de uitvoer moet dat kunnen zeggen.
+
+        `bool(self.subclasses)` was hier eerder het antwoord, en dat is een ander en
+        ruimer predicaat: een enkele subklasserelatie ergens in de export -- ook een
+        die met knopen en strengen niets te maken heeft -- zette het op `True` terwijl
+        de lader wel degelijk op geometrie terugviel. Een deel van de TTL-fixtures in
+        deze repo zit in die tussentoestand: hierarchie voor `Put` en `Leiding`, geen
+        voor `Knooppunt` en `Verbinding`.
+
+        Niet af te lezen aan `ontologies`: een handgeschreven fixture die haar eigen
+        subklassen declareert heeft geen ontologiebestand nodig en toetst wel degelijk.
+        De vraag is wat de graaf over klassen weet, niet waar die kennis vandaan komt.
+        """
+        return all(
+            _bruikbare_afsluiting(self.subclasses, wortel) is not None
+            for wortel in WORTELS_VOOR_HERKENNING
+        )
+
+    def is_connection_class(self, root: str) -> bool:
+        """Geeft aan of deze klasse in de Verbinding-afsluiting valt.
+
+        Zulke klassen staan op de orientatie van een streng, en `Conduit` draagt
+        haar orientatietypen niet zoals `Node` dat wel doet; een selectie erop kan
+        dus nooit een treffer geven. `of_class()` weigert er een, want daar is de
+        klassenaam configuratie. Wie een klassenaam uit een *meting* krijgt --
+        `analysis.bepaal_typeringspoort` leest ze uit de CfkTypes_typ-regels van de
+        SHACL-nulmeting -- vraagt het hier vooraf: een meetuitkomst hoort de run
+        niet te laten vallen, maar als onbeoordeelbaar in het rapport te komen.
+
+        Zonder ontologie is de afsluiting alleen `Verbinding` zelf, dus dan wordt
+        alleen die naam herkend.
+        """
+        return _uri(root) in self.closure("Verbinding")
 
     def of_class(self, root: str) -> list[str]:
-        """De URI's van alle knooppunten en strengen van dit type."""
+        """De URI's van alle knooppunten en strengen van dit type.
+
+        Een klasse uit de Verbinding-afsluiting kan hier nooit een treffer geven
+        (zie `is_connection_class`). De selectie zou stil nul opleveren, en die nul
+        is niet te onderscheiden van een dataset zonder die objecten; op een
+        geconfigureerde rol is dat daarom een harde fout.
+        """
+        if self.is_connection_class(root):
+            raise DatasetError(
+                f"{root} is een verbindingsklasse en kan als rol nooit een object opleveren: "
+                f"die klassen staan op de orientatie van een streng, en het domeinmodel "
+                f"draagt de orientatietypen van een streng niet. Configureer de klasse van "
+                f"het object zelf, bijvoorbeeld een subklasse van Leiding."
+            )
         gesloten = self.closure(root)
         return [uri for uri in (*self.nodes, *self.conduits) if self.types_of(uri) & gesloten]
 
@@ -395,10 +614,85 @@ class GwswDataset:
             gevonden.extend(self.graph.subjects(RDF.type, URIRef(klasse)))
         return gevonden
 
+    def onderdelen(self, uri: str, wortel: str | None = None) -> list[str]:
+        """De directe onderdelen van een object, optioneel beperkt tot een klasse.
+
+        De neerwaartse tegenhanger van `klim_naar_knoop`: een stap langs hasPart
+        omlaag, in beide schrijfrichtingen. Met een `wortel` blijven alleen de delen
+        over die volgens `graph_is_a` van die klasse zijn -- ook delen die geen knoop
+        of streng zijn, zoals een overstortdrempel. De volgorde is de graafvolgorde
+        van `parts_of`, ongewijzigd; sorteren zou de uitvoer van de checks die hierop
+        leunen veranderen.
+
+        Voorbehoud: het wortelfilter loopt via `graph_types_of`, dat zijn subject nog
+        met een vaste `URIRef(uri)` opzoekt -- een BNode-onderdeel valt daar dus uit
+        het gefilterde antwoord, terwijl de ongefilterde lijst (en `onderdeel_label`/
+        `onderdeel_aspecten`, via `_subject_term`) hem wel ziet.
+        """
+        delen = [str(deel) for deel in parts_of(self.graph, self._subject_term(uri))]
+        if wortel is None:
+            return delen
+        return [deel for deel in delen if self.graph_is_a(deel, wortel)]
+
+    def onderdeel_label(self, uri: str) -> str | None:
+        """Het rdfs:label van een willekeurig subject in de graaf, of None.
+
+        Ook voor onderdelen die geen `Node` of `Conduit` zijn en dus geen eigen
+        labelveld in het domeinmodel hebben.
+        """
+        waarde = self.graph.value(self._subject_term(uri), RDFS.label)
+        return str(waarde) if waarde is not None else None
+
+    def onderdeel_aspecten(self, uri: str) -> list[Aspect]:
+        """De kenmerken die via hasAspect aan een willekeurig subject hangen.
+
+        Dezelfde lezing als `_read_aspects`, maar dan als methode: de checks hoeven
+        de graaf er niet meer voor aan te raken.
+        """
+        return list(_read_aspects(self.graph, self._subject_term(uri)))
+
+    def _subject_term(self, uri: str) -> RdfNode:
+        """De graafterm achter deze URI-tekst: de URIRef, of anders de BNode.
+
+        De `onderdeel_*`-lezers krijgen hun subject als tekst, meestal via
+        `str(subject)` op een term uit `subjects_of_class`. Voor een BNode-subject
+        verloor de vaste `URIRef(uri)`-omweg dan het label en de kenmerken (bevinding
+        uit de review van issue #26): `str(BNode("b1"))` is "b1", en `URIRef("b1")`
+        staat nergens in de graaf. Hier wint de URIRef als die als subject voorkomt;
+        anders telt de gelijknamige BNode. Een tekst die geen van beide is, blijft de
+        URIRef -- hetzelfde lege antwoord als voorheen.
+        """
+        term: RdfNode = URIRef(uri)
+        if self.graph.heeft_subject(term):
+            return term
+        bnode = BNode(uri)
+        if self.graph.heeft_subject(bnode):
+            return bnode
+        return term
+
+    def stelsel_leden(self, uri: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """De streng- en knoop-URI's die dit stelsel via `hasPart` draagt.
+
+        Twee gesorteerde tuples: (strengen, knopen). Voor de stelsellaag (#25) en de
+        nulmetingjoin, die allebei hetzelfde onderscheid nodig hebben en niet uit elkaar
+        mogen lopen. Een stelsel met knopen erin is een gemeentebrede `_geb_0`-bucket
+        (#17): die verzamelt de putten van een heel type naast verspreide strengen en is
+        geen lokaal stelsel -- de stelsellaag slaat hem daarom over.
+        """
+        strengen: list[str] = []
+        knopen: list[str] = []
+        for lid in parts_of(self.graph, URIRef(uri)):
+            fragment = str(lid)
+            if fragment in self.conduits:
+                strengen.append(fragment)
+            elif fragment in self.nodes:
+                knopen.append(fragment)
+        return tuple(sorted(strengen)), tuple(sorted(knopen))
+
     def subset(self, uris: Iterable[str]) -> GwswDataset:
         """Dezelfde dataset met alleen deze knopen en verbindingen.
 
-        De rdflib-graaf gaat ongewijzigd mee: hij is de bron waaruit de checks hun
+        De graafindex gaat ongewijzigd mee: hij is de bron waaruit de checks hun
         onderdelen opzoeken, en hem meesnijden zou stilzwijgend gegevens weglaten.
         Alleen `subjects_of_class()` loopt daardoor nog over de volledige export;
         dat zijn de drempels in NET-007 en RVZ, en dat staat in het rapport.
@@ -424,6 +718,49 @@ def _short(uri: str) -> str:
     return uri.rsplit("/", 1)[-1].rsplit("#", 1)[-1]
 
 
+def _beide_richtingen(
+    voorwaarts: Iterable[RdfNode], invers: Iterable[RdfNode]
+) -> Iterator[RdfNode]:
+    """De termen uit beide schrijfrichtingen, elk hoogstens een keer.
+
+    Een export mag `hasPart` schrijven, `isPartOf`, of allebei; in het laatste geval
+    zou een dubbel kenmerk of een dubbel onderdeel ontstaan. De voorwaartse richting
+    gaat voorop, zodat de volgorde niet verandert voor de exports die alleen die
+    richting schrijven.
+    """
+    gezien: set[RdfNode] = set()
+    for term in voorwaarts:
+        gezien.add(term)
+        yield term
+    for term in invers:
+        if term not in gezien:
+            yield term
+
+
+def parts_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
+    """De onderdelen van een object, in beide schrijfrichtingen van hasPart."""
+    return _beide_richtingen(graph.objects(subject, HAS_PART), graph.subjects(IS_PART_OF, subject))
+
+
+def part_holders_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
+    """De objecten die dit object als onderdeel bevatten, in beide schrijfrichtingen."""
+    return _beide_richtingen(graph.subjects(HAS_PART, subject), graph.objects(subject, IS_PART_OF))
+
+
+def aspects_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
+    """De aspecten van een object, in beide schrijfrichtingen van hasAspect."""
+    return _beide_richtingen(
+        graph.objects(subject, HAS_ASPECT), graph.subjects(IS_ASPECT_OF, subject)
+    )
+
+
+def aspect_holders_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
+    """De objecten die dit object als aspect dragen, in beide schrijfrichtingen."""
+    return _beide_richtingen(
+        graph.subjects(HAS_ASPECT, subject), graph.objects(subject, IS_ASPECT_OF)
+    )
+
+
 ISO_DATUM = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
 JAARTAL = re.compile(r"^(\d{4})$")
 
@@ -447,14 +784,14 @@ def _as_date(waarde: str | None) -> date | None:
     return None
 
 
-def _read_aspects(graph: Graph, subject: RdfNode) -> tuple[Aspect, ...]:
+def _read_aspects(graph: GraafIndex, subject: RdfNode) -> tuple[Aspect, ...]:
     """Leest de kenmerken die via hasAspect aan een object hangen.
 
     Aspecten zonder waarde en zonder verwijzing zijn geen kenmerken maar
     orientaties en geometrieen; die horen hier niet thuis en vallen af.
     """
     gevonden: list[Aspect] = []
-    for aspect in graph.objects(subject, HAS_ASPECT):
+    for aspect in aspects_of(graph, subject):
         waarde = graph.value(aspect, HAS_VALUE)
         referentie = graph.value(aspect, HAS_REFERENCE)
         if waarde is None and referentie is None:
@@ -472,14 +809,14 @@ def _read_aspects(graph: Graph, subject: RdfNode) -> tuple[Aspect, ...]:
     return tuple(gevonden)
 
 
-def _read_inwinning(graph: Graph, subject: RdfNode) -> Inwinning | None:
+def _read_inwinning(graph: GraafIndex, subject: RdfNode) -> Inwinning | None:
     """Leest de inwinningsmetagegevens die aan een kenmerk hangen."""
-    for aspect in graph.objects(subject, HAS_ASPECT):
+    for aspect in aspects_of(graph, subject):
         if (aspect, RDF.type, KLASSE_INWINNING) not in graph:
             continue
         wijze: str | None = None
         datum: date | None = None
-        for deel in graph.objects(aspect, HAS_ASPECT):
+        for deel in aspects_of(graph, aspect):
             if (deel, RDF.type, KLASSE_WIJZE_VAN_INWINNING) in graph:
                 referentie = graph.value(deel, HAS_REFERENCE)
                 wijze = _short(str(referentie)) if referentie is not None else None
@@ -492,9 +829,9 @@ def _read_inwinning(graph: Graph, subject: RdfNode) -> Inwinning | None:
     return None
 
 
-def _aspect_van_klasse(graph: Graph, subject: RdfNode, klasse: URIRef) -> Aspect | None:
+def _aspect_van_klasse(graph: GraafIndex, subject: RdfNode, klasse: URIRef) -> Aspect | None:
     """Het kenmerk van deze klasse dat direct aan het object hangt."""
-    for aspect in graph.objects(subject, HAS_ASPECT):
+    for aspect in aspects_of(graph, subject):
         if (aspect, RDF.type, klasse) not in graph:
             continue
         waarde = graph.value(aspect, HAS_VALUE)
@@ -508,7 +845,9 @@ def _aspect_van_klasse(graph: Graph, subject: RdfNode, klasse: URIRef) -> Aspect
     return None
 
 
-def _maaiveld_kenmerk(graph: Graph, orientation: RdfNode) -> tuple[Aspect | None, Inwinning | None]:
+def _maaiveld_kenmerk(
+    graph: GraafIndex, orientation: RdfNode
+) -> tuple[Aspect | None, Inwinning | None]:
     """De maaiveldhoogte bij een knooppunt, met de herkomst ervan.
 
     Het GWSW hangt het maaiveld niet aan de put zelf maar aan een aparte
@@ -523,10 +862,10 @@ def _maaiveld_kenmerk(graph: Graph, orientation: RdfNode) -> tuple[Aspect | None
     return None, None
 
 
-def _herkomst(graph: Graph, orientation: RdfNode, aspect: Aspect) -> Inwinning | None:
+def _herkomst(graph: GraafIndex, orientation: RdfNode, aspect: Aspect) -> Inwinning | None:
     """De inwinning van een kenmerk, met terugval op die van de puntgeometrie.
 
-    De BrutIS-export van De Wolden hangt een record-brede inwinningswijze aan het
+    De BrutIS-export van De Wolden en Hoogeveen hangt een record-brede inwinningswijze aan het
     Punt-aspect van de orientatie en herhaalt hem op het kenmerk zelf. Bij AHN2
     blijft die herhaling uit: dan staat de wijze uitsluitend op het Punt. Zonder
     deze terugval zou juist de uit het AHN afgeleide helft van de maaiveldhoogten
@@ -539,7 +878,7 @@ def _herkomst(graph: Graph, orientation: RdfNode, aspect: Aspect) -> Inwinning |
 
 
 def _deksel_kenmerk(
-    graph: Graph, subject: RdfNode, deksel_klassen: frozenset[str]
+    graph: GraafIndex, subject: RdfNode, deksel_klassen: frozenset[str]
 ) -> tuple[Aspect | None, Inwinning | None]:
     """Het putdekselniveau van een put, met de herkomst ervan.
 
@@ -547,15 +886,31 @@ def _deksel_kenmerk(
     exports hangen het rechtstreeks aan de put. Beide wegen worden gevolgd. De
     herkomst volgt dezelfde terugval als bij de maaiveldhoogte: staat er geen
     inwinning op het kenmerk zelf, dan telt die van de puntgeometrie ernaast.
+
+    `deksel_klassen` is de subklasse-afsluiting van Putdeksel, niet een enkele
+    klasse: het GWSW kent `Putdeksel_LichtVerkeer` en `Putdeksel_ZwaarVerkeer` als
+    subklassen, en een exacte typevergelijking zou zo'n put stilzwijgend haar
+    dekselniveau afnemen -- waarna `Node.bovenkant` op het maaiveld terugvalt zonder
+    dat iemand het merkt.
+
+    **Wat hier niet gedekt is.** De afsluiting stopt bij `Putdeksel`. Het GWSW hangt
+    onder `Deksel` ook `Straatpot`, `Drainputdeksel` en `Peilbuisdeksel` -- zusters
+    van `Putdeksel`, geen subklassen -- en onder `Afdekking` daarnaast `Rooster`,
+    `Luik` en `Afdekplaat`. Een put met een `Straatpot` die netjes een
+    `Dekselorientatie` met een `Putdekselniveau` draagt, verliest dat niveau hier dus
+    nog steeds, met dezelfde stille terugval op het maaiveld. Verbreden naar `Deksel`
+    of `Afdekking` is een domeinkeuze -- telt het niveau onder een rooster als
+    putdekselniveau? -- en die ligt bij de auteur, niet hier. Zie het rapport bij
+    issue #36.
     """
     direct = _aspect_van_klasse(graph, subject, KLASSE_PUTDEKSELNIVEAU)
     if direct is not None:
         return direct, _herkomst(graph, subject, direct)
 
-    for deel in graph.objects(subject, HAS_PART):
+    for deel in parts_of(graph, subject):
         if not any((deel, RDF.type, URIRef(klasse)) in graph for klasse in deksel_klassen):
             continue
-        for orientatie in graph.objects(deel, HAS_ASPECT):
+        for orientatie in aspects_of(graph, deel):
             aspect = _aspect_van_klasse(graph, orientatie, KLASSE_PUTDEKSELNIVEAU)
             if aspect is not None:
                 return aspect, _herkomst(graph, orientatie, aspect)
@@ -569,20 +924,41 @@ def load_dataset(
     dataset_path: Path,
     ontology_paths: list[Path] | None = None,
     fallback_encoding: str = FALLBACK_ENCODING,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
 ) -> GwswDataset:
-    """Leest de OroX-dataset en de ontologie(en) en bouwt het domeinmodel op."""
+    """Leest de OroX-dataset en de ontologie(en) en bouwt het domeinmodel op.
+
+    De voortgang gaat per bestand. rdflib geeft geen tussenstand binnen een bestand,
+    en juist het parsen van de dataset is de lange stap; er wordt daarom geen
+    percentage getoond dat er niet is.
+    """
     dataset_path = Path(dataset_path)
-    graph, fallback = _parse(dataset_path, fallback_encoding)
+    voortgang.start_fase("TTL laden", 1 + len(ontology_paths or []))
+    try:
+        graph, fallback = _parse(dataset_path, fallback_encoding)
+        voortgang.stap(label=dataset_path.name)
 
-    ontology = Graph()
-    for pad in ontology_paths or []:
-        ontology += _parse(Path(pad), fallback_encoding)[0]
+        ontology = GraafIndex()
+        for pad in ontology_paths or []:
+            _parse(Path(pad), fallback_encoding, index=ontology)
+            voortgang.stap(label=Path(pad).name)
+    finally:
+        voortgang.einde_fase()
 
-    subclasses = _subclass_closure(ontology or graph)
+    restrictiebron = ontology if len(ontology) else graph
+    subclasses = _subclass_closure(restrictiebron)
+    kenmerk_property = _kenmerk_properties(restrictiebron, subclasses)
     geometry_errors: dict[str, str] = {}
-    knooppunt = _bruikbare_afsluiting(subclasses, "Knooppunt")
-    verbinding = _bruikbare_afsluiting(subclasses, "Verbinding")
-    nodes = _read_nodes(graph, geometry_errors, knooppunt)
+    # Dezelfde twee vragen die `GwswDataset.klassenhierarchie_bekend` stelt, met
+    # dezelfde functie: `None` hier betekent terugval op geometrie, en dat is precies
+    # wat het voorbehoud in de uitvoer zegt.
+    knooppunt = _bruikbare_afsluiting(subclasses, WORTEL_KNOOPPUNT)
+    verbinding = _bruikbare_afsluiting(subclasses, WORTEL_VERBINDING)
+    # De afsluiting, niet de kale klasse: zie `_deksel_kenmerk`. Zonder klassenkennis
+    # blijft het bij Putdeksel zelf, net als bij elke andere `closure()`.
+    deksel = _afsluiting(subclasses, "Putdeksel")
+    nodes = _read_nodes(graph, geometry_errors, knooppunt, deksel)
     conduits = _read_conduits(graph, nodes, geometry_errors, verbinding)
 
     if not nodes and not conduits:
@@ -600,10 +976,73 @@ def load_dataset(
         geometry_errors=geometry_errors,
         decode_fallback=fallback,
         ontologies=tuple(Path(pad) for pad in ontology_paths or []),
+        kenmerk_property=kenmerk_property,
     )
-    if knooppunt or verbinding:
-        dataset.structural_diff.update(_structural_diff(graph, nodes, conduits))
+    # Altijd, en juist ook zonder klassenkennis: dan laat het verschil zien dat de
+    # ontologische route nul objecten oplevert en de hele lezing op geometrie rust.
+    dataset.structural_diff.update(_structural_diff(graph, subclasses))
     return dataset
+
+
+def markeer_vulwaarden(
+    dataset: GwswDataset, kenmerken: Sequence[str], band_m: float
+) -> GwswDataset:
+    """Leest een hoogtekenmerk binnen de vulwaardeband als niet geregistreerd.
+
+    Sommige exports schrijven 0,000 waar het kenmerk leeg hoort te zijn (De Wolden en Hoogeveen:
+    een kwart van de BOB's). De checks zouden die nul als meting lezen en er duizenden
+    hoogtefouten van maken. Deze stap zet zo'n kenmerk op `None` en onthoudt op het
+    object dat en welke waarde er stond, zodat ATTR-013 het een keer kan melden en de
+    hoogtechecks het object overslaan en dat in hun toelichting zeggen.
+
+    De stap staat los van het laden: de cache bewaart de ruwe parse, de band is
+    projectconfiguratie. De meegegeven dataset blijft onaangeraakt; met een lege
+    kenmerkenlijst is dit de identiteit.
+    """
+    if not kenmerken:
+        return dataset
+    gekozen = frozenset(kenmerken)
+
+    def vulwaarde(aspect: Aspect | None) -> Vulwaarde | None:
+        """De vulwaarde die dit kenmerk draagt, of None als het een meting is."""
+        if aspect is None or aspect.kind not in gekozen:
+            return None
+        getal = aspect.number
+        if getal is None or abs(getal) > band_m:
+            return None
+        return Vulwaarde(aspect.kind, getal)
+
+    nodes: dict[str, Node] = {}
+    for uri, node in dataset.nodes.items():
+        maaiveld, deksel = vulwaarde(node.maaiveld_aspect), vulwaarde(node.deksel_aspect)
+        gevonden = tuple(vul for vul in (maaiveld, deksel) if vul is not None)
+        nodes[uri] = (
+            replace(
+                node,
+                maaiveld_aspect=None if maaiveld is not None else node.maaiveld_aspect,
+                deksel_aspect=None if deksel is not None else node.deksel_aspect,
+                vulwaarden=gevonden,
+            )
+            if gevonden
+            else node
+        )
+
+    conduits: dict[str, Conduit] = {}
+    for uri, conduit in dataset.conduits.items():
+        begin, eind = vulwaarde(conduit.bob_start_aspect), vulwaarde(conduit.bob_end_aspect)
+        gevonden = tuple(vul for vul in (begin, eind) if vul is not None)
+        conduits[uri] = (
+            replace(
+                conduit,
+                bob_start_aspect=None if begin is not None else conduit.bob_start_aspect,
+                bob_end_aspect=None if eind is not None else conduit.bob_end_aspect,
+                vulwaarden=gevonden,
+            )
+            if gevonden
+            else conduit
+        )
+
+    return replace(dataset, nodes=nodes, conduits=conduits)
 
 
 @contextmanager
@@ -623,39 +1062,66 @@ def _quiet_rdflib():
         logger.setLevel(oud)
 
 
+def _afsluiting(subclasses: dict[str, frozenset[str]], wortel: str) -> frozenset[str]:
+    """De subklasse-afsluiting van een wortel; zonder klassenkennis de wortel zelf.
+
+    De enige plek waar die terugval opgeschreven staat. Stond hij er twee keer, dan
+    zou een van beide bij een wijziging achterblijven zonder dat het opvalt: een
+    afsluiting die stilzwijgend krimpt levert geen fout op maar een lege selectie.
+    """
+    return subclasses.get(_uri(wortel), frozenset({_uri(wortel)}))
+
+
 def _bruikbare_afsluiting(
     subclasses: dict[str, frozenset[str]], wortel: str
 ) -> frozenset[str] | None:
     """De subklasse-afsluiting van een wortel, of None als de ontologie ontbreekt."""
-    afsluiting = subclasses.get(_uri(wortel))
-    return afsluiting if afsluiting and len(afsluiting) > 1 else None
+    afsluiting = _afsluiting(subclasses, wortel)
+    return afsluiting if len(afsluiting) > 1 else None
 
 
-def _structural_diff(
-    graph: Graph, nodes: dict[str, Node], conduits: dict[str, Conduit]
-) -> dict[str, int]:
+def _houders(graph: GraafIndex, orientaties: Iterable[RdfNode]) -> set[str]:
+    """De objecten die deze orientaties dragen, als URI-teksten."""
+    return {
+        str(subject)
+        for orientation in orientaties
+        for subject in aspect_holders_of(graph, orientation)
+    }
+
+
+def _structural_diff(graph: GraafIndex, subclasses: dict[str, frozenset[str]]) -> dict[str, int]:
     """Vergelijkt de ontologische uitkomst met de structurele herkenning.
 
     Zonder ontologie herkent de lader knopen aan een puntgeometrie en verbindingen
     aan hun begin- en eindvertex. Die aanname is niet altijd waar: een knooppunt mag
     best geen geometrie hebben. Het verschil tussen beide manieren is een maat voor
     hoeveel de dataset op geometrie leunt, en hoort in het rapport te staan.
+
+    De ontologische kant wordt hier zelf uit de graaf gehaald en niet aan de al
+    ingelezen knopen ontleend. Anders zou dit instrument juist stil blijven in het
+    geval waarvoor het bedoeld is: zonder klassenkennis *zijn* die knopen de
+    structurele herkenning, en vergelijkt de telling zichzelf met zichzelf. Nu valt
+    de ontologische kant via `_afsluiting` terug op de kale wortelklasse -- op een
+    OroX-export die niets op wortelniveau typeert is dat nul, en dat is precies het
+    cijfer dat de lezer moet zien.
+
+    Neemt `subclasses` en niet de twee afsluitingen die `load_dataset` al berekende:
+    `_bruikbare_afsluiting` levert exact `None` waar `_afsluiting` een singleton
+    oplevert, dus die twee zouden hier alleen als omweg naar dezelfde uitkomst dienen.
     """
-    structureel_knopen = {
-        str(subject)
-        for orientation in _orientations_with(graph, KLASSE_PUNT)
-        for subject in graph.subjects(HAS_ASPECT, orientation)
-    }
-    structureel_strengen = {
-        str(subject)
-        for orientation in _leiding_orientations(graph)
-        for subject in graph.subjects(HAS_ASPECT, orientation)
-    }
+    ontologisch_knopen = _houders(
+        graph, _orientations_of_class(graph, _afsluiting(subclasses, "Knooppunt"))
+    )
+    ontologisch_strengen = _houders(
+        graph, _orientations_of_class(graph, _afsluiting(subclasses, "Verbinding"))
+    )
+    structureel_knopen = _houders(graph, _orientations_with(graph, KLASSE_PUNT))
+    structureel_strengen = _houders(graph, _leiding_orientations(graph))
 
     verschillen: dict[str, int] = {}
     for rol, ontologisch, structureel in (
-        ("knooppunten", set(nodes), structureel_knopen),
-        ("strengen", set(conduits), structureel_strengen),
+        ("knooppunten", ontologisch_knopen, structureel_knopen),
+        ("strengen", ontologisch_strengen, structureel_strengen),
     ):
         zonder_geometrie = len(ontologisch - structureel)
         geen_knoop = len(structureel - ontologisch)
@@ -666,8 +1132,18 @@ def _structural_diff(
     return verschillen
 
 
-def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | None]:
-    """Leest een enkel TTL-bestand in, desnoods via een terugvalcodering."""
+def _parse(
+    path: Path, fallback_encoding: str, index: GraafIndex | None = None
+) -> tuple[GraafIndex, DecodeFallback | None]:
+    """Leest een enkel TTL-bestand in, desnoods via een terugvalcodering.
+
+    Het parsen zelf gaat via pyoxigraph's Rust-parser (ordegrootten sneller dan rdflib's
+    pure-Python `notation3`); de triples vullen in stream-volgorde een `GraafIndex` met
+    rdflib-termen, zodat de checks en de rest van de lader hun vergelijkingen houden.
+    pyoxigraph verlangt UTF-8-bytes, dus de al gedecodeerde tekst wordt opnieuw als
+    UTF-8 gecodeerd -- niet de ruwe bytes, die immers cp850 kunnen zijn. Een meegegeven
+    `index` wordt aangevuld; zo stapelen meerdere ontologiebestanden in een index.
+    """
     try:
         rauw = path.read_bytes()
     except OSError as error:
@@ -675,13 +1151,17 @@ def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | 
 
     tekst, fallback = _decode(path, rauw, fallback_encoding)
 
-    graph = Graph()
+    index = index if index is not None else GraafIndex()
     try:
+        quads = pyoxigraph.parse(tekst.encode("utf-8"), format=pyoxigraph.RdfFormat.TURTLE)
+        # rdflib waarschuwt bij het bouwen van een literaal met een ongeldige lexicale
+        # vorm (de meegeleverde ontologie draagt een xsd:date "20210830" zonder streepjes);
+        # net als bij de oude parse hoort die traceback niet in de CLI-uitvoer thuis.
         with _quiet_rdflib():
-            graph.parse(data=tekst, format="turtle")
-    except Exception as error:  # rdflib gooit uiteenlopende parsefouten
+            index.vul_uit(quads)
+    except Exception as error:  # pyoxigraph gooit uiteenlopende parsefouten
         raise DatasetError(f"{path}: geen geldige Turtle ({error}).") from error
-    return graph, fallback
+    return index, fallback
 
 
 def _decode(path: Path, rauw: bytes, fallback_encoding: str) -> tuple[str, DecodeFallback | None]:
@@ -705,11 +1185,14 @@ def _decode(path: Path, rauw: bytes, fallback_encoding: str) -> tuple[str, Decod
             f"{eerste_positie}) en ook niet te lezen als {fallback_encoding} ({fout})."
         ) from fout
 
-    afwijkend = [byte for byte in rauw if byte > 0x7F]
+    # De niet-ASCII-bytes tellen zonder een Python-lus over alle 112 MB: `translate`
+    # verwijdert in C alle bytes 0x00-0x7F, en wat overblijft zijn er precies de bytes
+    # groter dan 0x7F.
+    byte_count = len(rauw.translate(None, bytes(range(0x80))))
     return tekst, DecodeFallback(
         path=path,
         encoding=fallback_encoding,
-        byte_count=len(afwijkend),
+        byte_count=byte_count,
         samples=_fallback_samples(rauw, fallback_encoding),
     )
 
@@ -731,7 +1214,7 @@ def _fallback_samples(rauw: bytes, encoding: str, limiet: int = 5) -> list[str]:
     return voorbeelden
 
 
-def _subclass_closure(graph: Graph) -> dict[str, frozenset[str]]:
+def _subclass_closure(graph: GraafIndex) -> dict[str, frozenset[str]]:
     """Berekent per klasse de verzameling van zichzelf en al haar subklassen."""
     kinderen: dict[str, set[str]] = {}
     for kind, ouder in graph.subject_objects(RDFS.subClassOf):
@@ -739,33 +1222,53 @@ def _subclass_closure(graph: Graph) -> dict[str, frozenset[str]]:
             kinderen.setdefault(str(ouder), set()).add(str(kind))
 
     afsluiting: dict[str, frozenset[str]] = {}
-    for ouder in kinderen:
-        gezien = {ouder}
-        stapel = [ouder]
+    # Een eigen naam voor de lus: `ouder` hierboven is een rdflib-term, hier een str.
+    for klasse in kinderen:
+        gezien = {klasse}
+        stapel = [klasse]
         while stapel:
             huidig = stapel.pop()
-            for kind in kinderen.get(huidig, ()):
-                if kind not in gezien:
-                    gezien.add(kind)
-                    stapel.append(kind)
-        afsluiting[ouder] = frozenset(gezien)
+            for afstammeling in kinderen.get(huidig, ()):
+                if afstammeling not in gezien:
+                    gezien.add(afstammeling)
+                    stapel.append(afstammeling)
+        afsluiting[klasse] = frozenset(gezien)
     return afsluiting
 
 
-def _label(graph: Graph, subject: RdfNode) -> str:
+def _kenmerk_properties(graph: GraafIndex, subclasses: dict[str, frozenset[str]]) -> dict[str, str]:
+    """Per kenmerktype de property die de ontologie voor zijn waarde voorschrijft.
+
+    Loopt over de subklassen van `Kenmerk` en houdt alleen de types die een
+    `hasValue`- of `hasReference`-restrictie dragen. Leest uit dezelfde graaf als
+    `subclasses` (de ontologie, of bij een fixture de dataset zelf), zodat het met
+    `--geen-ontologie` en inline-hierarchieen meebeweegt. Zonder klassenkennis blijft
+    de afsluiting op `Kenmerk` zelf steken en levert dit een leeg woordenboek.
+    """
+    from nlriochecker.ontologie import verwachte_property
+
+    gevonden: dict[str, str] = {}
+    for uri in _afsluiting(subclasses, "Kenmerk"):
+        property_ = verwachte_property(graph, URIRef(uri))
+        if property_ is not None:
+            gevonden[_short(uri)] = property_
+    return gevonden
+
+
+def _label(graph: GraafIndex, subject: RdfNode) -> str:
     """Het rdfs:label van een object, of een lege tekst."""
     waarde = graph.value(subject, RDFS.label)
     return str(waarde) if waarde is not None else ""
 
 
-def _types(graph: Graph, subject: RdfNode) -> frozenset[str]:
+def _types(graph: GraafIndex, subject: RdfNode) -> frozenset[str]:
     """Alle rdf:type-waarden van een object."""
     return frozenset(str(waarde) for waarde in graph.objects(subject, RDF.type))
 
 
-def _geometry(graph: Graph, orientation: RdfNode, klasse: URIRef, errors: dict[str, str]):
+def _geometry(graph: GraafIndex, orientation: RdfNode, klasse: URIRef, errors: dict[str, str]):
     """Zoekt de geometrie van een orientatie en geeft die met haar z-waarden terug."""
-    for aspect in graph.objects(orientation, HAS_ASPECT):
+    for aspect in aspects_of(graph, orientation):
         if (aspect, RDF.type, klasse) not in graph:
             continue
         literal = graph.value(aspect, HAS_VALUE)
@@ -780,10 +1283,10 @@ def _geometry(graph: Graph, orientation: RdfNode, klasse: URIRef, errors: dict[s
 
 
 def _read_nodes(
-    graph: Graph,
+    graph: GraafIndex,
     errors: dict[str, str],
     knooppunt_klassen: frozenset[str] | None = None,
-    deksel_klassen: frozenset[str] = frozenset({_uri("Putdeksel")}),
+    deksel_klassen: frozenset[str] | None = None,
 ) -> dict[str, Node]:
     """Leest de knooppunten van het netwerk.
 
@@ -793,6 +1296,7 @@ def _read_nodes(
     puntgeometrie), zodat een dataset ook zonder ontologie leesbaar blijft.
     """
     nodes: dict[str, Node] = {}
+    deksel_klassen = deksel_klassen or _afsluiting({}, "Putdeksel")
 
     if knooppunt_klassen:
         bron = _orientations_of_class(graph, knooppunt_klassen)
@@ -803,7 +1307,7 @@ def _read_nodes(
         point, z_waarden = _geometry(graph, orientation, KLASSE_PUNT, errors)
         maaiveld, maaiveld_inwinning = _maaiveld_kenmerk(graph, orientation)
         multipart = _is_multipart(graph, orientation, KLASSE_PUNT)
-        for subject in graph.subjects(HAS_ASPECT, orientation):
+        for subject in aspect_holders_of(graph, orientation):
             uri = str(subject)
             if uri in nodes:
                 continue
@@ -816,7 +1320,7 @@ def _read_nodes(
                 orientation_types=_types(graph, orientation),
                 point=point,
                 z=z_waarden[0] if z_waarden else None,
-                parent=_parent(graph, subject),
+                parents=_parents(graph, subject),
                 aspects=_read_aspects(graph, subject),
                 maaiveld_aspect=maaiveld,
                 maaiveld_inwinning=maaiveld_inwinning,
@@ -828,15 +1332,28 @@ def _read_nodes(
     return nodes
 
 
-def _parent(graph: Graph, subject: RdfNode) -> str | None:
-    """Het object dat dit object via hasPart bevat, als dat er is."""
-    for houder in graph.subjects(HAS_PART, subject):
-        if isinstance(houder, URIRef) and houder != subject:
-            return str(houder)
-    return None
+def _parents(graph: GraafIndex, subject: RdfNode) -> tuple[str, ...]:
+    """De objecten die dit object via hasPart bevatten, oplopend gesorteerd.
+
+    Alle houders en niet de eerste: het GWSW staat er meer dan een toe (een `Put`
+    hangt onder een Afwateringsgebied *en* een Straat, een `Overstortdrempel` onder
+    een Overstortput of een Overstortconstructie), en welke houder rdflib het eerst
+    oplevert hangt af van de schrijfvolgorde van de export. Een enkele houder
+    onthouden zou de wandeling van `klim_naar_knoop` op de verkeerde tak kunnen
+    zetten en daar laten doodlopen. De sortering maakt die wandeling reproduceerbaar.
+    """
+    return tuple(
+        sorted(
+            {
+                str(houder)
+                for houder in part_holders_of(graph, subject)
+                if isinstance(houder, URIRef) and houder != subject
+            }
+        )
+    )
 
 
-def _orientations_of_class(graph: Graph, klassen: frozenset[str]):
+def _orientations_of_class(graph: GraafIndex, klassen: frozenset[str]):
     """De orientaties waarvan het type in deze verzameling klassen valt."""
     gezien = set()
     for klasse in klassen:
@@ -846,18 +1363,18 @@ def _orientations_of_class(graph: Graph, klassen: frozenset[str]):
                 yield orientation
 
 
-def _orientations_with(graph: Graph, klasse: URIRef):
+def _orientations_with(graph: GraafIndex, klasse: URIRef):
     """De orientaties die via hasAspect een geometrie van dit type dragen."""
     gezien = set()
     for aspect in graph.subjects(RDF.type, klasse):
-        for orientation in graph.subjects(HAS_ASPECT, aspect):
+        for orientation in aspect_holders_of(graph, aspect):
             if orientation not in gezien:
                 gezien.add(orientation)
                 yield orientation
 
 
 def _read_conduits(
-    graph: Graph,
+    graph: GraafIndex,
     nodes: dict[str, Node],
     errors: dict[str, str],
     verbinding_klassen: frozenset[str] | None = None,
@@ -884,7 +1401,7 @@ def _read_conduits(
         begin = _endpoint(graph, orientation, KLASSEN_BEGINPUNT)
         eind = _endpoint(graph, orientation, KLASSEN_EINDPUNT)
 
-        for subject in graph.subjects(HAS_ASPECT, orientation):
+        for subject in aspect_holders_of(graph, orientation):
             uri = str(subject)
             if uri in conduits:
                 continue
@@ -905,7 +1422,7 @@ def _read_conduits(
     return conduits
 
 
-def _is_multipart(graph: Graph, orientation: RdfNode, klasse: URIRef) -> bool:
+def _is_multipart(graph: GraafIndex, orientation: RdfNode, klasse: URIRef) -> bool:
     """Geeft aan of de geometrie van deze orientatie uit meerdere losse delen bestaat.
 
     Twee vormen tellen mee: een GML-literaal met een multi-geometrie erin, en meer
@@ -913,7 +1430,7 @@ def _is_multipart(graph: Graph, orientation: RdfNode, klasse: URIRef) -> bool:
     """
     literalen = [
         str(graph.value(aspect, HAS_VALUE))
-        for aspect in graph.objects(orientation, HAS_ASPECT)
+        for aspect in aspects_of(graph, orientation)
         if (aspect, RDF.type, klasse) in graph and graph.value(aspect, HAS_VALUE) is not None
     ]
     if len(literalen) > 1:
@@ -921,27 +1438,29 @@ def _is_multipart(graph: Graph, orientation: RdfNode, klasse: URIRef) -> bool:
     return any(is_multipart_literal(literal) for literal in literalen)
 
 
-def _leiding_orientations(graph: Graph):
+def _leiding_orientations(graph: GraafIndex):
     """De orientaties die een begin- of eindpunt van een leiding bevatten."""
     gezien = set()
     for klasse in (*KLASSEN_BEGINPUNT, *KLASSEN_EINDPUNT):
         for endpoint in graph.subjects(RDF.type, klasse):
-            for orientation in graph.subjects(HAS_PART, endpoint):
+            for orientation in part_holders_of(graph, endpoint):
                 if orientation not in gezien:
                     gezien.add(orientation)
                     yield orientation
 
 
-def _endpoint(graph: Graph, orientation: RdfNode, klassen: tuple[URIRef, ...]) -> RdfNode | None:
+def _endpoint(
+    graph: GraafIndex, orientation: RdfNode, klassen: tuple[URIRef, ...]
+) -> RdfNode | None:
     """Het begin- of eindpunt van een verbinding, van welke soort dan ook."""
-    for part in graph.objects(orientation, HAS_PART):
+    for part in parts_of(graph, orientation):
         if any((part, RDF.type, klasse) in graph for klasse in klassen):
             return part
     return None
 
 
 def _connected_node(
-    graph: Graph, endpoint: RdfNode | None, orientation_to_node: dict[str, str]
+    graph: GraafIndex, endpoint: RdfNode | None, orientation_to_node: dict[str, str]
 ) -> str | None:
     """Herleidt de hasConnection van een strengeindpunt naar de put erachter.
 
@@ -959,13 +1478,13 @@ def _connected_node(
     return None
 
 
-def _connections(graph: Graph, subject: RdfNode):
+def _connections(graph: GraafIndex, subject: RdfNode):
     """De hasConnection-buren van een object, in beide schrijfrichtingen."""
     yield from graph.objects(subject, HAS_CONNECTION)
     yield from graph.subjects(HAS_CONNECTION, subject)
 
 
-def _bob(graph: Graph, endpoint: RdfNode | None, klasse: URIRef) -> Aspect | None:
+def _bob(graph: GraafIndex, endpoint: RdfNode | None, klasse: URIRef) -> Aspect | None:
     """Het BOB-kenmerk dat aan een strengeindpunt hangt, met zijn inwinning."""
     if endpoint is None:
         return None

@@ -103,6 +103,89 @@ def test_qgis_laadt_de_stijl_uit_het_bestand(qgis_app, geschreven_gpkg: Path, la
     assert "Provider" in boodschap
 
 
+def test_qgis_leest_de_symbolentabel_terug_zoals_ze_bedoeld_is(
+    qgis_app, geschreven_gpkg: Path
+) -> None:
+    """Een onbekende markervorm wordt door QGIS stil een cirkel.
+
+    De opgebouwde stijl noemt vormen als `octagon` en `cross2` bij naam. Staat daar een
+    tikfout in, dan tekent QGIS zonder morren een cirkel en ziet niemand dat het
+    GWSW-symbool weg is. Deze test laat QGIS de vorm terugcoderen en vergelijkt hem met
+    de tabel.
+    """
+    from nlriochecker.uitvoer.stijlen.symbolen import PUNTSYMBOLEN, VANGNET_PUNT
+
+    vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=putten", "p", "ogr")
+    vector.loadDefaultStyle()
+
+    gevonden = set()
+    for regel in vector.renderer().rootRule().children():
+        for kind in regel.children():
+            for symboollaag in kind.symbol().symbolLayers():
+                gevonden.add(
+                    qgis_core.QgsSimpleMarkerSymbolLayerBase.encodeShape(symboollaag.shape())
+                )
+
+    # De stijl draagt alleen regels voor de typen die in deze laag staan, plus het
+    # vangnet; de vormen die QGIS teruggeeft horen daar precies bij te horen.
+    aanwezig = {
+        kenmerk["objecttype"]
+        for kenmerk in vector.getFeatures()  # type: ignore[index]
+    }
+    bedoeld = {PUNTSYMBOLEN[naam].vorm for naam in aanwezig if naam in PUNTSYMBOLEN}
+    bedoeld.add(VANGNET_PUNT.vorm)
+
+    assert aanwezig, "de fixture levert geen putten op"
+    assert gevonden == bedoeld
+
+
+def test_de_legenda_blijft_hanteerbaar(qgis_app, geschreven_gpkg: Path) -> None:
+    """De lagenboom van QGIS toont een regel per bladregel van de renderer.
+
+    Met de volledige symbolentabel zijn dat er ruim tweehonderd per laag, op een
+    bestand met een handvol objecttypen. Dat is geen legenda meer maar een muur, en
+    het is precies wat een blik op het scherm zou hebben laten zien. De stijl draagt
+    daarom alleen regels voor de typen die in de laag staan; deze test legt vast dat
+    de legenda meeschaalt met de data en niet met de tabel.
+    """
+    for laag in ("putten", "strengen"):
+        vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername={laag}", laag, "ogr")
+        vector.loadDefaultStyle()
+        soorten = {kenmerk["objecttype"] for kenmerk in vector.getFeatures()}  # type: ignore[index]
+
+        regels = len(vector.renderer().legendSymbolItems())
+
+        # Per objecttype vijf statusregels plus het vangnet, en bij de strengen drie
+        # richtingsregels. Ruim genomen, maar ver onder de tweehonderd.
+        assert regels <= (len(soorten) + 1) * 6 + 5, f"{laag}: {regels} legendaregels"
+
+
+def test_de_maptip_van_beide_objectlagen_toont_de_popup(qgis_app, geschreven_gpkg: Path) -> None:
+    """De maptip moet uit `layer_styles` mee terugkomen, niet alleen in de QML staan."""
+    for laag in ("putten", "strengen"):
+        vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername={laag}", laag, "ogr")
+        boodschap, gelukt = vector.loadDefaultStyle()
+
+        assert gelukt, f"{laag}: {boodschap}"
+        assert '[% "popup_html" %]' in vector.mapTipTemplate(), laag
+        assert "<style>" in vector.mapTipTemplate(), laag
+
+
+def test_de_maptipexpressie_levert_de_popup_van_het_object(qgis_app, geschreven_gpkg: Path) -> None:
+    """Niet alleen de tekst, maar de uitkomst: de expressie moet echt HTML opleveren."""
+    vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=strengen", "s", "ogr")
+    vector.loadDefaultStyle()
+    feature = next(vector.getFeatures())
+
+    context = qgis_core.QgsExpressionContext()
+    context.appendScopes(qgis_core.QgsExpressionContextUtils.globalProjectLayerScopes(vector))
+    context.setFeature(feature)
+    gerenderd = qgis_core.QgsExpression.replaceExpressionText(vector.mapTipTemplate(), context)
+
+    assert "gwsw-popup" in gerenderd
+    assert "[%" not in gerenderd
+
+
 def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_gpkg: Path) -> None:
     vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=strengen", "s", "ogr")
     vector.loadDefaultStyle()
@@ -114,6 +197,22 @@ def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_g
         "BOB tegen de lijnrichting in",
         "BOB-richting niet te bepalen",
     } <= labels
+
+
+def test_de_stelsellaag_toont_standaard_alleen_de_stelsels_zonder_afvoerroute(
+    qgis_app, geschreven_gpkg: Path
+) -> None:
+    """De kern van #25: de laag opent met alleen de probleemgevallen aan.
+
+    Beide regels zitten in de stijl -- de gebruiker kan de rest zelf aanzetten -- maar
+    alleen de regel die op `bereikt_eindpunt = 0` filtert staat standaard aan.
+    """
+    vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=stelsels", "st", "ogr")
+    boodschap, gelukt = vector.loadDefaultStyle()
+
+    assert gelukt, f"stelsels: {boodschap}"
+    actief = {regel.label(): regel.active() for regel in vector.renderer().rootRule().children()}
+    assert actief == {"Geen afvoerroute": True, "Bereikt een afvoereindpunt": False}
 
 
 def _renderer_symbolen(renderer):

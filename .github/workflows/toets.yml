@@ -1,0 +1,126 @@
+name: toets
+
+on:
+  push:
+    branches: [main, dev]
+  # Alleen pull requests naar main. Dat dekt de werkwijze zoals hij is: er wordt op dev
+  # gecommit en dev wordt in main gemerged, zonder PR. Wat de twee filters samen NIET
+  # uitsluiten: staat er een PR dev -> main open, dan start een push naar dev zowel een
+  # push- als een pull_request-run voor dezelfde commit, en die twee cancelen elkaar niet
+  # (verschillende github.ref, dus verschillende concurrency-groep). Gaan er ooit PR's
+  # naar dev lopen, dan draait daar juist helemaal geen toets op: de bronbranch valt
+  # buiten het push-filter en de basis valt buiten het pull_request-filter. Zet in dat
+  # geval dev in de lijst hieronder en haal hem uit het push-filter.
+  pull_request:
+    branches: [main]
+
+# Bewust geen paths-ignore op '**.md' of docs/**: Markdown is hier invoer van de suite en
+# niet alleen documentatie. tests/test_uitvoer_herkomst.py toetst docs/json-schema.md,
+# tests/test_gwsw_vocabulaire.py leest CLAUDE.md en tests/test_checks_registry.py leest
+# data/checkregister-gwsw-nulmeting-v0_9.md. Een filter dat die wijzigingen overslaat zet
+# de poort uit op precies de commits waar de drifttests voor bestaan.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  toets:
+    runs-on: ubuntu-latest
+    # De run duurt circa 40 seconden. Zonder grens mag een vastgelopen stap de volle zes
+    # uur van de runner opmaken; 15 minuten laat ruim ruimte voor een koude cache en
+    # kapt de rest af.
+    timeout-minutes: 15
+    env:
+      # Deze runner mist de niet-getrackte delen van data/ (de OroX-export, de
+      # ontologieen, de GIS-bronnen) en PyQGIS; de eerste groene run gaf 673 geslaagd
+      # en 33 overgeslagen bij 711 lokaal. De grens vangt dus niet dat data/ ontbreekt
+      # -- dat is hier de normale toestand en haalt hem ruim -- maar wel het wegvallen
+      # van meer dan die bekende overslagen, zoals een fixturemap die niet meekomt.
+      # Zonder grens leest zoiets als "alles groen". Loopt de suite door, verhoog de
+      # grens dan mee; hij hoort onder het CI-aantal te blijven.
+      # De controle zelf staat in tests/conftest.py.
+      #
+      # Ronde 1 bracht de suite lokaal op 774; de nieuwe tests hangen alleen van
+      # getrackte fixtures af, dus CI komt rond 736 uit. 700 houdt daar marge onder
+      # en is weer een grens die bijt: met 650 zou een regressie die tachtig tests
+      # laat wegvallen er ongezien doorheen zijn gekomen.
+      #
+      # De suite staat nu lokaal op 1316 geslaagd; 700 bijt dus allang niet meer. Het
+      # CI-aantal is niet geschat maar gemeten in een schone `git clone` van dev (die
+      # heeft `data/` niet, net als deze runner): 1275 geslaagd, 48 overgeslagen.
+      # Daar gaan de 10 tests van tests/test_uitvoer_qgis.py nog af -- de kloonmachine
+      # heeft QGIS, ubuntu-latest niet -- dus CI komt op ongeveer 1265. 1200 houdt
+      # daar dezelfde marge van circa 5% onder als 700 onder 736 deed.
+      #
+      # Het sprong met 136 omhoog doordat data/gwsw-vocabulaire-index.json getrackt
+      # is: tests/test_gwsw_vocabulaire.py sloeg hier eerst 140 van zijn 142 gevallen
+      # over en draait nu op een na volledig mee. Die ene is de drifttest, die de
+      # ontologie zelf nodig heeft.
+      NLRIOCHECKER_MIN_GESLAAGD: "1200"
+      # De ondergrens hierboven is nu tweemaal met de hand nagetrokken nadat hij was
+      # opgehouden te bijten, en dat blijft zo: "geslaagd" kruipt met de suite mee
+      # omhoog. Wat de poort wil vangen is stille overslag, en dat is een bovengrens op
+      # "overgeslagen" -- die beweegt niet mee met suitegroei. Bovendien levert de
+      # vocabulairemodule een geval per GWSW-naam in de configuratie, dus een
+      # configwijziging die namen schrapt zou een ondergrens op "geslaagd" ten onrechte
+      # rood laten vallen; op overslagen heeft datzelfde geen effect.
+      #
+      # Gemeten in een kopie van de werkboom met alleen de getrackte delen van data/ en
+      # met PyQGIS uitgezet (GWSW_QGIS_SITE_PACKAGES=/nonexistent) -- de toestand van
+      # deze runner: 1300 geslaagd, 44 overgeslagen. Die 44 zijn 41 tests die data/
+      # nodig hebben, 1 modulewijde skip van tests/test_uitvoer_qgis.py en de 2
+      # openstaande BEKENDE_AFWIJKINGEN uit tests/test_gwsw_vocabulaire.py. 50 laat
+      # ruimte voor een handvol nieuwe datagebonden tests en valt om zodra er zeven
+      # losse overslagen bijkomen -- een fixture die niet meekomt, een bron die op de
+      # runner ineens ontbreekt.
+      #
+      # Wat deze twee grenzen *niet* vingen: een `pytest.skip(allow_module_level=True)`
+      # telt als één overslag, hoeveel tests de module ook draagt. Gemeten: een module
+      # van 29 tests zo uitzetten laat het aantal overslagen op 44 staan en het aantal
+      # geslaagden naar 1271 zakken -- ruim boven de ondergrens. Voor dat geval hadden
+      # beide grenzen te veel lucht; de derde grens hieronder vangt het wel (issue #52).
+      #
+      # Herijkt 2026-08-24: de teller stond op 51 (de testaanwas van issues #18, #25,
+      # #26, #37-#39 en #55 bracht legitieme datagebonden overslagen mee) en de grens
+      # van 50 klapte -- precies waarvoor hij bestaat, alleen was de groei hier echt.
+      # Nagemeten in de runner-conditie (alleen de getrackte delen van data/): 50
+      # overslagen plus de PyQGIS-moduleskip = 51. Zelfde marge van zes als bij de
+      # vorige ijking.
+      NLRIOCHECKER_MAX_OVERGESLAGEN: "57"
+      # De bovengrens op modulewijde overslagen. Anders dan de twee hierboven beweegt hij
+      # niet mee met suitegroei: een hele module die met `allow_module_level=True`
+      # afhaakt is precies "een fixturemap die niet meekomt", en dat is wat de poort wil
+      # vangen. Vandaag 1 op deze runner -- tests/test_uitvoer_qgis.py, want ubuntu-latest
+      # heeft geen PyQGIS. Komt er een tweede bij, dan is er een module weggevallen.
+      # `conftest.py` onderscheidt modulewijde overslagen (CollectReport) van test-skips
+      # (TestReport) in rapporteur.stats["skipped"].
+      NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: uv installeren
+        # setup-uv publiceert geen meebewegende major-tag meer; daarom een vast nummer.
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Afhankelijkheden installeren
+        run: uv sync --frozen
+
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (opmaak)
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy
+
+      - name: Pytest en dekking
+        # De dekkingsondergrens (95%) draait hier en in scripts/uitgave.py met hetzelfde
+        # getal; tests/test_uitgave.py bindt de twee aan `DEKKINGSONDERGRENS`. Gemeten in
+        # deze runner-conditie (geen untracked data/, geen QGIS): 96%, dus 95% bijt niet
+        # op normale schommeling maar wel op een echte regressie. `pytest-cov` staat bewust
+        # buiten de dev-groep en wordt per run met `--with` opgelost (BO-38).
+        run: uv run --with pytest-cov pytest -q --cov=nlriochecker --cov-fail-under=95

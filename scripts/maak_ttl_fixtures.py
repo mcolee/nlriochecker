@@ -2,8 +2,10 @@
 """Schrijft de TTL-fixtures onder tests/fixtures/ttl.
 
 Elke fixture bevat precies een ingebouwd defect, met bovenaan in een DEFECT-regel
-wat dat defect is. De prelude met de klassenhierarchie is voor alle fixtures
-gelijk; die staat hier een keer in plaats van twintig keer in de bestanden.
+wat dat defect is. De uitzondering is `selectie_rollen.ttl`: die bevat geen defect
+maar een object per klassenrol, om de selecties uit `checks/selectie.py` te dekken.
+De prelude met de klassenhierarchie is voor alle fixtures gelijk; die staat hier een
+keer in plaats van twintig keer in de bestanden.
 
 Gebruik:  uv run python scripts/maak_ttl_fixtures.py
 """
@@ -36,12 +38,15 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Overstortleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
-gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
+gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 """
@@ -129,7 +134,7 @@ def maaiveld(naam: str, hoogte: float, wijze: str | None = None) -> str:
     """Hangt een maaiveldorientatie met maaiveldhoogte aan een putorientatie.
 
     Met `wijze` krijgt de orientatie ook een puntgeometrie met inwinning erop, zoals
-    de BrutIS-export van De Wolden die schrijft: de inwinningswijze hangt daar aan
+    de BrutIS-export van De Wolden en Hoogeveen die schrijft: de inwinningswijze hangt daar aan
     het Punt-aspect en niet aan de maaiveldhoogte zelf.
     """
     if wijze is None:
@@ -150,8 +155,18 @@ def maaiveld(naam: str, hoogte: float, wijze: str | None = None) -> str:
 """
 
 
-def deksel(naam: str, niveau: float, wijze: str | None = None, datum: str | None = None) -> str:
-    """Hangt een putdeksel met dekselniveau (en eventueel inwinning) aan een put."""
+def deksel(
+    naam: str,
+    niveau: float,
+    wijze: str | None = None,
+    datum: str | None = None,
+    klasse: str = "Putdeksel",
+) -> str:
+    """Hangt een putdeksel met dekselniveau (en eventueel inwinning) aan een put.
+
+    Met `klasse` een subklasse als `Putdeksel_ZwaarVerkeer`; de fixture moet die dan
+    zelf als subklasse van Putdeksel declareren, want de prelude kent haar niet.
+    """
     inwinning = ""
     if wijze or datum:
         delen = []
@@ -165,7 +180,7 @@ def deksel(naam: str, niveau: float, wijze: str | None = None, datum: str | None
         )
     return f"""
 :{naam} gwsw:hasPart :{naam}_dek .
-:{naam}_dek rdf:type gwsw:Putdeksel ;
+:{naam}_dek rdf:type gwsw:{klasse} ;
     gwsw:hasAspect :{naam}_dek_ori .
 :{naam}_dek_ori rdf:type gwsw:Dekselorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue {niveau}{inwinning} ] .
@@ -437,6 +452,97 @@ FIXTURES["net008_veel_lozingspunten.ttl"] = (
 )
 
 
+# NET-009: een streng die omgekeerd getekend is terwijl de BOB de administratie volgt.
+# Geometrie tegen, BOB mee: de drie richtingssignalen spreken elkaar tegen.
+FIXTURES["net009_omgekeerd_getekend.ttl"] = (
+    "streng 1 is van B naar A getekend terwijl de administratie en de BOB A->B zeggen",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1050.0, 2000.0), (1000.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.5, 10.0),
+    ),
+)
+
+# NET-009: een vlakke streng. De BOB is gelijk aan begin en eind (verval 0), dus de BOB
+# zegt niets over de richting: geen bevinding, wel "geen uitspraak".
+FIXTURES["net009_vlakke_streng.ttl"] = (
+    "streng 1 ligt vlak (BOB begin en eind gelijk), dus de richting is niet uit de BOB te lezen",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1050.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.0, 10.0),
+    ),
+)
+
+# NET-009: een streng met een BOB van 0,00 aan beide zijden. De vulwaardenregel leest die
+# als niet geregistreerd; zonder BOB kan de richting niet op de bodem getoetst worden.
+FIXTURES["net009_bob_vulwaarde.ttl"] = (
+    "streng 1 draagt een BOB van 0,00 die als vulwaarde wordt gelezen en dus ontbreekt",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1050.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(0.0, 0.0),
+    ),
+)
+
+
+# NET-009: twee tegenspraken met andere signaalcombinaties. Streng 1 is omgekeerd
+# getekend maar ligt vlak (geometrie tegen, BOB vlak); streng 2 mist een bruikbare lijn
+# maar heeft een stijgende BOB (geometrie onbekend, BOB tegen). Beide worden gemeld.
+FIXTURES["net009_signaalvarianten.ttl"] = (
+    "streng 1 is omgekeerd getekend en vlak; streng 2 mist geometrie en heeft een stijgende BOB",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1000.0, 2100.0)
+    + put("PutD", "D", 1050.0, 2100.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1050.0, 2000.0), (1000.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.0, 10.0),
+    )
+    + leiding("L2", "2", [(1000.0, 2100.0)], "PutC", "PutD", bob=(10.0, 10.5)),
+)
+
+
+# NET-009: streng 2 draagt geen bruikbare lijn (enkel punt) en geen BOB, dus geen enkel
+# richtingssignaal. Ze wordt niet gemeld, maar mag ook niet stil verdwijnen: de
+# toelichting telt haar. Streng 1 is schoon en zorgt dat er wel iets te bekijken valt.
+FIXTURES["net009_geen_signaal.ttl"] = (
+    "streng 2 mist zowel een bruikbare lijn als een BOB, dus geen enkel richtingssignaal",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1000.0, 2100.0)
+    + put("PutD", "D", 1050.0, 2100.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1050.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.5, 10.0),
+    )
+    + leiding("L2", "2", [(1000.0, 2100.0)], "PutC", "PutD"),
+)
+
+
 # ---------------------------------------------------------------------------
 # Blok A: ATTR, HGT, RVZ, ADM en BTR
 # ---------------------------------------------------------------------------
@@ -468,6 +574,9 @@ def nette_leiding(naam: str, label: str, punten, begin, eind, **extra) -> str:
 
 A = (1000.0, 2000.0)
 B = (1050.0, 2000.0)
+C = (1100.0, 2000.0)
+D = (1150.0, 2000.0)
+E = (1200.0, 2000.0)
 
 FIXTURES["attr_schoon.ttl"] = (
     "geen; alle attributen zijn aannemelijk en onderling consistent",
@@ -505,7 +614,7 @@ FIXTURES["attr002_kleine_diameter.ttl"] = (
 )
 
 FIXTURES["attr003_pvc_te_vroeg.ttl"] = (
-    "streng 1 is PVC met aanlegjaar 1940; PVC bestaat pas vanaf 1955",
+    "streng 1 is PVC met begindatum 1940; PVC bestaat pas vanaf 1955",
     nette_put("PutA", "A", *A)
     + nette_put("PutB", "B", *B)
     + nette_leiding(
@@ -518,12 +627,239 @@ FIXTURES["attr003_pvc_te_vroeg.ttl"] = (
     ),
 )
 
+FIXTURES["attr002_stelseltype.ttl"] = (
+    "G (gemengd, Ø220) valt onder de gemengd-ondergrens van 250 mm; "
+    "V (vuilwater, Ø220) blijft boven de vuilwater-ondergrens van 200 mm (issue #20)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_leiding(
+        "G",
+        "G",
+        [A, B],
+        "PutA",
+        "PutB",
+        klasse="GemengdRiool",
+        velden={"BreedteLeiding": 220, "HoogteLeiding": 220},
+    )
+    + nette_leiding(
+        "V",
+        "V",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 220, "HoogteLeiding": 220},
+    ),
+)
+
+FIXTURES["attr001_diameterbesluit.ttl"] = (
+    "geen; de vier door issue #20 gecorrigeerde bereiken passen nu -- PP Ø80 (min 100->80), "
+    "GewapendBeton Ø300 (min 400->300), Gres Ø1200 (max 1000->1400), "
+    "Asbestcement Ø1500 (max 1000->1800)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_put("PutD", "D", *D)
+    + nette_put("PutE", "E", *E)
+    + nette_leiding(
+        "PP",
+        "PP",
+        [A, B],
+        "PutA",
+        "PutB",
+        klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 80, "HoogteLeiding": 80, "MateriaalLeiding_ref": "Polypropyleen"},
+    )
+    + nette_leiding(
+        "GB",
+        "GB",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        velden={
+            "BreedteLeiding": 300,
+            "HoogteLeiding": 300,
+            "MateriaalLeiding_ref": "GewapendBeton",
+        },
+    )
+    + nette_leiding(
+        "GR",
+        "GR",
+        [C, D],
+        "PutC",
+        "PutD",
+        klasse="Vuilwaterriool",
+        velden={"BreedteLeiding": 1200, "HoogteLeiding": 1200, "MateriaalLeiding_ref": "Gres"},
+    )
+    + nette_leiding(
+        "AC",
+        "AC",
+        [D, E],
+        "PutD",
+        "PutE",
+        klasse="Vuilwaterriool",
+        velden={
+            "BreedteLeiding": 1500,
+            "HoogteLeiding": 1500,
+            "MateriaalLeiding_ref": "Asbestcement",
+        },
+    ),
+)
+
+FIXTURES["attr003_begindatum_besluit.ttl"] = (
+    "PVC56 (PVC, 1956) valt vóór 1958; PE65 en GB15 hebben geen tijdvakregel meer "
+    "en zijn geen bevinding (issue #20)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_put("PutD", "D", *D)
+    + nette_leiding(
+        "PVC56",
+        "PVC56",
+        [A, B],
+        "PutA",
+        "PutB",
+        klasse="Vuilwaterriool",
+        velden={"MateriaalLeiding_ref": "PVC", "Begindatum": "1956-01-01"},
+    )
+    + nette_leiding(
+        "PE65",
+        "PE65",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        velden={"MateriaalLeiding_ref": "PE", "Begindatum": "1965-01-01"},
+    )
+    + nette_leiding(
+        "GB15",
+        "GB15",
+        [C, D],
+        "PutC",
+        "PutD",
+        klasse="Vuilwaterriool",
+        velden={
+            "BreedteLeiding": 400,
+            "HoogteLeiding": 400,
+            "MateriaalLeiding_ref": "GewapendBeton",
+            "Begindatum": "1915-01-01",
+        },
+    ),
+)
+
 FIXTURES["attr004_rond_ongelijk.ttl"] = (
     "streng 1 heet rond maar heeft breedte 300 en hoogte 400",
     nette_put("PutA", "A", *A)
     + nette_put("PutB", "B", *B)
     + nette_leiding(
         "L1", "1", [A, B], "PutA", "PutB", velden={"BreedteLeiding": 300, "HoogteLeiding": 400}
+    ),
+)
+
+FIXTURES["attr004_muil_te_hoog.ttl"] = (
+    "streng 1 heeft een muilprofiel dat hoger is dan breed; een muil is breder dan hoog.\n"
+    "# Het muilprofiel zelf hoort bij metselwerk, dus ATTR-012 heeft hier niets te melden.",
+    nette_put("PutA", "A", *A, MateriaalPut_ref="Metselwerk")
+    + nette_put("PutB", "B", *B, MateriaalPut_ref="Metselwerk")
+    + nette_leiding(
+        "L1",
+        "1",
+        [A, B],
+        "PutA",
+        "PutB",
+        velden={
+            "BreedteLeiding": 600,
+            "HoogteLeiding": 800,
+            "MateriaalLeiding_ref": "Metselwerk",
+            "VormLeiding_ref": "Muil",
+            "Begindatum": "1930-01-01",
+        },
+    ),
+)
+
+FIXTURES["attr016_ronde_put_ongelijk.ttl"] = (
+    "put A heet rond maar heeft breedte 800 en lengte 1000; een ronde put heeft een diameter.\n"
+    "# Put B is rond met 800 bij 800 (geen bevinding), put C is rechthoekig met 800 bij 1000\n"
+    "# (een rechthoekige put mag ongelijke maten hebben, dus ook geen bevinding).",
+    nette_put("PutA", "A", *A, VormPut_ref="Rond", BreedtePut=800, LengtePut=1000)
+    + nette_put("PutB", "B", *B, VormPut_ref="Rond", BreedtePut=800, LengtePut=800)
+    + nette_put(
+        "PutC", "C", 1100.0, 2000.0, VormPut_ref="Rechthoekig", BreedtePut=800, LengtePut=1000
+    )
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
+)
+
+# ATTR-017: wandruwheid past niet bij het leidingmateriaal. De schaal wordt uit de
+# data zelf bepaald (de lezing met de minste afwijkingen). Hier winnen tienden van
+# een mm: bij schaal 1:10 valt maar een streng buiten zijn band, bij schaal 1:1 alle
+# drie.
+_P1, _P2, _P3, _P4 = (1000.0, 2000.0), (1050.0, 2000.0), (1100.0, 2000.0), (1150.0, 2000.0)
+FIXTURES["attr017_wandruwheid_pe_betonwaarde.ttl"] = (
+    "streng 2 is van PE met wandruwheid 30 (3,0 mm bij schaal 1:10), de betonwaarde;\n"
+    "# PE hoort rond 0,4 mm te liggen. Streng 1 (beton, 30 = 3,0 mm) en streng 3 (PE, 4 =\n"
+    "# 0,4 mm) passen wel bij hun materiaal en blijven stil.",
+    nette_put("PutA", "A", *_P1)
+    + nette_put("PutB", "B", *_P2)
+    + nette_put("PutC", "C", *_P3)
+    + nette_put("PutD", "D", *_P4)
+    + nette_leiding(
+        "L1",
+        "1",
+        [_P1, _P2],
+        "PutA",
+        "PutB",
+        velden={
+            "MateriaalLeiding_ref": "Beton",
+            "WandruwheidBinnenboven": 30,
+            "WandruwheidBinnenonder": 30,
+        },
+    )
+    + nette_leiding(
+        "L2",
+        "2",
+        [_P2, _P3],
+        "PutB",
+        "PutC",
+        velden={
+            "MateriaalLeiding_ref": "PE",
+            "WandruwheidBinnenboven": 30,
+            "WandruwheidBinnenonder": 30,
+        },
+    )
+    + nette_leiding(
+        "L3",
+        "3",
+        [_P3, _P4],
+        "PutC",
+        "PutD",
+        velden={
+            "MateriaalLeiding_ref": "PE",
+            "WandruwheidBinnenboven": 4,
+            "WandruwheidBinnenonder": 4,
+        },
+    ),
+)
+
+# ATTR-017 met een export in hele millimeters: een betonleiding met wandruwheid 3
+# hoort geen bevinding te geven. Bewijst dat de schaallezing niet op tienden is
+# vastgezet -- hier wint schaal 1:1 (nul afwijkingen tegen een afwijking bij 1:10).
+FIXTURES["attr017_wandruwheid_hele_mm.ttl"] = (
+    "geen; de betonleiding draagt wandruwheid 3, wat in hele mm precies de C2100-waarde is",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_leiding(
+        "L1",
+        "1",
+        [A, B],
+        "PutA",
+        "PutB",
+        velden={
+            "MateriaalLeiding_ref": "Beton",
+            "WandruwheidBinnenboven": 3,
+            "WandruwheidBinnenonder": 3,
+        },
     ),
 )
 
@@ -550,6 +886,20 @@ FIXTURES["attr006_te_grote_streng.ttl"] = (
     ),
 )
 
+FIXTURES["attr006_twee_te_kleine_putten.ttl"] = (
+    "streng 1 is 1200 mm terwijl put A en put B allebei 800 bij 800 mm zijn",
+    nette_put("PutA", "A", *A, BreedtePut=800, LengtePut=800)
+    + nette_put("PutB", "B", *B, BreedtePut=800, LengtePut=800)
+    + nette_leiding(
+        "L1",
+        "1",
+        [A, B],
+        "PutA",
+        "PutB",
+        velden={"BreedteLeiding": 1200, "HoogteLeiding": 1200},
+    ),
+)
+
 FIXTURES["attr007_toekomstig_jaar.ttl"] = (
     "streng 1 heeft begindatum 2099-01-01",
     nette_put("PutA", "A", *A)
@@ -558,7 +908,7 @@ FIXTURES["attr007_toekomstig_jaar.ttl"] = (
 )
 
 FIXTURES["attr008_lange_streng.ttl"] = (
-    "streng 1 is administratief 500 m lang, boven de bovengrens van 200 m",
+    "streng 1 is administratief 500 m lang, boven de ontologiegrens van 75 m",
     nette_put("PutA", "A", *A)
     + nette_put("PutB", "B", (1500.0, 2000.0)[0], 2000.0)
     + nette_leiding(
@@ -579,9 +929,11 @@ FIXTURES["attr009_lengte_wijkt_af.ttl"] = (
 )
 
 FIXTURES["attr010_materiaal_put.ttl"] = (
-    "gemetselde streng 1 komt uit op put B van kunststof",
+    "gemetselde streng 1 komt uit op put B van PVC.\n"
+    "# Het putmateriaal was hier `Kunststof`, een waarde die MateriaalPutColl niet kent:\n"
+    "# de fixture toetste een export die niet kan bestaan (issue #43).",
     nette_put("PutA", "A", *A, MateriaalPut_ref="Metselwerk")
-    + nette_put("PutB", "B", *B, MateriaalPut_ref="Kunststof")
+    + nette_put("PutB", "B", *B, MateriaalPut_ref="PVC")
     + nette_leiding(
         "L1",
         "1",
@@ -596,6 +948,15 @@ FIXTURES["attr010_materiaal_put.ttl"] = (
             "Begindatum": "1930-01-01",
         },
     ),
+)
+
+FIXTURES["attr010_gresput.ttl"] = (
+    "geen; een betonnen streng tussen twee gresputten. Gres is een legaal lid van\n"
+    "# MateriaalPutColl en een gresput onder een betonnen riool is niets bijzonders.\n"
+    "# De tegenhanger van attr010_materiaal_put.ttl.",
+    nette_put("PutA", "A", *A, MateriaalPut_ref="Gres")
+    + nette_put("PutB", "B", *B, MateriaalPut_ref="Gres")
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
 )
 
 FIXTURES["attr012_metselwerk_rond.ttl"] = (
@@ -618,10 +979,41 @@ FIXTURES["attr012_metselwerk_rond.ttl"] = (
     ),
 )
 
+
+def _begindatum_reeks(jaren: list[int]) -> str:
+    """Een losse streng per jaartal, elk met een eigen begindatum en geometrie."""
+    return "".join(
+        nette_leiding(
+            f"L{i}",
+            str(i),
+            [(1000.0 + i * 10, 2000.0), (1000.0 + i * 10 + 5, 2000.0)],
+            None,
+            None,
+            velden={"Begindatum": f"{jaar}-01-01"},
+        )
+        for i, jaar in enumerate(jaren)
+    )
+
+
+# ATTR-015: 16 van de 40 strengen (40%) op begindatum 1900, ruim boven de signaaldrempel
+# van 20%; de overige 24 elk een eigen jaar, zodat alleen 1900 opvalt.
+FIXTURES["attr015_vulwaardejaar.ttl"] = (
+    "16 van de 40 strengen dragen begindatum 1900 (40%); dat ruikt naar een vulwaarde",
+    _begindatum_reeks([1900] * 16 + list(range(1980, 2004))),
+)
+
+# De tegenhanger: genoeg gedateerde strengen, maar geen enkel jaar overheerst.
+FIXTURES["attr015_geen_piek.ttl"] = (
+    "40 strengen met elk een eigen begindatumjaar; geen enkel jaar overheerst",
+    _begindatum_reeks(list(range(1964, 2004))),
+)
+
 # --- HGT ------------------------------------------------------------------
 #
 # Het schone hoogtebeeld: maaiveld 10,00 m NAP, deksel 10,00, puthoogte 1,50 m
-# (bodem dus 8,50) en een BOB die van 8,60 naar 8,55 daalt over 50 m.
+# (bodem dus 8,50) en een BOB die van 8,70 naar 8,50 daalt over 50 m: verhang 1:250,
+# ruim boven wat de RIONED-staffel bij 300 mm vraagt (1:500, issue #29). Het beginpunt
+# ligt hoog genoeg zodat de putbodem-BOB-relatie (HGT-015) ongemoeid blijft.
 
 C = (1100.0, 2000.0)
 
@@ -631,7 +1023,7 @@ def hoogteput(
 ):
     """Een put met maaiveld, putdeksel en puthoogte.
 
-    Met `dek=None` krijgt de put geen putdeksel. Zo ziet de De Wolden-export eruit:
+    Met `dek=None` krijgt de put geen putdeksel. Zo ziet de De Wolden en Hoogeveen-export eruit:
     daarin komt `Putdekselniveau` geen enkele keer voor, zodat de hoogtechecks op de
     maaiveldhoogte terugvallen.
     """
@@ -662,7 +1054,7 @@ FIXTURES["hgt_schoon.ttl"] = (
     "geen; hoogten en verhang zijn onderling consistent",
     hoogteput("PutA", "A", A)
     + hoogteput("PutB", "B", B)
-    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.50)),
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.70, 8.50)),
 )
 
 FIXTURES["hgt004_bob_boven_deksel.ttl"] = (
@@ -740,7 +1132,7 @@ FIXTURES["hgt011_drempel_onder_bob.ttl"] = (
 )
 
 FIXTURES["hgt012_putdiepte.ttl"] = (
-    "put B heeft een puthoogte van 12 m, boven de grens van 6 m",
+    "put B heeft een puthoogte van 12 m, boven de ontologiegrens van 4 m",
     hoogteput("PutA", "A", A)
     + hoogteput("PutB", "B", B, hoogte=12000)
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),
@@ -808,35 +1200,200 @@ FIXTURES["hgt018_buiskruin_boven_maaiveld.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(9.98, 8.55)),
 )
 
+# ATTR-013: vulwaarden in hoogtekenmerken (issue #1). Staat hier omdat ze de
+# HGT-helpers gebruikt. Put A heeft maaiveld 0,00 (en geen deksel), put B maaiveld
+# 0,01, put C is schoon; streng 1 heeft een BOB van 0,000 aan het beginpunt. Met de
+# standaardconfig meldt ATTR-013 put A, put B en streng 1; HGT-004 en HGT-014
+# zwijgen over hen met een toelichting.
+FIXTURES["attr013_vulwaarde_hoogte.ttl"] = (
+    "put A (maaiveld 0,00), put B (maaiveld 0,01) en streng 1 (BOB begin 0,000) "
+    "dragen een vulwaarde",
+    hoogteput("PutA", "A", A, mv=0.0, dek=None)
+    + hoogteput("PutB", "B", B, mv=0.01, dek=None)
+    + hoogteput("PutC", "C", C)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(0.0, 8.55))
+    + hoogteleiding("L2", "2", [B, C], "PutB", "PutC", bob=(8.60, 8.55)),
+)
+
 # --- RVZ ------------------------------------------------------------------
 
-FIXTURES["rvz_schoon.ttl"] = (
-    "geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost",
-    hoogteput("PutA", "A", A)
-    + put(
-        "PutO",
-        "O",
-        B[0],
-        B[1],
-        klasse="Overstortput",
-        extra=kenmerken(
-            "PutO", BreedtePut=1000, LengtePut=1000, HoogtePut=1500, MateriaalPut_ref="Beton"
-        ),
-    )
-    + maaiveld("PutO", 10.0)
-    + deksel("PutO", 10.0)
-    + drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0)
-    + hoogteput("PutU", "U", C)
-    + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55))
-    + hoogteleiding(
-        "L2", "2", [B, C], "PutO", "PutU", bob=(9.00, 8.95), Begindatum="1980-01-01"
-    ).replace("gwsw:GemengdRiool", "gwsw:Overstortleiding")
-    + """:Sloot1 rdf:type gwsw:Sloot ; rdfs:label "sloot" ;
+
+def _overstortstelsel(drempelregel: str) -> str:
+    """Een gemengd stelsel met een aangesloten overstortput O die op een sloot loost.
+
+    `drempelregel` is de TTL van de overstortdrempel van put O (uit `drempel(...)`),
+    of een lege string voor een put zonder drempelonderdeel. Basis van rvz_schoon en
+    van de RVZ-002/003-fixtures.
+    """
+    return (
+        hoogteput("PutA", "A", A)
+        + put(
+            "PutO",
+            "O",
+            B[0],
+            B[1],
+            klasse="Overstortput",
+            extra=kenmerken(
+                "PutO", BreedtePut=1000, LengtePut=1000, HoogtePut=1500, MateriaalPut_ref="Beton"
+            ),
+        )
+        + maaiveld("PutO", 10.0)
+        + deksel("PutO", 10.0)
+        + drempelregel
+        + hoogteput("PutU", "U", C)
+        + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55))
+        + hoogteleiding(
+            "L2", "2", [B, C], "PutO", "PutU", bob=(9.00, 8.95), Begindatum="1980-01-01"
+        ).replace("gwsw:GemengdRiool", "gwsw:Overstortleiding")
+        + """:Sloot1 rdf:type gwsw:Sloot ; rdfs:label "sloot" ;
     gwsw:hasAspect :Sloot1_ori .
 :Sloot1_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>1062.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
-""",
+"""
+    )
+
+
+def gemaal(naam: str, label: str, punt: tuple[float, float]) -> str:
+    """Een rioolgemaal als afvoereindpunt in het netwerk (subklasse van Gemaal)."""
+    return put(naam, label, punt[0], punt[1], klasse="Rioolgemaal")
+
+
+# NET (#18, fase 1): een keten van drie strengen naar een gemaal. Elke streng bereikt
+# hetzelfde eindpunt en telt een aflopend aantal stappen; de afstanden zijn 50 m per
+# streng, zodat de meters netjes optellen.
+FIXTURES["net_afvoerpad_keten.ttl"] = (
+    "geen; drie strengen A->B->C->gemaal, invoer voor de afvoerpadanalyse",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + gemaal("Gem", "G", (1150.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC")
+    + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutC", "Gem"),
+)
+
+# NET (#18, fase 1): een streng met een lijngeometrie van een enkel punt. Die is niet
+# als lijn te lezen (line=None), maar de netwerkkoppelingen blijven staan: de streng
+# krijgt wel een afvoerpad in stappen en geen padlengte in meters.
+FIXTURES["net_afvoerpad_zonder_lijn.ttl"] = (
+    "streng 1 heeft een lijngeometrie van een enkel punt en dus geen bruikbare lengte",
+    put("PutA", "A", 1000.0, 2000.0)
+    + gemaal("Gem", "G", (1050.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0)], "PutA", "Gem"),
+)
+
+# NET (#18, fase 1): put A bereikt twee gemalen in evenveel stappen. Het dichtstbijzijnde
+# in stappen is een gelijkspel, dus wint de kleinste URI (GemA < GemB) -- het determinisme.
+FIXTURES["net_afvoerpad_twee_eindpunten.ttl"] = (
+    "geen; put A bereikt gemaal A en gemaal B beide in een stap",
+    put("PutA", "A", 1000.0, 2000.0)
+    + gemaal("GemA", "GA", (1050.0, 2010.0))
+    + gemaal("GemB", "GB", (1050.0, 1990.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2010.0)], "PutA", "GemA")
+    + leiding("L2", "2", [(1000.0, 2000.0), (1050.0, 1990.0)], "PutA", "GemB"),
+)
+
+# NET (#18, fase 1): twee parallelle strengen van A naar het gemaal, met verschillende
+# getekende lengte (La recht = 100 m, Lb met knik = ~141 m). De knoop A leest de lengte
+# van de kleinste-URI streng (La); elke streng leest haar eigen lengte.
+FIXTURES["net_afvoerpad_parallel.ttl"] = (
+    "geen; twee parallelle strengen A->gemaal met verschillende lengte",
+    put("PutA", "A", 1000.0, 2000.0)
+    + gemaal("Gem", "G", (1100.0, 2000.0))
+    + leiding("La", "a", [(1000.0, 2000.0), (1100.0, 2000.0)], "PutA", "Gem")
+    + leiding("Lb", "b", [(1000.0, 2000.0), (1050.0, 2050.0), (1100.0, 2000.0)], "PutA", "Gem"),
+)
+
+# NET (#18, fase 1): een persleiding (mechanisch, geen vrijverval) naar het gemaal. Ze
+# hoort niet in de vrijverval-afvoerpadanalyse: een streng-afvoerpad is er alleen voor
+# vrijvervalstrengen, niet voor gepompt riool.
+FIXTURES["net_afvoerpad_mechanisch.ttl"] = (
+    "geen; naast de vrijvervalstreng 1 loopt een persleiding p naar hetzelfde gemaal",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutX", "X", 1000.0, 2100.0)
+    + gemaal("Gem", "G", (1050.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Gem")
+    + leiding("P1", "p", [(1000.0, 2100.0), (1050.0, 2000.0)], "PutX", "Gem", klasse="Persleiding"),
+)
+
+
+# De subklassehierarchie van de stelselfamilie, inline: de gedeelde prelude kent haar
+# niet, en haar aan de prelude toevoegen zou alle 140 fixtures herschrijven.
+STELSEL_HIERARCHIE = """gwsw:Vuilwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:GemengdStelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:Hemelwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:Rioolstelsel rdfs:subClassOf gwsw:Stelsel .
+"""
+
+
+def stelsel(naam: str, label: str, klasse: str, leden: list[str]) -> str:
+    """Een geregistreerd stelselobject dat zijn leden via `hasPart` draagt (#17, #25)."""
+    delen = " , ".join(f":{lid}" for lid in leden)
+    return f':{naam} rdf:type gwsw:{klasse} ; rdfs:label "{label}" ;\n    gwsw:hasPart {delen} .\n'
+
+
+# #25: de geregistreerde stelselboom die #17 blootlegde. Twee lokale stelsels met alleen
+# strengen -- een vuilwaterstelsel dat een gemaal bereikt en een gemengd stelsel zonder
+# afvoerroute -- plus een gemeentebrede `_geb_0`-bucket die naast een streng ook putten
+# bevat (#17). De bucket krijgt geen vlak: zulke buckets liggen over de hele gemeente en
+# zouden een uitgesmeerde vlek geven. `stelselvlak_buffer_m` bepaalt de bufferbreedte.
+FIXTURES["stelsels_registratie.ttl"] = (
+    "geen; twee lokale stelsels met alleen strengen (vuilwater bereikt een gemaal, "
+    "gemengd niet) plus een gemeentebrede bucket met strengen en putten die geen vlak krijgt",
+    STELSEL_HIERARCHIE
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + gemaal("Gem", "G", (1100.0, 2000.0))
+    + put("PutC", "C", 1000.0, 2100.0)
+    + put("PutD", "D", 1050.0, 2100.0)
+    + put("PutE", "E", 1000.0, 2200.0)
+    + leiding(
+        "LV1", "V1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", klasse="Vuilwaterriool"
+    )
+    + leiding(
+        "LV2", "V2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "Gem", klasse="Vuilwaterriool"
+    )
+    + leiding("LG1", "G1", [(1000.0, 2100.0), (1050.0, 2100.0)], "PutC", "PutD")
+    + leiding(
+        "LH1", "H1", [(1000.0, 2200.0), (1050.0, 2200.0)], "PutE", None, klasse="Hemelwaterriool"
+    )
+    + stelsel("stelV", "vuilwater-1", "Vuilwaterstelsel", ["LV1", "LV2"])
+    + stelsel("stelG", "gemengd-1", "GemengdStelsel", ["LG1"])
+    + stelsel("stelH", "hemelwater-bucket", "Hemelwaterstelsel", ["LH1", "PutE"]),
+)
+
+
+# Het afvoereindpunt van de schone stelsels: net onder de overstort-/BBB-put.
+GEM = (1050.0, 1950.0)
+
+FIXTURES["rvz_schoon.ttl"] = (
+    "geen; een gemengd stelsel met een aangesloten overstortput die op een sloot loost en "
+    "een gemaal als afvoereindpunt, dus het voldoet aan beide eisen van RVZ-006",
+    _overstortstelsel(drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0))
+    + gemaal("Gem", "G", GEM)
+    # Aan de gemengde trunk (vanaf PutO), bewust niet achter de overstortleiding L2: dan
+    # zou L2 tussen twee gemengde zijden komen te liggen en RVZ-010 vuren.
+    + hoogteleiding("L3", "3", [B, GEM], "PutO", "Gem", bob=(8.50, 8.45)),
+)
+
+# RVZ-002: de drempel draagt geen Drempelniveau.
+FIXTURES["rvz002_drempel_zonder_niveau.ttl"] = (
+    "de drempel van overstortput O heeft wel een breedte maar geen Drempelniveau",
+    _overstortstelsel(drempel("PutO", "DrempelO", niveau=None, breedte=2000.0)),
+)
+
+# RVZ-003: de drempel draagt geen Drempelbreedte.
+FIXTURES["rvz003_drempel_zonder_breedte.ttl"] = (
+    "de drempel van overstortput O heeft wel een niveau maar geen Drempelbreedte",
+    _overstortstelsel(drempel("PutO", "DrempelO", niveau=9.00, breedte=None)),
+)
+
+# RVZ-002 en RVZ-003: er is helemaal geen drempelonderdeel.
+FIXTURES["rvz002_overstort_zonder_drempel.ttl"] = (
+    "overstortput O heeft geen enkel Overstortdrempel-onderdeel; RVZ-002 en RVZ-003 "
+    "gaan allebei af",
+    _overstortstelsel(""),
 )
 
 FIXTURES["rvz001_losse_overstort.ttl"] = (
@@ -876,6 +1433,15 @@ FIXTURES["rvz006_gemengd_zonder_overstort.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),
 )
 
+# RVZ-006, tweede tak (issue #23): wel een overstort, geen afvoereindpunt.
+FIXTURES["rvz006_gemengd_zonder_afvoereindpunt.ttl"] = (
+    "een gemengd deelstelsel met overstort maar zonder afvoereindpunt (gemaal of overnamepunt)",
+    hoogteput("PutA", "A", A)
+    + put("PutO", "O", B[0], B[1], klasse="Overstortput", extra=kenmerken("PutO", **STANDAARDPUT))
+    + drempel("PutO", "DrempelO", niveau=9.0, breedte=2000.0)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55)),
+)
+
 
 def bbb(naam: str, label: str, punt, met_maten: bool = True) -> str:
     """Een bergbezinkbassin, desgewenst met afmetingen."""
@@ -907,6 +1473,22 @@ FIXTURES["rvz008_bbb_zonder_lediging.ttl"] = (
     + bbb("BBB", "BBB", B)
     + drempel("BBB", "DrempelBBB", niveau=9.5, breedte=2000.0)
     + hoogteleiding("L1", "1", [A, B], "PutA", "BBB", bob=(8.60, 8.50)),
+)
+
+FIXTURES["rvz008_bbb_met_lediging.ttl"] = (
+    "geen; zelfde als rvz008_bbb_zonder_lediging maar de BBB draagt een "
+    "geregistreerde ledigingsvoorziening en het stelsel voert af op een gemaal",
+    hoogteput("PutA", "A", A)
+    + bbb("BBB", "BBB", B)
+    + drempel("BBB", "DrempelBBB", niveau=9.5, breedte=2000.0)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "BBB", bob=(8.60, 8.50))
+    + """
+:BBB gwsw:hasPart :BBB_led .
+:BBB_led rdf:type gwsw:Ledigingsvoorziening ; rdfs:label "BBB/lediging" .
+"""
+    # Een afvoereindpunt, anders vuurt RVZ-006 op dit gemengde deel (issue #23).
+    + gemaal("Gem", "G", GEM)
+    + hoogteleiding("L2", "2", [B, GEM], "BBB", "Gem", bob=(8.40, 8.35)),
 )
 
 FIXTURES["rvz009_bbb_zonder_nooduitlaat.ttl"] = (
@@ -971,6 +1553,15 @@ FIXTURES["adm007_overstort_zonder_functie.ttl"] = (
     "overstortput O heeft geen overstortleiding en geen drempel",
     nette_put("PutA", "A", *A)
     + put("PutO", "O", B[0], B[1], klasse="Overstortput")
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutO"),
+)
+
+FIXTURES["adm007_overstort_met_drempel.ttl"] = (
+    "geen; zelfde als adm007_overstort_zonder_functie maar put 'O' draagt een "
+    "ingebouwde overstortdrempel",
+    nette_put("PutA", "A", *A)
+    + put("PutO", "O", B[0], B[1], klasse="Overstortput")
+    + drempel("PutO", "DrempelO", niveau=9.00, breedte=2000.0)
     + nette_leiding("L1", "1", [A, B], "PutA", "PutO"),
 )
 
@@ -1052,6 +1643,9 @@ EXT_C = (1090.0, 2000.0)
 EXT_D = (2000.0, 2000.0)
 EXT_E = (1000.0, 2010.0)
 EXT_F = (1040.0, 2010.0)
+# De duiker (streng 6) kruist water-2 op eigen hoogte, los van streng 3.
+EXT_G = (1010.0, 2013.0)
+EXT_H = (1030.0, 2013.0)
 
 # Datakarakteristieken: jaarprecisie van de datums en expliciete onbekend-waarden.
 # Vier strengen met een begindatum, waarvan drie op 1 januari; vier putten met een
@@ -1093,7 +1687,7 @@ FIXTURES["ext_scenario.ttl"] = (
     # Put D ligt buiten het studiegebied en mag geen enkele uitslag krijgen.
     + hoogteput("PutD", "D", EXT_D, mv=99.00, dek=99.00)
     # Put F ligt op de nodata-vlek van het raster.
-    # Put E heeft geen putdekselniveau, net als elke put in De Wolden. De hoogtechecks
+    # Put E heeft geen putdekselniveau, net als elke put in De Wolden en Hoogeveen. De hoogtechecks
     # vallen dan terug op de maaiveldhoogte, en die komt hier uit AHN2. Zijn afwijking
     # is 0,08 m, dus hij komt in HGT-001 terecht.
     + hoogteput("PutE", "E", EXT_E, mv=10.08, dek=None, mv_wijze="AHN2")
@@ -1105,20 +1699,237 @@ FIXTURES["ext_scenario.ttl"] = (
     + hoogteleiding("L1", "1", [EXT_A, EXT_B], "PutA", "PutB", bob=(11.00, 9.50))
     # Streng 2 kruist water-1 en is geen duiker: EXT-002 en EXT-003.
     + hoogteleiding("L2", "2", [EXT_B, EXT_C], "PutB", "PutC", bob=(9.50, 6.30))
-    # Streng 3 is een duiker die water-2 kruist: wel EXT-002, geen EXT-003.
+    # Streng 3 is een zinker die water-2 kruist: wel EXT-002, geen EXT-003. Een zinker
+    # is in de ontologie een VrijvervalRioolleiding en zit dus in de populatie.
     + hoogteleiding("L3", "3", [EXT_E, EXT_F], "PutE", "PutF", bob=(9.60, 9.55)).replace(
-        "gwsw:GemengdRiool", "gwsw:Duiker"
+        "gwsw:GemengdRiool", "gwsw:Zinker"
     )
+    # Streng 6 is een duiker die water-2 kruist, net als streng 3, maar drie meter
+    # noordelijker en op een eigen route: een duiker is geen rioolleiding (subklasse
+    # van Leiding, niet van VrijvervalRioolleiding) en valt buiten de populatie van
+    # EXT-002 en EXT-003; geen van beide meldt hem. Hij verbindt oppervlaktewater en
+    # heeft dus geen rioolputten aan zijn uiteinden. Boven op streng 3 leverde hij
+    # TOP-006 een samenvalmelding op; die check draait op alle leidingen.
+    + leiding("L6", "6", [EXT_G, EXT_H], None, None, klasse="Duiker")
     # Streng 4 verbindt de lozingsputten met het net.
-    + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35)),
+    + hoogteleiding("L4", "4", [EXT_C, (1072.0, 2008.0)], "PutC", "PutL2", bob=(9.40, 9.35))
+    + "\n"
+    # Put P, put Q en streng "4" liggen binnen het BGT-pand; EXT-001 moet ze als
+    # "binnen" melden, in tegenstelling tot streng "1" die de gevel kruist. Ze
+    # krijgen geen maaiveldhoogte, BOB of inwinning, zodat ze de HGT- en BTR-tests
+    # niet raken -- vandaar `put`/`leiding` en niet `hoogteput`/`hoogteleiding`.
+    + '# Put P, put Q en streng "4" liggen binnen het BGT-pand (1020, 1998)-(1030, 2002);\n'
+    + '# EXT-001 moet ze als "binnen" melden, in tegenstelling tot streng "1" die de gevel\n'
+    + "# kruist. Ze krijgen geen maaiveldhoogte, BOB of inwinning, zodat ze de HGT- en\n"
+    + "# BTR-tests niet raken.\n"
+    + put("PutP", "P", 1022.0, 2000.0)
+    + put("PutQ", "Q", 1028.0, 2000.0)
+    + leiding("L5", "4", [(1022.0, 2000.0), (1028.0, 2000.0)], "PutP", "PutQ"),
 )
+
+
+# Geen check maar de klassenselecties uit checks/selectie.py: het Juinen-voorbeeld
+# bevat maar zes van de veertien rollen, en een selectie die stil leeg blijft leest
+# als "die rol komt niet voor". Hier staat precies een object per ontbrekende rol.
+FIXTURES["selectie_rollen.ttl"] = (
+    "geen -- deze fixture dekt de klassenselecties, niet een gebrek",
+    # Bergbezinkleiding staat niet in de gedeelde prelude; alleen deze fixture heeft
+    # hem nodig. De regel gaat met een toelichting mee het bestand in, zodat hij daar
+    # niet als een losse zwerver leest.
+    "# Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude"
+    " kent haar niet.\n"
+    "gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .\n\n"
+    + put("Put1", "Put1", 1000.0, 2000.0)
+    + put("Lozing1", "Lozing1", 1050.0, 2000.0, klasse="Lozingsput")
+    + put("Val1", "Val1", 1200.0, 2000.0, klasse="Valput")
+    # Overstortput en loze put staan hier ook, zodat de fixture alle veertien rollen
+    # dekt zonder het Juinen-voorbeeld: dat staat in data/ en ontbreekt in een
+    # schone kloon, en dan zou de dekkingstest stil overslaan.
+    + put("Overstort1", "Overstort1", 1250.0, 2000.0, klasse="Overstortput")
+    + put("Loos1", "Loos1", 1300.0, 2000.0, klasse="LozePut")
+    # Een uitlaatconstructie en een bergbezinkbassin zijn bouwwerken, geen putten;
+    # hun orientatie is dus een Bouwwerkorientatie.
+    + put("Uitlaat1", "Uitlaat1", 1100.0, 2000.0, klasse="Uitlaatconstructie").replace(
+        "gwsw:Putorientatie", "gwsw:Bouwwerkorientatie"
+    )
+    + put("Bbb1", "Bbb1", 1150.0, 2000.0, klasse="Bergbezinkbassin").replace(
+        "gwsw:Putorientatie", "gwsw:Bouwwerkorientatie"
+    )
+    + leiding("L1", "L1", [(1000.0, 2000.0), (1050.0, 2000.0)], "Put1", "Lozing1")
+    + leiding(
+        "L2",
+        "L2",
+        [(1050.0, 2000.0), (1100.0, 2000.0)],
+        "Lozing1",
+        "Uitlaat1",
+        klasse="Overstortleiding",
+    )
+    + leiding(
+        "L3",
+        "L3",
+        [(1100.0, 2000.0), (1150.0, 2000.0)],
+        "Uitlaat1",
+        "Bbb1",
+        klasse="Bergbezinkleiding",
+    )
+    + leiding(
+        "L4",
+        "L4",
+        [(1150.0, 2000.0), (1200.0, 2000.0)],
+        "Bbb1",
+        "Val1",
+        klasse="Infiltratieriool",
+    )
+    # Een persleiding is wel een gwsw:Leiding maar geen vrijvervalrioolleiding.
+    + leiding("P1", "P1", [(1200.0, 2000.0), (1250.0, 2000.0)], "Val1", None, klasse="Persleiding")
+    # Oppervlaktewater is lijnvormig en komt dus bij de verbindingen terecht.
+    + leiding("Sloot1", "Sloot1", [(1000.0, 2100.0), (1250.0, 2100.0)], None, None, klasse="Sloot"),
+)
+
+
+# Een streng waarvan de GML-literaal een lijn met precies een coordinaat bevat. GEOS
+# weigert die, en de lader hoort het object als onleesbaar te tellen in plaats van af
+# te breken. Er staat een gezonde streng naast, zodat zichtbaar is dat de rest
+# gewoon doorloopt.
+FIXTURES["geometriefout.ttl"] = (
+    "streng 2 heeft een lijngeometrie met maar een coordinaat en is dus onleesbaar",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding(
+        "L2",
+        "2",
+        [],
+        "PutB",
+        "PutC",
+        literal=(
+            '<gml:LineString xmlns:gml=\\"http://www.opengis.net/gml\\">'
+            '<gml:posList srsDimension=\\"2\\">1050.0 2000.0</gml:posList></gml:LineString>'
+        ),
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Vier vormen die de lader zelf moeten bijten. De Wolden en Hoogeveen kent ze geen van vieren,
+# dus zonder deze fixtures is er geen dataset waarop de reparaties uit issue #36
+# zichtbaar zijn. Ze dragen geen defect: ze zijn conform GWSW 1.6 geschreven en
+# horen dus juist wél gelezen te worden.
+# ---------------------------------------------------------------------------
+
+FIXTURES["dataset_zwaarverkeerdeksel.ttl"] = (
+    "geen; put B draagt een Putdeksel_ZwaarVerkeer in plaats van een kaal Putdeksel",
+    "# De subklasse staat niet in de gedeelde prelude; alleen deze fixture heeft haar nodig.\n"
+    "gwsw:Putdeksel_ZwaarVerkeer rdfs:subClassOf gwsw:Putdeksel .\n\n"
+    + hoogteput("PutA", "A", A)
+    + hoogteput("PutB", "B", B, dek=None)
+    + deksel("PutB", 9.95, klasse="Putdeksel_ZwaarVerkeer")
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),
+)
+
+
+def _twee_houders(straat_eerst: bool) -> str:
+    """Een compartiment onder twee houders, in de gevraagde schrijfvolgorde.
+
+    Het GWSW staat meer dan een houder toe en rdflib levert ze in schrijfvolgorde
+    op. Staat de straat vooraan, dan loopt een wandeling die de eerste houder volgt
+    dood: een `Straat` is geen knoop en draagt zelf geen houder.
+    """
+    houders = [":PutB gwsw:hasPart :PutB_c1 .", ":Straat1 gwsw:hasPart :PutB_c1 ."]
+    if straat_eerst:
+        houders.reverse()
+    return (
+        nette_put("PutA", "A", *A)
+        + nette_put("PutB", "B", *B)
+        + nette_leiding("L1", "1", [A, B], "PutA", "PutB_c1")
+        + '\n:Straat1 rdf:type gwsw:Straat ; rdfs:label "Dorpsstraat" .\n'
+        + "\n".join(houders)
+        + '\n:PutB_c1 rdf:type gwsw:Compartiment ; rdfs:label "B/c1" ;\n'
+        "    gwsw:hasAspect :PutB_c1_ori .\n"
+        ":PutB_c1_ori rdf:type gwsw:Compartimentorientatie .\n"
+    )
+
+
+FIXTURES["dataset_twee_houders_put_eerst.ttl"] = (
+    "geen; compartiment B/c1 hangt onder put B en onder een straat, put eerst geschreven",
+    _twee_houders(straat_eerst=False),
+)
+
+FIXTURES["dataset_twee_houders_straat_eerst.ttl"] = (
+    "geen; hetzelfde compartiment onder dezelfde twee houders, straat eerst geschreven",
+    _twee_houders(straat_eerst=True),
+)
+
+# Dezelfde twee putten en streng als elders, maar met `isPartOf` en `isAspectOf`
+# geschreven. Het GWSW declareert die als de inverse van `hasPart` en `hasAspect`,
+# dus dit is een conforme export -- alleen een andere schrijfrichting.
+FIXTURES["dataset_inverse_properties.ttl"] = (
+    "geen; alle insluitingen staan als isPartOf/isAspectOf in plaats van hasPart/hasAspect",
+    """:PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" .
+:PutA_ori rdf:type gwsw:Putorientatie ; gwsw:isAspectOf :PutA .
+:PutA_pun rdf:type gwsw:Punt ; gwsw:isAspectOf :PutA_ori ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral .
+:PutB rdf:type gwsw:Inspectieput ; rdfs:label "B" .
+:PutB_ori rdf:type gwsw:Putorientatie ; gwsw:isAspectOf :PutB .
+:PutB_pun rdf:type gwsw:Punt ; gwsw:isAspectOf :PutB_ori ;
+    gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral .
+:L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" .
+:L1_ori rdf:type gwsw:Leidingorientatie ; gwsw:isAspectOf :L1 .
+:L1_lij rdf:type gwsw:Lijn ; gwsw:isAspectOf :L1_ori ;
+    gwsw:hasValue "<gml:LineString xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:posList srsDimension=\\"2\\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral .
+:L1_b rdf:type gwsw:BeginpuntLeiding ; gwsw:isPartOf :L1_ori ; gwsw:hasConnection :PutA_ori .
+:L1_b_bob rdf:type gwsw:BobBeginpuntLeiding ; gwsw:isAspectOf :L1_b ; gwsw:hasValue 8.60 .
+:L1_e rdf:type gwsw:EindpuntLeiding ; gwsw:isPartOf :L1_ori ; gwsw:hasConnection :PutB_ori .
+:L1_e_bob rdf:type gwsw:BobEindpuntLeiding ; gwsw:isAspectOf :L1_e ; gwsw:hasValue 8.55 .
+""",
+)
+
+# Een export mag beide schrijfrichtingen naast elkaar zetten -- ze zeggen hetzelfde.
+# Wie ze allebei leest zonder te ontdubbelen, telt het kenmerk en het onderdeel twee
+# keer, en dat is precies het soort dubbeltelling dat nergens een melding oplevert.
+FIXTURES["dataset_dubbele_schrijfrichting.ttl"] = (
+    "geen; put B schrijft dezelfde twee relaties zowel voorwaarts als invers",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB")
+    + """
+:PutB gwsw:hasAspect :PutB_bd .
+:PutB_bd gwsw:isAspectOf :PutB .
+:PutB_bd rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date .
+:PutB gwsw:hasPart :PutB_c1 .
+:PutB_c1 gwsw:isPartOf :PutB .
+:PutB_c1 rdf:type gwsw:Compartiment ; rdfs:label "B/c1" ;
+    gwsw:hasAspect :PutB_c1_ori .
+:PutB_c1_ori rdf:type gwsw:Compartimentorientatie .
+""",
+)
+
+# Een uitlaatconstructie die daarnaast als bouwwerk getypeerd is. Alfabetisch wint
+# "Bouwwerk", maar dat is de algemenere van de twee: de ontologie zegt dat
+# Uitlaatconstructie een subklasse van Bouwwerk is.
+FIXTURES["dataset_meervoudig_objecttype.ttl"] = (
+    "geen; bouwwerk U draagt zowel gwsw:Bouwwerk als gwsw:Uitlaatconstructie",
+    put("Uitlaat1", "U", 1100.0, 2000.0, klasse="Uitlaatconstructie").replace(
+        "gwsw:Putorientatie", "gwsw:Bouwwerkorientatie"
+    )
+    + ":Uitlaat1 rdf:type gwsw:Bouwwerk .\n",
+)
+
+
+def render(defect: str, inhoud: str) -> str:
+    """De volledige tekst van een fixture: de prelude, de DEFECT-regel en de inhoud.
+
+    Staat apart van `main` zodat `tests/test_ttl_fixtures.py` dezelfde regel gebruikt
+    om te bewaken dat de bestanden op schijf nog bij dit script passen. Zou de test
+    de opmaak overschrijven, dan bewaakte hij zijn eigen kopie.
+    """
+    return f"{PRELUDE}\n# DEFECT: {defect}\n\n{inhoud}"
 
 
 def main() -> None:
     DOEL.mkdir(parents=True, exist_ok=True)
     for naam, (defect, inhoud) in FIXTURES.items():
-        tekst = f"{PRELUDE}\n# DEFECT: {defect}\n\n{inhoud}"
-        (DOEL / naam).write_text(tekst, encoding="utf-8")
+        (DOEL / naam).write_text(render(defect, inhoud), encoding="utf-8")
         print(naam)
 
 

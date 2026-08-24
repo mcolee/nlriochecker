@@ -1,7 +1,7 @@
-"""Externe geodata uit `data/gis/` voor de EXT- en AHN-checks.
+"""Externe geodata uit `data/gis_koekangerveld/` voor de EXT- en AHN-checks.
 
 De aangeleverde bronnen dekken alleen het studiegebied Koekangerveld, terwijl de
-GWSW-dataset de hele gemeente De Wolden beslaat. Een GWSW-object buiten dat gebied
+GWSW-dataset de gemeenten De Wolden en Hoogeveen beslaat. Een GWSW-object buiten dat gebied
 mag daarom nooit een check-uitslag krijgen: dat er geen BGT-deksel of BAG-pand in de
 buurt ligt zegt daar niets over de datakwaliteit en alles over de dekking van de
 bron. Alle EXT- en AHN-checks vragen daarom eerst `binnen_bereik()` en laten de rest
@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, NamedTuple
 
 from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
@@ -27,6 +28,13 @@ RD_NEW = 28992
 
 class ExternalDataError(PipelineError):
     """Een externe bron ontbreekt, is onleesbaar of staat in een ander stelsel."""
+
+
+class Dekkingseis(NamedTuple):
+    """Hoe ver buiten het bereik de checks kijken, en welk tekort toegestaan is."""
+
+    marge_m: float
+    tolerantie_m: float
 
 
 @dataclass(frozen=True)
@@ -73,7 +81,8 @@ class RasterSampler:
     crs: str
     nodata: float | None
     bounds: tuple[float, float, float, float]
-    reader: object = None
+    # Rasterio levert geen typestubs; het lezerobject blijft daarom ongetypeerd.
+    reader: Any = None
 
     def sample(self, x: float, y: float) -> float | None:
         """De rasterwaarde op deze RD-coordinaat, of None buiten het raster."""
@@ -136,12 +145,19 @@ ROLLEN = {
 }
 
 
-def load_external_data(bronnen, wortel: Path | None = None) -> ExternalData:
+def load_external_data(
+    bronnen, wortel: Path | None = None, *, dekkingseis: Dekkingseis | None = None
+) -> ExternalData:
     """Leest de externe bronnen uit de geconfigureerde map.
 
     Ontbreekt een bestand, dan is dat geen fout: de bronnen zijn optioneel en de
     checks die ze nodig hebben melden zelf dat ze niets konden toetsen. Wat er niet
     was komt in `missing` te staan en daarmee in het rapport.
+
+    Met een `dekkingseis` wordt elke aangeleverde bron getoetst op dekking van het
+    bereik voordat er ook maar een check draait; zie `_toets_dekking`. Zonder eis
+    blijft die toets achterwege -- een beller die de zoekafstanden en de tolerantie
+    niet kent, kan er ook geen oordeel over vellen.
     """
     basis = Path(wortel) if wortel is not None else Path.cwd()
     map_pad = basis / bronnen.map
@@ -161,13 +177,13 @@ def load_external_data(bronnen, wortel: Path | None = None) -> ExternalData:
             lagen[rol] = laag
 
     for rol, bestand in (("bag_pand", bronnen.bag_pand), ("nwb_wegvak", bronnen.nwb_wegvakken)):
-        laag = _lees_rol(map_pad, bestand, rol, [], ontbrekend, notities)
+        laag = _lees_rol(map_pad, bestand, rol, [], ontbrekend, notities, enige_laag=True)
         if laag is not None:
             lagen[rol] = laag
 
     raster = _lees_raster(map_pad, bronnen.ahn_dtm, ontbrekend, notities)
 
-    return ExternalData(
+    data = ExternalData(
         extent=extent,
         extent_source=extent_pad,
         extent_name=extent_naam,
@@ -176,6 +192,120 @@ def load_external_data(bronnen, wortel: Path | None = None) -> ExternalData:
         missing=tuple(ontbrekend),
         notes=tuple(notities),
     )
+    if dekkingseis is not None:
+        _toets_dekking(data, dekkingseis)
+    return data
+
+
+def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
+    """Weigert bronnen die kleiner zijn dan het bereik waarvoor ze gelden.
+
+    Een extract dat maar een deel van het bereik dekt geeft een misleidend schone
+    uitkomst: geen treffer leest als geen probleem, terwijl de bron er domweg niet
+    was. Daarom is dit een fout en geen waarschuwing, en is er geen forceer-vlag --
+    wel een geconfigureerde tolerantie (`[bronnen] dekking_tolerantie_m`).
+
+    Het bereik is dat van `bronnen.studiegebied`: het gebied waarvoor je de bronnen
+    geldig verklaart, en precies het gebied waarbinnen de checks uitslagen geven. Dat
+    de bronnen maar een deel van de GWSW-dataset dekken is iets anders en al eerlijk
+    afgevangen: objecten daarbuiten krijgen de status *buiten studiegebied* (BC-2).
+    Zonder bereik draait deze poort dan ook niet -- dan geeft geen enkele EXT-check
+    een uitslag en valt er niets te maskeren.
+
+    De vectorlagen worden getoetst tegen het bereik plus `marge_m`, want een pand net
+    buiten het bereik telt mee voor een object er net binnen. Het raster krijgt geen
+    marge: bemonsteren is puntsgewijs.
+
+    Wat deze poort *niet* kan: bbox-dekking is noodzakelijk maar niet voldoende. Een
+    gat midden in het extract valt er niet mee op, en een tekort op een dunne laag
+    betekent "hier staan geen features", niet per se "extract afgeknipt". De
+    `binnen_bereik`-notities per object blijven het tweede vangnet.
+    """
+    if data.extent is None:
+        return
+
+    bereik = data.extent.bounds
+    tekorten: list[str] = []
+    for rol, laag in sorted(data.layers.items()):
+        omhullende = _omhullende(laag.geometries)
+        if omhullende is None:
+            continue
+        tekorten += _tekortregel(rol, laag.source.name, omhullende, bereik, eis.marge_m, eis)
+    if data.raster is not None:
+        tekorten += _tekortregel(
+            "ahn_dtm", data.raster.source.name, data.raster.bounds, bereik, 0.0, eis
+        )
+
+    if tekorten:
+        raise ExternalDataError(
+            "de aangeleverde bronnen dekken het bereik niet waarvoor ze gelden; een te "
+            "klein extract geeft een misleidend schone uitkomst. Trek de betreffende "
+            "extracten opnieuw, ruimer dan het bereik, of verhoog "
+            "`[bronnen] dekking_tolerantie_m` als de lege rand klopt -- die tolerantie "
+            "geldt voor alle lagen tegelijk, dus een ruime waarde heft de poort ook voor "
+            "de andere bronnen op.\n"
+            "Is een bron niet te klein maar ongeschikt -- bevat hij iets "
+            "anders dan zijn naam suggereert -- zet hem dan uit "
+            "(`bgt_putdeksellagen = []`, of laat `bag_pand` weg); de bijbehorende checks "
+            "slaan dan over met uitleg in het rapport, wat een eerlijker antwoord is dan "
+            "een uitslag op een verkeerde bron.\n" + "\n".join(tekorten)
+        )
+
+
+def _omhullende(
+    geometrieen: tuple[BaseGeometry, ...],
+) -> tuple[float, float, float, float] | None:
+    """De omhullende van een verzameling geometrieen, of None als er niets in zit.
+
+    Met min/max over de losse omhullenden en niet met `unary_union`: die berekent een
+    echte unie -- op de aangeleverde BGT-panden meetbaar traag -- terwijl hier alleen
+    de buitenmaat telt.
+    """
+    grenzen = [vorm.bounds for vorm in geometrieen if vorm is not None and not vorm.is_empty]
+    if not grenzen:
+        return None
+    return (
+        min(g[0] for g in grenzen),
+        min(g[1] for g in grenzen),
+        max(g[2] for g in grenzen),
+        max(g[3] for g in grenzen),
+    )
+
+
+def _tekortregel(
+    rol: str,
+    bestand: str,
+    omhullende: tuple[float, float, float, float],
+    bereik: tuple[float, float, float, float],
+    marge_m: float,
+    eis: Dekkingseis,
+) -> list[str]:
+    """De foutregel voor een bron die het bereik niet dekt, of niets."""
+    referentie = (
+        bereik[0] - marge_m,
+        bereik[1] - marge_m,
+        bereik[2] + marge_m,
+        bereik[3] + marge_m,
+    )
+    tekort = (
+        max(0.0, omhullende[0] - referentie[0]),
+        max(0.0, omhullende[1] - referentie[1]),
+        max(0.0, referentie[2] - omhullende[2]),
+        max(0.0, referentie[3] - omhullende[3]),
+    )
+    if max(tekort) <= eis.tolerantie_m:
+        return []
+    return [
+        f"- {rol} (`{bestand}`): bron {_bbox(omhullende)}, vereist {_bbox(referentie)}; "
+        f"tekort west/zuid/oost/noord = "
+        f"{tekort[0]:.1f}/{tekort[1]:.1f}/{tekort[2]:.1f}/{tekort[3]:.1f} m, "
+        f"toegestaan {eis.tolerantie_m:.1f} m."
+    ]
+
+
+def _bbox(grenzen: tuple[float, float, float, float]) -> str:
+    """Een omhullende als leesbare tekst."""
+    return f"({grenzen[0]:.1f}, {grenzen[1]:.1f} - {grenzen[2]:.1f}, {grenzen[3]:.1f})"
 
 
 def _lees_studiegebied(
@@ -217,8 +347,16 @@ def _lees_rol(
     laagnamen: list[str],
     ontbrekend: list[str],
     notities: list[str],
+    *,
+    enige_laag: bool = False,
 ) -> VectorLayer | None:
-    """Leest de lagen die een rol vervullen en voegt ze samen tot een laag."""
+    """Leest de lagen die een rol vervullen en voegt ze samen tot een laag.
+
+    `enige_laag` scheidt de twee aanroepplekken: `bag_pand`/`nwb_wegvak` leveren een
+    eenlaagsbestand aan en pakken de enige laag, ook zonder laagnaam. De BGT-rollen
+    dragen hun laagnaam per rol; daar is een lege lijst een uitschakeling en wordt de
+    rol niet gelezen -- ongeacht het aantal lagen. Zie issue #53.
+    """
     if bestand is None:
         ontbrekend.append(rol)
         return None
@@ -228,14 +366,20 @@ def _lees_rol(
         return None
 
     beschikbaar = _laagnamen(pad)
-    if not laagnamen and len(beschikbaar) > 1:
-        # Een bestand met meerdere lagen zonder rolconfiguratie: gokken welke laag
-        # bedoeld is levert stille onzin op (de eerste BGT-laag is `bak`).
-        ontbrekend.append(
-            f"{rol} ({pad.name} heeft {len(beschikbaar)} lagen en er is geen laagnaam "
-            f"geconfigureerd voor deze rol)"
-        )
-        return None
+    if not laagnamen:
+        if not enige_laag:
+            # Een rol zonder laagnaam is uitgezet of niet ingevuld; hem alsnog aan de
+            # enige laag koppelen is dezelfde gok die we bij meerdere lagen afwijzen.
+            ontbrekend.append(f"{rol} (geen laagnaam geconfigureerd voor deze rol)")
+            return None
+        if len(beschikbaar) > 1:
+            # Een eenlaagsbron met meer dan een laag: gokken welke bedoeld is levert
+            # stille onzin op (de eerste BGT-laag is `bak`).
+            ontbrekend.append(
+                f"{rol} ({pad.name} heeft {len(beschikbaar)} lagen en er is geen laagnaam "
+                f"geconfigureerd voor deze rol)"
+            )
+            return None
     gekozen = laagnamen or beschikbaar[:1]
     bestaan = [naam for naam in gekozen if naam in beschikbaar]
     if not bestaan:

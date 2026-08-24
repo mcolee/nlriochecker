@@ -22,12 +22,15 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Overstortleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
-gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
+gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
@@ -206,7 +209,7 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :L2_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 6.3 ] .
 :L2_b gwsw:hasConnection :PutB_ori .
 :L2_e gwsw:hasConnection :PutC_ori .
-:L3 rdf:type gwsw:Duiker ; rdfs:label "3" ;
+:L3 rdf:type gwsw:Zinker ; rdfs:label "3" ;
     gwsw:hasAspect :L3_ori .
 :L3 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,
     [ rdf:type gwsw:HoogteLeiding ; gwsw:hasValue 300 ] ,
@@ -224,6 +227,14 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :L3_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 9.55 ] .
 :L3_b gwsw:hasConnection :PutE_ori .
 :L3_e gwsw:hasConnection :PutF_ori .
+:L6 rdf:type gwsw:Duiker ; rdfs:label "6" ;
+    gwsw:hasAspect :L6_ori .
+:L6_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L6_b , :L6_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1010.0 2013.0 1030.0 2013.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L6_b rdf:type gwsw:BeginpuntLeiding .
+:L6_e rdf:type gwsw:EindpuntLeiding .
 :L4 rdf:type gwsw:GemengdRiool ; rdfs:label "4" ;
     gwsw:hasAspect :L4_ori .
 :L4 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,

@@ -23,11 +23,14 @@ uv run python scripts/uitgave.py patch|minor|major
 Het script doorloopt:
 
 1. eisen dat je op `main` staat, met een schone werkboom, niet achterlopend op
-   `origin/main` (is de remote onbereikbaar, dan slaat die laatste controle over);
+   `origin/main` (is de remote onbereikbaar, dan slaat die laatste controle over), en
+   dat `CHANGELOG.md` onder `## [Unreleased]` iets te melden heeft;
 2. het volgende nummer berekenen met `uv version --bump --dry-run`, dat niets schrijft,
    en controleren dat de bijbehorende tag nog niet bestaat;
 3. pas dan echt bumpen met `uv version --bump`, wat `pyproject.toml` en `uv.lock` raakt;
-4. `ruff check .`, `ruff format --check .` en `pytest -q` draaien;
+4. `ruff check .`, `ruff format --check .`, `mypy` en `pytest -q` draaien, dat laatste met
+   `--cov=nlriochecker --cov-fail-under=95` -- dezelfde dekkingsondergrens die ook de CI
+   afdwingt (BO-38);
 5. committen als `Versie X.Y.Z` -- alleen `pyproject.toml` en `uv.lock` bij naam, nooit
    wat de toets toevallig in de werkboom achterliet;
 6. taggen als `vX.Y.Z`.
@@ -58,7 +61,7 @@ checkregister ontbreken.
 | Deel  | Wanneer |
 |-------|---------|
 | patch | Reparaties, en nieuwe checks binnen een blok dat er al is. |
-| minor | Een afgerond blok of fase. Ook: een breuk in de CLI, de configuratie (`checks.toml`, projectconfig) of het uitvoerformaat. |
+| minor | Een afgerond blok of fase. Ook: een breuk in de CLI, de configuratie (`checks.toml`, projectconfig), het uitvoerformaat of de Python-API (`nlriochecker.toetsrun` en wat het aanreikt). |
 | major | Pas als het checkregister volledig gedekt is. Daarna: elke breuk in de publieke API. |
 
 Check-ID's uit het checkregister zijn stabiel en staan los van dit nummer; een vervallen

@@ -3,7 +3,9 @@
 # Klassenwortels bepalen welke objecten als put, vrijvervalleiding of netwerk-
 # eindpunt tellen; de engine gebruikt de subklasse-afsluiting uit de ontologie,
 # dus een wortel dekt al haar subklassen. Drempelwaarden zijn per project aan
-# te passen; er staat niets hardgecodeerd in de code.
+# te passen; er staat niets hardgecodeerd in de code. Elk veld van
+# CheckThresholds staat expliciet in [drempels] hieronder, met zijn huidige
+# waarde; een drifttest in tests/test_checkconfig.py dwingt dat af (issue #28).
 
 [klassen]
 put = ["Put"]
@@ -11,25 +13,40 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
-# Mechanisch riool valt buiten scope (zie het checkregister). Deze klassen komen
-# niet in de analyse maar wel in de GIS-uitvoer, in een eigen grijze laag; een leeg
-# kaartbeeld daar zou anders als "geen gebreken" lezen. De namen zijn geverifieerd
-# tegen de export: Persleiding 3548, Vacuumleiding 147, Drukleiding 25.
-mechanisch = ["Persleiding", "Drukleiding", "Vacuumleiding"]
-# NET-001 en NET-002 vragen om verschillende eindpunten. 'Overnamepunt' bestaat
-# niet als klasse in de GWSW-ontologie; dat is open punt 6 uit het checkregister.
-# Pompunit staat erbij omdat een vrijvervalstreng die op een drukrioleringspomp
-# eindigt daar het mechanische stelsel in gaat; dat is het overnamepunt waar het
-# register over spreekt. Zonder deze regel geldt heel de drukriolering van De
-# Wolden als onbereikbaar.
-afvoer_eindpunt = ["Gemaal", "Pompunit"]
+# Mechanisch riool valt buiten scope (zie het checkregister). Deze lijst filtert
+# echter geen enkele check: dat mechanisch riool buiten de analyse blijft komt
+# doordat de checks op `vrijvervalleiding` selecteren en niet doordat deze klassen
+# hier staan. Haar enige lezer is `uitvoer/gpkg.py` via `selectie.mechanischeleidingen`,
+# en die bepaalt uitsluitend de kaartkleur: een mechanische streng blijft in de laag
+# `strengen` maar krijgt status `grijs` zolang er niets op staat, zodat "geen kleur"
+# daar niet als "getoetst en in orde" leest.
+# De twee ontologische wortels in plaats van de losse bladen: `MechanischeRioolleiding`
+# dekt Drukleiding, Luchtpersleiding en Vacuumleiding; `MechanischeTransportleiding` dekt
+# Persleiding, Leidingsegment en Spoelleiding. Dat sluit het gat met de symbolentabel,
+# die Leidingsegment en Luchtpersleiding al als mechanische streepjeslijn tekent
+# (`uitvoer/stijlen/symbolen.py`, `MECHANISCHE_LIJNEN`), en overleeft een volgende
+# GWSW-versie. De Wolden telt onder deze wortels alleen Persleiding 3548, Vacuumleiding
+# 147 en Drukleiding 25; nul Luchtpersleiding, Leidingsegment of Spoelleiding, dus geen
+# object verandert van categorie (issue #56).
+mechanisch = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
+# NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
+# degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
+# ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden.
+# Gemaal en Pompunit staan erbij als erkend noodverband: een vrijvervalstreng die
+# op een drukrioleringspomp eindigt gaat daar het mechanische stelsel in. Zonder
+# die regel geldt heel de drukriolering van De Wolden als onbereikbaar. Het
+# noodverband en het criterium om het los te laten staan in BO-33.
+afvoer_eindpunt = ["Overnamepunt", "Gemaal", "Pompunit"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
 # (een Bouwwerk) fysieke objecten zijn. De Wolden gebruikt alleen die laatste twee.
+# De losse klasse `Uitlaat` hoort er niet bij: die hangt onder RepresentatieFysiekObject,
+# niet onder Knooppunt of FysiekObject, en belandt dus in geen van de twee selectiebakken.
+# Zelfs een object met dubbele typering (Uitlaatconstructie én Uitlaat) matcht al via
+# Uitlaatconstructie hierboven, dus de regel voegde niets toe -- een stille nul (issue #56).
 lozings_eindpunt = [
   "Lozingspunt",
   "UitlaatPunt",
-  "Uitlaat",
   "Lozingsput",
   "Uitlaatconstructie",
 ]
@@ -37,8 +54,10 @@ lozings_eindpunt = [
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]
 hemelwater = ["Hemelwaterriool"]
-# De ontologie kent geen klasse "IT-stelsel"; NET-007 leest een deelstelsel met
-# infiltratieleidingen als IT-stelsel. Zie open punt 6 van het checkregister.
+# De ontologie kent het IT-stelsel wel: Infiltratiestelsel met zijn subklasse
+# DrainageInfiltratieTransportStelsel, plus de leidingklassen DIT_riool en DT_riool.
+# NET-007 leidt een IT-stelsel voorlopig toch af uit de infiltratieleidingen, omdat
+# de engine de stelselboom uit de export nergens leest. Zie BO-34.
 infiltratie = ["Infiltratieriool"]
 drempel = ["Overstortdrempel"]
 
@@ -95,6 +114,36 @@ puttype = "Lozingsput"
 vereist_een_van = ["VrijvervalRioolleiding", "Duiker"]
 toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben."
 
+# HGT-007: het minimale afschot voor vuilwater en gemengd hangt af van de diameter.
+# Bron: RIONED Kennisbank Stedelijk Water. Kleine leidingen moeten steiler liggen dan
+# grote; een vlakke drempel voor alles zou juist de waarde nemen die "vrijwel niet
+# voorkomt". Zie issue #29.
+#
+#   "De beginstrengen die het verst bij een gemaal vandaan liggen [...] krijgen in het
+#    ontwerp ten minste een afschot van 1:250 tot 1:300. Dit zijn meestal ook de
+#    kleinste leidingen (met een diameter vanaf 200 mm)."
+#   "Bij leidingen met een diameter van 300 mm is het minimale afschot ongeveer 1:500;
+#    Bij leidingen van 400 tot 600 mm is het afschot 1:750;
+#    Bij leidingen van zo'n 700 tot 1.000 mm is het minimale afschot 1:1.000;
+#    Een afschot van 1:1.000 of flauwer komt in vuilwaterstelsels vrijwel niet voor."
+#
+# `tot_diameter_mm` is de bovengrens (inclusief) in mm; de laatste trede laat hem weg
+# en is het vangnet zonder bovengrens. `minimaal_verhang_een_op` is de noemer van 1:n.
+[[verhang_staffel]]
+tot_diameter_mm = 250
+minimaal_verhang_een_op = 250
+
+[[verhang_staffel]]
+tot_diameter_mm = 350
+minimaal_verhang_een_op = 500
+
+[[verhang_staffel]]
+tot_diameter_mm = 650
+minimaal_verhang_een_op = 750
+
+[[verhang_staffel]]
+minimaal_verhang_een_op = 1000
+
 [naamgeving]
 # ADM-003: de naamgevingsconventie is projectafhankelijk. Zonder patroon draait de
 # check niet; een verzonnen conventie zou elke dataset afkeuren.
@@ -105,7 +154,12 @@ toelichting = "Een lozingsput hoort aanvoer uit het vrijvervalstelsel te hebben.
 # Blok C: de aangeleverde externe bronnen. Ze dekken alleen het studiegebied
 # Koekangerveld; objecten daarbuiten krijgen geen EXT-uitslag maar de status
 # "buiten studiegebied".
-map = "data/gis"
+map = "data/gis_koekangerveld"
+# Hoeveel een aangeleverde bron kleiner mag zijn dan het bereik in `studiegebied`
+# voordat het laden faalt. De code staat standaard op 0 (streng); voor déze bronnen is
+# ruimte nodig: `bgt_bouwwerk` telt 52 objecten die aan de oostkant 276 m voor de rand
+# ophouden, en dat is leegte en geen afgeknipt extract. Zie BO-19 in de beslislog.
+dekking_tolerantie_m = 300.0
 bgt = "BGT.gpkg"
 bag_pand = "bag_pand_koekangerveld.gpkg"
 nwb_wegvakken = "nwb_wegvakken_koekangerveld.gpkg"
@@ -115,15 +169,179 @@ ahn_dtm = "ahn5_dtm_koekangerveld.tif"
 # zie docs/gis-inventarisatie.md. Een lege of ontbrekende laag laat de bijbehorende
 # checks overslaan met de melding "laag niet aanwezig in aangeleverde data".
 bgt_pandlagen = ["pand"]
-bgt_waterlagen = ["waterdeel", "ondersteunendwaterdeel"]
+# Alleen `waterdeel`, nooit `ondersteunendwaterdeel`: dat is de oever en niet het water
+# zelf, en een streng die een slootkant raakt kruist geen watergang. Binnen `waterdeel`
+# telt elk type mee (waterloop, greppel/droge sloot, watervlakte, zee); daar wordt niet
+# op gefilterd. Zie BO-24 in de beslislog.
+bgt_waterlagen = ["waterdeel"]
 bgt_putdeksellagen = ["put"]
 bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
 
 [drempels]
-# TOP-004: hoe ver een strengeindpunt van zijn put mag liggen.
+# Elke drempel draagt zijn check-ID en herkomst: een getal uit het checkregister,
+# of "projectkeuze, geen externe bron" als het register de check wel noemt maar
+# geen waarde geeft. Zie issue #28.
+
+# TOP-004: hoe ver een strengeindpunt van zijn put mag liggen. Het checkregister
+# noemt alleen "afstand > tolerantie" zonder getal; projectkeuze, geen externe bron.
 snapping_tolerantie_m = 0.10
-# TOP-005: binnen deze afstand gelden twee putten als dubbel.
+# TOP-005: binnen deze afstand gelden twee putten als dubbel. Uit het
+# checkregister: "bijv. 0,30 m".
 dubbele_put_tolerantie_m = 0.30
+# TOP-006: hoe ver twee strengen mogen afwijken en hoe lang ze moeten samenvallen
+# om als dubbel ingetekend te gelden. Projectkeuze, geen externe bron.
+overlap_tolerantie_m = 0.05
+overlap_minimale_lengte_m = 1.0
+# TOP-007: onder deze lengte geldt een streng als nul-lengte. Projectkeuze, geen
+# externe bron.
+nul_lengte_m = 0.01
+# TOP-008: hoe ver de hartlijn van een rechte put-putverbinding mag afwijken.
+# Projectkeuze, geen externe bron.
+rechtheid_afwijking_m = 0.50
+# TOP-009: het geldige RD-bereik (EPSG:28992) in meters, een ruime omhullende om
+# Nederland. Projectkeuze, geen externe bron: dit zijn geen gepubliceerde EPSG- of
+# RDNAPTRANS-grenzen.
+rd_x_min = 0.0
+rd_x_max = 300_000.0
+rd_y_min = 300_000.0
+rd_y_max = 630_000.0
+# TOP-010: extra marge bovenop de halve diameter van beide strengen. Projectkeuze,
+# geen externe bron.
+diameterbuffer_marge_m = 0.0
+# TOP-013 en TOP-014: aantallen waarboven het onaannemelijk wordt. Uit het
+# checkregister: "meer dan twee parallelle strengen" en "meer dan vier
+# aansluitende strengen".
+parallelle_strengen_maximum = 2
+aansluitende_strengen_maximum = 4
+# TOP-018: wanneer twee vertices als dubbel gelden en wanneer een hoek een spike
+# is. Projectkeuze, geen externe bron.
+dubbele_vertex_tolerantie_m = 0.01
+spike_hoek_graden = 5.0
+# TOP-021: hoe dicht een put bij een doorlopende streng mag liggen zonder erop te
+# snappen. Projectkeuze, geen externe bron.
+put_op_streng_tolerantie_m = 0.50
+
+# ATTR-002: de ondergrens per stelseltype staat in `plausibiliteit.toml`
+# (`[[minimale_diameter]]`), met een bron per regel -- niet meer als losse drempel.
+# ATTR-005: eenheidsfout binnen bereik; een diameter onder deze waarde in
+# combinatie met een deelbaar-door-tien-patroon wijst op centimeters.
+# Projectkeuze, geen externe bron.
+eenheidsverdenking_diameter_mm = 100.0
+# ATTR-006: hoeveel de strengdiameter de putafmeting mag overschrijden.
+# Projectkeuze, geen externe bron.
+put_diameter_marge_mm = 0.0
+# ATTR-007: geldig bereik voor de begindatum (aanlegdatum). Uit het checkregister:
+# "in de toekomst of voor 1870".
+begindatum_minimum = 1870
+# De bovengrens (`begindatum_maximum`) staat hier bewust niet: zonder waarde is het
+# het huidige jaar. Zet er een vast jaar neer om een run reproduceerbaar te maken.
+# ATTR-015: signaalwaarde, geen norm. Boven dit aandeel van de gedateerde objecten
+# op een enkel jaartal komt er een systemische melding dat het naar een vulwaarde
+# ruikt. Op De Wolden is de hoogste natuurlijke piek 4,5%, dus 0,20 blijft daar stil.
+begindatum_vulwaarde_aandeel = 0.20
+# ATTR-015: onder zoveel gedateerde objecten zegt zo'n aandeel niets.
+begindatum_vulwaarde_minimum_objecten = 30
+# ATTR-008: aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
+# `Dt_LengteLeiding` declareert 1-75 m (owl:withRestrictions). GWSW is leidend, dus
+# beide grenzen volgen de ontologie -- niet langer de projectkeuze 200 m, die
+# strengen goedkeurde die de SHACL-nulmeting afkeurt (issue #35).
+minimale_strenglengte_m = 1.0
+maximale_strenglengte_m = 75.0
+# ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.
+# Het checkregister laat het percentage als "X%" open; projectkeuze, geen externe
+# bron.
+lengte_afwijking_procent = 5.0
+# ATTR-004: hoeveel breedte en hoogte bij een rond profiel mogen verschillen.
+# Projectkeuze, geen externe bron.
+rondheid_tolerantie_mm = 0.0
+# ATTR-017: de schalen waarmee de wandruwheid gelezen kan worden. Het GWSW-datatype
+# is een geheel getal in mm en kan de kunststofwaarden uit C2100 niet uitdrukken, dus
+# een export noteert de waarde soms in tienden van een mm. ATTR-017 kiest de schaal
+# met de minste afwijkingen; met een tweede kandidaat blijft een export in hele mm ook
+# goed getoetst. Zie BO-39.
+wandruwheid_schalen = [1.0, 10.0]
+
+# HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN. Uit het
+# checkregister: "meer dan 5 cm" (waarschuwing) en "meer dan 25 cm" (fout).
+ahn_afwijking_waarschuwing_m = 0.05
+ahn_afwijking_fout_m = 0.25
+# HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. Uit het
+# checkregister: "meer dan 3 m eronder".
+bob_maximale_diepte_m = 3.0
+# HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng. Het
+# checkregister noemt "onder drempel" en "boven drempel" zonder getal;
+# projectkeuze, geen externe bron.
+tegenverhang_licht_m = 0.01
+tegenverhang_fors_m = 0.05
+# HGT-007: het minimale afschot staat als diameterstaffel in [[verhang_staffel]]
+# hierboven, met de RIONED-citaten. Geen scalaire drempel meer.
+# HGT-008: steiler dan een op zoveel is verdacht. Uit het checkregister: "steiler
+# dan bijv. 1:50".
+extreem_verhang_een_op = 50.0
+# HGT-009 en HGT-016: BOB-sprong waarboven een valconstructie verwacht wordt. Het
+# checkregister noemt "boven drempel" zonder getal; projectkeuze, geen externe
+# bron.
+bob_sprong_m = 0.25
+# HGT-012: aannemelijk bereik voor de putdiepte. Bron: het GWSW-datatype
+# `Dt_HoogtePut` declareert 500-4000 mm (owl:withRestrictions). GWSW is leidend, dus
+# beide grenzen volgen de ontologie -- niet langer de projectkeuze 6 m zonder
+# ondergrens, die putten goedkeurde die de ontologie afkeurt (issue #35).
+minimale_putdiepte_m = 0.5
+maximale_putdiepte_m = 4.0
+# HGT-013: gronddekking op de buiskruin. Uit het checkregister: "kleiner dan 0,5 m
+# of groter dan 4 m".
+minimale_gronddekking_m = 0.50
+maximale_gronddekking_m = 4.0
+# HGT-014: hoeveel het leidingverhang van het maaiveldverloop mag afwijken.
+# Projectkeuze, geen externe bron.
+maaiveldvolging_afwijking_m = 1.0
+# HGT-015: marge van het putbodemniveau ten opzichte van de laagste BOB. Uit het
+# checkregister: "hoger dan +50 mm, of zonk dieper dan 500 mm".
+putbodem_boven_bob_m = 0.05
+putbodem_zonk_m = 0.50
+# HGT-017: afwijking tussen de z-waarde uit de geometrie en de administratie. Het
+# checkregister noemt de check maar geen getal; projectkeuze, geen externe bron.
+z_afwijking_m = 0.05
+
+# RVZ-004: afstand tot ontvangend oppervlaktewater. Het checkregister laat de
+# afstand als "X m" open; projectkeuze, geen externe bron.
+overstort_water_afstand_m = 25.0
+# RVZ-011: minimale waking van de overstortdrempel. Uit het checkregister:
+# "kleiner dan 0,40 m".
+minimale_waking_m = 0.40
+# NET-008: wanneer een deelstelsel klein heet en hoeveel lozingspunten opvallen.
+# Het checkregister noemt "opvallend veel" zonder getal; projectkeuze, geen
+# externe bron.
+klein_deelstelsel_knopen = 25
+lozingspunten_per_deelstelsel = 2
+
+# BTR-003: leeftijd van de inwinning per grondsoort, in jaren. Uit het
+# checkregister: "indicatie: zand 40 jaar, veen 10 jaar"; deze drempel draagt de
+# zand-indicatie als enkele waarde, geen grondsoortafhankelijke tabel.
+inwinning_maximale_leeftijd_jaar = 40
+# BTR-004: geldig bereik van de grondwaterstand ten opzichte van maaiveld. Uit het
+# checkregister: "meer dan 5 m onder maaiveld".
+grondwater_maximale_diepte_m = 5.0
+# BTR-006: raster waarop afronding gemeten wordt, en het aandeel waarboven het
+# cluster als systematisch geldt. Het checkregister noemt de check maar geen
+# getal; projectkeuze, geen externe bron.
+afronding_raster_m = 0.05
+afronding_aandeel_procent = 80.0
+afronding_minimum_waarnemingen = 30
+
+# EXT-checks: bufferafstanden tot de externe bronnen. Het checkregister laat de
+# afstanden als "X m" open; projectkeuze, geen externe bron.
+ext_pand_buffer_m = 1.0
+ext_watergang_buffer_m = 1.0
+ext_putdeksel_afstand_m = 2.0
+ext_lozingspunt_water_afstand_m = 10.0
+ext_perceel_buffer_m = 1.0
+
+# #25: bufferafstand om de strengen van een stelsel, voor de cartografische laag
+# `stelsels` in de GeoPackage. Projectkeuze, geen externe bron: 10 m buffert elke
+# strenglijn tot een lint van 20 m breed, zodat de strengen van een stelsel langs
+# een straat samenvloeien tot één vlak zonder een langgerekt stelsel op te blazen.
+stelselvlak_buffer_m = 10.0
 
 [netwerk]
 # Hoe de afvoerrichting van een vrijvervalstreng bepaald wordt.
@@ -147,14 +365,30 @@ vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 # ingewonnen, vergelijken HGT-001 en HGT-002 met haar eigen bron; de bevinding
 # krijgt daarom een kanttekening. In De Wolden geldt dat voor 5104 van de 22363
 # maaiveldhoogten: daar staat AHN2 op het Punt-aspect van de maaiveldorientatie.
-uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN5"]
+# `AHN6` is de gebruikte inwinningsbron, maar bestaat nog niet in GWSW 1.6:
+# WijzeVanInwinningColl stopt bij AHN4. De waarde blijft bewust staan als vooruitloop op
+# een latere GWSW-versie; zo besloten in vraag 1 van issue #47 (BO-40).
+uit_hoogtemodel = ["AHN", "AHN1", "AHN2", "AHN3", "AHN4", "AHN6"]
 # Waarden die expliciet "onbekend" zeggen. Ze passeren elke kardinaliteits- en
 # collectietoets van de nulmeting maar zijn informatief leeg; het bevindingen-
 # rapport telt ze apart zodat een compleetheidscijfer niet te rooskleurig leest.
 onbekend = ["NietAchterhaald"]
 
-# Instellingen van het rapport en de GIS-uitvoer. Geen enkele drempel staat in de
-# code; wie ze wil verleggen doet dat hier.
+[vulwaarden]
+# Hoogtekenmerken waarin deze bronexport 0,000 schrijft voor "niet geregistreerd".
+# In De Wolden is 25% van de BOB's en 14% van de maaiveldhoogten exact 0,00 bij een
+# maaiveld van 5 tot 17 m NAP. Zo'n waarde wordt na het laden als ontbrekend gelezen
+# en door ATTR-013 een keer per object gemeld; de hoogtechecks slaan het object over
+# en zeggen dat in hun toelichting. Een lege lijst zet de leesregel uit (laag
+# Nederland: daar kan 0,00 m NAP een meting zijn).
+hoogte_kenmerken = ["BobBeginpuntLeiding", "BobEindpuntLeiding", "Maaiveldhoogte", "Putdekselniveau"]
+# |waarde| tot en met deze band geldt als vulwaarde; 0.01 omdat ook 0,01 voorkomt.
+hoogte_band_m = 0.01
+
+# Instellingen van het rapport en de GIS-uitvoer. Elk veld van ReportOptions staat
+# hieronder expliciet, met zijn huidige waarde; dezelfde drifttest bewaakt dat
+# (issue #28). Wie een van deze drempels wil verleggen doet dat hier -- de bereiken per
+# materiaal en profielvorm staan niet hier maar in plausibiliteit.toml.
 [rapport]
 # Boven dit aandeel strengen met stijgende bodem benoemt het rapport systematisch
 # omgekeerde registratie als gezamenlijke oorzaak.
@@ -169,7 +403,7 @@ max_bevindingen_per_check = 0
 # zegt dan meer over de export als geheel dan over de losse objecten.
 systemisch_drempel = 0.80
 # Versie van het checkregister waaraan deze run getoetst is.
-register_versie = "v0.8"
+register_versie = "v0.9"
 
 # Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
 # draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de

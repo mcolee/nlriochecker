@@ -2,33 +2,29 @@
 
 from __future__ import annotations
 
+import sys
+from contextlib import suppress
 from pathlib import Path
+from typing import Any
 
 import click
 
 from nlriochecker import __version__
-from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import MetingAnalysis, analyze
-from nlriochecker.cache import laad_met_cache
 from nlriochecker.checkconfig import load_check_config
-from nlriochecker.checks import REGISTRY, CheckContext, Severity, run_checks
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import CoverageConfig, load_coverage_config
 from nlriochecker.coverage import assess_coverage, verify_register
 from nlriochecker.dataset import GwswDataset, load_dataset
 from nlriochecker.errors import PipelineError
-from nlriochecker.externedata import load_external_data
-from nlriochecker.meting import laad_nulmeting
-from nlriochecker.plausibiliteit import load_plausibility
+from nlriochecker.meting import kies_cfk, laad_nulmeting
 from nlriochecker.register import Register, default_register_path, load_register
 from nlriochecker.reporting import (
     write_comparison_reports,
     write_coverage_report,
     write_reports,
 )
-from nlriochecker.studiegebied import load_study_area
-from nlriochecker.taal import getal, vorm
-from nlriochecker.uitvoer import schrijf_uitvoer
+from nlriochecker.toetsrun import Toetsopdracht, voer_toets_uit
 
 
 class _CliError(click.ClickException):
@@ -37,6 +33,90 @@ class _CliError(click.ClickException):
     def show(self, file: object | None = None) -> None:
         """Toont de foutmelding op stderr."""
         click.echo(f"Fout: {self.format_message()}", err=True)
+
+
+class _BalkVoortgang:
+    """Voortgang als `click.progressbar`, op stderr.
+
+    De balk gaat naar stderr en niet naar stdout: daar staan de geschreven paden en
+    de tellingen, en wie die doorpipet moet er geen balkresten in krijgen.
+
+    Er komt geen eigen TTY-detectie bij; click zet de balk in een niet-interactieve
+    omgeving zelf uit. Zonder bepaalbaar totaal is er geen balk te tekenen -- dan
+    wordt de fasenaam een keer gemeld, want een balk met een verzonnen lengte zou
+    over de resterende tijd liegen.
+
+    Elke schrijfactie is afgeschermd met `suppress(OSError)`. Voortgang is weergave
+    en mag een run nooit laten mislukken: valt de lezer van stderr weg
+    (`nlriochecker toets ... 2>&1 | head`), dan gooit de balk een
+    `BrokenPipeError`, en die zou dwars door `run_checks` heen slaan en de hele run
+    afbreken zonder een enkel uitvoerbestand -- op een echte dataset ruim drie
+    minuten laadwerk kwijt omdat een balk niet getekend kon worden. Alleen `OSError`
+    wordt gedempt; een fout in onze eigen boekhouding hoort gewoon om te vallen.
+    """
+
+    def __init__(self) -> None:
+        # `click.progressbar` levert een ProgressBar uit een private module; die
+        # importeren om hem te kunnen annoteren zou een privaat pad vastleggen.
+        # `Optional[Any]` collapst naar `Any`; die `| None` zou nauwkeurigheid
+        # suggereren die mypy hier niet levert.
+        self._balk: Any = None
+        self._stap_label: str | None = None
+
+    def start_fase(self, naam: str, totaal: int | None) -> None:
+        """Opent een balk voor deze fase, of meldt hem als er geen totaal is."""
+        # Een fase die nog openstaat hoort eerst dicht; anders wordt zijn balk
+        # overschreven en nooit afgesloten.
+        self.einde_fase()
+        self._stap_label = None
+        if totaal is None:
+            with suppress(OSError):
+                click.echo(f"{naam}...", err=True)
+            return
+        # `click.progressbar` is generiek in het itemtype; zonder items kan mypy
+        # dat niet afleiden.
+        balk: Any = click.progressbar(
+            length=totaal,
+            label=naam,
+            file=sys.stderr,
+            item_show_func=lambda _: self._stap_label,
+        )
+        with suppress(OSError):
+            balk.__enter__()
+            self._balk = balk
+
+    def stap(self, n: int = 1, label: str | None = None) -> None:
+        """Schuift de balk op en zet erachter wat er net klaar is.
+
+        Het staplabel gaat via `item_show_func` en niet door `balk.label` te
+        overschrijven. Click spreekt die functie alleen aan als hij echt een balk
+        tekent; in een niet-interactieve omgeving echoot hij enkel het vaste
+        faselabel, en dan een keer. Zou het faselabel per stap wisselen, dan zette
+        een run met veertig checks veertig regels ruis in een CI-log.
+
+        Dat is ook de reden dat hier niet naar het verborgen-zijn van de balk
+        gekeken wordt: dat attribuut heet per clickversie anders (`hidden` dan wel
+        `is_hidden`), terwijl `item_show_func` gedocumenteerd is.
+        """
+        if label is not None:
+            self._stap_label = label
+        if self._balk is None:
+            return
+        with suppress(OSError):
+            self._balk.update(n)
+
+    def einde_fase(self) -> None:
+        """Sluit de balk van deze fase.
+
+        `_balk` gaat eerst op None: gooit `__exit__` alsnog, dan blijft er geen
+        halfdode balk staan die de volgende fase overschrijft.
+        """
+        balk: Any = self._balk
+        self._balk = None
+        if balk is None:
+            return
+        with suppress(OSError):
+            balk.__exit__(None, None, None)
 
 
 @click.group()
@@ -164,6 +244,20 @@ def _laad_register(register_path: Path | None, config: CoverageConfig) -> Regist
     return load_register(register_path)
 
 
+def _cfk_option():
+    """Bouwt de optie voor een deelverzameling conformiteitsklassen."""
+    return click.option(
+        "--cfk",
+        "cfk_keuze",
+        multiple=True,
+        help=(
+            "Conformiteitsklasse om op te toetsen; meermaals toegestaan. Zonder deze optie "
+            "gelden alle klassen uit de projectconfiguratie en is een ontbrekend rapport een "
+            "fout. Een deelset wordt in alle uitvoervormen gemarkeerd."
+        ),
+    )
+
+
 def _projectconfig_option():
     """Bouwt de optie voor de projectconfiguratie."""
     return click.option(
@@ -203,10 +297,11 @@ def _bronnen_option():
     )
 
 
-def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths):
+def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze=()):
     """Leest de nulmeting en optioneel de dataset, en analyseert ze."""
     project = load_check_config(project_config_path)
-    nulmeting = laad_nulmeting(list(shacl_paths), project.nulmeting.vereiste_cfk)
+    gekozen = kies_cfk(cfk_keuze, project.nulmeting.vereiste_cfk)
+    nulmeting = laad_nulmeting(list(shacl_paths), gekozen, project.nulmeting.vereiste_cfk)
     dataset = load_dataset(dataset_path, list(ontology_paths)) if dataset_path is not None else None
     return project, nulmeting, analyze(nulmeting, dataset), dataset
 
@@ -229,6 +324,7 @@ def _echo_meting(analyse: MetingAnalysis, dataset: GwswDataset | None) -> None:
 @main.command("analyseer")
 @_shacl_option()
 @_dataset_options()
+@_cfk_option()
 @_projectconfig_option()
 @_config_option()
 @_checkregister_option()
@@ -237,6 +333,7 @@ def analyze_command(
     shacl_paths: tuple[Path, ...],
     dataset_path: Path | None,
     ontology_paths: tuple[Path, ...],
+    cfk_keuze: tuple[str, ...],
     project_config_path: Path | None,
     config_path: Path | None,
     register_path: Path | None,
@@ -245,7 +342,7 @@ def analyze_command(
     """Analyseert een SHACL-nulmeting en schrijft samenvatting en aggregaties weg."""
     try:
         _, _, analyse, dataset = _laad_meting(
-            shacl_paths, project_config_path, dataset_path, ontology_paths
+            shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze
         )
         config = load_coverage_config(config_path)
         register = _laad_register(register_path, config)
@@ -269,6 +366,7 @@ def analyze_command(
 @main.command("dekking")
 @_shacl_option()
 @_dataset_options()
+@_cfk_option()
 @_projectconfig_option()
 @_config_option()
 @_checkregister_option()
@@ -277,6 +375,7 @@ def coverage_command(
     shacl_paths: tuple[Path, ...],
     dataset_path: Path | None,
     ontology_paths: tuple[Path, ...],
+    cfk_keuze: tuple[str, ...],
     project_config_path: Path | None,
     config_path: Path | None,
     register_path: Path | None,
@@ -285,7 +384,7 @@ def coverage_command(
     """Toetst of de nulmeting de geschrapte checks in deze dataset daadwerkelijk raakt."""
     try:
         _, _, analyse, _ = _laad_meting(
-            shacl_paths, project_config_path, dataset_path, ontology_paths
+            shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze
         )
         config = load_coverage_config(config_path)
         register = _laad_register(register_path, config)
@@ -339,12 +438,14 @@ def coverage_command(
     type=RAPPORT_TYPE,
     help="SHACL-rapport van het tweede meetmoment; meermaals toegestaan.",
 )
+@_cfk_option()
 @_projectconfig_option()
 @_config_option()
 @_output_option("Map waarin de vergelijking wordt geschreven.")
 def compare_command(
     earlier_paths: tuple[Path, ...],
     later_paths: tuple[Path, ...],
+    cfk_keuze: tuple[str, ...],
     project_config_path: Path | None,
     config_path: Path | None,
     output_dir: Path,
@@ -352,8 +453,10 @@ def compare_command(
     """Zet twee nulmetingen van dezelfde dataset naast elkaar voor trendbewaking."""
     try:
         project = load_check_config(project_config_path)
-        eerder = analyze(laad_nulmeting(list(earlier_paths), project.nulmeting.vereiste_cfk))
-        later = analyze(laad_nulmeting(list(later_paths), project.nulmeting.vereiste_cfk))
+        volledig = project.nulmeting.vereiste_cfk
+        gekozen = kies_cfk(cfk_keuze, project.nulmeting.vereiste_cfk)
+        eerder = analyze(laad_nulmeting(list(earlier_paths), gekozen, volledig))
+        later = analyze(laad_nulmeting(list(later_paths), gekozen, volledig))
         comparison = compare_metingen(eerder, later, load_coverage_config(config_path))
         markdown_path, csv_path, objects_path = write_comparison_reports(comparison, output_dir)
     except PipelineError as error:
@@ -393,6 +496,15 @@ def compare_command(
     help="GWSW-ontologie (TTL) voor de klassenhierarchie; meermaals toegestaan.",
 )
 @click.option(
+    "--geen-ontologie",
+    "geen_ontologie",
+    is_flag=True,
+    help=(
+        "Draai zonder klassenhierarchie. De checks draaien dan over een onvolledige "
+        "selectie en hun uitkomst draagt geen oordeel; het rapport zegt dat."
+    ),
+)
+@click.option(
     "--shacl",
     "shacl_paths",
     multiple=True,
@@ -409,11 +521,27 @@ def compare_command(
 @_projectconfig_option()
 @_plausibiliteit_option()
 @_bronnen_option()
+@_cfk_option()
+@click.option(
+    "--gebied",
+    "gebied_keuze",
+    multiple=True,
+    help=(
+        "Beperk de run tot deze naam_gebied-waarde uit het studiegebiedbestand; "
+        "meermaals toegestaan. Zonder deze optie draaien alle gebieden."
+    ),
+)
 @click.option(
     "--geen-gpkg",
     "geen_gpkg",
     is_flag=True,
     help="Sla de GeoPackage-export over; schrijf alleen het rapport en de CSV.",
+)
+@click.option(
+    "--geen-json",
+    "geen_json",
+    is_flag=True,
+    help="Sla de JSON-export over; schrijf alleen het rapport, de CSV en de GeoPackage.",
 )
 @click.option(
     "--geen-cache",
@@ -432,6 +560,7 @@ def compare_command(
 def check_command(
     dataset_path: Path,
     ontology_paths: tuple[Path, ...],
+    geen_ontologie: bool,
     shacl_paths: tuple[Path, ...],
     check_ids: tuple[str, ...],
     study_path: Path | None,
@@ -439,132 +568,38 @@ def check_command(
     project_config_path: Path | None,
     plausibility_path: Path | None,
     bronnen_dir: Path | None,
+    cfk_keuze: tuple[str, ...],
+    gebied_keuze: tuple[str, ...],
     geen_gpkg: bool,
+    geen_json: bool,
     geen_cache: bool,
     cache_dir: Path | None,
     output_dir: Path,
 ) -> None:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset."""
+    opdracht = Toetsopdracht(
+        dataset_pad=dataset_path,
+        ontologieen=ontology_paths,
+        geen_ontologie=geen_ontologie,
+        shacl=shacl_paths,
+        check_ids=check_ids,
+        studiegebied=study_path,
+        studiegebied_laag=study_layer,
+        gebieden=gebied_keuze,
+        projectconfig=project_config_path,
+        plausibiliteit=plausibility_path,
+        bronnen=bronnen_dir,
+        cfk=cfk_keuze,
+        uitvoermap=output_dir,
+        met_geopackage=not geen_gpkg,
+        met_json=not geen_json,
+        gebruik_cache=not geen_cache,
+        cachemap=cache_dir,
+    )
     try:
-        config = load_check_config(project_config_path)
-        dataset, cache = laad_met_cache(
-            dataset_path, list(ontology_paths), cache_dir, not geen_cache
-        )
-        onbetrouwbaar, gate_applied = _typing_gate(shacl_paths, config, dataset)
-        bronnen = _externe_bronnen(config, bronnen_dir)
-        area = load_study_area(study_path, study_layer) if study_path is not None else None
-        analyseset = bouw_analyseset(dataset, area, config) if area is not None else None
-        context = CheckContext(
-            dataset=analyseset.dataset if analyseset is not None else dataset,
-            config=config,
-            unreliable_objects=onbetrouwbaar,
-            plausibiliteit=load_plausibility(plausibility_path),
-            bronnen=bronnen,
-            volledige_dataset=dataset,
-            analyseset=analyseset,
-        )
-        run = run_checks(context, list(check_ids) or None, typing_gate_applied=gate_applied)
-        if area is not None:
-            run = run.beperk_tot_studiegebied(area)
-        uitvoer = schrijf_uitvoer(run, output_dir, met_geopackage=not geen_gpkg)
+        uitslag = voer_toets_uit(opdracht, voortgang=_BalkVoortgang())
     except PipelineError as error:
         raise _CliError(str(error)) from error
-    except KeyError as error:
-        bekend = ", ".join(sorted(REGISTRY))
-        raise _CliError(f"{error.args[0]}. Bekende checks: {bekend}.") from error
 
-    click.echo(
-        f"{dataset_path.name}: {len(dataset.nodes)} knooppunten, {len(dataset.conduits)} strengen"
-    )
-    herkomst = "uit de cache" if cache.bron == "cache" else "ingelezen"
-    click.echo(f"  Dataset {herkomst} in {cache.seconden:.1f} s.")
-    if cache.melding:
-        click.echo(f"  {cache.melding}")
-    if dataset.decode_fallback is not None:
-        fallback = dataset.decode_fallback
-        click.echo(
-            f"  Let op: geen geldige UTF-8; gelezen als {fallback.encoding} "
-            f"({fallback.byte_count} bytes buiten ASCII). Zie het rapport."
-        )
-    if dataset.geometry_errors:
-        click.echo(f"  {len(dataset.geometry_errors)} objecten met onleesbare geometrie.")
-    if run.study_area is not None:
-        gebied = run.study_area
-        weggelaten = sum(outcome.weggelaten for outcome in run.outcomes)
-        click.echo(
-            f"  Studiegebied {gebied.name} ({gebied.area_ha:.1f} ha): "
-            f"{getal(weggelaten, 'bevinding', 'bevindingen')} buiten het gebied weggelaten."
-        )
-    if run.analyseset is not None:
-        stel = run.analyseset
-        click.echo(
-            f"  Analyseset: {getal(len(stel.kern), 'object', 'objecten')} in de kern, "
-            f"{len(stel.schil)} in de contextschil, van {stel.volledig_aantal} in de export."
-        )
-        if stel.aandeel > config.studiegebied.component_waarschuwingsdrempel:
-            click.echo(
-                "  Let op: het net binnen dit gebied hangt met vrijwel de hele export samen; "
-                "de afbakening levert weinig tijdwinst op."
-            )
-    if not gate_applied:
-        click.echo("  Geen typeringspoort toegepast (--shacl niet opgegeven).")
-    if bronnen is None:
-        click.echo("  Geen externe bronnen geladen (--bronnen niet opgegeven).")
-    else:
-        click.echo(
-            f"  Externe bronnen: {len(bronnen.layers)} lagen"
-            f"{', hoogteraster' if bronnen.raster is not None else ''}"
-            f", bereik {bronnen.extent_name or 'onbekend'}."
-        )
-        for ontbreekt in bronnen.missing:
-            click.echo(f"    Niet aanwezig: {ontbreekt}")
-    for outcome in run.outcomes:
-        voorbehoud = (
-            f", {outcome.unreliable_count} met typeringsvoorbehoud"
-            if outcome.unreliable_count
-            else ""
-        )
-        aantal = len(outcome.findings)
-        click.echo(
-            f"  {outcome.check_id:9s} {outcome.severity.value}  "
-            f"{aantal:5d} {vorm(aantal, 'bevinding', 'bevindingen')}{voorbehoud}"
-        )
-    click.echo(
-        f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen"
-    )
-    click.echo(f"Geschreven: {uitvoer.markdown}")
-    click.echo(f"Geschreven: {uitvoer.csv}")
-    if uitvoer.geopackage is not None:
-        click.echo(f"Geschreven: {uitvoer.geopackage}")
-
-
-def _externe_bronnen(config, bronnen_dir: Path | None):
-    """Leest de externe geodata als er een bronmap opgegeven is.
-
-    De aangeleverde bronnen dekken maar een deel van het beheergebied; ze worden
-    daarom alleen geladen als de gebruiker er expliciet om vraagt, en de EXT-checks
-    melden zelf wanneer ze niets konden toetsen.
-    """
-    if bronnen_dir is None:
-        return None
-    bronnen = config.bronnen.model_copy(update={"map": "."})
-    return load_external_data(bronnen, bronnen_dir)
-
-
-def _typing_gate(
-    shacl_paths: tuple[Path, ...], config, dataset: GwswDataset
-) -> tuple[frozenset[str], bool]:
-    """Haalt de te globaal getypeerde objecten uit de nulmeting.
-
-    De SHACL-meting noemt de te globale klassen; de instanties komen uit de dataset.
-    Dat geeft een exacte verzameling in plaats van een labellijst.
-    """
-    if not shacl_paths:
-        return frozenset(), False
-
-    nulmeting = laad_nulmeting(list(shacl_paths), config.nulmeting.vereiste_cfk)
-    analyse = analyze(nulmeting, dataset)
-    objecten: set[str] = set()
-    for deel in analyse.per_cfk.values():
-        objecten.update(deel.typing_gate.objects)
-    return frozenset(objecten), True
+    for regel in uitslag.regels():
+        click.echo(regel)

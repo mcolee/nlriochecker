@@ -1,4 +1,4 @@
-# Inventarisatie externe geodata (`data/gis/`)
+# Inventarisatie externe geodata (`data/gis_koekangerveld/`)
 
 Opgemaakt op 2026-08-16 op de aangeleverde bestanden. Alles is gelezen met
 `sqlite3` (GeoPackage-metadata), `geopandas`/`pyogrio` (features) en `rasterio`
@@ -49,7 +49,7 @@ voordat een EXT- of AHN-check draait.
 | --- | ---: | --- | --- |
 | `pand` | 199 | multipolygoon | `bgt_pand` — EXT-001 |
 | `waterdeel` | 233 | polygoon | `bgt_water` — EXT-002, EXT-003, EXT-007 |
-| `ondersteunendwaterdeel` | 94 | polygoon | `bgt_water` — idem |
+| `ondersteunendwaterdeel` | 94 | polygoon | geen check — buiten scope, zie BO-24 |
 | `wegdeel` | 192 | polygoon | geen check |
 | `begroeidterreindeel` | 429 | polygoon | geen check |
 | `onbegroeidterreindeel` | 136 | polygoon | geen check |
@@ -84,7 +84,7 @@ volledig, en de check gebruikt de vereniging van de twee lagen. Het veld
 `aantal_verblijfsobjecten` staat in de export maar wordt niet gebruikt: EXT-008
 (BAG-verblijfsobject zonder riolering binnen X m) is sinds checkregister v0.8
 vervallen — de dekkingsvraag hoort bij het rioleringsplan, niet bij deze toets.
-Zie `data/checkregister-gwsw-nulmeting-v0_8.md`.
+Zie `data/checkregister-gwsw-nulmeting-v0_9.md`.
 
 ## NWB-wegvakken
 

@@ -1,6 +1,6 @@
 # Dekkingsmatrix checkregister
 
-Gegenereerd uit `data/checkregister-gwsw-nulmeting-v0_8.md` (versie 0.8) met `scripts/dekkingsmatrix.py`. Niet met de hand bijwerken.
+Gegenereerd uit `data/checkregister-gwsw-nulmeting-v0_9.md` (versie 0.9) met `scripts/dekkingsmatrix.py`. Niet met de hand bijwerken.
 
 Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, *ontbreekt*, of *geschrapt (gedekt door nulmeting)*. Een check die als skelet geregistreerd staat telt als geimplementeerd, maar levert per definitie geen uitslag; de markering en de reden staan in de kolom Toelichting.
 
@@ -8,13 +8,13 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | ---: | ---: | ---: | ---: | ---: |
 | TOP | 21 | 21 | 0 | 0 | 0 |
 | ADM | 9 | 6 | 0 | 0 | 3 |
-| ATTR | 12 | 11 | 0 | 0 | 1 |
+| ATTR | 17 | 16 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
-| NET | 8 | 8 | 0 | 0 | 0 |
-| RVZ | 11 | 9 | 0 | 0 | 2 |
+| NET | 9 | 9 | 0 | 0 | 0 |
+| RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **92** | **86** | **0** | **0** | **6** |
+| **totaal** | **98** | **94** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -62,16 +62,21 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | --- | --- | --- | --- | --- |
 | ATTR-001 | Diameter past niet bij materiaal | F | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-002 | Diameter kleiner dan rond 200 mm (de nulmeting toetst alleen de extreme ondergrens van 63 mm) | W | Plausibiliteit | geimplementeerd met test | — |
-| ATTR-003 | Materiaal past niet bij aanlegjaar (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit | geimplementeerd met test | — |
+| ATTR-003 | Materiaal past niet bij begindatum (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-004 | Vorm versus afmetingen inconsistent (eivorm zonder hoogte, rond met breedte ongelijk hoogte); NB het MDSTOP-deelmodel dwingt de aanwezigheid van bree… | F | Consistentie | geimplementeerd met test | — |
 | ATTR-005 | Eenhedenfouten die binnen de GWSW-waardebereiken vallen (bijv. diameter 300 genoteerd in cm); fouten buiten bereik dekt de nulmeting | F | Nauwkeurigheid | geimplementeerd met test | — |
 | ATTR-006 | Strengdiameter groter dan afmeting van de aangesloten put | W | Plausibiliteit | geimplementeerd met test | — |
-| ATTR-007 | Aanlegjaar in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit | geimplementeerd met test | — |
+| ATTR-007 | Begindatum in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-008 | Strenglengte korter dan X m of langer dan X m | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-009 | Geometrische lengte wijkt meer dan X% af van administratieve lengte | W | Consistentie | geimplementeerd met test | — |
 | ATTR-010 | Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past | W | Plausibiliteit | geimplementeerd met test | — |
 | ATTR-011 | Absurde lengtewaarde boven harde bovengrens | — | — | geschrapt (gedekt door nulmeting) | Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype Dt_LengteLeiding) |
 | ATTR-012 | Materiaal past niet bij profielvorm (bijv. metselwerk met rond profiel in plaats van ei- of muilprofiel) | W | Plausibiliteit | geimplementeerd met test | — |
+| ATTR-013 | Hoogtekenmerk (BOB, maaiveldhoogte, putdekselniveau) op een vulwaarde rond 0 m NAP dat als meting geregistreerd staat; de band en de kenmerken zijn p… | W | Compleetheid | geimplementeerd met test | — |
+| ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmetin… | F | Consistentie | geimplementeerd met test | — |
+| ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum… | W | Compleetheid | geimplementeerd met test | — |
+| ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De… | F | Consistentie | geimplementeerd met test | — |
+| ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2… | W | Plausibiliteit | geimplementeerd met test | — |
 
 ## HGT
 
@@ -108,17 +113,18 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit | geimplementeerd met test | — |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid | geimplementeerd met test | — |
 | NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit | geimplementeerd met test | — |
+| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | F | Consistentie | geimplementeerd met test | — |
 
 ## RVZ
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |
 | --- | --- | --- | --- | --- | --- |
 | RVZ-001 | Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk; geometrisch-topologische variant, de administratieve koppeling dekt… | F | Consistentie | geimplementeerd met test | — |
-| RVZ-002 | Overstort zonder geregistreerde drempelhoogte | — | — | geschrapt (gedekt door nulmeting) | Beide CFK's: Drempelniveau exact=1 (Mds) / min=1 (Hyd) |
-| RVZ-003 | Overstort zonder geregistreerde drempelbreedte | — | — | geschrapt (gedekt door nulmeting) | Alleen Hyd: Drempelbreedte exact=1; Mds staat ontbreken toe (max=1, geen min-eis) |
+| RVZ-002 | Overstort zonder geregistreerde drempelhoogte (Drempelniveau), ook als het drempelonderdeel zelf ontbreekt; overlapt bewust met de nulmetingvorm Over… | W | Compleetheid | geimplementeerd met test | — |
+| RVZ-003 | Overstort zonder geregistreerde drempelbreedte (Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt | W | Compleetheid | geimplementeerd met test | — |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit | geimplementeerd met test | — |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie | geimplementeerd met test | — |
-| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB | W | Plausibiliteit | geimplementeerd met test | — |
+| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal, pompunit of overnamepunt) | F | Plausibiliteit | geimplementeerd met test | — |
 | RVZ-007 | BBB zonder geregistreerde bergingsinhoud of afmetingen | W | Compleetheid | geimplementeerd met test | — |
 | RVZ-008 | BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel | W | Compleetheid | geimplementeerd met test | — |
 | RVZ-009 | BBB zonder nooduitlaat of externe overstortdrempel | W | Compleetheid | geimplementeerd met test | — |
@@ -129,10 +135,10 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |
 | --- | --- | --- | --- | --- | --- |
-| BTR-001 | Kritieke hoogtekenmerken (BOB, dekselniveau, drempelniveau) zonder inwinningsmetagegevens | W | Traceerbaarheid | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De De Wolden-export bevat 25.546 keer `WijzeVanInwinning` en geen enkele `DatumIn… |
-| BTR-002 | Kritieke kenmerken ingewonnen via schatting, plan of ontwerp in plaats van meting | W | Traceerbaarheid | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden wel op de kritieke hoogtekenmerken, maar op… |
-| BTR-003 | Inwinningsdatum BOB ouder dan drempel, afhankelijk van grondsoort (indicatie: zand 40 jaar, veen 10 jaar) | W | Actualiteit | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. Er is geen enkele `DatumInwinning` in de De Wolden-export, en er is geen grondsoo… |
-| BTR-004 | Geregistreerde grondwaterstand boven maaiveld of meer dan 5 m onder maaiveld | W | Plausibiliteit | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De De Wolden-export bevat geen enkel `Grondwaterniveau`-kenmerk; er valt niets te… |
+| BTR-001 | Kritieke hoogtekenmerken (BOB, dekselniveau, drempelniveau) zonder inwinningsmetagegevens | W | Traceerbaarheid | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat 25.546 keer `WijzeVanInwinning` en geen en… |
+| BTR-002 | Kritieke kenmerken ingewonnen via schatting, plan of ontwerp in plaats van meting | W | Traceerbaarheid | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden en Hoogeveen wel op de kritieke hoogtekenme… |
+| BTR-003 | Inwinningsdatum BOB ouder dan drempel, afhankelijk van grondsoort (indicatie: zand 40 jaar, veen 10 jaar) | W | Actualiteit | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. Er is geen enkele `DatumInwinning` in de De Wolden en Hoogeveen-export, en er is… |
+| BTR-004 | Geregistreerde grondwaterstand boven maaiveld of meer dan 5 m onder maaiveld | W | Plausibiliteit | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat geen enkel `Grondwaterniveau`-kenmerk; er… |
 | BTR-005 | Toestands- of inspectiegegevens ouder dan drempel, gewogen naar risicoligging (spoor, dijk, wegfunctie) | W | Actualiteit | geimplementeerd met test | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De export bevat geen inspectie- of toestandsgegevens, en de weging naar risicolig… |
 | BTR-006 | Systematisch afgeronde hoogtewaarden: BOB's of dekselhoogten clusteren op ronde waarden (hele of halve decimeters), indicatie van geschatte in plaats… | W | Precisie | geimplementeerd met test | — |
 
@@ -142,7 +148,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | --- | --- | --- | --- | --- |
 | EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit | geimplementeerd met test | — |
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit | geimplementeerd met test | — |
-| EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid | geimplementeerd met test | — |
+| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie… | W | Compleetheid | geimplementeerd met test | — |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd met test | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid | geimplementeerd met test | — |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid | geimplementeerd met test | — |

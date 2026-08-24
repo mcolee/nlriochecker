@@ -1,6 +1,6 @@
 # Voorstel: waarvoor de NWB-wegvakken gebruikt zouden kunnen worden
 
-`data/gis/nwb_wegvakken_koekangerveld.gpkg` bevat 13 wegvakken uit het Nationaal
+`data/gis_koekangerveld/nwb_wegvakken_koekangerveld.gpkg` bevat 13 wegvakken uit het Nationaal
 Wegenbestand (bronjaar 2025) binnen het studiegebied Koekangerveld. **Er is in dit
 project niets mee gebouwd**: geen enkele check uit
 `data/checkregister-gwsw-nulmeting-v0_7.md` is aan deze bron gekoppeld. Dit

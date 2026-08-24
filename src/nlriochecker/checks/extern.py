@@ -1,8 +1,8 @@
 """EXT-checks en de AHN-hoogtechecks: toetsing tegen externe bronnen.
 
-Alle bronnen in `data/gis/` dekken uitsluitend het studiegebied Koekangerveld,
-terwijl de GWSW-dataset de hele gemeente De Wolden beslaat. Een GWSW-object daar
-buiten krijgt daarom geen uitslag maar de status *buiten studiegebied*: dat er geen
+Alle bronnen in `data/gis_koekangerveld/` dekken uitsluitend het studiegebied
+Koekangerveld, terwijl de GWSW-dataset de gemeenten De Wolden en Hoogeveen beslaat. Een
+GWSW-object daar buiten krijgt daarom geen uitslag maar de status *buiten studiegebied*: dat er geen
 BGT-deksel of BAG-pand naast ligt zegt daar niets over de datakwaliteit en alles
 over de dekking van de bron. Elke check meldt in haar toelichting hoeveel objecten
 om die reden buiten beschouwing bleven.
@@ -18,6 +18,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from shapely.geometry.base import BaseGeometry
+
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -27,12 +29,41 @@ from nlriochecker.checks.base import (
     SkeletonCheck,
     register,
 )
-from nlriochecker.checks.verbanden import objecten_van_klassen, verbonden_knopen
+from nlriochecker.checks.selectie import lozingspunten, netwerkknopen, vrijvervalrioolleidingen
+from nlriochecker.checks.treffers import Treffer, bouw_sleutel
+from nlriochecker.checks.verbanden import verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
+from nlriochecker.externedata import VectorLayer
 from nlriochecker.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
 MARKERING_NIET_TOETSBAAR = "niet betrouwbaar toetsbaar"
+
+# Het URI-voorvoegsel per bron-rol; de sleutel van een treffer wordt
+# `<voorvoegsel>/<bron-id>`. Zie `checks/treffers.py` voor de terugval.
+VOORVOEGSEL = {
+    "bgt_pand": "bgt:pand",
+    "bag_pand": "bag:pand",
+    "bgt_bouwwerk": "bgt:bouwwerk",
+    "bgt_water": "bgt:waterdeel",
+}
+
+MARKERING_ZONDER_ID = (
+    "Een of meer geraakte objecten komen uit een bron zonder identificatie; die dragen "
+    "een sleutel op grond van hun geometrie (`geo:...`) in plaats van hun bron-ID."
+)
+
+
+def _notitie_zonder_id(context: CheckContext, check_id: str) -> list[str]:
+    """De toelichting bij bronnen die geen identificatie dragen, of niets.
+
+    `run()` draait voor `notes()` in `run_checks`, dus wat de check tijdens het
+    draaien in het register meldde staat hier al klaar.
+    """
+    bronbestanden = context.treffers.zonder_id(check_id)
+    if not bronbestanden:
+        return []
+    return [f"{MARKERING_ZONDER_ID} Betreft: {', '.join(bronbestanden)}."]
 
 
 @dataclass(frozen=True)
@@ -112,30 +143,6 @@ def _bereiknotities(context: CheckContext, selectie: _Selectie, soort: str) -> l
             f"{selectie.totaal} {soort}."
         )
     return notities
-
-
-def _strengen(context: CheckContext) -> list[Conduit]:
-    """De vrijvervalstrengen waarop de EXT-checks draaien."""
-    return context.cached(
-        "ext:strengen",
-        lambda: objecten_van_klassen(context, context.config.klassen.vrijvervalleiding, "conduits"),
-    )
-
-
-def _putten(context: CheckContext) -> list[Node]:
-    """De putten van het netwerk."""
-    return context.cached(
-        "ext:putten",
-        lambda: objecten_van_klassen(context, context.config.klassen.netwerkknopen, "nodes"),
-    )
-
-
-def _lozingspunten(context: CheckContext) -> list[Node]:
-    """De knopen die als lozings- of uitstroompunt gelden."""
-    return context.cached(
-        "ext:lozingspunten",
-        lambda: objecten_van_klassen(context, context.config.klassen.lozings_eindpunt, "nodes"),
-    )
 
 
 class _ExterneCheck(Check):
@@ -225,7 +232,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De vrijvervalstrengen en de putten; beide horen niet in een pand."""
-        return [*_strengen(context), *_putten(context)]
+        return [*vrijvervalrioolleidingen(context), *netwerkknopen(context)]
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elk object dat binnen, door of vlak langs een bouwwerk ligt.
@@ -247,7 +254,10 @@ class KruisingMetBouwwerk(_ExterneCheck):
             geraakt = self._sterkste(geometrie, lagen, buffer)
             if geraakt is None:
                 continue
-            relatie, afstand, laag = geraakt
+            relatie, afstand, laag, vorm, attributen = geraakt
+            sleutel, aanduiding = self._registreer(
+                context, object_, laag, vorm, attributen, afstand
+            )
             yield self.finding(
                 context,
                 object_.uri,
@@ -259,25 +269,73 @@ class KruisingMetBouwwerk(_ExterneCheck):
                 afstand_m=round(afstand, 3),
                 bron=laag.source.name,
                 laag=laag.layer,
+                object2_uri=sleutel,
+                object2_label=aanduiding,
             )
 
+    def _registreer(
+        self, context: CheckContext, object_, laag, vorm, attributen, afstand: float
+    ) -> tuple[str, str]:
+        """Legt het geraakte bouwwerk vast en levert sleutel en aanduiding terug.
+
+        De GeoPackage-laag `bouwwerken` wordt hieruit gevuld, gejoind op de meldingen;
+        de melding zelf draagt alleen de sleutel en de aanduiding, want een polygoon
+        hoort niet in de CSV of de JSON.
+        """
+        sleutel, terugval = bouw_sleutel(VOORVOEGSEL[laag.role], attributen, vorm)
+        if terugval:
+            context.treffers.meld_zonder_id(self.id, laag.source.name)
+        naam = sleutel.split("/")[-1]
+        soort = attributen.get("type")
+        if laag.role == "bgt_bouwwerk":
+            aanduiding = f"bouwwerk {naam}" + (f" ({soort})" if soort else "")
+        else:
+            aanduiding = f"pand {naam}"
+        context.treffers.registreer(
+            Treffer(
+                sleutel=sleutel,
+                bron=laag.role,
+                label=aanduiding,
+                bronbestand=laag.source.name,
+                geometrie=vorm,
+                attributen=dict(attributen),
+            ),
+            check_id=self.id,
+            object_uri=object_.uri,
+            afstand_m=round(afstand, 3),
+        )
+        return sleutel, aanduiding
+
     def _sterkste(self, geometrie, lagen, buffer: float):
-        """De zwaarste relatie met een bouwwerk binnen de buffer, met afstand en laag.
+        """De zwaarste relatie met een bouwwerk binnen de buffer.
 
         Bij gelijke relatie wint het dichtstbijzijnde bouwwerk; zo hangt de melding
         niet af van de volgorde waarin de lagen toevallig gelezen zijn.
+
+        Levert `(relatie, afstand, laag, vorm, attributen)`. De vorm en de attributen
+        zijn nodig om de treffer te registreren voor de GIS-uitvoer; de keuze zelf
+        verandert er niet door, want de vergelijking blijft op `(volgorde, afstand)`.
         """
         beste = None
         for laag in lagen:
-            for vorm, _ in laag.nabij(geometrie, buffer):
+            for vorm, attributen in laag.nabij(geometrie, buffer):
                 afstand = geometrie.distance(vorm)
                 if afstand > buffer:
                     continue
                 relatie = self._relatie(geometrie, vorm, afstand)
-                kandidaat = (RELATIE_VOLGORDE.index(relatie), afstand, relatie, laag)
+                kandidaat = (
+                    RELATIE_VOLGORDE.index(relatie),
+                    afstand,
+                    relatie,
+                    laag,
+                    vorm,
+                    attributen,
+                )
                 if beste is None or kandidaat[:2] < beste[:2]:
                     beste = kandidaat
-        return None if beste is None else (beste[2], beste[1], beste[3])
+        if beste is None:
+            return None
+        return (beste[2], beste[1], beste[3], beste[4], beste[5])
 
     def _relatie(self, geometrie, bouwwerk, afstand: float) -> str:
         """De relatie tussen object en bouwwerk: binnen, kruist of nabij."""
@@ -318,7 +376,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
         return bool(self.bouwwerklagen(context))
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt welke pandbronnen gebruikt zijn."""
+        """Meldt welke pandbronnen gebruikt zijn, en of er identificaties ontbraken."""
         if context.bronnen is None or context.bronnen.extent is None:
             return _bereiknotities(context, self.selectie(context), self.soort)
         gebruikt = self.bouwwerklagen(context)
@@ -328,31 +386,118 @@ class KruisingMetBouwwerk(_ExterneCheck):
         return [
             *_bereiknotities(context, self.selectie(context), self.soort),
             f"Getoetst tegen: {omschrijving}.",
+            *_notitie_zonder_id(context, self.id),
         ]
 
 
+@dataclass(frozen=True)
+class _Kruising:
+    """Een streng die binnen de buffer van een BGT-waterdeel ligt.
+
+    De geometrie van het waterdeel gaat mee omdat EXT-003 er de treffer voor de
+    GIS-uitvoer mee registreert; de detectie verandert er niet door. Een dataclass in
+    plaats van een tuple: beide checks pakten hem uit op positie, en een veld erbij of
+    een andere volgorde zou daar pas tijdens het draaien opvallen.
+    """
+
+    conduit: Conduit
+    vorm: BaseGeometry
+    rij: dict[str, object]
+    laag: VectorLayer
+    buffer: float
+
+
+def _zoek_kruisingen(
+    strengen: list[Conduit], laag: VectorLayer | None, buffer: float
+) -> Iterator[_Kruising]:
+    """Loopt de toetsbare strengen langs de waterdeellaag.
+
+    Vrije functie zonder `self`: de uitkomst hangt alleen van deze drie argumenten af,
+    zodat de gedeelde cache-ingang van `_WatergangKruising.kruisingen` niet aan de
+    eerste aanroepende subklasse vastzit.
+    """
+    if laag is None:
+        return
+    for conduit in strengen:
+        # `_selecteer` liet alleen strengen met een geometrie door; deze functie leunt
+        # daar niet op, zodat ze ook los van die selectie te lezen is.
+        if conduit.line is None:
+            continue
+        for geometrie, rij in laag.nabij(conduit.line, buffer):
+            if conduit.line.distance(geometrie) > buffer:
+                continue
+            yield _Kruising(conduit, geometrie, rij, laag, buffer)
+            break
+
+
 class _WatergangKruising(_ExterneCheck):
-    """Gedeelde basis voor de twee kruisingschecks op BGT-waterdelen."""
+    """Gedeelde basis voor de twee kruisingschecks op BGT-waterdelen.
+
+    De populatie is die van `klassen.vrijvervalleiding`. Een duiker is in de
+    GWSW-ontologie een `Leiding` die oppervlaktewater verbindt, geen rioolleiding;
+    hij valt dus buiten deze checks en `buiten_populatie()` telt hoeveel dat er zijn,
+    zodat het rapport dat meldt in plaats van erover te zwijgen (BO-25).
+    """
 
     rol = "bgt_water"
     soort = "vrijvervalstrengen"
 
     def objecten(self, context: CheckContext) -> list:
         """De vrijvervalstrengen."""
-        return _strengen(context)
+        return vrijvervalrioolleidingen(context)
 
-    def kruisingen(self, context: CheckContext):
-        """De strengen die een waterdeel raken, met het waterdeel erbij."""
+    def kruisingen(self, context: CheckContext) -> tuple[_Kruising, ...]:
+        """De strengen die een waterdeel raken, met het waterdeel erbij.
+
+        De lijst wordt een keer per context berekend en door EXT-002 en EXT-003 gedeeld.
+        Dat mag omdat de drie ingredienten van deze basisklasse zijn en niet van de
+        aanroepende check: de populatie (`objecten()` levert voor beide
+        `vrijvervalrioolleidingen(context)`, door dezelfde `selectie()` gefilterd), de
+        laag `bgt_water` en de buffer. De twee deden dus tweemaal dezelfde ruimtelijke
+        toets.
+
+        De bouwer is daarom een vrije functie: hij krijgt die drie mee en kent geen
+        `self`, zodat de gedeelde ingang niet stilzwijgend van de eerste aanroeper kan
+        gaan afhangen. Wie hier ooit een derde subklasse met een eigen populatie onder
+        hangt (BO-25 verwierp dat voor EXT-003), moet haar dus een eigen sleutel geven.
+
+        De `break` na het eerste gevonden waterdeel per streng blijft staan: een streng
+        die twee waterdelen kruist levert er een, en welke hangt van de volgorde af. Dat
+        is een bewust geaccepteerde beperking (BO-17).
+        """
+        toetsbaar = self.selectie(context).toetsbaar
         laag = self.laag(context)
-        if laag is None:
-            return
         buffer = context.config.drempels.ext_watergang_buffer_m
-        for conduit in self.selectie(context).toetsbaar:
-            for geometrie, rij in laag.nabij(conduit.line, buffer):
-                if conduit.line.distance(geometrie) > buffer:
-                    continue
-                yield conduit, rij, laag, buffer
-                break
+        return context.cached(
+            "ext:watergangkruisingen",
+            lambda: tuple(_zoek_kruisingen(toetsbaar, laag, buffer)),
+        )
+
+    def buiten_populatie(self, context: CheckContext) -> dict[str, int]:
+        """Per kruisingsklasse die geen vrijvervalleiding is: hoeveel strengen erbuiten vallen."""
+        dataset = context.dataset
+        binnen = {conduit.uri for conduit in vrijvervalrioolleidingen(context)}
+        telling: dict[str, int] = {}
+        for wortel in context.config.klassen.kruisingsleiding:
+            buiten = [
+                uri
+                for uri in dataset.of_class(wortel)
+                if uri in dataset.conduits and uri not in binnen
+            ]
+            if buiten:
+                telling[wortel] = len(buiten)
+        return telling
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt de strengen die wel kruisingsklasse zijn maar buiten de populatie vallen."""
+        notities = super().notes(context)
+        for klasse, aantal in self.buiten_populatie(context).items():
+            notities.append(
+                "Buiten de populatie (geen vrijvervalleiding) en dus niet bekeken: "
+                f"{getal(aantal, 'streng', 'strengen')} van de klasse {klasse}. Een "
+                "kruising van zo'n streng met een watergang is geen bevinding."
+            )
+        return notities
 
 
 @register
@@ -370,16 +515,16 @@ class KruisingMetWatergang(_WatergangKruising):
         Het register laat BGT als watergangbron toe; waterschapsdata is niet
         aangeleverd en valt in deze fase buiten scope.
         """
-        for conduit, rij, laag, buffer in self.kruisingen(context):
-            soort = rij.get("type") or "waterdeel"
+        for kruising in self.kruisingen(context):
+            soort = kruising.rij.get("type") or "waterdeel"
             yield self.finding(
                 context,
-                conduit.uri,
-                conduit.label,
-                f"Kruist een BGT-waterdeel van het type {soort!r} (buffer {buffer:g} m).",
+                kruising.conduit.uri,
+                kruising.conduit.label,
+                f"Kruist een BGT-waterdeel van het type {soort!r} (buffer {kruising.buffer:g} m).",
                 watertype=soort,
-                bron=laag.source.name,
-                buffer_m=buffer,
+                bron=kruising.laag.source.name,
+                buffer_m=kruising.buffer,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -393,10 +538,17 @@ class KruisingMetWatergang(_WatergangKruising):
 
 @register
 class KruisingZonderZinkerOfDuiker(_WatergangKruising):
-    """EXT-003: een watergangkruising die niet als zinker of duiker geregistreerd staat."""
+    """EXT-003: een watergangkruising die niet als kruisingsconstructie geregistreerd staat.
+
+    De klassenaam dateert van voor de correctie van de klassenhierarchie. Wat de
+    uitzondering doorlaat staat in `klassen.kruisingsleiding`, en dat is nog steeds
+    zinker en duiker; alleen een zinker kan binnen de populatie voorkomen, want een
+    duiker is geen vrijvervalleiding. De titel en de meldingstekst noemen daarom de
+    zinker: dat is wat het gebrek oplost.
+    """
 
     id = "EXT-003"
-    title = "Kruising met watergang zonder registratie als zinker of duiker"
+    title = "Kruising met watergang zonder registratie als zinker"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
 
@@ -405,18 +557,35 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
         dataset = context.dataset
         wortels = context.config.klassen.kruisingsleiding
 
-        for conduit, rij, _laag, buffer in self.kruisingen(context):
+        for kruising in self.kruisingen(context):
+            conduit = kruising.conduit
             if any(dataset.is_a(conduit.uri, wortel) for wortel in wortels):
                 continue
-            soort = rij.get("type") or "waterdeel"
+            soort = str(kruising.rij.get("type") or "waterdeel")
+            sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], kruising.rij, kruising.vorm)
+            if terugval:
+                context.treffers.meld_zonder_id(self.id, kruising.laag.source.name)
+            context.treffers.registreer(
+                Treffer(
+                    sleutel=sleutel,
+                    bron="bgt_water",
+                    label=soort,
+                    bronbestand=kruising.laag.source.name,
+                    geometrie=kruising.vorm,
+                    attributen=dict(kruising.rij),
+                ),
+                check_id=self.id,
+                object_uri=conduit.uri,
+            )
             yield self.finding(
                 context,
                 conduit.uri,
                 conduit.label,
-                f"Kruist een BGT-waterdeel ({soort}) maar staat niet geregistreerd als "
-                f"{' of '.join(wortels) or 'kruisingsconstructie'}.",
+                f"Kruist een BGT-waterdeel ({soort}) maar staat niet geregistreerd als zinker.",
                 watertype=soort,
-                buffer_m=buffer,
+                buffer_m=kruising.buffer,
+                object2_uri=sleutel,
+                object2_label=soort,
             )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -427,8 +596,13 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
                 *super().notes(context),
                 "Er zijn geen kruisingsconstructieklassen geconfigureerd "
                 "(`klassen.kruisingsleiding`); elke kruising telt daardoor mee.",
+                *_notitie_zonder_id(context, self.id),
             ]
-        return [*super().notes(context), f"Als kruisingsconstructie gelden: {', '.join(wortels)}."]
+        return [
+            *super().notes(context),
+            f"Als kruisingsconstructie gelden: {', '.join(wortels)}.",
+            *_notitie_zonder_id(context, self.id),
+        ]
 
 
 @register
@@ -461,7 +635,7 @@ class PutZonderBgtDeksel(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De putten van het netwerk."""
-        return _putten(context)
+        return netwerkknopen(context)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt putten zonder BGT-deksel binnen de afstand."""
@@ -498,7 +672,7 @@ class BgtDekselZonderPut(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De putten van het netwerk; die vormen de vergelijkingsbasis."""
-        return _putten(context)
+        return netwerkknopen(context)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BGT-deksels zonder GWSW-put binnen de afstand.
@@ -577,7 +751,7 @@ class LozingspuntZonderWatergang(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De knopen die als lozings- of uitstroompunt gelden."""
-        return _lozingspunten(context)
+        return lozingspunten(context)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt lozingspunten zonder BGT-waterdeel binnen de afstand."""
@@ -608,7 +782,7 @@ class _AhnCheck(_ExterneCheck):
 
     def objecten(self, context: CheckContext) -> list:
         """De putten van het netwerk."""
-        return _putten(context)
+        return netwerkknopen(context)
 
     def raster(self, context: CheckContext):
         """Het hoogteraster, of None."""
@@ -672,7 +846,7 @@ class _DekselAfwijking(_AhnCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de geregistreerde maaiveldhoogte met het AHN.
 
-        De De Wolden-export bevat geen `Putdekselniveau`; de `Maaiveldhoogte` bij de
+        De De Wolden en Hoogeveen-export bevat geen `Putdekselniveau`; de `Maaiveldhoogte` bij de
         put is dan de dichtstbijzijnde benadering van de dekselhoogte. Welke van de
         twee gebruikt is staat in de melding.
         """
@@ -747,7 +921,7 @@ def _kenmerknotitie(vergeleken: list[Node]) -> list[str]:
 
     Het register spreekt van de dekselhoogte, maar de check valt terug op de
     maaiveldhoogte als `Putdekselniveau` ontbreekt — zoals in de hele De
-    Wolden-export. Zonder deze regel claimt het rapport iets anders te hebben
+    Wolden en Hoogeveen-export. Zonder deze regel claimt het rapport iets anders te hebben
     getoetst dan het deed.
     """
     if not vergeleken:
@@ -829,7 +1003,7 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
         if raster is None:
             return
 
-        for conduit in _strengen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             begin, eind = verbonden_knopen(context, conduit)
             for uri, bob, zijde in (
                 (begin, conduit.bob_start, "beginpunt"),

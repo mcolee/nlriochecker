@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from nlriochecker.errors import NulmetingError
-from nlriochecker.meting import laad_nulmeting
+from nlriochecker.meting import Meetbereik, laad_nulmeting
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 
@@ -51,3 +51,111 @@ def test_eigen_eisenlijst(mini_hyd_shacl: Path) -> None:
     meting = laad_nulmeting([mini_hyd_shacl], ["Hyd"])
 
     assert meting.cfks == ["Hyd"]
+
+
+def test_meetbereik_op_de_volle_set_is_volledig() -> None:
+    """Alle klassen gekozen betekent volledig en niets ontbrekend."""
+    bereik = Meetbereik.van(VEREIST, VEREIST)
+
+    assert bereik.volledig
+    assert bereik.ontbreekt == ()
+    assert bereik.cfk_tekst == "Hyd, MdsPlan, MdsProj"
+
+
+def test_meetbereik_sorteert_en_ontdubbelt() -> None:
+    """De schrijfwijze voor GeoPackage en JSON is vast, wat de beller ook aanlevert."""
+    bereik = Meetbereik.van(["MdsProj", "Hyd", "MdsPlan"], ["MdsPlan", "Hyd", "Hyd"])
+
+    assert bereik.gekozen == ("Hyd", "MdsPlan")
+    assert bereik.volledige_set == ("Hyd", "MdsPlan", "MdsProj")
+
+
+def test_meetbereik_op_een_deelset_noemt_wat_ontbreekt() -> None:
+    """Een deelset is niet volledig en weet welke klassen buiten de meting vielen."""
+    bereik = Meetbereik.van(VEREIST, ["Hyd", "MdsPlan"])
+
+    assert not bereik.volledig
+    assert bereik.ontbreekt == ("MdsProj",)
+
+
+def test_meetbereik_zonder_meting_is_niet_volledig() -> None:
+    """Een run zonder nulmeting is een eigen toestand, geen deelset van nul klassen."""
+    bereik = Meetbereik.niet_gemeten(VEREIST)
+
+    assert not bereik.gemeten
+    assert not bereik.volledig
+    assert bereik.gekozen == ()
+    assert bereik.cfk_tekst == ""
+    assert bereik.ontbreekt == ("Hyd", "MdsPlan", "MdsProj")
+
+
+def test_nulmeting_draagt_het_meetbereik(shacl_drieluik: list[Path]) -> None:
+    """De volledige drieluik levert een gemeten, volledig bereik."""
+    meting = laad_nulmeting(shacl_drieluik, VEREIST)
+
+    assert meting.meetbereik.volledig
+    assert meting.meetbereik.gekozen == ("Hyd", "MdsPlan", "MdsProj")
+
+
+def test_nulmeting_op_een_deelset_kent_de_volle_set(mini_hyd_shacl: Path) -> None:
+    """De volle set komt uit de projectconfig, niet uit wat er aangeleverd is.
+
+    Zonder dat onderscheid kan geen rapport melden wat er ontbreekt: een deelset
+    zou dan altijd "volledig" heten.
+    """
+    meting = laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST)
+
+    assert not meting.meetbereik.volledig
+    assert meting.meetbereik.ontbreekt == ("MdsPlan", "MdsProj")
+
+
+def test_laad_nulmeting_weigert_een_rapport_voor_een_niet_gekozen_cfk(
+    shacl_drieluik: list[Path],
+) -> None:
+    """Een rapport buiten de gekozen set is een fout, geen stille overslag.
+
+    Wie op een deelset toetst en per ongeluk alle rapporten meegeeft, moet dat
+    horen; anders zegt de markering "MdsProj ontbreekt" terwijl het bestand er lag.
+    """
+    with pytest.raises(NulmetingError, match="MdsProj"):
+        laad_nulmeting(shacl_drieluik, ["Hyd", "MdsPlan"], VEREIST)
+
+
+def test_markering_zwijgt_bij_een_volledige_meting() -> None:
+    """Volledig gemeten rapporten blijven byte-voor-byte als voorheen."""
+    assert Meetbereik.van(VEREIST, VEREIST).markering() is None
+
+
+def test_markering_noemt_de_deelset_en_wat_ontbreekt() -> None:
+    """De lezer moet zien waarop wel en waarop niet getoetst is."""
+    regel = Meetbereik.van(VEREIST, ["Hyd", "MdsPlan"]).markering()
+
+    assert regel == "**Onvolledige meting:** getoetst op Hyd, MdsPlan; MdsProj ontbreekt."
+
+
+def test_markering_vervoegt_bij_meer_dan_een_ontbrekende_klasse() -> None:
+    """'MdsPlan, MdsProj ontbreken', niet 'ontbreekt'."""
+    regel = Meetbereik.van(VEREIST, ["Hyd"]).markering()
+
+    assert regel is not None
+    assert regel.endswith("MdsPlan, MdsProj ontbreken.")
+
+
+def test_markering_onderscheidt_een_run_zonder_nulmeting() -> None:
+    """Niet gemeten is een andere boodschap dan een deelset."""
+    regel = Meetbereik.niet_gemeten(VEREIST).markering()
+
+    assert regel is not None
+    assert regel.startswith("**Geen nulmeting:**")
+    assert "typeringspoort" in regel
+
+
+def test_meetbereik_weigert_een_keuze_buiten_de_volle_set() -> None:
+    """Zonder deze toets levert het een zin met een lege opsomming op.
+
+    `Meetbereik.van(VEREIST, [*VEREIST, "Extra"])` gaf eerder "getoetst op Extra,
+    Hyd, MdsPlan, MdsProj;  ontbreken." -- niets ontbrak, maar de zin beweerde van
+    wel. De CLI schermt dit af; `laad_nulmeting` is publieke API en doet dat niet.
+    """
+    with pytest.raises(NulmetingError, match="Extra"):
+        Meetbereik.van(VEREIST, [*VEREIST, "Extra"])

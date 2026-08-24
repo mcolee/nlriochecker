@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Schrijft de kleine externe-bronfixtures onder tests/fixtures/gis/ext.
 
-De echte bronnen in `data/gis/` dekken alleen Koekangerveld en zijn te groot en te
-traag voor unit tests. Deze fixtures zijn miniatuurversies met dezelfde structuur
-(dezelfde laagnamen, dezelfde attribuutnamen, EPSG:28992) in het lokale
+De echte bronnen in `data/gis_koekangerveld/` dekken alleen Koekangerveld en zijn te
+groot en te traag voor unit tests. Deze fixtures zijn miniatuurversies met dezelfde
+structuur (dezelfde laagnamen, dezelfde attribuutnamen, EPSG:28992) in het lokale
 assenstelsel dat de TTL-fixtures ook gebruiken.
 
 Gebruik:  uv run python scripts/maak_gis_fixtures.py
@@ -23,7 +23,17 @@ from shapely.geometry import LineString, Point, box
 # gepuzzel met twee GDAL-instanties in een proces.
 
 DOEL = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "gis" / "ext"
+GIS = DOEL.parent
 RD = "EPSG:28992"
+
+# De twee buurten van de multi-gebiedfixtures, op de coordinaten van
+# `afbakening_kern_en_schil.ttl`. Noord omsluit put A en B, Zuid put C en D; streng
+# B-C raakt ze allebei en is daarmee het grensobject waarop de dubbeltelling te
+# zien is.
+BUURTEN = {
+    "Noord": (990.0, 1990.0, 1060.0, 2010.0),
+    "Zuid": (1060.0, 1990.0, 1160.0, 2010.0),
+}
 
 # Het studiegebied van de fixtures: een strook rond de TTL-coordinaten.
 GEBIED = (980.0, 1980.0, 1120.0, 2020.0)
@@ -66,7 +76,8 @@ def main() -> None:
         bgt,
         "pand",
     )
-    # W1 kruist streng 2 (gemengd), W2 kruist streng 3 (een duiker).
+    # W1 kruist streng 2 (gemengd), W2 kruist streng 3 (een zinker) en streng 6
+    # (een duiker, en dus geen rioolleiding).
     schrijf(
         gpd.GeoDataFrame(
             {
@@ -125,7 +136,32 @@ def main() -> None:
         "output",
     )
 
+    _schrijf_buurten(gpd)
+
     print(f"Geschreven in {DOEL}")
+
+
+def _schrijf_buurten(gpd) -> None:
+    """Schrijft de studiegebiedbestanden voor de rapportage per gebied.
+
+    Drie bestanden: een met beide buurten, en per buurt een met alleen die ene. De
+    equivalentietest draait ze tegen elkaar; per gebied moeten de meldingen gelijk
+    zijn aan die van de losse run.
+    """
+    schrijf(
+        gpd.GeoDataFrame(
+            {"naam_gebied": list(BUURTEN)},
+            geometry=[box(*vak) for vak in BUURTEN.values()],
+        ),
+        GIS / "buurten_twee.gpkg",
+        "buurten",
+    )
+    for naam, vak in BUURTEN.items():
+        schrijf(
+            gpd.GeoDataFrame({"naam_gebied": [naam]}, geometry=[box(*vak)]),
+            GIS / f"buurt_{naam.lower()}.gpkg",
+            "buurten",
+        )
 
 
 def _schrijf_raster(pad: Path) -> None:

@@ -1,12 +1,17 @@
-"""Integratietests op de echte De Wolden-bestanden."""
+"""Integratietests op de echte De Wolden en Hoogeveen-bestanden."""
 
 from __future__ import annotations
 
 import csv
+import logging
+import sqlite3
+import time
+from datetime import date
 from pathlib import Path
 
 import pytest
 
+from gpkghelper import schrijf_buurten, schrijf_buurtenraster
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
 from nlriochecker.checkconfig import load_check_config
@@ -14,30 +19,33 @@ from nlriochecker.checks import REGISTRY, CheckContext, run_checks
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import Verdict, assess_coverage
 from nlriochecker.dataset import load_dataset
-from nlriochecker.meting import laad_nulmeting
+from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.reporting import write_check_report, write_reports
-from nlriochecker.studiegebied import load_study_area
+from nlriochecker.studiegebied import load_studiegebieden, load_study_area
+from nlriochecker.toetsloop import toets_gebieden
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer_gebieden
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 SHACL_DIR = DATA_DIR / "shacl_nulmeting"
 OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
 ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
-GIS_DIR = DATA_DIR / "gis"
+GIS_DIR = DATA_DIR / "gis_koekangerveld"
 
-OROX_DE_WOLDEN = OROX_DIR / "dewolden_orox.ttl"
+OROX_DEWOLDENHOOGEVEEN = OROX_DIR / "dewoldenhoogeveen_orox.ttl"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
 ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Mds.ttl"
 ONTOLOGIE_TOTAAL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
 STUDIEGEBIED = GIS_DIR / "cbs_buurt_koekangerveld_studiegebied.gpkg"
 
 SHACL_PADEN = sorted(SHACL_DIR.glob("*.csv"))
+RUNDATUM = date(2026, 8, 18)
 
 pytestmark = pytest.mark.integratie
 
 
 @pytest.fixture(scope="module")
 def meting():
-    """De volledige SHACL-nulmeting van De Wolden."""
+    """De volledige SHACL-nulmeting van De Wolden en Hoogeveen."""
     if len(SHACL_PADEN) < 3:
         pytest.skip("de SHACL-rapporten staan niet in data/shacl_nulmeting/")
     return laad_nulmeting(SHACL_PADEN, ["Hyd", "MdsPlan", "MdsProj"])
@@ -100,9 +108,8 @@ def test_dekkingoordelen(meting) -> None:
     assert oordelen["ADM-004"] is Verdict.TOUCHED
     assert oordelen["ADM-005"] is Verdict.TOUCHED
     assert oordelen["ATTR-011"] is Verdict.TOUCHED
-    # In de SHACL-meting komt geen enkele vorm op Drempelniveau of Drempelbreedte voor.
-    assert oordelen["RVZ-002"] is Verdict.UNTOUCHED
-    assert oordelen["RVZ-003"] is Verdict.UNTOUCHED
+    # Geen enkele geschrapte check mag ongeraakt blijven; zie test_coverage.py.
+    assert result.untouched == []
 
 
 def test_samenvatting_schrijven(meting, tmp_path: Path) -> None:
@@ -129,11 +136,11 @@ def test_alle_checks_draaien_op_het_voorbeeld(tmp_path: Path) -> None:
 
 @pytest.mark.zwaar
 @pytest.mark.skipif(
-    not (OROX_DE_WOLDEN.exists() and ONTOLOGIE_TOTAAL.exists()),
-    reason="de De Wolden-OroX staat niet in data/",
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and ONTOLOGIE_TOTAAL.exists()),
+    reason="de De Wolden en Hoogeveen-OroX staat niet in data/",
 )
-def test_checks_op_de_wolden_met_typeringspoort(meting, tmp_path: Path) -> None:
-    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+def test_checks_op_dewoldenhoogeveen_met_typeringspoort(meting, tmp_path: Path) -> None:
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
     analyse = analyze(meting, dataset)
 
     onbetrouwbaar = set()
@@ -158,12 +165,63 @@ def test_checks_op_de_wolden_met_typeringspoort(meting, tmp_path: Path) -> None:
 
 @pytest.mark.zwaar
 @pytest.mark.skipif(
-    not (OROX_DE_WOLDEN.exists() and STUDIEGEBIED.exists()),
-    reason="de De Wolden-OroX of het studiegebied staat niet in data/",
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and ONTOLOGIE_TOTAAL.exists()),
+    reason="de De Wolden en Hoogeveen-OroX staat niet in data/",
+)
+def test_attr014_op_dewoldenhoogeveen_meldt_alleen_wibonthema() -> None:
+    """ATTR-014 vindt precies een property-tegenspraak op De Wolden en Hoogeveen: WIBONThema.
+
+    De verificatie-eis uit issue #37: meer dan een melding zou betekenen dat de check
+    te breed staat. De aantallen (23.440 objecten, 18.363 met de vulwaarde 0) komen
+    rechtstreeks uit de audit in het issue.
+    """
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    outcome = run_checks(context, ["ATTR-014"]).outcomes[0]
+
+    assert len(outcome.findings) == 1
+    bevinding = outcome.findings[0]
+    assert bevinding.details["kenmerk"] == "WIBONThema"
+    assert bevinding.systemisch is True
+    assert bevinding.message == (
+        "WIBONThema gebruikt hasValue in plaats van hasReference op 23440 objecten, "
+        "waarvan 18363 met de vulwaarde 0."
+    )
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and ONTOLOGIE_TOTAAL.exists()),
+    reason="de De Wolden en Hoogeveen-OroX staat niet in data/",
+)
+def test_attr017_op_dewoldenhoogeveen_meldt_de_pe_leidingen() -> None:
+    """ATTR-017 meldt de 962 PE-leidingen die de betonwaarde 30 (3,0 mm) dragen.
+
+    De verificatie-eis uit issue #38: de schaal 1:10 volgt uit de data (23.440
+    leidingen dragen alle een wandruwheid), en dan valt precies de PE-groep buiten zijn
+    band -- beton (30), pvc (4) en gres (5) passen wel. Loopt het aantal op naar
+    duizenden, dan is de schaallezing misgegaan. De 49 Polypropyleen-leidingen en de
+    1.362 zonder materiaal blijven ongetoetst en staan in de toelichting.
+    """
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    outcome = run_checks(context, ["ATTR-017"]).outcomes[0]
+
+    assert len(outcome.findings) == 962
+    assert {finding.details["materiaal"] for finding in outcome.findings} == {"PE"}
+    assert all(finding.details["schaal"] == 10 for finding in outcome.findings)
+    assert any("schaal 1:10" in note for note in outcome.notes), outcome.notes
+    assert any("Polypropyleen" in note for note in outcome.notes), outcome.notes
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of het studiegebied staat niet in data/",
 )
 def test_studiegebied_koekangerveld(tmp_path: Path) -> None:
     """De afbakening moet aanzienlijk minder bevindingen opleveren, en dat melden."""
-    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
     context = CheckContext(dataset=dataset, config=load_check_config())
     volledig = run_checks(context)
 
@@ -185,14 +243,16 @@ AHN_TIF = GIS_DIR / "ahn5_dtm_koekangerveld.tif"
 
 
 def _koekangerveld_bronnen():
-    """Leest de echte externe bronnen uit data/gis."""
+    """Leest de echte externe bronnen uit data/gis_koekangerveld."""
     from nlriochecker.externedata import load_external_data
 
     basis = load_check_config().bronnen
     return load_external_data(basis.model_copy(update={"map": "."}), GIS_DIR)
 
 
-@pytest.mark.skipif(not AHN_TIF.exists(), reason="de externe bronnen staan niet in data/gis/")
+@pytest.mark.skipif(
+    not AHN_TIF.exists(), reason="de externe bronnen staan niet in data/gis_koekangerveld/"
+)
 def test_externe_bronnen_van_koekangerveld() -> None:
     """Legt de inventarisatie uit docs/gis-inventarisatie.md vast."""
     bronnen = _koekangerveld_bronnen()
@@ -201,7 +261,8 @@ def test_externe_bronnen_van_koekangerveld() -> None:
     assert bronnen.extent.area / 10_000 == pytest.approx(43.2, abs=0.5)
     assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
         "bgt_pand": 199,
-        "bgt_water": 327,
+        # Alleen `waterdeel`; `ondersteunendwaterdeel` (94 oevers) valt buiten scope.
+        "bgt_water": 233,
         "bgt_bouwwerk": 52,
         "bag_pand": 166,
         "nwb_wegvak": 13,
@@ -218,8 +279,8 @@ def test_externe_bronnen_van_koekangerveld() -> None:
 
 @pytest.mark.zwaar
 @pytest.mark.skipif(
-    not (OROX_DE_WOLDEN.exists() and AHN_TIF.exists() and STUDIEGEBIED.exists()),
-    reason="de De Wolden-OroX of de externe bronnen staan niet in data/",
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and AHN_TIF.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of de externe bronnen staan niet in data/",
 )
 def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     """De EXT- en AHN-checks draaien op de Koekangerveld-uitsnede.
@@ -228,7 +289,7 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     overgrote deel van de objecten hoort daarom de status *buiten studiegebied* te
     krijgen en geen uitslag.
     """
-    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
@@ -256,12 +317,12 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
 
 @pytest.mark.zwaar
 @pytest.mark.skipif(
-    not (OROX_DE_WOLDEN.exists() and STUDIEGEBIED.exists()),
-    reason="de De Wolden-OroX of het studiegebied staat niet in data/",
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of het studiegebied staat niet in data/",
 )
 def test_afbakening_op_koekangerveld_verandert_de_bevindingen_niet() -> None:
     """De contextschil mag de uitkomst op de kern niet veranderen, alleen sneller maken."""
-    dataset = load_dataset(OROX_DE_WOLDEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
     config = load_check_config()
     area = load_study_area(STUDIEGEBIED)
     ids = ["NET-001", "NET-002", "NET-004", "TOP-001", "TOP-005"]
@@ -280,3 +341,145 @@ def test_afbakening_op_koekangerveld_verandert_de_bevindingen_niet() -> None:
 
     assert sleutel(afgebakend) == sleutel(volledig)
     assert len(analyseset.alles) < len(dataset.nodes) + len(dataset.conduits)
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of het studiegebied staat niet in data/",
+)
+def test_twee_buurten_op_dewoldenhoogeveen(tmp_path: Path) -> None:
+    """Rapportage per gebied op de echte data, met de equivalentie-eis erbij.
+
+    Het gebiedsbestand wordt uit de Koekangerveld-buurt afgeleid: de westelijke en
+    de oostelijke helft, elk als eigen feature. Per helft moeten de meldingen
+    gelijk zijn aan die van een losse run op alleen die helft.
+    """
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    config = load_check_config()
+    ids = ["NET-001", "TOP-001", "TOP-005"]
+    west, oost = _helften(load_study_area(STUDIEGEBIED).geometry)
+
+    samen = schrijf_buurten(tmp_path / "twee.gpkg", [("West", west), ("Oost", oost)])
+    los = schrijf_buurten(tmp_path / "west.gpkg", [("West", west)])
+
+    beide = toets_gebieden(
+        dataset,
+        load_studiegebieden(samen),
+        config,
+        check_ids=ids,
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    alleen = toets_gebieden(
+        dataset,
+        load_studiegebieden(los),
+        config,
+        check_ids=ids,
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+
+    uitvoer = schrijf_uitvoer_gebieden(beide, tmp_path / "uit", RUNDATUM)
+
+    def sleutel(gebiedsrun):
+        return sorted((f.check_id, f.object_uri) for f in gebiedsrun.run.findings)
+
+    assert [run.naam for run in beide] == ["West", "Oost"]
+    assert sleutel(beide[0]) == sleutel(alleen[0])
+    assert (tmp_path / "uit" / "west" / "bevindingen.md").exists()
+    assert (tmp_path / "uit" / "oost" / "bevindingen.md").exists()
+    assert uitvoer.synthese is not None and uitvoer.synthese.exists()
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of het studiegebied staat niet in data/",
+)
+def test_schaal_tachtig_buurten(tmp_path: Path) -> None:
+    """De referentiecasus telt 80+ buurten; die run moet doorlopen.
+
+    Geen tijdslimiet in de test -- die zou op een trage machine willekeurig falen --
+    maar de duur wordt wel gelogd, zodat de meting op deze casus mogelijk blijft.
+    Dat is de meting waarop het uitstel van de lokaal/contextueel-optimalisatie
+    wacht (zie de beslislog).
+    """
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    bestand = schrijf_buurtenraster(
+        tmp_path / "tachtig.gpkg", 80, load_study_area(STUDIEGEBIED).geometry.bounds
+    )
+    gebieden = load_studiegebieden(bestand)
+
+    begin = time.monotonic()
+    runs = toets_gebieden(
+        dataset,
+        gebieden,
+        load_check_config(),
+        check_ids=["TOP-001"],
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    uitvoer = schrijf_uitvoer_gebieden(
+        runs, tmp_path / "uit", RUNDATUM, met_geopackage=False, beschikbaar=gebieden.beschikbaar
+    )
+    duur = time.monotonic() - begin
+    logging.getLogger(__name__).warning("80 buurten in %.1f s", duur)
+
+    assert len(runs) == 80
+    assert len(uitvoer.per_gebied) == 80
+    assert sorted(pad.name for pad in (tmp_path / "uit").iterdir())[:2] == [
+        "buurt_001",
+        "buurt_002",
+    ]
+    assert uitvoer.synthese is not None and uitvoer.synthese.exists()
+
+
+def _helften(vlak):
+    """Splitst een vlak in een westelijke en een oostelijke helft."""
+    from shapely.geometry import box
+
+    x_min, y_min, x_max, y_max = vlak.bounds
+    midden = (x_min + x_max) / 2
+    return (
+        vlak.intersection(box(x_min, y_min, midden, y_max)),
+        vlak.intersection(box(midden, y_min, x_max, y_max)),
+    )
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and AHN_TIF.exists() and STUDIEGEBIED.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of de externe bronnen staan niet in data/",
+)
+def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
+    """De lagen in de GeoPackage zijn exact de treffers uit de meldingen.
+
+    Op de echte BGT- en BAG-bronnen, met het studiegebied Koekangerveld als bereik.
+    De dekkingspoort krijgt hier geen eis mee: deze extracten komen tot 276 m tekort
+    doordat hun randen leeg zijn, en dat is een projectkeuze (`dekking_tolerantie_m`)
+    en geen eigenschap van deze test.
+    """
+    from nlriochecker.uitvoer.gpkg import schrijf_geopackage
+    from nlriochecker.uitvoer.melding import bouw_meldingen
+
+    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    context = CheckContext(
+        dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
+    )
+    run = run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
+    meldingen = bouw_meldingen(run, RUNDATUM)
+
+    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+
+    verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    try:
+        geschreven = {
+            laag: {rij[0] for rij in verbinding.execute(f'select id from "{laag}"')}
+            for laag in ("bouwwerken", "waterdelen_zonder_zinker")
+        }
+    finally:
+        verbinding.close()
+
+    for laag, check_id in (("bouwwerken", "EXT-001"), ("waterdelen_zonder_zinker", "EXT-003")):
+        verwacht = {m.object2_uri for m in meldingen if m.check_id == check_id and m.object2_uri}
+        assert geschreven[laag] == verwacht
+        assert all(sleutel.startswith(("bgt:", "bag:")) for sleutel in geschreven[laag])
+    assert geschreven["bouwwerken"]

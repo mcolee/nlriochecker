@@ -1,12 +1,15 @@
 """RVZ-checks: bergbezinkvoorzieningen, overstorten en drempels.
 
-Hoe overstorten in een export verschijnen ligt niet vast; het checkregister noemt
-dat expliciet als open punt. Empirisch op de De Wolden-export (zie
+Hoe overstorten in een export verschijnen ligt niet vast; het checkregister noemde
+dat als open punt 6, inmiddels afgehandeld op grond van wat hieronder staat.
+Empirisch op de De Wolden en Hoogeveen-export (zie
 docs/beslislog.md): overstorten staan er als `Overstortput` met een
 `Overstortleiding` eraan. Losse `Overstortdrempel`-onderdelen met `Drempelniveau`
 en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel
 kent. Deze module leest daarom beide vormen, en meldt in de toelichting welke ze in
-deze dataset heeft aangetroffen.
+deze dataset heeft aangetroffen. RVZ-002 en RVZ-003 melden dat per overstortput: een
+put zonder geregistreerd drempelniveau of zonder geregistreerde drempelbreedte, ook
+als het drempelonderdeel zelf ontbreekt.
 
 Een *externe* overstort loost op oppervlaktewater en heeft een overstortleiding naar
 buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put.
@@ -14,9 +17,12 @@ buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import ClassVar
 
+from nlriochecker import taal
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -25,13 +31,19 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
+from nlriochecker.checks.selectie import (
+    bergbezinkleidingen,
+    bergbezinkvoorzieningen,
+    oppervlaktewaterobjecten,
+    overstortleidingen,
+    overstortputten,
+)
 from nlriochecker.checks.verbanden import (
     aansluitingen,
     deelstelsel_ids,
     netwerkdelen,
-    objecten_van_klassen,
 )
-from nlriochecker.dataset import HAS_PART, Conduit, Node
+from nlriochecker.dataset import Node, part_holders_of
 
 
 @dataclass(frozen=True)
@@ -45,44 +57,10 @@ class Drempel:
     put_uri: str | None
 
 
-def _overstortputten(context: CheckContext) -> list[Node]:
-    """De putten die als overstort geregistreerd staan."""
-    return context.cached(
-        "rvz:overstortputten",
-        lambda: objecten_van_klassen(context, context.config.klassen.overstortput, "nodes"),
-    )
-
-
-def _overstortleidingen(context: CheckContext) -> list[Conduit]:
-    """De leidingen die als overstortleiding geregistreerd staan."""
-    return context.cached(
-        "rvz:overstortleidingen",
-        lambda: objecten_van_klassen(context, context.config.klassen.overstortleiding, "conduits"),
-    )
-
-
-def _bergbezink(context: CheckContext) -> list[Node]:
-    """De bergbezinkvoorzieningen (BBB's) in de dataset."""
-    return context.cached(
-        "rvz:bbb",
-        lambda: objecten_van_klassen(
-            context, context.config.klassen.bergbezinkvoorziening, "nodes"
-        ),
-    )
-
-
-def _bergbezinkleidingen(context: CheckContext) -> list[Conduit]:
-    """De bergbezinkriolen: bergingsvoorzieningen die als leiding geregistreerd staan."""
-    return context.cached(
-        "rvz:bbb_leidingen",
-        lambda: objecten_van_klassen(context, context.config.klassen.bergbezinkleiding, "conduits"),
-    )
-
-
 def bbb_notitie(context: CheckContext) -> list[str]:
     """Meldt of er bergbezinkvoorzieningen zijn en wat er buiten de toets valt."""
-    knopen = _bergbezink(context)
-    leidingen = _bergbezinkleidingen(context)
+    knopen = bergbezinkvoorzieningen(context)
+    riolen = bergbezinkleidingen(context)
     notities: list[str] = []
     if not knopen:
         klassen = ", ".join(context.config.klassen.bergbezinkvoorziening) or "geen"
@@ -91,12 +69,12 @@ def bbb_notitie(context: CheckContext) -> list[str]:
             f"bergbezinkvoorziening van de geconfigureerde klassen ({klassen}); er is niets "
             "getoetst."
         )
-    if leidingen:
+    if riolen:
         notities.append(
-            f"{len(leidingen)} bergbezinkriolen staan als leiding geregistreerd en niet als "
+            f"{len(riolen)} bergbezinkriolen staan als leiding geregistreerd en niet als "
             "bouwwerk. Deze check redeneert over de voorziening als knoop in het netwerk "
             "(aanvoer, lediging, nooduitlaat) en laat die leidingen buiten beschouwing; "
-            f"het gaat om: {', '.join(sorted(conduit.label for conduit in leidingen)[:10])}."
+            f"het gaat om: {', '.join(sorted(conduit.label for conduit in riolen)[:10])}."
         )
     return notities
 
@@ -132,7 +110,7 @@ def _bouw_drempels(context: CheckContext) -> dict[str, list[Drempel]]:
             niveau = _waarde(context, subject, "Drempelniveau")
             breedte = _waarde(context, subject, "Drempelbreedte")
             put_uri = None
-            for houder in dataset.graph.subjects(HAS_PART, subject):
+            for houder in part_holders_of(dataset.graph, subject):
                 put_uri = dataset.resolve_network_node(str(houder), wortels)
                 if put_uri is not None:
                     break
@@ -152,9 +130,7 @@ def _bouw_drempels(context: CheckContext) -> dict[str, list[Drempel]]:
 
 def _waarde(context: CheckContext, subject, kenmerk: str) -> float | None:
     """De numerieke waarde van een kenmerk dat aan dit object hangt."""
-    from nlriochecker.dataset import _read_aspects
-
-    for aspect in _read_aspects(context.dataset.graph, subject):
+    for aspect in context.dataset.onderdeel_aspecten(str(subject)):
         if aspect.kind == kenmerk:
             return aspect.number
     return None
@@ -162,10 +138,7 @@ def _waarde(context: CheckContext, subject, kenmerk: str) -> float | None:
 
 def _label(context: CheckContext, subject) -> str:
     """Het rdfs:label van een object in de graaf."""
-    from rdflib import RDFS
-
-    waarde = context.dataset.graph.value(subject, RDFS.label)
-    return str(waarde) if waarde is not None else ""
+    return context.dataset.onderdeel_label(str(subject)) or ""
 
 
 def drempelnotitie(context: CheckContext) -> list[str]:
@@ -231,6 +204,30 @@ def _stelseltypen_van(context: CheckContext, knopen: set[str]) -> set[str]:
     return soorten
 
 
+def _afvoereindpunten(context: CheckContext) -> set[str]:
+    """De knopen die als afvoereindpunt gelden: gemaal, pompunit of overnamepunt.
+
+    Dezelfde klassen als NET-001 gebruikt (`klassen.afvoer_eindpunt`), zodat de twee
+    checks over hetzelfde begrip oordelen. `of_class` sluit de subklassen in, dus
+    `Gemaal` dekt de 893 `Rioolgemaal` van De Wolden zonder ze los op te sommen.
+    """
+    dataset = context.dataset
+    return {
+        uri for wortel in context.config.klassen.afvoer_eindpunt for uri in dataset.of_class(wortel)
+    }
+
+
+def _rvz006_gebrek(heeft_overstort: bool, heeft_eindpunt: bool) -> str:
+    """De deelreden voor RVZ-006: welke van de twee eisen het deelstelsel mist."""
+    zonder_overstort = "zonder enige externe overstort of bergbezinkvoorziening"
+    zonder_eindpunt = "zonder afvoereindpunt (gemaal, pompunit of overnamepunt)"
+    if not heeft_overstort and not heeft_eindpunt:
+        return f"{zonder_overstort} en {zonder_eindpunt}"
+    if not heeft_overstort:
+        return zonder_overstort
+    return zonder_eindpunt
+
+
 @register
 class RandvoorzieningNietAangesloten(Check):
     """RVZ-001: een randvoorziening die topologisch nergens op uitkomt."""
@@ -248,7 +245,7 @@ class RandvoorzieningNietAangesloten(Check):
         nulmeting al.
         """
         index = aansluitingen(context)
-        for node in (*_overstortputten(context), *_bergbezink(context)):
+        for node in (*overstortputten(context), *bergbezinkvoorzieningen(context)):
             if index.strengen(node.uri):
                 continue
             yield self.finding(
@@ -261,7 +258,107 @@ class RandvoorzieningNietAangesloten(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal randvoorzieningen."""
-        return len(_overstortputten(context)) + len(_bergbezink(context))
+        return len(overstortputten(context)) + len(bergbezinkvoorzieningen(context))
+
+
+class _OverstortZonderDrempelkenmerk(Check):
+    """Basis voor RVZ-002 en RVZ-003: een overstortput waarvan geen enkele drempel
+    het gevraagde kenmerk draagt -- ook als er helemaal geen drempelonderdeel is.
+
+    De nulmetingvorm `Overstortput_Overstortdrempel_card` meldt het ontbreken van het
+    onderdeel zelf al; die overlap is bewust (BO-26): het register vraagt naar de
+    geregistreerde waarde, en `toets` moet ook zonder `--shacl` iets zien.
+    """
+
+    kenmerk: ClassVar[str] = ""
+    omschrijving: ClassVar[str] = ""
+
+    @abstractmethod
+    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
+        """De waarde van het gevraagde kenmerk op deze drempel."""
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke overstortput zonder geregistreerd kenmerk op een van haar drempels."""
+        per_put = drempels_per_put(context)
+        for node in overstortputten(context):
+            groep = per_put.get(node.uri, [])
+            if any(self._kenmerkwaarde(drempel) is not None for drempel in groep):
+                continue
+            # Het voltooid deelwoord achteraan: `drempelniveau` is onzijdig en
+            # `drempelbreedte` niet, dus "een geregistreerd {omschrijving}" klopt maar
+            # voor een van de twee checks.
+            if len(groep) == 1:
+                tekst = (
+                    "De enige overstortdrempel van deze put heeft geen "
+                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
+                )
+            elif groep:
+                tekst = (
+                    f"Geen van de {len(groep)} overstortdrempels van deze put heeft een "
+                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
+                )
+            else:
+                tekst = (
+                    "Deze overstortput heeft geen enkel `Overstortdrempel`-onderdeel, en dus "
+                    f"ook geen {self.omschrijving}."
+                )
+            yield self.finding(context, node.uri, node.label, tekst, drempels=len(groep))
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Zegt hoeveel putten geen drempel hebben en dat de nulmeting dat ook meldt."""
+        per_put = drempels_per_put(context)
+        putten = overstortputten(context)
+        zonder = sum(1 for node in putten if not per_put.get(node.uri))
+        notities = [
+            f"Bekeken: {taal.getal(len(putten), 'overstortput', 'overstortputten')} in "
+            f"{context.scope_in_woorden()} "
+            f"({', '.join(context.config.klassen.overstortput)})."
+        ]
+        if zonder:
+            notities.append(
+                f"{zonder} daarvan {taal.vorm(zonder, 'staat', 'staan')} zonder enig "
+                "`Overstortdrempel`-onderdeel geregistreerd; "
+                "de nulmetingvorm `Overstortput_Overstortdrempel_card` meldt dat ook. De "
+                "overlap is bewust: deze check toetst de geregistreerde waarde en werkt ook "
+                "zonder nulmeting."
+            )
+        return notities
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal overstortputten."""
+        return len(overstortputten(context))
+
+
+@register
+class OverstortZonderDrempelniveau(_OverstortZonderDrempelkenmerk):
+    """RVZ-002: overstortput zonder geregistreerd drempelniveau."""
+
+    id = "RVZ-002"
+    title = "Overstort zonder geregistreerde drempelhoogte"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    kenmerk = "Drempelniveau"
+    omschrijving = "drempelniveau"
+
+    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
+        """Het geregistreerde drempelniveau."""
+        return drempel.niveau
+
+
+@register
+class OverstortZonderDrempelbreedte(_OverstortZonderDrempelkenmerk):
+    """RVZ-003: overstortput zonder geregistreerde drempelbreedte."""
+
+    id = "RVZ-003"
+    title = "Overstort zonder geregistreerde drempelbreedte"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    kenmerk = "Drempelbreedte"
+    omschrijving = "drempelbreedte"
+
+    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
+        """De geregistreerde drempelbreedte."""
+        return drempel.breedte
 
 
 @register
@@ -285,7 +382,7 @@ class ExterneOverstortZonderWater(Check):
         if not wateren:
             return
 
-        for node in _overstortputten(context):
+        for node in overstortputten(context):
             if node.point is None:
                 continue
             if any(water.distance(node.point) <= afstand for water in wateren):
@@ -315,7 +412,7 @@ class ExterneOverstortZonderWater(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal overstortputten."""
-        return len(_overstortputten(context))
+        return len(overstortputten(context))
 
 
 @register
@@ -339,13 +436,14 @@ class OverstortOpVerkeerdStelsel(Check):
         klassen = context.config.klassen
         verdacht = {"hemelwater", "infiltratie"}
 
-        for node in _overstortputten(context):
+        for node in overstortputten(context):
             soorten = {
-                klassen.stelseltype(conduit.types, context.dataset.closure)
+                soort
                 for conduit in index.strengen(node.uri)
+                if (soort := klassen.stelseltype(conduit.types, context.dataset.closure))
+                is not None
+                and soort != "overstort"
             }
-            soorten.discard(None)
-            soorten.discard("overstort")
             if not soorten or not soorten <= verdacht:
                 continue
             yield self.finding(
@@ -359,28 +457,37 @@ class OverstortOpVerkeerdStelsel(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal overstortputten."""
-        return len(_overstortputten(context))
+        return len(overstortputten(context))
 
 
 @register
 class GemengdDeelstelselZonderOverstort(Check):
-    """RVZ-006: een gemengd deelstelsel zonder overstort of BBB."""
+    """RVZ-006: een gemengd deelstelsel zonder overstort/BBB of zonder afvoereindpunt."""
 
     id = "RVZ-006"
-    title = "Gemengd deelstelsel zonder enige externe overstort of BBB"
-    severity = Severity.WARNING
+    title = "Gemengd deelstelsel zonder externe overstort/BBB of zonder afvoereindpunt"
+    severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Zoekt samenhangende gemengde deelstelsels zonder noodafvoer."""
-        randvoorzieningen = {node.uri for node in _overstortputten(context)}
-        randvoorzieningen |= {node.uri for node in _bergbezink(context)}
+        """Zoekt gemengde deelstelsels zonder overstort of zonder afvoereindpunt.
+
+        Een gemengd stelsel moet zijn vuilwater ergens kwijt kunnen -- via een
+        externe overstort/BBB bij hoogwater, en via een afvoereindpunt (gemaal of
+        overnamepunt) in de gewone toestand. Ontbreekt een van beide, dan is het
+        stelsel onvolledig geregistreerd; de melding noemt welke eis faalt.
+        """
+        randvoorzieningen = {node.uri for node in overstortputten(context)}
+        randvoorzieningen |= {node.uri for node in bergbezinkvoorzieningen(context)}
+        afvoereindpunten = _afvoereindpunten(context)
         clusters = deelstelsel_ids(context)
 
         for deel in _stelseldelen(context):
             if "gemengd" not in _stelseltypen_van(context, deel):
                 continue
-            if deel & randvoorzieningen:
+            heeft_overstort = bool(deel & randvoorzieningen)
+            heeft_eindpunt = bool(deel & afvoereindpunten)
+            if heeft_overstort and heeft_eindpunt:
                 continue
             knopen = sorted(deel)
             uri = knopen[0]
@@ -389,8 +496,8 @@ class GemengdDeelstelselZonderOverstort(Check):
                 context,
                 uri,
                 node.label if node is not None else uri,
-                f"Ligt in een gemengd deelstelsel van {len(deel)} knopen zonder enige "
-                "externe overstort of bergbezinkvoorziening.",
+                f"Ligt in een gemengd deelstelsel van {len(deel)} knopen "
+                f"{_rvz006_gebrek(heeft_overstort, heeft_eindpunt)}.",
                 knopen_in_deelstelsel=len(deel),
                 cluster_id=clusters.get(uri, ""),
                 foutlocatie=_zwaartepunt(context, deel),
@@ -416,7 +523,7 @@ class _BbbKenmerk(Check):
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke BBB waarvan het gevraagde kenmerk ontbreekt."""
-        for node in _bergbezink(context):
+        for node in bergbezinkvoorzieningen(context):
             if self.aanwezig(context, node):
                 continue
             yield self.finding(
@@ -437,7 +544,7 @@ class _BbbKenmerk(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal bergbezinkvoorzieningen."""
-        return len(_bergbezink(context))
+        return len(bergbezinkvoorzieningen(context))
 
 
 @register
@@ -479,7 +586,7 @@ class BbbZonderLediging(Check):
         index = aansluitingen(context)
         ledigingsklassen = context.config.klassen.ledigingsvoorziening
 
-        for node in _bergbezink(context):
+        for node in bergbezinkvoorzieningen(context):
             if self._heeft_voorziening(context, node, ledigingsklassen):
                 continue
             uit = [
@@ -501,10 +608,8 @@ class BbbZonderLediging(Check):
     def _heeft_voorziening(self, context: CheckContext, node: Node, klassen: list[str]) -> bool:
         """Geeft aan of de BBB een ledigingsvoorziening als onderdeel heeft."""
         dataset = context.dataset
-        from rdflib import URIRef
-
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
-            if any(dataset.is_a(str(deel), wortel) for wortel in klassen):
+        for deel in dataset.onderdelen(node.uri):
+            if any(dataset.graph_is_a(deel, wortel) for wortel in klassen):
                 return True
         return False
 
@@ -518,7 +623,7 @@ class BbbZonderLediging(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal bergbezinkvoorzieningen."""
-        return len(_bergbezink(context))
+        return len(bergbezinkvoorzieningen(context))
 
 
 @register
@@ -534,12 +639,12 @@ class BbbZonderNooduitlaat(Check):
         """Zoekt BBB's zonder overstortdrempel en zonder overstortleiding."""
         drempels = drempels_per_put(context)
         index = aansluitingen(context)
-        overstortleidingen = {conduit.uri for conduit in _overstortleidingen(context)}
+        overstort_uris = {conduit.uri for conduit in overstortleidingen(context)}
 
-        for node in _bergbezink(context):
+        for node in bergbezinkvoorzieningen(context):
             if node.uri in drempels:
                 continue
-            if any(conduit.uri in overstortleidingen for conduit in index.strengen(node.uri)):
+            if any(conduit.uri in overstort_uris for conduit in index.strengen(node.uri)):
                 continue
             yield self.finding(
                 context,
@@ -556,7 +661,7 @@ class BbbZonderNooduitlaat(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal bergbezinkvoorzieningen."""
-        return len(_bergbezink(context))
+        return len(bergbezinkvoorzieningen(context))
 
 
 @register
@@ -579,19 +684,19 @@ class InterneOverstortZelfdeStelseltype(Check):
         klassen = context.config.klassen
         dataset = context.dataset
 
-        for conduit in _overstortleidingen(context):
+        for conduit in overstortleidingen(context):
             begin, eind = index.knopen(conduit.uri)
             if begin is None or eind is None:
                 continue
-            soorten = []
+            soorten: list[set[str]] = []
             for knoop in (begin, eind):
                 buren = {
-                    klassen.stelseltype(buur.types, dataset.closure)
+                    soort
                     for buur in index.strengen(knoop)
                     if buur.uri != conduit.uri
+                    and (soort := klassen.stelseltype(buur.types, dataset.closure)) is not None
+                    and soort != "overstort"
                 }
-                buren.discard(None)
-                buren.discard("overstort")
                 soorten.append(buren)
             if not soorten[0] or not soorten[1]:
                 continue
@@ -609,7 +714,7 @@ class InterneOverstortZelfdeStelseltype(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoe interne overstorten in deze dataset herkend worden."""
-        aantal = len(_overstortleidingen(context))
+        aantal = len(overstortleidingen(context))
         if not aantal:
             klassen = ", ".join(context.config.klassen.overstortleiding) or "geen"
             return [
@@ -626,7 +731,7 @@ class InterneOverstortZelfdeStelseltype(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal overstortleidingen."""
-        return len(_overstortleidingen(context))
+        return len(overstortleidingen(context))
 
 
 @register
@@ -696,16 +801,15 @@ def _watergeometrieen(context: CheckContext) -> list:
 
 
 def _bouw_watergeometrieen(context: CheckContext) -> list:
-    """Verzamelt punt- en lijngeometrie van alle oppervlaktewaterobjecten."""
-    dataset = context.dataset
+    """Verzamelt punt- en lijngeometrie van alle oppervlaktewaterobjecten.
+
+    De selectie levert de objecten van de klasse, ook die zonder geometrie; het
+    filteren hoort hier, want een object zonder punt of lijn kan deze structuur niet
+    gebruiken.
+    """
     gevonden = []
-    for wortel in context.config.klassen.oppervlaktewater:
-        for uri in dataset.of_class(wortel):
-            node = dataset.nodes.get(uri)
-            if node is not None and node.point is not None:
-                gevonden.append(node.point)
-                continue
-            conduit = dataset.conduits.get(uri)
-            if conduit is not None and conduit.line is not None:
-                gevonden.append(conduit.line)
+    for object_ in oppervlaktewaterobjecten(context):
+        meetkunde = object_.point if isinstance(object_, Node) else object_.line
+        if meetkunde is not None:
+            gevonden.append(meetkunde)
     return gevonden

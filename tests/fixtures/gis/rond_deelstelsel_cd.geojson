@@ -1,4 +1,5 @@
 {
   "type": "Polygon",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::28992" } },
   "coordinates": [[[1950, 2950], [2100, 2950], [2100, 3050], [1950, 3050], [1950, 2950]]]
 }

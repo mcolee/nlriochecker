@@ -6,8 +6,8 @@
 # tegen die versie. De vormnamen zijn geverifieerd tegen de drie SHACL-rapporten
 # over dewolden_orox.ttl. Pas ze aan per project; niets is hardcoded in de code.
 
-checkregister_versie = "0.8"
-bron = "data/checkregister-gwsw-nulmeting-v0_8.md"
+checkregister_versie = "0.9"
+bron = "data/checkregister-gwsw-nulmeting-v0_9.md"
 
 [drempels]
 # Onder deze typeringsscore verklaart de nulmeting haar eigen vervolgvalidaties
@@ -34,8 +34,13 @@ id = "ADM-004"
 onderwerp = "Verplichte GWSW-MdS-attributen niet gevuld"
 claim = """Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, \
 lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, \
-maaiveldhoogte); Hyd aanvullend inclusief BOB's en afmetingen exact=1"""
+maaiveldhoogte); Hyd aanvullend inclusief BOB's, afmetingen exact=1 en de put-vormen \
+materiaal (MateriaalPut) en maaiveldschematisering (Maaiveldschematisering) - die twee \
+hasAspect-eisen (exact=1) leveren uitsluitend in Hyd meldingen op, dus de dekking van die \
+twee attributen rust op Hyd en niet op Mds (na te lopen via #41)"""
 vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
+# MateriaalPut en Maaiveldschematisering (hasAspect exact=1) vuren alleen in Hyd; de
+# dekkinganalyse meldt die twee dan ook als discrepantie tegen MdsPlan/MdsProj.
 bewijs = [
   { vorm = "Leiding_MateriaalLeiding_card" },
   { vorm = "Leiding_VormLeiding_card" },
@@ -65,28 +70,5 @@ Dt_LengteLeiding)"""
 vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
 bewijs = [
   { vorm = "LengteLeiding_val" },
-]
-tegenbewijs = []
-
-[[check]]
-id = "RVZ-002"
-onderwerp = "Overstort zonder geregistreerde drempelhoogte"
-claim = "Beide CFK's: Drempelniveau exact=1 (Mds) / min=1 (Hyd)"
-vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
-# In de SHACL-rapporten over De Wolden komt geen enkele vorm op Drempelniveau voor;
-# de dichtstbijzijnde vorm toetst of de overstortput een drempel *heeft*, niet of
-# het niveau ervan geregistreerd is.
-bewijs = [
-  { vorm_prefix = "Drempelniveau" },
-]
-tegenbewijs = []
-
-[[check]]
-id = "RVZ-003"
-onderwerp = "Overstort zonder geregistreerde drempelbreedte"
-claim = "Alleen Hyd: Drempelbreedte exact=1; Mds staat ontbreken toe (max=1, geen min-eis)"
-vereiste_cfk = ["Hyd"]
-bewijs = [
-  { vorm_prefix = "Drempelbreedte" },
 ]
 tegenbewijs = []

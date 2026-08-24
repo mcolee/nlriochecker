@@ -44,24 +44,19 @@ def _check(result: CoverageResult, check_id: str) -> CheckCoverage:
         ("ADM-004", Verdict.TOUCHED),
         ("ADM-005", Verdict.TOUCHED),
         ("ATTR-011", Verdict.TOUCHED),
-        ("RVZ-002", Verdict.UNTOUCHED),
-        ("RVZ-003", Verdict.UNTOUCHED),
     ],
 )
 def test_oordeel_per_check(result: CoverageResult, check_id: str, verdict: Verdict) -> None:
     assert _check(result, check_id).verdict is verdict
 
 
-def test_drempelvormen_ontbreken_in_de_shacl_meting(result: CoverageResult) -> None:
-    """RVZ-002 en RVZ-003 zijn geschrapt omdat de nulmeting de drempel zou dekken.
-
-    In de SHACL-rapporten komt geen enkele vorm op Drempelniveau of Drempelbreedte
-    voor, dus die dekking is hier niet aan te tonen.
+def test_elke_geschrapte_check_wordt_door_de_nulmeting_geraakt(result: CoverageResult) -> None:
+    """Voorwaarde 3 van de schrapronde eist een sentinel per geschrapte check;
+    `verify_register` toetst alleen of die er is, niet of hij iets aantoont. Dit is de
+    inhoudelijke poort: een geschrapte check waarvan het bewijs in de referentiemeting
+    nul meldingen oplevert, wordt door niets meer bewaakt (RVZ-002/003 waren zo'n gat).
     """
-    for check_id in ("RVZ-002", "RVZ-003"):
-        check = _check(result, check_id)
-        assert check.evidence_cfks == []
-        assert check in result.untouched
+    assert result.untouched == []
 
 
 def test_koppeling_zit_in_alle_drie_de_cfks(result: CoverageResult) -> None:

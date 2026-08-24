@@ -1,0 +1,88 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix gwsw: <http://data.gwsw.nl/1.6/totaal/> .
+@prefix :     <http://example.org/toets#> .
+
+# Minimale klassenhierarchie, zodat de fixture zonder de volle ontologie werkt.
+# De drie regels over Overnamepunt volgen Ontologie_GWSW_Totaal.ttl versie 1.6:
+# gwsw:Overnamepunt rdfs:subClassOf gwsw:Aansluitpunt (regel 31892-31901) en
+# gwsw:Aansluitpunt rdfs:subClassOf gwsw:Knooppunt (regel 31320-31326).
+gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
+gwsw:Rioolput     rdfs:subClassOf gwsw:Put .
+gwsw:Putorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Aansluitpunt  rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Overnamepunt  rdfs:subClassOf gwsw:Aansluitpunt .
+gwsw:GemengdRiool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
+gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
+
+# DEFECT: streng '2' hangt met haar eindpunt aan een Overnamepunt-orientatie zonder
+# dragend object; die orientatie wordt geen knoop, dus streng '2' valt buiten de
+# netwerkanalyse.
+#
+# Deze fixture oefent de route die BO-33 belooft: "zodra een gemeente ze wel levert,
+# werkt NET-001 meteen goed." De Wolden levert nul overnamepunten, dus zonder deze
+# fixture draait `_eindpunten` -> `of_class` -> `types_of` -> `orientation_types` op
+# geen enkele dataset en in geen enkele test.
+#
+# Twee losse deelstelsels, met opzet naast elkaar:
+#
+# 1. Streng '1' watert af op put B, en de PUTORIENTATIE van B draagt daarnaast het
+#    type gwsw:Overnamepunt -- zo legt het GWSW de topologische rol vast, op de
+#    orientatie en niet op de put. NET-001 hoort '1' NIET te melden.
+#
+# 2. Streng '2' watert af op :LosOvp_ori, een Overnamepunt-orientatie die aan geen
+#    enkel object hangt. Het domeinmodel bouwt zijn knopen uit objecten, dus zo'n
+#    losse orientatie komt niet in `nodes` en daarmee niet in de selectie. Gemeten
+#    uitkomst: streng '2' krijgt GEEN NET-001-melding -- ze heeft geen herleidbare
+#    put aan beide zijden en valt daarmee helemaal buiten de netwerkanalyse. Alleen
+#    de notitie van de check telt haar. Dat is het restrisico van de belofte
+#    hierboven, hier vastgelegd als feit in plaats van als aanname: een export die
+#    haar overnamepunten als losse orientatie levert, verliest niet alleen het
+#    eindpunt maar ook de streng ernaartoe.
+
+:PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
+    gwsw:hasAspect :PutA_ori .
+:PutA_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:PutB rdf:type gwsw:Inspectieput ; rdfs:label "B" ;
+    gwsw:hasAspect :PutB_ori .
+:PutB_ori rdf:type gwsw:Putorientatie .
+:PutB_ori rdf:type gwsw:Overnamepunt .
+:PutB_ori gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
+    gwsw:hasAspect :L1_ori .
+:L1_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L1_b , :L1_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L1_b rdf:type gwsw:BeginpuntLeiding .
+:L1_e rdf:type gwsw:EindpuntLeiding .
+:L1_b gwsw:hasConnection :PutA_ori .
+:L1_e gwsw:hasConnection :PutB_ori .
+
+:PutC rdf:type gwsw:Inspectieput ; rdfs:label "C" ;
+    gwsw:hasAspect :PutC_ori .
+:PutC_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>2000.0 3000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:LosOvp_ori rdf:type gwsw:Overnamepunt ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>2050.0 3000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:L2 rdf:type gwsw:GemengdRiool ; rdfs:label "2" ;
+    gwsw:hasAspect :L2_ori .
+:L2_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L2_b , :L2_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">2000.0 3000.0 2050.0 3000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L2_b rdf:type gwsw:BeginpuntLeiding .
+:L2_e rdf:type gwsw:EindpuntLeiding .
+:L2_b gwsw:hasConnection :PutC_ori .
+:L2_e gwsw:hasConnection :LosOvp_ori .

@@ -12,7 +12,7 @@ import re
 from collections.abc import Iterator
 from datetime import date
 
-from rdflib import RDF, URIRef
+from rdflib import URIRef
 
 from nlriochecker.checks.base import (
     Check,
@@ -22,24 +22,9 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.verbanden import aansluitingen, objecten_van_klassen
-from nlriochecker.dataset import HAS_CONNECTION, HAS_PART
-
-
-def _putten(context: CheckContext):
-    """De putten van het netwerk."""
-    return context.cached(
-        "adm:putten",
-        lambda: objecten_van_klassen(context, context.config.klassen.netwerkknopen, "nodes"),
-    )
-
-
-def _strengen(context: CheckContext):
-    """Alle leidingen van de dataset."""
-    return context.cached(
-        "adm:strengen",
-        lambda: objecten_van_klassen(context, context.config.klassen.streng, "conduits"),
-    )
+from nlriochecker.checks.selectie import leidingen, netwerkknopen
+from nlriochecker.checks.verbanden import aansluitingen
+from nlriochecker.dataset import HAS_CONNECTION, Conduit, Node, part_holders_of, parts_of
 
 
 @register
@@ -63,7 +48,7 @@ class NietUniekeIdentificatie(Check):
         is het omgekeerde geval: twee verschillende subjecten met hetzelfde
         `rdfs:label`. De toelichting zegt welke helft dit is.
         """
-        for soort, objecten in (("put", _putten(context)), ("streng", _strengen(context))):
+        for soort, objecten in (("put", netwerkknopen(context)), ("streng", leidingen(context))):
             per_label: dict[str, list[str]] = {}
             for object_ in objecten:
                 if object_.label:
@@ -93,7 +78,7 @@ class NietUniekeIdentificatie(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten plus strengen."""
-        return len(_putten(context)) + len(_strengen(context))
+        return len(netwerkknopen(context)) + len(leidingen(context))
 
 
 @register
@@ -113,8 +98,8 @@ class NaamgevingWijktAfVanConventie(Check):
         """
         naamgeving = context.config.naamgeving
         for patroon, objecten, soort in (
-            (naamgeving.putpatroon, _putten(context), "put"),
-            (naamgeving.strengpatroon, _strengen(context), "streng"),
+            (naamgeving.putpatroon, netwerkknopen(context), "put"),
+            (naamgeving.strengpatroon, leidingen(context), "streng"),
         ):
             if patroon is None:
                 continue
@@ -156,9 +141,9 @@ class NaamgevingWijktAfVanConventie(Check):
         naamgeving = context.config.naamgeving
         aantal = 0
         if naamgeving.putpatroon is not None:
-            aantal += len(_putten(context))
+            aantal += len(netwerkknopen(context))
         if naamgeving.strengpatroon is not None:
-            aantal += len(_strengen(context))
+            aantal += len(leidingen(context))
         return aantal
 
 
@@ -182,7 +167,8 @@ class VervallenObjectInActiefNetwerk(Check):
         index = aansluitingen(context)
         dataset = context.dataset
 
-        for object_ in (*_putten(context), *_strengen(context)):
+        alles: list[Node | Conduit] = [*netwerkknopen(context), *leidingen(context)]
+        for object_ in alles:
             reden = self._reden(object_, vandaag)
             if reden is None:
                 continue
@@ -216,7 +202,7 @@ class VervallenObjectInActiefNetwerk(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel objecten geen einddatum hebben."""
-        objecten = [*_putten(context), *_strengen(context)]
+        objecten: list[Node | Conduit] = [*netwerkknopen(context), *leidingen(context)]
         met_einde = sum(1 for object_ in objecten if object_.date("Einddatum") is not None)
         if met_einde:
             return [f"{met_einde} van de {len(objecten)} objecten hebben een einddatum."]
@@ -228,7 +214,7 @@ class VervallenObjectInActiefNetwerk(Check):
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten plus strengen."""
-        return len(_putten(context)) + len(_strengen(context))
+        return len(netwerkknopen(context)) + len(leidingen(context))
 
 
 @register
@@ -273,8 +259,8 @@ class PuttypePastNietBijLeiding(Check):
         for conduit in index.strengen(node.uri):
             if any(dataset.is_a(conduit.uri, wortel) for wortel in regel.vereist_een_van):
                 return True
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
-            if any(dataset.is_a(str(deel), wortel) for wortel in regel.vereist_een_van):
+        for deel in dataset.onderdelen(node.uri):
+            if any(dataset.graph_is_a(deel, wortel) for wortel in regel.vereist_een_van):
                 return True
         return False
 
@@ -326,7 +312,7 @@ class PutonderdelenZonderVerbinding(Check):
         """
         dataset = context.dataset
 
-        for node in _putten(context):
+        for node in netwerkknopen(context):
             onderdelen = self._onderdelen(context, node)
             if len(onderdelen) < 2:
                 continue
@@ -348,8 +334,7 @@ class PutonderdelenZonderVerbinding(Check):
         """De compartimenten van een put, als URI's."""
         dataset = context.dataset
         gevonden = []
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
-            uri = str(deel)
+        for uri in dataset.onderdelen(node.uri):
             if uri in dataset.nodes and dataset.nodes[uri].orientation is not None:
                 gevonden.append(uri)
         return gevonden
@@ -357,8 +342,11 @@ class PutonderdelenZonderVerbinding(Check):
     def _verbonden(self, context: CheckContext, onderdelen: list[str]) -> bool:
         """Geeft aan of er tussen deze onderdelen een verbinding geregistreerd is."""
         dataset = context.dataset
-        orientaties = {dataset.nodes[uri].orientation for uri in onderdelen if uri in dataset.nodes}
-        orientaties.discard(None)
+        orientaties = {
+            orientatie
+            for uri in onderdelen
+            if uri in dataset.nodes and (orientatie := dataset.nodes[uri].orientation) is not None
+        }
         for orientatie in orientaties:
             subject = URIRef(orientatie)
             buren = {str(buur) for buur in dataset.graph.objects(subject, HAS_CONNECTION)}
@@ -366,7 +354,7 @@ class PutonderdelenZonderVerbinding(Check):
             # Een verbinding loopt via een begin- of eindpunt van een onderdeel; dat
             # eindpunt hangt met hasPart aan een onderdeelorientatie.
             for buur in buren:
-                for houder in dataset.graph.subjects(HAS_PART, URIRef(buur)):
+                for houder in part_holders_of(dataset.graph, URIRef(buur)):
                     andere = self._raakt_ander_onderdeel(dataset, houder, orientaties, orientatie)
                     if andere:
                         return True
@@ -376,7 +364,7 @@ class PutonderdelenZonderVerbinding(Check):
 
     def _raakt_ander_onderdeel(self, dataset, houder, orientaties: set[str], eigen: str) -> bool:
         """Geeft aan of deze onderdeelorientatie ook een ander compartiment raakt."""
-        for deel in dataset.graph.objects(houder, HAS_PART):
+        for deel in parts_of(dataset.graph, houder):
             for buur in dataset.graph.objects(deel, HAS_CONNECTION):
                 if str(buur) in orientaties and str(buur) != eigen:
                     return True
@@ -387,18 +375,18 @@ class PutonderdelenZonderVerbinding(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten meer dan een onderdeel hebben."""
-        putten = _putten(context)
-        met_delen = sum(1 for node in putten if len(self._onderdelen(context, node)) >= 2)
+        knopen = netwerkknopen(context)
+        met_delen = sum(1 for node in knopen if len(self._onderdelen(context, node)) >= 2)
         if met_delen:
-            return [f"{met_delen} van de {len(putten)} putten hebben meer dan een onderdeel."]
+            return [f"{met_delen} van de {len(knopen)} putten hebben meer dan een onderdeel."]
         return [
-            f"Geen van de {len(putten)} putten heeft meer dan een compartiment; er valt "
+            f"Geen van de {len(knopen)} putten heeft meer dan een compartiment; er valt "
             "niets te verbinden en er is dus niets getoetst."
         ]
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten."""
-        return len(_putten(context))
+        return len(netwerkknopen(context))
 
 
 @register
@@ -421,7 +409,7 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
         index = aansluitingen(context)
         wortels = context.config.klassen.netwerkknopen
 
-        for node in _putten(context):
+        for node in netwerkknopen(context):
             compartimenten = self._compartimenten(context, node)
             if not compartimenten:
                 continue
@@ -448,30 +436,32 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
                     )
 
     def _compartimenten(self, context: CheckContext, node) -> list[str]:
-        """De compartimenten van een put, inclusief subklassen als een pompkelder."""
-        dataset = context.dataset
-        afsluiting = dataset.closure("Compartiment")
-        gevonden = []
-        for deel in dataset.graph.objects(URIRef(node.uri), HAS_PART):
-            soorten = {str(soort) for soort in dataset.graph.objects(deel, RDF.type)}
-            if soorten & afsluiting:
-                gevonden.append(str(deel))
-        return gevonden
+        """De compartimenten van een put, inclusief subklassen als een pompkelder.
+
+        `graph_is_a` en niet de expliciete typematch op de graaf: een compartiment is
+        een onderdeel en geen knoop, dus `is_a` zou hier stil `False` geven. Dat het
+        ruimer is dan de expliciete vorm -- `graph_types_of` unieert ook de
+        orientatietypen -- kan hier geen extra treffer opleveren: de afsluiting van
+        `Compartiment` (drie klassen) en die van `Knooppunt` (vijftien) delen in de
+        GWSW-totaalontologie 1.6 geen enkele klasse, dus geen orientatietype valt onder
+        `Compartiment`.
+        """
+        return context.dataset.onderdelen(node.uri, "Compartiment")
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten compartimenten hebben."""
-        putten = _putten(context)
-        met = sum(1 for node in putten if self._compartimenten(context, node))
+        knopen = netwerkknopen(context)
+        met = sum(1 for node in knopen if self._compartimenten(context, node))
         if met:
-            return [f"{met} van de {len(putten)} putten hebben compartimenten."]
+            return [f"{met} van de {len(knopen)} putten hebben compartimenten."]
         return [
-            f"Geen van de {len(putten)} putten heeft compartimenten; elke leiding hoort dan "
+            f"Geen van de {len(knopen)} putten heeft compartimenten; elke leiding hoort dan "
             "aan de put zelf te hangen en er is niets getoetst."
         ]
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten met compartimenten."""
-        return sum(1 for node in _putten(context) if self._compartimenten(context, node))
+        return sum(1 for node in netwerkknopen(context) if self._compartimenten(context, node))
 
 
 def _iso(waarde: date | None) -> str | None:

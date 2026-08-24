@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 
@@ -21,12 +21,20 @@ class TypingGate:
     De SHACL-meting noemt de te globale *klassen*, niet de objecten. Met de dataset
     erbij worden de instanties opgezocht; zonder dataset blijft het bij de klassen
     en is er geen score te geven.
+
+    `unassessable_classes` is de deelverzameling van `classes` die niet naar objecten
+    in het domeinmodel te herleiden is: dat model kent alleen knopen en strengen, en
+    een verbindingsklasse staat bovendien op de orientatie van een streng en niet op
+    de streng zelf. Ze tellen niet mee in de score, en ze staan hier apart omdat het
+    rapport ze moet noemen -- stilte over een klasse die niet beoordeeld is leest als
+    "beoordeeld en niets gevonden".
     """
 
     classes: list[str]
     objects: list[str]
     total_objects: int
     resolved: bool
+    unassessable_classes: list[str] = field(default_factory=list)
 
     @property
     def too_generic_count(self) -> int:
@@ -127,18 +135,42 @@ def bepaal_typeringspoort(report: ShaclReport, dataset: GwswDataset | None = Non
     De klassen komen uit de CfkTypes_typ-meldingen; de instanties uit de dataset.
     Zonder dataset zijn de objecten niet te bepalen en blijft de score leeg, in
     plaats van een getal te suggereren dat er niet is.
+
+    Een verbindingsklasse is hier niet naar objecten te herleiden (zie
+    `GwswDataset.is_connection_class`). Dat is geen vergissing van de gebruiker maar
+    een meetuitkomst -- `Afvoerrelatie` is precies de vorm die een CFK te globaal
+    kan noemen -- dus de klasse wordt onbeoordeelbaar genoemd en de run loopt door.
+
+    Diezelfde behandeling krijgt elke klasse die op nul objecten uitkomt terwijl de
+    graaf er wel instanties van draagt. Dat is niet het hypothetische geval maar het
+    werkelijke: over de drie aangeleverde SHACL-rapporten samen noemt `CfkTypes_typ`
+    drie klassen, en `Rioolstelsel` en `MechanischRioolstelsel` zijn er twee van. Die
+    staan onder `Stelsel` en zijn dus knoop noch streng, dus `of_class()` geeft er stil
+    `[]` op terug -- en zonder deze tak zou de poort er nul te globale objecten voor
+    scoren zonder een woord, terwijl de dataset de stelsels wel bevat. Nul objecten bij
+    nul instanties is iets anders: dan komt de klasse in deze dataset niet voor, en dat
+    is een echte nul.
     """
     klassen = report.too_generic_classes
     if dataset is None:
         return TypingGate(classes=klassen, objects=[], total_objects=0, resolved=False)
 
     objecten: set[str] = set()
+    onbeoordeelbaar: list[str] = []
     for klasse in klassen:
-        objecten.update(dataset.of_class(klasse))
+        if dataset.is_connection_class(klasse):
+            onbeoordeelbaar.append(klasse)
+            continue
+        gevonden = dataset.of_class(klasse)
+        if not gevonden and dataset.subjects_of_class(klasse):
+            onbeoordeelbaar.append(klasse)
+            continue
+        objecten.update(gevonden)
 
     return TypingGate(
         classes=klassen,
         objects=sorted(objecten),
         total_objects=len(dataset.nodes) + len(dataset.conduits),
         resolved=True,
+        unassessable_classes=onbeoordeelbaar,
     )

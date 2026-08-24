@@ -22,16 +22,19 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Overstortleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
-gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
+gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: streng 1 is PVC met aanlegjaar 1940; PVC bestaat pas vanaf 1955
+# DEFECT: streng 1 is PVC met begindatum 1940; PVC bestaat pas vanaf 1955
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .

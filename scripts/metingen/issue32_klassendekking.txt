@@ -1,0 +1,165 @@
+Ontologie : data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl
+Export    : data/gwsw_orox_ttl/dewolden_orox.ttl
+Config    : src/nlriochecker/checks.toml + configs/dewoldenhoogeveen.toml
+  [klassen] is in beide bestanden gelijk; 21 sleutels gelezen.
+  regels: 3708107; regeleinden: {'CRLF': 3708107}
+  regelvorm van dewolden_orox.ttl: vlak, geen verkorte notatie -- scan is geldig.
+
+CONTROLE -- regelscan tegen nlriochecker.dataset.load_dataset
+-------------------------------------------------------------
+  uittreksel van dewolden_orox.ttl, vensters (startregel, lengte): [(1, 150000), (1450000, 150000)]
+  lader : 3175 knopen, 1164 verbindingen
+  scan  : 3175 knopen, 1164 verbindingen
+  GELIJK -- ook beide klassentellingen (13 knoopklassen, 9 verbindingklassen) komen overeen.
+  DEKKING van deze ijking -- wat ze wel en niet draagt:
+    aandeel van het bestand: 300000 van 3708107 regels (8.1%)
+    knoopklassen: 10 van 13 geijkt
+      niet in het uittreksel: ['Drainageput', 'Kolk', 'Ontstoppingsstuk']
+    verbindingklassen: 9 van 16 geijkt
+      niet in het uittreksel: ['Bergbezinkleiding', 'Drain', 'DwaPerceelaansluitleiding', 'GemengdePerceelaansluitleiding', 'HwaPerceelaansluitleiding', 'Kolkaansluitleiding', 'Vacuumleiding']
+    Klassen die hierboven ontbreken steunen uitsluitend op de directe telling van de regelscan, niet op de vergelijking met de pakketlader.
+
+OMVANG van de export
+--------------------
+  getypeerde objecten: 650470
+  knopen             : 23485
+  verbindingen       : 23440
+  knoopklassen       : [('Inspectieput', 19322), ('Pompunit', 1107), ('T_stuk', 1054), ('Rioolgemaal', 893), ('Uitlaatconstructie', 712), ('Overstortput', 218), ('Afsluitstuk', 58), ('Lozingsput', 55), ('Kruisingsput', 27), ('Stuwput', 27), ('Ontstoppingsstuk', 10), ('Drainageput', 1), ('Kolk', 1)]
+  verbindingklassen  : [('GemengdRiool', 7784), ('Vuilwaterriool', 4771), ('Hemelwaterriool', 4639), ('Persleiding', 3548), ('Drain', 1216), ('Duiker', 610), ('Infiltratieriool', 340), ('Vacuumleiding', 147), ('Kolkaansluitleiding', 124), ('DwaPerceelaansluitleiding', 70), ('Overstortleiding', 68), ('LozeLeiding', 54), ('HwaPerceelaansluitleiding', 42), ('Drukleiding', 25), ('Bergbezinkleiding', 1), ('GemengdePerceelaansluitleiding', 1)]
+
+PUNT 1 -- klassen.mechanisch: drie bladen -> twee wortels
+---------------------------------------------------------
+  huidig  : ['Persleiding', 'Drukleiding', 'Vacuumleiding']
+  voorstel: ['MechanischeRioolleiding', 'MechanischeTransportleiding']
+  afsluiting van het voorstel: ['Drukleiding', 'Leidingsegment', 'Luchtpersleiding', 'MechanischeRioolleiding', 'MechanischeTransportleiding', 'Persleiding', 'Spoelleiding', 'Vacuumleiding']
+  Luchtpersleiding                   owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Leidingsegment                     owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Spoelleiding                       owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  mechanische verbindingen: nu 3720 verbindingen, na de ingreep 3720.
+    erbij: 0   eraf: 0
+  overlap voorstel x VrijvervalRioolleiding-afsluiting: geen
+  daarvan nu ook vrijverval (dus checkgedrag): 0
+
+PUNT 2 -- klassen.afvoer_eindpunt: RWZI, Afleveringspunt, AfvoerpuntGebied
+--------------------------------------------------------------------------
+  Overnamepunt                       owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Gemaal                             owl:Class=true  instanties=   893 knopen=   893 verbindingen=     0 subklassen=13
+  Pompunit                           owl:Class=true  instanties=  1107 knopen=  1107 verbindingen=     0 subklassen=0
+  RWZI                               owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Afleveringspunt                    owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  AfvoerpuntGebied                   owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Overnamepunt                       owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  afvoereindpunten: nu 2000 knopen, na de ingreep 2000.
+    erbij: 0   eraf: 0
+
+PUNT 3 -- klassen.stelseltypen: VrijvervalRioolleiding-subklassen zonder stelseltype
+------------------------------------------------------------------------------------
+  [klassen.stelseltypen] noemt nu 7 wortels: ['Drain', 'Duiker', 'GemengdRiool', 'Hemelwaterriool', 'Infiltratieriool', 'Overstortleiding', 'Vuilwaterriool']
+  hun afsluiting telt 7 klassen.
+  VrijvervalRioolleiding heeft 14 directe subklassen: ['Bergbezinkleiding', 'Bergingsleiding', 'Blusriool', 'DIT_riool', 'DT_riool', 'GemengdRiool', 'Hemelwaterriool', 'Infiltratieriool', 'Overstortleiding', 'Parallelriool', 'Stuwrioolleiding', 'Tandemriool', 'Vuilwaterriool', 'Zinker']
+  niet gedekt door [klassen.stelseltypen] (9): ['Bergbezinkleiding', 'Bergingsleiding', 'Blusriool', 'DIT_riool', 'DT_riool', 'Parallelriool', 'Stuwrioolleiding', 'Tandemriool', 'Zinker']
+  (het issue noemt er zes; dat aantal klopt niet)
+  Bergbezinkleiding                  owl:Class=true  instanties=     1 knopen=     0 verbindingen=     1 subklassen=0
+  Bergingsleiding                    owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Blusriool                          owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  DIT_riool                          owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  DT_riool                           owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Parallelriool                      owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Stuwrioolleiding                   owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Tandemriool                        owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Zinker                             owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  verbindingen die een stelseltype zouden krijgen: 1
+  vrijvervalverbindingen die nu geen stelseltype krijgen: 1
+    per klasse: [('Bergbezinkleiding', 1)]
+
+PUNT 4 -- klassen.stelseltypen.transport staat op de verkeerde tak
+------------------------------------------------------------------
+  Duiker                             owl:Class=true  instanties=   610 knopen=     0 verbindingen=   610 subklassen=0
+  VrijvervalTransportleiding         owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=3
+  Transportrioolleiding              owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=1
+  VrijvervalLeidingsegment           owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Zinker                             owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  ouders van Duiker: ['Leiding']
+  voorouders van Duiker: ['FysiekObject', 'Leiding']
+  huidig [klassen.stelseltypen] transport: ['Duiker']
+  verbindingen met stelseltype transport: nu 610 verbindingen, na de ingreep 610.
+    erbij: 0   eraf: 0
+  Zinker als extra stelseltype: 0 verbindingen
+
+PUNT 5 -- 'de ontologie kent geen klasse IT-stelsel'
+----------------------------------------------------
+  DIT_riool                          owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  DT_riool                           owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  DrainageInfiltratieTransportStelsel owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Infiltratiestelsel                 owl:Class=true  instanties=    13 knopen=     0 verbindingen=     0 subklassen=1
+  Infiltratiestelsel-objecten in de export: 13
+    hun hasPart-leden: 687 -> [('Infiltratieriool', 340), ('Inspectieput', 329), ('Overstortput', 15), ('Uitlaatconstructie', 3)]
+  Infiltratieriool-verbindingen totaal: 340
+    daarvan lid van een Infiltratiestelsel: 340
+  alle Rioolstelsel-instanties per klasse: [('Vuilwaterstelsel', 57), ('GemengdStelsel', 55), ('Hemelwaterstelsel', 48), ('MechanischRioolstelsel', 35), ('Rioolstelsel', 31), ('Infiltratiestelsel', 13), ('Drukriolering', 5), ('Vacuumriolering', 2)]
+
+PUNT 6 -- klassen.bergbezinkvoorziening: 3 van de Reservoir-subklassen
+----------------------------------------------------------------------
+  Reservoir-afsluiting telt 23 klassen (inclusief Reservoir zelf).
+  huidig: ['Bergbezinkbassin', 'Bergingsbassin', 'Bezinkbassin']
+  niet gedekt (20): ['Bergingsvijver', 'Biofilter', 'Grindkoffer', 'Helofytenfilter', 'IBA', 'IBAKlasseI', 'IBAKlasseII', 'IBAKlasseIIIa', 'IBAKlasseIIIb', 'Infiltratiebassin', 'Infiltratiegreppel', 'Infiltratiereservoir', 'Lavakoffer', 'OpenBerging', 'Reservoir', 'Septictank', 'Steenwolkoffer', 'Wadi', 'Zandkoffer', 'Zuiveringsreservoir']
+  Reservoir-klassen met instanties in De Wolden: geen
+  bergbezinkvoorzieningen: nu 0 knopen, na de ingreep 0.
+    erbij: 0   eraf: 0
+
+PUNT 7a -- klassen.lozings_eindpunt
+-----------------------------------
+  Lozingspunt                        owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=2
+  UitlaatPunt                        owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Uitlaat                            owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Lozingsput                         owl:Class=true  instanties=    55 knopen=    55 verbindingen=     0 subklassen=0
+  Uitlaatconstructie                 owl:Class=true  instanties=   712 knopen=   712 verbindingen=     0 subklassen=2
+  Uitstroombak                       owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  InlaatOppervlaktewater             owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Ontlastput                         owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Beekriool                          owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Overkluizing                       owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=1
+  Beekriool zit al in de afsluiting van Overkluizing: True
+  lozingseindpunten: nu 767 knopen, na de ingreep 767.
+    erbij: 0   eraf: 0
+
+PUNT 7b -- klassen.valconstructie
+---------------------------------
+  Valput                             owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Zandvangput                        owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Wervelput                          owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Werveloverstortput                 owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  VerdieptePut                       owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  Ontlastput                         owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0
+  valconstructies: nu 0 knopen, na de ingreep 0.
+    erbij: 0   eraf: 0
+
+PUNT 7c -- klassen.functieloze_knoop
+------------------------------------
+  huidige afsluiting (13 klassen): ['BlindePut', 'Bochtstuk', 'Kruisstuk', 'LozePut', 'Mof', 'Ontstoppingsstuk', 'Overgangsstuk', 'T_stuk', 'Tubelure', 'Verbindingsstuk', 'Verloopstuk', 'VolgeschuimdePut', 'Y_stuk']
+  Mof                                owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=true
+  Overgangsstuk                      owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=true
+  Verloopstuk                        owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=true
+  Bochtstuk                          owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=true
+  Pendelstuk                         owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=false
+  Zadel                              owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=false
+  Putbuis                            owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=false
+  VolgeschuimdePut                   owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0 al_gedekt=true
+  functieloze knopen: nu 1064 knopen, na de ingreep 1064.
+    erbij: 0   eraf: 0
+
+PUNT 7d -- symbolentabel: de wortelklassen hebben geen symbool
+--------------------------------------------------------------
+  Telling op de exacte klassenaam: de symbolentabel doet geen subklasse-afsluiting.
+  Rioolput                           owl:Class=true  exacte instanties=0
+  Rioolleiding                       owl:Class=true  exacte instanties=0
+  VrijvervalRioolleiding             owl:Class=true  exacte instanties=0
+  Aansluitleiding                    owl:Class=true  exacte instanties=0
+
+BEVINDING -- 'Uitlaat' in klassen.lozings_eindpunt is een stille nul
+--------------------------------------------------------------------
+  ouders van Uitlaat    : ['RepresentatieFysiekObject']
+  voorouders van Uitlaat: ['RepresentatieFysiekObject', 'TopologischElement']
+  Uitlaat in de Knooppunt-afsluiting   : False
+  Uitlaat in de FysiekObject-afsluiting: False
+  Uitlaat                            owl:Class=true  instanties=     0 knopen=     0 verbindingen=     0 subklassen=0

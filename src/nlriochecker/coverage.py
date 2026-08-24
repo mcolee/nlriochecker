@@ -20,6 +20,7 @@ import pandas as pd
 from nlriochecker.analysis import MetingAnalysis, ReportAnalysis
 from nlriochecker.config import CheckMapping, CoverageConfig, MessagePattern
 from nlriochecker.errors import CoverageError
+from nlriochecker.meting import Meetbereik
 from nlriochecker.register import Register
 
 
@@ -149,6 +150,10 @@ class CoverageResult:
     dataset: str
     config: CoverageConfig
     checks: list[CheckCoverage]
+    # Op hoeveel conformiteitsklassen deze dekkinganalyse steunt. Het rapport zet het
+    # boven de tekst: een dekkingclaim die op een deelset rust is minder waard, en
+    # `CoverageResult` draagt zelf geen verwijzing naar de analyse waar hij uit komt.
+    meetbereik: Meetbereik
     discrepanties: list[ShapeDiscrepancy] = field(default_factory=list)
     registercontrole: RegisterCheck | None = None
     ongelijke_meting: list[str] = field(default_factory=list)
@@ -188,6 +193,7 @@ def assess_coverage(
         dataset=analyse.meting.dataset_file,
         config=config,
         checks=checks,
+        meetbereik=analyse.meting.meetbereik,
         discrepanties=discrepanties,
         registercontrole=verify_register(config, register) if register is not None else None,
         ongelijke_meting=_ongelijke_meting(analyses),

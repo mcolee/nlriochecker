@@ -1,6 +1,22 @@
 {
   "enabledPlugins": {
     "python-library-complete@dev-skills": true,
-    "superpowers@claude-plugins-official": true
+    "superpowers@claude-plugins-official": true,
+    "mattpocock-skills@claude-plugins-official": true,
+    "guard-pack@claude-code-hooks": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-code-hooks": {
+      "source": {
+        "source": "github",
+        "repo": "karanb192/claude-code-hooks"
+      }
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff check *)",
+      "Bash(uv run mypy *)"
+    ]
   }
 }

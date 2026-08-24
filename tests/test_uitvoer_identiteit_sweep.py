@@ -66,7 +66,7 @@ def test_alle_broncode_staat_onder_versiebeheer() -> None:
     onder_versiebeheer = {WORTEL / naam for naam in gevolgd}
     op_schijf = {
         pad
-        for patroon in ("*.py", "*.toml", "*.qml")
+        for patroon in ("*.py", "*.toml", "*.qml", "py.typed")
         for pad in (WORTEL / "src").rglob(patroon)
         if "__pycache__" not in pad.parts
     }

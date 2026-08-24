@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from shapely.errors import ShapelyError
 from shapely.geometry import LineString, Point, Polygon
 
 GML_SOORT_PATROON = re.compile(r"<gml:(Point|LineString|Polygon|LinearRing)\b")
@@ -32,7 +33,13 @@ def parse_gml(literal: str) -> Point | LineString | Polygon:
         if soort == "LineString":
             return LineString(coordinaten)
         return Polygon(coordinaten)
-    except (IndexError, ValueError) as error:
+    except (IndexError, ValueError, ShapelyError) as error:
+        # `ShapelyError` hoort er expliciet bij en volgt niet uit `ValueError`: een
+        # lijn met precies een coordinaat laat GEOS zelf struikelen, en die fout erft
+        # niet van ValueError. Zonder deze tak vluchtte hij ongevangen naar buiten en
+        # brak het inlezen van de hele export af op een enkel onleesbaar object --
+        # terwijl het bedoelde gedrag is dat het object in `geometry_errors` belandt
+        # en het rapport erover meldt.
         raise GeometryError(f"onbruikbare {soort}-geometrie: {error}") from error
 
 

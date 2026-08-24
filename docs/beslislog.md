@@ -242,6 +242,8 @@ type `Overstortdrempel`. Waar de drempelgegevens ontbreken meldt de check dat
 expliciet in plaats van nul bevindingen te tonen. Dit bevestigt het openstaande punt
 uit CLAUDE.md: RVZ-002 en RVZ-003 zijn geschrapt omdat de nulmeting ze zou dekken,
 maar er is in deze dataset geen enkele SHACL-vorm en geen enkel object dat ze raakt.
+Die laatste vaststelling heeft de schrapping later ongedaan gemaakt: beide checks zijn
+alsnog gebouwd (zie BO-26). De zin hierboven beschrijft de toestand van voor dat besluit.
 
 **Gevolg voor ADM-007.** 181 van de 273 overstort- en lozingsputten hebben geen
 overstortleiding of -drempel. Dat is geen 181 losse gebreken maar een systematisch
@@ -435,6 +437,14 @@ Engelse tekst zoals GitHub die herkent, `pyproject.toml` draagt de SPDX-expressi
 `EUPL-1.2`, en de README draagt de notitie `Licensed under the EUPL` die artikel 1 van de
 licentie zelf voorschrijft.
 
+**Het checkregister hoort erbij.** `data/checkregister-gwsw-nulmeting-v0_8.md` is eigen
+werk van de auteur, geen overname uit een externe bron. Er rust dus geen vreemd
+auteursrecht op en het valt onder dezelfde EUPL-1.2 als de code. Het register verwijst
+wel naar de GWSW-ontologie en naar de SHACL-vormen van apps.gwsw.nl, maar dat zijn
+verwijzingen, geen overgenomen tekst; de formulering van elke check is van de auteur.
+Dat betekent ook dat het register vrij te wijzigen is: geen externe partij hoeft ermee
+in te stemmen.
+
 **Waarom.** Doel is dat wie dit verbetert die verbetering ook deelt. De afhankelijkheden
 dwingen niets af: alle 28 pakketten zijn permissief (BSD, MIT, Apache, MPL-2.0, PSF), en
 de copyleft die er is — GEOS en libquadmath onder LGPL-2.1, libgfortran onder GPL-3 met
@@ -459,3 +469,1829 @@ bouwen zonder iets terug te geven, en dat is precies wat we niet willen). GPL-3.
 (verworpen: dekt draaien-als-dienst niet, en is niet in het Nederlands rechtsgeldig).
 AGPL-3.0 (verworpen: dekt hetzelfde als de EUPL hier, maar zonder de publieke-sector- en
 taalvoordelen).
+
+### BO-4 Elk uitvoerbestand draagt de package en versie die het schreef
+
+**Wat.** Elk bestand dat deze package oplevert noemt zijn herkomst: `nlriochecker <versie>`.
+Markdown krijgt een cursieve regel direct onder de titel, elke CSV de kolom `Gereedschap`
+op elke rij, en de GeoPackage het veld `gereedschap` in de tabel `gwsw_run`. De string
+komt uit `uitvoer/herkomst.py` en leest het nummer via `__version__`, dus uit de
+packagemetadata; hij staat nergens een tweede keer opgeschreven (zie BO-2).
+
+**Waarom.** De checks veranderen tussen versies. Een bevindingenlijst die een half jaar
+later opduikt is zonder versienummer niet te herleiden tot de logica die hem opleverde:
+of een object toen niet gemeld werd omdat het goed was, of omdat de check nog niet
+bestond, is dan niet meer vast te stellen. Dat is precies de vraag die een nulmeting
+over tijd moet kunnen beantwoorden. De drie uitvoervormen zeggen het met dezelfde string
+uit dezelfde functie, zodat ze niet uit elkaar kunnen lopen — dezelfde reden waarom ze
+al uit een enkele meldingenstroom komen.
+
+**Waarom een kolom en geen commentaarregel in de CSV.** Een `#`-regel bovenaan is
+compacter, maar breekt elke lezer die hem niet verwacht, en `comment="#"` is hier
+bovendien de verkeerde oplossing: de kolommen `ObjectURI` en `Object2URI` bevatten
+GWSW-URI's van de vorm `http://sparql.gwsw.nl/dewolden#knp3437`, en pandas kapt met die
+optie elke regel af vanaf het eerste `#`. Dat zou stilzwijgend alle URI's halveren. Een
+kolom kost herhaling, maar houdt het archief leesbaar voor pandas, Excel en QGIS zonder
+extra opties, zoals `bevindingen.csv` al doet met `RunDatum` en `Dataset`. De vier andere
+CSV's droegen nog geen runmetadata; voor hen is dit de eerste zo'n kolom.
+
+**De grens.** Een CSV zonder rijen krijgt wel de kolomkop maar geen enkele waarde, en
+noemt de versie dus niet. Dat is inherent aan een kolom en niet met een kolom te
+repareren. Het raakt alleen een toets die niets vond; het Markdown-rapport ernaast draagt
+de herkomst dan wel, want die staat in de kop en niet in de rijen.
+
+**Alternatieven.** Een los `herkomst.json` in de uitvoermap (verworpen: raakt los van de
+CSV zodra iemand alleen die CSV doorstuurt, en dan is de herkomst weg). De versie alleen
+in de GeoPackage (verworpen: dan draagt juist het bestand dat het vaakst wordt
+doorgestuurd, de CSV, hem niet).
+
+### BO-5 De poort staat in CI, en mypy hoort erbij
+
+**Wat.** `.github/workflows/toets.yml` draait `ruff check`, `ruff format --check`, `mypy`
+en `pytest` op elke push naar `main` of `dev` en op elke pull request.
+`scripts/uitgave.py` draait dezelfde vier bij een uitgave, en beide draaien sinds BO-38
+ook een dekkingsondergrens. Mypy staat schoon op
+`src/nlriochecker`, met `ignore_missing_imports` omdat rdflib, shapely, geopandas en
+rasterio geen bruikbare stubs leveren.
+
+**Waarom.** De poort bestond al, maar draaide alleen lokaal en alleen bij een uitgave.
+Alles ertussen leunde erop dat iemand eraan dacht. En de typehints waren nooit
+gecontroleerd: mypy vond er bij de eerste run 55 fouten in dertien bestanden, in code die
+volgens `CLAUDE.md` overal hints hoort te hebben.
+
+Drieentwintig van die 55 kwamen uit een enkele oorzaak: `CheckContext.cached()` gaf
+`object` terug, waardoor elke check die er een structuur uithaalde zijn type kwijtraakte.
+Die functie is generiek gemaakt; de rest bleek versmallingsgrenzen (een geometrie die
+`| None` is terwijl de bouwer er al op gefilterd heeft) en een handvol `set[str | None]`
+die met `.discard(None)` werd opgeschoond in plaats van meteen goed opgebouwd. Geen van de
+55 was een echt defect, maar dat was vooraf niet vast te stellen -- en dat is het punt.
+
+**De ondergrens op geslaagde tests.** `data/` staat buiten versiebeheer: de OroX-export en
+de GIS-bronnen beslaan gigabytes. Een schone kloon slaat de tests die erop leunen dus over
+en leest groen. Gemeten bij het inrichten: met de volledige `data/` en PyQGIS erbij slagen
+er lokaal 711; zonder `data/` zakt dat naar 490 met drie fouten. De eerste groene CI-run gaf
+673 geslaagd en 33 overgeslagen -- die runner mist zowel de niet-getrackte data als PyQGIS.
+CI zet daarom `NLRIOCHECKER_MIN_GESLAAGD=650`; `tests/conftest.py` laat de run vallen als er
+minder slagen.
+
+Wees precies over wat die grens doet: hij merkt een ontbrekende `data/` *niet* op, want 673
+ligt er ruim boven -- dat is de normale toestand in CI. Hij vangt het wegvallen van meer dan
+die bekende overslagen, bijvoorbeeld een fixturemap die niet meekomt of een importfout die
+een heel testbestand laat overslaan. Zonder grens zou zoiets als "alles groen" lezen.
+
+Deze aantallen verouderen bij elke nieuwe test. Ze staan hier als ijkpunt, niet als
+contract; de grens hoort onder het CI-aantal te blijven en mag meegroeien.
+
+**Wat er niet onder valt.** Mypy kijkt naar `src/nlriochecker`, niet naar `scripts/` en
+`tests/`; daar staan samen nog negentien meldingen. En `disallow_untyped_defs` staat uit:
+met die vlag erbij zijn het 67 meldingen in vijftien bestanden, met `cli.py` (16) en
+`checks/extern.py` (9) voorop, niet de twee bestanden die je zou verwachten. Het annoteren
+van die parameters trekt hun lichamen alsnog de controle in; dat is een eigen ronde waard.
+Wel al schoon: `mypy --check-untyped-defs`, dus de nul is sterker dan alleen de
+geannoteerde functies.
+
+**Alternatieven.** Mypy meteen in strikte modus (verworpen: zie hierboven; een poort die je
+op dag een op 67 meldingen zet, wordt een poort die je uitzet). De data in de repository zetten met git-lfs (verworpen: gigabytes, en
+de brondata is niet van ons om te verspreiden). CI zonder ondergrens (verworpen: dat is
+de gevaarlijkste variant, want hij geeft vertrouwen dat hij niet verdient).
+
+### BO-6 Twee beveiligingsmeldingen die blijven staan
+
+**Wat.** Bandit meldt twaalf punten op `src/`. Ze blijven alle twaalf staan, met deze
+onderbouwing; `pip-audit` is schoon.
+
+**B608, negen keer: SQL uit een f-string.** In `studiegebied.py` en `uitvoer/gpkg.py`
+worden tabel- en kolomnamen geinterpoleerd, want SQLite laat identifiers niet als
+parameter toe. Alle *waarden* gaan wel als parameter mee, en de identifiers gaan door
+`_escape()`, dat aanhalingstekens verdubbelt -- de manier die SQLite daarvoor kent. De
+enige identifier die van buiten komt is de laagnaam uit `--studiegebied-laag`; de rest
+zijn constanten uit onze eigen kolomdefinities.
+
+**B301/B403, drie keer: pickle.** De datasetcache in `~/.cache/nlriochecker` wordt door
+dit gereedschap zelf geschreven en teruggelezen. Wie daar een vijandig bestand kan
+neerzetten, kan ook gewoon code in de venv zetten; de cache voegt geen aanvalsvlak toe dat
+er niet al was. Een rdflib-`Graph` is bovendien niet zonder verlies in een veiliger
+formaat te bewaren, en dat was de hele reden voor de cache. De sleutel bevat de broncode
+van de lader, dus een cache van een andere versie wordt nooit gelezen.
+
+**Waarom niet onderdrukken.** Geen `# nosec` en geen bandit-configuratie: de meldingen
+zijn juist, alleen niet van toepassing. Ze wegdrukken zou de volgende scan schoon laten
+lijken zonder dat iemand de afweging nog ziet. Bandit draait niet in CI; wie hem draait,
+leest dit.
+
+
+### BO-7 De CFK-eis is versoepeld, maar elke afwijking is luid
+
+**Wat.** Het checkregister v0.8 eist dat de dataset aan alle conformiteitsklassen
+getoetst is: Hyd, MdsPlan en MdsProj. `--cfk` laat een run op een deelverzameling toe.
+
+**Waarom.** De harde eis is goed voor een oplevering, maar hij blokkeert werk dat er
+onderweg wel is: een tussentijdse meting waarbij nog niet alle drie de rapporten
+getrokken zijn, of een gerichte controle op een enkele klasse. Zonder uitweg gaan
+mensen om de pijplijn heen werken, en dan is er geen markering meer.
+
+**De voorwaarde.** De versoepeling geldt alleen onder twee eisen, en die zijn niet
+optioneel gemaakt:
+
+1. De afwijking is **expliciet**. Zonder `--cfk` verandert er niets: alle drie vereist,
+   en een ontbrekend rapport faalt. Er is geen configuratie die de standaard verzet.
+2. De afwijking is **zichtbaar in elke uitvoervorm die hem kan dragen**. Een
+   waarschuwingsregel boven elk Markdown-rapport, `cfk_set` en `volledig` in `gwsw_run`
+   en in de JSON-envelop. De tekst komt uit `Meetbereik.markering()` en niet uit een
+   schrijver, zodat geen twee uitvoervormen iets anders over dezelfde run kunnen zeggen;
+   `tests/test_uitvoer_herkomst.py` legt die overeenstemming vast.
+
+   **De CSV draagt hem bewust niet**, en dat is een erkend gat. De opdracht schrijft
+   voor: geen extra kolom per rij, want de CFK-set hoort bij de run en niet bij de
+   melding. Gevolg: `bevindingen.csv` uit een volle run en uit een `--cfk Hyd`-run
+   verschillen alleen in `TyperingBetrouwbaar`. Wie die twee in Excel naast elkaar legt
+   -- precies de doelgroep van dat bestand -- kan "de typering is verbeterd" lezen
+   terwijl er alleen minder gemeten is. `dekking.csv` en `geaggregeerde_meldingen.csv`
+   ontsnappen hieraan omdat zij een `CFK`-kolom per rij dragen. Een kolom `CfkSet` plus
+   `Volledig` in `bevindingen.csv` zou het dichten; dat is een wijziging van het
+   uitvoerformaat en daarmee een aparte beslissing.
+
+Daarbij hoort dat een rapport voor een niet-gekozen klasse een fout is en geen stille
+overslag: wie op Hyd toetst en per ongeluk alle drie de bestanden meegeeft, moet dat
+horen. Anders meldt de markering "MdsProj ontbreekt" terwijl het bestand er lag.
+
+**Een derde toestand.** `toets` kan zonder `--shacl` draaien; dan is er geen meting.
+Dat is niet hetzelfde als een deelset, want een deelset beweert dat er iets gemeten is.
+`Meetbereik` kent daarom drie toestanden en de markering drie teksten. Dat volgt de
+werkafspraak dat wat een check niet bekeken heeft in het rapport hoort: stilte leest als
+"alles gecontroleerd".
+
+**Geen forceer-vlag bij `vergelijk`.** Twee meetmomenten met ongelijke CFK-sets worden
+geweigerd. Een daling in het aantal meldingen die uit een kleinere getoetste set komt is
+geen verbetering, en een trendrapport dat hem als vooruitgang toont is onjuist, niet
+onzeker. Wie beide momenten wil vergelijken, toetst ze op dezelfde set.
+
+### BO-8 Het JSON-schema is een contract met een eigen versienummer
+
+**Wat.** `toets` schrijft `bevindingen.json`: de volledige meldingenstroom met een
+envelop. `schema_versie` begint op `"1.0"` en staat los van het versienummer van de
+package. Het contract staat in `docs/json-schema.md`.
+
+**Waarom een eigen nummer.** De afnemer is een nog te bouwen package die er
+Kikker/BrutIS-mutaties uit afleidt. Die pint op het formaat, niet op onze checks. Elke
+patchuitgave van `nlriochecker` verandert bevindingen; het formaat hoeft daar niet in mee
+te gaan. Zouden ze samenvallen, dan zegt een versiebump niets meer over of de afnemer
+werk heeft.
+
+**De regel.** Nieuwe optionele velden mogen binnen een hoofdversie. Een verwijderd of
+hernoemd veld, een gewijzigd type, een gewijzigde betekenis of een andere structuur
+verhoogt het hoofdnummer. Een afnemer op `1.x` mag onbekende velden negeren en mag niet
+aannemen dat `2.0` leesbaar blijft.
+
+**Fase B is buiten scope.** Het veld `voorstel` (veld, huidige waarde, voorgestelde
+waarde per melding) is gereserveerd en gedocumenteerd, maar wordt **niet geschreven** --
+ook niet als `null`. Het importformaat van Kikker en BrutIS is nog niet gespecificeerd,
+en een altijd-lege sleutel zou een belofte zijn die het schema nog niet waarmaakt.
+Toevoegen kan later binnen 1.x.
+
+**Twee drifttests.** `docs/json-schema.md` is een tweede plek waar de veldnamen staan, en
+een afnemer programmeert daartegen. Twee tests houden het document aan de code vast: elk
+veld van `Melding` moet erin beschreven zijn, en het voorbeeld moet de geschreven
+`SCHEMA_VERSIE` noemen. Zonder die tests wordt het contract stil onvolledig zodra
+`Melding` een veld krijgt -- en dat valt niemand op, want het bestand zelf klopt wel.
+
+### BO-9 `analyseer` schrijft geen JSON
+
+**Wat.** De opdracht noemde `toets` én `analyseer` als schrijvers van de JSON-export.
+Alleen `toets` doet het.
+
+**Waarom.** Diezelfde opdracht eist dat de inhoud uitsluitend uit de meldingenstroom
+komt en dat er geen pad bestaat waarlangs een schrijver zelf een `Finding` interpreteert.
+Op `analyseer` zijn die twee eisen niet tegelijk waar te maken: dat commando analyseert
+SHACL-nulmetingrapporten en kent geen `CheckRun`, dus geen `Melding`.
+
+**De afgewogen alternatieven.** Een tweede schema voor `analyseer` zou een tweede
+contract met een eigen versielijn zijn, terwijl het doel juist één stabiel contract is.
+Dezelfde envelop met een lege meldingenlijst zou "nul meldingen" zeggen terwijl de
+nulmeting er duizenden telt -- een bestand dat aantoonbaar het verkeerde beweert.
+
+**Gevolg.** `--geen-json` staat alleen op `toets`. Wie de SHACL-analyse machineleesbaar
+wil, heeft `geaggregeerde_meldingen.csv`.
+
+### BO-10 `[nulmeting] vereiste_cfk` is verplicht geworden
+
+**Wat.** `NulmetingOptions.vereiste_cfk` had een pydantic-default
+`["Hyd", "MdsPlan", "MdsProj"]`, en `CheckConfig.nulmeting` een `default_factory`. Beide
+zijn verwijderd; een projectconfig zonder de sectie faalt nu met een `ConfigError`.
+
+**Waarom.** De domeinregel is dat de lijst in `checks.toml` staat en niet in de code. Die
+default schreef hem een tweede keer op, en een config die de sectie miste viel er
+onzichtbaar op terug. Sinds `--cfk` weegt dat zwaarder: diezelfde lijst bepaalt nu ook
+welke klassen die optie accepteert. Een project waarvan de GWSW-server andere klassen
+aanbiedt, zou met een onvolledige config stilzwijgend de verkeerde geaccepteerd zien.
+
+**Waarom dit veilig kon.** Niemand construeert `CheckConfig` of `NulmetingOptions`
+rechtstreeks; alles loopt via `load_check_config()`. `klassen: ClassRoots` was al
+verplicht zonder default, dus dit volgt een bestaand patroon. Vijf minimale testconfigs
+die een geslaagde load verwachten dragen de sectie nu; de vier ongeldige-configgevallen
+hadden hem niet nodig, want pydantic rapporteert alle fouten en die tests zoeken een
+substring.
+
+### BO-11 Een object op een gebiedsgrens telt in elk rakend gebied mee
+
+**Wat.** Rapporteert `toets` per studiegebied-feature, dan wordt er tussen gebieden niet
+ontdubbeld. `StudyArea.bevat` gebruikt `intersects`, dus een streng die de grens tussen
+twee buurten kruist verschijnt in de uitvoer van allebei. De totaalsynthese telt de
+unieke meldingen en zegt er expliciet bij hoeveel er in meer dan een gebied voorkomen.
+
+**Waarom.** Elk gebied moet zijn eigen volledige werkelijkheid tonen: wie het rapport van
+een buurt leest, ziet alle bevindingen die die buurt raken, ook die op de rand. Het
+alternatief -- elk object aan precies een gebied toewijzen -- vraagt een regel (het gebied
+waarin het zwaartepunt ligt? het eerste gebied in het bestand?) die op de grens altijd
+willekeurig is, en dan mist een van de twee buurten een bevinding die er wel degelijk
+ligt. Dat is de duurdere fout.
+
+**Wat dat vraagt.** `melding_id` mag het gebied niet bevatten, anders is hetzelfde defect
+in twee buurten niet als een defect te herkennen en telt de synthese het dubbel.
+`uitvoer/identiteit.py` bouwt de ID uit check, objecten en detailsleutels; het gebied zit
+er niet in en `tests/test_uitvoer_identiteit.py` legt dat vast op de handtekening, zodat
+het er niet ongemerkt bij komt.
+
+**Gevolg dat je moet kennen.** De som van de meldingen per gebied is hoger dan het aantal
+unieke meldingen. `totaal/synthese.md` noemt beide getallen en het verschil;
+`totaal/bevindingen.csv` en `totaal/bevindingen.json` bevatten de unieke meldingen,
+waarbij een grensmelding het gebied van zijn eerste voorkomen bij oplopende gebiedsnaam
+draagt.
+
+### BO-12 Hybride uitvoeringsmodel: een keer laden, per gebied toetsen
+
+**Wat.** `toetsloop.toets_gebieden` laadt niets zelf. De dataset en de ontologie worden
+een keer geladen, daarna bouwt de loop per gebied een eigen analyseset met de bestaande
+`bouw_analyseset`. Twee structuren worden over de gebieden heen gedeeld: de ruimtelijke
+index (`shapely.STRtree`) over alle objectgeometrieen, en de samenhangende
+vrijvervalcomponenten van het volledige net (`GedeeldeIndex`). Daarnaast wordt de
+volledige-export-`CheckContext` een keer gebouwd en aan elke gebiedscontext meegegeven.
+
+**Waarom.** Het laden van de De Wolden-export kost ruim drie minuten en circa 3 GB; de
+referentiecasus telt 80+ buurten. Tachtig keer laden is uitgesloten, en tachtig keer de
+componentgraaf en de datakarakteristiek van de volledige export herrekenen ook.
+
+**De harde eis eronder.** De meldingen per gebied moeten gelijk zijn aan die van een
+losse run met alleen dat gebied. Elke optimalisatie is daarop getoetst:
+
+- De STRtree levert alleen *kandidaten* op omhullende; het oordeel blijft `area.bevat`.
+  Een omhullende-query is per constructie een superset van de snijdende geometrieen, dus
+  de uitkomst kan niet verschillen -- ook niet bij de ongeldige geometrieen die deze
+  datasets bevatten (TOP-016), waar een voorbereid predicaat anders zou kunnen beslissen
+  dan `intersects` zelf.
+- De componentstructuur werd al over de volledige dataset berekend; alleen de vraag welke
+  component de kern raakt hangt van het gebied af, en die blijft per gebied.
+- De gedeelde volledige-export-context hangt af van de volledige dataset, de config en de
+  onbetrouwbare objecten. Alle drie zijn gebiedsonafhankelijk. Wat aan de uitgedunde
+  dataset van een gebied hangt -- de topologie-index, de netwerkgraaf -- wordt nooit
+  gedeeld; elke gebiedscontext krijgt een lege cache.
+
+`tests/test_toetsloop.py` toetst de equivalentie per gebied, en
+`tests/test_afbakening.py` de gedeelde index tegen de directe route.
+
+### BO-13 De CRS-heuristiek voor GeoJSON, en waarom de fixtures hun stelsel noemen
+
+**Wat.** Een GeoPackage draagt zijn `srs_id` en wordt daarop getoetst. GeoJSON kent
+formeel alleen WGS84 (RFC 7946), dus daar geldt: een legacy `crs`-member die EPSG:28992
+noemt is afdoende, en anders moeten alle coordinaten binnen de RD-grenzen vallen. Die
+grenzen komen uit `[drempels] rd_x_min` en verder in de projectconfiguratie -- dezelfde
+waarden die TOP-009 gebruikt, geen tweede plek. Wie `load_studiegebieden` zonder grenzen
+aanroept, krijgt de heuristiek niet: zonder grenzen is er geen oordeel te vellen, en een
+verzonnen grens is erger dan geen.
+
+**Waarom een harde fout.** Een studiegebiedbestand in WGS84 snijdt niets uit de
+RD-dataset. Zonder deze toets levert dat geen foutmelding maar een leeg gebied, en dat
+leest als "geen bevindingen".
+
+**De fixtures.** Elke GeoJSON-fixture in deze repository ligt op lokale coordinaten rond
+(1000, 2000) -- ver buiten de RD-grenzen, net als de TTL-fixtures, die datzelfde
+assenstelsel voor RD laten doorgaan. Ze hebben daarom de `crs`-member gekregen die de
+heuristiek accepteert. Dat is een wijziging in de fixturebestanden en niet in de tests:
+geen enkele testregel is ervoor aangepast, en de fixtures zeggen nu expliciet wat ze
+altijd al beweerden.
+
+### BO-14 De lokaal/contextueel-optimalisatie is uitgesteld, niet vergeten
+
+**Wat.** Lokale checks (attributen, hoogten) geven voor hetzelfde object dezelfde
+bevinding, ongeacht welke subset eromheen zit. Ze zouden bij een run over tachtig buurten
+een keer over de unie kunnen draaien in plaats van tachtig keer per gebied. Dat is
+bewust *niet* gebouwd.
+
+**Waarom niet.** Het vraagt een classificatie lokaal/contextueel per check, en een fout
+in die classificatie breekt de equivalentiegarantie uit BO-12 stilzwijgend: een check die
+ten onrechte als lokaal geldt, mist de context van het gebied en meldt te veel of te
+weinig, zonder dat iets afwijkt behalve de uitkomst. De winst is bovendien onbekend
+zolang er niet gemeten is.
+
+**Waar de meting vandaan komt.** De voortgangsfasen dragen de gebiedsnaam (`Checks
+<naam>`), en `tests/test_integration.py::test_schaal_tachtig_buurten` logt de duur van een
+80-buurtenrun. Pas als die meting laat zien dat de checkfase de post is die telt, is deze
+optimalisatie de moeite en het risico waard.
+
+**Eerste meting (18 augustus 2026).** Op de volledige De Wolden-export, met de
+Koekangerveld-omhullende in 80 stroken en TOP-001 als enige check: **2,7 seconden** voor
+alle tachtig gebieden samen, tegen ruim twee en een halve minuut voor het inlezen van de
+dataset. De post die telt is dus het laden, en dat gebeurt al maar een keer. Deze meting
+is niet het hele verhaal -- met de volle checkset en echte buurten (groter, meer objecten
+per gebied) loopt de checkfase op -- maar ze laat wel zien dat er op dit moment geen
+aanleiding is om de equivalentiegarantie op het spel te zetten. Herhaal de meting op een
+echt 80-buurtenbestand met alle checks voordat je BO-14 heroverweegt.
+
+### BO-15 Een gebied zonder GWSW-objecten stopt een meervoudige run niet
+
+**Wat.** Bij een run over meerdere studiegebied-features levert een gebied zonder enkele
+put en zonder enkele streng een gewone uitvoer op met nul bevindingen, met een expliciete
+regel in zijn eigen rapport ("Geen objecten in dit gebied") en een vermelding in de
+totaalsynthese. Bij een run op een enkel gebied blijft het een harde fout, met dezelfde
+melding als voorheen. `CheckRun.beperk_tot_studiegebied` heeft daarvoor het keyword
+`leeg_toegestaan`; de toetsloop zet het alleen bij meerdere gebieden.
+
+**Waarom.** Een CBS-buurtenbestand van een plattelandsgemeente bevat betrouwbaar buurten
+zonder vrijvervalriolering: water, natuur, een bedrijventerrein op eigen beheer. De
+schaaltest op 80 gegenereerde buurten liep hier ook op vast. Een hele run van uren laten
+sneuvelen op de eerste zo'n buurt maakt de functie onbruikbaar voor precies het geval
+waarvoor hij gebouwd is. Bij een enkel gebied is een leeg gebied juist bijna altijd een
+verkeerd bestand of een verkeerde laagkeuze, en daar blijft de fout dus staan.
+
+**Waarom niet stil.** Nul bevindingen leest als "hier is alles in orde". Daarom staat het
+in het rapport van het gebied zelf en in de synthese, in de geest van de regel dat wat
+niet bekeken is in het rapport hoort.
+
+### BO-16 De mapnaam `totaal` is gereserveerd
+
+**Wat.** Een gebiedsnaam die na sanering `totaal` oplevert, is een harde fout bij het
+lezen van het gebiedsbestand.
+
+**Waarom.** `totaal/` is de submap met de synthese en de unieke meldingen. Een buurt die
+"Totaal" heet zou erin schrijven, waarna de synthesestap de CSV en de JSON van die buurt
+overschrijft en er een map achterblijft die er compleet uitziet. Dat is stille corruptie;
+de bestaande botsingscontrole tussen twee gebiedsnamen zag hem niet, want de tweede naam
+is geen gebied. De constante staat in `studiegebied.py` en de uitvoerlaag leest hem daar,
+zodat de reservering en het gebruik niet uit elkaar kunnen lopen.
+
+### BO-17 De twee EXT-lagen volgen de meldingen, en erven hun beperkingen
+
+**Wat.** De GeoPackage-lagen `bouwwerken` (EXT-001) en `waterdelen_zonder_zinker`
+(EXT-003) worden uitsluitend gevuld door de meldingen van die uitvoer te joinen op het
+trefferregister van de run (`checks/treffers.py`). De schrijver bevraagt geen externe
+bron en doet geen ruimtelijke selectie.
+
+**Waarom.** Een tweede pad naar dezelfde vraag is een tweede antwoord. Zou
+`uitvoer/gpkg.py` zelf de BGT bevragen, dan kan de laag panden tonen waar geen melding
+over gaat, of andersom -- en dan is niet meer te zeggen welk van beide de uitslag is.
+Nu is de laag per constructie de verzameling unieke `object2_uri`'s van die check, en
+de kerntest in `tests/test_uitvoer_gpkg.py` legt precies dat vast. Bij rapportage per
+gebied volgt het juiste gedrag er gratis uit: per gebied de treffers van dát gebied.
+
+**Twee beperkingen die bewust meekomen.** EXT-001 meldt per streng of put alleen het
+sterkste bouwwerk (`_sterkste`); een object dat twee panden raakt levert dus één pand
+in de laag. `_WatergangKruising.kruisingen()` breekt af na het eerste gevonden
+waterdeel per streng; een streng die er twee kruist levert er één, en welke hangt van
+de volgorde af. Beide zijn niet gerepareerd: dat zou meldingaantallen, rapporten en
+trendvergelijkingen wijzigen, en dat is een eigen beslissing met een eigen ronde.
+
+**De verruiming als benoemde optie.** Alle geraakte objecten melden in plaats van
+alleen het sterkste (en het eerste) is de voor de hand liggende volgende stap. Hij
+staat niet gepland; wie hem oppakt, moet weten dat de meldingaantallen erdoor
+veranderen en dat elke trendvergelijking over die grens heen breekt.
+
+### BO-18 De sleutel van een extern object, met een geometriehash als terugval
+
+**Wat.** `object2_uri` van een EXT-melding is `bgt:pand/<id>`, `bag:pand/<id>`,
+`bgt:bouwwerk/<id>` of `bgt:waterdeel/<id>`. De `<id>` komt uit de eerste gevulde
+kolom van `lokaal_id`, `identificatie`, `id` -- gemeten op `data/gis` én op de
+fixtures: de BGT-lagen dragen `lokaal_id`, de BAG-laag `identificatie`, en beide
+daarnaast een `id`. Draagt een bron geen van drieën, dan wordt de sleutel
+`geo:<eerste 12 hex van sha256 over de WKB>`, met een notitie in de checkuitkomst.
+
+**Waarom geen harde fout bij een ontbrekend ID.** Externe data is context, geen poort
+(BC-1). Een bron zonder identificatie is nog steeds bruikbaar; alleen is de sleutel
+dan gevoelig voor een wijziging in de geometrie, en dat hoort de lezer te weten.
+Vandaar de notitie in plaats van een uitzondering.
+
+**Waarom de geometrie en niet de rij-index.** Een index is niet stabiel over exports
+en zegt niets als de bron opnieuw getrokken wordt. De hash over de WKB is stabiel
+zolang de geometrie dat is, en ontdubbelt twee bestanden met hetzelfde object -- wat
+hier precies de bedoeling is.
+
+**Waarom de geometrie niet in de melding zit.** Een polygoon in `Finding.details` zou
+in de CSV en de JSON als WKB terechtkomen. De geometrie gaat daarom via het
+trefferregister naar de GeoPackage; de JSON draagt alleen de sleutel en het label.
+
+### BO-19 De dekkingspoort meet tegen het bereik van de bronnen
+
+**Wat.** Bij het laden van de externe bronnen wordt elke aangeleverde laag, plus het
+AHN-raster, getoetst op dekking van de omhullende van `bronnen.studiegebied`. De
+vectorlagen krijgen daar de grootste EXT-zoekafstand bij (`ext_zoekafstand_max_m`, in
+de standaardconfig 10 m); het raster niet, want bemonsteren is puntsgewijs. Een tekort
+groter dan `[bronnen] dekking_tolerantie_m` (standaard 0) is een `ExternalDataError`
+die per falende bron beide omhullenden en het tekort per zijde noemt. Geen
+forceer-vlag.
+
+**Waarom een harde fout, terwijl externe data "context, geen poort" is.** Die
+filosofie (BC-1, BC-2) gaat over *ontbrekende* data: een check die zijn bron mist,
+meldt dat en geeft geen uitslag. Deze poort gaat over *aangeleverde maar te kleine*
+data. Daar is de faalwijze omgekeerd: de check draait, vindt niets, en dat leest als
+"geen probleem" terwijl de bron er domweg niet was. Stil falen is hier het gevaar, en
+een waarschuwing in een rapport dat verder schoon oogt is niet genoeg.
+
+**Waarom `bronnen.studiegebied` als referentie en niet het studiegebied van de run.**
+Het masterdocument stelde de unie van de studiegebied-features voor. Dat de bronnen
+maar een deel van de GWSW-dataset dekken is in dit project echter normaal en al
+eerlijk afgevangen: objecten buiten het bereik krijgen de status *buiten studiegebied*
+en worden geteld (BC-2). Wat overblijft is een laag die kleiner is dan het gebied
+waarvoor je hem geldig verklaart, en dat gebied is precies `bronnen.studiegebied`.
+Bijkomend voordeel: de poort blijft binnen `load_external_data`, zonder nieuwe
+parameter en zonder volgorde-afspraak in de CLI die iemand later kan omdraaien.
+Nadeel dat je moet kennen: dekt het bereik zelf maar de helft van je studiegebied, dan
+zegt deze poort daar niets over -- de per-objectnotities doen dat.
+
+**Waarom een instelbare tolerantie.** De omhullende van een laag is die van zijn
+*features*. Een dunne laag met een lege rand is niet te onderscheiden van een
+afgeknipt extract. Gemeten op de eigen bronnen van dit project: het AHN-raster komt
+0,3 m tekort (afrondingsruis van de uitsnede) en `bgt_bouwwerk` 276 m (52 objecten die
+aan de oostkant ophouden). Elke drempel daartussen is een keuze en geen meting, en die
+keuze hoort in de projectconfiguratie. De standaard is 0, dus streng; voor `data/gis`
+is ongeveer 300 m nodig.
+
+**Wat deze poort niet kan.** Bbox-dekking is noodzakelijk maar niet voldoende: een gat
+midden in het extract valt er niet mee op. Dat staat in de docstring, en er is een
+test die het vastlegt (`test_gat_middenin_slaagt`) zodat de belofte niet stilletjes
+groter wordt dan de meting.
+
+**Overwogen en niet gedaan:** een raster een pixelmaat speling geven in plaats van de
+gewone tolerantie. Het AHN-raster komt 0,3 m tekort door afronding van de uitsnede, en
+een halve cel is daar een natuurlijker maat voor dan een drempel in meters. Het is niet
+gebouwd: het zou een tweede drempelbegrip introduceren voor precies één bron, terwijl de
+bestaande tolerantie het geval al afvangt. Wie het alsnog wil, heeft aan de celgrootte
+uit `RasterSampler` genoeg.
+
+**Gevolg voor de meldingidentiteit.** Nu EXT-001 en EXT-003 hun `object2_uri` vullen,
+verschuift hun `melding_id` eenmalig -- die hash bevat dat veld. Een trendvergelijking
+over die grens heen laat de meldingen als opgelost plus nieuw zien. Dat staat in het
+wijzigingslog en in `docs/json-schema.md`; het alternatief (het veld buiten de hash
+houden) zou twee meldingen over verschillende panden dezelfde identiteit geven.
+
+### BO-20 De klassenselecties staan op een plek, met de GWSW-naam waar die bestaat
+
+**Wat.** Elke rol waarop de checks selecteren -- netwerkknopen, putten, leidingen,
+vrijvervalrioolleidingen en tien andere -- heeft een functie in
+`src/nlriochecker/checks/selectie.py` en cachet daar onder `sel:<rolnaam>`. De
+generieke ingang `verbanden.objecten_van_klassen` is verwijderd. De begrippen staan in
+[CONTEXT.md](../CONTEXT.md).
+
+**Waarom.** Dezelfde selectie werd op zes plaatsen opgebouwd. `netwerkknopen` had drie
+cachesleutels (`adm:putten`, `hgt:putten`, `ext:putten`) plus een ongecachete aanroep
+plus twee met de hand overgeschreven comprehensions; `vrijvervalleiding` idem.
+`dataset.of_class` doet per wortelklasse een volledige doorloop over knopen en strengen
+en wordt niet gememoiseerd, en `netwerkknopen` telt elf wortelklassen. Dat waren dus
+tientallen doorlopen waar er elf nodig zijn, en evenveel kopieen van dezelfde lijst in
+geheugen op een dataset van 3 GB.
+
+**Waarom een module en geen methoden op `CheckContext`.** `context.putten()` leest
+beter, maar `objecten_van_klassen` woonde in `verbanden.py` en dat importeert
+`base.py`. Methoden zouden de implementatie naar `base.py` trekken, en dat bestand is
+al de knoop waar elke checkmodule op leunt. Een module met functies die de context als
+parameter nemen volgt bovendien het patroon dat `verbanden.aansluitingen(context)` al
+had.
+
+**Waarom de GWSW-naam.** De oude helper `_strengen` selecteerde `gwsw:Leiding`, en dat
+is een verkeerd woord: `gwsw:Streng` bestaat niet en `gwsw:Rioolstreng` is iets anders
+(de NEN 3300-aanduiding voor de riolering tussen twee putmiddelpunten). Waar een klasse
+de rol dekt draagt de functie die klassenaam, ook als hij lang is
+(`vrijvervalrioolleidingen`). Waar geen klasse de rol dekt is de naam een rolnaam en
+zegt de docstring dat erbij. Bij `netwerkknopen` uitdrukkelijk: `gwsw:Knooppunt`
+bestaat wel, maar is de orientatie en niet het object, dus die naam zou de ontologie
+verkeerd citeren. Alle 22 wortelklassen uit `checks.toml` zijn tegen
+`Ontologie_GWSW_Totaal.ttl` nagelopen en bestaan letterlijk.
+
+**Waarom geen generieke ingang.** Een opzoeking op naam
+(`selecteer(context, "putten")`) zou de vijftien functies overbodig maken. Precies zo'n
+ingang bestond al -- `objecten_van_klassen` stond klaar -- en dat is hoe elke
+checkmodule aan zijn eigen variant kwam. Een nieuwe rol kost nu een sleutel in
+`[klassen]` en een functie; dat is een regel meer werk en het houdt de seam heel. Om
+dezelfde reden is de naam-naar-functietabel in de module privé (`_ROLLEN`) en bestaat
+hij alleen zodat de tests kunnen bewaken dat geen rol uitsluitend op een lege
+verzameling getoetst wordt.
+
+**Wat er niet in zit, en waarom dat geen vergeetachtigheid is.** Drie plekken krijgen
+de rol als *gegeven* mee, via `getattr(context.config.klassen, rol)`:
+`verbanden._bouw_aansluitingen` (aangeroepen met `"streng"` en `"vrijvervalleiding"`),
+`netwerk._eindpunten` (met `"afvoer_eindpunt"` en `"lozings_eindpunt"`) en de
+`stelselrol` van de NET-checks (met `"vuilwater"` en `"hemelwater"`). Daar is de rol
+een variabele, en een benoemde functie kan die niet bedienen zonder de opzoeking op
+naam die hierboven juist verworpen is. Ze bouwen dus nog steeds hun eigen selectie.
+Buiten de checklaag geldt hetzelfde voor `afbakening.py`, `analysis.py`,
+`uitvoer/synthese.py` en `uitvoer/gpkg.py`: die hebben geen `CheckContext` en dus geen
+cache om in te hangen. Ze horen bij de uitvoerlaag en gaan mee met de eerstvolgende
+verbouwing daarvan. De belofte "de selecties staan op een plek" geldt dus voor de
+vaste rollen in de checklaag, en niet verder.
+
+**Hoe is vastgesteld dat er niets verschoof.** Een volledige run op De Wolden (23.485
+knooppunten, 23.440 strengen, 35.975 bevindingen over 86 checks) voor en na de reeks
+levert een byte-identieke `bevindingen.csv` en `bevindingen.json` op.
+`tests/test_checks_selectie.py` legt daarnaast per rol de aantallen vast op het
+Juinen-voorbeeld en op een fixture die alle rollen dekt, met de deelverzamelingsrelatie
+tussen `putten` en `netwerkknopen` er expliciet bij -- dat is de verwisseling die deze
+verbouwing had kunnen maken.
+
+**Verworpen alternatieven.** De configuratiesleutels meehernoemen (`[klassen] streng`
+naar `leiding`): dat maakt de laag consistent maar breekt bestaande projectconfiguraties
+voor iets wat los staat van de duplicatie; `extra="forbid"` in de pydantic-modellen
+zorgt wel dat zo'n breuk hard faalt en niet stil, dus het kan later alsnog. Een sweep
+over de 448 keer "streng" in `src/`: dat is een andere verbouwing, en hij zou het bewijs
+hierboven onleesbaar maken omdat elke rapportregel verandert.
+
+### BO-21 De toetsrun is een module, en de opdrachtregel een adapter
+
+**Wat.** `toetsrun.py` voert een toets uit: `Toetsopdracht` (paden en vlaggen) in,
+`Toetsuitslag` uit. De module laadt, bewaakt de volgorde, toetst, schrijft en levert
+met `regels()` het verhaal dat de gebruiker te zien krijgt. `cli.py` bouwt de
+opdracht, roept aan en echoot; hij houdt alleen nog `_BalkVoortgang`, de click-kant
+van het voortgangsprotocol. Alleen `toets` is omgezet -- `analyseer`, `dekking` en
+`vergelijk` waren al dunne adapters van vijf tot acht statements zonder
+domeinbeslissingen onderweg.
+
+**Waarom.** De beslissingen in `check_command` waren geen presentatiekeuzes. De
+volgorde (valideer de keuzes, de gebieden en de bronnen vóór je drie minuten en 3 GB
+aan dataset laadt), de typeringspoort met haar drie samenhangende uitkomsten, en de
+dekkingspoort op de bronnen zijn domeinregels. Ze stonden in privéfuncties van een
+click-commando, en daarmee was `CliRunner` de enige seam om ze te bereiken:
+`test_cli.py` telde 899 regels en 38 invokes, waarvan er veertien niets over de
+opdrachtregel zeiden.
+
+**Waarom de zinnen meegaan.** Het lag voor de hand om alleen data terug te geven en
+de CLI de tekst te laten maken. Maar de tekst velt oordelen -- dat het net binnen een
+gebied met vrijwel de hele export samenhangt, dat een gebied geen objecten bevat, dat
+een check bevindingen met typeringsvoorbehoud heeft. Dat is interpretatie en geen
+opmaak; in de CLI laten zou kandidaat A voor de helft laten mislukken. De uitslag
+draagt daarom naast `regels()` ook negen velden, zodat een test op een veld kan
+toetsen in plaats van op een zin, en een programmatische beller niet aan tekst vast
+zit.
+
+**Waarom `regels()` vlagnamen mag noemen.** Zinnen als "Geen typeringspoort toegepast
+(--shacl niet opgegeven)" verwijzen naar de opdrachtregel. Neutraal formuleren maakt
+de melding minder bruikbaar voor de enige gebruiker die er vandaag is; hem op twee
+plekken zetten laat de twee uit elkaar lopen. De afspraak staat in de docstring:
+`regels()` is de tekst voor de opdrachtregelgebruiker, en wie programmeert leest de
+velden.
+
+**Waarom `Toetsopdracht` paden draagt en geen geladen objecten.** Zou de opdracht een
+geladen `Studiegebieden` en `ExternalData` bevatten, dan moest de beller ze zelf in
+de goede volgorde laden -- precies de kennis die deze module overneemt. Dan was de
+opdracht verplaatst en de kennis niet.
+
+**Wat er niet in zit.** `_gekozen_cfk` kon niet mee: alle vier de commando's
+gebruiken hem. Hij heet nu `meting.kies_cfk` en neemt twee reeksen in plaats van een
+`CheckConfig`, zodat `meting.py` los blijft van de configuratielaag; dat sluit aan op
+de regel dat de CFK-toestanden uit `Meetbereik` komen en nergens anders.
+
+**Publiek, zonder belofte.** `toetsrun` is de bedoelde ingang voor een tweede beller
+en de package levert `py.typed`, dus de hints komen bij een importeur aan. Onder 1.0
+kan de vorm nog schuiven; `docs/versionering.md` noemt de Python-API nu expliciet
+naast de CLI, de configuratie en het uitvoerformaat.
+
+**Hoe is vastgesteld dat er niets verschoof.** De veertig verhaalregels verhuisden
+naar een ander bestand, en daar kan een spatie of een omgekeerde volgorde bij
+sneuvelen zonder dat een assertie faalt. Van een volledige run op De Wolden is
+daarom de hele stdout vergeleken: 95 regels, identiek op de gemeten laadtijd na (2,6
+tegen 2,5 seconden), en `bevindingen.csv` byte-identiek. De regeldekking is gemeten
+op de staat vóór en na: `cli.py` had 18 ongedekte statements, en elke ongedekte regel
+erna heeft een voorganger.
+
+### BO-22 De GeoPackage-lagen krijgen geen gezamenlijke declaratie
+
+**Wat.** Een architectuurreview stelde voor om elke laag van de GeoPackage als een
+`Laagdefinitie` te beschrijven -- naam, geometriesoort, kolommen, omschrijving,
+stijl, rijenbouwer -- en `schrijf_geopackage` die lijst te laten aflopen. Dat gaat
+niet door. Wat er wel gebeurd is: het fase-totaal van de voortgang volgt nu uit een
+rij staplabels in plaats van uit een met de hand geteld getal.
+
+**Waarom niet.** De aanleiding was echt: een laag toevoegen raakt zes plaatsen, en de
+laatste uitbreiding kostte 196 regels. Maar de zes featurelagen zijn niet
+gelijkvormig. `putten` en `strengen` delen hun kolommen en lopen al door een
+gezamenlijke lus. `mechanisch_riool`, `meldinglocaties`, `bouwwerken` en
+`waterdelen_zonder_zinker` hebben elk een eigen schrijver met eigen ingrediënten: de
+een heeft de verzameling objecten binnen het gebied nodig, de ander de meldingen per
+object, de derde het trefferregister. Ze onder één declaratie brengen vraagt om een
+rijenbouwer per laag met een eigen signatuur, en dan staat de complexiteit in een
+tabel met lambda's in plaats van in zes functies. De deletion test valt negatief uit:
+haal de declaratie weg en er verdwijnt niets, het verhuist alleen terug.
+
+**Wat er wel fout was.** `start_fase("GeoPackage", 10)` was een getal dat met de hand
+geteld werd over drie functies heen (twee in de featurelus, twee losse lagen, twee
+trefferlagen, vier attribuuttabellen en stijlen). Niets hield het gelijk aan het
+aantal `stap()`-aanroepen. Liep het uit de pas, dan telde de balk over of stopte hij
+te vroeg -- geen verkeerde uitslag, wel een verkeerd beeld van wat er gebeurt tijdens
+de duurste schrijffase. Het totaal is nu `len(GEOPACKAGE_STAPPEN)`, en een test
+toetst dat de gezette labels precies die rij zijn.
+
+**Wanneer dit heroverwogen hoort te worden.** Als er een derde trefferlaag bijkomt --
+`bouwwerken` en `waterdelen_zonder_zinker` delen wél hun vorm, want ze komen allebei
+uit het trefferregister via `_vul_trefferlaag`. Twee is krap voor een seam; drie
+maakt het een echte. Voor die twee alleen is de bestaande gedeelde functie genoeg.
+
+### BO-23 De uitvoerlaag krijgt geen gezamenlijk `(run, meldingen)`-object
+
+**Wat.** Een architectuurreview stelde voor om het paar `(run, meldingen)` -- dat
+door negen functies in de uitvoerlaag reist -- in een `Meldingenstroom` te vatten:
+run plus rundatum in, meldingen erbij gebouwd, en de schrijvers nemen die ene waarde.
+Dat is gebouwd en weer teruggedraaid. Wat er wel van over is: de twee plekken die nog
+hun eigen klassenselectie opbouwden gebruiken nu `checks/selectie.py` (het restant dat
+BO-20 aankondigde), en `mechanischeleidingen` is daar als rol bijgekomen.
+
+**Waarom het aantrekkelijk leek.** De vier uitvoervormen moeten aantoonbaar dezelfde
+meldingen wegschrijven. Dat de meldingen bij die run horen, en met dezelfde rundatum
+gebouwd zijn, stond nergens in een interface. `schrijf_uitvoer` had er zelfs een
+optionele parameter voor, met als enige reden dat de gebiedenlus de lijst niet twee
+keer wilde bouwen.
+
+**Waarom het niet doorgaat.** Bij het omzetten van de tests bleek dat vijf tests de
+meldinglijst met opzet los van de run aanleveren, en dat ze daar gelijk in hebben:
+
+- de stapelnummering moet onafhankelijk zijn van de volgorde van de lijst, dus voert
+  de test dezelfde meldingen omgekeerd in;
+- een melding die naar een niet-geregistreerde treffer wijst moet luid falen, dus
+  voert de test één zelfgemaakte melding in;
+- de afkapping van de verdachte-objectenlijst slaat pas aan bij acht objecten met
+  meldingen uit drie checks, en het meervoud in de slotzin bij precies één;
+- het rapport moet een melding zonder foutlocatie apart benoemen.
+
+Die toestanden zijn uit een echte dataset niet of alleen met veel moeite te bouwen.
+De `Meldingenstroom` maakt ze onbereikbaar, en dan verruil je een invariant die in de
+productiecode nooit geschonden werd -- de enige plek die het kon, gaf de lijst door
+die hij een regel eerder zelf gebouwd had -- voor testbaarheid die wel echt gebruikt
+wordt. Een escape hatch (`Meldingenstroom.van_meldingen(...)`) zou precies de
+ontkoppeling terugbrengen die het object moest opheffen, en dan is de winst nul.
+
+**Wat het wel zegt over de code.** De optionele `meldingen`-parameter van
+`schrijf_uitvoer` en `write_check_report` blijft een parameter die er alleen staat om
+dubbel rekenwerk te vermijden. Dat is een prijs die we bewust betalen; hij staat in de
+docstring van beide functies uitgelegd.
+
+**Wanneer dit heroverwogen hoort te worden.** Als er een schrijver bijkomt die zijn
+meldingen zelf ophaalt in plaats van ze aangereikt te krijgen. Dan is de invariant wel
+degelijk schendbaar, en weegt hij op tegen de testbaarheid.
+
+### BO-24 De oever telt niet als watergang
+
+**Wat.** `bgt_waterlagen` bevat alleen `waterdeel`, nooit `ondersteunendwaterdeel`. Die
+laatste laag valt buiten scope voor de hele analyse. Binnen `waterdeel` telt elk type
+mee; er wordt niet op `type` gefilterd.
+
+**Waarom.** EXT-002 en EXT-003 gaan over een streng die een watergang kruist, en EXT-007
+over een lozingspunt bij ontvangend oppervlaktewater. `ondersteunendwaterdeel` is in de
+BGT de oever: van de 44.144 objecten in de De Wolden-export draagt 44.143 het type
+`oever, slootkant` en één `transitie`. Een streng die een slootkant raakt kruist geen
+water. Erger nog: de check stopt na het eerste waterdeel per streng (BO-18), dus een
+oever die eerder in de index staat dan de sloot waar hij bij hoort, verdringt de echte
+kruising uit de melding.
+
+**De meting.** Op de eerste volledige run over De Wolden + Hoogeveen (2026-08-19) meldden
+EXT-002 en EXT-003 elk 993 strengen. Naar BGT-type: waterloop 514, oever/slootkant 306,
+greppel/droge sloot 109, watervlakte 64. Bijna een derde van de meldingen ging dus over
+een oever. Op Koekangerveld viel dat niet op: daar telt `ondersteunendwaterdeel` 94
+objecten en ging het om enkele meldingen.
+
+**Waarom niet op type filteren binnen `waterdeel`.** De verleiding is om ook
+`greppel, droge sloot` (21.673 van de 97.148 objecten in De Wolden) te laten vallen: droog
+is geen watergang. Dat is niet gedaan. Een greppel is een watervoerend element dat bij
+neerslag wel degelijk water afvoert, en of hij ter plaatse droog staat is een momentopname
+en geen eigenschap van de kruising. Bovendien is de scheiding tussen laag en type
+principieel: de laag zegt *wat het object is* (water of oever), het type zegt *hoe het
+eruitziet*. Alleen het eerste hoort de populatie te bepalen.
+
+**Waarom in de config en niet in de code.** `bgt_waterlagen` blijft een lijst in de
+projectconfiguratie, zoals alle laagrollen. Een export met andere laagnamen moet die
+kunnen aanwijzen. Wat hier verandert is de standaard, en de reden staat in het configbestand
+zelf zodat wie hem overschrijft weet wat hij weggooit.
+
+**Het gemeten effect.** Dezelfde run opnieuw gedraaid met alleen `waterdeel`:
+
+| | voor | na |
+|---|---:|---:|
+| EXT-002 / EXT-003 | 993 | 859 |
+| EXT-007 | 55 | 58 |
+| meldingen totaal | 52.373 | 52.108 |
+
+Er vielen 134 strengen weg en er kwam er geen enkele bij. De overige 172 oevertreffers
+bleken strengen die óók een echte watergang kruisen; die worden nu op dat waterdeel gemeld.
+Bij **195 strengen** wijst de melding daardoor een ander object aan dan voorheen -- dat is
+de verdringing uit BO-18 die zichtbaar wordt, en meteen de belangrijkste winst: die
+meldingen wezen naar de verkeerde watergang. Wat overblijft is waterloop 657,
+greppel/droge sloot 123, watervlakte 79.
+
+EXT-007 gaat juist *omhoog*, van 55 naar 58. Drie lozingspunten lagen naast een oever en
+telden daardoor als aangesloten op oppervlaktewater terwijl er geen waterdeel in de buurt
+lag. Dat zijn geen valse meldingen erbij maar drie gemiste bevindingen die nu boven water
+komen.
+
+**Gevolg voor de meldingidentiteit.** De meldingen die op een oever stonden verdwijnen, en
+de 195 strengen die op een ander object gemeld worden krijgen een andere `object2_uri`.
+Hun `melding_id` verschuift daarmee eenmalig, net als bij BO-19: een trendvergelijking over
+die grens heen laat ze als opgelost plus nieuw zien.
+
+### BO-25 Een duiker is geen rioolleiding; EXT-002 en EXT-003 blijven op VrijvervalRioolleiding
+
+**Wat.** De populatie van EXT-002 en EXT-003 blijft `klassen.vrijvervalleiding`
+(`VrijvervalRioolleiding`). Een `Duiker` valt daar buiten en wordt dus niet op een
+watergangkruising getoetst. De uitzondering van EXT-003 luistert nog steeds naar
+`klassen.kruisingsleiding` (zinker en duiker), maar alleen de zinker kan binnen de
+populatie voorkomen; titel en meldingstekst noemen daarom de zinker. Het rapport telt in
+de toelichting hoeveel strengen van een kruisingsklasse buiten de populatie vielen.
+
+**Waarom.** De ontologie is er ondubbelzinnig over.
+`gwsw:Duiker rdfs:subClassOf gwsw:Leiding`, met als definitie "Een leiding die
+oppervlaktewater-elementen verbindt" -- een duiker *is* de watergang, hij kruist er geen.
+`gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding`: die zit dus wel in de
+populatie, en daar is de uitzondering van EXT-003 ook voor bedoeld. Issue #3 las de
+gelijkheid van EXT-002 en EXT-003 als een fout in de populatie; ze is een gevolg van de
+klassenhierarchie. Wat er wel aan mankeerde is dat niets dat opschreef.
+
+**Verworpen: de populatie verbreden naar `Leiding`.** Dan komen ook drains (1.216),
+kolkaansluitleidingen (124), loze leidingen (54) en perceelaansluitleidingen (113) in
+beeld, en meldt EXT-002 elke drain die langs een sloot ligt als watergangkruising. Dat is
+niet wat het register met "kruising met watergang" bedoelt, en het zou de meldingenstroom
+met ruis vullen om een uitzondering te kunnen laten afgaan.
+
+**Verworpen: EXT-003 een eigen, bredere populatie geven.** Duikers erbij halen om ze
+vervolgens door de uitzondering te laten uitzonderen levert per constructie nul extra
+meldingen op. Objecten binnenhalen met de enige bedoeling ze weer weg te strepen is
+vertoon, geen toets.
+
+**De fixtures.** `scripts/maak_ttl_fixtures.py` zette `Duiker` en `Zinker` allebei onder
+`VrijvervalRioolleiding`. Daarmee testte het EXT-scenario een hierarchie die niet bestaat
+en kon de fout uit issue #3 in de tests niet zichtbaar worden. De fixtures volgen nu de
+totaal-ontologie: `Duiker` onder `Leiding`, `Zinker` onder `VrijvervalRioolleiding`.
+
+**De meting.** Op De Wolden + Hoogeveen melden EXT-002 en EXT-003 elk 859 strengen op
+17.603 bekeken -- ongewijzigd ten opzichte van BO-24, zoals de bedoeling was: deze ronde
+verandert geen enkele melding van de twee. Nieuw is de regel in de toelichting van EXT-003:
+"Buiten de populatie (geen vrijvervalleiding) en dus niet bekeken: 610 strengen van de
+klasse Duiker." Dat is precies de 610 uit issue #3, nu in het rapport zelf.
+
+**Gevolg.** EXT-002 en EXT-003 delen sinds deze ronde een kruisingenlijst
+(`context.cached("ext:watergangkruisingen")`): hun `toetsbaar`-verzameling, buffer en laag
+zijn aantoonbaar dezelfde, dus de ruimtelijke toets liep twee keer voor niets. De uitslag
+verandert daar niet van. Dat EXT-003 gelijk is aan EXT-002 blijft waar zolang de dataset
+geen zinker bevat -- De Wolden heeft er nul -- maar het staat nu in het rapport in plaats
+van dat het opvalt als raadsel. De `break` na het eerste waterdeel per streng blijft staan
+(BO-17, BO-18).
+
+### BO-26 RVZ-002 en RVZ-003 terug in de engine; een sentinel moet iets aantonen
+
+**Wat.** RVZ-002 (drempelniveau) en RVZ-003 (drempelbreedte) zijn uit de tabel Geschrapte
+checks van het register gehaald en gebouwd: W, Compleetheid, een melding per overstortput
+zonder geregistreerd niveau respectievelijk zonder geregistreerde breedte. Hun sentinels
+zijn uit `dekking.toml`. De dekkinganalyse eist voortaan dat elke overgebleven sentinel
+in de referentiemeting werkelijk iets aantoont.
+
+**Waarom.** De schrapping rustte op de claim dat de nulmeting de twee zou dekken. In geen
+van de drie SHACL-rapporten over De Wolden bestaat een vorm op `Drempelniveau` of op
+`Drempelbreedte`; de enige drempelvorm is `Overstortput_Overstortdrempel_card`, en die
+toetst of de put een drempel *heeft*, niet of het niveau of de breedte geregistreerd is.
+Er keek dus niets naar die twee eigenschappen: de engine niet, want de check was
+geschrapt, de nulmeting niet, want de vorm bestaat niet, en het rapport meldde geen gat,
+want een geschrapte check hoort daar niet meer thuis. Het register waarschuwt onder de
+tabel Geschrapte checks precies voor dit geval.
+
+**Waarom ook putten zonder drempelonderdeel.** De check meldt een overstortput ook als er
+helemaal geen `Overstortdrempel`-onderdeel aan hangt -- en dat is in De Wolden de regel,
+niet de uitzondering. Die melding overlapt met `Overstortput_Overstortdrempel_card`, en
+die overlap is bewust: het register vraagt naar de geregistreerde *waarde*, en `toets`
+moet ook zonder `--shacl` iets zien. De toelichting benoemt de overlap, zodat wie beide
+rapporten naast elkaar legt weet dat hij hetzelfde gebrek twee keer telt.
+
+**Waarom W en Compleetheid.** Naar analogie van RVZ-007 t/m RVZ-009: een ontbrekende
+registratie op een randvoorziening is een gat in de gegevens, geen aantoonbare fout in de
+werkelijkheid. Een drempel die niet geregistreerd staat hoeft er fysiek niet te ontbreken.
+
+**De poort eronder.** Het echte gat zat in de dekkinganalyse zelf: `verify_register`
+toetste alleen ID-pariteit tussen het register en de sentineltabel, nooit of een sentinel
+in de referentiemeting iets aantoont. Daar is nu een inhoudelijke poort naast gezet:
+`CoverageResult.untouched == []`, op de mini-nulmeting (`tests/test_coverage.py`) en op de
+volledige De Wolden-rapporten (`tests/test_integration.py`). Een schrapping waarvan het
+bewijs nul meldingen oplevert valt daarmee in CI om. De weergave van "niet geraakt" blijft
+apart getoetst met een fixture-mapping waarvan de sentinel nergens vuurt.
+
+**De meting.** Op De Wolden + Hoogeveen melden RVZ-002 en RVZ-003 allebei alle 245 bekeken
+overstortputten: 218 `Overstortput` plus 27 `Stuwput`, want `klassen.overstortput` bevat ze
+allebei. Dat is geen 245 losse gebreken maar een systematisch registratiepatroon -- de
+export bevat geen enkel `Overstortdrempel`-onderdeel (BA-10) -- en de toelichting van de
+check zegt dat er met zoveel woorden bij. De twee checks samen brengen 490 waarschuwingen
+in de totaaltelling.
+
+**Gevolg.** Het aantal ID's in de engine groeit met twee; de dekkingsmatrix en de
+versiehistorie van het register (v0.9) volgen. De ID's zijn nooit hergebruikt, dus RVZ-002
+en RVZ-003 betekenen nog steeds wat ze in v0.1 betekenden.
+
+### BO-27 Een vulwaarde rond 0 m NAP is geen meting: een leesregel plus ATTR-013
+
+**Wat.** Een hoogtekenmerk uit `[vulwaarden] hoogte_kenmerken` met |waarde| <=
+`hoogte_band_m` wordt gelezen als *niet geregistreerd*. De regel staat in
+`dataset.markeer_vulwaarden`, wordt op precies een plek toegepast -- in
+`toetsrun.voer_toets_uit`, direct na `laad_met_cache` -- en onthoudt op het object welk
+kenmerk welke waarde droeg. De nieuwe check ATTR-013 (W, Compleetheid) meldt dat een keer
+per object.
+
+**Waarom.** In de De Wolden-export is 11.786 van de 46.880 BOB-waarden (25,1%) exact
+`0.000`; de op een na meest voorkomende waarde komt 399 keer voor. Van de 22.363
+maaiveldhoogten staat 14% op `0,00` of `0,01`. Het AHN ligt in dit gebied tussen 5,09 en
+17,09 m NAP. Dat is een vulwaarde voor "niet geregistreerd", geen buisbodem op zeeniveau.
+De hoogtechecks lazen hem als meting. Een regex over de meldingteksten in issue #1 vond een
+nul in 94% van de HGT-004-meldingen, 85% van HGT-018, 61% van HGT-003 en 48% van HGT-002 --
+samen circa 5.700 van de 31.901 harde fouten. Dat zijn de cijfers van die regex, niet van de
+meting hieronder: hij zag de nul alleen waar die in de tekst stond. Dat is de situatie waar
+CLAUDE.md voor waarschuwt: duizenden bevindingen wijzen op een modelleerfout in de engine,
+niet op duizenden gebreken.
+
+**Het gemeten effect.** Dezelfde run over De Wolden + Hoogeveen twee keer gedraaid, alleen
+`hoogte_kenmerken` leeggemaakt in de tweede: dat isoleert de leesregel van de rest van deze
+bugronde. De tabel noemt elke check die beweegt -- veertien -- zodat beide kolommen op hun
+totaal uitkomen; alle overige checks staan links en rechts op hetzelfde getal.
+
+| | zonder leesregel | met leesregel |
+|---|---:|---:|
+| HGT-002 (deksel vs AHN) F | 5.231 | 2.128 |
+| HGT-003 (BOB-sanity vs AHN) F | 2.813 | 1.090 |
+| HGT-004 (BOB boven deksel) F | 532 | 31 |
+| HGT-018 (buiskruin boven maaiveld) F | 1.190 | 175 |
+| HGT-006 (fors tegenverhang) F | 2.459 | 2.377 |
+| NET-003 (stroming tegen het verhang) F | 3.725 | 3.651 |
+| HGT-013 (gronddekking) W | 2.545 | 340 |
+| HGT-014 (verhang vs maaiveld) W | 889 | 157 |
+| HGT-007 (te weinig verhang) W | 2.126 | 1.559 |
+| HGT-008 (extreem verhang) W | 247 | 159 |
+| HGT-009 (BOB-sprong zonder valput) W | 327 | 282 |
+| HGT-001 (dekselhoogte vs AHN, 5 cm) W | 5.820 | 5.811 |
+| HGT-005 (licht tegenverhang) W | 1.286 | 1.285 |
+| ATTR-013 W | 0 | 4.215 |
+| **fouten totaal** | **31.901** | **25.403** |
+| **waarschuwingen totaal** | **20.697** | **21.265** |
+
+Beide kolommen komen van de code *na* deze bugronde; alleen de leesregel verschilt. Dat de
+linkerkolom precies de 31.901 uit issue #1 reproduceert, en HGT-002/003/004/014/018 daar op
+precies 5.231 / 2.813 / 532 / 889 / 1.190 staan, is dus zelf een uitkomst: geen andere
+wijziging van deze ronde verschuift een van die aantallen. Er verdwijnen
+6.498 fouten en 3.647 waarschuwingen. Elke verdwenen melding is terug te voeren op een
+vulwaarde op het gemelde object zelf of op een van zijn twee putten -- nagelopen op de
+melding-ID's, met nul onverklaarde gevallen. Er komt er ook bijna geen bij: alleen HGT-009
+wint er twee, doordat een 0,000-BOB de werkelijke, kleinere BOB-sprong op die put stond te
+verdringen.
+
+De schatting van circa 5.700 uit issue #1 was een ondergrens: die regex keek naar vijf
+checks en naar de waarde in de meldingtekst. HGT-002 verliest er 566 meer dan de regex
+zag, en HGT-006 en NET-003 stonden er niet eens in. Wie op de vulwaarde in de tekst zoekt,
+mist de melding waarin het buurobject de nul draagt.
+
+**Wat ATTR-013 niet meldt.** Van de 11.812 BOB-waarden binnen de band liggen er 2.003
+op een `VrijvervalRioolleiding`; de overige 9.809 zitten op klassen die de hoogtechecks
+sowieso niet bekijken -- `Persleiding` 6.894 van 7.096 (97%), `Drain` 1.593, `Duiker` 483,
+`Kolkaansluitleiding` 244, de perceelaansluitleidingen 223, `Vacuumleiding` 294 (alle),
+`Drukleiding` 49, `LozeLeiding` 29. Dat is geen gat maar dezelfde afbakening: ATTR-013
+bekijkt de netwerkknopen plus de vrijvervalstrengen, en meldt 2.003 BOB's op 1.095
+strengen plus 3.120 maaiveldhoogten, samen 4.215 objecten. Wie het getal 11.786 uit issue
+#1 naast 4.215 legt, moet dat verschil kennen: een persleiding zonder BOB is geen gebrek
+dat deze checks aanwijzen.
+
+Let wel: de leesregel zelf loopt over *alle* strengen in `dataset.conduits` en zet die 9.809
+BOB's dus ook op ontbrekend. Wat de populatie buitensluit is niet de bewerking maar de
+melding: ATTR-013 rapporteert die objecten nooit. Dat is hier zonder gevolg -- geen enkele
+hoogtecheck kijkt naar een persleiding -- maar het is een stille plek, en zodra een check op
+die klassen gebouwd wordt moet ATTR-013's populatie meebewegen.
+
+Aan de knoopkant staat precies hetzelfde: `markeer_vulwaarden` loopt over *alle* knopen in
+`dataset.nodes`, terwijl ATTR-013 de netwerkknopen meldt (put, afvoer- en lozingseindpunt,
+bergbezinkvoorziening). Een maaiveldhoogte of dekselniveau op een compartiment- of
+hulpstukorientatie wordt dus wel als ontbrekend gelezen en nooit gemeld.
+
+Beide helften zijn sindsdien niet meer stil: de toelichting van ATTR-013 telt hoeveel knopen
+en hoeveel strengen met een vulwaarde buiten haar gemelde populatie vallen. Het getal wordt
+per run berekend uit de gemarkeerde dataset, zodat het niet uit de pas kan lopen met wat de
+leesregel deed. Wat er nog niet staat is de klasse-uitsplitsing hierboven -- die staat hier,
+gemeten op De Wolden, en niet in het rapport.
+
+**Waarom een leesregel na het laden en niet in de lader.** De cache bewaart de ruwe parse;
+de band is projectconfiguratie. Zou de lader hem toepassen, dan zat een projectkeuze in de
+cachesleutel en leverde dezelfde TTL onder twee configuraties twee cache-ingangen op. Nu
+is `markeer_vulwaarden` een pure functie op een geladen dataset -- ze geeft via
+`dataclasses.replace` een nieuwe dataset terug -- met precies een aanroepplek. `analyseer`
+en `dekking` raken hem niet: die gaan over de nulmeting en niet over de hoogten.
+
+**Waarom een nieuw ATTR-nummer en geen HGT.** Wat er gemeld wordt is dat een kenmerk niet
+geregistreerd is terwijl het als meting in de export staat. Dat is een registratiegebrek
+(Compleetheid), geen hoogtefout (Plausibiliteit of Nauwkeurigheid). Een HGT-nummer zou het
+tussen de verhang- en dekkingchecks zetten, waar de lezer een uitspraak over de hoogte
+verwacht. En het is er precies een per object, niet een per hoogtevergelijking.
+
+**Waarom een band en geen exacte nul.** Naast `0,000` komt `0,01` voor: 11.786 BOB's staan
+exact op nul, 11.812 binnen de band, dus 26 waarden zitten ertussenin. `hoogte_band_m`
+staat daarom op 0,01 en de regel toetst `abs(waarde) <= band`, zodat ook `-0,01` meetelt.
+Een exacte gelijkheid op een float zou bovendien een broze toets zijn.
+
+**Waarom `[vulwaarden]` met een lege lijst als uit-schakelaar.** TOML kent geen null, dus
+een aparte `aan`-vlag naast een kenmerkenlijst zou twee waarheden opleveren die uit elkaar
+kunnen lopen. Een lege `hoogte_kenmerken` is de uit-stand, en die stand staat met zoveel
+woorden in de toelichting van ATTR-013: in laag Nederland kan 0,00 m NAP een echte meting
+zijn, en stilte mag daar niet als "alles gecontroleerd" lezen.
+
+**Verworpen: elke HGT-check filtert zelf.** Dan staat dezelfde drempel in dertien checks
+opgeschreven -- zoveel blijken er in de meting geraakt te worden, en NET-003 zit er ook bij,
+dus het is niet eens tot de HGT-familie beperkt. Het filter verschuift bij de eerste die
+het vergeet, en geen enkele check kan dan zeggen hoeveel objecten er om deze reden zijn
+overgeslagen. Een leesregel op een plek laat de checks doen waar ze voor zijn, en laat een
+van hen -- ATTR-013 -- het gebrek benoemen.
+
+**Gevolg.** De hoogtechecks slaan de betrokken objecten over en tellen ze in hun
+toelichting mee bij de objecten zonder dat kenmerk; HGT-018 kreeg daarvoor de `notes()`
+die ze nog niet had. Ze noemen de vulwaarde niet als reden -- dat doet ATTR-013 -- dus wie
+alleen een HGT-toelichting leest, ziet "geen BOB" en niet "een BOB van 0,000". De
+`melding_id`'s van de vervallen HGT-meldingen verdwijnen; een trendvergelijking over deze
+grens heen ziet ze eenmalig als opgelost.
+
+Ook de tabel met datakarakteristieken beweegt mee: `bepaal_karakteristiek` draait op de
+gemarkeerde dataset, dus de kolom *Waarden* telt sindsdien alleen echte registraties.
+Op De Wolden zakt de noemer met de kenmerken waarvoor hierboven een daling gemeten is: de
+11.812 BOB-waarden binnen de band en de circa 3,1 duizend maaiveldhoogten daarbinnen (de
+14% hierboven). Dat is geen volledige balans -- `Putdekselniveau` staat in dezelfde
+leesregel en de noemer loopt over alle knopen, ook die buiten de netwerkknopen, maar
+hoeveel er daar wegvalt is in deze ronde niet apart gemeten. Het histogram per
+inwinningswijze zakt mee. Dat zijn de eerlijker getallen -- een vulwaarde is geen
+registratie -- maar een noemer die zonder uitleg
+verspringt leest als een meetfout, dus het rapport zegt het er zelf bij: onder de tabel
+staat hoeveel hoogtewaarden de leesregel heeft weggezet.
+
+### BO-28 De nulmeting is een tweede bron in de meldingenstroom, geen zeventigtal checks
+
+**Context.** De SHACL-nulmeting voedde alleen de typeringspoort; de overtredingen zelf
+verdwenen. Daardoor kon geen enkele uitvoervorm tonen dat een gebrek uit de GWSW-nulmeting
+komt, laat staan uit welke conformiteitsklasse -- terwijl de categorie `NULMETING` en de
+kolom `n_nulmeting` al in de GeoPackage stonden te wachten op een producent (issue #12).
+
+**Besluit.** De overtredingen worden `Nulbevinding`'s (`nulbevinding.py`), hangen als veld
+aan de `CheckRun` en worden door `bouw_meldingen` tot gewone `Melding`'s gemaakt, naast die
+van het register. Ze dragen `bron = "nulmeting"`, categorie `NULMETING`, check-ID
+`NULMETING-<SHACL-vorm>`, dimensie `Compliance` en een nieuw veld `cfk`.
+
+**Verworpen: er `CheckOutcome`'s van maken.** Dan is elke SHACL-vorm een pseudo-check, geeft
+`REGISTRY[outcome.check_id]` overal een `KeyError`, en krijgt het bevindingenrapport enkele
+honderden vormsecties. De nulmeting is een tweede *bron*, geen tweede register.
+
+**Verworpen: een tweede schrijver.** De vier uitvoervormen komen uit een meldingenstroom;
+dat is geen afspraak maar een eigenschap van de code, en de sweep in
+`tests/test_uitvoer_herkomst.py` bewaakt hem.
+
+**De join loopt omhoog, en `hasConnection` mag alleen de eerste stap zijn.** De kolom
+`Focus node` draagt het URI-fragment uit de dataset, maar wijst lang niet altijd een put of
+streng aan: een `BeginpuntLeiding` hangt via `hasPart` onder zijn leidingorientatie, een
+`Maaiveldorientatie` hangt via `hasConnection` onder de putorientatie. Er wordt daarom
+omhooggelopen. `hasPart` en `hasAspect` zijn insluitingen en gaan altijd voor;
+`hasConnection` is een symmetrische netwerkverbinding en zou de wandeling zijwaarts het
+net in kunnen laten lopen, en doet daarom alleen in de eerste stap mee en pas als de twee
+andere niets opleveren. Gemeten op De Wolden: strikt direct joint 87%, met insluitingen
+98%, met de verbindingsstap erbij 99,5% (105.385 van de 105.963). Wat overblijft zijn 575
+overtredingen op een stelsel (`vw_geb_6`) en drie klassenamen uit `CfkTypes_typ` --
+objecten die geen put en geen streng zijn en dat ook niet horen te worden.
+
+**Een overtreding zonder object verdwijnt niet.** Hij krijgt geen `object_uri`, geen
+locatie en een **leeg** gebied: hij is aan geen enkel studiegebied toe te wijzen, en hem
+het gebied van de run geven zou beweren dat hij daarbinnen ligt. Hij blijft daarom in elke
+gebiedsrun staan -- een losse run over dat ene gebied zou hem ook opnemen, en dat is de
+equivalentie-eis van BO-12. In `totaal/` staat hij een keer, want daar wordt op
+`melding_id` ontdubbeld. Het rapport telt hem apart, ook als het er nul zijn: stilte over
+een gebrek dat de nulmeting wel telt, leest als "alles gecontroleerd".
+
+**De identiteit hangt aan de focusnode en de boodschap.** De object-URI onderscheidt niet
+genoeg -- twee eindpunten van dezelfde streng herleiden naar diezelfde streng -- en de
+boodschap is bovendien de ontdubbelsleutel, want dezelfde vorm noemt per CFK een andere
+drempel. Prijs: herformuleert de GWSW-server een boodschap, dan verschuiven de
+melding-ID's van die vorm eenmalig en leest een trendvergelijking ze als opgelost plus
+nieuw. Dat staat in `docs/json-schema.md` en in de wijzigingslog.
+
+**Honderdduizend meldingen is de uitslag, niet een modelleerfout.** De drie rapporten
+tellen samen 213.500 regels; na ontdubbeling over de conformiteitsklassen blijven er
+105.963 over (87.017 fouten, 18.946 waarschuwingen). De zwaarste posten zijn drie
+kardinaliteitsvormen die vrijwel elke `Inspectieput` raken -- `Put_HoogtePut_card`,
+`Rioolput_Maaiveldschematisering_card` en `Rioolput_BergendOppervlak_card`, elk 19.322 keer
+op ongeveer 19,5 duizend inspectieputten. Daar is de systemisch-vlag voor: 68.882 van de
+105.963 meldingen dragen hem, en zeggen daarmee iets over de export als geheel in plaats
+van over een los gebrek. De noemer van die vlag is het aantal instanties van het
+objecttype uit `type=`, geteld over de volledige export en niet over een studiegebied --
+anders zou "systemisch" iets anders betekenen naargelang er een gebied is opgegeven.
+
+**Wat de tweede bron elders brak, en hoe het gerepareerd is.** `bouw_meldingen` heeft meer
+afnemers dan de vier schrijvers, en die waren op een enkele bron gebouwd. Drie plekken
+moesten mee:
+
+- `synthese._multi_melding` ("dit object draagt meldingen uit drie of meer verschillende
+  checks, zoek een enkele verdachte waarde") telt voortaan alleen meldingen uit het
+  register. De redenering gaat niet op voor de nulmeting: haar vormen zijn niet
+  onafhankelijk maar per kenmerk gesplitst, dus `Put_HoogtePut_card`,
+  `Rioolput_Maaiveldschematisering_card` en `Rioolput_BergendOppervlak_card` slaan per
+  constructie samen aan. Op De Wolden dragen 23.296 van de 32.389 focusnodes drie of meer
+  vormen; die alle als verdacht aanwijzen maakt van die sectie ruis met een advies dat
+  nergens toe leidt. Meldingen zonder object doen ook niet mee -- die belandden samen in
+  een naamloze emmer en verschenen als een verdacht object met het label van de laatste.
+- `gwsw_run` telt `fouten` en `waarschuwingen` voortaan uit de meldingenstroom in plaats
+  van uit `CheckRun.count`, want `meldingen_totaal` deed dat al. Ze liepen anders met de
+  hele nulmeting uit elkaar.
+- De opdrachtregel zegt "fouten uit de eigen checks" en noemt de overtredingen uit de
+  nulmeting apart. Optellen zou twee ongelijksoortige tellingen op een hoop gooien;
+  verzwijgen zou een regel "120 fouten" opleveren naast een CSV met er tienduizenden.
+
+En `CheckRun.weggelaten` telt sindsdien ook de nulbevindingen die de afbakening tot een
+studiegebied wegliet. Het is nu de ene plek waar dat getal vandaan komt, zodat de
+opdrachtregel, het rapport en de synthese er niet drie kunnen noemen.
+
+**Het dashboard draagt allebei de bronnen, met lege checkkolommen.** `overzicht_checks` in
+de GeoPackage bleef aanvankelijk op `run.outcomes` staan en toonde dus alleen het register,
+terwijl de tabel zich als de checklijst presenteert (issue #24). Er staat nu een rij per
+SHACL-vorm naast de rijen per check, uit dezelfde meldingenstroom en met de kolom `cfk`
+erbij. De kolommen die alleen een `CheckOutcome` kent -- de omschrijving, `bekeken`,
+`percentage_populatie`, `skelet` -- blijven op zo'n rij **leeg**: er is geen populatie
+bekeken en er is geen titel, en een gevuld getal zou een dekking beweren die niemand
+gemeten heeft. Dat is dezelfde regel als hierboven bij de overtreding zonder object. De
+ernst is de zwaarste binnen de vorm, gelijk aan wat het rapport per vorm toont; twee
+uitvoervormen die over dezelfde vorm een andere ernst noemen zou erger zijn dan geen van
+beide. `scripts/steekproef.py` leest deze tabel op naam en filtert al op
+`bron = "register"`, dus de steekproef ziet hetzelfde als voorheen.
+
+**Het contract.** `cfk` is een achterwaarts verenigbare toevoeging, dus `schema_versie`
+gaat van `1.0` naar `1.1` en niet naar `2.0`. `docs/json-schema.md` beschrijft het veld en
+de nulmetingmeldingen; de twee drifttests bewaken dat het document de velden en de versie
+blijft noemen.
+
+### BO-29 Twee objectlagen met een status, en wat daarvoor van de kaart verdwijnt
+
+**Context.** De GeoPackage had zes featurelagen, waarvan drie over dezelfde riolering
+gingen: `putten`, `strengen`, `mechanisch_riool` en daarnaast `meldinglocaties` met een
+punt per melding. Voor de eindgebruiker in QGIS moeten dat twee objectlagen worden, met de
+gebreken *op* het object (issue #13).
+
+**Besluit.** `putten` (punt) en `strengen` (lijn) blijven over. Elk object draagt `status`
+-- vier waarden waar de symbologie op filtert -- en `popup_html`, de voorgebakken
+hoverpopup. `mechanisch_riool` gaat op in de lijnenlaag met status `grijs`;
+`meldinglocaties` vervalt.
+
+**Er komt een grijze ring om het gebied.** Het issue noemt bij `grijs` letterlijk "object
+in de schil (niet de kern)", en dat kan alleen als er iets naast de kern in de laag staat.
+Het weglaten laat de kaart bij de gebiedsgrens ophouden alsof daar niets ligt.
+
+*Herzien na codereview:* de ring is `Analyseset.buffer` en **niet** de hele schil. De
+schil bevat naast de buffer ook de samenhangende vrijvervalcomponent waar de kern in ligt,
+en die is op de buurt Kattouw 12.106 objecten bij een kern van 507. Elk van de tachtig
+buurtbestanden zou dan het net van de halve gemeente als grijze achtergrond meesturen, met
+een popup van bijna een kilobyte per object, en hetzelfde object zou groen zijn in zijn
+eigen buurtbestand en grijs in dat van de buurman. De buffer is precies wat een lezer om
+zijn gebied heen ziet liggen en is naar constructie begrensd: op Kattouw 79 objecten.
+
+De ring komt uit `run.analyseset` en niet uit "alles wat niet in de kern ligt": een run
+die met `beperk_tot_studiegebied` op de volledige export is afgebakend heeft geen
+analyseset, en dan hoort het bestand bij de grens op te houden zoals het altijd deed.
+
+**`status` telt systemische meldingen niet mee.** Dit is de scherpste keuze van dit issue.
+Op De Wolden draagt de nulmeting 68.882 systemische meldingen op 105.963; zouden die
+meetellen, dan is vrijwel elke put rood en zegt de kaart niets meer. De bestaande kolommen
+`ergste_ernst`, `n_fout` en `n_waarschuwing` doen het al zo, en om precies deze reden.
+Gevolg dat je moet kennen: een object waarvan *alle* meldingen systemisch zijn krijgt
+`groen`. Dat betekent hier "geen gebrek dat dit object van zijn buren onderscheidt", niet
+"in orde". Twee dingen vangen dat op: `n_systemisch` blijft gevuld, en `popup_html` noemt
+de systemische meldingen met zoveel woorden.
+
+**Herzien na codereview: grijs wint niet van een gebrek.** De aanname in het issue dat
+mechanisch riool ongetoetst blijft, klopt niet: TOP-010 en TOP-011 draaien er wel op en de
+SHACL-nulmeting sowieso. Op de Koekangerveld-run droegen 17 van de 20 mechanische strengen
+een melding, en 48 van de 874 meldingen stonden op een object dat de kaart grijs verfde.
+Zouden die grijs blijven, dan beweert de kaart dat er niets bekeken is terwijl er fouten op
+staan -- en sinds `meldinglocaties` verviel is er geen tweede plek meer waar ze wel
+zichtbaar zijn. `grijs` betekent daarom: niet beoordeeld **en niets gevonden**. Wat er wel
+gevonden is kleurt het object, en de popup zegt "Maar deels beoordeeld" met de reden. Op
+de eindronde over twee buurten: nul grijze objecten met een melding.
+
+**En de popup zet de niet-systemische meldingen vooraan.** Zonder die sorteersleutel kon
+een rood object vijf systemische nulmetingmeldingen tonen en de fout die hem rood maakte
+achter "en nog N andere" verstoppen -- 6 van de 44 gekleurde objecten op de
+Koekangerveld-run. Er staat sindsdien ook een voetnoot onder de popup die zegt hoeveel
+meldingen niet meetellen in de status en waarom; zonder haar leest een groene kop met
+drie rode kruisen eronder als een tegenspraak.
+
+**Verworpen: een vijfde status.** Het issue vraagt precies vier waarden, en elke waarde
+erbij is een regel erbij in elke QML. De reden waarom een object buiten de beoordeling
+viel -- mechanisch riool of de ring -- staat daarom in de popup en niet in een eigen
+kolom.
+
+**Bewust verlies.** Met `meldinglocaties` verdwijnen twee dingen van de kaart: de exacte
+foutlocatie op een lijn (het snijpunt van een kruising, het midden van een streng) en het
+naloopwerk in een kaal GIS-pakket zonder joins. De meldingen blijven volledig in de tabel
+`meldingen`, en die tabel kreeg de kolommen `x` en `y` met diezelfde foutlocatie -- anders
+zou hij stilzwijgend uit de GeoPackage verdwijnen terwijl de CSV en de JSON hem wel
+dragen. Wie de punten terug wil, maakt er in QGIS een geometriegenerator van.
+
+**`popup_html` is een fragment, geen document.** Geen `<style>`-blok en geen vaste breedte:
+die staan een keer in de maptip van de QML (issue #15). Op De Wolden zou een stijlblok per
+rij de GeoPackage tientallen megabytes groter maken zonder dat er iets bij komt. De inhoud
+wordt geescaped -- labels en boodschappen komen uit de brondata en mogen de popup niet
+kunnen breken.
+
+**De tellingen in `gwsw_run`.** `n_putten` en `n_strengen` betekenen wat ze altijd
+betekenden: het aantal rijen dat er werkelijk in staat. Doordat de lijnenlaag nu ook
+mechanisch riool en de ring bevat, zijn dat er meer dan voorheen; `n_mechanisch` telt
+hoeveel van die lijnen mechanisch zijn. Er komt geen kolom bij: wie het per status wil
+weten, telt `select status, count(*) from strengen group by status`.
+
+**De kolom `gebied` noemt het gebied van deze uitvoer, niet dat het object erin ligt.**
+Een ringobject draagt dus de naam van de buurt waar het naast ligt. Dat is dezelfde
+betekenis als in `meldingen.gebied` en `gwsw_run.gebied` -- de kolom hoort niet in de ene
+laag iets anders te zeggen dan in de andere. Waar een object werkelijk ligt, staat in
+`status`: `grijs` met "ligt naast het studiegebied en niet erin" in de popup.
+
+### BO-30 De symbologie wordt opgebouwd, en de SVG's van de SLD's blijven buiten beeld
+
+**Context.** Issue #14 vraagt GWSW-conforme symbolen waarvan alleen de kleur de
+analysestatus draagt, met regelstructuur objecttype x status. Issue #15 vraagt een maptip
+in dezelfde bestanden. De symbolen zouden uit de PDOK-SLD's in `data/gwsw_opmaak/` komen.
+
+**De SVG's zijn er niet.** Die SLD's verwijzen hun beeld als `ExternalGraphic` naar
+`https://data.gwsw.nl/img/*.svg`; de bestanden zelf zijn niet meegeleverd. Ophalen zou dit
+pakket van een netwerkbron afhankelijk maken en symbolen van een derde in onze uitvoer
+bakken, en een QML in `layer_styles` moet zelfstandig reizen. Het issue voorziet dit geval
+en schrijft de uitweg voor: hertekenen als eenvoudige marker in de GWSW-vorm. De SLD's
+blijven wel de bron voor de *indeling* -- welk type welk symbool krijgt en welke typen er
+een delen -- en elke regel in `stijlen/symbolen.py` noemt de SLD-regel die hij vervangt.
+
+**De QML's worden opgebouwd in plaats van geschreven.** Objecttype x status levert met de
+44 knoop- en 37 verbindingstypen in de symbolentabel 225 bladregels voor de putten en 190
+voor de strengen op, elk met een eigen symbool: samen ruim vierduizend regels XML. Met de hand onderhouden zou de typenlijst
+op twee plekken zetten, en een tikfout in een markernaam trekt de kaart stil leeg -- QGIS
+maakt van een onbekende vorm zonder morren een cirkel. De tabel plus een opbouwer staat in
+`src/nlriochecker/uitvoer/stijlen/symbolen.py`, dus de stijlen blijven waar het issue ze
+wil hebben. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven onveranderde
+bestanden.
+
+**Een stijl draagt alleen de typen die in zijn laag staan.** Dat kwam uit de codereview,
+en het is geen zuinigheid maar noodzaak: met de volledige tabel toont de lagenboom van
+QGIS 225 legendaregels voor de putten en 193 voor de strengen, op een laag met zes
+voorkomende objecttypen. Dat is geen legenda meer maar een muur -- precies wat de
+handmatige QGIS-controle uit het issue zou hebben laten zien en wat de PyQGIS-test in zijn
+eerste vorm niet zag. De stijl reist mee in het bestand waar hij bij hoort, dus hij hoeft
+alleen te dragen wat erin zit; op Kattouw levert dat 35 respectievelijk 38 legendaregels.
+Een type dat er later bij komt valt in het vangnet.
+
+**Ook de statuskolom heeft een vangnet.** Een waarde die de vier niet is zou door geen
+enkele regel geraakt worden en dus onzichtbaar zijn. Onbereikbaar zolang
+`objectkaart.bepaal_status` de bron is, maar onzichtbaar is een stiller gebrek dan een
+verkeerd symbool, en het objecttype kreeg om dezelfde reden zijn vangnet.
+
+De waarborg is de PyQGIS-test: hij laadt de GeoPackage in een echte QGIS, past de
+default-stijl toe, laat QGIS de markervorm van elk symbool terugcoderen om hem met de
+tabel te vergelijken, en telt de legendaregels. Dat vangt precies de fouten die een blik
+op het scherm mist -- en de kaart is tijdens de bouw ook een keer echt gerenderd, wat een
+pijl opleverde die de putsymbolen overstemde.
+
+**Kleur is van de status, en de legenda zegt wat groen betekent.** Het GWSW en de
+PDOK-SLD onderscheiden leidingsoorten met kleur; die is hier aan de status vergeven. Voor
+verbindingen blijft dus alleen lijndikte en streepjespatroon over, en daarmee zijn zestien
+typen niet uit elkaar te houden. Elk type houdt wel zijn eigen regel met zijn eigen
+legendalabel -- de legenda blijft volledig -- maar verwante typen delen een lijnstijl,
+zodat het kaartbeeld de families toont: vrijverval, mechanisch, aansluiting, drain, duiker,
+berging, loos. De legenda van groen zegt "geen eigen gebrek" en niet "in orde", want een
+object waarvan alle meldingen systemisch zijn is groen (BO-29).
+
+**Hoofdletterongevoelig filteren.** De De Wolden-export schrijft
+`DwaPerceelaansluitleiding` waar de PDOK-SLD `DWAPerceelaansluitleiding` noemt.
+Hoofdlettergevoelig filteren zou zulke objecten stil in het vangnet laten vallen, dus de
+filters vergelijken op `lower("objecttype")`.
+
+**De maptip is een expressie van een regel.** `[% "popup_html" %]`, met daaromheen een
+stijlblok en een `<div style="width:300px">`. De vaste breedte houdt het popupframe stil in
+plaats van bij elk object te herschalen. Het stijlblok staat in de QML en niet in de kolom:
+per rij herhaald zou het op De Wolden tientallen megabytes aan de GeoPackage toevoegen
+zonder dat er iets bij komt. Geen live joins of relations -- die reizen niet mee in
+`layer_styles` -- en geen webfont of afbeelding-URL.
+
+`styleCategories` moet `MapTips` expliciet noemen. Staat er alleen `Symbology`, dan leest
+QGIS het `mapTip`-element niet terug uit `layer_styles`, blijft de popup leeg, en meldt
+niets. Dat is met PyQGIS vastgesteld op deze uitvoer.
+
+**De handmatige QGIS-controle is vervangen door de PyQGIS-test.** Die laadt de stijl
+echt, controleert dat elke regel een symbool heeft, dat elke expressie naar een bestaande
+kolom verwijst, dat de markervormen zijn wat de tabel zegt, en dat de maptipexpressie op
+een echte feature HTML oplevert in plaats van een letterlijke `[% ... %]`. Dat toetst
+harder dan een blik op het scherm; wat het niet toetst is of het er goed uitziet, en dat
+blijft aan de gebruiker.
+
+### BO-31 Het bevindingenrapport leest van gebied naar detail
+
+**Context.** Het rapport opende met "Checkbevindingen <dataset>" en somde daarna per check
+de meldingen op. De lezer -- beheerder of management -- wil eerst weten over welk gebied
+het gaat, wat erin ligt en of het voldoet, en pas daarna het detail (issue #16).
+
+**Besluit.** De volgorde is onderdeel van de uitvoer: titel met de gebiedsnaam, aantallen,
+managementsamenvatting, rode draad, verantwoording, en dan het detail in twee
+herkomstblokken -- eerst de GWSW-nulmeting, dan de eigen checks, elk met de fouten voorop.
+
+**De aantallen tellen de kern, niet de schil.** De contextschil zit in de dataset van de
+run omdat de netwerkchecks hem nodig hebben, maar er wordt niet over gerapporteerd. Hem
+meetellen zou de aantallen laten afwijken van de bevindingen eronder; hij staat als
+voetnoot. De meters zijn de **getekende** lengte en niet het kenmerk `LengteLeiding`: de
+tabel hoort te zeggen wat er op de kaart ligt, en wijken de twee af dan is dat ATTR-009.
+
+**Een vinkje betekent nul fouten, en zwijgt niet over waarschuwingen.** Vorm: "12 fouten
+(waarvan 9 systemisch), 4 waarschuwingen (0 systemisch)". Een regel die vierhonderd
+waarschuwingen weglaat leest als "niets aan de hand".
+
+**Per CFK een oordeel, ook binnen een deelset.** Het issue schrijft voor dat de CFK-regels
+bij een `--cfk`-deelset de toestandstekst uit `Meetbereik` tonen, "want er is niet
+gemeten". Die reden gaat niet op voor een klasse die *wel* in de deelset zat: daar is
+gemeten en valt er iets te oordelen. De regel volgt daarom de reden en niet de letter: een
+gekozen klasse krijgt haar vinkje of kruisje, een niet-gekozen klasse de toestandstekst.
+Het voorbehoud over de deelset als geheel staat al als markering boven het rapport (BO-7),
+dus er gaat niets verloren.
+
+**De klassen staan in de volgorde van de projectconfiguratie** (gesorteerd), niet in de
+volgorde waarin het issue ze opsomt: zo krijgt een project met andere klassen dezelfde
+opzet zonder dat er iets in de code hoeft te veranderen.
+
+**De nulmeting per vorm, niet per melding.** De SHACL-vormen zijn er honderden en de
+meldingen op De Wolden ruim honderdduizend; een lijst daarvan is geen rapport maar een CSV.
+Wat een lezer nodig heeft is welke eis waar de mist in gaat, hoe vaak, en welke
+conformiteitsklassen hem stellen. De losse meldingen staan in `bevindingen.csv`, in de
+JSON en op de kaart.
+
+**De rode draad schuift mee naar voren.** Hij zegt wat de bevindingen samen betekenen, en
+dat is wat een lezer na de vier regels van de samenvatting wil weten -- niet pas achter de
+tabellen.
+
+**`stelseltypen` verhuist naar `uitvoer/omvang.py`.** Zowel de aantallentabel als de
+GeoPackage heeft hem nodig; twee kopieen zouden op een dag verschillende stelsels aan
+dezelfde put toekennen.
+
+### BO-32 De GWSW-vocabulaire-index gaat mee in de repository
+
+**Context.** `tests/test_gwsw_vocabulaire.py` toetst elke GWSW-naam die dit pakket gebruikt
+tegen de ontologie. Die ontologie (`data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`, 2,6 MB)
+staat buiten versiebeheer, samen met de rest van `data/`. Gevolg: op de CI-runner sloeg die
+test 140 van zijn 142 gevallen over -- precies de stilte die issue #30 wilde opheffen.
+
+**Besluit.** Er komt een afgeleide in versiebeheer: `data/gwsw-vocabulaire-index.json`,
+geschreven door `scripts/maak_gwsw_index.py`. Ze draagt per GWSW-naam zijn `rdf:type`s en zijn
+directe superklassen, en niets meer -- genoeg om te beantwoorden of een begrip bestaat, of het
+in de juiste collectie zit, en welke klassen onder een wortel hangen. Nu 285 kB bij 3.316
+termen en 2.078 klassen met een superklasse, samen goed voor 2.124 subklasserelaties. (Dit
+laatste getal stond hier eerst als "2.078 subklasserelaties": het script drukte het aantal
+sleutels van `subklasse_van` af onder het label van het aantal kanten. Een klasse mag meer
+dan een GWSW-ouder hebben: 42 klassen hebben er meerdere, samen goed voor 46 kanten boven
+het aantal sleutels. Script en getal zijn rechtgezet.)
+
+**Licentie is geen bezwaar.** De GWSW-ontologie staat onder CC0
+(https://stichtingrioned.github.io/GWSW_Ontologie_RDF/); herdistributie, ook van een
+afgeleide, is vrij en verplicht ons tot niets. De afweging gaat dus over bestandsgrootte en
+onderhoud, niet over rechten.
+
+**Bestandsgrootte.** 285 kB tekst met een regel per term is te overzien in een repository die
+verder alleen broncode draagt, en de opmaak is met opzet diffbaar: een nieuwe GWSW-versie
+levert een leesbare lijst toevoegingen op in plaats van één regel van tienduizend tekens.
+De hele TTL tracken (2,6 MB, en de ontologie is niet het enige bestand in die map) zou de
+grens over gaan waar `data/` juist voor buitengesloten is.
+
+**Onderhoudsmodel.** De index wordt nooit met de hand bijgewerkt. Zet de auteur een nieuwe
+ontologie neer, dan draait hij `uv run python scripts/maak_gwsw_index.py` en commit hij het
+resultaat; `CLAUDE.md` en `README.md` zeggen dat op de plek waar hij kijkt.
+`test_index_volgt_de_ontologie` vergelijkt de hele bestandstekst met een vers geparseerde TTL
+en `test_indexversie_staat_in_claude_md` houdt de `versie=`-regel van de index gelijk aan de
+GWSW-versie in `CLAUDE.md` -- die tweede draait ook op CI, want beide bestanden zijn getrackt.
+
+**Dat de drifttest alleen lokaal draait is geen ongedekt gat.** De enige die de index kan
+laten verouderen is de auteur die een nieuwe ontologie neerzet, en dat is dezelfde persoon op
+dezelfde machine die als enige die test draait. `scripts/uitgave.py` draait `uv run pytest -q`
+als uitgavepoort en `TAKVOORWAARDE` dwingt die poort af op `main`: een verouderde index kan
+geen uitgave overleven.
+
+**Eén restrisico, eerlijk benoemd.** Een term die een volgende GWSW-versie hernoemt of naar een
+andere collectie verplaatst blijft gewoon valideren tegen de 1.6-index tot die vervangen is.
+Nieuwe namen vallen luid om, hernoemde niet. Daarom moet `CLAUDE.md` gezaghebbend blijven over
+welke GWSW-versie leidt, en bewaakt `test_indexversie_staat_in_claude_md` dat de twee niet elk
+hun eigen versie gaan dragen.
+
+**Alternatieven.** De TTL zelf tracken (verworpen: te groot, en dan verhuist de discussie naar
+de rest van `data/`). De ontologie bij data.gwsw.nl ophalen in CI (verworpen: `CLAUDE.md`
+verbiedt een automatische versiecontrole tegen die bron expliciet, en het maakt de suite
+afhankelijk van een netwerkdienst van een derde). De test op CI laten overslaan (verworpen:
+dat wás de toestand die #30 opheft).
+
+### BO-33 Overnamepunt staat in `afvoer_eindpunt`; Gemaal en Pompunit zijn een erkend noodverband
+
+**De klasse bestaat.** `data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl` (versie 1.6) draagt
+op regel 31892:
+
+```turtle
+gwsw:Overnamepunt rdfs:label "Overnamepunt"@nl;
+    rdfs:seeAlso "[NEN 3300:1996] locatie waar de overdracht plaatsvindt van het water uit de
+                  riolering aan de beheerder van de afvalwaterzuiveringinrichting"@nl,
+                 "[IRIS-RIOKEN:2012] Het punt waar de verantwoording over het afvalwater
+                  overgaat van een gemeente/bedrijf op het waterschap of omgekeerd ..."@nl;
+    skos:altLabel "Afgiftepunt"@nl, "Inprikpunt"@nl, "Overdrachtspunt"@nl;
+    skos:scopeNote gwsw:Cof_BAS, gwsw:Cof_PLI, gwsw:Cof_DMO;
+    a owl:Class;
+    rdfs:subClassOf gwsw:Aansluitpunt, ... .
+```
+
+`Aansluitpunt` is een `Knooppunt`-subklasse, dus `Overnamepunt` staat op de **orientatie**,
+net als `Lozingspunt`. `grep "rdfs:subClassOf.*gwsw:Overnamepunt"` levert niets: de klasse
+heeft zelf geen subklassen, dus haar subklasse-afsluiting is zij alleen. Ze staat ook in
+`data/gwsw-vocabulaire-index.json` als `owl:Class`. Ze ontbreekt in `Ontologie_GWSW_Mds.ttl`
+en `Ontologie_GWSW_Hyd.ttl`, maar die dragen conversiedatum 20210920 en zijn ruim vier jaar
+ouder dan het totaalbestand; daar valt geen modelleerkeuze uit af te lezen.
+
+**Eerdere vastlegging was fout, en dat is de aanleiding.** `checks.toml` schreef in een
+commentaar dat `Overnamepunt` "niet als klasse in de GWSW-ontologie" bestaat, en open punt 6
+van het checkregister herhaalde dat. Onjuist, en het is precies de verwisseling waar
+`CLAUDE.md` voor waarschuwt: "bestaat de klasse in de ontologie" en "komen er instanties voor
+in deze dataset" zijn twee vragen met verschillende antwoorden en tegengestelde ingrepen. Een
+ontbrekende klasse zou een gat in ons model zijn; ontbrekende instanties zijn een gat in de
+aanlevering. Het tweede is hier het geval.
+
+**De instanties ontbreken.** `grep -c "gwsw:Overnamepunt\b" data/gwsw_orox_ttl/dewolden_orox.ttl`
+geeft **0** -- geen `rdf:type`, geen verwijzing. De export van De Wolden kent geen enkel
+overnamepunt. (Hetzelfde beeld als bij `VerbeterdGescheidenStelsel`, zie #17.)
+
+**Besluit.** `Overnamepunt` gaat in `[klassen] afvoer_eindpunt`, en `Gemaal` en `Pompunit`
+blijven er voorlopig naast staan als **erkend noodverband**. De lijst is daarmee
+`["Overnamepunt", "Gemaal", "Pompunit"]` in `src/nlriochecker/checks.toml` en in
+`configs/dewoldenhoogeveen.toml`.
+
+**Waarom `Overnamepunt` erbij, terwijl het vandaag niets doet.** Nul instanties betekent nul
+verandering in de uitkomst -- geverifieerd, zie hieronder. Maar zodra een gemeente ze wel
+levert werkt NET-001 meteen goed, zonder dat iemand deze redenering opnieuw moet voeren. En
+het maakt de lijst leesbaar als wat ze is: één klasse die de rol dekt, plus twee die haar
+vervangen zolang ze leeg blijft.
+
+**Waarom `Gemaal` en `Pompunit` niet nu al weg kunnen.** Er is in De Wolden geen enkel
+overnamepunt om te bereiken. Ze eruit halen zou NET-001 élke vuilwater- en gemengde streng
+laten melden -- 9.062 bevindingen die niets over de data zeggen en alles over onze lijst. Dat
+is het geval waar de huisregel voor waarschuwt: duizenden bevindingen wijzen op een
+modelleerfout in de engine, niet op duizenden gebreken. Inhoudelijk is de brug ook niet
+willekeurig: een vrijvervalstreng die op een drukrioleringspomp eindigt gaat daar het
+mechanische stelsel in, en dat is in deze export de plek waar het vrijvervalnet ophoudt.
+
+**De richting staat wel vast: ze moeten er allebei uit.** Een gemaal is geen overdrachtspunt
+maar een knik in het stelsel; de NEN 3300-definitie hierboven legt de overdracht bij het
+overnamepunt. `Pompunit` valt onder hetzelfde verhaal. Dit is een surrogaat, geen model.
+
+**Het loslaatcriterium is meetbaar.** #22 voegt een rapportregel toe die toont wélke klassen
+als afvoereindpunt gelden en hoeveel instanties er van elk gevonden zijn. Zolang die regel
+voor `Overnamepunt` nul toont staat zwart op wit in het rapport dat de uitkomst van NET-001
+op een surrogaat rust; zodra hij boven nul komt is de vraag rijp. Dat `Overnamepunt` daar
+vandaag als nul verschijnt is de bedoeling van deze toevoeging, geen bijwerking.
+
+**Wat hier expliciet niet besloten wordt.** Op welk moment `Gemaal` er precies uit gaat -- bij
+het eerste overnamepunt in de data, of pas bij een af te spreken aandeel van de stelsels --
+is een domeinoordeel met 9.062 bevindingen eronder en ligt bij de auteur. Het staat als vraag 3
+van issue #47.
+
+**Nagekomen (issue #47, vraag 3).** De auteur heeft het criterium bevestigd: `Gemaal` (en
+`Pompunit`) blijven in `afvoer_eindpunt` zolang `Overnamepunt` nul instanties heeft, en gaan
+eruit zodra dat aantal boven nul komt -- niet eerder, niet op een aandeel van de stelsels. Het
+meetbare criterium uit deze BO is daarmee ook het besliscriterium. RVZ-006 (issue #23) bouwt
+op deze ongewijzigde lijst voort.
+
+**Hoe is vastgesteld dat er niets verschoof.** Niet met een gerichte run: `afvoer_eindpunt`
+gaat behalve in NET-001 ook op in `KlassenConfig.netwerkknopen`, en die rol draagt de hele
+netwerkgraaf. Daarom een volle `toets` op De Wolden (`--dataset dewolden_orox.ttl
+--ontologie Ontologie_GWSW_Totaal.ttl`, zonder `--shacl`, `--bronnen` en `--studiegebied`),
+vóór en na. Uitkomst: 35.370 meldingen over 48 checks, geen enkele check beweegt, en de
+35.370 rijen van `bevindingen.csv` zijn over alle kolommen behalve `RunDatum` identiek.
+
+### BO-34 Met "IT-stelsel" bedoelen wij hier `Infiltratiestelsel`; NET-007 blijft voorlopig op de leidingen
+
+**De klassen bestaan.** `checks.toml` schreef dat de ontologie geen klasse "IT-stelsel" kent.
+Onjuist. `Ontologie_GWSW_Totaal.ttl` (versie 1.6) draagt vier kandidaten:
+
+| regel | naam | label | `rdfs:subClassOf` |
+|---|---|---|---|
+| 38844 | `DIT_riool` | "DIT-riool" | `VrijvervalRioolleiding` |
+| 38875 | `DT_riool` | "DT-riool" | `VrijvervalRioolleiding` |
+| 39918 | `Infiltratiestelsel` | "Infiltratiestelsel" | `Rioolstelsel` |
+| 38865 | `DrainageInfiltratieTransportStelsel` | "Drainage/infiltratie transportstelsel" | `Infiltratiestelsel` |
+
+Alle vier `a owl:Class`, alle vier in `data/gwsw-vocabulaire-index.json`.
+
+**Welke klasse wij eronder verstaan; het register zegt het niet.** Het checkregister noemt
+NET-007 alleen bij titel en definieert de term "IT-stelsel" nergens, dus dit is een
+afleiding van ons en geen registerfeit. NET-007 heet "IT-stelsel zonder drempel" en redeneert
+over een stelsel, niet over een leiding. Dat is `Infiltratiestelsel`; het
+`DrainageInfiltratieTransportStelsel` is daar een subklasse van en valt dus binnen dezelfde
+subklasse-afsluiting. `DIT_riool` en `DT_riool` zijn `VrijvervalRioolleiding`-subklassen: die
+benoemen de buis, niet het stelsel, en zijn hier het verkeerde niveau.
+
+**Besluit: NET-007 blijft voorlopig de afleiding uit de infiltratieleidingen gebruiken.** De
+check leest een zwak samenhangend deel met infiltratieleidingen (`[klassen] infiltratie`,
+nu `["Infiltratieriool"]`) als IT-stelsel. Dat blijft zo, en het commentaar in `checks.toml`
+zegt voortaan waarom: niet omdat de klasse ontbreekt, maar omdat **de engine de stelselboom
+uit de export nergens leest.**
+
+**Waarom niet meteen overgaan.** Niet omdat onduidelijk zou zijn welke van de twee lezingen
+gelijk heeft: op deze data geven ze hetzelfde. De export modelleert stelsels wel degelijk als
+objecten -- 13 `rdf:type gwsw:Infiltratiestelsel` (naast 57 `Vuilwaterstelsel`, 55
+`GemengdStelsel`, 48 `Hemelwaterstelsel` en 4 `Drainagestelsel`), en die dertien dragen samen
+687 `hasPart`-leden, waaronder **alle** 340 `Infiltratieriool`-instanties en geen enkel
+infiltratieriool daarbuiten. De graafafleiding en de `hasPart`-boom wijzen hier dus dezelfde
+strengen aan. Dat NET-007 op alle 340 uitkomt heeft trouwens een derde oorzaak:
+`[klassen] drempel = ["Overstortdrempel"]`, en die klasse heeft in De Wolden nul instanties en
+in de ontologie geen subklassen, dus de drempelverzameling is leeg en elk infiltratieriool
+wordt onvoorwaardelijk gemeld. Dat is een bevinding op zichzelf en ligt buiten deze BO.
+
+De reden om te wachten is dus een engine-feit en geen datavraag: **de engine leest de
+stelselboom nergens.** Overgaan betekent NET-007 zijn graafanalyse laten inruilen voor een
+`hasPart`-boom die verder geen enkele check kent -- een verbouwing van hoe dit pakket stelsels
+leest, niet een regel in een klassenlijst. Dat bredere gat staat in #17, en omdat beide
+lezingen vandaag dezelfde 340 opleveren is de overgang daar een aparte en veilige ingreep.
+Deze BO legt de afleiding vast als bewuste keuze met een vervaldatum, niet als de laatste
+stand.
+
+**Wat dit besluit niet is.** Geen afwijking van GWSW in de zin van "wij kennen dit begrip
+niet". De begrippen zijn erkend en staan hierboven met regelnummer; wat we uitstellen is het
+gebruik van de stelselobjecten door de engine.
+
+### BO-35 `Metselwerk` blijft voorlopig als putmateriaal staan: een bewuste, tijdelijke tolerantie
+
+**Wat er feitelijk staat.** `src/nlriochecker/plausibiliteit.toml` noemt in alle drie de
+regels van `[[leiding_put_materiaal]]` de waarde `Metselwerk` als verwacht putmateriaal.
+Die waarde bestaat in de GWSW-ontologie, maar niet als putmateriaal: `gwsw:Metselwerk`
+draagt `a gwsw:MateriaalLeidingColl` (regel 53856-53864 van
+`data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`, versie 1.6). `MateriaalPutColl` kent hem
+niet; die collectie heeft `MetselwerkBaksteen`, `MetselwerkBepleisterd` en
+`MetselwerkOnbepleisterd`. Geen legale export kan dus `gwsw:Metselwerk` op een put
+schrijven.
+
+**Waarom dit een BO is en geen configcommentaar.** Dit is een afwijking van de eerste regel
+van `CLAUDE.md` -- "GWSW is leidend" -- en die regel zegt zelf dat zo'n afwijking als
+BO-nummer in dit bestand hoort en *"niet als commentaar in een configbestand"*. Het
+onderscheid met de andere twee openstaande vragen uit de weekendrun is dat deze regel
+gedrag draagt. `AHN5` in `[vulwaarden] uit_hoogtemodel` is **inert**: `WijzeVanInwinningColl`
+stopt bij `AHN4`, geen export kan die waarde schrijven, dus de regel doet vandaag niets.
+`Metselwerk` doet wel iets, want de export schrijft de waarde wel.
+
+**De data.** In `data/gwsw_orox_ttl/dewolden_orox.ttl` dragen **33 putten** een
+`MateriaalPut` die naar `gwsw:Metselwerk` verwijst -- op 16.616 `MateriaalPut`-kenmerken,
+naast `Beton` 16.215, `PVC` 361, `GewapendBeton` 5 en `PE` 2. Dat de export daarmee buiten
+de domeinlijst valt is niet onopgemerkt: alle drie de SHACL-rapporten in
+`data/shacl_nulmeting/` tellen precies 33 `MateriaalPut_ref`-regels. De nulmeting meldt het
+dus al, per conformiteitsklasse.
+
+**De kosten van beide kanten, gemeten.** ATTR-010 staat op De Wolden vandaag op **0**
+bevindingen. Zou `Metselwerk` uit de drie rijen geschrapt worden, dan komt de check uit op
+**51 bevindingen over 37 strengen, rakend aan 27 van de 33 putten** (gemeten met de engine
+op de volledige export, ontologie `Ontologie_GWSW_Totaal.ttl`, alleen ATTR-010). Dat zijn 51
+waarschuwingen op objecten waarvan het gebrek niet in de put-leidingcombinatie zit maar in
+de gekozen domeinwaarde -- een gebrek dat de nulmeting al 33 keer per CFK meldt. Laten staan
+kost het omgekeerde: een waarde in een projecttabel die het GWSW niet kent, plus een
+permanente regel op `BEKENDE_AFWIJKINGEN` in `tests/test_gwsw_vocabulaire.py`.
+
+**Besluit: de regel blijft staan, en dit is geen eindantwoord.** De tolerantie geldt zolang
+vraag 2 van issue #47 niet beantwoord is. Dat is een domeinoordeel -- volgt deze tabel de
+export of de domeinlijst? -- en het ligt bij de auteur, niet bij de engine. Wat hier
+vastligt is alleen dat de afwijking bewust is, dat ze zichtbaar is, en op grond van welke
+getallen ze voorlopig geaccepteerd wordt. Het loslaatcriterium is de beslissing zelf, niet
+een meting: er is geen drempel die de vraag vanzelf beantwoordt.
+
+**Samenhang met #43.** `verwachte_putmaterialen` mist negen klassen die wél in
+`MateriaalPutColl` zitten, waaronder juist `MetselwerkBaksteen`, `MetselwerkBepleisterd` en
+`MetselwerkOnbepleisterd`. Worden die drie toegevoegd, dan verandert het argument om de
+niet-bestaande `Metselwerk` te laten staan -- een export die netjes `MetselwerkBaksteen`
+schrijft heeft de tolerantie niet nodig. #43 en #47 vraag 2 horen daarom in één keer
+beslist te worden.
+
+**Wat dit besluit niet is.** Geen uitspraak dat `Metselwerk` niet bestaat: hij bestaat, als
+leidingmateriaal, en op de leidingkant van dezelfde tabel staat hij volkomen terecht. De
+afwijking zit uitsluitend in het gebruik als *put*materiaal.
+
+**Nagekomen (BO-36, issue #43).** De tolerantie heeft geen drager meer. De tabel noemt sinds
+de omkering alleen nog onwaarschijnlijke putmaterialen, en `Metselwerk` staat op geen van
+die twee lijsten; de regel op `BEKENDE_AFWIJKINGEN` is daarmee vervallen. Dat is géén
+antwoord op vraag 2 van #47 -- de 33 gemetselde putten van De Wolden werden voorheen niet
+gemeld en worden dat nu evenmin -- maar het pakket claimt niet langer dat `Metselwerk` een
+putmateriaal is, en dat was de afwijking van "GWSW is leidend".
+
+**Nagekomen (issue #47, vraag 2).** De auteur heeft bevestigd dat hiermee niets meer op de
+putkant hoeft te gebeuren: de verbodslijst accepteert de drie officiële put-varianten
+`MetselwerkBaksteen`, `MetselwerkBepleisterd` en `MetselwerkOnbepleisterd` al, en de
+niet-bestaande `Metselwerk` als putmateriaal is met deze BO en BO-36 afgehandeld. Wat open
+blijft is uitsluitend de leidingkant (de whitelist op exacte naam, zie BO-36, "Wat deze BO niet
+repareert"); dat is een aparte uitbreiding en valt buiten #47.
+
+### BO-36 ATTR-010 noemt wat onwaarschijnlijk is, niet wat toegestaan is
+
+**Wat.** `[[leiding_put_materiaal]]` in `src/nlriochecker/plausibiliteit.toml` heeft geen
+veld `verwachte_putmaterialen` meer maar `onwaarschijnlijke_putmaterialen`, en de conditie
+in `checks/attributen.py` is meegedraaid. Er zijn nog twee regels in plaats van drie:
+`GewapendBeton` en `Metselwerk`, elk met dezelfde acht kunststoffen uit `MateriaalPutColl`
+(`PVC`, `PE`, `HDPE`, `GVK`, `Polyester`, `Polypropyleen`, `PitchFibre`,
+`UnidentifiedTypeOfPlastics`).
+
+**Waarom.** Een lijst met *verwachte* materialen maakt van elk lid van `MateriaalPutColl`
+dat niemand heeft ingetypt een bevinding. Dat waren er 26 van de 30 -- issue #43 telde er
+negen, maar `Gres`, `Klei`, `Staal`, `Asbestcement`, `Vezelcement`, de drie gietijzers en
+nog negen andere ontbraken net zo goed. Een gemeente die netjes volgens de GWSW-domeinlijst
+exporteert kreeg daar een valse W op, en dat is de omgekeerde wereld van "GWSW is leidend".
+De verbodsvorm zegt bovendien wat de check werkelijk bedoelt: de enige toelichting die het
+blok ooit droeg was *"Een gemetselde streng op een kunststof put is bouwhistorisch
+onmogelijk."* Een verbodslijst onderhoudt zichzelf ook: een nieuwe klasse in een volgende
+GWSW-versie meldt niets tot iemand besluit dat ze onwaarschijnlijk is.
+
+**Drie keuzes binnen de omkering.**
+
+- **Elke regel houdt precies de uitsluitingen die hij had.** De omkering is bedoeld om
+  valse positieven weg te nemen, niet om bestaande meldingen te laten vervallen. `Beton`
+  verbiedt daarom zes van de acht kunststoffen: `PVC` en `PE` stonden op zijn oude lijst
+  met verwachte putmaterialen en blijven toegestaan. `GewapendBeton` en `Metselwerk`
+  verbieden alle acht, want die stonden op geen van beide oude lijsten.
+- **`Epoxy` en `Bitumen` staan niet op de verbodslijst**, hoewel het kunststoffen zijn. Dat
+  zijn coatings, en juist op een gerenoveerde gemetselde put; ze verbieden zou vals alarm
+  geven op precies de oude riolen waar deze check over gaat.
+- **ATTR-010 heeft een `notes()` gekregen.** `examined` telt alle vrijvervalstrengen, maar
+  vergeleken worden alleen de materialen die in de tabel staan. Zonder die regel leest "0
+  bevindingen op 17.603 bekeken objecten" als een schone rekening voor het hele stelsel.
+  Op De Wolden meldt hij nu: *5634 van de 17603 strengen dragen een leidingmateriaal
+  waarvoor de tabel geen regel heeft en zijn niet vergeleken (PVC 5376, zonder materiaal
+  227, Gres 31).* Dat is de huisregel uit `CLAUDE.md` -- wat een check niet bekeken heeft
+  hoort in het rapport -- en hij was hier niet nagekomen.
+
+**Gemeten.** ATTR-010 stond op De Wolden op 0 bevindingen en staat er na de omkering nog
+steeds op 0, over dezelfde 11.969 vergeleken strengen (volledige export,
+`Ontologie_GWSW_Totaal.ttl`, alleen ATTR-010). Het gedrag op deze dataset verandert dus
+niet; wat verandert is wat een andere, correcte export krijgt.
+
+**Wat deze BO niet repareert.** De leidingkant van de tabel is nog steeds een whitelist, en
+de vergelijking is exact op naam. `MateriaalLeidingColl` kent naast `Metselwerk` ook
+`MetselwerkBaksteen`, `MetselwerkBepleisterd` en `MetselwerkOnbepleisterd`, en naast `Beton`
+ook `BetonnenSegmenten`, `GespotenBeton` en `VoorgespannenBeton`; geen van die zes heeft een
+regel. Een export die ze netjes schrijft komt ATTR-010 dus helemaal niet tegen. Dat is
+hetzelfde gat als #43 beschreef, op de andere as. Zes bijna gelijke regels erbij is geen
+goede reparatie -- dat vraagt een veld `leidingmaterialen` (meervoud) -- en het is dus een
+uitbreiding voor de auteur, niet iets om er stilzwijgend bij te doen. De `notes()` hierboven
+maakt het gat vanaf nu zichtbaar in elk rapport.
+
+**Bijvangst.** De enige fixture van ATTR-010 gaf de put `gwsw:Kunststof` als materiaal --
+een waarde die `MateriaalPutColl` niet kent. De fixture toetste dus een export die niet kan
+bestaan; hij draagt nu `PVC`. Er is een tegenhanger bij gekomen
+(`attr010_gresput.ttl`): een betonnen streng tussen twee gresputten, die zwijgt.
+
+**Alternatieven.** De negen klassen uit #43 toevoegen (verworpen: laat zeventien andere
+gaten open en herhaalt de fout bij elke volgende GWSW-versie). De whitelist compleet maken
+tegen `MateriaalPutColl` met een drifttest erop (verworpen: drie lijsten van ruim twintig
+namen die de eigenlijke regel -- geen kunststof onder metselwerk -- juist onzichtbaar
+maken). De `Beton`-regel helemaal schrappen omdat hij `PVC` en `PE` toestond (verworpen in
+de codereview, en terecht: die redenering stelt "kunststof" gelijk aan "PVC en PE", precies
+de denkfout die #43 aanwees. `MateriaalPutColl` kent zes andere kunststoffen, en de check
+zou van 11.969 naar 8 vergeleken strengen zijn gevallen zonder dat het rapport dat zei).
+
+### BO-37 ATTR-014 meldt per kenmerk, niet per object; `Finding.systemisch` is een eigen vlag
+
+**Wat.** `checks/attributen.py` heeft een nieuwe check ATTR-014 (F, Consistentie): een kenmerk
+dat `hasValue` gebruikt waar de ontologie via een `owl:onProperty`/`owl:allValuesFrom`-restrictie
+`hasReference` naar een collectie eist, of andersom. De verwachte property komt uit
+`ontologie.verwachte_property`; bij het laden wordt dat over de subklassen van `Kenmerk`
+afgeleid tot `GwswDataset.kenmerk_property` -- een klein woordenboek per kenmerktype, hetzelfde
+soort afgeleide als `subclasses`, uit `ontology or graph` (dus werkt met inline-fixtures en
+`--geen-ontologie`; leeg zonder klassenkennis). De hele ontologiegraaf wordt niet bewaard.
+`Finding` draagt nu een veld `systemisch` dat een check zelf kan zetten; `uitvoer/melding.py`
+OR't het met de bestaande populatieratio (`_is_systemisch`).
+
+**Waarom generiek, geen WIBONThema-check.** De fout die dit vindt is precies het soort dat de
+SHACL-nulmeting per constructie mist: `allValuesFrom` over een property die er niet staat is
+vacuously true, en er is geen minimum-kardinaliteit. Een check die alleen naar WIBONThema kijkt
+mist dezelfde fout op het volgende kenmerk in de volgende export. De generieke vorm onderhoudt
+zichzelf: op De Wolden zijn 509 kenmerktypen tegen hun voorgeschreven property gehouden en is
+`WIBONThema` de enige met een tegenspraak -- 23.440 objecten, waarvan 18.363 met de vulwaarde 0.
+Nul valse positieven. Was er meer dan een melding geweest, dan stond de check te breed en was
+dat gemeld, niet weggedraaid.
+
+**Twee keuzes die het issue expliciet aan de auteur liet.**
+
+- **Een systemische melding per kenmerk, niet 23.440 losse bevindingen.** De fout is per
+  kenmerktype hetzelfde verhaal; 23.440 rijen in CSV en JSON zetten zou het kaartbeeld en de
+  meldingenstroom overspoelen zonder een scherper signaal. De bevinding wijst geen los object
+  aan (`object_uri=""`), draagt de kenmerknaam als label en `systemisch=True`. Objectloze
+  meldingen kleuren de kaart al niet en het rapport telt ze al apart (`_zonder_locatie`), dus
+  dit sluit aan op bestaand gedrag. `Finding.systemisch` is nieuw omdat de bestaande
+  systemisch-vlag een populatieratio is (bevindingen/bekeken > 0,80) die bij een
+  aggregaatbevinding niet vuurt; een aggregaat over een heel kenmerk is systemisch van vorm,
+  niet van ratio.
+- **ATTR-014, geen nieuwe categorie.** De fout gaat over een attribuut, alleen over hoe het
+  geschreven is in plaats van over zijn waarde -- een lichte rek van ATTR. Een nieuwe categorie
+  had `CATEGORIEEN` in `gpkg.py`, de registerkoppen en de samenvatting geraakt voor een enkele
+  check; dat oppervlak weegt niet op tegen de zuiverheid. ATTR-011 is geschrapt en wordt nooit
+  hergebruikt; ATTR-014 is het volgende vrije nummer.
+
+**Meebewegende plumbing.** `beperk_tot_studiegebied` liet een bevinding zonder object en zonder
+locatie vallen; nu blijft zo'n dataset-brede bevinding in elk gebiedsrapport staan -- dezelfde
+regel als `_nul_hoort_erbij` voor een nulmetingbevinding die nergens op uitkwam (BO-12). De
+check draait `volledig_bereik`, zodat de telling de hele export beslaat en niet met het
+studiegebied meebeweegt. De sleutel van de datasetcache dekt sinds deze BO ook de broncode van
+`ontologie.py`, want `kenmerk_property` wordt mee gecachet.
+
+**Wat deze BO niet doet.** Geen tweede laag (thema versus leidingklasse: een duiker die "riool
+vrijverval" draagt). Dat is inhoudelijker en discutabeler, en het issue liet het los ("apart of
+niet"); het valt buiten deze sessie.
+
+**Gemeten op De Wolden** (volledige export, `Ontologie_GWSW_Totaal.ttl`, alleen ATTR-014):
+459.108 kenmerkinstanties met een property-restrictie bekeken, precies een bevinding --
+`WIBONThema gebruikt hasValue in plaats van hasReference op 23440 objecten, waarvan 18363 met de
+vulwaarde 0`. Op de handgeschreven fixtures: de defectfixtures (beide richtingen) geven een
+melding, de correcte (`hasReference`) geeft er geen.
+
+### BO-38 Een dekkingsondergrens van 95%, in beide poorten
+
+**Wat.** De testdekking krijgt een ondergrens van 95% op het totaal, afgedwongen met
+`pytest --cov=nlriochecker --cov-fail-under=95`. Die stap draait op CI
+(`.github/workflows/toets.yml`) én in de uitgavepoort (`scripts/uitgave.py`,
+`DEKKINGSONDERGRENS`) -- de twee blijven "dezelfde poort" (BO-5), nu vijf stappen. Het
+meetcommando `uv run --with pytest-cov pytest --cov=nlriochecker` staat nu in `CLAUDE.md`
+en `README.md`; `pytest-cov` blijft bewust buiten de dev-groep en wordt per run met
+`--with` opgelost (MIT, dus geen licentiebezwaar; het is geen vaste afhankelijkheid).
+
+**Waarom 95%, en waarom ook op CI.** De keuze ging eerst uit van "CI kan de dekking zonder
+`data/` niet betekenisvol meten"; dat is nagemeten en bleek onwaar. In de runner-conditie
+(een `git worktree` van dev zonder untracked `data/`, `GWSW_QGIS_SITE_PACKAGES` uitgezet)
+haalt de suite **96,46%** (287 van 8102 regels gemist), tegen **96,69%** met de volledige
+`data/` -- een verschil van circa 0,2 procentpunt en zo'n 58 tests, niet "honderden". De
+handgeschreven fixtures dekken vrijwel alle regels; de data-afhankelijke integratietests
+voegen nauwelijks unieke dekking toe. 95% ligt dus ruim onder beide getallen en bijt op
+een echte regressie, niet op normale schommeling -- op CI net zo goed als lokaal. Daarmee
+vervalt de reden om de grens tot de uitgave te beperken, en blijft de invariant uit BO-5
+overeind: de grens vangt een regressie meteen bij de dev-commit.
+
+**Een kanttekening voor later.** CI telt regels die alléén data-afhankelijke tests raken
+als ongedekt (die tests slaan er over). Vandaag scheelt dat 0,2pp, maar groeit de
+EXT/`externedata`-laag met code die alleen met de GIS-bronnen te toetsen is, dan zakt het
+CI-getal sneller dan het lokale. Komt CI ooit tegen de 95% aan terwijl een volledige run
+ruim boven zit, verlaag dan de CI-grens of splits de twee -- niet vóór dat gebeurt.
+
+**Alleen een totaalgrens.** Geen grens per module: `externedata.py` staat op 87% en zou
+meteen ongepland werk vragen. De per-module-cijfers blijven een observatie in de
+rondeverslagen.
+
+**Drift bewaakt.** `tests/test_uitgave.py` bindt het getal in de CI-workflow, de
+uitgavepoort en `CLAUDE.md` aan `DEKKINGSONDERGRENS`, zodat de drie niet stil uiteen kunnen
+lopen en de belofte in de documentatie niet afwijkt van wat de poort afdwingt.
+
+**Alternatieven.** `pytest-cov` in de dev-groep (verworpen: dat overrulet de vastgelegde
+keuze om hem eruit te houden, voor iets wat we een paar keer per ronde doen; `--with` lost
+hem net zo goed op, ook op CI, met de setup-uv-cache erachter). De grens alleen in de
+uitgavepoort (verworpen nadat de meting liet zien dat CI hem net zo goed haalt: dat zou de
+invariant breken en een regressie pas bij de uitgave vangen, voor geen winst). Alleen het
+commando vindbaar maken zonder ondergrens (verworpen: dan blijft de dekking een meting en
+geen belofte -- de kern van issue #54).
+
+### BO-39 De wandruwheid wordt gelezen op een uit de data afgeleide schaal, niet in hele mm
+
+**Wat.** ATTR-017 leest de kenmerken `WandruwheidBinnenboven` en `WandruwheidBinnenonder`
+niet als het gehele aantal millimeters dat het GWSW-datatype voorschrijft, maar op een schaal
+die uit de data zelf volgt: de lezing (uit `wandruwheid_schalen`, default `[1.0, 10.0]`) met
+de minste afwijkingen tegen de C2100-banden per materiaal. Op De Wolden en Hoogeveen wint
+schaal 1:10 -- de export noteert de waarde in tienden van een millimeter.
+
+**Waarom dit een afwijking van GWSW is, en waarom ze toch mag.** De hoofdregel in `CLAUDE.md`
+is dat GWSW leidend is; een afwijking mag alleen als de auteur ze expliciet en onderbouwd
+maakt, en dan hoort ze hier. `gwsw:Wandruwheid hasUnit "mm"` en `Dt_Wandruwheid` is een
+`xsd:integer` van 0 tot 99 (`Ontologie_GWSW_Totaal.ttl:29402-29413`, `44106`). Een geheel
+getal in millimeters kán de door RIONED geautoriseerde defaultwaarden uit Leidraad Riolering
+C2100 tabel B2.1 niet uitdrukken: pvc 0,4 · HPE 0,4 · gres 0,5 worden als integer allemaal 0
+of 1. De tienden-conventie is dus geen slordigheid van de leverancier maar de enige uitweg uit
+een datatype dat de voorgeschreven waarden niet kan dragen. De auteur heeft beslist dat de
+Leidraad hier leidend is (issue #38); onder de tienden-lezing volgt de export van De Wolden en
+Hoogeveen die Leidraad exact voor 21.067 van de 22.078 leidingen, en blijven de PE-leidingen
+over die de betonwaarde dragen in plaats van de kunststofwaarde.
+
+**Waarom uit de data afgeleid en niet vast op tienden.** Een andere gemeente kan wél in hele
+millimeters exporteren, en een vaste deling door tien zou dan elke leiding afkeuren. Door de
+schaal per dataset te kiezen (de lezing met de minste afwijkingen) toetst de check beide
+conventies correct; bij gelijke afwijkingen wint de eerste kandidaat (1:1, de lezing zonder
+herschaling). De gekozen lezing staat in `notes()`, zodat de lezer van het rapport weet welke
+schaal gold.
+
+**Wat buiten beeld blijft.** Polypropyleen en Asbestcement kennen geen C2100-waarde en krijgen
+dus geen band; hun leidingen worden niet getoetst en `notes()` telt ze. De 49 PP-leidingen die
+op De Wolden dezelfde betonwaarde dragen als de PE-leidingen blijven daarmee ongemeld -- een
+band bij analogie (0,4 mm, als HPE en LDPE) zou een nieuw domeinoordeel zijn zonder bron, en
+dat is aan de auteur.
+
+**Alternatieven.** Een vaste schaalfactor in de config (verworpen: keurt een export in hele mm
+af, tenzij het project hem overschrijft -- de data-afleiding doet dat vanzelf). De schaal
+hardcoderen op tienden (verworpen: strijdig met "geen hardcoded drempels" en niet overdraagbaar
+naar een andere gemeente). PP meenemen op 0,4 mm (verworpen zonder bron; als nevenbevinding aan
+de auteur voorgelegd).
+
+### BO-40 `AHN6` staat in `uit_hoogtemodel` als vooruitloop op een latere GWSW-versie
+
+**Wat.** `uit_hoogtemodel` in `src/nlriochecker/checks.toml` en
+`configs/dewoldenhoogeveen.toml` noemt `AHN6` in plaats van `AHN5`. Op
+`BEKENDE_AFWIJKINGEN` in `tests/test_gwsw_vocabulaire.py` staat het paar
+`("AHN6", "WijzeVanInwinningColl")`.
+
+**Waarom.** `AHN6` is de inwinningsbron die dit project gebruikt -- de maaiveldraster is
+`AHN6_DeWoldenHoogeveen_DTM.tif` (`configs/dewoldenhoogeveen.toml`, `ahn_dtm`). De GWSW
+1.6-ontologie kent hem nog niet: `WijzeVanInwinningColl` stopt bij `AHN4` (geverifieerd,
+`Ontologie_GWSW_Totaal.ttl` bevat `AHN`, `AHN1`--`AHN4`, geen `AHN5` of `AHN6`). De waarde
+die er tot nu toe stond, `AHN5`, was een even niet-bestaande vooruitloop én bovendien niet
+de bron die het project gebruikt.
+
+**Beslissing (issue #47, vraag 1).** De auteur heeft gekozen: het moet `AHN6` zijn, en de
+waarde blijft staan als bewuste vooruitloop op een latere GWSW-versie. Dat houdt één
+permanent rode term op de uitzonderingslijst, met zijn reden erbij; de drifttest
+`test_bekende_afwijking_is_nog_niet_opgeruimd` bewaakt dat de term daar pas afgaat zodra een
+GWSW-versie hem kent.
+
+**Waarom een afwijking van "GWSW is leidend" mag.** De hoofdregel is dat GWSW leidend is;
+een afwijking mag alleen als de auteur ze expliciet en onderbouwd maakt, en dan hoort ze
+hier. Deze afwijking is niet "een begrip verzinnen dat GWSW niet kent voor de toetsing",
+maar "de feitelijke inwinningsbron van dit project benoemen terwijl de ontologie nog niet is
+bijgewerkt". `uit_hoogtemodel` bepaalt alleen welke inwinningswaarden HGT-001/HGT-002 een
+kanttekening geven; een waarde die geen enkel object draagt, verandert geen bevinding.
+
+**Alternatief.** `AHN5` laten staan (verworpen: bestaat evenmin en is niet de gebruikte
+bron). `AHN6` weghalen (verworpen: verliest de vermelding van de werkelijk gebruikte bron).
+
+### BO-41 `pyoxigraph` als harde afhankelijkheid voor de TTL-parse
+
+**Wat.** De OroX-dataset wordt niet langer door rdflib's pure-Python `notation3`-parser
+ingelezen maar door de Rust-parser van `pyoxigraph` (`pyoxigraph.parse`). De triples worden
+daarna in een gewone `rdflib.Graph` overgezet, zodat de checks, de cache en de rest van de
+lader onveranderd blijven. `pyoxigraph` is een **harde** afhankelijkheid, niet optioneel:
+optioneel zou twee codepaden en twee testmatrices betekenen, en een standaardrun die traag
+blijft terwijl snelheid het hele punt is (issue #26).
+
+**Licentie.** `pyoxigraph` staat onder Apache-2.0 — permissief en EUPL-verenigbaar conform
+[[BO-3]]. De afhankelijkheid dwingt geen copyleft af.
+
+**Waarom alleen `pyoxigraph`, niet `oxrdflib`.** `oxrdflib` levert een Oxigraph-*store* achter
+de rdflib-interface. Twee bezwaren: een Oxigraph-store is niet te picklen
+(`cannot pickle 'pyoxigraph.Store'`), waardoor de graafcache in `cache.py` breekt; en het
+parsen via `Graph(store="Oxigraph").parse()` bleek in de meting niet sneller dan rdflib zelf
+(circa 124 s), want die weg gebruikt de native parser niet. De native `pyoxigraph.parse` doet
+de 1,88 miljoen triples in circa 5 s. Daarom parseren we native en zetten we over naar een
+gewone `rdflib.Graph`; `oxrdflib` is niet nodig.
+
+**Waarom overzetten en niet de checks op de Oxigraph-store draaien.** De checks doen miljoenen
+puntbevragingen (`graph.objects`, `graph.value`, `(s,p,o) in graph`); die tegen een store via
+de Python/Rust-grens draaien zou per bevraging trager kunnen zijn dan rdflib's dicts, en zou
+de cache en de check-semantiek raken -- een groter project met equivalentierisico, precies wat
+het issue afwees. Het overzetten kost eenmalig circa 45 s (Python-invoeging in rdflib's store,
+dezelfde kost die de oude parse ook al betaalde), maar houdt alles erna identiek.
+
+**Equivalentie, geverifieerd.** De eis uit issue #26 is dat de uitkomst aantoonbaar identiek
+blijft. `bevindingen.json` van een volledige `toets` op De Wolden en Hoogeveen is vóór en na de
+omzetting **byte voor byte gelijk** (sha256 `fde7f23a…`), en de `zwaar`-tests houden hun exacte
+aantallen (`conduits == 23440`, `nodes == 23485`, `decode_fallback.byte_count == 5`). Dat de
+export geen blanke knopen bevat en `pyoxigraph` de lexicale vorm van literalen (ook de
+ongeldige `xsd:date "20210830"` in de ontologie) net als rdflib ongemoeid laat, maakt die
+gelijkheid mogelijk. Een gewone string-literaal krijgt in de omzetting datatype `None`, net als
+rdflib's eigen parser. Let op de grens: een expliciet getypeerde `"x"^^xsd:string` zou rdflib's
+parser wél als aparte term bewaren, maar pyoxigraph vouwt die (RDF 1.1) al samen met de gewone
+vorm en levert hem niet apart aan -- die is dus niet te reconstrueren. De byte-gelijkheid steunt
+er daarom op dat de ingelezen bestanden geen expliciet `^^xsd:string` dragen (nagegaan voor de
+totaal-ontologie en de OroX-export), niet op een algemene reconstructiegarantie. Een toekomstige
+invoer met zo'n literaal zou de gelijkheid stil kunnen doorbreken; de byte-vergelijking uit de
+equivalentie-eis vangt dat.
+
+**Cache-invalidatie.** De cachesleutel bevat al de broncode van `dataset.py` en de versies van
+rdflib en shapely; `pyoxigraph.__version__` is toegevoegd, zodat een parser-upgrade de cache
+net zo goed ongeldig maakt. Bestaande caches invalideren vanzelf doordat `dataset.py` wijzigde.
+
+**Alternatief.** Een eigen streaming-TTL-lezer (verworpen in het issue: een project op zich,
+strijdig met "minimum code dat het probleem oplost"). De rdflib-store-vulling verder pruimen
+(een ruimtelijk voorfilter, de graaf snoeien tot de triples die de checks raken) is complementair
+en blijft mogelijk vervolg, niet nu.
+
+**Achterhaald (deels).** De opslagkeuze -- overzetten naar een gewone `rdflib.Graph`, met de
+eenmalige circa 45 s -- is achterhaald door [[BO-42]]: de store is vervangen door eigen
+graafindexen. De parsekeuze (`pyoxigraph` als harde afhankelijkheid) staat.
+
+### BO-42 Eigen graafindexen (`GraafIndex`) vervangen de rdflib-store
+
+**Wat.** `GwswDataset.graph` is geen `rdflib.Graph` meer maar een eigen `GraafIndex`
+(`src/nlriochecker/graaf.py`): twee dicts (s→p→objecten en p→o→subjecten), rechtstreeks
+gevuld uit de pyoxigraph-stream, met rdflib-termen (`URIRef`, `BNode`, `Literal`) als
+munteenheid zodat de checks en alle vergelijkingen ongewijzigd blijven. De rdflib-store
+bouwde drie geneste indexen (spo, pos, osp) met per triple dict-in-dict-in-dict-overhead,
+terwijl de checks maar een handvol leesbewerkingen doen, allemaal met gebonden argumenten;
+de moduledocstring van `graaf.py` draagt het volledige leescontract.
+
+**Gemeten.** Koude toetsrun op De Wolden en Hoogeveen: 107 s totaal waarvan laden 27,9 s
+(was 205 s totaal, laden 84,6 s). Warme run 98 s, cache-lezen 2,3 s (was 163 s / 34 s).
+Piek-RSS 1,76 GB (was 3,98 GB). De graafpickle in de cache is 91 MB (was 436 MB).
+
+**Cache: picklen, niet herbouwen.** Beide alternatieven zijn gemeten: de gepicklede index
+laden kost 5,7 s, hem warm herbouwen uit een nieuwe pyoxigraph-parse 19,9 s. Daarom
+pickle't de cache de index; herbouwen verworpen.
+
+**Equivalentie, geborgd.** TDD tegen rdflib's `Memory`-semantiek: `tests/test_graaf.py`
+toetst elke leesbewerking uit het contract tegen het rdflib-antwoord op dezelfde triples,
+inclusief volgorde (eerste-toevoegvolgorde; de pos-groepering van `subject_objects`) en
+dedupe. Daarbovenop is de uitvoer van een volledige `toets` op De Wolden en Hoogeveen
+byte-/inhoudsgelijk aan die van vóór de omzetting, koud én warm.
+
+**Cache-invalidatie.** `graaf.py` telt mee in de cachesleutel, naast `dataset.py`,
+`geometry.py` en `ontologie.py`: een wijziging aan de termconversie of de volgordegarantie
+is net zo goed een andere lader en dus een andere sleutel.

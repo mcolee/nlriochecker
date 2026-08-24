@@ -15,88 +15,26 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import HAS_PART, Conduit
+from nlriochecker.checks.selectie import (
+    infiltratieleidingen,
+    overstortputten,
+)
+from nlriochecker.checks.verbanden import (
+    _eindpunten,
+    _Netwerk,
+    _netwerk,
+    deelstelsel_ids,
+    verbonden_knopen,
+)
+from nlriochecker.dataset import Conduit, GwswDataset, part_holders_of
 from nlriochecker.taal import getal, vorm
-
-
-@dataclass(frozen=True)
-class _Netwerk:
-    """De gerichte vrijvervalgraaf plus de strengen die erin zitten.
-
-    De richting is de administratieve van-naar-richting: van BeginpuntLeiding naar
-    EindpuntLeiding. Dat is de richting die het GWSW-model als afvoerrichting
-    bedoelt; NET-003 toetst later of de geometrie daarmee overeenkomt.
-    """
-
-    graph: nx.DiGraph
-    conduits: list[Conduit]
-    unconnected: list[Conduit]
-    reversed_count: int = 0
-
-
-def _netwerk(context: CheckContext) -> _Netwerk:
-    """Geeft de netwerkgraaf; die wordt per context een keer gebouwd."""
-    return context.cached("netwerk", lambda: _bouw_netwerk(context))
-
-
-def _bouw_netwerk(context: CheckContext) -> _Netwerk:
-    """Bouwt de gerichte graaf: knoop is put of eindpunt, kant is streng."""
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
-
-    conduits = list(
-        {
-            uri: dataset.conduits[uri]
-            for wortel in context.config.klassen.vrijvervalleiding
-            for uri in dataset.of_class(wortel)
-            if uri in dataset.conduits
-        }.values()
-    )
-
-    op_bob = context.config.netwerk.richting == "bob"
-    graph = nx.DiGraph()
-    aangesloten: list[Conduit] = []
-    los: list[Conduit] = []
-    omgedraaid = 0
-    for conduit in conduits:
-        begin = dataset.resolve_network_node(conduit.start_node, wortels)
-        eind = dataset.resolve_network_node(conduit.end_node, wortels)
-        if begin is None or eind is None:
-            los.append(conduit)
-            continue
-        if op_bob and _stijgt(conduit):
-            begin, eind = eind, begin
-            omgedraaid += 1
-        graph.add_edge(begin, eind, uri=conduit.uri, label=conduit.label)
-        aangesloten.append(conduit)
-
-    return _Netwerk(graph=graph, conduits=aangesloten, unconnected=los, reversed_count=omgedraaid)
-
-
-def _stijgt(conduit: Conduit) -> bool:
-    """Geeft aan of de bodem stijgt van begin- naar eindpunt."""
-    verval = conduit.bob_verval
-    return verval is not None and verval < 0
-
-
-def _eindpunten(context: CheckContext, rol: str) -> set[str]:
-    """De knopen in de graaf die als eindpunt van deze soort afvoer gelden."""
-    netwerk = _netwerk(context)
-    dataset = context.dataset
-    return {
-        uri
-        for wortel in getattr(context.config.klassen, rol)
-        for uri in dataset.of_class(wortel)
-        if uri in netwerk.graph
-    }
 
 
 def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     """De knopen die stroomafwaarts een van deze eindpunten bereiken.
 
     Een enkele doorloop over de omgekeerde graaf vanaf alle eindpunten tegelijk.
-    Per eindpunt afzonderlijk zoeken kost O(eindpunten x graaf): De Wolden heeft
+    Per eindpunt afzonderlijk zoeken kost O(eindpunten x graaf): De Wolden en Hoogeveen heeft
     893 gemalen op ruim 20.000 knopen, en dat loopt in de tientallen miljoenen
     stappen. Zo blijft het een enkele O(knopen + kanten)-doorloop.
     """
@@ -299,7 +237,9 @@ class _ZonderAfvoerpad(Check):
                 continue
             begin = dataset.resolve_network_node(conduit.start_node, wortels)
             if begin not in bereikt:
-                gevonden.append((conduit, clusters.get(begin, "")))
+                # Een streng waarvan het beginpunt niet op te lossen is hoort hier
+                # thuis -- onbereikbaar is onbereikbaar -- maar heeft geen cluster.
+                gevonden.append((conduit, clusters.get(begin, "") if begin else ""))
         return gevonden, not endpoints
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -371,7 +311,7 @@ class KringloopInNetwerk(Check):
             subgraaf = netwerk.graph.subgraph(deel)
             kring = self._voorbeeldkring(subgraaf)
             labels = [self._label(dataset, uri) for uri in kring]
-            uri, label = self._eerste_streng(subgraaf, kring, dataset)
+            uri, label = self._eerste_streng(netwerk, kring, dataset)
             yield self.finding(
                 context,
                 uri,
@@ -388,23 +328,34 @@ class KringloopInNetwerk(Check):
         return netwerk.graph.has_edge(knoop, knoop)
 
     def _voorbeeldkring(self, subgraaf) -> list[str]:
-        """Een kringloop uit dit deel, als illustratie in de melding."""
+        """Een kringloop uit dit deel, als illustratie in de melding.
+
+        Met een vast beginpunt, want zonder `source` begint `find_cycle` bij de eerste
+        knoop in invoegvolgorde. Die volgt uit de `set` die
+        `strongly_connected_components` oplevert en dus uit de hashseed: dezelfde data
+        zou per run een andere streng aanwijzen, en `vergelijk` zou daar een verschil
+        in zien dat er niet is. Elk knooppunt van een sterk samenhangend deel ligt op
+        een kringloop, dus de kleinste URI voldoet als startpunt.
+        """
         try:
-            kanten = nx.find_cycle(subgraaf)
+            kanten = nx.find_cycle(subgraaf, source=min(subgraaf))
         except nx.NetworkXNoCycle:
             return sorted(subgraaf)[:1]
         return [begin for begin, _, *_ in kanten]
 
-    def _label(self, dataset, uri: str) -> str:
+    def _label(self, dataset: GwswDataset, uri: str) -> str:
         """Het label van een knooppunt, of de URI als dat er niet is."""
         node = dataset.nodes.get(uri)
         return node.label if node is not None and node.label else uri
 
-    def _eerste_streng(self, subgraaf, kring: list[str], dataset) -> tuple[str, str]:
-        """De streng waarop de melding wordt gehangen."""
-        if len(kring) > 1 and subgraaf.has_edge(kring[0], kring[1]):
-            kant = subgraaf.edges[kring[0], kring[1]]
-            return kant["uri"], kant["label"]
+    def _eerste_streng(
+        self, netwerk: _Netwerk, kring: list[str], dataset: GwswDataset
+    ) -> tuple[str, str]:
+        """De streng waarop de melding wordt gehangen: de eerste op de kant kring[0] -> kring[1]."""
+        if len(kring) > 1:
+            strengen = netwerk.strengen_per_kant.get((kring[0], kring[1]), ())
+            if strengen:
+                return strengen[0].uri, strengen[0].label
         return kring[0], self._label(dataset, kring[0])
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -428,32 +379,38 @@ class ItStelselZonderDrempel(Check):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt samenhangende delen met infiltratieleidingen maar zonder drempel.
 
-        De GWSW-ontologie kent geen klasse 'IT-stelsel'; een deelstelsel waarin
-        infiltratieleidingen liggen geldt hier als zodanig. Welke klassen dat zijn,
-        staat in de projectconfig.
+        De GWSW-ontologie kent het IT-stelsel wel (Infiltratiestelsel en zijn
+        subklasse DrainageInfiltratieTransportStelsel), maar de engine leest de
+        stelselboom uit de export nergens; een deelstelsel waarin infiltratieleidingen
+        liggen geldt hier daarom als IT-stelsel. Welke klassen dat zijn, staat in de
+        projectconfig. Zie BO-34 in docs/beslislog.md.
         """
         netwerk = _netwerk(context)
         dataset = context.dataset
         wortels = context.config.klassen.netwerkknopen
 
-        infiltratie = {
-            uri
-            for wortel in context.config.klassen.infiltratie
-            for uri in dataset.of_class(wortel)
-            if uri in dataset.conduits
-        }
+        infiltratie = {conduit.uri for conduit in infiltratieleidingen(context)}
         if not infiltratie:
             return
 
         drempelknopen = self._knopen_met_drempel(context)
 
-        for deel in nx.weakly_connected_components(netwerk.graph):
-            strengen = [
-                conduit
-                for conduit in netwerk.conduits
-                if conduit.uri in infiltratie
-                and dataset.resolve_network_node(conduit.start_node, wortels) in deel
-            ]
+        # Een doorloop over de strengen in plaats van een per component: de dict
+        # wijst elke knoop zijn component aan, en de meldingsvolgorde blijft die
+        # van de componenten met daarbinnen de volgorde van `netwerk.conduits`.
+        componenten = list(nx.weakly_connected_components(netwerk.graph))
+        component_van = {knoop: index for index, deel in enumerate(componenten) for knoop in deel}
+        per_component: dict[int, list[Conduit]] = {}
+        for conduit in netwerk.conduits:
+            if conduit.uri not in infiltratie:
+                continue
+            begin = dataset.resolve_network_node(conduit.start_node, wortels)
+            index = component_van.get(begin) if begin is not None else None
+            if index is not None:
+                per_component.setdefault(index, []).append(conduit)
+
+        for index, deel in enumerate(componenten):
+            strengen = per_component.get(index, [])
             if not strengen or deel & drempelknopen:
                 continue
             for conduit in strengen:
@@ -466,21 +423,41 @@ class ItStelselZonderDrempel(Check):
                 )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt wat er buiten de graaf viel."""
-        return _netwerk_notities(context)
+        """Meldt wat als drempel telt en wat er buiten de graaf viel."""
+        notities = _netwerk_notities(context)
+        if infiltratieleidingen(context):
+            notities.insert(
+                0,
+                "Een deelstelsel telt hier als voorzien van een drempel wanneer er een los "
+                "`Overstortdrempel`-onderdeel in ligt of een overstortput (`Overstortput`, "
+                "`Stuwput`); een bergbezinkvoorziening telt niet mee.",
+            )
+        return notities
 
     def _knopen_met_drempel(self, context: CheckContext) -> set[str]:
-        """De knopen die zelf een drempel bevatten of er onderdeel van zijn."""
+        """De knopen die een overstortvoorziening dragen.
+
+        Twee vormen, dezelfde als `checks/randvoorzieningen.py` leest: een los
+        `Overstortdrempel`-onderdeel, en de overstortput zelf. Op de De
+        Wolden en Hoogeveen-export staan overstorten als `Overstortput` met een
+        `Overstortleiding`, niet als los `Overstortdrempel`-object (BO-34, open
+        punt 6); alleen op `Overstortdrempel` afgaan liet de verzameling leeg en
+        meldde elk infiltratieriool onvoorwaardelijk. Zie issue #42.
+        """
         dataset = context.dataset
         wortels = context.config.klassen.netwerkknopen
 
         knopen: set[str] = set()
         for wortel in context.config.klassen.drempel:
             for drempel in dataset.subjects_of_class(wortel):
-                for houder in dataset.graph.subjects(HAS_PART, drempel):
+                for houder in part_holders_of(dataset.graph, drempel):
                     knoop = dataset.resolve_network_node(str(houder), wortels)
                     if knoop is not None:
                         knopen.add(knoop)
+        for put in overstortputten(context):
+            knoop = dataset.resolve_network_node(put.uri, wortels)
+            if knoop is not None:
+                knopen.add(knoop)
         return knopen
 
     def examined(self, context: CheckContext) -> int:
@@ -557,6 +534,193 @@ class OrientatieTegenAfvoerrichting(Check):
         )
 
 
+_RICHTING_MEE = "mee"
+_RICHTING_TEGEN = "tegen"
+_RICHTING_VLAK = "vlak"
+_RICHTING_ONBEKEND = "onbekend"
+
+
+@dataclass(frozen=True)
+class _Richtingsdiagnose:
+    """De drie richtingssignalen van een streng, elk ten opzichte van de administratie.
+
+    `geometrie` en `bob` zeggen of dat signaal met de administratieve van-naar-richting
+    meeloopt (`mee`), er tegenin (`tegen`), niet te bepalen is (`onbekend`) of -- alleen
+    de BOB -- vlak ligt (`vlak`). De administratie zelf is de referentie: van
+    `begin_label` naar `eind_label`.
+    """
+
+    conduit: Conduit
+    begin_label: str
+    eind_label: str
+    geometrie: str
+    bob: str
+    bob_verval: float | None
+
+
+def _knooplabel(context: CheckContext, uri: str | None) -> str:
+    """Het label van de knoop boven een strengkoppeling, of de URI als er geen label is."""
+    dataset = context.dataset
+    knoop = dataset.resolve_network_node(uri, context.config.klassen.netwerkknopen)
+    node = dataset.nodes.get(knoop or "")
+    return node.label if node is not None and node.label else (knoop or "")
+
+
+def _geometrie_richting(context: CheckContext, conduit: Conduit) -> str:
+    """De tekenrichting van de lijn ten opzichte van de van-naar-richting."""
+    uitslag = context.dataset.richting_van_geometrie(conduit, context.config.klassen.netwerkknopen)
+    if uitslag is None:
+        return _RICHTING_ONBEKEND
+    omgekeerd, _, _ = uitslag
+    return _RICHTING_TEGEN if omgekeerd else _RICHTING_MEE
+
+
+def _bob_richting(conduit: Conduit, drempel: float) -> str:
+    """De BOB-richting: daalt (mee), stijgt (tegen), ligt vlak, of ontbreekt."""
+    verval = conduit.bob_verval
+    if verval is None:
+        return _RICHTING_ONBEKEND
+    if verval > drempel:
+        return _RICHTING_MEE
+    if verval < -drempel:
+        return _RICHTING_TEGEN
+    return _RICHTING_VLAK
+
+
+def _richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
+    """De richtingssignalen per streng in de graaf; een keer per context."""
+    return context.cached("net009", lambda: _bouw_richtingsdiagnoses(context))
+
+
+def _bouw_richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
+    """Bepaalt per aangesloten vrijvervalstreng haar drie richtingssignalen."""
+    drempel = context.config.drempels.tegenverhang_licht_m
+    return [
+        _Richtingsdiagnose(
+            conduit=conduit,
+            begin_label=_knooplabel(context, conduit.start_node),
+            eind_label=_knooplabel(context, conduit.end_node),
+            geometrie=_geometrie_richting(context, conduit),
+            bob=_bob_richting(conduit, drempel),
+            bob_verval=conduit.bob_verval,
+        )
+        for conduit in _netwerk(context).conduits
+    ]
+
+
+def _tegenspraak(diagnose: _Richtingsdiagnose) -> bool:
+    """Geeft aan of een van de signalen tegen de administratie in wijst.
+
+    De administratie is de referentie (altijd 'mee'), dus er is tegenspraak zodra de
+    geometrie of de BOB de andere kant op wijst. Twee tegen-signalen die het onderling
+    eens zijn spreken de administratie nog steeds tegen -- de streng lijkt dan omgekeerd
+    geregistreerd.
+    """
+    return _RICHTING_TEGEN in (diagnose.geometrie, diagnose.bob)
+
+
+def _geen_signaal(diagnose: _Richtingsdiagnose) -> bool:
+    """Geeft aan of noch de geometrie noch de BOB iets over de richting zegt."""
+    return diagnose.geometrie == _RICHTING_ONBEKEND and diagnose.bob == _RICHTING_ONBEKEND
+
+
+def _geometrie_zin(richting: str) -> str:
+    """De geometrieregel van de melding."""
+    if richting == _RICHTING_TEGEN:
+        return "De lijn is omgekeerd getekend, van eind naar begin."
+    if richting == _RICHTING_MEE:
+        return "De lijn is in de van-naar-richting getekend."
+    return "De tekenrichting van de lijn is niet te bepalen."
+
+
+def _bob_zin(richting: str, verval: float | None) -> str:
+    """De BOB-regel van de melding."""
+    if richting == _RICHTING_MEE and verval is not None:
+        return f"De BOB daalt {verval:.3f} m van begin naar eind."
+    if richting == _RICHTING_TEGEN and verval is not None:
+        return f"De BOB stijgt {abs(verval):.3f} m van begin naar eind."
+    if richting == _RICHTING_VLAK and verval is not None:
+        return f"De BOB ligt vlak ({verval:.3f} m)."
+    return "De BOB ontbreekt."
+
+
+@register
+class RichtingssignalenSprekenElkaarTegen(Check):
+    """NET-009: administratie, geometrie en BOB wijzen niet dezelfde kant op."""
+
+    id = "NET-009"
+    title = "Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke streng waarvan de drie richtingssignalen elkaar tegenspreken.
+
+        De administratieve van-naar-richting is de referentie; de melding noemt alle
+        drie de waarden, zodat de beheerder zelf ziet welke fout is. NET-003 en TOP-020
+        melden elk een van de signalen apart; NET-009 leest ze samen en maakt beide tot
+        een deelgeval.
+        """
+        for diagnose in _richtingsdiagnoses(context):
+            if not _tegenspraak(diagnose):
+                continue
+            boodschap = (
+                "De richtingssignalen spreken elkaar tegen. Administratief loopt de "
+                f"streng van {diagnose.begin_label!r} naar {diagnose.eind_label!r}. "
+                f"{_geometrie_zin(diagnose.geometrie)} "
+                f"{_bob_zin(diagnose.bob, diagnose.bob_verval)}"
+            )
+            yield self.finding(
+                context,
+                diagnose.conduit.uri,
+                diagnose.conduit.label,
+                boodschap,
+                geometrie=diagnose.geometrie,
+                bob=diagnose.bob,
+                bob_verval_m=round(diagnose.bob_verval, 3)
+                if diagnose.bob_verval is not None
+                else None,
+                administratief_begin=diagnose.begin_label,
+                administratief_eind=diagnose.eind_label,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt de vlakke strengen ('geen uitspraak') en de BOB's die als vulwaarde wegvielen."""
+        diagnoses = _richtingsdiagnoses(context)
+        notities = _netwerk_notities(context)
+
+        vlak = sum(1 for d in diagnoses if not _tegenspraak(d) and d.bob == _RICHTING_VLAK)
+        if vlak:
+            drempel = context.config.drempels.tegenverhang_licht_m
+            notities.append(
+                f"{getal(vlak, 'streng', 'strengen')} {vorm(vlak, 'ligt', 'liggen')} vlak "
+                f"(|verval| ≤ {drempel} m): de BOB zegt niets over de richting, dus deze toets "
+                f"doet daar geen uitspraak over."
+            )
+
+        vulwaarde = sum(1 for d in diagnoses if d.conduit.vulwaarden)
+        if vulwaarde:
+            notities.append(
+                f"{getal(vulwaarde, 'streng', 'strengen')} {vorm(vulwaarde, 'heeft', 'hebben')} "
+                "een BOB die als vulwaarde (rond 0 m NAP) is gelezen en daardoor ontbreekt; "
+                "hun richting kon niet op de BOB getoetst worden."
+            )
+
+        geen_signaal = sum(1 for d in diagnoses if _geen_signaal(d))
+        if geen_signaal:
+            notities.append(
+                f"{getal(geen_signaal, 'streng', 'strengen')} "
+                f"{vorm(geen_signaal, 'draagt', 'dragen')} geen bruikbare tekenrichting en geen "
+                "BOB, dus met geen enkel richtingssignaal te toetsen; deze strengen zijn niet "
+                "beoordeeld."
+            )
+        return notities
+
+    def examined(self, context: CheckContext) -> int:
+        """De strengen met minstens een richtingssignaal; de rest kon niet beoordeeld worden."""
+        return sum(1 for d in _richtingsdiagnoses(context) if not _geen_signaal(d))
+
+
 @register
 class StelseltypeWijktAfVanBuren(Check):
     """NET-005: een streng met een ander stelseltype dan al haar buren."""
@@ -575,16 +739,11 @@ class StelseltypeWijktAfVanBuren(Check):
         aan de rand van een stelsel is namelijk terecht anders dan haar buur.
         """
         netwerk = _netwerk(context)
-        dataset = context.dataset
-        wortels = context.config.klassen.netwerkknopen
 
         soorten = {conduit.uri: _stelseltype(context, conduit) for conduit in netwerk.conduits}
         per_knoop: dict[str, list[Conduit]] = {}
         for conduit in netwerk.conduits:
-            for uri in (
-                dataset.resolve_network_node(conduit.start_node, wortels),
-                dataset.resolve_network_node(conduit.end_node, wortels),
-            ):
+            for uri in verbonden_knopen(context, conduit):
                 if uri is not None:
                     per_knoop.setdefault(uri, []).append(conduit)
 
@@ -592,8 +751,7 @@ class StelseltypeWijktAfVanBuren(Check):
             eigen = soorten[conduit.uri]
             if eigen is None:
                 continue
-            begin = dataset.resolve_network_node(conduit.start_node, wortels)
-            eind = dataset.resolve_network_node(conduit.end_node, wortels)
+            begin, eind = verbonden_knopen(context, conduit)
             bovenstrooms = self._buren(per_knoop, begin, conduit.uri, soorten)
             benedenstrooms = self._buren(per_knoop, eind, conduit.uri, soorten)
             # Het register vraagt om afwijking van *boven- en* benedenstroomse
@@ -608,6 +766,7 @@ class StelseltypeWijktAfVanBuren(Check):
             aantal = sum(
                 1
                 for uri in (begin, eind)
+                if uri is not None
                 for buur in per_knoop.get(uri, [])
                 if buur.uri != conduit.uri
             )
@@ -632,9 +791,9 @@ class StelseltypeWijktAfVanBuren(Check):
         if knoop is None:
             return set()
         return {
-            soorten[buur.uri]
+            soort
             for buur in per_knoop.get(knoop, [])
-            if buur.uri != eigen_uri and soorten[buur.uri] is not None
+            if buur.uri != eigen_uri and (soort := soorten[buur.uri]) is not None
         }
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -664,17 +823,13 @@ class KoppelingTussenStelseltypen(Check):
         """
         netwerk = _netwerk(context)
         dataset = context.dataset
-        wortels = context.config.klassen.netwerkknopen
 
         per_knoop: dict[str, dict[str, list[str]]] = {}
         for conduit in netwerk.conduits:
             soort = _stelseltype(context, conduit)
             if soort is None:
                 continue
-            for uri in (
-                dataset.resolve_network_node(conduit.start_node, wortels),
-                dataset.resolve_network_node(conduit.end_node, wortels),
-            ):
+            for uri in verbonden_knopen(context, conduit):
                 if uri is not None:
                     per_knoop.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
 

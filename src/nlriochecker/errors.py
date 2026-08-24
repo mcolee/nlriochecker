@@ -31,3 +31,7 @@ class StudyAreaError(PipelineError):
 
 class CoverageError(PipelineError):
     """De dekkingmapping loopt uit de pas met het checkregister."""
+
+
+class OpdrachtError(PipelineError):
+    """Het verzoek zelf kan niet: een onbekende keuze of een vlag zonder houvast."""

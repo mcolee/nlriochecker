@@ -1,7 +1,8 @@
 """Tests voor de EXT-checks en de AHN-hoogtechecks op miniatuurbronnen.
 
 De fixtures onder `tests/fixtures/gis/ext` hebben dezelfde structuur als de echte
-bronnen in `data/gis` (dezelfde laagnamen, dezelfde attribuutnamen, EPSG:28992),
+bronnen in `data/gis_koekangerveld` (dezelfde laagnamen, dezelfde attribuutnamen,
+EPSG:28992),
 maar dan in het lokale assenstelsel van de TTL-fixtures. Ze worden gemaakt met
 `scripts/maak_gis_fixtures.py`; het hoogteraster staat overal op 10,00 m NAP met
 een nodata-vlek rond (1040, 2010).
@@ -182,10 +183,64 @@ def test_ext001_benoemt_de_relatie_met_het_bouwwerk(
     )
 
 
-def test_ext003_zwijgt_over_een_duiker(config: CheckConfig, bronnen: ExternalData) -> None:
-    # Streng 3 is een duiker en kruist water-2; EXT-002 meldt hem wel, EXT-003 niet.
+def test_ext003_zwijgt_over_een_zinker(config: CheckConfig, bronnen: ExternalData) -> None:
+    # Streng 3 is een zinker en kruist water-2; EXT-002 meldt hem wel, EXT-003 niet.
     assert "3" in labels(uitkomst("EXT-002", config, bronnen))
     assert "3" not in labels(uitkomst("EXT-003", config, bronnen))
+
+
+def test_de_twee_kruisingschecks_delen_een_populatie(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """De gedeelde kruisingenlijst mag alleen bestaan zolang de populatie gedeeld is.
+
+    EXT-002 en EXT-003 lezen dezelfde cache-ingang `ext:watergangkruisingen`. Kreeg een
+    van de twee een eigen, bredere populatie -- BO-25 verwierp dat, maar dat is een
+    besluit en geen onmogelijkheid -- dan zou de check die het eerst draait de lijst van
+    de ander bepalen, zonder uitzondering en met de verkeerde uitslag.
+    """
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+    ext002 = REGISTRY["EXT-002"]()
+    ext003 = REGISTRY["EXT-003"]()
+
+    assert ext002.selectie(context).toetsbaar == ext003.selectie(context).toetsbaar
+    assert ext002.laag(context) is ext003.laag(context)
+
+
+def test_een_duiker_valt_buiten_beide_kruisingschecks(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 6 is een Duiker: in de ontologie een Leiding, geen VrijvervalRioolleiding.
+
+    Hij kruist water-2 net als streng 3, maar zit in geen van beide populaties. De
+    toelichting van beide checks zegt dat hij niet bekeken is.
+    """
+    for check_id in ("EXT-002", "EXT-003"):
+        outcome = uitkomst(check_id, config, bronnen)
+        assert "6" not in labels(outcome)
+        assert any(
+            "niet bekeken: 1 streng van de klasse Duiker" in note for note in outcome.notes
+        ), outcome.notes
+
+
+def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
+    """Streng 6 is decor voor de populatiegrens en mag nergens een gebrek opleveren.
+
+    Hij ligt op een eigen route, los van streng 3: precies bovenop streng 3 gaf hij
+    TOP-006 een samenvalmelding, en die dook op in de melding van streng 3 -- niet in
+    die van streng 6. Een assertie op zijn eigen label zou dat dus missen; deze kijkt
+    daarom ook in de meldingsteksten.
+    """
+    dataset = load_dataset(SCENARIO)
+    resultaat = run_checks(CheckContext(dataset=dataset, config=config))
+    betrokken = [
+        (outcome.check_id, finding.message)
+        for outcome in resultaat.outcomes
+        for finding in outcome.findings
+        if finding.object_label == "6" or "'6'" in finding.message
+    ]
+    assert betrokken == []
 
 
 def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -251,7 +306,7 @@ def test_hgt001_meldt_een_maaiveld_uit_hetzelfde_hoogtemodel(
 def test_hgt001_valt_terug_op_de_wijze_van_het_punt(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
-    """Put E heeft geen putdekselniveau, net als elke put in De Wolden.
+    """Put E heeft geen putdekselniveau, net als elke put in De Wolden en Hoogeveen.
 
     De check valt dan terug op de maaiveldhoogte, en die draagt haar
     inwinningswijze niet zelf maar op het Punt van de maaiveldorientatie. Zonder
@@ -291,7 +346,7 @@ def test_lege_lijst_zet_de_kanttekening_uit(config: CheckConfig, bronnen: Extern
 def test_hgt001_en_hgt002_claimen_geen_dekselhoogte() -> None:
     """De titel mag niet meer onvoorwaardelijk over de dekselhoogte spreken.
 
-    In De Wolden ontbreekt `Putdekselniveau` en toetst de check de maaiveldhoogte;
+    In De Wolden en Hoogeveen ontbreekt `Putdekselniveau` en toetst de check de maaiveldhoogte;
     de titel voedt ook de dekkingsmatrix en het registeroverzicht, dus hij hoort
     beide kenmerken te dekken in plaats van er een te claimen.
     """
@@ -314,3 +369,77 @@ def test_hgt001_gebruikt_het_juiste_lidwoord(config: CheckConfig, bronnen: Exter
 
     bevinding = next(f for f in outcome.findings if f.details["bron"] == "maaiveldhoogte")
     assert bevinding.message.startswith("De maaiveldhoogte ")
+
+
+def test_ext001_wijst_het_geraakte_pand_aan(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Alle vier de bevindingen raken hetzelfde pand uit de BGT-fixture."""
+    outcome = uitkomst("EXT-001", config, bronnen)
+
+    uris = {finding.details["object2_uri"] for finding in outcome.findings}
+    aanduidingen = {finding.details["object2_label"] for finding in outcome.findings}
+
+    assert uris == {"bgt:pand/pand-1"}
+    assert aanduidingen == {"pand pand-1"}
+
+
+def test_ext001_registreert_de_treffer_met_geometrie(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-001"])
+
+    treffer = run.treffers.get("bgt:pand/pand-1")
+    assert treffer is not None
+    assert treffer.bron == "bgt_pand"
+    assert treffer.bronbestand == "bgt.gpkg"
+    assert treffer.geometrie.geom_type in {"Polygon", "MultiPolygon"}
+    assert len(run.treffers) == 1
+
+
+def test_ext001_bewaart_de_afstand_per_melding(config: CheckConfig, bronnen: ExternalData) -> None:
+    """`Melding` draagt de afstand niet; de laag haalt hem uit het register."""
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-001"])
+    streng = next(f for f in run.findings if f.object_label == "1")
+
+    assert run.treffers.afstand("bgt:pand/pand-1", "EXT-001", streng.object_uri) == 0.0
+
+
+def test_ext001_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:
+    """De detectie blijft gelijk; er komt alleen een verwijzing bij."""
+    outcome = uitkomst("EXT-001", config, bronnen)
+    relaties = {finding.object_label: finding.details["waarde"] for finding in outcome.findings}
+
+    assert relaties == {"1": "kruist", "4": "binnen", "P": "binnen", "Q": "binnen"}
+
+
+def test_ext003_wijst_het_geraakte_waterdeel_aan(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    outcome = uitkomst("EXT-003", config, bronnen)
+
+    verwijzingen = {
+        (finding.details["object2_uri"], finding.details["object2_label"])
+        for finding in outcome.findings
+    }
+
+    assert verwijzingen == {("bgt:waterdeel/water-1", "waterloop")}
+
+
+def test_ext002_registreert_geen_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
+    """De laag volgt EXT-003; kruisingen met een duiker horen er bewust buiten."""
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-002"])
+
+    assert len(run.treffers) == 0
+    assert run.findings
+
+
+def test_ext003_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:
+    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2"]

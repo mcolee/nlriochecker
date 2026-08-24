@@ -12,9 +12,11 @@ from nlriochecker.coverage import CheckEvidence, CoverageResult
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
+    FILE_CHECKS_JSON,
     FILE_CHECKS_MARKDOWN,
     write_check_report,
 )
+from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.tabel import TOP_N, prepare, table, title
 
 FILE_MARKDOWN = "samenvatting.md"
@@ -50,14 +52,19 @@ def write_markdown(
 ) -> Path:
     """Schrijft de samenvatting als Markdown en geeft het geschreven pad terug."""
     target = _check_target(Path(output_dir) / FILE_MARKDOWN, analyse)
-    target.write_text(_render_markdown(analyse, coverage), encoding="utf-8")
-    return target
+    titel = f"# Nulmeting-samenvatting {analyse.meting.dataset_file}"
+    return schrijf_markdown(
+        target,
+        titel,
+        _render_markdown(analyse, coverage),
+        markering=analyse.meting.meetbereik.markering(),
+    )
 
 
 def write_csv(analyse: MetingAnalysis, output_dir: Path) -> Path:
     """Schrijft de geaggregeerde meldingen van alle CFK's als een enkele CSV."""
     target = _check_target(Path(output_dir) / FILE_CSV, analyse)
-    _aggregated_table(analyse).to_csv(target, sep=";", index=False, encoding="utf-8")
+    schrijf_csv(_aggregated_table(analyse), target)
     return target
 
 
@@ -81,12 +88,10 @@ def _check_target(target: Path, analyse: MetingAnalysis) -> Path:
     return target
 
 
-def _render_markdown(analyse: MetingAnalysis, coverage: CoverageResult | None = None) -> str:
-    """Stelt de volledige Markdown-samenvatting samen."""
+def _render_markdown(analyse: MetingAnalysis, coverage: CoverageResult | None = None) -> list[str]:
+    """Stelt de romp van de samenvatting samen; titel en herkomst komen uit `schrijf_markdown`."""
     meting = analyse.meting
     lines = [
-        f"# Nulmeting-samenvatting {meting.dataset_file}",
-        "",
         "## Herkomst",
         "",
         "| CFK | Bronbestand | Toetsmoment | Meldingen | Fouten | Waarschuwingen |",
@@ -121,7 +126,7 @@ def _render_markdown(analyse: MetingAnalysis, coverage: CoverageResult | None = 
         lines += [""]
         lines += table(deel.by_object_type.head(TOP_N), title("Objecttypen", deel.by_object_type))
 
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def _typing_section(analyse: MetingAnalysis) -> list[str]:
@@ -142,6 +147,23 @@ def _typing_section(analyse: MetingAnalysis) -> list[str]:
         objecten = str(gate.too_generic_count) if gate.resolved else "\u2014"
         lines.append(f"| {cfk} | {klassen} | {objecten} | {score} |")
 
+    onbeoordeelbaar = sorted(
+        {
+            klasse
+            for cfk in analyse.meting.cfks
+            for klasse in analyse.per_cfk[cfk].typing_gate.unassessable_classes
+        }
+    )
+    if onbeoordeelbaar:
+        lines += [
+            "",
+            f"> Niet beoordeeld: {', '.join(onbeoordeelbaar)}. Die klassen zijn niet naar "
+            "objecten in het domeinmodel te herleiden: dat kent alleen knopen en strengen, "
+            "en een verbindingsklasse staat bovendien op de orientatie van een streng en "
+            "niet op de streng zelf. Ze tellen niet mee in het aantal en niet in de score, "
+            "dus over hun objecten zegt de typeringsscore niets.",
+        ]
+
     if not any(analyse.per_cfk[cfk].typing_gate.resolved for cfk in analyse.meting.cfks):
         lines += [
             "",
@@ -156,11 +178,15 @@ def write_coverage_report(result: CoverageResult, output_dir: Path) -> tuple[Pat
     """Schrijft de dekkinganalyse als Markdown en CSV en geeft beide paden terug."""
     output_dir = prepare(output_dir)
 
-    markdown_path = Path(output_dir) / FILE_COVERAGE_MARKDOWN
-    markdown_path.write_text(_render_coverage(result), encoding="utf-8")
+    markdown_path = schrijf_markdown(
+        Path(output_dir) / FILE_COVERAGE_MARKDOWN,
+        f"# Dekkinganalyse {result.dataset}",
+        _render_coverage(result),
+        markering=result.meetbereik.markering(),
+    )
 
     csv_path = Path(output_dir) / FILE_COVERAGE_CSV
-    _coverage_table(result).to_csv(csv_path, sep=";", index=False, encoding="utf-8")
+    schrijf_csv(_coverage_table(result), csv_path)
 
     return markdown_path, csv_path
 
@@ -196,11 +222,9 @@ def _coverage_table(result: CoverageResult) -> pd.DataFrame:
     )
 
 
-def _render_coverage(result: CoverageResult) -> str:
-    """Stelt het volledige dekkingrapport samen."""
+def _render_coverage(result: CoverageResult) -> list[str]:
+    """Stelt de romp van het dekkingrapport samen; de kop komt uit `schrijf_markdown`."""
     lines = [
-        f"# Dekkinganalyse {result.dataset}",
-        "",
         f"Checkregister versie {result.config.checkregister_versie} (`{result.config.bron}`), "
         f"typeringsdrempel {result.config.drempels.typeringsscore_minimum:.1f}%.",
         "",
@@ -233,7 +257,7 @@ def _render_coverage(result: CoverageResult) -> str:
                 "voorbehoud.",
             ]
 
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def _register_section(result: CoverageResult) -> list[str]:
@@ -361,14 +385,20 @@ def write_comparison_reports(
     """Schrijft de vergelijking als Markdown plus twee CSV's."""
     output_dir = prepare(output_dir)
 
-    markdown_path = Path(output_dir) / FILE_COMPARISON_MARKDOWN
-    markdown_path.write_text(_render_comparison(comparison), encoding="utf-8")
+    markdown_path = schrijf_markdown(
+        Path(output_dir) / FILE_COMPARISON_MARKDOWN,
+        f"# Trendvergelijking {comparison.dataset_file}",
+        _render_comparison(comparison),
+        # De twee meetbereiken zijn gelijk: `compare_metingen` weigert ongelijke
+        # sets. Het latere meetmoment staat hier dus voor beide.
+        markering=comparison.later.meting.meetbereik.markering(),
+    )
 
     csv_path = Path(output_dir) / FILE_COMPARISON_CSV
-    _comparison_table(comparison).to_csv(csv_path, sep=";", index=False, encoding="utf-8")
+    schrijf_csv(_comparison_table(comparison), csv_path)
 
     objects_path = Path(output_dir) / FILE_OBJECT_CHANGES_CSV
-    _object_changes_table(comparison).to_csv(objects_path, sep=";", index=False, encoding="utf-8")
+    schrijf_csv(_object_changes_table(comparison), objects_path)
 
     return markdown_path, csv_path, objects_path
 
@@ -398,11 +428,9 @@ def _object_changes_table(comparison: MetingComparison) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
-def _render_comparison(comparison: MetingComparison) -> str:
-    """Stelt het volledige vergelijkingsrapport samen."""
+def _render_comparison(comparison: MetingComparison) -> list[str]:
+    """Stelt de romp van het vergelijkingsrapport samen; de kop komt uit `schrijf_markdown`."""
     lines = [
-        f"# Trendvergelijking {comparison.dataset_file}",
-        "",
         "| Meetmoment | CFK | Toetsmoment | Meldingen | Fouten | Typeringsscore |",
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
@@ -455,7 +483,7 @@ def _render_comparison(comparison: MetingComparison) -> str:
         "",
         f"De volledige objectverschillen staan in `{FILE_OBJECT_CHANGES_CSV}`.",
     ]
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def _grootste_verschillen(frame: pd.DataFrame, sleutel: str) -> pd.DataFrame:
@@ -471,6 +499,7 @@ def _grootste_verschillen(frame: pd.DataFrame, sleutel: str) -> pd.DataFrame:
 # importeerbaar: bestaande aanroepen en tests hoeven daar niet van te weten.
 __all__ = [
     "FILE_CHECKS_CSV",
+    "FILE_CHECKS_JSON",
     "FILE_CHECKS_MARKDOWN",
     "write_check_report",
     "write_comparison_reports",

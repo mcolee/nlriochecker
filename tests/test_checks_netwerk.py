@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import networkx as nx
 import pytest
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
-from nlriochecker.checks.netwerk import _netwerk
-from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import load_dataset
+from nlriochecker.checks.netwerk import KringloopInNetwerk
+from nlriochecker.checks.verbanden import _netwerk, deelstelsel_ids, verbonden_knopen
+from nlriochecker.dataset import GWSW, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 NET_IDS = ["NET-001", "NET-002", "NET-004", "NET-007"]
@@ -38,6 +39,60 @@ def test_net001_vindt_het_losse_deelstelsel() -> None:
     assert _labels("net001_geen_afvoerpad.ttl", "NET-001") == ["3"]
 
 
+def test_net001_accepteert_een_overnamepunt_op_de_orientatie(tmp_path: Path) -> None:
+    """De belofte van BO-33 nagemeten: een geleverd overnamepunt werkt meteen.
+
+    De Wolden en Hoogeveen levert er nul, dus zonder deze fixture draait de hele route
+    `_eindpunten` -> `of_class` -> `types_of` -> `orientation_types` op geen enkele
+    dataset en in geen enkele test. `gwsw:Overnamepunt` is een subklasse van
+    `Aansluitpunt` en dus van `Knooppunt`, en staat daarom op de ORIENTATIE van de
+    put; het is die weg die hier bewezen wordt.
+
+    De tweede helft van de test is de controle: haal `Overnamepunt` uit
+    `afvoer_eindpunt` en streng "1" wordt wel gemeld. Zonder die helft zou de lege
+    lijst hierboven ook groen zijn als de klasse nooit werd opgezocht.
+    """
+    bestand = "net001_overnamepunt.ttl"
+    dataset = load_dataset(TTL_DIR / bestand)
+
+    # De klasse wordt op de orientatie van put B gevonden, niet op put B zelf.
+    knoop = dataset.nodes["http://example.org/toets#PutB"]
+    assert f"{GWSW}Overnamepunt" in knoop.orientation_types
+    assert f"{GWSW}Overnamepunt" not in knoop.types
+    assert dataset.of_class("Overnamepunt") == ["http://example.org/toets#PutB"]
+
+    assert _labels(bestand, "NET-001") == []
+
+    zonder_overnamepunt = tmp_path / "zonder.toml"
+    zonder_overnamepunt.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = []\nvuilwater = ['GemengdRiool']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        encoding="utf-8",
+    )
+    gevonden = _outcome(bestand, "NET-001", load_check_config(zonder_overnamepunt))
+    assert sorted(finding.object_label for finding in gevonden.findings) == ["1"]
+
+
+def test_losse_overnamepuntorientatie_verdwijnt_uit_de_netwerkanalyse() -> None:
+    """Het restrisico bij BO-33, als feit vastgelegd in plaats van als aanname.
+
+    Levert een export een `Overnamepunt` als losstaande orientatie zonder dragend
+    object, dan bouwt het domeinmodel er geen knoop van. Gevolg is niet dat de
+    streng ernaartoe als onbereikbaar gemeld wordt, maar dat ze helemaal buiten de
+    netwerkanalyse valt: geen herleidbare put aan beide zijden. Alleen de notitie
+    van de check telt haar nog.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_overnamepunt.ttl")
+    assert "http://example.org/toets#LosOvp_ori" not in dataset.nodes
+
+    outcome = _outcome("net001_overnamepunt.ttl", "NET-001")
+
+    assert [finding.object_label for finding in outcome.findings] == []
+    notitie = next(n for n in outcome.notes if "buiten de netwerkanalyse" in n)
+    assert "2" in notitie
+
+
 def test_net002_vindt_hemelwater_zonder_lozingspunt() -> None:
     assert _labels("net002_hemelwater_zonder_lozingspunt.ttl", "NET-002") == ["4"]
 
@@ -54,7 +109,49 @@ def test_net004_vindt_de_kringloop() -> None:
     # kringloop: dat laatste groeit exponentieel op een echt stelsel.
     assert len(bevindingen) == 1
     assert bevindingen[0].details["putten_in_deel"] == 3
-    assert set(bevindingen[0].details["voorbeeldkring"]) == {"C", "D", "E"}
+    # Op volgorde, niet als verzameling: de kring hoort niet per run te verspringen.
+    assert bevindingen[0].details["voorbeeldkring"] == ["C", "D", "E"]
+
+
+def test_net004_voorbeeldkring_hangt_niet_van_de_knoopvolgorde_af() -> None:
+    """Dezelfde kringloop moet dezelfde melding opleveren, hoe de graaf ook gevuld is.
+
+    `nx.find_cycle` zonder `source` begint bij de eerste knoop in invoegvolgorde, en
+    die volgt uit een `set` uit `strongly_connected_components` -- dus uit de hashseed.
+    Zonder vast beginpunt wijst NET-004 per run een andere streng aan, en dan toont
+    `vergelijk` verschillen tussen twee runs op dezelfde data die er niet zijn.
+    """
+    check = KringloopInNetwerk()
+    kanten = [("c", "a"), ("a", "b"), ("b", "c")]
+    volgordes = (kanten, list(reversed(kanten)), [kanten[1], kanten[2], kanten[0]])
+
+    kringen = set()
+    for volgorde in volgordes:
+        graaf = nx.DiGraph()
+        graaf.add_edges_from(volgorde)
+        kringen.add(tuple(check._voorbeeldkring(graaf)))
+
+    assert kringen == {("a", "b", "c")}
+
+
+@pytest.mark.parametrize(
+    "bestand", ["net004_parallelle_strengen.ttl", "net004_parallelle_strengen_omgekeerd.ttl"]
+)
+def test_net004_noemt_dezelfde_streng_ongeacht_de_invoervolgorde(bestand: str) -> None:
+    """Twee parallelle strengen op de kring: de melding hangt aan een streng die echt op
+    de kant kring[0] -> kring[1] ligt, en aan dezelfde streng ongeacht de volgorde waarin
+    de export ze declareert. Anders verschuift de melding-ID tussen twee exports."""
+    dataset = load_dataset(TTL_DIR / bestand)
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    bevindingen = run_checks(context, ["NET-004"]).outcomes[0].findings
+
+    assert len(bevindingen) == 1
+    assert bevindingen[0].details["voorbeeldkring"] == ["C", "D", "E"]
+    streng = dataset.conduits[bevindingen[0].object_uri]
+    begin, eind = verbonden_knopen(context, streng)
+    assert (dataset.nodes[begin].label, dataset.nodes[eind].label) == ("C", "D")
+    # De kleinste URI van de parallelle set, in beide declaratievolgordes.
+    assert bevindingen[0].object_label == "5"
 
 
 def test_net007_vindt_it_zonder_drempel() -> None:
@@ -63,6 +160,13 @@ def test_net007_vindt_it_zonder_drempel() -> None:
 
 def test_net007_zwijgt_als_er_een_drempel_is() -> None:
     assert _labels("net007_it_met_drempel.ttl", "NET-007") == []
+
+
+def test_net007_zwijgt_bij_overstortput_zonder_los_drempelobject() -> None:
+    # Zoals overstorten op de De Wolden en Hoogeveen-export staan: een Overstortput met een
+    # Overstortleiding, geen los Overstortdrempel-object. NET-007 hoort die vorm te
+    # herkennen; deed hij dat niet, dan meldde hij elk infiltratieriool. Zie issue #42.
+    assert _labels("net007_it_met_overstortput.ttl", "NET-007") == []
 
 
 def test_ontbrekend_eindpunt_wordt_expliciet_gemeld() -> None:
@@ -89,7 +193,8 @@ def test_eindpuntklassen_komen_uit_de_config(tmp_path: Path) -> None:
     zonder_gemaal = tmp_path / "zonder.toml"
     zonder_gemaal.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
-        "lozings_eindpunt = ['Lozingspunt']\nvuilwater = ['GemengdRiool']\n",
+        "lozings_eindpunt = ['Lozingspunt']\nvuilwater = ['GemengdRiool']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
         encoding="utf-8",
     )
 
@@ -166,6 +271,7 @@ def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> Non
     op_bob.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
         "afvoer_eindpunt = ['Gemaal']\nvuilwater = ['GemengdRiool']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
         "[netwerk]\nrichting = 'bob'\n",
         encoding="utf-8",
     )
@@ -258,7 +364,7 @@ def test_net001_laat_de_clusterduiding_aan_het_rapport() -> None:
     """De check kent de afbakening niet, dus telt hij de deelstelsels niet zelf.
 
     Zou hij dat wel doen, dan meldde een tot een buurt afgebakend rapport het
-    aantal deelstelsels van de hele dataset -- op De Wolden 174 bij 24 bevindingen.
+    aantal deelstelsels van de hele dataset -- op De Wolden en Hoogeveen 174 bij 24 bevindingen.
     """
     outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
 

@@ -22,12 +22,15 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Overstortleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
-gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
+gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
@@ -85,7 +88,7 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
         gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2000.0 1050.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
 :L1_b rdf:type gwsw:BeginpuntLeiding .
 :L1_e rdf:type gwsw:EindpuntLeiding .
-:L1_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 8.6 ] .
+:L1_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 8.7 ] .
 :L1_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 8.5 ] .
 :L1_b gwsw:hasConnection :PutA_ori .
 :L1_e gwsw:hasConnection :PutB_ori .

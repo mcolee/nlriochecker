@@ -6,18 +6,27 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
 
 from shapely.geometry import Point
 
 from nlriochecker.afbakening import Analyseset, objecten_in_gebied
 from nlriochecker.checkconfig import CheckConfig
+from nlriochecker.checks.treffers import Trefferregister
 from nlriochecker.dataset import GwswDataset
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import ExternalData
 from nlriochecker.karakteristiek import DataCharacteristics, bepaal_karakteristiek
+from nlriochecker.meting import Meetbereik
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import StudyArea
+from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
+
+if TYPE_CHECKING:  # pragma: no cover
+    # Alleen als type. `nulbevinding` leest `uitvoer.identiteit`, en die module
+    # trekt via haar package `checks` weer binnen; een gewone import zou de kring
+    # rond maken.
+    from nlriochecker.nulbevinding import Nulbevinding
 
 
 class Severity(StrEnum):
@@ -56,6 +65,15 @@ class Finding:
     # BGT-putdeksel zonder put, een BAG-pand zonder riolering). Die hebben geen
     # dataset-URI om op af te bakenen; hun eigen RD-coordinaat neemt die rol over.
     location: tuple[float, float] | None = None
+    # Een bevinding die niet over een los object maar over de export als geheel gaat
+    # (ATTR-014 meldt per kenmerk, over alle objecten samen). De meldingenlaag OR't
+    # dit met de bestaande populatieratio; zie `melding._is_systemisch`.
+    systemisch: bool = False
+
+
+# Het type van een afgeleide structuur in de contextcache: wat `bouw` oplevert,
+# krijgt de beller terug.
+_Afgeleid = TypeVar("_Afgeleid")
 
 
 @dataclass(frozen=True)
@@ -71,6 +89,19 @@ class CheckContext:
     # `volledig_bereik` heeft de volledige export nodig; die staat hier.
     volledige_dataset: GwswDataset | None = None
     analyseset: Analyseset | None = None
+    # De volledige-export-context van een run over meerdere studiegebieden. Hij hangt
+    # af van de volledige dataset, de config en de onbetrouwbare objecten -- alle drie
+    # gebiedsonafhankelijk -- en mag daarom over gebieden heen gedeeld worden. Zonder
+    # dit veld bouwt elk gebied zijn eigen volledige context met een lege cache, en
+    # draaien de karakteristiek en de checks met `volledig_bereik` per gebied opnieuw
+    # over de hele export.
+    gedeelde_volledige_context: CheckContext | None = field(default=None, compare=False, repr=False)
+    # De externe objecten die de EXT-checks tijdens deze run raken. Mutabel, net als
+    # `_cache`: een check registreert zijn treffer terwijl hij draait, en `run_checks`
+    # bouwt de `CheckOutcome` pas als de generator leeg is. Het register doet geen
+    # uitspraken -- alleen wat een melding aanwijst komt in de uitvoer terecht -- dus
+    # een entry die blijft staan kan geen verkeerde laag opleveren.
+    treffers: Trefferregister = field(default_factory=Trefferregister, compare=False, repr=False)
     _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     def volledige_context(self) -> CheckContext:
@@ -80,23 +111,36 @@ class CheckContext:
         volledige export zijn andere structuren dan die van de analyseset, en ze
         door elkaar halen zou de verkeerde antwoorden geven.
         """
-        if self.volledige_dataset is None or self.volledige_dataset is self.dataset:
+        if self.gedeelde_volledige_context is not None:
+            return self.gedeelde_volledige_context
+        volledig = self.volledige_dataset
+        if volledig is None or volledig is self.dataset:
             return self
         return self.cached(
             "volledige-context",
-            lambda: replace(self, dataset=self.volledige_dataset, _cache={}),
+            lambda: replace(self, dataset=volledig, _cache={}),
         )
 
-    def cached(self, sleutel: str, bouw: Callable[[], object]) -> object:
+    def cached(self, sleutel: str, bouw: Callable[[], _Afgeleid]) -> _Afgeleid:
         """Bouwt een afgeleide structuur een keer per context en hergebruikt die.
 
         De topologie-index en de netwerkgraaf worden door meerdere checks en door
         `examined()` en `notes()` opgevraagd. Op een dataset met tienduizenden
         objecten is telkens opnieuw opbouwen merkbaar duur.
+
+        Het type volgt uit `bouw`, zodat de bellers hun eigen structuur terugkrijgen
+        en niet `object`. De cache zelf bewaart ze door elkaar en kan dat niet
+        vasthouden; die ene `cast` is de prijs. Hij is veilig zolang een sleutel
+        altijd met dezelfde `bouw` gevuld wordt, en daar zorgt het voorvoegsel voor:
+        elk voorvoegsel heeft een eigenaar. `hgt:` en `rvz:` zijn van hun eigen
+        checkmodule; `sel:` en `aansluitingen:` zijn juist gedeeld en horen bij
+        `checks/selectie.py` respectievelijk `checks/verbanden.py`, die als enige
+        die sleutels vullen; `ext:` is van `checks/extern.py`, waar EXT-002 en EXT-003
+        hun kruisingenlijst onder delen.
         """
         if sleutel not in self._cache:
             self._cache[sleutel] = bouw()
-        return self._cache[sleutel]
+        return cast(_Afgeleid, self._cache[sleutel])
 
     def is_reliable(self, uri: str) -> bool:
         """Geeft aan of de typering van dit object betrouwbaar genoeg is.
@@ -137,6 +181,10 @@ class CheckOutcome:
     dimension: Dimension
     examined: int
     findings: list[Finding]
+    # Uit de checkklasse overgenomen, net als `title` en `severity`: de uitvoerlaag
+    # leest ze van de outcome en hoeft de registry er niet meer bij te halen.
+    id_sleutels: tuple[str, ...]
+    volledig_bereik: bool
     notes: list[str] = field(default_factory=list)
     weggelaten: int = 0
     skeleton: str = ""
@@ -154,17 +202,60 @@ class CheckRun:
     dataset: GwswDataset
     outcomes: list[CheckOutcome]
     typing_gate_applied: bool
+    # De uitvoerlaag heeft de klassenlijsten en de rapportdrempels nodig; die
+    # meegeven is minder broos dan ze langs elke schrijver door te reiken.
+    #
+    # Nooit None. Een ontbrekende config zou elke schrijver dwingen stil een eigen
+    # `checks.toml` te lezen, en dan kan een run met projectconfig met andere
+    # drempels rapporteren dan waarmee hij getoetst is -- dezelfde reden waarom
+    # `meetbereik` hieronder nooit None is.
+    config: CheckConfig
+    # De context waarmee de checks daadwerkelijk gedraaid hebben. De schrijvers lezen
+    # hem in plaats van zelf een `CheckContext` te bouwen: een eigen context begint
+    # met een lege cache en kan -- bij een afwijkende opbouw -- een ander afvoerpad
+    # tekenen dan de checks beoordeelden.
+    context: CheckContext = field(compare=False, repr=False)
     unreliable_labels: int = 0
     unreliable_labels_in_dataset: int = 0
     study_area: StudyArea | None = None
     bronnen: ExternalData | None = None
     karakteristiek: DataCharacteristics | None = None
-    # De uitvoerlaag heeft de klassenlijsten en de rapportdrempels nodig; die
-    # meegeven is minder broos dan ze langs elke schrijver door te reiken.
-    config: CheckConfig | None = None
     # De kern en de contextschil waarop de checks gedraaid hebben; None zonder
     # studiegebied. De uitvoerlaag meldt hieruit hoe groot elk deel was.
     analyseset: Analyseset | None = None
+    # Tegen welke conformiteitsklassen deze run getoetst is. De uitvoerlaag heeft het
+    # nodig voor de markering boven het rapport, voor `gwsw_run` en voor de
+    # JSON-envelop; het hier meegeven is minder broos dan het langs elke schrijver
+    # doorreiken -- dezelfde reden waarom `config` en `analyseset` hier staan.
+    #
+    # Nooit None. Een run die zijn bereik niet kreeg is er een zonder nulmeting, en
+    # dat is een toestand die `Meetbereik` al kent. Zou `None` toegestaan zijn, dan
+    # moest elke schrijver dat vierde geval zelf duiden, en dan zeggen ze er
+    # verschillende dingen over -- Markdown zweeg terwijl de JSON `volledig: false`
+    # beweerde.
+    meetbereik: Meetbereik = field(default_factory=lambda: Meetbereik.niet_gemeten(()))
+    # De overtredingen uit de SHACL-nulmeting, herleid tot objecten uit deze dataset.
+    # Ze zijn geen `CheckOutcome`: de nulmeting is een tweede bron naast het register,
+    # geen zeventigtal extra checks. `uitvoer.melding.bouw_meldingen` maakt er
+    # meldingen van naast die van de checks, zodat de vier uitvoervormen ook hiervoor
+    # uit een stroom komen. Zie `nulbevinding.py` en BO-28.
+    nulbevindingen: tuple[Nulbevinding, ...] = ()
+    # Hoeveel nulmetingbevindingen de afbakening tot het studiegebied weggelaten
+    # heeft. Het tegenhangertje van `CheckOutcome.weggelaten`, en om dezelfde reden:
+    # een rapport dat wel afbakent maar niet zegt hoeveel er buiten viel, leest als
+    # "dit is alles".
+    nulbevindingen_weggelaten: int = 0
+    # De klassen die de nulmeting te globaal noemt maar die de typeringspoort niet naar
+    # objecten in het domeinmodel kon herleiden (`TypingGate.unassessable_classes`,
+    # gebundeld over de conformiteitsklassen). Runmetadata zoals `meetbereik`, geen
+    # melding: `analyseer` noemt ze al, en het toets-rapport zou er anders over zwijgen
+    # -- stilte over een klasse die niet beoordeeld is leest als "beoordeeld en niets
+    # gevonden". Zie `uitvoer/bevindingen.py` en issue #52.
+    niet_beoordeelde_klassen: tuple[str, ...] = ()
+    # Het trefferregister van de context waarop deze run gedraaid heeft; de
+    # GeoPackage-schrijver joint de meldingen erop om de lagen met externe objecten te
+    # vullen. Zie `checks/treffers.py`.
+    treffers: Trefferregister = field(default_factory=Trefferregister, compare=False, repr=False)
     _binnen: frozenset[str] | None = field(default=None, compare=False, repr=False)
 
     @property
@@ -173,8 +264,24 @@ class CheckRun:
         return [finding for outcome in self.outcomes for finding in outcome.findings]
 
     def count(self, severity: Severity) -> int:
-        """Het aantal bevindingen van een ernstniveau."""
+        """Het aantal bevindingen van een ernstniveau.
+
+        Alleen de bevindingen van de eigen checks; de overtredingen uit de nulmeting
+        staan in `nulbevindingen` en worden pas in `bouw_meldingen` meldingen. Wie
+        het totaal wil, telt over de meldingenstroom.
+        """
         return sum(1 for finding in self.findings if finding.severity is severity)
+
+    @property
+    def weggelaten(self) -> int:
+        """Alles wat de afbakening tot het studiegebied heeft weggelaten.
+
+        De bevindingen van de checks plus de overtredingen uit de nulmeting. Een
+        rapport dat afbakent maar niet zegt hoeveel er buiten viel, leest als "dit is
+        alles"; deze eigenschap is de ene plek waar dat getal vandaan komt, zodat de
+        opdrachtregel, het rapport en de synthese er niet drie kunnen noemen.
+        """
+        return sum(outcome.weggelaten for outcome in self.outcomes) + self.nulbevindingen_weggelaten
 
     def objecten_binnen(self) -> frozenset[str] | None:
         """De objecten binnen het studiegebied, of None als er geen gebied is.
@@ -188,7 +295,13 @@ class CheckRun:
             object.__setattr__(self, "_binnen", objecten_in_gebied(self.dataset, self.study_area))
         return self._binnen
 
-    def beperk_tot_studiegebied(self, area: StudyArea) -> CheckRun:
+    def beperk_tot_studiegebied(
+        self,
+        area: StudyArea,
+        binnen: frozenset[str] | None = None,
+        *,
+        leeg_toegestaan: bool = False,
+    ) -> CheckRun:
         """Geeft een run terug met alleen de bevindingen binnen het gebied.
 
         Met een studiegebied zijn de checks al op de kern plus de contextschil
@@ -198,9 +311,22 @@ class CheckRun:
         Checks die over de hele populatie gaan (`Check.volledig_bereik`, of hun
         ID in `config.studiegebied.volledige_dataset_checks`) zijn sowieso op de
         volledige export blijven draaien.
+
+        `binnen` mag de beller meegeven als hij de kern al kent. Dat is precies
+        `Analyseset.kern`: die is de verzameling objecten van de *volledige* export
+        die het gebied raken, de schil is er per constructie van losgetrokken, en de
+        uitgedunde dataset is kern plus schil. Opnieuw over alle geometrieen lopen
+        levert dus dezelfde verzameling, tegen de prijs van een volledige doorloop
+        per gebied.
+
+        `leeg_toegestaan` is voor de rapportage over meerdere gebieden: een buurt
+        zonder riolering (water, natuur, bedrijventerrein) is daar een normaal
+        gegeven en mag de andere gebieden niet meeslepen. Bij een run op een enkel
+        gebied blijft het een harde fout, want daar is het bijna altijd een verkeerd
+        bestand of een verkeerde laagkeuze.
         """
-        binnen = objecten_in_gebied(self.dataset, area)
-        if not binnen:
+        binnen = objecten_in_gebied(self.dataset, area) if binnen is None else binnen
+        if not binnen and not leeg_toegestaan:
             raise StudyAreaError(
                 f"studiegebied {area.name!r} ({area.area_ha:.1f} ha) bevat geen GWSW-objecten: "
                 f"geen enkele put en geen enkele streng valt erbinnen. Controleer de laagkeuze "
@@ -213,6 +339,12 @@ class CheckRun:
                 return True
             if finding.location is not None:
                 return area.bevat(Point(*finding.location))
+            # Een dataset-brede bevinding zonder object en zonder locatie (ATTR-014
+            # meldt per kenmerk) is aan geen enkel gebied toe te wijzen en blijft in
+            # elk gebiedsrapport staan -- dezelfde regel als `_nul_hoort_erbij` voor
+            # een nulmetingbevinding die nergens op uitkwam (BO-12).
+            if not finding.object_uri:
+                return True
             return False
 
         outcomes = []
@@ -226,24 +358,40 @@ class CheckRun:
                     dimension=outcome.dimension,
                     examined=outcome.examined,
                     findings=binnen_gebied,
+                    id_sleutels=outcome.id_sleutels,
+                    volledig_bereik=outcome.volledig_bereik,
                     notes=outcome.notes,
                     weggelaten=len(outcome.findings) - len(binnen_gebied),
                     skeleton=outcome.skeleton,
                 )
             )
-        return CheckRun(
-            dataset=self.dataset,
+        # `replace` in plaats van elk veld opsommen: die opsomming vergat bij elke
+        # uitbreiding een veld, en dan valt het stil weg op precies de runs met een
+        # studiegebied.
+        nulbevindingen = tuple(
+            bevinding for bevinding in self.nulbevindingen if _nul_hoort_erbij(bevinding, binnen)
+        )
+        return replace(
+            self,
             outcomes=outcomes,
-            typing_gate_applied=self.typing_gate_applied,
-            unreliable_labels=self.unreliable_labels,
-            unreliable_labels_in_dataset=self.unreliable_labels_in_dataset,
+            nulbevindingen=nulbevindingen,
+            nulbevindingen_weggelaten=len(self.nulbevindingen) - len(nulbevindingen),
             study_area=area,
-            bronnen=self.bronnen,
-            karakteristiek=self.karakteristiek,
-            config=self.config,
-            analyseset=self.analyseset,
             _binnen=binnen,
         )
+
+
+def _nul_hoort_erbij(bevinding: Nulbevinding, binnen: frozenset[str]) -> bool:
+    """Geeft aan of deze nulmetingbevinding in het studiegebied hoort.
+
+    Een bevinding die tot een knoop of streng herleid is, volgt de gewone regel: hij
+    telt mee als dat object het gebied raakt. Een bevinding die nergens op uitkwam --
+    een klassenaam uit `CfkTypes_typ`, een stelsel als `dru_geb_0` -- is aan geen
+    enkel gebied toe te wijzen en blijft daarom in elke gebiedsrun staan. Een losse
+    run over dat ene gebied zou hem ook opnemen, en dat is de equivalentie-eis van
+    BO-12; hem hier wegfilteren zou hem uit *elk* gebiedsrapport laten verdwijnen.
+    """
+    return bevinding.object_uri in binnen if bevinding.herleid else True
 
 
 class Check(ABC):
@@ -341,8 +489,17 @@ def run_checks(
     context: CheckContext,
     check_ids: list[str] | None = None,
     typing_gate_applied: bool = False,
+    *,
+    voortgang: Voortgang = NUL_VOORTGANG,
+    fase: str = "Checks",
 ) -> CheckRun:
-    """Draait de gevraagde checks; zonder selectie draait de hele registry."""
+    """Draait de gevraagde checks; zonder selectie draait de hele registry.
+
+    De voortgang meldt per check het ID, zodat zichtbaar is welke check loopt en
+    niet alleen dat er iets loopt. Hij raakt de uitkomst niet. `fase` is het label
+    van de voortgangsfase; een run over meerdere gebieden zet de gebiedsnaam erin,
+    zodat zichtbaar blijft welk gebied loopt.
+    """
     gekozen = sorted(REGISTRY) if check_ids is None else list(check_ids)
 
     onbekend = [check_id for check_id in gekozen if check_id not in REGISTRY]
@@ -352,22 +509,42 @@ def run_checks(
     volledige_ids = set(context.config.studiegebied.volledige_dataset_checks)
 
     outcomes = []
-    for check_id in gekozen:
-        check = REGISTRY[check_id]()
-        over_volledige_populatie = check.volledig_bereik or check.id in volledige_ids
-        gebruikt = context.volledige_context() if over_volledige_populatie else context
-        outcomes.append(
-            CheckOutcome(
-                check_id=check.id,
-                title=check.title,
-                severity=check.severity,
-                dimension=check.dimension,
-                examined=check.examined(gebruikt),
-                findings=list(check.run(gebruikt)),
-                notes=check.notes(gebruikt),
-                skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
+    voortgang.start_fase(fase, len(gekozen))
+    try:
+        for check_id in gekozen:
+            check = REGISTRY[check_id]()
+            over_volledige_populatie = check.volledig_bereik or check.id in volledige_ids
+            gebruikt = context.volledige_context() if over_volledige_populatie else context
+            if gebruikt is not context:
+                # De volledige-export-context heeft een eigen trefferregister, en bij
+                # een run over meerdere gebieden is dat een gedeeld exemplaar. Een
+                # check die daar zijn treffers in achterlaat, zou een melding met
+                # `object2_uri` opleveren waarvan de GIS-laag het object niet meer kan
+                # vinden -- precies de stille afwijking tussen laag en uitslag die dit
+                # ontwerp uitsluit. `replace` deelt het cachewoordenboek, dus de dure
+                # structuren van de volledige export blijven hergebruikt.
+                gebruikt = replace(gebruikt, treffers=context.treffers)
+            # De bevindingen bewust vóór de toelichting: `notes()` van de EXT-checks
+            # leest wat `run()` in het register meldde. Als keyword-argument zou de
+            # volgorde ook kloppen, maar dan staat ze nergens.
+            bevindingen = list(check.run(gebruikt))
+            outcomes.append(
+                CheckOutcome(
+                    check_id=check.id,
+                    title=check.title,
+                    severity=check.severity,
+                    dimension=check.dimension,
+                    examined=check.examined(gebruikt),
+                    findings=bevindingen,
+                    id_sleutels=check.id_sleutels,
+                    volledig_bereik=check.volledig_bereik,
+                    notes=check.notes(gebruikt),
+                    skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
+                )
             )
-        )
+            voortgang.stap(label=check.id)
+    finally:
+        voortgang.einde_fase()
 
     # De datakarakteristiek en de telling van onbetrouwbaar getypeerde objecten
     # gaan altijd over de volledige export, ook met een studiegebied: het rapport
@@ -381,7 +558,11 @@ def run_checks(
         unreliable_labels=len(context.unreliable_objects),
         unreliable_labels_in_dataset=len(volledig.matched_objects()),
         bronnen=context.bronnen,
-        karakteristiek=bepaal_karakteristiek(volledig.dataset, context.config),
+        karakteristiek=volledig.cached(
+            "karakteristiek", lambda: bepaal_karakteristiek(volledig.dataset, context.config)
+        ),
         config=context.config,
+        context=context,
         analyseset=context.analyseset,
+        treffers=context.treffers,
     )

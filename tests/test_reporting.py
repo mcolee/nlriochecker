@@ -34,6 +34,7 @@ from nlriochecker.reporting import (
     write_reports,
 )
 from nlriochecker.studiegebied import load_study_area
+from test_analysis import dataset_met_verbindingsklasse, meting_met_verbindingsklasse
 
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -64,6 +65,25 @@ def test_samenvatting_meldt_ontbrekende_dataset(analyse, tmp_path: Path) -> None
     assert "geen OroX-dataset meegegeven" in tekst
 
 
+def test_samenvatting_noemt_een_onbeoordeelbare_verbindingsklasse(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Een te globale verbindingsklasse is niet te wegen; dat hoort in het rapport.
+
+    Zwijgen zou lezen als "beoordeeld en niets gevonden", terwijl de klasse juist
+    niet naar objecten te herleiden is.
+    """
+    hyd, mdsplan, mdsproj = shacl_drieluik
+    aangepast = meting_met_verbindingsklasse(mdsplan, tmp_path / "verbinding.csv")
+    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"))
+    meting = laad_nulmeting([hyd, aangepast, mdsproj], VEREIST)
+
+    markdown_path, _ = write_reports(analyze(meting, dataset), tmp_path / "uitvoer")
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "Niet beoordeeld: Afvoerrelatie" in tekst
+
+
 def test_dekkingrapport(analyse, tmp_path: Path) -> None:
     coverage = assess_coverage(analyse, load_coverage_config())
     markdown_path, csv_path = write_coverage_report(coverage, tmp_path)
@@ -71,9 +91,21 @@ def test_dekkingrapport(analyse, tmp_path: Path) -> None:
 
     assert markdown_path.name == FILE_COVERAGE_MARKDOWN
     assert csv_path.name == FILE_COVERAGE_CSV
-    assert "RVZ-003" in tekst
+    assert "ADM-001" in tekst
     assert "niet goedgekeurd" in tekst
-    assert "RVZ-002, RVZ-003" in tekst
+    assert "raakt de nulmeting alle geschrapte checks" in tekst
+
+
+def test_dekkingrapport_noemt_een_sentinel_zonder_bewijs(
+    analyse, mapping_zonder_bewijs: Path, tmp_path: Path
+) -> None:
+    """De andere tak van dezelfde weergave: een check die de nulmeting niet raakt."""
+    coverage = assess_coverage(analyse, load_coverage_config(mapping_zonder_bewijs))
+    markdown_path, _ = write_coverage_report(coverage, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "niet goedgekeurd" in tekst
+    assert "In deze dataset geldt dat voor: ADM-001." in tekst
 
 
 def test_vergelijkingsrapport(analyse, tmp_path: Path) -> None:
@@ -364,7 +396,7 @@ def test_clusterduiding_telt_de_getoonde_bevindingen(tmp_path: Path) -> None:
 
     Dataset-breed liggen er twee losse deelstelsels; het studiegebied dekt er een.
     Een telling over de volledige dataset zou hier 2 melden bij 1 bevinding -- op De
-    Wolden werd dat "174 deelstelsels" bij 24 bevindingen.
+    Wolden en Hoogeveen werd dat "174 deelstelsels" bij 24 bevindingen.
     """
     run = _checkrun("net001_twee_losse_deelstelsels.ttl", "NET-001")
     assert len(run.findings) == 2
@@ -394,7 +426,9 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
     run = _checkrun("top013_parallel.ttl", "TOP-013")
-    volledig = bouw_meldingen(run, date(2026, 8, 16))
+    # Alleen de checkmeldingen; de datasetsignalen (bron "dataset", issue #22) staan
+    # los van wat deze test over het volgen van de meegegeven stroom aantoont.
+    volledig = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
     assert len(volledig) == 3
 
     markdown_path, csv_path = write_check_report(
@@ -411,7 +445,7 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
     """Zwijgen hierover leest als "alles staat op de kaart".
 
     De GeoPackage telt ze in gwsw_run; wie alleen het rapport leest moet het daar
-    ook zien. Op de fixtures en op De Wolden komt dit niet voor -- daarom wordt het
+    ook zien. Op de fixtures en op De Wolden en Hoogeveen komt dit niet voor -- daarom wordt het
     hier met een aangepaste meldingenstroom afgedwongen.
     """
     import dataclasses
@@ -419,7 +453,9 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
     run = _checkrun("top013_parallel.ttl", "TOP-013")
-    meldingen = bouw_meldingen(run, date(2026, 8, 16))
+    # Alleen de checkmeldingen: de datasetsignalen hebben zelf geen plek op de kaart en
+    # zouden de telling die deze test afdwingt vertroebelen.
+    meldingen = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
     zonder = [dataclasses.replace(meldingen[0], foutlocatie=None), *meldingen[1:]]
 
     markdown_path, _ = write_check_report(run, tmp_path, date(2026, 8, 16), meldingen=zonder)
@@ -430,8 +466,55 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
 
 
 def test_rapport_zwijgt_als_elke_melding_een_plek_heeft(tmp_path: Path) -> None:
-    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    markdown_path, _ = write_check_report(run, tmp_path, date(2026, 8, 16))
+    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    # De checkmeldingen hebben alle een plek; de datasetsignalen (issue #22) horen per
+    # definitie geen plek te hebben en staan hier los van.
+    meldingen = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
+
+    markdown_path, _ = write_check_report(run, tmp_path, date(2026, 8, 16), meldingen=meldingen)
 
     assert "geen plek op de kaart" not in markdown_path.read_text(encoding="utf-8")
+
+
+def test_samenvatting_markeert_een_deelmeting(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Een deelset staat boven het rapport, niet ergens in een voetnoot."""
+    analyse = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+
+    markdown_path, _ = write_reports(analyse, tmp_path)
+
+    regels = markdown_path.read_text(encoding="utf-8").splitlines()
+    assert regels[4].startswith("**Onvolledige meting:**")
+    assert "MdsPlan, MdsProj ontbreken" in regels[4]
+
+
+def test_samenvatting_van_een_volledige_meting_draagt_geen_markering(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Zonder deelset blijft het rapport byte-voor-byte als voorheen."""
+    analyse = analyze(laad_nulmeting(shacl_drieluik, VEREIST))
+
+    markdown_path, _ = write_reports(analyse, tmp_path)
+
+    assert "Onvolledige meting" not in markdown_path.read_text(encoding="utf-8")
+
+
+def test_dekkingrapport_markeert_een_deelmeting(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Ook de dekkinganalyse zegt op hoeveel klassen zij steunt."""
+    analyse = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+    coverage = assess_coverage(analyse, load_coverage_config())
+
+    markdown_path, _ = write_coverage_report(coverage, tmp_path)
+
+    assert "**Onvolledige meting:**" in markdown_path.read_text(encoding="utf-8")
+
+
+def test_vergelijkingsrapport_markeert_een_deelmeting(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Een trend over een deelset is een trend over minder dan de norm."""
+    analyse = analyze(laad_nulmeting([mini_hyd_shacl], ["Hyd"], VEREIST))
+    vergelijking = compare_metingen(analyse, analyse, load_coverage_config())
+
+    markdown_path, _, _ = write_comparison_reports(vergelijking, tmp_path)
+
+    assert "**Onvolledige meting:**" in markdown_path.read_text(encoding="utf-8")

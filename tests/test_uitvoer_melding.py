@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
+from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import load_study_area
 from nlriochecker.uitvoer.identiteit import melding_id
 from nlriochecker.uitvoer.melding import _is_systemisch, bouw_meldingen
@@ -80,9 +82,12 @@ def test_scope_en_gebied_met_studiegebied() -> None:
 
     meldingen = bouw_meldingen(run.beperk_tot_studiegebied(gebied), RUNDATUM)
 
-    assert meldingen
-    assert all(melding.scope == "binnen_studiegebied" for melding in meldingen)
-    assert all(melding.gebied == "rond_de_fixture" for melding in meldingen)
+    # De datasetsignalen (bron "dataset") zijn niet aan een gebied gebonden; het
+    # scope-en-gebied-contract geldt de gelokaliseerde meldingen.
+    gelokaliseerd = [melding for melding in meldingen if melding.bron != "dataset"]
+    assert gelokaliseerd
+    assert all(melding.scope == "binnen_studiegebied" for melding in gelokaliseerd)
+    assert all(melding.gebied == "rond_de_fixture" for melding in gelokaliseerd)
 
 
 def test_waarschuwing_krijgt_de_laagste_prioriteit() -> None:
@@ -199,3 +204,112 @@ def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
     # de dataset als geheel; er is alleen niets meer om te markeren.
     assert bouw_meldingen(beperkt, RUNDATUM) == []
     assert _is_systemisch(beperkt.outcomes[0], config)
+
+
+def _nulbevinding(**overschrijf: object) -> Nulbevinding:
+    """Een nulbevinding met verder onbelangrijke velden ingevuld."""
+    velden: dict[str, object] = {
+        "check_id": "NULMETING-Put_HoogtePut_card",
+        "vorm": "Put_HoogtePut_card",
+        "focus_node": "PutA",
+        "ernst": "F",
+        "object_uri": "http://example.org/toets#PutA",
+        "object_label": "A",
+        "objecttype": "Inspectieput",
+        "boodschap": "aantal voorkomens wijkt af (exact=1)",
+        "waarde": "te weinig voorkomens",
+        "cfk": ("MdsPlan", "MdsProj"),
+        "systemisch": False,
+        "herleid": True,
+    }
+    velden.update(overschrijf)
+    return Nulbevinding(**velden)  # type: ignore[arg-type]
+
+
+def _run_met_nulbevindingen(bestand: str, *bevindingen: Nulbevinding) -> CheckRun:
+    """Een run zonder eigen checkbevindingen, met alleen nulmetingbevindingen."""
+    dataset = load_dataset(TTL_DIR / bestand)
+    context = CheckContext(dataset=dataset, config=_config())
+    run = run_checks(context, [])
+    return replace(run, nulbevindingen=tuple(bevindingen))
+
+
+def _uit_nulmeting(meldingen: list) -> list:
+    """De meldingen uit de nulmeting, los van de datasetsignalen (issue #22)."""
+    return [melding for melding in meldingen if melding.bron == "nulmeting"]
+
+
+def test_eigen_checkmelding_noemt_geen_conformiteitsklasse() -> None:
+    """`cfk` hoort bij de nulmeting; een eigen check heeft er niets mee te maken."""
+    meldingen = bouw_meldingen(_run("top001_losliggende_put.ttl", "TOP-001"), RUNDATUM)
+
+    assert meldingen[0].cfk == ()
+
+
+def test_nulbevinding_wordt_een_melding_uit_de_nulmeting() -> None:
+    """Bron, categorie en dimensie liggen vast; de CFK's komen van de bevinding."""
+    run = _run_met_nulbevindingen("nulmeting_join.ttl", _nulbevinding())
+
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
+
+    assert melding.bron == "nulmeting"
+    assert melding.categorie == "NULMETING"
+    assert melding.dimensie == "Compliance"
+    assert melding.cfk == ("MdsPlan", "MdsProj")
+    assert melding.check_id == "NULMETING-Put_HoogtePut_card"
+
+
+def test_nulmelding_op_een_object_met_geometrie_krijgt_een_plek_op_de_kaart() -> None:
+    run = _run_met_nulbevindingen("nulmeting_join.ttl", _nulbevinding())
+
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
+
+    assert melding.foutlocatie is not None
+
+
+def test_onherleide_nulmelding_heeft_geen_object_en_geen_gebied() -> None:
+    """Een klassenaam of stelsel is aan geen enkel gebied toe te wijzen."""
+    onherleid = _nulbevinding(
+        check_id="NULMETING-CfkTypes_typ",
+        vorm="CfkTypes_typ",
+        focus_node="Rioolstelsel",
+        object_uri="",
+        object_label="",
+        objecttype="",
+        herleid=False,
+    )
+    run = _run_met_nulbevindingen("nulmeting_join.ttl", onherleid)
+
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
+
+    assert melding.object_uri == ""
+    assert melding.gebied == ""
+    assert melding.foutlocatie is None
+
+
+def test_twee_nulmeldingen_op_hetzelfde_object_krijgen_een_eigen_id() -> None:
+    """De focusnode onderscheidt ze; de object-URI is dat niet.
+
+    Twee eindpunten van dezelfde streng herleiden naar diezelfde streng.
+    """
+    run = _run_met_nulbevindingen(
+        "nulmeting_join.ttl",
+        _nulbevinding(focus_node="L1_b", object_uri="http://example.org/toets#L1"),
+        _nulbevinding(focus_node="L1_e", object_uri="http://example.org/toets#L1"),
+    )
+
+    eerste, tweede = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
+
+    assert eerste.melding_id != tweede.melding_id
+
+
+def test_prioriteit_volgt_dezelfde_regel_als_bij_een_eigen_check() -> None:
+    """Fout is 2 (of 1 op een kritiek object), waarschuwing is 3."""
+    run = _run_met_nulbevindingen(
+        "nulmeting_join.ttl",
+        _nulbevinding(ernst="W", focus_node="L1_e"),
+    )
+
+    (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
+
+    assert melding.prioriteit == 3

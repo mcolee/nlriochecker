@@ -1,6 +1,6 @@
 # Checkregister GWSW-nulmeting vrijverval
 
-Versie 0.8, werkdocument (afbakening tot een studiegebied toegevoegd d.d. 2026-08-16; EXT-008 vervallen). Scope: vrijvervalriolering inclusief randvoorzieningen (bergbezinkbassins, overstorten, drempels). Buiten scope: mechanische riolering en gemalen als object; gemalen en overnamepunten tellen wel mee als eindpunt in de netwerkanalyse. Bronnen: Brutis/Kikker-export (GWSW), AHN, BGT, BAG, BRK, waterschapsdata. Ernst: F = fout, W = waarschuwing. Elke check heeft een dimensietag conform het kwaliteitsraamwerk Omgevingswet/NORA (RIONED-kennisbank, Kwaliteit van gegevens). Alle drempelwaarden zijn configureerbaar per project.
+Versie 0.9, werkdocument (RVZ-002 en RVZ-003 terug in de engine, ATTR-013 toegevoegd, EXT-003 gepreciseerd d.d. 2026-08-19; afbakening tot een studiegebied toegevoegd d.d. 2026-08-16; EXT-008 vervallen). Scope: vrijvervalriolering inclusief randvoorzieningen (bergbezinkbassins, overstorten, drempels). Buiten scope: mechanische riolering en gemalen als object; gemalen en overnamepunten tellen wel mee als eindpunt in de netwerkanalyse. Bronnen: Brutis/Kikker-export (GWSW), AHN, BGT, BAG, BRK, waterschapsdata. Ernst: F = fout, W = waarschuwing. Elke check heeft een dimensietag conform het kwaliteitsraamwerk Omgevingswet/NORA (RIONED-kennisbank, Kwaliteit van gegevens). Alle drempelwaarden zijn configureerbaar per project.
 
 De dataset wordt aan twee GWSW-conformiteitsklassen getoetst: Mds en Hyd (deelmodellen v1.6, filters collectie_MDSTOP_v16 respectievelijk collectie_HYDTOP5_v16). Checks die deze nulmetingen aantoonbaar dekken zijn geschrapt; zie de tabel Geschrapte checks onderaan. Vervallen ID's worden niet hergebruikt. Let op: de verplichte aanwezigheid van de administratieve put-strengkoppeling rust volledig op Hyd (in Mds is de koppeling optioneel, max=1); het gelijktijdig toetsen van beide conformiteitsklassen is daarmee een harde voorwaarde voor de geldigheid van de schrapronde.
 
@@ -75,15 +75,20 @@ gebreken" leest.
 |---|---|---|---|
 | ATTR-001 | Diameter past niet bij materiaal | F | Plausibiliteit |
 | ATTR-002 | Diameter kleiner dan rond 200 mm (de nulmeting toetst alleen de extreme ondergrens van 63 mm) | W | Plausibiliteit |
-| ATTR-003 | Materiaal past niet bij aanlegjaar (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit |
+| ATTR-003 | Materiaal past niet bij begindatum (bijv. PVC voor 1955, PE voor 1970) | W | Plausibiliteit |
 | ATTR-004 | Vorm versus afmetingen inconsistent (eivorm zonder hoogte, rond met breedte ongelijk hoogte); NB het MDSTOP-deelmodel dwingt de aanwezigheid van breedte en hoogte per leiding af (someValuesFrom in de Top-laag), Hyd verplicht breedte exact=1; de consistentietoets vorm versus afmetingen doet geen van beide | F | Consistentie |
 | ATTR-005 | Eenhedenfouten die binnen de GWSW-waardebereiken vallen (bijv. diameter 300 genoteerd in cm); fouten buiten bereik dekt de nulmeting | F | Nauwkeurigheid |
 | ATTR-006 | Strengdiameter groter dan afmeting van de aangesloten put | W | Plausibiliteit |
-| ATTR-007 | Aanlegjaar in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit |
+| ATTR-007 | Begindatum in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit |
 | ATTR-008 | Strenglengte korter dan X m of langer dan X m | W | Plausibiliteit |
 | ATTR-009 | Geometrische lengte wijkt meer dan X% af van administratieve lengte | W | Consistentie |
 | ATTR-010 | Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past | W | Plausibiliteit |
 | ATTR-012 | Materiaal past niet bij profielvorm (bijv. metselwerk met rond profiel in plaats van ei- of muilprofiel) | W | Plausibiliteit |
+| ATTR-013 | Hoogtekenmerk (BOB, maaiveldhoogte, putdekselniveau) op een vulwaarde rond 0 m NAP dat als meting geregistreerd staat; de band en de kenmerken zijn projectconfiguratie (`[vulwaarden]`), de leesregel zet het kenmerk op ontbrekend en de hoogtechecks slaan het object over | W | Compleetheid |
+| ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmeting per constructie mist (issue #37). Generiek over alle kenmerktypen, uit de ontologische `owl:onProperty`/`owl:allValuesFrom`-keten; een systemische melding per kenmerk, niet per object | F | Consistentie |
+| ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum_vulwaarde_aandeel`); een systemische melding per verdacht jaar, zwijgt bij een natuurlijke verdeling of bij te weinig gedateerde objecten (issue #21) | W | Compleetheid |
+| ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De tegenhanger van ATTR-004 voor putten in plaats van leidingen, met dezelfde tolerantie (`rondheid_tolerantie_mm`); de nulmeting toetst alleen de aanwezigheid van de vorm (`Put_VormPut_card`), niet de samenhang met de afmetingen (issue #39) | F | Consistentie |
+| ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2100 tabel B2.1 (`plausibiliteit.toml`). Het GWSW-datatype is een geheel getal in mm en kan de kunststofwaarden niet uitdrukken, dus de schaal wordt uit de data afgeleid (`wandruwheid_schalen`); de nulmeting toetst de wandruwheid nergens (issue #38, BO-39) | W | Plausibiliteit |
 
 ## HGT: Hoogten en verhang
 
@@ -122,15 +127,18 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid |
 | NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit |
+| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | F | Consistentie |
 
 ## RVZ: Randvoorzieningen (BBB's, overstorten, drempels)
 
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
 | RVZ-001 | Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk; geometrisch-topologische variant, de administratieve koppeling dekt de nulmeting | F | Consistentie |
+| RVZ-002 | Overstort zonder geregistreerde drempelhoogte (Drempelniveau), ook als het drempelonderdeel zelf ontbreekt; overlapt bewust met de nulmetingvorm Overstortput_Overstortdrempel_card, want die toetst alleen of de put een drempel heeft en de check werkt ook zonder nulmeting | W | Compleetheid |
+| RVZ-003 | Overstort zonder geregistreerde drempelbreedte (Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt | W | Compleetheid |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie |
-| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB | W | Plausibiliteit |
+| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal, pompunit of overnamepunt) | F | Plausibiliteit |
 | RVZ-007 | BBB zonder geregistreerde bergingsinhoud of afmetingen | W | Compleetheid |
 | RVZ-008 | BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel | W | Compleetheid |
 | RVZ-009 | BBB zonder nooduitlaat of externe overstortdrempel | W | Compleetheid |
@@ -160,7 +168,7 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 |---|---|---|---|
 | EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit |
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit |
-| EXT-003 | Kruising met watergang zonder registratie als zinker of duiker | W | Compleetheid |
+| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie van EXT-002 en EXT-003, het rapport meldt hoeveel dat er zijn | W | Compleetheid |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit |
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid |
@@ -175,11 +183,9 @@ Alle drie de voorwaarden worden machinaal gehandhaafd (2026-08-16). Voorwaarde 1
 | ID | Check | Gedekt door |
 |---|---|---|
 | ADM-001 | Streng verwijst naar niet-bestaande begin- of eindput | Generieke melding gerefereerd object onbekend (CFK-onafhankelijk); verplichte aanwezigheid van de koppeling alleen via Hyd (hasConnection Knooppunt exact=1); Mds eist slechts max=1 |
-| ADM-004 | Verplichte GWSW-MdS-attributen niet gevuld | Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, maaiveldhoogte); Hyd aanvullend inclusief BOB's en afmetingen exact=1 |
+| ADM-004 | Verplichte GWSW-MdS-attributen niet gevuld | Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, maaiveldhoogte); Hyd aanvullend inclusief BOB's, afmetingen exact=1 en de put-vormen materiaal (MateriaalPut) en maaiveldschematisering (Maaiveldschematisering) — die twee hasAspect-eisen (exact=1) leveren uitsluitend in Hyd meldingen op (4142 resp. 20756 op De Wolden, nul in MdsPlan en MdsProj op hetzelfde RDF-bestand), dus de dekking van díé twee attributen rust op Hyd en niet op Mds (mechanisch na te lopen via [#41](https://github.com/mcolee/nlriochecker/issues/41)) |
 | ADM-005 | Attribuutwaarden buiten de GWSW-domeinlijsten | Beide CFK's: collectietoetsing hasReference |
 | ATTR-011 | Absurde lengtewaarde boven harde bovengrens | Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype Dt_LengteLeiding) |
-| RVZ-002 | Overstort zonder geregistreerde drempelhoogte | Beide CFK's: Drempelniveau exact=1 (Mds) / min=1 (Hyd) |
-| RVZ-003 | Overstort zonder geregistreerde drempelbreedte | Alleen Hyd: Drempelbreedte exact=1; Mds staat ontbreken toe (max=1, geen min-eis) |
 
 ## Vervallen checks (niet relevant voor deze toepassing)
 
@@ -193,24 +199,83 @@ uitkomst geven. De ID's worden niet hergebruikt.
 
 ## Open punten
 
-1. BRK is beschikbaar als bron; EXT-004 wordt daarop gebouwd.
-2. Drempelwaarden vaststellen: snapping-tolerantie, min/max strenglengte, minimaal verhang per stelseltype, valput-drempel, buffer-afstanden EXT-checks.
-3. Naamgevingsconventie (ADM-003) als configureerbaar regex-patroon per project.
+1. Verplaatst naar de issuetracker: [#8 EXT-004 bouwen op BRK-percelen](https://github.com/mcolee/nlriochecker/issues/8).
+2. Afgehandeld (2026-08-19). Alle vijf staan als instelbare waarde in `[drempels]` van de projectconfiguratie, met de standaard tussen haakjes: snapping-tolerantie (`snapping_tolerantie_m`, 0,10 m), min/max strenglengte (`minimale_strenglengte_m` 1 m en `maximale_strenglengte_m` 200 m, ATTR-008), minimaal verhang voor vuilwater en gemengd (HGT-007; sinds issue #29 geen enkele waarde meer maar de RIONED-diameterstaffel `[[verhang_staffel]]`, met 1:250 voor de kleinste leidingen tot 1:1000 voor de grootste), valput-drempel (`bob_sprong_m`, 0,25 m, HGT-009 en HGT-016) en de bufferafstanden van de EXT-checks (`ext_pand_buffer_m`, `ext_watergang_buffer_m`, `ext_putdeksel_afstand_m`, `ext_lozingspunt_water_afstand_m`, `ext_perceel_buffer_m`). Er staat geen drempel hardgecodeerd in de engine.
+3. Afgehandeld (2026-08-19). `naamgeving.putpatroon` en `naamgeving.strengpatroon` in de projectconfiguratie nemen elk een regex, en een onbruikbaar patroon faalt bij het laden in plaats van tijdens de run. Er is bewust geen standaardpatroon: staat er geen, dan draait ADM-003 niet en meldt het rapport dat met zoveel woorden, want een verzonnen conventie zou elke dataset afkeuren. `examined` telt dan ook alleen de objectsoorten waarvoor wel een patroon geldt.
 4. Buiten scope: persleiding- en gemaalconsistentiechecks (mechanisch); gemalen en overnamepunten doen wel mee als eindpunt in NET-001.
 5. RVZ-008 (lediging BBB) raakt de scopegrens: lediging loopt in de praktijk vaak via een gemaal. De check toetst alleen of er een ledigingsroute geregistreerd staat, niet het gemaal zelf. NB: de nulmeting dekt dit niet (Ledigingsvoorziening heeft in beide CFK's, Mds en Hyd, max=1 en geen min-eis); alleen als er wel een ledigingsvoorziening geregistreerd is, eist Hyd daarin minimaal een pomp.
-6. Bepalen hoe overstorten in de export verschijnen (als put met functie overstort, als kunstwerk, of als apart object); dat bepaalt de implementatie van RVZ-004 t/m RVZ-010.
-7. Afgehandeld: schrapronde uitgevoerd en geactualiseerd naar toetsbasis Mds, zie tabel Geschrapte checks. Afwijkingen ten opzichte van de oorspronkelijke verwachting: ADM-002 en ADM-003 blijven staan (duplicaat-ID's smelten in RDF geruisloos samen respectievelijk geen patroontoetsing), ADM-008/009 blijven staan (in de nulmeting-beschrijving expliciet aangemerkt als externe validatie), ATTR-011 en RVZ-003 zijn juist wel geschrapt. In het proces borgen dat beide nulmeting-rapporten (Mds en Hyd) beschikbaar zijn en dat de typeringsscore als voorwaarde geldt.
+6. Afgehandeld (2026-08-19). Empirisch vastgesteld op de De Wolden-export en vastgelegd in de beslislog: overstorten staan er als `Overstortput` met een `Overstortleiding` eraan; losse `Overstortdrempel`-objecten met `Drempelniveau` en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel kent. `checks/randvoorzieningen.py` leest daarom beide vormen en meldt in de toelichting welke het in deze dataset heeft aangetroffen; de klassen staan in `[klassen]` van de projectconfiguratie (`overstortput`, `overstortleiding`, `drempel`). RVZ-004 t/m RVZ-011 zijn gebouwd en draaien. NB: dezelfde vraag speelt voor `Overnamepunt` en voor het IT-stelsel. Die twee zijn eerder ten onrechte als ontbrekende GWSW-begrippen opgeschreven; de ontologie kent ze wel (`Overnamepunt` als subklasse van `Aansluitpunt`, het IT-stelsel als `Infiltratiestelsel` met zijn subklasse `DrainageInfiltratieTransportStelsel`), maar de De Wolden-export levert nul `Overnamepunt`-instanties. Wat er wel en niet uit volgt staat in BO-33 en BO-34 van de beslislog; het spoor loopt via [#11](https://github.com/mcolee/nlriochecker/issues/11).
+7. Afgehandeld: schrapronde uitgevoerd en geactualiseerd naar toetsbasis Mds, zie tabel Geschrapte checks. Afwijkingen ten opzichte van de oorspronkelijke verwachting: ADM-002 en ADM-003 blijven staan (duplicaat-ID's smelten in RDF geruisloos samen respectievelijk geen patroontoetsing), ADM-008/009 blijven staan (in de nulmeting-beschrijving expliciet aangemerkt als externe validatie), ATTR-011 is juist wel geschrapt; RVZ-003 was dat ook maar is in v0.9 teruggehaald (issue #6). In het proces borgen dat beide nulmeting-rapporten (Mds en Hyd) beschikbaar zijn en dat de typeringsscore als voorwaarde geldt.
 8. Afgehandeld voor de inwinningswijze; open voor de rest. De eerste run op De Wolden (2026-08-16) laat zien dat BTR-001 t/m BTR-005 op deze export inderdaad vrijwel alleen ontbreken-meldingen opleveren: er is geen enkele `DatumInwinning` en geen `Grondwaterniveau`, en de wijze hangt aan de puntgeometrie in plaats van aan het kenmerk (zie de inleiding van BTR). Ze blijven skelet. Een voorgestelde uitbreiding BTR-008 (inwinningswijze past niet bij het kenmerk) is afgewezen, zie de BTR-inleiding. Twee andere kandidaten, placeholder-datums en expliciete onbekend-waarden, zijn afgewezen als check en opgenomen als datakarakteristieken in de kop van het bevindingenrapport: ze slaan op vrijwel de hele dataset aan en leveren per object geen handeling op, maar bepalen wel op welke precisie leeftijden gelden en hoe rooskleurig een compleetheidscijfer leest.
-9. Uit het onderzoeksrapport zijn de geometrie- en hoogtechecks verwerkt (N2 t/m N5, N7, N17 t/m N22, als TOP-015 t/m TOP-021, ATTR-011/012, HGT-016 t/m HGT-018). N1 (BOB onder putbodem) was al gedekt door HGT-004. Nog te verwerken: N6 (herkomstvlag per attribuut), N8 (connectiviteitsregel-tabel), N9 t/m N16 en de open-datachecks N23 t/m N35.
-10. Deels afgehandeld (2026-08-16). Wat een regressietoets per run kan bewaken, wordt nu bewaakt; zie de voorwaarden bij Geschrapte checks. Wat niet kan: de rapportkoppen van de GWSW-server bevatten geen CFK-versie of filternaam, dus of de meting nog op deelmodel v1.6 en de filters collectie_MDSTOP_v16 en collectie_HYDTOP5_v16 draait, is niet uit de rapporten af te leiden en blijft handwerk. Resterend uit de oorspronkelijke formulering: (a) verifieren aan een echt Mds-nulmetingrapport of de someValuesFrom-eisen uit de Top-laag (waaronder HoogteLeiding, hasValidity-codering 1t 3t) daadwerkelijk als melding verschijnen; raakt de NB-noot bij ATTR-004. (b) Omdat Mds strenger is dan MdsPlan, kan een hernieuwde dekkinganalyse extra schrapkandidaten opleveren; aparte ronde plannen. (c) Geen enkele geschrapte check hoeft terug: Mds eist meer dan MdsPlan, niet minder.
+9. Uit het onderzoeksrapport zijn de geometrie- en hoogtechecks verwerkt (N2 t/m N5, N7, N17 t/m N22, als TOP-015 t/m TOP-021, ATTR-011/012, HGT-016 t/m HGT-018). N1 (BOB onder putbodem) was al gedekt door HGT-004. Het restant is verplaatst naar de issuetracker: [#9 Resterende checks uit het onderzoeksrapport](https://github.com/mcolee/nlriochecker/issues/9).
+10. Deels afgehandeld (2026-08-16). Wat een regressietoets per run kan bewaken, wordt nu bewaakt; zie de voorwaarden bij Geschrapte checks. Wat niet kan: de rapportkoppen van de GWSW-server bevatten geen CFK-versie of filternaam, dus of de meting nog op deelmodel v1.6 en de filters collectie_MDSTOP_v16 en collectie_HYDTOP5_v16 draait, is niet uit de rapporten af te leiden en blijft handwerk. Het restant wordt niet opgepakt (besloten 2026-08-19): er is geen Mds-nulmetingrapport beschikbaar, en daarmee valt het buiten scope. Beide onderdelen staan of vallen met die bron -- zonder rapport is er niets om aan te verifieren en niets om een dekkinganalyse op te draaien. Komt er alsnog een Mds-rapport, dan is dit punt weer te openen. Dat restant was: (a) verifieren aan een echt Mds-nulmetingrapport of de someValuesFrom-eisen uit de Top-laag (waaronder HoogteLeiding, hasValidity-codering 1t 3t) daadwerkelijk als melding verschijnen, wat de NB-noot bij ATTR-004 raakt; en (b) een hernieuwde dekkinganalyse op Mds, die extra schrapkandidaten zou kunnen opleveren. (c) blijft staan als vaststelling: geen enkele geschrapte check hoeft terug, want Mds eist meer dan MdsPlan en niet minder.
 
-11. De dekkinganalyse op De Wolden (2026-08-16) meldt dat de vormen `Put_MateriaalPut_card` en `Rioolput_Maaiveldschematisering_card` alleen in Hyd meldingen opleveren en niet in MdsPlan of MdsProj, terwijl de dekkingclaim van ADM-004 die eisen aan Mds toeschrijft. Beide CFK's toetsen hetzelfde RDF-bestand, dus schone data verklaart het verschil niet, en de drie rapporten zijn blijkens hun kopblok op dezelfde onderdelen gevalideerd zonder afwijkende uitzonderingen; het verschil zit dus in de vormverzameling van de CFK. Herformuleren bij de volgende dekkinganalyse, of de claim beperken tot Hyd.
+11. Verplaatst naar de issuetracker: [#7 Twee dekkingclaims schrijven eisen aan de verkeerde conformiteitsklasse toe](https://github.com/mcolee/nlriochecker/issues/7).
 
 12. Typering De Wolden (2026-08-16): een voorgestelde poortwachtercheck op te globaal getypeerde objecten is afgewezen als dubbel. De typeringspoort bestaat al (de SHACL-meting benoemt de te globale klassen, de dataset levert de instanties) en de drempel waaronder een dekkingclaim een voorbehoud krijgt is configureerbaar. Meten helpt hier bovendien niet: alle 20.758 putorientaties in De Wolden hangen aan een specifieke subklasse (19.322 Inspectieput, 1.107 Pompunit, 218 Overstortput, 55 Lozingsput, 27 Stuwput, 27 Kruisingsput, 1 Kolk, 1 Drainageput). Er is geen generiek getypeerde put.
 
-13. `checks/netwerk.py::_bouw_netwerk` bouwt de vrijvervalgraaf als `nx.DiGraph` en zet per streng `graph.add_edge(begin, eind, uri=conduit.uri, label=conduit.label)`. Twee parallelle strengen tussen hetzelfde knopenpaar (in dit domein normaal, zie TOP-013) delen een kantsleutel; de tweede `add_edge`-aanroep overschrijft `uri` en `label` van de eerste stilzwijgend. NET-004 leest die kantattributen in `_eerste_streng()` om de representatieve streng van een kringloop te noemen, en kan zo de verkeerde streng noemen. Pre-existent (niet in deze ronde geintroduceerd), maar nu opvallend naast `afbakening.py::_component`, die ditzelfde patroon voor de componentberekening bewust omzeilt door de kantsleutel los van de knopensamenhang bij te houden. Repareren: `_bouw_netwerk` net zo bijhouden welke strengen bij welk knopenpaar horen, in plaats van op het laatst toegevoegde kantattribuut te vertrouwen.
+13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-23): ATTR-017 toegevoegd (W, Plausibiliteit): de wandruwheid
+(`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal. De aannemelijke band
+per materiaal komt uit Leidraad Riolering C2100 tabel B2.1 en staat in `plausibiliteit.toml`;
+het GWSW-datatype `Dt_Wandruwheid` is een geheel getal in mm (0-99) en kan de kunststofwaarden
+niet uitdrukken, dus de export noteert de waarde in tienden van een mm en de check leidt die
+schaal uit de data af (`wandruwheid_schalen`). Polypropyleen en Asbestcement kennen geen
+C2100-waarde en blijven ongetoetst. Het aanbevolen ID uit het issue (ATTR-014) was inmiddels
+vergeven; ATTR-017 is het eerstvolgende vrije. Op De Wolden en Hoogeveen meldt hij de
+PE-leidingen die de betonwaarde dragen. Zie
+[#38](https://github.com/mcolee/nlriochecker/issues/38) en BO-39.
+
+Versie 0.9, addendum (2026-08-23): ATTR-016 toegevoegd (F, Consistentie): een ronde put
+(`VormPut = Rond`) waarvan breedte en lengte verschillen -- een ronde put heeft een diameter.
+De tegenhanger van ATTR-004 voor putten in plaats van leidingen, met dezelfde tolerantie
+(`rondheid_tolerantie_mm`); een eigen check-ID en geen uitbreiding van ATTR-004, want
+`vergelijk` zet meetmomenten op check-ID naast elkaar en dan mag de betekenis van een ID niet
+verschuiven. Het aanbevolen ID uit het issue (ATTR-015) was inmiddels vergeven; ATTR-016 is
+het eerstvolgende vrije. Op De Wolden meldt hij 88 ronde putten. Zie
+[#39](https://github.com/mcolee/nlriochecker/issues/39).
+
+Versie 0.9, addendum (2026-08-23): ATTR-015 toegevoegd (W, Compleetheid): een systemische
+melding wanneer een enkel jaartal een onevenredig deel van de begindatums draagt -- een
+signaaldetector voor een vulwaardejaar, met een instelbare drempel
+(`begindatum_vulwaarde_aandeel`) en geen norm; op De Wolden en Hoogeveen meldt hij niets.
+ATTR-003 en ATTR-007 zijn hernoemd van "aanlegjaar" naar "begindatum" (de GWSW-term is
+leidend, ook in de titels en de identifiers); het check-ID en de ernst blijven. ATTR-007
+verantwoordt nu in zijn toelichting hoeveel objecten geen begindatum dragen en dus niet
+getoetst zijn, en zijn bovengrens is instelbaar (`begindatum_maximum`, standaard het huidige
+jaar) zodat een run reproduceerbaar te maken is. Zie
+[#21](https://github.com/mcolee/nlriochecker/issues/21).
+
+Versie 0.9, addendum (2026-08-23): geen checks toegevoegd, geschrapt of van ernst of
+dimensie veranderd; het contract is ongewijzigd. Redactioneel: de dekkingclaim van ADM-004
+is beperkt tot de conformiteitsklasse waar hij aantoonbaar op rust. De put-vormen MateriaalPut
+en Maaiveldschematisering (hasAspect exact=1) leveren op De Wolden uitsluitend in Hyd meldingen
+op, niet in MdsPlan of MdsProj op hetzelfde RDF-bestand; de dekking van die twee attributen
+rust dus op Hyd. De sentineltabel `dekking.toml` en de gegenereerde `docs/dekkingsmatrix.md`
+volgen. De tweede claim uit issue #7 (ADM-001, de put-strengkoppeling) is bewust ongemoeid
+gelaten: die raakt de onderbouwing van de harde CFK-eis (BO-7) en wacht op akkoord van de
+auteur. Zie [#7](https://github.com/mcolee/nlriochecker/issues/7).
+
+Versie 0.9 (2026-08-19): RVZ-002 en RVZ-003 zijn uit de tabel Geschrapte checks gehaald
+en gebouwd (W, Compleetheid): in geen van de drie SHACL-rapporten bestaat een vorm op
+Drempelniveau of Drempelbreedte, de enige drempelvorm
+(Overstortput_Overstortdrempel_card) toetst of de put een drempel heeft, dus de
+dekkingclaim was niet aantoonbaar en er keek niets naar die twee eigenschappen (issue
+#6). ATTR-013 toegevoegd (W, Compleetheid): een hoogtekenmerk op een vulwaarde rond 0 m
+NAP dat als meting geregistreerd staat (issue #1). EXT-003 gepreciseerd: een duiker is
+geen rioolleiding en valt buiten de populatie (issue #3). Verder geen checks toegevoegd,
+geschrapt of van ernst of dimensie veranderd. Vervallen ID's worden niet hergebruikt.
+
+Versie 0.8, addendum (2026-08-19): geen checks toegevoegd, geschrapt of van ernst of
+dimensie veranderd; het contract is ongewijzigd. Wel opgeschoond in de open punten: 1, 9,
+11 en 13 zijn verplaatst naar de issuetracker op GitHub en vervangen door een verwijzing;
+2, 3 en 6 staan als afgehandeld gemarkeerd, elk met de plek in de configuratie of de code
+waar dat te controleren is; en van punt 10 wordt het restant niet opgepakt, wat er met de
+inhoud bij staat. De nummering is bewust ongemoeid gelaten, omdat `checks.toml` en twee
+modules naar punt 6 en punt 8 bij nummer verwijzen.
 
 Versie 0.8 (2026-08-16): EXT-008 vervallen (BAG-verblijfsobjecten zijn voor deze opdracht
 niet relevant; het ID wordt niet hergebruikt). EXT-001 uitgebreid van strengen naar

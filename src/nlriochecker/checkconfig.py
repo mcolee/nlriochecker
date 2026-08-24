@@ -8,8 +8,16 @@ from importlib import resources
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
+from nlriochecker.dataset import VULWAARDE_KENMERKEN
 from nlriochecker.errors import ConfigError
 
 DEFAULT_CHECK_CONFIG_NAME = "checks.toml"
@@ -92,6 +100,20 @@ class PutTypeRule(BaseModel):
     toelichting: str = ""
 
 
+class VerhangStap(BaseModel):
+    """HGT-007: één trede van de verhangstaffel per diameter.
+
+    `tot_diameter_mm` is de bovengrens (inclusief) van de trede in millimeters;
+    `None` is de vangnettrede zonder bovengrens. `minimaal_verhang_een_op` is het
+    minimale afschot als noemer van 1:n, dus 250 betekent 1:250.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tot_diameter_mm: float | None = Field(default=None, gt=0.0)
+    minimaal_verhang_een_op: float = Field(gt=0.0)
+
+
 class CheckThresholds(BaseModel):
     """Configureerbare drempelwaarden van de checks."""
 
@@ -123,22 +145,47 @@ class CheckThresholds(BaseModel):
     # TOP-021: hoe dicht een put bij een doorlopende streng mag liggen.
     put_op_streng_tolerantie_m: float = Field(default=0.50, gt=0.0)
 
-    # ATTR-002: diameters onder deze waarde zijn onaannemelijk voor een riool.
-    minimale_diameter_mm: float = Field(default=200.0, gt=0.0)
+    # ATTR-002: de ondergrens staat per stelseltype in `plausibiliteit.toml`
+    # (`[[minimale_diameter]]`), niet als losse drempel -- ze draagt een bron per regel.
     # ATTR-005: eenheidsfout binnen bereik; een diameter onder deze waarde in
     # combinatie met een deelbaar-door-tien-patroon wijst op centimeters.
     eenheidsverdenking_diameter_mm: float = Field(default=100.0, gt=0.0)
     # ATTR-006: hoeveel de strengdiameter de putafmeting mag overschrijden.
     put_diameter_marge_mm: float = Field(default=0.0, ge=0.0)
-    # ATTR-007: geldig bereik voor het aanlegjaar.
-    aanlegjaar_minimum: int = Field(default=1870, ge=1)
-    # ATTR-008: aannemelijk bereik voor de strenglengte.
+    # ATTR-007: geldig bereik voor de begindatum (aanlegdatum).
+    begindatum_minimum: int = Field(default=1870, ge=1)
+    # ATTR-007: bovengrens van de begindatum. None betekent het huidige jaar
+    # (`date.today().year`); een vast jaar maakt een run reproduceerbaar, los van
+    # wanneer hij draait.
+    begindatum_maximum: int | None = Field(default=None, ge=1)
+    # ATTR-015: signaalwaarde, geen norm. Draagt een enkel jaartal meer dan dit
+    # aandeel van de gedateerde objecten, dan ruikt dat naar een vulwaarde.
+    begindatum_vulwaarde_aandeel: float = Field(default=0.20, gt=0.0, le=1.0)
+    # ATTR-015: onder zoveel gedateerde objecten zegt een aandeel niets; dan zwijgt
+    # de detector.
+    begindatum_vulwaarde_minimum_objecten: int = Field(default=30, ge=1)
+    # ATTR-008: aannemelijk bereik voor de strenglengte; de grenzen volgen het
+    # GWSW-datatype Dt_LengteLeiding (1-75 m). Zie checks.toml en issue #35.
     minimale_strenglengte_m: float = Field(default=1.0, gt=0.0)
-    maximale_strenglengte_m: float = Field(default=200.0, gt=0.0)
+    maximale_strenglengte_m: float = Field(default=75.0, gt=0.0)
     # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.
     lengte_afwijking_procent: float = Field(default=5.0, gt=0.0)
     # ATTR-004: hoeveel breedte en hoogte bij een rond profiel mogen verschillen.
     rondheid_tolerantie_mm: float = Field(default=0.0, ge=0.0)
+    # ATTR-017: de kandidaat-schalen waarmee de wandruwheid gelezen kan worden. Het
+    # GWSW-datatype `Dt_Wandruwheid` is een geheel getal in mm (0-99) en kan de
+    # kunststofwaarden uit C2100 niet uitdrukken, dus een export noteert de waarde soms
+    # in tienden van een mm. ATTR-017 kiest de schaal die de minste afwijkingen oplevert;
+    # met een tweede kandidaat blijft ook een export in hele mm goed getoetst. Zie BO-39.
+    wandruwheid_schalen: list[float] = Field(default_factory=lambda: [1.0, 10.0], min_length=1)
+
+    @field_validator("wandruwheid_schalen")
+    @classmethod
+    def _positieve_schalen(cls, schalen: list[float]) -> list[float]:
+        """Weigert een schaalfactor van nul of minder; erdoor delen zou onzin geven."""
+        if any(schaal <= 0 for schaal in schalen):
+            raise ValueError("wandruwheid_schalen moet uit positieve getallen bestaan")
+        return schalen
 
     # HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN.
     ahn_afwijking_waarschuwing_m: float = Field(default=0.05, gt=0.0)
@@ -148,14 +195,14 @@ class CheckThresholds(BaseModel):
     # HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng.
     tegenverhang_licht_m: float = Field(default=0.01, gt=0.0)
     tegenverhang_fors_m: float = Field(default=0.05, gt=0.0)
-    # HGT-007: minimaal verhang per meter voor vuilwater en gemengd.
-    minimaal_verhang_promille: float = Field(default=1.0, gt=0.0)
     # HGT-008: steiler dan een op zoveel is verdacht.
     extreem_verhang_een_op: float = Field(default=50.0, gt=0.0)
     # HGT-009 en HGT-016: BOB-sprong waarboven een valconstructie verwacht wordt.
     bob_sprong_m: float = Field(default=0.25, gt=0.0)
-    # HGT-012: aannemelijk bereik voor de putdiepte.
-    maximale_putdiepte_m: float = Field(default=6.0, gt=0.0)
+    # HGT-012: aannemelijk bereik voor de putdiepte; de grenzen volgen het
+    # GWSW-datatype Dt_HoogtePut (500-4000 mm). Zie checks.toml en issue #35.
+    minimale_putdiepte_m: float = Field(default=0.5, gt=0.0)
+    maximale_putdiepte_m: float = Field(default=4.0, gt=0.0)
     # HGT-013: gronddekking op de buiskruin.
     minimale_gronddekking_m: float = Field(default=0.50, gt=0.0)
     maximale_gronddekking_m: float = Field(default=4.0, gt=0.0)
@@ -191,6 +238,27 @@ class CheckThresholds(BaseModel):
     ext_putdeksel_afstand_m: float = Field(default=2.0, gt=0.0)
     ext_lozingspunt_water_afstand_m: float = Field(default=10.0, gt=0.0)
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
+
+    # #25: bufferafstand om de strengen van een stelsel voor de cartografische
+    # stelsellaag in de GeoPackage. Geen check-drempel; alleen de kaartlaag leest hem.
+    stelselvlak_buffer_m: float = Field(default=10.0, gt=0.0)
+
+    @property
+    def ext_zoekafstand_max_m(self) -> float:
+        """De verste blik van de EXT-checks in de externe lagen.
+
+        De dekkingspoort verruimt het bereik van de bronnen hiermee: een pand net
+        buiten dat bereik telt mee voor een object er net binnen. Bewust niet de
+        contextschil uit `[studiegebied]` -- die hoort bij de afbakening van de
+        GWSW-analyse en niet bij het zoekbereik in de externe lagen.
+        """
+        return max(
+            self.ext_pand_buffer_m,
+            self.ext_watergang_buffer_m,
+            self.ext_putdeksel_afstand_m,
+            self.ext_lozingspunt_water_afstand_m,
+            self.ext_perceel_buffer_m,
+        )
 
 
 class NetworkOptions(BaseModel):
@@ -228,8 +296,12 @@ class NulmetingOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Het checkregister eist dat de dataset aan alle conformiteitsklassen getoetst is;
-    # welke dat zijn, hangt af van wat de GWSW-server aanbiedt.
-    vereiste_cfk: list[str] = Field(default=["Hyd", "MdsPlan", "MdsProj"], min_length=1)
+    # welke dat zijn, hangt af van wat de GWSW-server aanbiedt. Bewust zonder default:
+    # de lijst hoort in checks.toml te staan en nergens anders. Een default hier zou
+    # hem een tweede keer opschrijven en een config die de sectie mist onzichtbaar
+    # laten terugvallen -- wat sinds `--cfk` zwaarder weegt, want deze lijst bepaalt
+    # ook welke klassen die optie accepteert.
+    vereiste_cfk: list[str] = Field(min_length=1)
 
 
 class InwinningOptions(BaseModel):
@@ -250,6 +322,45 @@ class InwinningOptions(BaseModel):
     # Waarden die "onbekend" zeggen zonder het kenmerk leeg te laten. Ze passeren
     # elke kardinaliteits- en collectietoets maar dragen geen informatie.
     onbekend: list[str] = Field(default_factory=list)
+
+
+class VulwaardeOptions(BaseModel):
+    """Welke hoogtekenmerken een vulwaarde rond 0 m NAP kunnen dragen.
+
+    Sommige bronsystemen schrijven 0,000 als "niet geregistreerd" in plaats van het
+    kenmerk leeg te laten. Dat is per project te beoordelen: in laag Nederland kan
+    0,00 m NAP een echte meting zijn. Een lege lijst zet de leesregel uit.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # De kenmerken (korte GWSW-naam, zoals `Aspect.kind`) waarop de leesregel werkt.
+    hoogte_kenmerken: list[str] = Field(default_factory=list)
+    # |waarde| kleiner dan of gelijk aan deze band telt als vulwaarde. De bovengrens is
+    # geen drempel maar een invoertoets: een halve meter is als vulwaardeband al veel
+    # ruimer dan enig project nodig heeft (De Wolden en Hoogeveen komt uit op 0,01),
+    # en wie de eenheid
+    # mist en centimeters of millimeters invult (1 of 10 in plaats van 0,01) leest zonder
+    # die grens elke BOB en elke maaiveldhoogte als ontbrekend: dertien checks vallen dan
+    # stil en ATTR-013 meldt elk object dat een hoogte draagt.
+    hoogte_band_m: float = Field(default=0.01, ge=0.0, le=0.5)
+
+    @field_validator("hoogte_kenmerken")
+    @classmethod
+    def _bekende_kenmerken(cls, kenmerken: list[str]) -> list[str]:
+        """Weigert een kenmerk waarop de leesregel niet werkt.
+
+        `markeer_vulwaarden` kijkt naar vier velden. Een naam die daar niet bij hoort,
+        of dezelfde naam met ander hoofdlettergebruik, doet stil niets terwijl ATTR-013
+        in haar toelichting meldt dat de regel op dat kenmerk gold.
+        """
+        onbekend = [kenmerk for kenmerk in kenmerken if kenmerk not in VULWAARDE_KENMERKEN]
+        if onbekend:
+            raise ValueError(
+                f"hoogte_kenmerken kent {', '.join(onbekend)} niet; de leesregel werkt "
+                f"alleen op {', '.join(sorted(VULWAARDE_KENMERKEN))}"
+            )
+        return kenmerken
 
 
 class NamingOptions(BaseModel):
@@ -279,11 +390,19 @@ class NamingOptions(BaseModel):
 
 
 class ExternalSources(BaseModel):
-    """Paden en laagnamen van de externe bronnen uit data/gis/."""
+    """Paden en laagnamen van de externe bronnen uit data/gis_koekangerveld/."""
 
     model_config = ConfigDict(extra="forbid")
 
-    map: str = "data/gis"
+    # Hoeveel een aangeleverde laag kleiner mag zijn dan het bereik waarvoor je hem
+    # geldig verklaart (`studiegebied` hieronder), voordat het laden faalt. Nul is
+    # streng. De omhullende van een laag is die van zijn *features*: een dunne laag
+    # met een lege rand is niet te onderscheiden van een afgeknipt extract, en die
+    # afweging hoort in het project thuis en niet in de code. Zie BO-19 in de
+    # beslislog.
+    dekking_tolerantie_m: float = Field(default=0.0, ge=0.0)
+
+    map: str = "data/gis_koekangerveld"
     bgt: str | None = None
     bag_pand: str | None = None
     nwb_wegvakken: str | None = None
@@ -310,7 +429,7 @@ class ReportOptions(BaseModel):
     # Boven welk aandeel van de bekeken populatie een meldingtype systemisch heet.
     systemisch_drempel: float = Field(default=0.80, gt=0.0, le=1.0)
     # Versie van het checkregister, voor de metadata in de GIS-uitvoer.
-    register_versie: str = "v0.8"
+    register_versie: str = "v0.9"
 
 
 class CheckConfig(BaseModel):
@@ -322,10 +441,14 @@ class CheckConfig(BaseModel):
     drempels: CheckThresholds = Field(default_factory=CheckThresholds)
     netwerk: NetworkOptions = Field(default_factory=NetworkOptions)
     studiegebied: StudyAreaOptions = Field(default_factory=StudyAreaOptions)
-    nulmeting: NulmetingOptions = Field(default_factory=NulmetingOptions)
+    nulmeting: NulmetingOptions
     naamgeving: NamingOptions = Field(default_factory=NamingOptions)
     inwinning: InwinningOptions = Field(default_factory=InwinningOptions)
+    vulwaarden: VulwaardeOptions = Field(default_factory=VulwaardeOptions)
     puttyperegels: list[PutTypeRule] = Field(default_factory=list)
+    # HGT-007: de RIONED-verhangstaffel per diameter. Leeg betekent dat HGT-007 niets
+    # toetst en dat in zijn toelichting zegt; de staffel hoort in checks.toml te staan.
+    verhang_staffel: list[VerhangStap] = Field(default_factory=list)
     bronnen: ExternalSources = Field(default_factory=ExternalSources)
     rapport: ReportOptions = Field(default_factory=ReportOptions)
 

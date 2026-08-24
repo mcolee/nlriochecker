@@ -9,7 +9,7 @@ import pytest
 
 from nlriochecker.checks import REGISTRY, Dimension, Severity
 
-REGISTER = Path(__file__).resolve().parents[1] / "data" / "checkregister-gwsw-nulmeting-v0_8.md"
+REGISTER = Path(__file__).resolve().parents[1] / "data" / "checkregister-gwsw-nulmeting-v0_9.md"
 RIJ_PATROON = re.compile(
     r"^\|\s*(?P<id>[A-Z]{3,4}-\d{3})\s*\|(?P<check>[^|]*)\|\s*(?P<ernst>[FW])\s*\|"
     r"\s*(?P<dimensie>[A-Za-z]+)\s*\|"
@@ -58,6 +58,6 @@ def test_ernst_en_dimensie_volgen_het_register(check_id: str) -> None:
 @pytest.mark.parametrize("check_id", sorted(REGISTRY))
 def test_geschrapte_checks_worden_niet_opnieuw_gebouwd(check_id: str) -> None:
     # De schrapronde dekt deze ID's al via de nulmeting; ze horen niet in de engine.
-    geschrapt = {"ADM-001", "ADM-004", "ADM-005", "ATTR-011", "RVZ-002", "RVZ-003"}
+    geschrapt = {"ADM-001", "ADM-004", "ADM-005", "ATTR-011"}
 
     assert check_id not in geschrapt

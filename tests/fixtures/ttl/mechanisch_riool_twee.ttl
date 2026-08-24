@@ -9,7 +9,9 @@ gwsw:Inspectieput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Rioolput     rdfs:subClassOf gwsw:Put .
 gwsw:Putorientatie rdfs:subClassOf gwsw:Knooppunt .
 gwsw:Leidingorientatie rdfs:subClassOf gwsw:Verbinding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 
 # Twee mechanische leidingen (Z en A), zodat een test kan bewijzen dat
 # `_schrijf_mechanisch` ze in URI-sortering wegschrijft in plaats van in de

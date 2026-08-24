@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from helpers_melding import melding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
@@ -110,7 +111,7 @@ def _melding(object_label: str, check_id: str) -> Melding:
 def test_lijst_met_verdachte_objecten_wordt_afgekapt() -> None:
     """Zeventien objecten uitschrijven maakt de synthese onleesbaar.
 
-    Op De Wolden droegen 17 objecten meldingen uit drie of meer checks; die alle
+    Op De Wolden en Hoogeveen droegen 17 objecten meldingen uit drie of meer checks; die alle
     in een zin noemen verdrinkt de boodschap.
     """
     meldingen = [
@@ -157,3 +158,55 @@ def test_richtingspercentage_zegt_erbij_dat_het_datasetbreed_is() -> None:
 
 def test_zonder_studiegebied_komt_die_kanttekening_niet(tmp_path: Path) -> None:
     assert "over de volledige dataset geteld" not in _tekst("net003_tegen_de_richting.ttl")
+
+
+class TestRodeDraadEnDeNulmeting:
+    """De rode draad redeneert over eigen checks, niet over SHACL-vormen."""
+
+    def test_nulmetingmeldingen_maken_geen_verdacht_object(self) -> None:
+        """Drie SHACL-vormen op een put zijn geen drie onafhankelijke checks.
+
+        Op De Wolden en Hoogeveen dragen 23.296 focusnodes drie of meer vormen; zouden die
+        meetellen, dan wijst deze sectie vrijwel elke put aan als verdacht.
+        """
+        from nlriochecker.uitvoer.melding import BRON_NULMETING
+        from nlriochecker.uitvoer.synthese import _multi_melding
+
+        meldingen = [
+            melding(
+                melding_id=f"NULMETING-Vorm_{n}_card",
+                check_id=f"NULMETING-Vorm_{n}_card",
+                object_uri="http://example.org/toets#PutA",
+                bron=BRON_NULMETING,
+            )
+            for n in range(1, 6)
+        ]
+
+        assert _multi_melding(meldingen, load_check_config()) == []
+
+    def test_meldingen_zonder_object_belanden_niet_in_een_naamloze_emmer(self) -> None:
+        """Anders staan ze samen als een verdacht object in het rapport."""
+        from nlriochecker.uitvoer.synthese import _multi_melding
+
+        meldingen = [
+            melding(melding_id=f"TOP-{n:03d}", check_id=f"TOP-{n:03d}", object_uri="")
+            for n in range(1, 6)
+        ]
+
+        assert _multi_melding(meldingen, load_check_config()) == []
+
+    def test_eigen_checks_op_hetzelfde_object_blijven_wel_opvallen(self) -> None:
+        from nlriochecker.uitvoer.synthese import _multi_melding
+
+        meldingen = [
+            melding(
+                melding_id=f"TOP-{n:03d}",
+                check_id=f"TOP-{n:03d}",
+                object_uri="http://example.org/toets#PutA",
+            )
+            for n in range(1, 6)
+        ]
+
+        regels = _multi_melding(meldingen, load_check_config())
+
+        assert regels and "verschillende checks" in regels[0]

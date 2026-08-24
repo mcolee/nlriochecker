@@ -22,16 +22,21 @@ gwsw:Infiltratieriool rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Overstortleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:VrijvervalRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
 gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
-gwsw:Persleiding rdfs:subClassOf gwsw:Leiding .
+gwsw:Persleiding rdfs:subClassOf gwsw:MechanischeTransportleiding .
+gwsw:MechanischeTransportleiding rdfs:subClassOf gwsw:Transportleiding .
+gwsw:Transportleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Rioolgemaal rdfs:subClassOf gwsw:Gemaal .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
-gwsw:Duiker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
+gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: gemetselde streng 1 komt uit op put B van kunststof
+# DEFECT: gemetselde streng 1 komt uit op put B van PVC.
+# Het putmateriaal was hier `Kunststof`, een waarde die MateriaalPutColl niet kent:
+# de fixture toetste een export die niet kan bestaan (issue #43).
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .
@@ -50,7 +55,7 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
     gwsw:hasAspect :PutB_ori .
 :PutB gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
     [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
-    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Kunststof ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:PVC ] ,
     [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
 :PutB_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;

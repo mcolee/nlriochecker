@@ -67,6 +67,11 @@ class DataCharacteristics:
 
     datums: list[DatumPrecisie] = field(default_factory=list)
     inwinning: list[InwinningVulling] = field(default_factory=list)
+    # Hoeveel hoogtewaarden de vulwaarde-leesregel als niet geregistreerd heeft
+    # gelezen. Ze tellen niet mee in `inwinning`, want die telt over de gemarkeerde
+    # dataset. Zonder dit getal zouden de noemers van die tabel bewegen zonder dat
+    # het rapport zegt waarom.
+    vulwaarden: int = 0
 
     @property
     def jaarprecisie(self) -> list[DatumPrecisie]:
@@ -84,6 +89,19 @@ def bepaal_karakteristiek(dataset: GwswDataset, config: CheckConfig) -> DataChar
     return DataCharacteristics(
         datums=_datumprecisie(dataset),
         inwinning=_inwinningsvulling(dataset, config),
+        vulwaarden=_vulwaarden(dataset),
+    )
+
+
+def _vulwaarden(dataset: GwswDataset) -> int:
+    """Telt de hoogtewaarden die de vulwaarde-leesregel heeft weggezet.
+
+    Precies de vier kenmerken die `_inwinningsvulling` telt: `markeer_vulwaarden`
+    werkt op geen andere velden. Elk van deze waarden is uit de noemers van die
+    tabel verdwenen.
+    """
+    return sum(len(node.vulwaarden) for node in dataset.nodes.values()) + sum(
+        len(conduit.vulwaarden) for conduit in dataset.conduits.values()
     )
 
 
