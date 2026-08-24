@@ -18,8 +18,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   (F) meldt per loze streng een keten waar actief riool op aansluit (doorgaand, aanvoer
   of afvoer, in de administratieve richting), ADM-011 (W) een keten die aan niets hangt.
   De keten staat in `cluster_id`, het aantal actieve strengen bovenstrooms als detail.
-  Nieuwe rol `[klassen] loze_leiding`. Op De Wolden en Hoogeveen: 54 loze leidingen in 33
-  ketens, 38 F en 16 W (Task 2 meet het). Zie BO-47.
+  Nieuwe rol `[klassen] loze_leiding`. Gemeten op De Wolden en Hoogeveen: 54 loze
+  leidingen in 33 ketens -- 3 doorgaand (8 strengen), 11 aanvoer (16), 5 afvoer (14) en
+  14 losgekoppeld (16) -- dus 38 F en 16 W. Zie BO-47.
 
 - **TOP-022 en TOP-023: hulpstuk met een ander aantal aansluitingen dan zijn
   GWSW-functie voorschrijft** (issue #60). Het verwachte aantal komt uit de

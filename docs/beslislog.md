@@ -2524,3 +2524,29 @@ niet meer dan de afvoerrichting.
 (verworpen: die gaat over `Einddatum`/`Begindatum`, dit over de klasse; en ADM-006 vindt hier
 niets, want geen enkel object draagt een `Einddatum`). De ernst laten afhangen van het aantal
 strengen bovenstrooms (verworpen: het aantal is een sorteersleutel, geen norm).
+
+**Gemeten uitkomst (2026-08-25).** Volledige toets op De Wolden en Hoogeveen: 54 loze leidingen
+in 33 ketens -- doorgaand 3/8, aanvoer 11/16, afvoer 5/14, losgekoppeld 14/16 (ketens/strengen);
+ADM-010 38 meldingen, ADM-011 16. Dat is precies de tabel uit het issue: het koppelingsherstel
+van #60 heeft hier niets verschoven. Het Koekangerveld-controlegeval (`ID0500-Kv1X0002-1`,
+`Kv1X0002-Kv1G0014-1`) is doorgaand met `ID6391-ID0500-1` als aanvoer en
+`Kv1G0014-Kv1G0012-1`/`Kv1G0014-Kv1G0016-1` als afvoer. Grootste ketens naar actief riool
+bovenstrooms: `Zu1G0932-Zu1X0006-1` 253 (doorgaand), `Wi1G0282-Wi1X0002-1` 126,
+`An2G0048-An2X0002-1` 58, `Ru1G0138-Ru1X0004-1` 46 en `Ru1G0142-Ru1X0002-1` 41 (die vier
+aanvoer).
+
+**Niet alle buren zijn vrijverval.** Van de 36 aansluitende strengen bij ADM-010 zijn er 32
+vrijverval, 2 duiker en 2 persleiding. Dat hoort zo: de check leest `selectie.leidingen`
+(rol `[klassen] streng = ["Leiding"]`), dus "actief riool" is elke niet-loze `gwsw:Leiding`, en
+`Duiker` hangt in de ontologie rechtstreeks onder `Leiding` -- niet onder
+`VrijvervalRioolleiding`. Het raakt 3 van de 19 ADM-010-ketens, goed voor 6 van de 38 meldingen:
+`loos-Ru1X0010-Ru1U0066-1` (afvoer, op de duikers `Ru1U0066-Ru1U0064-1` en
+`Ru1U0066-Ru1U0068-1`), `loos-ID6480-RuBP0338-1` (afvoer, op persleiding `RuBP0338-ID4028-1`) en
+`loos-Wi1G0680-Wi1X0010-1` (aanvoer, vanaf persleiding `ID7234-Wi1G0680-1`). Bij de overige 16
+ADM-010-ketens is elke buur vrijverval.
+
+**Het detail `rakend` op deze dataset.** Niet leeg bij 12 van de 19 ADM-010-ketens (24 van de 38
+meldingen), en leeg bij alle 14 losgekoppelde ketens. De zin over een rakende actieve streng
+staat alleen in de ADM-011-tekst -- daar was ze nodig -- en komt op De Wolden en Hoogeveen dus
+in geen enkele melding voor; alleen de fixture dekt haar. Voor ADM-010 blijft `rakend` een
+detailveld zonder eigen zin, want daar zegt de tekst al welke strengen aansluiten.
