@@ -34,7 +34,7 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: geen; drie geregistreerde stelsels: vuilwater (bereikt gemaal), gemengd (geen afvoerroute) en een hemelwaterbucket met alleen een put
+# DEFECT: geen; twee lokale stelsels met alleen strengen (vuilwater bereikt een gemaal, gemengd niet) plus een gemeentebrede bucket met strengen en putten die geen vlak krijgt
 
 gwsw:Vuilwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
 gwsw:GemengdStelsel rdfs:subClassOf gwsw:Rioolstelsel .
@@ -100,9 +100,18 @@ gwsw:Rioolstelsel rdfs:subClassOf gwsw:Stelsel .
 :LG1_e rdf:type gwsw:EindpuntLeiding .
 :LG1_b gwsw:hasConnection :PutC_ori .
 :LG1_e gwsw:hasConnection :PutD_ori .
+:LH1 rdf:type gwsw:Hemelwaterriool ; rdfs:label "H1" ;
+    gwsw:hasAspect :LH1_ori .
+:LH1_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :LH1_b , :LH1_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2200.0 1050.0 2200.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:LH1_b rdf:type gwsw:BeginpuntLeiding .
+:LH1_e rdf:type gwsw:EindpuntLeiding .
+:LH1_b gwsw:hasConnection :PutE_ori .
 :stelV rdf:type gwsw:Vuilwaterstelsel ; rdfs:label "vuilwater-1" ;
     gwsw:hasPart :LV1 , :LV2 .
 :stelG rdf:type gwsw:GemengdStelsel ; rdfs:label "gemengd-1" ;
     gwsw:hasPart :LG1 .
 :stelH rdf:type gwsw:Hemelwaterstelsel ; rdfs:label "hemelwater-bucket" ;
-    gwsw:hasPart :PutE .
+    gwsw:hasPart :LH1 , :PutE .

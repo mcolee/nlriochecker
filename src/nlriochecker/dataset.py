@@ -591,6 +591,25 @@ class GwswDataset:
             gevonden.extend(self.graph.subjects(RDF.type, URIRef(klasse)))
         return gevonden
 
+    def stelsel_leden(self, uri: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """De streng- en knoop-URI's die dit stelsel via `hasPart` draagt.
+
+        Twee gesorteerde tuples: (strengen, knopen). Voor de stelsellaag (#25) en de
+        nulmetingjoin, die allebei hetzelfde onderscheid nodig hebben en niet uit elkaar
+        mogen lopen. Een stelsel met knopen erin is een gemeentebrede `_geb_0`-bucket
+        (#17): die verzamelt de putten van een heel type naast verspreide strengen en is
+        geen lokaal stelsel -- de stelsellaag slaat hem daarom over.
+        """
+        strengen: list[str] = []
+        knopen: list[str] = []
+        for lid in parts_of(self.graph, URIRef(uri)):
+            fragment = str(lid)
+            if fragment in self.conduits:
+                strengen.append(fragment)
+            elif fragment in self.nodes:
+                knopen.append(fragment)
+        return tuple(sorted(strengen)), tuple(sorted(knopen))
+
     def subset(self, uris: Iterable[str]) -> GwswDataset:
         """Dezelfde dataset met alleen deze knopen en verbindingen.
 

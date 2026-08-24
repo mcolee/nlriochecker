@@ -1333,13 +1333,14 @@ def stelsel(naam: str, label: str, klasse: str, leden: list[str]) -> str:
     return f':{naam} rdf:type gwsw:{klasse} ; rdfs:label "{label}" ;\n    gwsw:hasPart {delen} .\n'
 
 
-# #25: de geregistreerde stelselboom die #17 blootlegde. Twee stelsels met strengen --
-# een vuilwaterstelsel dat een gemaal bereikt en een gemengd stelsel zonder afvoerroute
-# -- en een hemelwaterstelsel dat alleen een put bevat (de gemeentebrede put-bucket uit
-# #17), dat geen strengen heeft en dus geen vlak krijgt.
+# #25: de geregistreerde stelselboom die #17 blootlegde. Twee lokale stelsels met alleen
+# strengen -- een vuilwaterstelsel dat een gemaal bereikt en een gemengd stelsel zonder
+# afvoerroute -- plus een gemeentebrede `_geb_0`-bucket die naast een streng ook putten
+# bevat (#17). De bucket krijgt geen vlak: zulke buckets liggen over de hele gemeente en
+# zouden een uitgesmeerde vlek geven. `stelselvlak_buffer_m` bepaalt de bufferbreedte.
 FIXTURES["stelsels_registratie.ttl"] = (
-    "geen; drie geregistreerde stelsels: vuilwater (bereikt gemaal), gemengd (geen "
-    "afvoerroute) en een hemelwaterbucket met alleen een put",
+    "geen; twee lokale stelsels met alleen strengen (vuilwater bereikt een gemaal, "
+    "gemengd niet) plus een gemeentebrede bucket met strengen en putten die geen vlak krijgt",
     STELSEL_HIERARCHIE
     + put("PutA", "A", 1000.0, 2000.0)
     + put("PutB", "B", 1050.0, 2000.0)
@@ -1350,9 +1351,10 @@ FIXTURES["stelsels_registratie.ttl"] = (
     + leiding("LV1", "V1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", klasse="Vuilwaterriool")
     + leiding("LV2", "V2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "Gem", klasse="Vuilwaterriool")
     + leiding("LG1", "G1", [(1000.0, 2100.0), (1050.0, 2100.0)], "PutC", "PutD")
+    + leiding("LH1", "H1", [(1000.0, 2200.0), (1050.0, 2200.0)], "PutE", None, klasse="Hemelwaterriool")
     + stelsel("stelV", "vuilwater-1", "Vuilwaterstelsel", ["LV1", "LV2"])
     + stelsel("stelG", "gemengd-1", "GemengdStelsel", ["LG1"])
-    + stelsel("stelH", "hemelwater-bucket", "Hemelwaterstelsel", ["PutE"]),
+    + stelsel("stelH", "hemelwater-bucket", "Hemelwaterstelsel", ["LH1", "PutE"]),
 )
 
 

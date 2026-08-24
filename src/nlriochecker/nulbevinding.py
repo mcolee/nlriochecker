@@ -294,11 +294,20 @@ class _Joiner:
         zijn stelselobjecten (`vw_geb_1` c.s.), die #17 blootlegde en die #25 als vlak
         tekent. Een `CfkTypes_typ`-klassenaam matcht hier niet: die is een klasse, geen
         instantie, dus `graph_is_a` op de Stelsel-afsluiting geeft False.
+
+        Alleen een stelsel dat #25 ook als vlak tekent koppelt hier: een lokaal stelsel
+        met alleen strengen. De gemeentebrede `_geb_0`-buckets (strengen naast putten)
+        krijgen geen vlak, dus een melding erop zou naar een niet-bestaande feature
+        wijzen; die blijft objectloos en telt als "nergens op uit". Zelfde regel als
+        `lees_stelsels`, via `dataset.stelsel_leden`.
         """
         if not self._basis:
             return ""
         kandidaat = f"{self._basis}{focus}"
-        return kandidaat if self._dataset.graph_is_a(kandidaat, "Stelsel") else ""
+        if not self._dataset.graph_is_a(kandidaat, "Stelsel"):
+            return ""
+        strengen, knopen = self._dataset.stelsel_leden(kandidaat)
+        return kandidaat if strengen and not knopen else ""
 
     def herleid(self, focus: str) -> str:
         """De URI van de knoop of streng achter deze focusnode, of leeg."""

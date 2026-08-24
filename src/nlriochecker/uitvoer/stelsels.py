@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 from rdflib import RDFS, URIRef
 
-from nlriochecker.dataset import GwswDataset, parts_of
+from nlriochecker.dataset import GwswDataset
 from nlriochecker.uitvoer.identiteit import kort
 
 
@@ -43,23 +43,22 @@ class Stelselvlak:
 
 
 def lees_stelsels(dataset: GwswDataset) -> list[Stelselvlak]:
-    """De geregistreerde stelsels met ten minste één streng, gesorteerd op URI.
+    """De lokale stelsels met alleen strengen, gesorteerd op URI.
 
-    Een stelsel zonder strengen (een put-bucket uit #17) krijgt geen vlak en valt hier
-    weg. De volgorde is die van de stelsel-URI: determinisme boven leesbaarheid, net als
-    bij de object- en trefferlagen.
+    Een vlak krijgt alleen een stelsel dat strengen draagt en geen putten. De
+    gemeentebrede `_geb_0`-buckets uit #17 dragen naast verspreide strengen ook alle
+    putten van een heel type; hun strengen liggen over de hele gemeente (op De Wolden en
+    Hoogeveen 22-34 km breed) en zouden een uitgesmeerde vlek geven in plaats van een
+    stelsel. Ze worden daarom overgeslagen -- `dataset.stelsel_leden` maakt het
+    onderscheid, dezelfde regel die de nulmetingjoin gebruikt. Een stelsel zonder
+    strengen valt ook weg. De volgorde is die van de stelsel-URI: determinisme boven
+    leesbaarheid, net als bij de object- en trefferlagen.
     """
     afsluiting = dataset.closure("Stelsel")
     vlakken: list[Stelselvlak] = []
     for subject in sorted({str(s) for s in dataset.subjects_of_class("Stelsel")}):
-        strengen = tuple(
-            sorted(
-                str(lid)
-                for lid in parts_of(dataset.graph, URIRef(subject))
-                if str(lid) in dataset.conduits
-            )
-        )
-        if not strengen:
+        strengen, knopen = dataset.stelsel_leden(subject)
+        if not strengen or knopen:
             continue
         vlakken.append(
             Stelselvlak(

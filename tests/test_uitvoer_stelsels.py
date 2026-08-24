@@ -27,13 +27,32 @@ def test_lees_stelsels_geeft_de_geregistreerde_stelsels_met_hun_strengen() -> No
     assert len(vlakken["gemengd-1"].strengen) == 1
 
 
-def test_een_stelsel_zonder_strengen_krijgt_geen_vlak() -> None:
-    """De gemeentebrede put-buckets uit #17 bevatten alleen putten, geen strengen.
-
-    Een vlak baseert zich op de strengen, dus zo'n bucket levert geen vlak op.
+def test_een_gemeentebrede_bucket_met_putten_krijgt_geen_vlak() -> None:
+    """De `_geb_0`-buckets uit #17 dragen naast strengen ook putten en liggen
+    gemeentebreed; ze zouden een uitgesmeerde vlek geven en krijgen daarom geen vlak,
+    ook al hebben ze strengen.
     """
     dataset = load_dataset(TTL_DIR / "stelsels_registratie.ttl")
 
     labels = {vlak.label for vlak in lees_stelsels(dataset)}
 
     assert "hemelwater-bucket" not in labels
+
+
+def test_stelsel_leden_scheidt_lokale_stelsels_van_buckets() -> None:
+    """`stelsel_leden` is de gedeelde regel van de laag en de nulmetingjoin.
+
+    Een lokaal stelsel draagt alleen strengen; een bucket draagt strengen én putten.
+    """
+    dataset = load_dataset(TTL_DIR / "stelsels_registratie.ttl")
+
+    lokaal = buckets = 0
+    for subject in dataset.subjects_of_class("Stelsel"):
+        strengen, knopen = dataset.stelsel_leden(str(subject))
+        if strengen and not knopen:
+            lokaal += 1
+        elif strengen and knopen:
+            buckets += 1
+
+    assert lokaal == 2  # vuilwater-1 en gemengd-1
+    assert buckets == 1  # de hemelwater-bucket met een streng én een put

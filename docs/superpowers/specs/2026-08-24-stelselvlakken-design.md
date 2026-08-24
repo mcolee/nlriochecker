@@ -9,10 +9,16 @@ komen; de eis zelf staat daar. Blokkades #17 en #18 zijn gesloten en leveren de 
 hasPart → strengen/putten` volledig doorgemeten: 276 stelsels, 100% dekking, elke streng
 aan **exact één** stelsel. Twee feiten sturen dit ontwerp:
 
-1. **De registratie scheidt putten van strengen.** ~268 stelsels bevatten alléén
-   strengen; alle 23485 putten zitten in ~8 gemeentebrede `_geb_0`-buckets (één per type).
-   Een stelselvlak baseren we daarom op de **strengen** van het stelselobject, nooit op de
-   omhullende van al zijn leden.
+1. **De registratie scheidt putten van strengen.** 267 stelsels bevatten alléén strengen
+   (lokaal, mediaan ~1 km breed); daarnaast zijn er 8 gemeentebrede `_geb_0`-buckets (één
+   per type) die álle putten van dat type dragen **plus verspreide strengen over de hele
+   gemeente** (22-34 km breed op De Wolden en Hoogeveen). Een stelselvlak baseren we op de
+   **strengen**, en we tekenen **alleen de 267 lokale stelsels**: een bucket zou een
+   uitgesmeerde vlek geven. Het onderscheid is robuust en semantisch: een bucket bevat
+   putten, een lokaal stelsel niet (`dataset.stelsel_leden`). Gevolg: ~5077 strengen (o.a.
+   alle drukriolering) zitten alleen in buckets en krijgen geen vlak; ze staan wel in de
+   strengenlaag. *(Correctie op de #17-overdracht, die aannam dat de bucketstrengen lokaal
+   lagen; de data weerlegt dat. Auteurskeuze 2026-08-24: buckets overslaan.)*
 2. **575 objectloze SHACL-nulmetingmeldingen** (over 202 focusnodes) hebben een stelsel-URI
    als focusnode. Ze dragen al naam en type maar geen kaartplek — precies omdat er geen
    stelselgeometrie was.
@@ -23,10 +29,12 @@ het raakt de grafafleiding niet aan.
 
 ## Beslissingen
 
-- **B1 — Geometrieloze put-buckets overslaan.** Alleen een rij per stelsel met ten minste
-  één tekenbare streng. De ~8 put-buckets zijn geen ruimtelijk stelsel en krijgen geen vlak.
-  `gwsw_run` draagt `n_stelsels` (het aantal geschreven rijen), zodat het aantal expliciet is
-  in plaats van stil kleiner dan 276. *(Auteurskeuze, 2026-08-24.)*
+- **B1 — Alleen lokale stelsels (met alleen strengen) tekenen.** Een stelsel dat putten
+  bevat is een gemeentebrede `_geb_0`-bucket en krijgt geen vlak; ook een stelsel zonder
+  strengen valt weg. Op De Wolden en Hoogeveen levert dat 267 vlakken. `gwsw_run` draagt
+  `n_stelsels`, zodat het aantal expliciet is in plaats van stil kleiner dan 276.
+  *(Auteurskeuze, 2026-08-24, aangescherpt nadat de data de bucketstrengen gemeentebreed
+  bleken; zie De vondst punt 1.)*
 - **B2 — De 575-nulmeldingkoppeling zit in scope.** De join zet hun `object_uri` op de
   stelsel-URI, zodat ze aan de nieuwe laag koppelen en op de kaart verschijnen. *(Auteurskeuze,
   2026-08-24.)*
@@ -84,9 +92,12 @@ Toevoegen aan `FEATURELAGEN` en `GEOPACKAGE_STAPPEN`; `n_stelsels` als kolom in 
 
 ### 4. De join (`nulbevinding.py`)
 
-In `bouw_nulbevindingen`: is `herleid(focus)` leeg, kijk dan of `{basis}{focus}` een
-`Stelsel`-instantie is (`graph_is_a(uri, "Stelsel")`). Zo ja → `object_uri = die URI`. De 3
-`CfkTypes_typ`-klassenamen blijven objectloos.
+In `bouw_nulbevindingen`: is `herleid(focus)` leeg, kijk dan of `{basis}{focus}` een lokaal
+stelsel is dat #25 ook tekent (`graph_is_a(uri, "Stelsel")` én `stelsel_leden` geeft strengen
+zonder knopen). Zo ja → `object_uri = die URI`. Een `_geb_0`-bucket of een `CfkTypes_typ`-
+klassenaam blijft objectloos: koppelen aan een stelsel zonder vlak zou naar een niet-bestaande
+feature wijzen en het rapport laten overclaimen. Zo blijft de rapportregel "landt op de
+stelsellaag" waar zonder een aparte telling.
 
 `herleid` blijft "op een knoop of streng uitgekomen"; een stelselkoppeling is dus **niet**
 `herleid=True`. Downstream: `dataset.nodes.get(uri) or conduits.get(uri)` (regel 115) geeft
@@ -110,10 +121,18 @@ nieuwe regel meldt hoeveel overtredingen op de stelsellaag terechtkomen. Stilte 
 ## Verificatie (uit #25, aangevuld)
 
 - `uv run ruff check`, `uv run ruff format --check`, `uv run mypy`, `uv run pytest`.
-- Rijen in `stelsels` = aantal stelsels mét tekenbare strengen; `n_stelsels` in `gwsw_run`
-  gelijk daaraan.
-- Som van `strenglengte_m` = omvangtabel op een run zonder studiegebied.
-- De 575 stelselmeldingen dragen nu een `object_uri`; de rapportregel klopt met dat aantal.
+- Rijen in `stelsels` = de lokale stelsels (267 op De Wolden en Hoogeveen); `n_stelsels` in
+  `gwsw_run` gelijk daaraan.
+- `strenglengte_m` som over de laag dekt de strengen van de 267 lokale stelsels (18363 van
+  23440 strengen; de bucketstrengen vallen weg). Dit is bewust **niet** meer gelijk aan het
+  omvangtabel-totaal, dat over álle strengen telt -- gevolg van het overslaan van de buckets.
+- De stelselmeldingen die op een lokaal stelsel landen dragen een `object_uri` en tellen in de
+  rapportregel "landt op de stelsellaag"; die op een bucket of klassenaam blijven objectloos
+  ("nergens op uit"). `op_stelsel` in het rapport = som van `n_meldingen` over de laag.
 - De bestaande vier lagen veranderen niet (kolommen noch tellingen).
 - `tests/test_uitvoer_qgis.py` pakt de nieuwe laag via `FEATURELAGEN` mee; met QGIS opent de
   laag met alleen de stelsels zonder afvoerroute zichtbaar.
+- Nevenbevinding voor de auteur: 115 van de 267 stelsels staan standaard aan
+  (`bereikt_eindpunt=0`), waarvan ~76 mechanisch/duiker/infiltratie/druk/vacuum -- die hebben
+  per definitie geen vrijverval-afvoerpad. Alleen ~39 vrijvervalstelsels zijn een echt
+  aandachtspunt. Buiten scope van #25; ter beslissing van de auteur.
