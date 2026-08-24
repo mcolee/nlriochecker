@@ -2309,8 +2309,9 @@ doorkruising ⟺ `L` snijdt `W` én beide eindpunten van `L` liggen buiten `W` (
 EXT-003 de doorkruisingen waarvan de streng geen kruisingsconstructie (`Zinker`/`Duiker`)
 is. Een leiding die alleen binnen de buffer ligt maar `W` niet snijdt (raakt niet), of
 die in `W` eíndigt (lozingspunt, `e≥1`), is geen bevinding. De BGT-invoer wordt vooraf
-op de actuele versie gefilterd (`eind_registratie IS NULL`); vervallen waterdelen tellen
-niet mee. Uitgewerkt in issues #58 (invoerfilter) en #59 (meetkunde).
+op de actuele versie gefilterd (`eind_registratie` én `termination_date` leeg);
+vervallen waterdelen tellen niet mee. Uitgewerkt in issues #58 (invoerfilter) en #59
+(meetkunde).
 
 **Waarom.** De oude toets was `distance ≤ ext_watergang_buffer_m` (1,0 m) — nabijheid,
 geen doorkruising. Handmatig geclassificeerd op de laatste volledige De Wolden-run (638

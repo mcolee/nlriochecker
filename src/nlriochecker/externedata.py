@@ -496,7 +496,8 @@ def _alleen_actueel(frame, pad: Path, laag: str, notities: list[str]):
     verlopen = int((~actueel).sum())
     frame = frame[actueel]
     notities.append(
-        f"`{pad.name}` laag {laag!r}: {verlopen} verlopen objectversies overgeslagen "
+        f"`{pad.name}` laag {laag!r}: "
+        f"{getal(verlopen, 'verlopen objectversie', 'verlopen objectversies')} overgeslagen "
         f"({' of '.join(HISTORIEVELDEN)} gevuld); "
         f"{getal(len(frame), 'actuele feature', 'actuele features')} gelezen."
     )
