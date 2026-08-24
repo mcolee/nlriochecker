@@ -629,17 +629,29 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         "Overtredingen per conformiteitsklasse",
     )
 
+    stelsel_uris = {str(subject) for subject in run.dataset.subjects_of_class("Stelsel")}
+    op_stelsel = sum(1 for melding in uit_nulmeting if melding.object_uri in stelsel_uris)
     zonder_object = sum(1 for melding in uit_nulmeting if not melding.object_uri)
     zonder_plek = sum(
-        1 for melding in uit_nulmeting if melding.object_uri and melding.foutlocatie is None
+        1
+        for melding in uit_nulmeting
+        if melding.object_uri
+        and melding.foutlocatie is None
+        and melding.object_uri not in stelsel_uris
     )
     regels += [
         "",
         f"> **{getal(zonder_object, 'overtreding kwam', 'overtredingen kwamen')} "
         f"nergens op uit** en {vorm(zonder_object, 'staat', 'staan')} dus niet op de "
-        "kaart: de focusnode is een klassenaam uit `CfkTypes_typ`, of een stelsel dat geen "
-        "knoop of streng is. Ze staan wel in dit rapport en in de meldingentabel, met een "
-        "leeg gebied -- ze zijn aan geen enkel studiegebied toe te wijzen.",
+        "kaart: de focusnode is een klassenaam uit `CfkTypes_typ` en wijst geen object aan. "
+        "Ze staan wel in dit rapport en in de meldingentabel, met een leeg gebied -- ze "
+        "zijn aan geen enkel studiegebied toe te wijzen.",
+        "",
+        f"> **{getal(op_stelsel, 'overtreding staat', 'overtredingen staan')} op een "
+        f"stelsel** en {vorm(op_stelsel, 'verschijnt', 'verschijnen')} op de laag `stelsels` "
+        "in de GeoPackage (#25): de focusnode is een geregistreerd stelsel (#17), geen knoop "
+        "of streng. Ze dragen geen eigen punt en zijn aan geen studiegebied toe te wijzen "
+        "(BO-12).",
         "",
         f"> **{getal(zonder_plek, 'overtreding staat', 'overtredingen staan')} op een "
         f"object zonder bruikbare geometrie** en {vorm(zonder_plek, 'kreeg', 'kregen')} "

@@ -1053,3 +1053,31 @@ def test_runmetadata_telt_de_stelsels(tmp_path: Path) -> None:
     ((aantal,),) = _rijen(pad, "select n_stelsels from gwsw_run")
 
     assert aantal == 2
+
+
+def test_stelselmelding_uit_de_nulmeting_landt_op_de_stelsellaag(tmp_path: Path) -> None:
+    """De bonus van #25: een SHACL-overtreding op een stelsel komt op zijn vlak.
+
+    De focusnode `vw_geb_1` is geen knoop of streng maar een geregistreerd stelsel; de
+    join koppelt de overtreding aan de stelsel-URI, en zo verschijnt ze op de kaart via
+    het stelselvlak in plaats van nergens op uit te komen.
+    """
+    from nlriochecker.meting import laad_nulmeting
+    from nlriochecker.nulbevinding import bouw_nulbevindingen
+
+    shacl = Path(__file__).parent / "fixtures" / "shacl"
+    rapporten = [shacl / "join_mdsplan.csv", shacl / "join_mdsproj.csv"]
+    nulmeting = laad_nulmeting(rapporten, VEREIST[1:])
+    basis = _run("nulmeting_join.ttl")
+    nulbevindingen = bouw_nulbevindingen(nulmeting, basis.dataset, 0.80)
+    run = replace(
+        basis, nulbevindingen=nulbevindingen, meetbereik=Meetbereik.van(VEREIST, VEREIST[1:])
+    )
+
+    pad = _schrijf(run, tmp_path)
+
+    ((n_meldingen, popup),) = _rijen(
+        pad, "select n_meldingen, popup_html from stelsels where label = 'vw-1'"
+    )
+    assert n_meldingen >= 1
+    assert "Vuilwaterstelsel_Lozingspunt_card" in popup

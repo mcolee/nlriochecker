@@ -22,6 +22,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   uit #17 (stelsels met alleen putten, geen strengen) krijgen geen vlak; `gwsw_run`
   telt de geschreven stelsels in `n_stelsels`. De QGIS-stijl `stelsels.qml` toont
   standaard alleen de stelsels zonder afvoerroute; de rest zit in de laag maar staat uit.
+- **Nulmetingovertredingen op een stelsel landen op de stelsellaag** (issue #25, na #17).
+  Een SHACL-focusnode die een geregistreerd stelsel is (bv. `vw_geb_1`) kreeg tot nu toe
+  geen object en kwam nergens op de kaart. De join koppelt zo'n overtreding nu aan het
+  stelsel zelf, zodat ze via de laag `stelsels` zichtbaar wordt; alleen de klassenamen uit
+  `CfkTypes_typ` blijven objectloos. Het rapport meldt beide aantallen apart.
 
 - **Richtingsdiagnose NET-009** (issue #18, fase 2). De nieuwe check **NET-009** (F,
   Consistentie) meldt per vrijvervalstreng waar de drie richtingssignalen elkaar

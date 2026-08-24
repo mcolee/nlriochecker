@@ -70,13 +70,29 @@ def test_focusnode_op_een_eindpunt_herleidt_naar_de_streng(
     assert bevinding.herleid
 
 
-def test_focusnode_zonder_object_blijft_onherleid(bevindingen: list[Nulbevinding]) -> None:
-    """Een stelsel of klassenaam komt nergens op uit; de melding blijft wel bestaan."""
-    stelsel = _een(bevindingen, "Vuilwaterstelsel_Lozingspunt_card", "vw_geb_1")
+def test_een_klassenaam_uit_cfktypes_komt_nergens_op_uit(
+    bevindingen: list[Nulbevinding],
+) -> None:
+    """Een `CfkTypes_typ`-focusnode is een klasse, geen object; hij blijft onherleid."""
     klasse = _een(bevindingen, "CfkTypes_typ", "Rioolstelsel")
 
-    assert not stelsel.herleid and stelsel.object_uri == ""
     assert not klasse.herleid and klasse.object_uri == ""
+
+
+def test_focusnode_op_een_stelsel_koppelt_aan_dat_stelsel(
+    bevindingen: list[Nulbevinding], joinset: GwswDataset
+) -> None:
+    """Een geregistreerd stelsel als focusnode krijgt het stelsel zelf als object (#25).
+
+    Zo koppelt de overtreding aan de stelsellaag in de GeoPackage in plaats van nergens
+    op uit te komen. Het blijft `herleid=False`: het object is geen knoop of streng, dus
+    het krijgt geen studiegebied en geen foutlocatie (BO-12).
+    """
+    stelsel = _een(bevindingen, "Vuilwaterstelsel_Lozingspunt_card", "vw_geb_1")
+
+    assert stelsel.object_uri.endswith("vw_geb_1")
+    assert stelsel.object_uri not in joinset.nodes and stelsel.object_uri not in joinset.conduits
+    assert not stelsel.herleid
 
 
 def test_label_valt_terug_op_dat_van_het_rapport(bevindingen: list[Nulbevinding]) -> None:

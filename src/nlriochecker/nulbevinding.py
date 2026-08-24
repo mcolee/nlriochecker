@@ -112,6 +112,12 @@ def bouw_nulbevindingen(
     for (vorm, focus, boodschap), gegevens in sorted(ruw.items()):
         ernst_rauw, waarde, objecttype, label, cfks = gegevens
         uri = joiner.herleid(focus)
+        # Een focusnode die geen knoop of streng is maar wel een geregistreerd stelsel
+        # (#17) krijgt het stelsel zelf als object, zodat de overtreding aan de
+        # stelsellaag koppelt (#25). Het blijft onherleid: een stelsel is geen knoop of
+        # streng, dus het krijgt geen studiegebied en geen foutlocatie (BO-12).
+        stelsel_uri = joiner.stelsel(focus) if not uri else ""
+        object_uri = uri or stelsel_uri
         object_ = (dataset.nodes.get(uri) or dataset.conduits.get(uri)) if uri else None
         eigen_label = object_.label if object_ is not None else ""
         bevindingen.append(
@@ -120,7 +126,7 @@ def bouw_nulbevindingen(
                 vorm=vorm,
                 focus_node=focus,
                 ernst="F" if ernst_rauw == ERNST_VIOLATION else "W",
-                object_uri=uri,
+                object_uri=object_uri,
                 object_label=eigen_label or label,
                 objecttype=objecttype,
                 boodschap=boodschap,
@@ -280,6 +286,19 @@ class _Joiner:
                     per_type[volledig.rsplit("/", 1)[-1].rsplit("#", 1)[-1]] += 1
             self._instanties = dict(per_type)
         return self._instanties
+
+    def stelsel(self, focus: str) -> str:
+        """De URI van het geregistreerde stelsel achter deze focusnode, of leeg.
+
+        Voor focusnodes die `herleid` niet op een knoop of streng kreeg: een deel ervan
+        zijn stelselobjecten (`vw_geb_1` c.s.), die #17 blootlegde en die #25 als vlak
+        tekent. Een `CfkTypes_typ`-klassenaam matcht hier niet: die is een klasse, geen
+        instantie, dus `graph_is_a` op de Stelsel-afsluiting geeft False.
+        """
+        if not self._basis:
+            return ""
+        kandidaat = f"{self._basis}{focus}"
+        return kandidaat if self._dataset.graph_is_a(kandidaat, "Stelsel") else ""
 
     def herleid(self, focus: str) -> str:
         """De URI van de knoop of streng achter deze focusnode, of leeg."""

@@ -541,7 +541,9 @@ def _schrijf_features(
         voortgang.stap(label=laag)
 
     bouwwerken, waterdelen = _schrijf_treffers(verbinding, run, meldingen, config, voortgang)
-    stelsel_aantal = _schrijf_stelsels(verbinding, run, config, afvoercontext, per_object, voortgang)
+    stelsel_aantal = _schrijf_stelsels(
+        verbinding, run, config, afvoercontext, per_object, voortgang
+    )
 
     return _LaagTellingen(
         putten=tellingen["putten"],

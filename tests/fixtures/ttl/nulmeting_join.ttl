@@ -31,6 +31,8 @@ gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
 gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
+gwsw:Vuilwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:Rioolstelsel rdfs:subClassOf gwsw:Stelsel .
 
 # Voor de join van SHACL-focusnodes op dataset-objecten. Geen ingebouwd defect voor
 # de eigen checks; het gebrek zit in de bijbehorende SHACL-fixtures.
@@ -80,3 +82,9 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1200.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 :PutD_ori_maa rdf:type gwsw:Maaiveldorientatie ;
     gwsw:hasConnection :PutD_ori .
+
+# Een geregistreerd stelsel (#17): vw_geb_1 hangt via hasPart aan streng L1. De
+# SHACL-focusnode vw_geb_1 is geen knoop of streng, maar koppelt hierdoor aan de
+# stelsellaag (#25) in plaats van nergens op uit te komen.
+:vw_geb_1 rdf:type gwsw:Vuilwaterstelsel ; rdfs:label "vw-1" ;
+    gwsw:hasPart :L1 .
