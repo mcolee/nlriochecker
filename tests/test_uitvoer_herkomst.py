@@ -451,8 +451,9 @@ def test_voorstel_is_gereserveerd_en_wordt_niet_geschreven(toets: CheckRun) -> N
     assert all("voorstel" not in rij for rij in rijen)
 
 
-def test_schrijf_json_is_leesbaar_utf8(tmp_path: Path) -> None:
-    """Geen ontsnapte codepunten en twee spaties inspringen, voor inspectie met het oog."""
+def test_schrijf_json_is_compacte_utf8(tmp_path: Path) -> None:
+    """Geen ontsnapte codepunten, en compact geschreven: wie het met het oog wil
+    lezen heeft `bevindingen.md`, dus de JSON draagt geen inspringing meer."""
     pad = schrijf_json(
         tmp_path / "b.json",
         [{"melding_id": "a", "object_label": "Ruinerwold \u00e9\u00e9n, Dwingelo\u00f6"}],
@@ -467,7 +468,8 @@ def test_schrijf_json_is_leesbaar_utf8(tmp_path: Path) -> None:
     # Niet-ASCII staat er als teken, niet als \uXXXX-ontsnapping.
     assert "Ruinerwold \u00e9\u00e9n, Dwingelo\u00f6" in tekst
     assert "\\u00e9" not in tekst
-    assert '\n  "schema_versie"' in tekst
+    # Compact: geen inspringing en geen spaties rond scheidingstekens.
+    assert tekst.startswith('{"schema_versie":')
     assert tekst.endswith("\n")
 
 

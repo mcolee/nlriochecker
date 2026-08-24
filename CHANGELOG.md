@@ -166,6 +166,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`bevindingen.json` wordt compact geschreven** (geen inspringing, geen spaties rond
+  scheidingstekens). De structuur, veldvolgorde en sortering veranderen niet en het
+  contract in `docs/json-schema.md` blijft `1.1`, maar de bytes van het bestand wijken
+  bewust af van eerdere versies: een byte-diff tussen twee meetmomenten over deze grens
+  heen vraagt eerst pretty-printen (`python -m json.tool`). Op De Wolden en Hoogeveen
+  scheelt het circa een kwart in bestandsgrootte (149 MB naar 111 MB).
 - **De rdflib-store is vervangen door eigen graafindexen uit de pyoxigraph-stream**
   (issue #26). `GwswDataset.graph` is voortaan een `graaf.GraafIndex`: twee dicts
   (s→p→objecten, p→o→subjecten), in stream-volgorde gevuld uit de pyoxigraph-parse en

@@ -169,6 +169,6 @@ def schrijf_json(
         "aantal_meldingen": len(meldingen),
         "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),
     }
-    tekst = json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False)
+    tekst = json.dumps(document, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     pad.write_text(tekst + "\n", encoding="utf-8")
     return pad

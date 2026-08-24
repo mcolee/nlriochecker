@@ -23,13 +23,14 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 
 ## Eigenschappen van het bestand
 
-- UTF-8, zonder ontsnapte codepunten (`ensure_ascii=False`), ingesprongen met twee
-  spaties, met een afsluitende regelovergang. Leesbaar bij inspectie; het bestand
-  blijft daar klein genoeg voor.
+- UTF-8, zonder ontsnapte codepunten (`ensure_ascii=False`), compact geserialiseerd
+  (geen inspringing, geen spaties rond scheidingstekens), met een afsluitende
+  regelovergang. Wie het met het oog wil lezen, haalt het door een pretty-printer
+  (`python -m json.tool`); voor de lezer is er `bevindingen.md`.
 - De meldingen staan gesorteerd op `melding_id`. Twee runs op dezelfde data met
   dezelfde `run_datum` leveren daarom een byte-identiek bestand, en twee
-  meetmomenten zijn met een gewone diff te vergelijken. Zie de kanttekening bij
-  `melding_id` over botsende ID's.
+  meetmomenten zijn — na pretty-printen — met een gewone diff te vergelijken. Zie
+  de kanttekening bij `melding_id` over botsende ID's.
 - Ongeldige getallen worden geweigerd (`allow_nan=False`). Een NaN-coördinaat zou als
   `[NaN, 1.0]` in het bestand komen, wat geen geldige JSON is; dan faalt de run liever
   luid dan dat er een onleesbaar contract wegschrijft.
