@@ -2394,3 +2394,29 @@ dan onhaalbaar en band en getoond getal kunnen tegenspreken). Een lichtere categ
 meldingen op precies 0,250 m draagt; de 44 die op 0,100 m afronden staan in HGT-001. De getallen
 zijn gelijk aan wat de baselinerun op afgeronde afwijkingen voorspelde, dus de nieuwe band is de
 enige oorzaak van het verschil.
+
+### BO-45 Een ontbrekende begindatum is een fout per object (ATTR-018), niet een notitieregel
+
+**Wat.** ATTR-018 (F, Compleetheid) meldt per vrijvervalrioolleiding en per put dat `Begindatum`
+ontbreekt. Populatie en `examined` zijn die van ATTR-007 (`vrijvervalrioolleidingen` plus
+`putten`); mechanisch riool en andere niet-vrijvervalleidingen vallen erbuiten en worden in de
+toelichting geteld. De GeoPackage-lagen `putten` en `strengen` krijgen de kolom `begindatum_jaar`
+(integer, leeg zonder datum). De tweede notitieregel van ATTR-007, die het gat over de hele
+meetset telde, vervalt. Uitgewerkt in issue #61.
+
+**Waarom.** `notes()` gaat per ontwerp alleen naar het Markdown-rapport; een object zonder
+aanlegjaar had dus geen spoor in de JSON, de CSV of de GeoPackage en kleurde groen -- "beoordeeld
+en niets gevonden". Zonder aanlegjaar is er geen vervangingsplanning, geen levensduurberekening en
+geen ATTR-003; dat is een gebrek in de aanlevering en geen signaal, vandaar F. Het jaar en niet de
+datum in de kolom, omdat de rest van de code met het jaartal werkt (`Conduit.begindatum_jaar`).
+
+**Gevolg dat je moet kennen.** Op De Wolden en Hoogeveen zijn het ongeveer 9274 bevindingen
+(24,2% van 38361; putten 9063 van 20758, strengen 211 van 17603). Dat haalt de systemische
+drempel (80%) niet, dus elke bevinding staat los in de CSV en op de kaart; het Markdown-rapport
+groeit navenant (`max_bevindingen_per_check = 0`). Afkappen is een keuze voor de auteur, niet
+voor de implementatie.
+
+**Alternatieven.** Alleen de kolom (verworpen: een kolom kleurt niets en komt niet in de CSV of
+JSON). Een systemische melding in plaats van per object (verworpen: het aandeel ligt onder de
+drempel en het gat is per object te herstellen). `Einddatum` erbij (verworpen: dat is ADM-006, en
+geen enkel object draagt er een).

@@ -11,6 +11,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Toegevoegd
+
+- **ATTR-018: ontbrekende begindatum wordt per object gemeld** (issue #61). Een
+  vrijvervalrioolleiding of put zonder `Begindatum` krijgt een fout (Compleetheid); tot nu
+  toe stond het gat alleen als één regel in de toelichting van ATTR-007 en bleef zo'n
+  object op de kaart groen. De GeoPackage-lagen `putten` en `strengen` dragen de nieuwe
+  kolom `begindatum_jaar` (leeg zonder datum). De meetsetregel van ATTR-007 vervalt; de
+  regel die zegt wat ATTR-007 zelf niet kon toetsen blijft. Op De Wolden en Hoogeveen:
+  ongeveer 9274 bevindingen, vooral putten (Task 2 meet het). Zie BO-45.
+
 ### Gewijzigd
 
 - **HGT-001 waarschuwt vanaf 10 cm AHN-afwijking, inclusief** (issue #63). De

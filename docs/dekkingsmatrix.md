@@ -8,13 +8,13 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | ---: | ---: | ---: | ---: | ---: |
 | TOP | 21 | 21 | 0 | 0 | 0 |
 | ADM | 9 | 6 | 0 | 0 | 3 |
-| ATTR | 17 | 16 | 0 | 0 | 1 |
+| ATTR | 18 | 17 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 9 | 9 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **98** | **94** | **0** | **0** | **4** |
+| **totaal** | **99** | **95** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -77,6 +77,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum… | W | Compleetheid | geimplementeerd met test | — |
 | ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De… | F | Consistentie | geimplementeerd met test | — |
 | ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2… | W | Plausibiliteit | geimplementeerd met test | — |
+| ATTR-018 | Begindatum ontbreekt op een vrijvervalrioolleiding of put. ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een aanwezige datum en de nulmeting eist `Be… | F | Compleetheid | geimplementeerd met test | — |
 
 ## HGT
 

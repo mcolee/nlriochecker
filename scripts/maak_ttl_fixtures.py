@@ -578,10 +578,12 @@ C = (1100.0, 2000.0)
 D = (1150.0, 2000.0)
 E = (1200.0, 2000.0)
 
+# De putten dragen sinds ATTR-018 een begindatum: zonder aanlegjaar is een put een
+# bevinding, en deze fixture hoort de hele ATTR-groep stil te houden (issue #61).
 FIXTURES["attr_schoon.ttl"] = (
     "geen; alle attributen zijn aannemelijk en onderling consistent",
-    nette_put("PutA", "A", *A)
-    + nette_put("PutB", "B", *B)
+    nette_put("PutA", "A", *A, Begindatum="1980-01-01")
+    + nette_put("PutB", "B", *B, Begindatum="1980-01-01")
     + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
 )
 
@@ -905,6 +907,24 @@ FIXTURES["attr007_toekomstig_jaar.ttl"] = (
     nette_put("PutA", "A", *A)
     + nette_put("PutB", "B", *B)
     + nette_leiding("L1", "1", [A, B], "PutA", "PutB", velden={"Begindatum": "2099-01-01"}),
+)
+
+# ATTR-018: streng 1 en put A dragen geen begindatum en melden; streng 2 en put B
+# dragen er wel een en zwijgen; persleiding 3 draagt er geen maar valt buiten de
+# populatie (mechanisch riool) en zwijgt ook. `kenmerken()` slaat een None-waarde
+# over, dus `velden={"Begindatum": None}` haalt de standaarddatum van nette_leiding weg.
+FIXTURES["attr018_zonder_begindatum.ttl"] = (
+    "streng 1 en put A hebben geen begindatum; streng 2, put B en persleiding 3 zijn "
+    "geen bevinding (issue #61)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B, Begindatum="1985-01-01")
+    + nette_put("PutC", "C", *C, Begindatum="1985-01-01")
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB", velden={"Begindatum": None})
+    + nette_leiding("L2", "2", [B, C], "PutB", "PutC")
+    + nette_leiding(
+        "L3", "3", [C, D], "PutC", "PutD", klasse="Persleiding", velden={"Begindatum": None}
+    )
+    + nette_put("PutD", "D", *D, Begindatum="1985-01-01"),
 )
 
 FIXTURES["attr008_lange_streng.ttl"] = (

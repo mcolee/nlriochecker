@@ -89,6 +89,7 @@ gebreken" leest.
 | ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum_vulwaarde_aandeel`); een systemische melding per verdacht jaar, zwijgt bij een natuurlijke verdeling of bij te weinig gedateerde objecten (issue #21) | W | Compleetheid |
 | ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De tegenhanger van ATTR-004 voor putten in plaats van leidingen, met dezelfde tolerantie (`rondheid_tolerantie_mm`); de nulmeting toetst alleen de aanwezigheid van de vorm (`Put_VormPut_card`), niet de samenhang met de afmetingen (issue #39) | F | Consistentie |
 | ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2100 tabel B2.1 (`plausibiliteit.toml`). Het GWSW-datatype is een geheel getal in mm en kan de kunststofwaarden niet uitdrukken, dus de schaal wordt uit de data afgeleid (`wandruwheid_schalen`); de nulmeting toetst de wandruwheid nergens (issue #38, BO-39) | W | Plausibiliteit |
+| ATTR-018 | Begindatum ontbreekt op een vrijvervalrioolleiding of put. ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een aanwezige datum en de nulmeting eist `Begindatum` in geen van de drie CFK-rapporten; zonder aanlegjaar is er geen vervangingsplanning, geen levensduur en geen ATTR-003. Mechanisch riool valt buiten de populatie en wordt in de toelichting geteld (issue #61) | F | Compleetheid |
 
 ## HGT: Hoogten en verhang
 
@@ -217,6 +218,14 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-24): ATTR-018 toegevoegd (F, Compleetheid): een
+vrijvervalrioolleiding of put zonder `Begindatum`. Tot nu toe kreeg zo'n object nergens een
+melding -- ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een aanwezige datum, de nulmeting
+eist het kenmerk niet -- en bleef het op de kaart groen. De GeoPackage-lagen `putten` en
+`strengen` dragen sindsdien ook de kolom `begindatum_jaar`. Op De Wolden en Hoogeveen meldt
+hij ongeveer 9274 objecten (24% van de populatie), vooral putten. Zie
+[#61](https://github.com/mcolee/nlriochecker/issues/61) en BO-45.
 
 Versie 0.9, addendum (2026-08-23): ATTR-017 toegevoegd (W, Plausibiliteit): de wandruwheid
 (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal. De aannemelijke band

@@ -71,6 +71,9 @@ DEFECTEN = [
     # 800x1000) blijven stil -- de drie verificatiegevallen uit issue #39 in een fixture.
     ("attr016_ronde_put_ongelijk.ttl", "ATTR-016", ["A"]),
     ("attr007_toekomstig_jaar.ttl", "ATTR-007", ["1"]),
+    # ATTR-018: alleen de vrijvervalstreng en de put zonder begindatum; persleiding 3
+    # valt buiten de populatie.
+    ("attr018_zonder_begindatum.ttl", "ATTR-018", ["1", "A"]),
     ("attr008_lange_streng.ttl", "ATTR-008", ["1"]),
     ("attr009_lengte_wijkt_af.ttl", "ATTR-009", ["1"]),
     ("attr010_materiaal_put.ttl", "ATTR-010", ["1"]),
@@ -887,8 +890,9 @@ def test_attr015_zwijgt_zonder_piek() -> None:
 def test_attr015_zwijgt_bij_te_weinig_gedateerde_objecten() -> None:
     """Onder het minimum zegt een aandeel niets; de detector zwijgt met een toelichting.
 
-    `attr_schoon.ttl` draagt maar een gedateerd object; zonder deze ondergrens zou dat
-    ene jaar 100% halen en vals aanslaan.
+    `attr_schoon.ttl` draagt drie gedateerde objecten, alle drie uit 1980 (de putten
+    kregen hun begindatum met ATTR-018, issue #61); zonder deze ondergrens zou dat ene
+    jaar 100% halen en vals aanslaan.
     """
     outcome = uitkomst("attr_schoon.ttl", "ATTR-015")
 
@@ -899,17 +903,42 @@ def test_attr015_zwijgt_bij_te_weinig_gedateerde_objecten() -> None:
 
 
 def test_attr007_verantwoordt_de_objecten_zonder_begindatum() -> None:
-    """De putten zonder begindatum en het bredere dekkingsgat horen in de toelichting.
+    """De putten zonder begindatum horen in de toelichting; de meetsettelling niet meer.
 
     De fixture heeft twee putten zonder begindatum en een streng met een (te toekomstige)
-    datum; zonder deze toelichting leest ATTR-007 als "alle aanlegdatums gecontroleerd".
+    datum. De tweede regel van voorheen ("In deze meetset hebben … geen begindatum")
+    telde wat ATTR-018 nu per object meldt; twee plekken die hetzelfde zeggen lopen
+    uit elkaar (issue #61).
     """
     outcome = uitkomst("attr007_toekomstig_jaar.ttl", "ATTR-007")
 
     assert any("2 van de 2 putten in deze toets" in note for note in outcome.notes), outcome.notes
-    assert any("meetset" in note and "geen begindatum" in note for note in outcome.notes), (
-        outcome.notes
-    )
+    assert not any("meetset" in note for note in outcome.notes), outcome.notes
+
+
+def test_attr018_meldt_per_object_en_benoemt_de_soort() -> None:
+    """Streng 1 en put A missen de begindatum; de melding zegt welke soort object het is."""
+    outcome = uitkomst("attr018_zonder_begindatum.ttl", "ATTR-018")
+
+    per_label = {f.object_label: f for f in outcome.findings}
+    assert set(per_label) == {"1", "A"}
+    assert per_label["1"].details["objectsoort"] == "streng"
+    assert per_label["A"].details["objectsoort"] == "put"
+    assert all("begindatum" in f.message.lower() for f in outcome.findings)
+    # Twee vrijvervalstrengen plus vier putten; de persleiding telt niet mee.
+    assert outcome.examined == 6
+
+
+def test_attr018_verantwoordt_de_leidingen_buiten_de_populatie() -> None:
+    """De persleiding zonder begindatum is geen bevinding, maar hoort wel geteld te zijn."""
+    outcome = uitkomst("attr018_zonder_begindatum.ttl", "ATTR-018")
+
+    assert any(
+        "1 van de 3 leidingen" in note
+        and "geen vrijvervalrioolleiding" in note
+        and "1 zonder" in note
+        for note in outcome.notes
+    ), outcome.notes
 
 
 def test_attr014_zwijgt_bij_de_juiste_property() -> None:

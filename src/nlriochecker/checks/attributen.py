@@ -799,38 +799,83 @@ class BegindatumBuitenBereik(_StrengCheck):
         Geen melding en geen drempel: een grens voor "te weinig gedateerd" hebben we
         niet en zouden we verzinnen. Zonder deze regel leest een schone ATTR-007 als
         "alle aanlegdatums gecontroleerd", terwijl een groot deel van de objecten er
-        geen draagt (issue #21). De tweede regel telt de hele meetset -- ook de objecten
-        die ATTR-007 niet toetst (persleidingen, drains, niet-put-knopen) -- want het gat
-        in de aanlevering is breder dan wat deze check aanraakt.
+        geen draagt (issue #21). Dat gat zelf meldt ATTR-018 per object (issue #61);
+        deze regel zegt alleen wat ATTR-007 daardoor niet kon toetsen.
         """
         strengen = vrijvervalrioolleidingen(context)
         alle_putten = putten(context)
         zonder_streng = sum(1 for conduit in strengen if conduit.date("Begindatum") is None)
         zonder_put = sum(1 for node in alle_putten if node.date("Begindatum") is None)
 
-        objecten = [*context.dataset.nodes.values(), *context.dataset.conduits.values()]
-        zonder_totaal = sum(1 for object_ in objecten if object_.date("Begindatum") is None)
-        totaal = len(objecten)
-
-        notities = []
-        if zonder_streng or zonder_put:
-            notities.append(
-                f"{zonder_streng} van de {len(strengen)} strengen en {zonder_put} van de "
-                f"{len(alle_putten)} putten in deze toets dragen geen begindatum en zijn niet "
-                "getoetst."
-            )
-        if zonder_totaal and totaal:
-            notities.append(
-                f"In deze meetset hebben {zonder_totaal} van de {totaal} objecten "
-                f"({zonder_totaal / totaal * 100:.1f}%) geen begindatum; daarin tellen ook de "
-                "objecten buiten deze toets mee (persleidingen, drains, niet-put-knopen)."
-            )
-        return notities
+        if not (zonder_streng or zonder_put):
+            return []
+        return [
+            f"{zonder_streng} van de {len(strengen)} strengen en {zonder_put} van de "
+            f"{len(alle_putten)} putten in deze toets dragen geen begindatum en zijn niet "
+            "getoetst."
+        ]
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen plus putten."""
         alle_putten = putten(context)
         return len(vrijvervalrioolleidingen(context)) + len(alle_putten)
+
+
+@register
+class BegindatumOntbreekt(Check):
+    """ATTR-018: een vrijvervalrioolleiding of put zonder begindatum.
+
+    ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een *aanwezige* datum en de
+    SHACL-nulmeting eist `Begindatum` nergens, zodat een object zonder aanlegjaar tot
+    dit issue nergens een melding kreeg en op de kaart groen bleef -- en groen betekent
+    daar "beoordeeld en niets gevonden". Zonder aanlegjaar is er geen
+    vervangingsplanning, geen levensduurberekening en geen ATTR-003; vandaar een fout
+    en niet een waarschuwing. Op De Wolden en Hoogeveen zijn het er ongeveer 9274,
+    vooral putten; dat is het echte gat en geen modelleerfout (issue #61).
+    """
+
+    id = "ATTR-018"
+    title = "Begindatum ontbreekt"
+    severity = Severity.ERROR
+    dimension = Dimension.COMPLETENESS
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke vrijvervalstreng en elke put zonder `Begindatum`."""
+        alles: list[Node | Conduit] = [*vrijvervalrioolleidingen(context), *putten(context)]
+        for object_ in alles:
+            if object_.date("Begindatum") is not None:
+                continue
+            soort = "streng" if isinstance(object_, Conduit) else "put"
+            yield self.finding(
+                context,
+                object_.uri,
+                object_.label,
+                f"Deze {soort} draagt geen begindatum; het aanlegjaar is onbekend.",
+                objectsoort=soort,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de leidingen buiten de populatie.
+
+        Mechanisch riool valt buiten het checkregister en andere leidingen (loze
+        leidingen, duikers) zijn geen vrijvervalrioolleiding; ook daar ontbreekt het
+        aanlegjaar vaak. Zonder deze regel leest de telling als het hele gat.
+        """
+        vrijverval = {conduit.uri for conduit in vrijvervalrioolleidingen(context)}
+        alle = leidingen(context)
+        buiten = [conduit for conduit in alle if conduit.uri not in vrijverval]
+        if not buiten:
+            return []
+        zonder = sum(1 for conduit in buiten if conduit.date("Begindatum") is None)
+        return [
+            f"{len(buiten)} van de {len(alle)} leidingen vallen buiten deze toets omdat ze "
+            "geen vrijvervalrioolleiding zijn (mechanisch riool en andere leidingen); "
+            f"daarvan zijn er {zonder} zonder begindatum."
+        ]
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal vrijvervalstrengen plus putten."""
+        return len(vrijvervalrioolleidingen(context)) + len(putten(context))
 
 
 @register
