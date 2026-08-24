@@ -11,6 +11,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gerepareerd
+
+- **BGT-lagen worden op de actuele objectversie gefilterd** (issue #58). Elke ingelezen
+  BGT-laag houdt alleen de rijen met `eind_registratie` én `termination_date` leeg
+  over; verlopen versies telden tot nu toe in elke ruimtelijke toets mee (op De Wolden
+  97.148 waterdelen waarvan 44.601 actueel). Het filter werkt alleen op lagen die de
+  historievelden dragen en meldt per laag hoeveel rijen vervielen onder *Externe
+  bronnen* in het rapport. Zie BO-43.
+
 ## [0.3.0] - 2026-08-24
 
 ### Toegevoegd

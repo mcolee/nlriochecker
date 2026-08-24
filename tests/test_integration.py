@@ -259,11 +259,15 @@ def test_externe_bronnen_van_koekangerveld() -> None:
 
     assert bronnen.extent is not None
     assert bronnen.extent.area / 10_000 == pytest.approx(43.2, abs=0.5)
+    # De aantallen zijn die van de *actuele* objectversies; de lagen in `BGT.gpkg`
+    # dragen hun registratiehistorie mee en die valt bij het inlezen af (issue #58).
+    # De tabel in docs/gis-inventarisatie.md telt de rijen in het bestand zelf en
+    # staat daarom hoger. De BAG- en NWB-bestanden dragen geen historievelden.
     assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
-        "bgt_pand": 199,
+        "bgt_pand": 138,
         # Alleen `waterdeel`; `ondersteunendwaterdeel` (94 oevers) valt buiten scope.
-        "bgt_water": 233,
-        "bgt_bouwwerk": 52,
+        "bgt_water": 120,
+        "bgt_bouwwerk": 41,
         "bag_pand": 166,
         "nwb_wegvak": 13,
     }

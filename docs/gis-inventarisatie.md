@@ -60,6 +60,11 @@ voordat een EXT- of AHN-check draait.
 | `overigbouwwerk` | 11 | polygoon | `bgt_bouwwerk` — EXT-001 |
 | `kunstwerkdeel_vlak` | 1 | polygoon | `bgt_bouwwerk` — EXT-001 |
 
+De kolom *Features* telt de rijen in het bestand, inclusief de afgesloten oudere
+objectversies. De engine leest sinds issue #58 alleen de actuele versie (rijen met
+`eind_registratie` én `termination_date` leeg) en houdt daarvan 138 panden,
+120 waterdelen en 41 bouwwerken over.
+
 **De laag `put` bestaat wel maar bevat nul features.** Dat is de BGT-laag met de
 putdeksels. EXT-005 (put zonder BGT-putdeksel) en EXT-006 (BGT-putdeksel zonder
 put) kunnen daardoor niet draaien; beide melden *laag niet aanwezig in

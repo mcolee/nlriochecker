@@ -22,6 +22,7 @@ from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
 
 from nlriochecker.errors import PipelineError
+from nlriochecker.taal import getal
 
 RD_NEW = 28992
 
@@ -462,12 +463,44 @@ def _lees_laag(pad: Path, laag: str, notities: list[str]):
             f"EPSG:{RD_NEW} geherprojecteerd."
         )
 
+    frame = _alleen_actueel(frame, pad, laag, notities)
+
     kolommen = [kolom for kolom in frame.columns if kolom != frame.geometry.name]
     rijen = [
         (geometrie, {kolom: rij[kolom] for kolom in kolommen})
         for geometrie, rij in zip(frame.geometry, frame.to_dict("records"), strict=False)
     ]
     return rijen, f"EPSG:{RD_NEW}", herprojectie
+
+
+HISTORIEVELDEN = ("eind_registratie", "termination_date")
+
+
+def _alleen_actueel(frame, pad: Path, laag: str, notities: list[str]):
+    """Houdt van een BGT-laag alleen de actuele objectversies over.
+
+    Elk BGT-object draagt zijn registratiegeschiedenis mee: de levende versie heeft
+    `eind_registratie` leeg, elke afgesloten oudere versie heeft die kolom gevuld;
+    `termination_date` houdt daarnaast een officieel beëindigd object buiten. Zonder
+    dit filter draaien alle ruimtelijke toetsen over de hele stapel versies -- op De
+    Wolden is meer dan de helft van de waterdelen oude historie (issue #58, BO-43).
+
+    Alleen de aanwezige historievelden tellen; een laag zonder die velden (een los
+    studiegebied, een waterschapsbestand) gaat ongewijzigd door. Wat afvalt komt als
+    notitie in het rapport: stilte zou lezen als "alles meegenomen".
+    """
+    aanwezig = [veld for veld in HISTORIEVELDEN if veld in frame.columns]
+    if not aanwezig:
+        return frame
+    actueel = frame[aanwezig].isna().all(axis=1)
+    verlopen = int((~actueel).sum())
+    frame = frame[actueel]
+    notities.append(
+        f"`{pad.name}` laag {laag!r}: {verlopen} verlopen objectversies overgeslagen "
+        f"({' of '.join(HISTORIEVELDEN)} gevuld); "
+        f"{getal(len(frame), 'actuele feature', 'actuele features')} gelezen."
+    )
+    return frame
 
 
 def _lees_raster(
