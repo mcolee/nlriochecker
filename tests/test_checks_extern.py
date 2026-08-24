@@ -10,6 +10,8 @@ een nodata-vlek rond (1040, 2010).
 
 from __future__ import annotations
 
+import logging
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -20,6 +22,7 @@ from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
 from nlriochecker.dataset import load_dataset
 from nlriochecker.externedata import ExternalData, load_external_data
+from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
@@ -80,7 +83,7 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
     assert bronnen.extent is not None
     assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
         "bgt_pand": 1,
-        "bgt_water": 6,
+        "bgt_water": 7,
         "bgt_putdeksel": 3,
         "bgt_bouwwerk": 1,
         "bag_pand": 2,
@@ -100,8 +103,9 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
     ("check_id", "verwacht"),
     [
         ("EXT-001", ["1", "4", "P", "Q"]),
-        ("EXT-002", ["2", "3", "9"]),
-        ("EXT-003", ["2", "9"]),
+        # Streng 9 doorkruist twee greppels (water-5 en water-7) en meldt dus twee keer.
+        ("EXT-002", ["2", "3", "9", "9"]),
+        ("EXT-003", ["2", "9", "9"]),
         ("EXT-005", ["C", "E", "F", "L1", "L2", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y"]),
         ("EXT-006", ["deksel-los"]),
         ("EXT-007", ["L1"]),
@@ -432,6 +436,7 @@ def test_ext003_wijst_het_geraakte_waterdeel_aan(
     assert verwijzingen == {
         ("bgt:waterdeel/water-1", "waterloop"),
         ("bgt:waterdeel/water-5", "greppel"),
+        ("bgt:waterdeel/water-7", "greppel"),
     }
 
 
@@ -447,7 +452,7 @@ def test_ext002_registreert_geen_treffer(config: CheckConfig, bronnen: ExternalD
 
 
 def test_ext003_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:
-    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2", "9"]
+    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2", "9", "9"]
 
 
 def test_kruisingscheck_telt_wat_binnen_de_zoekstraal_afviel(
@@ -461,13 +466,14 @@ def test_kruisingscheck_telt_wat_binnen_de_zoekstraal_afviel(
     for check_id in ("EXT-002", "EXT-003"):
         outcome = uitkomst(check_id, config, bronnen)
         notitie = next(note for note in outcome.notes if "doorkruis" in note.lower())
-        assert "3 doorkruisingen" in notitie
+        assert "7 paren" in notitie
+        assert "4 doorkruisingen" in notitie
         assert "1 raakt het waterdeel niet" in notitie
         assert "1 eindigt erin (lozingspunt)" in notitie
         assert "1 loopt over de rand" in notitie
 
 
-def test_ext002_noemt_de_zoekstraal_niet_als_criterium(
+def test_ext002_meldt_doorkruising_en_houdt_buffer_m(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
     bevinding = next(
@@ -508,3 +514,52 @@ def test_verhouding_tussen_streng_en_waterdeel(lijn: LineString, verwacht: str) 
     from nlriochecker.checks.extern import _verhouding
 
     assert _verhouding(lijn, box(10.0, 0.0, 20.0, 10.0)) == verwacht
+
+
+def test_een_streng_meldt_elk_doorkruist_waterdeel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 9 doorkruist twee greppels en levert twee bevindingen, elk met eigen waterdeel.
+
+    Dit is de bewaking tegen het terugkeren van de `break` na het eerste waterdeel per
+    streng: die beperking was in BO-17 nog geaccepteerd en is met BO-43 vervallen. Met
+    één kandidaat-waterdeel per streng zou het verschil onzichtbaar blijven.
+    """
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-003"])
+    negens = [finding for finding in run.findings if finding.object_label == "9"]
+
+    assert len(negens) == 2
+    assert {finding.details["object2_uri"] for finding in negens} == {
+        "bgt:waterdeel/water-5",
+        "bgt:waterdeel/water-7",
+    }
+    assert {treffer.sleutel for treffer in run.treffers} >= {
+        "bgt:waterdeel/water-5",
+        "bgt:waterdeel/water-7",
+    }
+
+
+def test_ext002_geeft_elke_doorkruising_een_eigen_melding_id(
+    config: CheckConfig, bronnen: ExternalData, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Twee doorkruisingen van één streng mogen niet op dezelfde melding-ID uitkomen.
+
+    EXT-002 droeg geen tweede object; `melding_id` kreeg dan voor beide bevindingen op
+    streng 9 dezelfde ingredienten en het volgnummer-vangnet sloeg aan -- een ID die van
+    de verwerkingsvolgorde afhangt. Het doorkruiste waterdeel is nu het tweede object.
+    """
+    dataset = load_dataset(SCENARIO)
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    with caplog.at_level(logging.WARNING, logger="nlriochecker.uitvoer.melding"):
+        run = run_checks(context, ["EXT-002"])
+        meldingen = bouw_meldingen(run, date.today())
+
+    negens = [melding for melding in meldingen if melding.object_label == "9"]
+
+    assert len(negens) == 2
+    assert len({melding.melding_id for melding in negens}) == 2
+    assert [record.message for record in caplog.records] == []

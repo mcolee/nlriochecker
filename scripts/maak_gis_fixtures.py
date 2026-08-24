@@ -81,12 +81,30 @@ def main() -> None:
     # van issue #59: streng 7 eindigt in water-3 (lozingspunt), streng 8 ligt 0,5 m
     # naast water-4 (raakt niet), streng 9 doorkruist de 0,3 m smalle greppel
     # water-5 (echte doorkruising, geen drempel) en streng 10 loopt precies over de
-    # oostrand van water-6 (tangentieel).
+    # oostrand van water-6 (tangentieel). Water-7 is een tweede smalle greppel die
+    # streng 9 óók doorkruist: die streng levert dus twee bevindingen, en dat is de
+    # bewaking tegen het terugkeren van de `break` na het eerste waterdeel (BO-43).
     schrijf(
         gpd.GeoDataFrame(
             {
-                "lokaal_id": ["water-1", "water-2", "water-3", "water-4", "water-5", "water-6"],
-                "type": ["waterloop", "greppel", "waterloop", "waterloop", "greppel", "waterloop"],
+                "lokaal_id": [
+                    "water-1",
+                    "water-2",
+                    "water-3",
+                    "water-4",
+                    "water-5",
+                    "water-6",
+                    "water-7",
+                ],
+                "type": [
+                    "waterloop",
+                    "greppel",
+                    "waterloop",
+                    "waterloop",
+                    "greppel",
+                    "waterloop",
+                    "greppel",
+                ],
             },
             geometry=[
                 box(1070.0, 1995.0, 1075.0, 2005.0),
@@ -95,6 +113,7 @@ def main() -> None:
                 box(1090.0, 1985.0, 1095.0, 1992.0),
                 box(1050.0, 1985.0, 1050.3, 1992.0),
                 box(1100.0, 1985.0, 1103.0, 1992.0),
+                box(1052.0, 1985.0, 1052.3, 1992.0),
             ],
         ),
         bgt,

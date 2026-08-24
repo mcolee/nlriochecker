@@ -25,8 +25,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   geen drempel). Een streng die binnen de zoekstraal ligt maar het water niet snijdt,
   of erin eindigt (lozingspunt), is geen bevinding meer; de toelichting telt die
   gevallen. Elke doorkruising per streng telt, de stop na het eerste waterdeel is
-  vervallen. Op De Wolden zakt EXT-003 van 638 gemelde waterdelen naar de echte
-  doorkruisingen. `ext_watergang_buffer_m` is voortaan alleen de zoekstraal. Zie BO-43.
+  vervallen. Op De Wolden zakt EXT-003 van 859 meldingen op 859 strengen (638
+  waterdelen) naar 319 doorkruisingen op 281 strengen (302 unieke waterdelen); 362
+  paren raken het waterdeel niet en 243 eindigen erin. Dat zijn er meer dan de 234
+  handmatig gevalideerde doorkruisingen uit BO-43; de herbeoordeling staat in issue
+  #59. EXT-002 draagt voortaan het doorkruiste waterdeel als tweede object
+  (`Object2`), zodat twee doorkruisingen van één streng een eigen, stabiele
+  melding-ID houden. `ext_watergang_buffer_m` is voortaan alleen de zoekstraal.
+  Zie BO-43.
 
 ## [0.3.0] - 2026-08-24
 

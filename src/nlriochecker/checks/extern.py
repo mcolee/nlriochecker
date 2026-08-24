@@ -571,7 +571,10 @@ class _WatergangKruising(_ExterneCheck):
                 f"{getal(toets.kandidaten, 'paar', 'paren')} streng-waterdeel: "
                 f"{getal(len(toets.doorkruisingen), 'doorkruising', 'doorkruisingen')}, "
                 f"{raakt_niet}, {lozingspunt} "
-                f"en {getal(toets.tangentieel, 'loopt over de rand', 'lopen over de rand')}."
+                f"en {getal(toets.tangentieel, 'loopt over de rand', 'lopen over de rand')}. "
+                "Doorkruisingen door een streng die als kruisingsconstructie "
+                "geregistreerd staat tellen hier mee; alleen EXT-003 laat die buiten de "
+                "bevindingen."
             )
         for klasse, aantal in self.buiten_populatie(context).items():
             notities.append(
@@ -599,6 +602,14 @@ class KruisingMetWatergang(_WatergangKruising):
         """
         for kruising in self.kruisingen(context):
             soort = kruising.rij.get("type") or "waterdeel"
+            # Het waterdeel gaat als tweede object mee, anders krijgen twee
+            # doorkruisingen van dezelfde streng dezelfde melding-ID en valt de tweede
+            # terug op een volgnummer dat van de verwerkingsvolgorde afhangt. Een
+            # treffer wordt hier bewust niet geregistreerd: de GeoPackage-laag
+            # `waterdelen_zonder_zinker` volgt EXT-003 (BO-17).
+            sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], kruising.rij, kruising.vorm)
+            if terugval:
+                context.treffers.meld_zonder_id(self.id, kruising.laag.source.name)
             yield self.finding(
                 context,
                 kruising.conduit.uri,
@@ -608,6 +619,8 @@ class KruisingMetWatergang(_WatergangKruising):
                 watertype=soort,
                 bron=kruising.laag.source.name,
                 buffer_m=kruising.buffer,
+                object2_uri=sleutel,
+                object2_label=str(soort),
             )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -616,6 +629,7 @@ class KruisingMetWatergang(_WatergangKruising):
             *super().notes(context),
             "Waterschapsdata is niet aangeleverd; alleen de BGT-waterdelen zijn gebruikt. "
             "Het register staat die bron expliciet toe.",
+            *_notitie_zonder_id(context, self.id),
         ]
 
 
