@@ -2420,3 +2420,15 @@ voor de implementatie.
 JSON). Een systemische melding in plaats van per object (verworpen: het aandeel ligt onder de
 drempel en het gat is per object te herstellen). `Einddatum` erbij (verworpen: dat is ADM-006, en
 geen enkel object draagt er een).
+
+**Gemeten uitkomst (2026-08-24).** Volledige toets op De Wolden en Hoogeveen: ATTR-018 meldt 9274
+objecten (211 strengen, 9063 putten), niet systemisch -- precies de verwachting. Buiten de toets
+vallen 5837 van de 23440 leidingen, waarvan 1703 zonder begindatum. Het Markdown-rapport groeit van
+53479 naar 62763 regels (6,7 → 7,5 MB) ten opzichte van dezelfde run zonder ATTR-018; dat is de
+enige verandering, want de bevindingentelling per check verschilt verder nergens. (Tegenover de
+0.3.0-meting van 24 augustus, 57526 regels en 7,2 MB, is de groei kleiner omdat BO-44 daar 2964
+HGT-001-meldingen liet vervallen.) In de GeoPackage staan 11534 lege `begindatum_jaar` op `putten`
+en 1914 op `strengen`. Die twee lagen dragen de hele meetset en niet de ATTR-018-populatie: op
+`strengen` komen de 1703 leidingen buiten de toets erbij (1703 + 211 = 1914) en op `putten` 2471
+knopen die geen put zijn (2471 + 9063 = 11534). Samen 13448 van de 46925 objecten -- exact het
+getal dat de vervallen meetsetregel van ATTR-007 gaf.

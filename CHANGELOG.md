@@ -19,7 +19,7 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   object op de kaart groen. De GeoPackage-lagen `putten` en `strengen` dragen de nieuwe
   kolom `begindatum_jaar` (leeg zonder datum). De meetsetregel van ATTR-007 vervalt; de
   regel die zegt wat ATTR-007 zelf niet kon toetsen blijft. Op De Wolden en Hoogeveen:
-  ongeveer 9274 bevindingen, vooral putten (Task 2 meet het). Zie BO-45.
+  9274 bevindingen (9063 putten, 211 strengen), niet systemisch. Zie BO-45.
 
 ### Gewijzigd
 
