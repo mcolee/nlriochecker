@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.selectie import vrijvervalrioolleidingen
 from nlriochecker.taal import getal, vorm
@@ -56,7 +56,7 @@ def rode_draad(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     if not meldingen:
         return []
 
-    config = run.config if run.config is not None else load_check_config()
+    config = run.config
     alinea = [
         *_richting(run, meldingen, config),
         *_multi_melding(meldingen, config),

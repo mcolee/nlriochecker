@@ -35,7 +35,7 @@ from shapely.geometry import MultiPolygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.netwerk import Afvoer, afvoerpad_van_streng, afvoerpaden
 from nlriochecker.checks.selectie import mechanischeleidingen
@@ -475,7 +475,7 @@ def _schrijf_features(
     per_object = _meldingen_per_object(meldingen)
     metadata = _metadata(run, run_datum)
     stelsels = stelseltypen(run)
-    config = run.config if run.config is not None else load_check_config()
+    config = run.config
     mechanisch = _mechanische_uris(run, config)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
@@ -1060,7 +1060,7 @@ def _gebied(run: CheckRun) -> str:
 
 def _metadata(run: CheckRun, run_datum: date) -> tuple[str, str, str]:
     """De drie metadatavelden die op elke laag staan."""
-    config = run.config if run.config is not None else load_check_config()
+    config = run.config
     return (
         run_datum.isoformat(),
         run.dataset.source.name,
@@ -1344,7 +1344,7 @@ def _schrijf_runmetadata(
     ]
     _maak_attribuuttabel(verbinding, "gwsw_run", kolommen, "Herkomst en bereik van deze run.")
 
-    config = run.config if run.config is not None else load_check_config()
+    config = run.config
     gebied = run.study_area
     stel = run.analyseset
     fallback = run.dataset.decode_fallback

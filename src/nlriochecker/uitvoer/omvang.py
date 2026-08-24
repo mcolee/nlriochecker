@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
 from nlriochecker.dataset import GwswDataset
 
@@ -47,7 +47,7 @@ def stelseltypen(run: CheckRun) -> dict[str, str]:
     erop uitkomt. Komen daar meerdere soorten samen, dan staan ze er allemaal --
     dat is voor NET-006 juist het interessante geval.
     """
-    config = run.config if run.config is not None else load_check_config()
+    config = run.config
     dataset = run.dataset
     per_object: dict[str, str] = {}
     per_put: dict[str, set[str]] = defaultdict(set)
@@ -182,11 +182,6 @@ def _rollen(config: CheckConfig) -> list[_Rol]:
     ]
 
 
-def _config(run: CheckRun) -> CheckConfig:
-    """De projectconfiguratie van de run, of de standaard als hij er geen draagt."""
-    return run.config if run.config is not None else load_check_config()
-
-
 def _aantal_klasse(dataset: GwswDataset, klasse: str, via_onderdeel: bool) -> int:
     """Hoeveel objecten van deze klasse de bijbehorende check ziet."""
     if via_onderdeel:
@@ -213,7 +208,7 @@ def klassentelling(run: CheckRun) -> pd.DataFrame:
     aanlevering, net als de datakarakteristiek, en verandert niet met de afbakening
     van de rapportage.
     """
-    config = _config(run)
+    config = run.config
     dataset = run.dataset
     rijen = [
         {
@@ -233,7 +228,7 @@ def eindpunttelling(run: CheckRun) -> pd.DataFrame:
     leunt de bereikbaarheid op het noodverband `Gemaal`/`Pompunit` (BO-33). Zodra hij
     een getal boven nul toont, kan dat noodverband weg. Zie issue #22.
     """
-    config = _config(run)
+    config = run.config
     dataset = run.dataset
     rijen = [
         {"Klasse": klasse, "Aantal": _aantal_klasse(dataset, klasse, False)}
@@ -267,7 +262,7 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
     if not dataset.klassenhierarchie_bekend:
         return []
     signalen: list[NulSignaal] = []
-    for rol in _rollen(_config(run)):
+    for rol in _rollen(run.config):
         if rol.per_klasse:
             signalen += [
                 NulSignaal(

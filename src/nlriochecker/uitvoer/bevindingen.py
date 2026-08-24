@@ -677,7 +677,7 @@ def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
     `checks.base.run_checks`). Hardcoderen van een naam hier -- zoals eerder
     alleen "ADM-002" -- laat een via de config toegevoegde check onvermeld.
     """
-    geconfigureerd = set(run.config.studiegebied.volledige_dataset_checks) if run.config else set()
+    geconfigureerd = set(run.config.studiegebied.volledige_dataset_checks)
     ids = {
         outcome.check_id
         for outcome in run.outcomes
@@ -870,7 +870,7 @@ def _findings_frame(meldingen: list[Melding]) -> pd.DataFrame:
 
 def _maximum_per_check(run: CheckRun) -> int:
     """Het maximum aantal getoonde bevindingen per check; 0 is onbeperkt."""
-    return run.config.rapport.max_bevindingen_per_check if run.config is not None else 0
+    return run.config.rapport.max_bevindingen_per_check
 
 
 def _clusterduiding(meldingen: list[Melding]) -> list[str]:

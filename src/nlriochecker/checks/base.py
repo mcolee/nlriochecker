@@ -198,14 +198,19 @@ class CheckRun:
     dataset: GwswDataset
     outcomes: list[CheckOutcome]
     typing_gate_applied: bool
+    # De uitvoerlaag heeft de klassenlijsten en de rapportdrempels nodig; die
+    # meegeven is minder broos dan ze langs elke schrijver door te reiken.
+    #
+    # Nooit None. Een ontbrekende config zou elke schrijver dwingen stil een eigen
+    # `checks.toml` te lezen, en dan kan een run met projectconfig met andere
+    # drempels rapporteren dan waarmee hij getoetst is -- dezelfde reden waarom
+    # `meetbereik` hieronder nooit None is.
+    config: CheckConfig
     unreliable_labels: int = 0
     unreliable_labels_in_dataset: int = 0
     study_area: StudyArea | None = None
     bronnen: ExternalData | None = None
     karakteristiek: DataCharacteristics | None = None
-    # De uitvoerlaag heeft de klassenlijsten en de rapportdrempels nodig; die
-    # meegeven is minder broos dan ze langs elke schrijver door te reiken.
-    config: CheckConfig | None = None
     # De kern en de contextschil waarop de checks gedraaid hebben; None zonder
     # studiegebied. De uitvoerlaag meldt hieruit hoe groot elk deel was.
     analyseset: Analyseset | None = None

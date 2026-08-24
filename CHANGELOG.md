@@ -166,6 +166,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`CheckRun.config` is verplicht; de uitvoerlaag leest geen config meer stil bij**.
+  Negen plekken in de uitvoerlaag vielen bij een ontbrekende `run.config` terug op
+  `load_check_config()`, waardoor een run met projectconfig met de standaarddrempels
+  kon rapporteren. Het veld is nu verplicht en elke schrijver gebruikt `run.config`
+  rechtstreeks; de uitkomst van een normale run verandert niet.
 - **TTL-parse via de Rust-parser van `pyoxigraph`** (issue #26, BO-41). Het OroX-TTL wordt
   ingelezen met `pyoxigraph.parse` en daarna overgezet in een gewone `rdflib.Graph`; de checks,
   de cache en de rest van de lader blijven ongewijzigd. `pyoxigraph` is een nieuwe **harde**

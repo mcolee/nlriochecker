@@ -14,7 +14,7 @@ from datetime import date
 
 from shapely.geometry import Point
 
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import REGISTRY as CHECK_REGISTRY
 from nlriochecker.checks import CheckOutcome, CheckRun, Dimension, Finding, Severity
 from nlriochecker.nulbevinding import Nulbevinding
@@ -93,7 +93,7 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
     """
     from nlriochecker.uitvoer.locatie import foutlocatie
 
-    config = run.config if run.config is not None else load_check_config()
+    config = run.config
     scope = SCOPE_BINNEN if run.study_area is not None else SCOPE_GEEN_GEBIED
     gebied = run.study_area.gebied if run.study_area is not None else ""
     kritiek = set(config.klassen.kritiek)
