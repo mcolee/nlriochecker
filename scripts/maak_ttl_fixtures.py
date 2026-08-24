@@ -1751,9 +1751,11 @@ FIXTURES["ext_scenario.ttl"] = (
 )
 
 
-# De vier grensgevallen van issue #63 op het vlakke raster van 10,00 m NAP uit
+# De vijf grensgevallen van issue #63 op het vlakke raster van 10,00 m NAP uit
 # tests/fixtures/gis/ext: 0,099 m zwijgt, 0,100 m is HGT-001 (ondergrens inclusief),
-# 0,249 m blijft HGT-001 en 0,251 m is HGT-002. Geen putdeksel, zoals in De Wolden en
+# 0,249 m blijft HGT-001, en 0,250 m is al HGT-002 -- de bovengrens van HGT-001 is
+# exclusief en die van HGT-002 inclusief, dus precies op de gedeelde grens meldt alleen
+# de zware check. 0,251 m ligt er net boven. Geen putdeksel, zoals in De Wolden en
 # Hoogeveen; de maaiveldhoogte is dan het getoetste kenmerk. De afwijking wordt op
 # millimeters afgerond vergeleken, anders is 10,10 - 10,00 in floating point 0,0999.
 FIXTURES["hgt001_grens.ttl"] = (
@@ -1761,6 +1763,7 @@ FIXTURES["hgt001_grens.ttl"] = (
     hoogteput("Grens099", "099", (1000.0, 1990.0), mv=10.099, dek=None)
     + hoogteput("Grens100", "100", (1010.0, 1990.0), mv=10.100, dek=None)
     + hoogteput("Grens249", "249", (1020.0, 1990.0), mv=10.249, dek=None)
+    + hoogteput("Grens250", "250", (1040.0, 1990.0), mv=10.250, dek=None)
     + hoogteput("Grens251", "251", (1030.0, 1990.0), mv=10.251, dek=None),
 )
 

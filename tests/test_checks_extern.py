@@ -365,18 +365,20 @@ def test_hgt001_en_hgt002_delen_een_halfopen_band_op_de_millimeter(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
     """0,099 m zwijgt, 0,100 m meldt (ondergrens inclusief), 0,249 m blijft HGT-001
-    en 0,251 m is HGT-002; geen enkele put krijgt beide meldingen.
+    en 0,250 m is al HGT-002; geen enkele put krijgt beide meldingen.
 
     De put met 10,100 m op een raster van 10,000 m bewijst de afronding op
-    millimeters: onafgerond is dat verschil 0,0999 en zou de put zwijgen.
+    millimeters: onafgerond is dat verschil 0,0999 en zou de put zwijgen. De put op
+    precies 0,250 m is de enige plek waar de bovengrens zichtbaar is: alleen daar
+    verschillen `>= boven` en `> boven` van elkaar.
     """
     licht = uitkomst("HGT-001", config, bronnen, GRENS)
     fors = uitkomst("HGT-002", config, bronnen, GRENS)
 
     assert labels(licht) == ["100", "249"]
-    assert labels(fors) == ["251"]
+    assert labels(fors) == ["250", "251"]
     per_label = {f.object_label: f.details["afwijking_m"] for f in licht.findings + fors.findings}
-    assert per_label == {"100": 0.1, "249": 0.249, "251": 0.251}
+    assert per_label == {"100": 0.1, "249": 0.249, "250": 0.25, "251": 0.251}
 
 
 def test_hgt001_en_hgt002_noemen_de_gehanteerde_drempel(
@@ -387,9 +389,9 @@ def test_hgt001_en_hgt002_noemen_de_gehanteerde_drempel(
     fors = uitkomst("HGT-002", config, bronnen, GRENS)
 
     assert any(
-        "vanaf een afwijking van 0.10 m" in note and "tot 0.25 m" in note for note in licht.notes
+        "vanaf een afwijking van 0.100 m" in note and "tot 0.250 m" in note for note in licht.notes
     )
-    assert any("vanaf een afwijking van 0.25 m" in note for note in fors.notes)
+    assert any("vanaf een afwijking van 0.250 m" in note for note in fors.notes)
     assert any("millimeter" in note for note in licht.notes)
 
 

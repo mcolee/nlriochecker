@@ -306,8 +306,9 @@ EPSG:28992 omgezet en dat wordt vastgelegd. Een raster met een ander CRS levert 
 fout op met het verzoek het in RD aan te leveren.
 
 **Waarom.** Een raster herprojecteren betekent resamplen: de hoogtewaarden
-verschuiven en worden geïnterpoleerd. HGT-001 en HGT-002 toetsen op 5 en 25 cm; een
-resample-artefact van enkele centimeters zou de uitkomst bepalen. Beter weigeren dan
+verschuiven en worden geïnterpoleerd. HGT-001 en HGT-002 toetsen op 5 en 25 cm --
+inmiddels op 10 en 25 cm, achterhaald door [[BO-44]] -- en een resample-artefact van
+enkele centimeters zou de uitkomst bepalen. Beter weigeren dan
 stilzwijgend nauwkeurigheid verliezen.
 
 ### BC-5 Een bron zonder CRS wordt geweigerd

@@ -75,6 +75,19 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :Grens249_ori gwsw:hasConnection :Grens249_maa .
 :Grens249_maa rdf:type gwsw:Maaiveldorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.249 ] .
+:Grens250 rdf:type gwsw:Inspectieput ; rdfs:label "250" ;
+    gwsw:hasAspect :Grens250_ori .
+:Grens250 gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
+    [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+:Grens250_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1040.0 1990.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+
+:Grens250_ori gwsw:hasConnection :Grens250_maa .
+:Grens250_maa rdf:type gwsw:Maaiveldorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Maaiveldhoogte ; gwsw:hasValue 10.25 ] .
 :Grens251 rdf:type gwsw:Inspectieput ; rdfs:label "251" ;
     gwsw:hasAspect :Grens251_ori .
 :Grens251 gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,

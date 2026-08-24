@@ -1002,9 +1002,9 @@ class _DekselAfwijking(_AhnCheck):
         onder = getattr(context.config.drempels, self.ondergrens)
         boven = getattr(context.config.drempels, self.bovengrens) if self.bovengrens else None
         bereik = (
-            f"vanaf een afwijking van {onder:.2f} m tot {boven:.2f} m (daarboven meldt HGT-002)"
+            f"vanaf een afwijking van {onder:.3f} m tot {boven:.3f} m (vanaf daar meldt HGT-002)"
             if boven is not None
-            else f"vanaf een afwijking van {onder:.2f} m"
+            else f"vanaf een afwijking van {onder:.3f} m"
         )
         notities.append(
             f"Gemeld {bereik}; de afwijking is op millimeters afgerond voordat hij met de "
