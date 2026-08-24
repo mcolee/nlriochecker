@@ -2490,3 +2490,33 @@ en na) krijgt de T-stukken niet als kandidaat. `len(dataset.conduits)` en
 van `_bouw_hulpstuktelling` noemt (25 om 19) is een eigenschap van het Juinen-voorbeeld, niet
 van De Wolden. Onverklaard: niets. Vergelijkingsrun: `uitvoer/issue61/bevindingen.csv`
 (2026-08-24 23:42, vóór a975d8d) tegen `uitvoer/issue60/bevindingen.csv`.
+
+### BO-47 Loze leidingen in ketens: ADM-010 voor een keten aan actief riool, ADM-011 voor dode data
+
+**Wat.** Loze leidingen (`LozeLeiding` en subklassen, rol `[klassen] loze_leiding`) die via een
+knoop aan elkaar hangen vormen een keten. Per keten, in de administratieve begin→eindrichting:
+`inkomend` zijn de niet-loze leidingen die eindigen in een beginknoop van de keten, `uitgaand`
+de niet-loze leidingen die beginnen in een eindknoop. ADM-010 (F) meldt *doorgaand* (beide),
+*aanvoer* (alleen inkomend) en *afvoer* (alleen uitgaand); ADM-011 (W) meldt *losgekoppeld*
+(geen van beide). Melding per loze streng, keten in `cluster_id`, het transitieve aantal actieve
+strengen bovenstrooms als detail `bovenstrooms` (zonder invloed op de ernst). Uitgewerkt in
+issue #62.
+
+**Waarom.** Een `LozeLeiding` is buiten gebruik; er kan per definitie geen actief riool op
+afwateren. In De Wolden en Hoogeveen gebeurt dat in 19 van de 33 ketens, waarvan 3 doorgaand.
+Geen enkele check zag het: `LozeLeiding` hangt onder `Leiding` en niet onder
+`VrijvervalRioolleiding`, dus alle checks op `klassen.vrijvervalleiding` slaan haar over; de
+nulmeting noemt loze leidingen 37 keer, alleen voor attribuutgebreken. Per streng melden en niet
+per keten, zodat elke streng op de kaart kleurt; het keten-ID houdt ze in het rapport bij elkaar.
+
+**Twee ID's, niet een.** Het issue nam ADM-010 met F én W aan; de engine en het register kennen
+per check een ernst (`Check.severity`, `test_ernst_en_dimensie_volgen_het_register`). Vandaar
+ADM-011 voor de losgekoppelde keten.
+
+**Richting.** Altijd de administratieve richting, ongeacht `[netwerk] richting`: dat is de bron
+die NET-003 toetst, en een verkeerd gerichte administratie is dáár een bevinding.
+
+**Alternatieven.** Melden per keten (verworpen: dan kleurt maar een streng). ADM-006 uitbreiden
+(verworpen: die gaat over `Einddatum`/`Begindatum`, dit over de klasse; en ADM-006 vindt hier
+niets, want geen enkel object draagt een `Einddatum`). De ernst laten afhangen van het aantal
+strengen bovenstrooms (verworpen: het aantal is een sorteersleutel, geen norm).

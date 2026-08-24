@@ -8,7 +8,7 @@ de eindpunten en de bergbezinkvoorzieningen), en `vrijvervalrioolleidingen` binn
 `leidingen`.
 
 Twee datasets, elk om een eigen reden. `selectie_rollen.ttl` bevat precies een
-object per rol en dekt ze dus alle vijftien; die fixture staat in de repository en
+object per rol en dekt ze dus alle zeventien; die fixture staat in de repository en
 is er altijd. Het Juinen-voorbeeld staat in `data/` -- dat ontbreekt in een schone
 kloon -- en dient voor de verhoudingen van een echte export: daar is een selectie
 groot genoeg dat een verwisseling van twee rollen in de aantallen opvalt.
@@ -48,8 +48,8 @@ def context_van(dataset: GwswDataset) -> CheckContext:
     return CheckContext(dataset=dataset, config=load_check_config())
 
 
-# De aantallen per rol op de rollenfixture: 7 knopen en 6 verbindingen. Alle
-# vijftien rollen komen erin voor; dat bewaakt `test_elke_rol_komt_erin_voor`.
+# De aantallen per rol op de rollenfixture: 7 knopen en 7 verbindingen. Alle
+# zeventien rollen komen erin voor; dat bewaakt `test_elke_rol_komt_erin_voor`.
 ROLLENSET_AANTALLEN = {
     "netwerkknopen": 7,
     "putten": 5,
@@ -63,7 +63,10 @@ ROLLENSET_AANTALLEN = {
     # het wordt hier alleen zichtbaar nu de fixture een hulpstuk draagt (issue #60).
     "functieloze_knopen": 2,
     "hulpstukken": 1,
-    "leidingen": 5,
+    # Zes: L1 t/m L4, de persleiding P1 en de loze leiding Loos2 -- die laatste is een
+    # gwsw:Leiding en telt dus mee (issue #62).
+    "leidingen": 6,
+    "lozeleidingen": 1,
     "vrijvervalrioolleidingen": 4,
     "overstortleidingen": 1,
     "bergbezinkleidingen": 1,
@@ -152,7 +155,8 @@ def test_vrijverval_zit_echt_binnen_leidingen(rollenset: GwswDataset) -> None:
     buiten = {conduit.label for conduit in leidingen(context)} - {
         conduit.label for conduit in vrijvervalrioolleidingen(context)
     }
-    assert buiten == {"P1"}
+    # Loos2 valt er sinds issue #62 ook buiten: LozeLeiding hangt onder Leiding.
+    assert buiten == {"P1", "Loos2"}
 
 
 def test_subklassen_tellen_mee(rollenset: GwswDataset) -> None:

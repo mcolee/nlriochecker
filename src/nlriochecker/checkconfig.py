@@ -53,6 +53,10 @@ class ClassRoots(BaseModel):
     # De status zelf komt uit Begindatum en Einddatum; deze lijst is voor
     # datasets die er een eigen klasse voor gebruiken.
     vervallen: list[str] = Field(default_factory=list)
+    # ADM-010 en ADM-011: leidingen die buiten gebruik zijn maar nog in de ondergrond
+    # liggen. LozeLeiding hangt onder Leiding, niet onder VrijvervalRioolleiding, en
+    # dekt GedammerdeLeiding, Uitlegger, VolgeschuimdeLeiding en VolgezandeLeiding.
+    loze_leiding: list[str] = Field(default_factory=list)
     # RVZ: hoe overstorten en bergbezinkvoorzieningen in de export verschijnen.
     overstortput: list[str] = Field(default_factory=list)
     overstortleiding: list[str] = Field(default_factory=list)

@@ -34,6 +34,10 @@ mechanisch = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
 # daarvan een aantal leidingen voorschrijft leest de check uit de ontologie
 # (functie hasValue VerbindenVanTwee/Drie/VierLeidingen), niet uit deze lijst.
 hulpstuk = ["Hulpstuk"]
+# ADM-010 en ADM-011: loze leidingen (GWSW: "Leiding is buiten gebruik"). De wortelklasse
+# dekt ook GedammerdeLeiding, Uitlegger, VolgeschuimdeLeiding en VolgezandeLeiding; De
+# Wolden levert alleen instanties van LozeLeiding zelf (54).
+loze_leiding = ["LozeLeiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
 # degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
 # ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden.

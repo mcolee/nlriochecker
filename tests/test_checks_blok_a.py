@@ -120,6 +120,11 @@ DEFECTEN = [
     ("adm007_overstort_zonder_functie.ttl", "ADM-007", ["O"]),
     ("adm008_losse_compartimenten.ttl", "ADM-008", ["B"]),
     ("adm009_leiding_aan_put.ttl", "ADM-009", ["1"]),
+    # ADM-010 meldt per loze streng; de twee strengen van de doorgaande keten allebei.
+    ("adm010_loze_keten_doorgaand.ttl", "ADM-010", ["X1", "X2"]),
+    ("adm010_loze_keten_aanvoer.ttl", "ADM-010", ["X1"]),
+    ("adm010_loze_keten_afvoer.ttl", "ADM-010", ["X1"]),
+    ("adm011_loze_keten_los.ttl", "ADM-011", ["X1"]),
     ("btr006_afgeronde_bobs.ttl", "BTR-006", ["b0"]),
 ]
 
@@ -961,3 +966,54 @@ def test_attr014_meldt_ook_de_omgekeerde_richting() -> None:
         bevinding.message == "LengteLeiding gebruikt hasReference in plaats van hasValue op "
         "1 objecten."
     )
+
+
+def test_adm010_doorgaande_keten_draagt_keten_buren_en_omvang() -> None:
+    """Beide loze strengen delen een keten-ID en noemen de aansluitende actieve strengen."""
+    outcome = uitkomst("adm010_loze_keten_doorgaand.ttl", "ADM-010")
+
+    per_label = {f.object_label: f for f in outcome.findings}
+    assert set(per_label) == {"X1", "X2"}
+    assert per_label["X1"].details["cluster_id"] == per_label["X2"].details["cluster_id"]
+    assert per_label["X1"].details["cluster_id"].startswith("loos-")
+    for bevinding in per_label.values():
+        assert bevinding.details["geval"] == "doorgaand"
+        assert bevinding.details["keten_strengen"] == 2
+        assert bevinding.details["inkomend"] == "1"
+        assert bevinding.details["uitgaand"] == "3"
+        # Streng 1 en streng 0 liggen transitief bovenstrooms.
+        assert bevinding.details["bovenstrooms"] == 2
+        assert "1" in bevinding.message and "3" in bevinding.message
+    assert outcome.examined == 2
+
+
+@pytest.mark.parametrize(
+    ("bestand", "geval"),
+    [
+        ("adm010_loze_keten_aanvoer.ttl", "aanvoer"),
+        ("adm010_loze_keten_afvoer.ttl", "afvoer"),
+    ],
+)
+def test_adm010_benoemt_het_geval(bestand: str, geval: str) -> None:
+    outcome = uitkomst(bestand, "ADM-010")
+
+    assert [f.details["geval"] for f in outcome.findings] == [geval]
+    assert labels(uitkomst(bestand, "ADM-011")) == []
+
+
+def test_adm011_losgekoppelde_keten_is_een_waarschuwing_en_geen_adm010() -> None:
+    outcome = uitkomst("adm011_loze_keten_los.ttl", "ADM-011")
+
+    assert labels(outcome) == ["X1"]
+    assert outcome.findings[0].details["geval"] == "losgekoppeld"
+    assert outcome.findings[0].details["bovenstrooms"] == 0
+    assert labels(uitkomst("adm011_loze_keten_los.ttl", "ADM-010")) == []
+    assert labels(uitkomst("adm010_loze_keten_doorgaand.ttl", "ADM-011")) == []
+
+
+def test_adm010_verantwoordt_de_ketens_per_geval() -> None:
+    outcome = uitkomst("adm010_loze_keten_doorgaand.ttl", "ADM-010")
+
+    assert any(
+        "2 loze leidingen in 1 keten" in note and "1 doorgaand" in note for note in outcome.notes
+    ), outcome.notes

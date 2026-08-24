@@ -211,6 +211,16 @@ def mechanischeleidingen(context: CheckContext) -> list[Conduit]:
     return _verbindingen(context, "sel:mechanischeleidingen", context.config.klassen.mechanisch)
 
 
+def lozeleidingen(context: CheckContext) -> list[Conduit]:
+    """De loze leidingen: `gwsw:LozeLeiding` en haar subklassen.
+
+    Buiten gebruik, maar nog in de ondergrond. Geen vrijvervalrioolleiding, dus elke
+    check die daarop selecteert slaat ze over; ADM-010 en ADM-011 kijken juist of het
+    actieve riool er nog op aansluit.
+    """
+    return _verbindingen(context, "sel:lozeleidingen", context.config.klassen.loze_leiding)
+
+
 def oppervlaktewaterobjecten(context: CheckContext) -> list[Node | Conduit]:
     """Het oppervlaktewater uit de GWSW-dataset zelf: `gwsw:Oppervlaktewater`.
 
@@ -267,5 +277,6 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "vuilwaterleidingen": vuilwaterleidingen,
     "infiltratieleidingen": infiltratieleidingen,
     "mechanischeleidingen": mechanischeleidingen,
+    "lozeleidingen": lozeleidingen,
     "oppervlaktewaterobjecten": oppervlaktewaterobjecten,
 }

@@ -13,6 +13,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **ADM-010 en ADM-011: loze leidingen die in het actieve netwerk hangen** (issue #62).
+  Loze leidingen (`LozeLeiding`, buiten gebruik) worden tot ketens gegroepeerd; ADM-010
+  (F) meldt per loze streng een keten waar actief riool op aansluit (doorgaand, aanvoer
+  of afvoer, in de administratieve richting), ADM-011 (W) een keten die aan niets hangt.
+  De keten staat in `cluster_id`, het aantal actieve strengen bovenstrooms als detail.
+  Nieuwe rol `[klassen] loze_leiding`. Op De Wolden en Hoogeveen: 54 loze leidingen in 33
+  ketens, 38 F en 16 W (Task 2 meet het). Zie BO-47.
+
 - **TOP-022 en TOP-023: hulpstuk met een ander aantal aansluitingen dan zijn
   GWSW-functie voorschrijft** (issue #60). Het verwachte aantal komt uit de
   `functie`-restrictie op de klasse in de ontologie (`Mof` 2, `T_stuk`/`Y_stuk` 3,

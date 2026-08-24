@@ -3,13 +3,15 @@
 ADM-001, ADM-004 en ADM-005 zijn geschrapt: de nulmeting dekt ze aantoonbaar. Wat
 overblijft zijn de dingen die de SHACL-meting niet ziet, hetzij omdat de fout al in
 de RDF-conversie verdwijnt (ADM-002), hetzij omdat het GWSW er geen regel voor kent
-(ADM-003, ADM-006 t/m ADM-009).
+(ADM-003, ADM-006 t/m ADM-011).
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections import deque
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from datetime import date
 
 from rdflib import URIRef
@@ -22,9 +24,10 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.selectie import leidingen, netwerkknopen
+from nlriochecker.checks.selectie import leidingen, lozeleidingen, netwerkknopen
 from nlriochecker.checks.verbanden import aansluitingen
 from nlriochecker.dataset import HAS_CONNECTION, Conduit, Node, part_holders_of, parts_of
+from nlriochecker.taal import getal, vorm
 
 
 @register
@@ -467,3 +470,256 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
 def _iso(waarde: date | None) -> str | None:
     """Een datum als ISO-tekst, of None."""
     return waarde.isoformat() if waarde is not None else None
+
+
+GEVAL_DOORGAAND = "doorgaand"
+GEVAL_AANVOER = "aanvoer"
+GEVAL_AFVOER = "afvoer"
+GEVAL_LOSGEKOPPELD = "losgekoppeld"
+
+
+@dataclass(frozen=True)
+class _LozeKeten:
+    """Loze leidingen die via een knoop aan elkaar hangen, met wat er actief op aansluit."""
+
+    id: str
+    strengen: tuple[Conduit, ...]
+    inkomend: tuple[Conduit, ...]
+    uitgaand: tuple[Conduit, ...]
+    bovenstrooms: int
+
+    @property
+    def geval(self) -> str:
+        """Hoe de keten aan het actieve riool hangt."""
+        if self.inkomend and self.uitgaand:
+            return GEVAL_DOORGAAND
+        if self.inkomend:
+            return GEVAL_AANVOER
+        if self.uitgaand:
+            return GEVAL_AFVOER
+        return GEVAL_LOSGEKOPPELD
+
+
+def _loze_ketens(context: CheckContext) -> tuple[_LozeKeten, ...]:
+    """De ketens van loze leidingen; een keer per context, gedeeld door ADM-010 en ADM-011."""
+    return context.cached("adm010:ketens", lambda: _bouw_loze_ketens(context))
+
+
+def _bouw_loze_ketens(context: CheckContext) -> tuple[_LozeKeten, ...]:
+    """Groepeert de loze leidingen tot ketens en bepaalt per keten de aansluitingen.
+
+    De richting is de administratieve begin-naar-eindrichting, ongeacht `[netwerk]
+    richting`: dat is de bron die NET-003 toetst, en een verkeerd gerichte administratie
+    is daar een bevinding en niet hier. Een strengeinde wordt naar zijn netwerkknoop
+    herleid met terugval op de rauwe URI, zodat ook een hulpstuk als knoop telt.
+    """
+    dataset = context.dataset
+    wortels = context.config.klassen.netwerkknopen
+
+    def knoop(uri: str | None) -> str | None:
+        if uri is None:
+            return None
+        return dataset.resolve_network_node(uri, wortels) or uri
+
+    loos = sorted(lozeleidingen(context), key=lambda conduit: conduit.uri)
+    loos_uris = {conduit.uri for conduit in loos}
+    actief = [conduit for conduit in leidingen(context) if conduit.uri not in loos_uris]
+    einden = {conduit.uri: (knoop(conduit.start_node), knoop(conduit.end_node)) for conduit in loos}
+    # Actieve strengen per eindknoop (voor inkomend en bovenstrooms) en per beginknoop.
+    actief_per_eind: dict[str, list[Conduit]] = {}
+    actief_per_begin: dict[str, list[Conduit]] = {}
+    for conduit in actief:
+        begin, eind = knoop(conduit.start_node), knoop(conduit.end_node)
+        if eind is not None:
+            actief_per_eind.setdefault(eind, []).append(conduit)
+        if begin is not None:
+            actief_per_begin.setdefault(begin, []).append(conduit)
+
+    # Loze strengen die een knoop delen horen bij dezelfde keten.
+    loos_per_knoop: dict[str, list[Conduit]] = {}
+    for conduit in loos:
+        for uri in einden[conduit.uri]:
+            if uri is not None:
+                loos_per_knoop.setdefault(uri, []).append(conduit)
+    gezien: set[str] = set()
+    gebruikt: set[str] = set()
+    ketens: list[_LozeKeten] = []
+    for start in loos:
+        if start.uri in gezien:
+            continue
+        groep: list[Conduit] = []
+        wachtrij = deque([start])
+        gezien.add(start.uri)
+        while wachtrij:
+            conduit = wachtrij.popleft()
+            groep.append(conduit)
+            for uri in einden[conduit.uri]:
+                for buur in loos_per_knoop.get(uri, []) if uri is not None else []:
+                    if buur.uri not in gezien:
+                        gezien.add(buur.uri)
+                        wachtrij.append(buur)
+        groep.sort(key=lambda conduit: conduit.uri)
+        # Met een walrus, zodat het type `set[str]` is en niet `set[str | None]`.
+        beginknopen = {begin for c in groep if (begin := einden[c.uri][0]) is not None}
+        eindknopen = {eind for c in groep if (eind := einden[c.uri][1]) is not None}
+        inkomend = sorted(
+            {c.uri: c for k in beginknopen for c in actief_per_eind.get(k, [])}.values(),
+            key=lambda conduit: conduit.uri,
+        )
+        uitgaand = sorted(
+            {c.uri: c for k in eindknopen for c in actief_per_begin.get(k, [])}.values(),
+            key=lambda conduit: conduit.uri,
+        )
+        naam = _uniek_ketennaam(
+            f"loos-{groep[0].label or groep[0].uri.rsplit('#', 1)[-1]}", gebruikt
+        )
+        gebruikt.add(naam)
+        ketens.append(
+            _LozeKeten(
+                naam,
+                tuple(groep),
+                tuple(inkomend),
+                tuple(uitgaand),
+                _bovenstrooms(beginknopen, actief_per_eind, knoop),
+            )
+        )
+    return tuple(ketens)
+
+
+def _bovenstrooms(
+    beginknopen: set[str],
+    actief_per_eind: dict[str, list[Conduit]],
+    knoop: Callable[[str | None], str | None],
+) -> int:
+    """Het aantal verschillende actieve strengen transitief bovenstrooms van deze knopen."""
+    gezien_knopen = set(beginknopen)
+    gezien_strengen: set[str] = set()
+    wachtrij = deque(beginknopen)
+    while wachtrij:
+        huidig = wachtrij.popleft()
+        for conduit in actief_per_eind.get(huidig, []):
+            if conduit.uri in gezien_strengen:
+                continue
+            gezien_strengen.add(conduit.uri)
+            begin = knoop(conduit.start_node)
+            if begin is not None and begin not in gezien_knopen:
+                gezien_knopen.add(begin)
+                wachtrij.append(begin)
+    return len(gezien_strengen)
+
+
+def _uniek_ketennaam(naam: str, gebruikt: set[str]) -> str:
+    """Maakt de ketennaam uniek; twee ketens mogen niet hetzelfde ID krijgen."""
+    if naam not in gebruikt:
+        return naam
+    volgnummer = 2
+    while f"{naam}-{volgnummer}" in gebruikt:
+        volgnummer += 1
+    return f"{naam}-{volgnummer}"
+
+
+def _labels(strengen: tuple[Conduit, ...]) -> str:
+    """De labels van deze strengen, komma-gescheiden."""
+    return ", ".join(conduit.label or conduit.uri for conduit in strengen)
+
+
+class _LozeLeidingen(Check):
+    """Gedeelde basis voor ADM-010 (keten aan actief riool) en ADM-011 (losgekoppeld)."""
+
+    gevallen: frozenset[str]
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt per loze streng in een keten van de gevallen van deze check."""
+        for keten in _loze_ketens(context):
+            geval = keten.geval
+            if geval not in self.gevallen:
+                continue
+            for conduit in keten.strengen:
+                yield self.finding(
+                    context,
+                    conduit.uri,
+                    conduit.label,
+                    self._boodschap(keten),
+                    cluster_id=keten.id,
+                    geval=geval,
+                    keten_strengen=len(keten.strengen),
+                    inkomend=_labels(keten.inkomend),
+                    uitgaand=_labels(keten.uitgaand),
+                    bovenstrooms=keten.bovenstrooms,
+                )
+
+    @staticmethod
+    def _boodschap(keten: _LozeKeten) -> str:
+        """De tekst per geval, met de aansluitende actieve strengen bij naam."""
+        boven = getal(keten.bovenstrooms, "actieve streng", "actieve strengen")
+        omvang = f" Bovenstrooms {vorm(keten.bovenstrooms, 'ligt', 'liggen')} {boven}."
+        if keten.geval == GEVAL_DOORGAAND:
+            return (
+                f"Het actieve riool loopt door deze loze leiding heen: {_labels(keten.inkomend)} "
+                f"komt binnen en {_labels(keten.uitgaand)} gaat verder.{omvang}"
+            )
+        if keten.geval == GEVAL_AANVOER:
+            return (
+                f"Actief riool ({_labels(keten.inkomend)}) watert af op deze loze leiding, "
+                f"maar er gaat niets verder.{omvang}"
+            )
+        if keten.geval == GEVAL_AFVOER:
+            return (
+                f"Deze loze leiding voert af op actief riool ({_labels(keten.uitgaand)}), "
+                "maar er komt niets binnen."
+            )
+        return "Deze loze leiding hangt aan geen enkele actieve streng: dode data."
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Telt de ketens en strengen per geval, zodat de lezer het geheel ziet."""
+        ketens = _loze_ketens(context)
+        if not ketens:
+            return []
+        per_geval = {
+            geval: [keten for keten in ketens if keten.geval == geval]
+            for geval in (GEVAL_DOORGAAND, GEVAL_AANVOER, GEVAL_AFVOER, GEVAL_LOSGEKOPPELD)
+        }
+        delen = ", ".join(
+            f"{len(groep)} {geval} "
+            f"({getal(sum(len(keten.strengen) for keten in groep), 'streng', 'strengen')})"
+            for geval, groep in per_geval.items()
+        )
+        totaal = sum(len(keten.strengen) for keten in ketens)
+        return [
+            f"{getal(totaal, 'loze leiding', 'loze leidingen')} in "
+            f"{getal(len(ketens), 'keten', 'ketens')}: {delen}. De richting is de "
+            "administratieve begin-naar-eindrichting; of die klopt toetst NET-003."
+        ]
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal loze leidingen."""
+        return len(lozeleidingen(context))
+
+
+@register
+class LozeLeidingAanActiefRiool(_LozeLeidingen):
+    """ADM-010: een keten van loze leidingen waar actief riool op aansluit.
+
+    Een `LozeLeiding` is buiten gebruik (GWSW: "Leiding is buiten gebruik"); er kan per
+    definitie geen actief riool op afwateren. Gebeurt dat toch, dan is de loze leiding
+    verkeerd geclassificeerd, of zijn de buurstrengen dat, of ontbreekt er een omlegging.
+    Doorgaand is het ergste: het actieve riool loopt volgens het model dwars door een
+    buiten gebruik gestelde streng (issue #62).
+    """
+
+    id = "ADM-010"
+    title = "Loze leiding waar actief riool op aansluit (doorgaand, aanvoer of afvoer)"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+    gevallen = frozenset({GEVAL_DOORGAAND, GEVAL_AANVOER, GEVAL_AFVOER})
+
+
+@register
+class LosgekoppeldeLozeLeiding(_LozeLeidingen):
+    """ADM-011: een keten van loze leidingen zonder enige actieve aansluiting: dode data."""
+
+    id = "ADM-011"
+    title = "Loze leiding zonder enige aansluiting op actief riool"
+    severity = Severity.WARNING
+    dimension = Dimension.CONSISTENCY
+    gevallen = frozenset({GEVAL_LOSGEKOPPELD})

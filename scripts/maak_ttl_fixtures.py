@@ -96,6 +96,10 @@ HULPSTUK_KLASSEN = (
     " owl:hasValue gwsw:VerbindenVanVierLeidingen ] .\n\n"
 )
 
+# De loze leiding staat niet in de gedeelde prelude; alleen de fixtures van issue #62
+# hebben haar nodig. Ze hangt onder Leiding en niet onder VrijvervalRioolleiding.
+LOZE_KLASSE = "gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .\n\n"
+
 
 def hulpstuk(naam: str, label: str, x: float, y: float, klasse: str = "T_stuk") -> str:
     """Een hulpstuk: als een put, maar met een Hulpstukorientatie als knooppunt."""
@@ -1659,6 +1663,63 @@ FIXTURES["adm009_leiding_aan_put.ttl"] = (
 """,
 )
 
+# ADM-010/ADM-011: loze leidingen in ketens (issue #62). Elke fixture bevat precies een
+# keten en precies een geval. Streng 0 en 1 zijn actief en komen binnen (bovenstrooms 2),
+# X1 en X2 zijn loos, streng 3 is actief en gaat verder.
+FIXTURES["adm010_loze_keten_doorgaand.ttl"] = (
+    "actief riool loopt via loze strengen X1 en X2 door: aanvoer via 1, afvoer via 3 (issue #62)",
+    LOZE_KLASSE
+    + put("PutA0", "A0", 950.0, 2000.0)
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + put("PutD", "D", 1150.0, 2000.0)
+    + put("PutE", "E", 1200.0, 2000.0)
+    + leiding("L0", "0", [(950.0, 2000.0), (1000.0, 2000.0)], "PutA0", "PutA")
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding(
+        "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
+    )
+    + leiding(
+        "X2", "X2", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutC", "PutD", klasse="LozeLeiding"
+    )
+    + leiding("L3", "3", [(1150.0, 2000.0), (1200.0, 2000.0)], "PutD", "PutE"),
+)
+
+FIXTURES["adm010_loze_keten_aanvoer.ttl"] = (
+    "actieve streng 1 watert af op loze streng X1; er gaat niets verder (issue #62)",
+    LOZE_KLASSE
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding(
+        "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
+    ),
+)
+
+FIXTURES["adm010_loze_keten_afvoer.ttl"] = (
+    "loze streng X1 voert af op actieve streng 3; er komt niets binnen (issue #62)",
+    LOZE_KLASSE
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + put("PutD", "D", 1150.0, 2000.0)
+    + leiding(
+        "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
+    )
+    + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutC", "PutD"),
+)
+
+FIXTURES["adm011_loze_keten_los.ttl"] = (
+    "loze streng X1 hangt aan geen enkele actieve streng: dode data (issue #62)",
+    LOZE_KLASSE
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + leiding(
+        "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
+    ),
+)
+
 # --- BTR ------------------------------------------------------------------
 
 _BTR_PUNTEN = [(1000.0 + 50.0 * i, 2000.0) for i in range(41)]
@@ -1828,7 +1889,7 @@ FIXTURES["hgt001_grens.ttl"] = (
 
 
 # Geen check maar de klassenselecties uit checks/selectie.py: het Juinen-voorbeeld
-# bevat maar zes van de vijftien rollen, en een selectie die stil leeg blijft leest
+# bevat maar zes van de zeventien rollen, en een selectie die stil leeg blijft leest
 # als "die rol komt niet voor". Hier staat precies een object per ontbrekende rol.
 FIXTURES["selectie_rollen.ttl"] = (
     "geen -- deze fixture dekt de klassenselecties, niet een gebrek",
@@ -1836,6 +1897,7 @@ FIXTURES["selectie_rollen.ttl"] = (
     # hem nodig. De regel gaat met een toelichting mee het bestand in, zodat hij daar
     # niet als een losse zwerver leest.
     HULPSTUK_KLASSEN
+    + LOZE_KLASSE
     + (
         "# Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude"
         " kent haar niet.\n"
@@ -1844,7 +1906,7 @@ FIXTURES["selectie_rollen.ttl"] = (
     + put("Put1", "Put1", 1000.0, 2000.0)
     + put("Lozing1", "Lozing1", 1050.0, 2000.0, klasse="Lozingsput")
     + put("Val1", "Val1", 1200.0, 2000.0, klasse="Valput")
-    # Overstortput en loze put staan hier ook, zodat de fixture alle vijftien rollen
+    # Overstortput en loze put staan hier ook, zodat de fixture alle zeventien rollen
     # dekt zonder het Juinen-voorbeeld: dat staat in data/ en ontbreekt in een
     # schone kloon, en dan zou de dekkingstest stil overslaan.
     + put("Overstort1", "Overstort1", 1250.0, 2000.0, klasse="Overstortput")
@@ -1887,6 +1949,11 @@ FIXTURES["selectie_rollen.ttl"] = (
     )
     # Een persleiding is wel een gwsw:Leiding maar geen vrijvervalrioolleiding.
     + leiding("P1", "P1", [(1200.0, 2000.0), (1250.0, 2000.0)], "Val1", None, klasse="Persleiding")
+    # Een loze leiding is wel een gwsw:Leiding maar geen vrijvervalrioolleiding en
+    # geen mechanische leiding (issue #62).
+    + leiding(
+        "Loos2", "Loos2", [(1300.0, 2000.0), (1300.0, 2050.0)], "Loos1", None, klasse="LozeLeiding"
+    )
     # Oppervlaktewater is lijnvormig en komt dus bij de verbindingen terecht.
     + leiding("Sloot1", "Sloot1", [(1000.0, 2100.0), (1250.0, 2100.0)], None, None, klasse="Sloot"),
 )

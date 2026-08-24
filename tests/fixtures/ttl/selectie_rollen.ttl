@@ -49,6 +49,8 @@ gwsw:T_stuk_Speciaal rdfs:subClassOf gwsw:T_stuk .
 gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,
     [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:VerbindenVanVierLeidingen ] .
 
+gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .
+
 # Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude kent haar niet.
 gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 
@@ -141,6 +143,15 @@ gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 :P1_b rdf:type gwsw:BeginpuntLeiding .
 :P1_e rdf:type gwsw:EindpuntLeiding .
 :P1_b gwsw:hasConnection :Val1_ori .
+:Loos2 rdf:type gwsw:LozeLeiding ; rdfs:label "Loos2" ;
+    gwsw:hasAspect :Loos2_ori .
+:Loos2_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :Loos2_b , :Loos2_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1300.0 2000.0 1300.0 2050.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:Loos2_b rdf:type gwsw:BeginpuntLeiding .
+:Loos2_e rdf:type gwsw:EindpuntLeiding .
+:Loos2_b gwsw:hasConnection :Loos1_ori .
 :Sloot1 rdf:type gwsw:Sloot ; rdfs:label "Sloot1" ;
     gwsw:hasAspect :Sloot1_ori .
 :Sloot1_ori rdf:type gwsw:Leidingorientatie ;

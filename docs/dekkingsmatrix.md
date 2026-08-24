@@ -7,14 +7,14 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | Categorie | Register | Met test | Zonder test | Ontbreekt | Geschrapt |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | TOP | 23 | 23 | 0 | 0 | 0 |
-| ADM | 9 | 6 | 0 | 0 | 3 |
+| ADM | 11 | 8 | 0 | 0 | 3 |
 | ATTR | 18 | 17 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 9 | 9 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **101** | **97** | **0** | **0** | **4** |
+| **totaal** | **103** | **99** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -57,6 +57,8 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ADM-007 | Puttype past niet bij het type aangesloten leiding (bijv. overstortput zonder overstortfunctie in het netwerk); netwerkfunctionele toets, de samenste… | F | Consistentie | geimplementeerd met test | — |
 | ADM-008 | Putcompartimenten of -onderdelen zonder onderlinge verbinding binnen de put | W | Consistentie | geimplementeerd met test | — |
 | ADM-009 | Leiding gekoppeld aan de put als geheel waar koppeling aan een compartiment vereist is | W | Consistentie | geimplementeerd met test | — |
+| ADM-010 | Loze leiding (`LozeLeiding` en subklassen: buiten gebruik, nog in de ondergrond) waar actief riool op aansluit. Loze leidingen die een knoop delen vo… | F | Consistentie | geimplementeerd met test | — |
+| ADM-011 | Loze leiding in een keten zonder enige aansluiting op actief riool: geen hydraulische fout maar dode data. Zelfde ketenbouw als ADM-010 (issue #62) | W | Consistentie | geimplementeerd met test | — |
 
 ## ATTR
 

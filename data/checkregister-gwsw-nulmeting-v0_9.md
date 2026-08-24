@@ -70,6 +70,8 @@ gebreken" leest.
 | ADM-007 | Puttype past niet bij het type aangesloten leiding (bijv. overstortput zonder overstortfunctie in het netwerk); netwerkfunctionele toets, de samenstellingsregels per puttype dekt de nulmeting | F | Consistentie |
 | ADM-008 | Putcompartimenten of -onderdelen zonder onderlinge verbinding binnen de put | W | Consistentie |
 | ADM-009 | Leiding gekoppeld aan de put als geheel waar koppeling aan een compartiment vereist is | W | Consistentie |
+| ADM-010 | Loze leiding (`LozeLeiding` en subklassen: buiten gebruik, nog in de ondergrond) waar actief riool op aansluit. Loze leidingen die een knoop delen vormen een keten; per keten in de administratieve richting: actief riool dat in een beginknoop eindigt (aanvoer), actief riool dat in een eindknoop begint (afvoer), of beide (doorgaand: het actieve riool loopt volgens het model door een buiten gebruik gestelde streng). Melding per loze streng met de keten in `cluster_id` en het aantal actieve strengen bovenstrooms als detail; de nulmeting noemt loze leidingen alleen voor attribuutgebreken, nooit voor hun plaats in het net (issue #62) | F | Consistentie |
+| ADM-011 | Loze leiding in een keten zonder enige aansluiting op actief riool: geen hydraulische fout maar dode data. Zelfde ketenbouw als ADM-010 (issue #62) | W | Consistentie |
 
 ## ATTR: Attribuutplausibiliteit
 
@@ -220,6 +222,14 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-24): ADM-010 (F) en ADM-011 (W), beide Consistentie, toegevoegd:
+loze leidingen, tot ketens gegroepeerd, waar actief riool op aansluit (doorgaand, aanvoer of
+afvoer) respectievelijk die aan niets hangen. Melding per loze streng met de keten in
+`cluster_id`. Twee ID's en niet één met twee ernsten, want elke check draagt hier precies één
+ernst. De klasse komt uit `[klassen] loze_leiding`; ADM-006 blijft ongemoeid (dat meldt op
+`Einddatum`/`Begindatum`, dit op de klasse). Zie
+[#62](https://github.com/mcolee/nlriochecker/issues/62) en BO-47.
 
 Versie 0.9, addendum (2026-08-24): TOP-022 (F) en TOP-023 (W), beide Consistentie, toegevoegd:
 een hulpstuk verbindt minder respectievelijk meer leidingen dan de `functie`-restrictie op
