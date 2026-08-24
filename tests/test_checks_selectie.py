@@ -8,7 +8,7 @@ de eindpunten en de bergbezinkvoorzieningen), en `vrijvervalrioolleidingen` binn
 `leidingen`.
 
 Twee datasets, elk om een eigen reden. `selectie_rollen.ttl` bevat precies een
-object per rol en dekt ze dus alle veertien; die fixture staat in de repository en
+object per rol en dekt ze dus alle vijftien; die fixture staat in de repository en
 is er altijd. Het Juinen-voorbeeld staat in `data/` -- dat ontbreekt in een schone
 kloon -- en dient voor de verhoudingen van een echte export: daar is een selectie
 groot genoeg dat een verwisseling van twee rollen in de aantallen opvalt.
@@ -49,7 +49,7 @@ def context_van(dataset: GwswDataset) -> CheckContext:
 
 
 # De aantallen per rol op de rollenfixture: 7 knopen en 6 verbindingen. Alle
-# veertien rollen komen erin voor; dat bewaakt `test_elke_rol_komt_erin_voor`.
+# vijftien rollen komen erin voor; dat bewaakt `test_elke_rol_komt_erin_voor`.
 ROLLENSET_AANTALLEN = {
     "netwerkknopen": 7,
     "putten": 5,
@@ -57,7 +57,12 @@ ROLLENSET_AANTALLEN = {
     "overstortputten": 1,
     "bergbezinkvoorzieningen": 1,
     "valconstructies": 1,
-    "functieloze_knopen": 1,
+    # Twee: de loze put en het T-stuk. Een T_stuk is een Verbindingsstuk, en dat staat
+    # in `functieloze_knoop` in beide TOML's -- een verbindingsstuk knoopt leidingen aan
+    # elkaar zonder zelf een functie te hebben. Dat gold al voor De Wolden en Hoogeveen;
+    # het wordt hier alleen zichtbaar nu de fixture een hulpstuk draagt (issue #60).
+    "functieloze_knopen": 2,
+    "hulpstukken": 1,
     "leidingen": 5,
     "vrijvervalrioolleidingen": 4,
     "overstortleidingen": 1,

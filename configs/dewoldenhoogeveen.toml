@@ -49,6 +49,11 @@ streng = ["Leiding"]
 # Spoelleiding, en dat sluit het gat met de symbolentabel. De Wolden en Hoogeveen telt eronder alleen
 # Persleiding 3548, Vacuumleiding 147, Drukleiding 25; nul van de rest.
 mechanisch = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
+# TOP-022 en TOP-023: de hulpstukken. Hulpstuk is de ontologische wortel van T_stuk,
+# Y_stuk, Kruisstuk, Mof, Afsluitstuk, Ontstoppingsstuk, Tubelure en de rest; welke
+# daarvan een aantal leidingen voorschrijft leest de check uit de ontologie
+# (functie hasValue VerbindenVanTwee/Drie/VierLeidingen), niet uit deze lijst.
+hulpstuk = ["Hulpstuk"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
 # degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
 # ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden en Hoogeveen.

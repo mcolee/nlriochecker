@@ -35,6 +35,10 @@ class ClassRoots(BaseModel):
     streng: list[str] = Field(default_factory=lambda: ["Leiding"])
     # Mechanisch riool: buiten scope voor de checks, wel zichtbaar in de GIS-uitvoer.
     mechanisch: list[str] = Field(default_factory=list)
+    # TOP-022 en TOP-023: hulpstukken (T-stuk, kruisstuk, mof, afsluitstuk, ...). Een
+    # hulpstuk is een knoop maar geen put; het verwachte aantal leidingen komt uit de
+    # functierestrictie in de ontologie, niet uit deze lijst.
+    hulpstuk: list[str] = Field(default_factory=list)
     # NET-001 en NET-002 vragen elk om een ander soort eindpunt; een vuilwaterstreng
     # die alleen een uitlaat bereikt is niet in orde.
     afvoer_eindpunt: list[str] = Field(default_factory=list)

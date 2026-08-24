@@ -2432,3 +2432,37 @@ en 1914 op `strengen`. Die twee lagen dragen de hele meetset en niet de ATTR-018
 `strengen` komen de 1703 leidingen buiten de toets erbij (1703 + 211 = 1914) en op `putten` 2471
 knopen die geen put zijn (2471 + 9063 = 11534). Samen 13448 van de 46925 objecten -- exact het
 getal dat de vervallen meetsetregel van ATTR-007 gaf.
+
+### BO-46 De lader herstelt de fantoomkoppeling naar hulpstukken en meldt dat; TOP-022/TOP-023 tellen richtingen tegen de GWSW-functie
+
+**Wat.** (1) Wijst geen enkel `hasConnection`-doel van een leidingeinde naar een bekende
+orientatie, dan strip de lader de staart `_put` en neemt hij de stam als knoop -- alleen als
+die stam een knoop met een `Hulpstukorientatie` is. Het aantal herstelde koppelingen en
+hulpstukken staat op `GwswDataset.koppelingsherstel` en gaat als datasetsignaal
+`SIG-hulpstukkoppeling` (W, systemisch, zonder object) de meldingenstroom in. (2) TOP-022 (F)
+en TOP-023 (W) vergelijken per hulpstuk het aantal richtingen -- verschillende buurknopen plus
+losse einden -- met het aantal dat de `gwsw:functie`-restrictie op zijn klasse voorschrijft
+(`VerbindenVanTwee/Drie/VierLeidingen` → 2/3/4). De klasse→functie-koppeling komt uit de
+ontologie (`GwswDataset.functie_per_klasse`, overgeerfd naar subklassen); alleen de vertaling
+van woord naar getal staat in code. Uitgewerkt in issue #60.
+
+**Waarom.** De BrutIS-export koppelt élk leidingeinde op een hulpstuk aan `<hulpstuk>_put`, een
+URI die nergens een type of aspect draagt; de orientatie heet `<hulpstuk>_put<n>`. Gemeten:
+1122 hulpstukken, 1122 fantoom-URI's, 3024 koppelingen, 3024 strengeinden zonder knoop, 859
+strengen met beide einden los, 0 T-stukken met een herkende aansluiting. De nulmeting meldt
+hetzelfde (`Knooppunt_Netwerk_conn` 1123×, `EindpuntLeiding_Knooppunt_card` 1846×,
+`BeginpuntLeiding_Knooppunt_card` 1178×). Zonder herstel meet een T-stukcheck niets; met een
+stil herstel zou het rapport het gebrek in de aanlevering verzwijgen. Richtingen in plaats van
+strengen: in Alteveer ligt elke vacuümrichting dubbel (108 knoopparen met meer dan een streng
+ertussen, 266 strengen), en per streng geteld zouden 17 hulpstukken ten onrechte melden.
+
+**Twee ID's, niet een.** Het issue nam een ID met F voor te weinig en W voor te veel aan. De
+engine en het register kennen per check precies een ernst (`Check.severity`;
+`test_ernst_en_dimensie_volgen_het_register`). Daarom TOP-022 voor te weinig (F: er ontbreekt
+een leiding, of het is geen T-stuk) en TOP-023 voor te veel (W: waarschijnlijk de verkeerde
+klasse).
+
+**Alternatieven.** Ruimer herstellen op naam (verworpen: gokken in een kritiek pad). Het
+verwachte aantal in `checks.toml` (verworpen: het staat in de ontologie en zou een tweede
+waarheid worden). Een losse streng zonder eind niet meetellen (verworpen: die leiding hangt
+wel degelijk aan het hulpstuk; dat haar andere eind los is, is een TOP-002/003-zaak).

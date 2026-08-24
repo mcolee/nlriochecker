@@ -140,6 +140,15 @@ def functieloze_knopen(context: CheckContext) -> list[Node]:
     return _knopen(context, "sel:functieloze_knopen", context.config.klassen.functieloze_knoop)
 
 
+def hulpstukken(context: CheckContext) -> list[Node]:
+    """De hulpstukken: `gwsw:Hulpstuk` en haar subklassen (T-stuk, kruisstuk, mof, ...).
+
+    Een hulpstuk is een knoop -- zijn `Hulpstukorientatie` is een `Knooppunt` -- maar
+    geen put en geen netwerkknoop. TOP-022 en TOP-023 tellen er de leidingen op.
+    """
+    return _knopen(context, "sel:hulpstukken", context.config.klassen.hulpstuk)
+
+
 def leidingen(context: CheckContext) -> list[Conduit]:
     """Alle leidingen: `gwsw:Leiding` en haar subklassen.
 
@@ -250,6 +259,7 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "bergbezinkvoorzieningen": bergbezinkvoorzieningen,
     "valconstructies": valconstructies,
     "functieloze_knopen": functieloze_knopen,
+    "hulpstukken": hulpstukken,
     "leidingen": leidingen,
     "vrijvervalrioolleidingen": vrijvervalrioolleidingen,
     "overstortleidingen": overstortleidingen,

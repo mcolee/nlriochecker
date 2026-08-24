@@ -88,6 +88,14 @@ def graaf() -> Graph:
     return graph
 
 
+@pytest.fixture(scope="module")
+def echte_graaf() -> Graph:
+    """De totaal-ontologie, een keer geparst; los parsen kost per test drie seconden."""
+    graph = Graph()
+    graph.parse(ONTOLOGIE_TTL, format="turtle")
+    return graph
+
+
 def _dt(naam: str) -> URIRef:
     return URIRef(GWSW + naam)
 
@@ -182,3 +190,24 @@ def test_bekende_bereiken_uit_de_echte_ontologie(
     bereik = facetbereik(graph, _dt(datatype))
     assert bereik is not None
     assert (bereik.minimum, bereik.maximum) == (minimum, maximum)
+
+
+@pytest.mark.skipif(not ONTOLOGIE_TTL.exists(), reason="de GWSW-ontologie staat niet in data/")
+@pytest.mark.parametrize(
+    ("klasse", "verwacht"),
+    [
+        ("Mof", "VerbindenVanTweeLeidingen"),
+        ("T_stuk", "VerbindenVanDrieLeidingen"),
+        ("Y_stuk", "VerbindenVanDrieLeidingen"),
+        ("Kruisstuk", "VerbindenVanVierLeidingen"),
+        ("Afsluitstuk", "AfsluitenVanLeidingen"),
+        # Zijn definitie noemt drie leidingen, het model niet.
+        ("Tubelure", None),
+    ],
+)
+def test_functie_van_klasse_uit_de_echte_ontologie(
+    echte_graaf: Graph, klasse: str, verwacht: str | None
+) -> None:
+    from nlriochecker.ontologie import functie_van_klasse
+
+    assert functie_van_klasse(echte_graaf, URIRef(GWSW + klasse)) == verwacht

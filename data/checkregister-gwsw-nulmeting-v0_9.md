@@ -57,6 +57,8 @@ gebreken" leest.
 | TOP-019 | Pseudo-knoop: twee strengen gescheiden door een functieloze knoop, met identieke attributen (diameter, materiaal, stelseltype); zouden een streng moeten zijn | W | Consistentie |
 | TOP-020 | Digitalisatierichting (begin- naar eindvertex) komt niet overeen met de administratieve van-naar-richting | W | Consistentie |
 | TOP-021 | Put valt niet samen met enig strengeindpunt maar ligt wel naast of op een doorlopende streng (verfijning van TOP-001) | W | Consistentie |
+| TOP-022 | Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft. Het verwachte aantal volgt uit de `functie`-restrictie op de klasse in de ontologie (`VerbindenVanTweeLeidingen` 2 voor `Mof`, `VerbindenVanDrieLeidingen` 3 voor `T_stuk` en `Y_stuk`, `VerbindenVanVierLeidingen` 4 voor `Kruisstuk`); geteld naar verschillende knopen aan de andere kant, zodat een dubbel gelegde richting een keer telt. Klassen zonder aantal in hun functie (`Afsluitstuk`, `Ontstoppingsstuk`, `Tubelure`, `Bochtstuk`, `Verloopstuk`, `Overgangsstuk`) vallen erbuiten en worden in de toelichting geteld. De nulmeting kent geen kardinaliteit op `hasConnection` van een hulpstuk (issue #60) | F | Consistentie |
+| TOP-023 | Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft; waarschijnlijk de verkeerde klasse gekozen (voor vier bestaat `Kruisstuk`). Zelfde telling als TOP-022 (issue #60) | W | Consistentie |
 
 ## ADM: Administratief en referentieel
 
@@ -218,6 +220,15 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-24): TOP-022 (F) en TOP-023 (W), beide Consistentie, toegevoegd:
+een hulpstuk verbindt minder respectievelijk meer leidingen dan de `functie`-restrictie op
+zijn GWSW-klasse voorschrijft; het aantal komt uit de ontologie en niet uit de configuratie,
+geteld naar buurknopen en niet naar strengen. Twee ID's en niet één met twee ernsten, want
+elke check draagt hier precies één ernst. Tegelijk herstelt de lader de fantoomkoppeling van
+de BrutIS-export (`<hulpstuk>_put`) en meldt dat als datasetsignaal; zonder dat herstel zag
+de engine bij alle 1054 T-stukken van De Wolden en Hoogeveen nul leidingen. Zie
+[#60](https://github.com/mcolee/nlriochecker/issues/60) en BO-46.
 
 Versie 0.9, addendum (2026-08-24): ATTR-018 toegevoegd (F, Compleetheid): een
 vrijvervalrioolleiding of put zonder `Begindatum`. Tot nu toe kreeg zo'n object nergens een

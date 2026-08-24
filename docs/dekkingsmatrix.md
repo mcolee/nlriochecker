@@ -6,7 +6,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | Categorie | Register | Met test | Zonder test | Ontbreekt | Geschrapt |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| TOP | 21 | 21 | 0 | 0 | 0 |
+| TOP | 23 | 23 | 0 | 0 | 0 |
 | ADM | 9 | 6 | 0 | 0 | 3 |
 | ATTR | 18 | 17 | 0 | 0 | 1 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
@@ -14,7 +14,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **99** | **95** | **0** | **0** | **4** |
+| **totaal** | **101** | **97** | **0** | **0** | **4** |
 
 ## TOP
 
@@ -41,6 +41,8 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | TOP-019 | Pseudo-knoop: twee strengen gescheiden door een functieloze knoop, met identieke attributen (diameter, materiaal, stelseltype); zouden een streng moe… | W | Consistentie | geimplementeerd met test | — |
 | TOP-020 | Digitalisatierichting (begin- naar eindvertex) komt niet overeen met de administratieve van-naar-richting | W | Consistentie | geimplementeerd met test | — |
 | TOP-021 | Put valt niet samen met enig strengeindpunt maar ligt wel naast of op een doorlopende streng (verfijning van TOP-001) | W | Consistentie | geimplementeerd met test | — |
+| TOP-022 | Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft. Het verwachte aantal volgt uit de `functie`-restrictie op de klasse in de onto… | F | Consistentie | geimplementeerd met test | — |
+| TOP-023 | Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft; waarschijnlijk de verkeerde klasse gekozen (voor vier bestaat `Kruisstuk`). Zelf… | W | Consistentie | geimplementeerd met test | — |
 
 ## ADM
 

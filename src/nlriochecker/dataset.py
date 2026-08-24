@@ -74,6 +74,7 @@ WORTEL_KNOOPPUNT = "Knooppunt"
 WORTEL_VERBINDING = "Verbinding"
 WORTELS_VOOR_HERKENNING = (WORTEL_KNOOPPUNT, WORTEL_VERBINDING)
 
+WORTEL_HULPSTUK = "Hulpstuk"
 WORTEL_HULPSTUKORIENTATIE = "Hulpstukorientatie"
 # De staart die de BrutIS-export achter de naam van een hulpstuk plakt in het
 # hasConnection-doel van een leidingeinde, waar de orientatie zelf anders heet.
@@ -354,6 +355,11 @@ class GwswDataset:
     # berekenen van `subclasses` verloren gaat; het is een klein afgeleid woordenboek
     # zoals `subclasses`, niet de hele ontologiegraaf. Leeg zonder klassenkennis.
     kenmerk_property: dict[str, str] = field(default_factory=dict)
+    # Per hulpstukklasse (volledige URI) de functiewaarde uit de `gwsw:functie`-restrictie
+    # van de ontologie, overgeerfd naar subklassen zonder eigen restrictie. TOP-022 en
+    # TOP-023 lezen er het verwachte aantal leidingen uit (issue #60). Net als
+    # `kenmerk_property` een klein afgeleid woordenboek; leeg zonder klassenkennis.
+    functie_per_klasse: dict[str, str] = field(default_factory=dict)
     # Het herstel van de fantoomkoppeling naar hulpstukken (issue #60); nul zonder
     # fantomen. Het rapport meldt het als datasetsignaal `SIG-hulpstukkoppeling`.
     koppelingsherstel: Koppelingsherstel = Koppelingsherstel()
@@ -974,6 +980,7 @@ def load_dataset(
     restrictiebron = ontology if len(ontology) else graph
     subclasses = _subclass_closure(restrictiebron)
     kenmerk_property = _kenmerk_properties(restrictiebron, subclasses)
+    functie_per_klasse = _klassefuncties(restrictiebron, subclasses)
     geometry_errors: dict[str, str] = {}
     # Dezelfde twee vragen die `GwswDataset.klassenhierarchie_bekend` stelt, met
     # dezelfde functie: `None` hier betekent terugval op geometrie, en dat is precies
@@ -1003,6 +1010,7 @@ def load_dataset(
         decode_fallback=fallback,
         ontologies=tuple(Path(pad) for pad in ontology_paths or []),
         kenmerk_property=kenmerk_property,
+        functie_per_klasse=functie_per_klasse,
         koppelingsherstel=herstel,
     )
     # Altijd, en juist ook zonder klassenkennis: dan laat het verschil zien dat de
@@ -1279,6 +1287,27 @@ def _kenmerk_properties(graph: GraafIndex, subclasses: dict[str, frozenset[str]]
         property_ = verwachte_property(graph, URIRef(uri))
         if property_ is not None:
             gevonden[_short(uri)] = property_
+    return gevonden
+
+
+def _klassefuncties(graph: GraafIndex, subclasses: dict[str, frozenset[str]]) -> dict[str, str]:
+    """Per hulpstukklasse de functiewaarde uit de ontologie, overgeerfd naar subklassen.
+
+    Loopt over de afsluiting van `Hulpstuk`; een klasse met een eigen restrictie wint
+    van wat zij van een bovenklasse zou erven. Sleutel is de volledige URI, zodat een
+    knoop er met zijn `types` direct in kan kijken.
+    """
+    from nlriochecker.ontologie import functie_van_klasse
+
+    eigen: dict[str, str] = {}
+    for uri in _afsluiting(subclasses, WORTEL_HULPSTUK):
+        functie = functie_van_klasse(graph, URIRef(uri))
+        if functie is not None:
+            eigen[uri] = functie
+    gevonden = dict(eigen)
+    for uri, functie in sorted(eigen.items()):
+        for sub in _afsluiting(subclasses, _short(uri)):
+            gevonden.setdefault(sub, functie)
     return gevonden
 
 

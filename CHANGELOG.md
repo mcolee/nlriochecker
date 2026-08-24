@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **TOP-022 en TOP-023: hulpstuk met een ander aantal aansluitingen dan zijn
+  GWSW-functie voorschrijft** (issue #60). Het verwachte aantal komt uit de
+  `functie`-restrictie op de klasse in de ontologie (`Mof` 2, `T_stuk`/`Y_stuk` 3,
+  `Kruisstuk` 4); geteld naar verschillende buurknopen, zodat een dubbel gelegde
+  richting een keer telt. TOP-022 (F) meldt te weinig, TOP-023 (W) te veel; klassen
+  zonder aantal in hun functie (afsluitstuk, ontstoppingsstuk, tubelure) vallen buiten
+  de toets en staan geteld in de toelichting. Nieuwe rol `[klassen] hulpstuk`. Op De
+  Wolden en Hoogeveen: TOP-022 224 en TOP-023 37 op 1054 T-stukken (Task 3 meet het).
+  Zie BO-46.
+
 - **ATTR-018: ontbrekende begindatum wordt per object gemeld** (issue #61). Een
   vrijvervalrioolleiding of put zonder `Begindatum` krijgt een fout (Compleetheid); tot nu
   toe stond het gat alleen als één regel in de toelichting van ATTR-007 en bleef zo'n

@@ -1821,20 +1821,23 @@ FIXTURES["hgt001_grens.ttl"] = (
 
 
 # Geen check maar de klassenselecties uit checks/selectie.py: het Juinen-voorbeeld
-# bevat maar zes van de veertien rollen, en een selectie die stil leeg blijft leest
+# bevat maar zes van de vijftien rollen, en een selectie die stil leeg blijft leest
 # als "die rol komt niet voor". Hier staat precies een object per ontbrekende rol.
 FIXTURES["selectie_rollen.ttl"] = (
     "geen -- deze fixture dekt de klassenselecties, niet een gebrek",
     # Bergbezinkleiding staat niet in de gedeelde prelude; alleen deze fixture heeft
     # hem nodig. De regel gaat met een toelichting mee het bestand in, zodat hij daar
     # niet als een losse zwerver leest.
-    "# Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude"
-    " kent haar niet.\n"
-    "gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .\n\n"
+    HULPSTUK_KLASSEN
+    + (
+        "# Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude"
+        " kent haar niet.\n"
+        "gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .\n\n"
+    )
     + put("Put1", "Put1", 1000.0, 2000.0)
     + put("Lozing1", "Lozing1", 1050.0, 2000.0, klasse="Lozingsput")
     + put("Val1", "Val1", 1200.0, 2000.0, klasse="Valput")
-    # Overstortput en loze put staan hier ook, zodat de fixture alle veertien rollen
+    # Overstortput en loze put staan hier ook, zodat de fixture alle vijftien rollen
     # dekt zonder het Juinen-voorbeeld: dat staat in data/ en ontbreekt in een
     # schone kloon, en dan zou de dekkingstest stil overslaan.
     + put("Overstort1", "Overstort1", 1250.0, 2000.0, klasse="Overstortput")
@@ -1847,6 +1850,9 @@ FIXTURES["selectie_rollen.ttl"] = (
     + put("Bbb1", "Bbb1", 1150.0, 2000.0, klasse="Bergbezinkbassin").replace(
         "gwsw:Putorientatie", "gwsw:Bouwwerkorientatie"
     )
+    # Een T-stuk is een knoop (Hulpstukorientatie is een Knooppunt) maar geen put en
+    # geen netwerkknoop; TOP-022/TOP-023 tellen er de leidingen op (issue #60).
+    + hulpstuk("Tstuk1", "Tstuk1", 1350.0, 2000.0)
     + leiding("L1", "L1", [(1000.0, 2000.0), (1050.0, 2000.0)], "Put1", "Lozing1")
     + leiding(
         "L2",
@@ -1897,6 +1903,59 @@ FIXTURES["dataset_fantoomkoppeling.ttl"] = (
     + put("PutC", "C", 1050.0, 2050.0)
     + leiding("L3", "3", [(1050.0, 2050.0), (1050.0, 2000.0)], "PutC", None)
     + ":L3_e gwsw:hasConnection :Onbekend_put .\n",
+)
+
+
+# TOP-022: T-stuk T1 heeft twee richtingen waar zijn functie er drie voorschrijft. De
+# rest is in orde en mag niet melden: T3 heeft drie richtingen waarvan een dubbel gelegd
+# (twee strengen naar put D, hartlijnen 5 cm uit elkaar), kruisstuk K1 heeft er vier
+# en afsluitstuk A1 draagt geen functie met een aantal en valt buiten de toets.
+FIXTURES["top022_hulpstuk_te_weinig.ttl"] = (
+    "T-stuk T1 verbindt twee leidingen waar zijn GWSW-functie er drie voorschrijft; T3 "
+    "(drie richtingen, een dubbel gelegd), kruisstuk K1 (vier) en afsluitstuk A1 zijn in "
+    "orde (issue #60)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1100.0, 2000.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T1")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "PutB")
+    + put("PutC", "C", 1000.0, 2100.0)
+    + put("PutD", "D", 1100.0, 2100.0)
+    + put("PutE", "E", 1050.0, 2150.0)
+    + hulpstuk("T3", "T3", 1050.0, 2100.0)
+    + leiding("L3", "3", [(1000.0, 2100.0), (1050.0, 2100.0)], "PutC", "T3")
+    + leiding("L4a", "4a", [(1050.0, 2100.0), (1100.0, 2100.0)], "T3", "PutD")
+    + leiding("L4b", "4b", [(1050.0, 2100.0), (1075.0, 2100.05), (1100.0, 2100.0)], "T3", "PutD")
+    + leiding("L5", "5", [(1050.0, 2100.0), (1050.0, 2150.0)], "T3", "PutE")
+    + put("PutF", "F", 1000.0, 2200.0)
+    + put("PutG", "G", 1100.0, 2200.0)
+    + put("PutH", "H", 1050.0, 2250.0)
+    + put("PutI", "I", 1050.0, 2170.0)
+    + hulpstuk("K1", "K1", 1050.0, 2200.0, klasse="Kruisstuk")
+    + leiding("L6", "6", [(1000.0, 2200.0), (1050.0, 2200.0)], "PutF", "K1")
+    + leiding("L7", "7", [(1050.0, 2200.0), (1100.0, 2200.0)], "K1", "PutG")
+    + leiding("L8", "8", [(1050.0, 2200.0), (1050.0, 2250.0)], "K1", "PutH")
+    + leiding("L9", "9", [(1050.0, 2170.0), (1050.0, 2200.0)], "PutI", "K1")
+    + put("PutJ", "J", 1150.0, 2000.0)
+    + hulpstuk("A1", "A1", 1200.0, 2000.0, klasse="Afsluitstuk")
+    + leiding("L10", "10", [(1150.0, 2000.0), (1200.0, 2000.0)], "PutJ", "A1"),
+)
+
+# TOP-023: T-stuk T2 verbindt vier verschillende knopen; voor vier bestaat Kruisstuk.
+FIXTURES["top023_hulpstuk_te_veel.ttl"] = (
+    "T-stuk T2 verbindt vier leidingen naar vier verschillende knopen waar zijn "
+    "GWSW-functie er drie voorschrijft (issue #60)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1100.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2050.0)
+    + put("PutD", "D", 1050.0, 1950.0)
+    + hulpstuk("T2", "T2", 1050.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T2")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T2", "PutB")
+    + leiding("L3", "3", [(1050.0, 2000.0), (1050.0, 2050.0)], "T2", "PutC")
+    + leiding("L4", "4", [(1050.0, 1950.0), (1050.0, 2000.0)], "PutD", "T2"),
 )
 
 

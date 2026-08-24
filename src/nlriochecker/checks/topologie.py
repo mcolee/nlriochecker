@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import cast
@@ -31,12 +32,14 @@ from nlriochecker.checks.meetkunde import (
 )
 from nlriochecker.checks.selectie import (
     functieloze_knopen,
+    hulpstukken,
     leidingen,
     netwerkknopen,
     vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.dataset import Conduit, Node
+from nlriochecker.dataset import Conduit, GwswDataset, Node
+from nlriochecker.taal import getal, vorm
 
 
 def _punt(node: Node) -> Point:
@@ -1236,3 +1239,180 @@ def _alle_geometrieen(topologie: _Topologie):
         yield node.uri, node.label, node.point
     for conduit in topologie.all_conduits:
         yield conduit.uri, conduit.label, conduit.line
+
+
+# Het aantal leidingen dat een functiewaarde van een hulpstuk voorschrijft. De klasse
+# → functie-koppeling komt uit de ontologie (`GwswDataset.functie_per_klasse`); dit
+# vertaalt alleen het woord naar het getal. Functiewaarden zonder aantal
+# (AfsluitenVanLeidingen, VerbindenVanLeidingenInEenHoek, ...) staan er bewust niet in.
+AANTAL_PER_FUNCTIE: dict[str, int] = {
+    "VerbindenVanTweeLeidingen": 2,
+    "VerbindenVanDrieLeidingen": 3,
+    "VerbindenVanVierLeidingen": 4,
+}
+
+
+@dataclass(frozen=True)
+class _Hulpstukaansluiting:
+    """Wat er op een hulpstuk met telbare functie aangesloten is."""
+
+    node: Node
+    functie: str
+    verwacht: int
+    # De verschillende knopen aan de andere kant, naar de put herleid; twee strengen
+    # tussen dezelfde twee knopen zijn een richting.
+    buren: tuple[str, ...]
+    # Strengen waarvan het andere eind aan niets hangt; elk telt als eigen richting.
+    losse_einden: int
+    strengen: tuple[str, ...]
+
+    @property
+    def richtingen(self) -> int:
+        """Het aantal richtingen dat dit hulpstuk werkelijk verbindt."""
+        return len(self.buren) + self.losse_einden
+
+
+@dataclass(frozen=True)
+class _Hulpstuktelling:
+    """De telbare hulpstukken plus, per klasse, hoeveel er buiten de toets vielen."""
+
+    telbaar: tuple[_Hulpstukaansluiting, ...]
+    buiten_per_klasse: dict[str, int]
+
+
+def _hulpstuktelling(context: CheckContext) -> _Hulpstuktelling:
+    """De aansluitingen per hulpstuk; een keer per context, gedeeld door TOP-022 en TOP-023."""
+    return context.cached("hulpstukken:aansluitingen", lambda: _bouw_hulpstuktelling(context))
+
+
+def _bouw_hulpstuktelling(context: CheckContext) -> _Hulpstuktelling:
+    """Telt per hulpstuk de richtingen: verschillende buurknopen plus losse einden.
+
+    Rechtstreeks op `start_node`/`end_node` en niet via `aansluitingen()`: die index
+    herleidt elk eind naar een netwerkknoop, en een hulpstuk is er geen.
+    """
+    dataset = context.dataset
+    wortels = context.config.klassen.netwerkknopen
+    alle = hulpstukken(context)
+    uris = {node.uri for node in alle}
+    per_hulpstuk: defaultdict[str, list[tuple[Conduit, str | None]]] = defaultdict(list)
+    for conduit in dataset.conduits.values():
+        for eigen, ander in (
+            (conduit.start_node, conduit.end_node),
+            (conduit.end_node, conduit.start_node),
+        ):
+            # Een streng met beide einden aan hetzelfde hulpstuk telt niet als buur.
+            if eigen in uris and ander != eigen:
+                per_hulpstuk[eigen].append((conduit, ander))
+
+    telbaar: list[_Hulpstukaansluiting] = []
+    buiten: Counter[str] = Counter()
+    for node in sorted(alle, key=lambda knoop: knoop.uri):
+        gevonden = _functie_met_aantal(dataset, node)
+        if gevonden is None:
+            buiten[dataset.beheerobjecttype(node.uri) or "(zonder type)"] += 1
+            continue
+        functie, verwacht = gevonden
+        buren: set[str] = set()
+        los = 0
+        labels: list[str] = []
+        for conduit, ander in per_hulpstuk.get(node.uri, []):
+            labels.append(conduit.label or conduit.uri)
+            if ander is None:
+                los += 1
+            else:
+                buren.add(dataset.resolve_network_node(ander, wortels) or ander)
+        telbaar.append(
+            _Hulpstukaansluiting(
+                node, functie, verwacht, tuple(sorted(buren)), los, tuple(sorted(labels))
+            )
+        )
+    return _Hulpstuktelling(tuple(telbaar), dict(buiten))
+
+
+def _functie_met_aantal(dataset: GwswDataset, node: Node) -> tuple[str, int] | None:
+    """De functiewaarde van dit hulpstuk en het aantal leidingen dat zij voorschrijft."""
+    for soort in sorted(node.types):
+        functie = dataset.functie_per_klasse.get(soort)
+        if functie in AANTAL_PER_FUNCTIE:
+            return functie, AANTAL_PER_FUNCTIE[functie]
+    return None
+
+
+class _HulpstukAansluitingen(Check):
+    """Gedeelde basis voor TOP-022 (te weinig richtingen) en TOP-023 (te veel)."""
+
+    te_veel: bool
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Vergelijkt per hulpstuk het aantal richtingen met de GWSW-functie."""
+        dataset = context.dataset
+        for aansluiting in _hulpstuktelling(context).telbaar:
+            if aansluiting.richtingen == aansluiting.verwacht:
+                continue
+            if (aansluiting.richtingen > aansluiting.verwacht) != self.te_veel:
+                continue
+            buren = ", ".join(
+                (dataset.nodes[uri].label or uri) if uri in dataset.nodes else uri
+                for uri in aansluiting.buren
+            )
+            los = (
+                f", plus {getal(aansluiting.losse_einden, 'streng', 'strengen')} met een los eind"
+                if aansluiting.losse_einden
+                else ""
+            )
+            soort = dataset.beheerobjecttype(aansluiting.node.uri) or "Hulpstuk"
+            yield self.finding(
+                context,
+                aansluiting.node.uri,
+                aansluiting.node.label,
+                f"{soort} verbindt {getal(aansluiting.richtingen, 'richting', 'richtingen')} "
+                f"({buren or 'geen buurknoop'}{los}) waar de GWSW-functie "
+                f"{aansluiting.functie} er {aansluiting.verwacht} voorschrijft.",
+                verwacht=aansluiting.verwacht,
+                aangesloten=aansluiting.richtingen,
+                losse_einden=aansluiting.losse_einden,
+                functie=aansluiting.functie,
+                buren=buren,
+                strengen=", ".join(aansluiting.strengen),
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de hulpstukken waarvan de klasse geen aantal voorschrijft."""
+        buiten = _hulpstuktelling(context).buiten_per_klasse
+        if not buiten:
+            return []
+        aantal = sum(buiten.values())
+        delen = ", ".join(f"{hoeveel} {klasse}" for klasse, hoeveel in sorted(buiten.items()))
+        return [
+            f"{getal(aantal, 'hulpstuk', 'hulpstukken')} {vorm(aantal, 'valt', 'vallen')} "
+            f"buiten deze toets omdat {vorm(aantal, 'zijn', 'hun')} klasse geen functie met "
+            f"een aantal leidingen draagt ({delen}); een afsluitstuk met een leiding is "
+            "precies goed."
+        ]
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal hulpstukken met een telbare functie."""
+        return len(_hulpstuktelling(context).telbaar)
+
+
+@register
+class HulpstukMetTeWeinigAansluitingen(_HulpstukAansluitingen):
+    """TOP-022: er ontbreekt een leiding, of het object is geen T-stuk."""
+
+    id = "TOP-022"
+    title = "Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+    te_veel = False
+
+
+@register
+class HulpstukMetTeVeelAansluitingen(_HulpstukAansluitingen):
+    """TOP-023: waarschijnlijk de verkeerde klasse; voor vier bestaat Kruisstuk."""
+
+    id = "TOP-023"
+    title = "Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft"
+    severity = Severity.WARNING
+    dimension = Dimension.CONSISTENCY
+    te_veel = True

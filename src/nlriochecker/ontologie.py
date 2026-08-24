@@ -116,3 +116,22 @@ def verwachte_property(graph: Graph | GraafIndex, kenmerk: URIRef) -> str | None
         if op == has_value:
             waarde = "hasValue"
     return waarde
+
+
+def functie_van_klasse(graph: Graph | GraafIndex, klasse: URIRef) -> str | None:
+    """De functiewaarde die de ontologie aan een klasse bindt, als korte naam, of None.
+
+    Het GWSW zegt wat een hulpstuk doet via een `owl:Restriction` op `gwsw:functie`
+    met `owl:hasValue` (`T_stuk` → `VerbindenVanDrieLeidingen`, `Kruisstuk` →
+    `VerbindenVanVierLeidingen`). TOP-022 en TOP-023 lezen daar het verwachte aantal
+    leidingen uit (issue #60). Alleen de restricties direct op de klasse; het
+    overerven naar subklassen doet `dataset._klassefuncties`.
+    """
+    functie = URIRef(GWSW + "functie")
+    for restrictie in graph.objects(klasse, RDFS.subClassOf):
+        if graph.value(restrictie, OWL.onProperty) != functie:
+            continue
+        waarde = graph.value(restrictie, OWL.hasValue)
+        if waarde is not None:
+            return str(waarde).removeprefix(GWSW)
+    return None

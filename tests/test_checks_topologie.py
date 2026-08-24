@@ -12,7 +12,16 @@ from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
-TOP_IDS = ["TOP-001", "TOP-002", "TOP-003", "TOP-004", "TOP-005", "TOP-012"]
+TOP_IDS = [
+    "TOP-001",
+    "TOP-002",
+    "TOP-003",
+    "TOP-004",
+    "TOP-005",
+    "TOP-012",
+    "TOP-022",
+    "TOP-023",
+]
 
 
 def _bevindingen(pad: Path, check_id: str, config: CheckConfig | None = None) -> list[Finding]:
@@ -36,6 +45,8 @@ def _labels(bevindingen: list[Finding]) -> list[str]:
         ("top004_niet_gesnapt.ttl", "TOP-004", "1"),
         ("top005_dubbele_put.ttl", "TOP-005", "B"),
         ("top012_zelfde_put.ttl", "TOP-012", "2"),
+        ("top022_hulpstuk_te_weinig.ttl", "TOP-022", "T1"),
+        ("top023_hulpstuk_te_veel.ttl", "TOP-023", "T2"),
     ],
 )
 def test_defect_wordt_gevonden(bestand: str, check_id: str, label: str) -> None:
@@ -123,3 +134,35 @@ def test_put_aan_alleen_een_persleiding_is_niet_losliggend() -> None:
     bevindingen = _bevindingen(TTL_DIR / "top001_put_aan_persleiding.ttl", "TOP-001")
 
     assert _labels(bevindingen) == ["LOS"]
+
+
+def test_top022_telt_richtingen_en_niet_strengen() -> None:
+    """T3 heeft vier strengen maar drie richtingen (een dubbel gelegd) en zwijgt; T1 meldt."""
+    pad = TTL_DIR / "top022_hulpstuk_te_weinig.ttl"
+    bevindingen = _bevindingen(pad, "TOP-022")
+
+    assert _labels(bevindingen) == ["T1"]
+    assert bevindingen[0].details["verwacht"] == 3
+    assert bevindingen[0].details["aangesloten"] == 2
+    assert bevindingen[0].details["functie"] == "VerbindenVanDrieLeidingen"
+    assert bevindingen[0].details["strengen"] == "1, 2"
+    assert _bevindingen(pad, "TOP-023") == []
+
+
+def test_top023_meldt_een_t_stuk_met_vier_richtingen() -> None:
+    pad = TTL_DIR / "top023_hulpstuk_te_veel.ttl"
+    bevindingen = _bevindingen(pad, "TOP-023")
+
+    assert _labels(bevindingen) == ["T2"]
+    assert bevindingen[0].details["aangesloten"] == 4
+    assert _bevindingen(pad, "TOP-022") == []
+
+
+def test_hulpstukchecks_verantwoorden_de_klassen_zonder_aantal() -> None:
+    """Afsluitstuk A1 draagt geen functie met een aantal: buiten de toets, wel geteld."""
+    dataset = load_dataset(TTL_DIR / "top022_hulpstuk_te_weinig.ttl")
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    outcome = run_checks(context, ["TOP-022"]).outcomes[0]
+
+    assert outcome.examined == 3
+    assert any("1 Afsluitstuk" in note for note in outcome.notes), outcome.notes

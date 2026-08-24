@@ -521,3 +521,12 @@ def test_fantoomkoppeling_naar_een_hulpstuk_wordt_op_naamstam_hersteld() -> None
 
 def test_zonder_fantoomkoppeling_is_er_niets_hersteld(juinen: GwswDataset) -> None:
     assert juinen.koppelingsherstel.koppelingen == 0
+
+
+def test_functie_per_klasse_komt_uit_de_restricties() -> None:
+    dataset = load_dataset(TTL_DIR / "top022_hulpstuk_te_weinig.ttl")
+
+    assert dataset.functie_per_klasse[f"{GWSW}T_stuk"] == "VerbindenVanDrieLeidingen"
+    assert dataset.functie_per_klasse[f"{GWSW}Kruisstuk"] == "VerbindenVanVierLeidingen"
+    assert dataset.functie_per_klasse[f"{GWSW}Afsluitstuk"] == "AfsluitenVanLeidingen"
+    assert f"{GWSW}Verbindingsstuk" not in dataset.functie_per_klasse
