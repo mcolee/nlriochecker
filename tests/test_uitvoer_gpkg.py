@@ -453,6 +453,21 @@ def test_featurelagen_dragen_het_stelseltype(tmp_path: Path) -> None:
     assert putten["A"] == "gemengd"
 
 
+def test_featurelagen_dragen_het_begindatumjaar(tmp_path: Path) -> None:
+    """Het aanlegjaar als kolom om op te filteren; leeg als het object er geen draagt.
+
+    `hgt_schoon.ttl` heeft één streng met begindatum 1980-01-01 en twee putten zonder
+    begindatum (issue #61).
+    """
+    pad = _schrijf(_run("hgt_schoon.ttl"), tmp_path)
+
+    strengen = dict(_rijen(pad, "select label, begindatum_jaar from strengen"))
+    putten = dict(_rijen(pad, "select label, begindatum_jaar from putten"))
+
+    assert strengen == {"1": 1980}
+    assert putten == {"A": None, "B": None}
+
+
 def test_strengen_dragen_de_bob_richting(tmp_path: Path) -> None:
     pad = _schrijf(_run("hgt_schoon.ttl"), tmp_path)
 

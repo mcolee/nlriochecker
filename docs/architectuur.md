@@ -95,7 +95,9 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 - De GeoPackage draagt twee objectlagen: `putten` (punt) en `strengen` (lijn), met de
   gebreken op het object. Elk object heeft `status` (precies vier waarden: rood, oranje,
   groen, grijs) en `popup_html` (een voorgebakken fragment, zonder stijlblok -- dat
-  staat een keer in de maptip). Grijs betekent: niet beoordeeld **en** niets gevonden;
+  staat een keer in de maptip). Beide lagen dragen ook `begindatum_jaar` (het aanlegjaar
+  uit `Begindatum`, leeg zonder datum; ATTR-018 meldt dat gat per object, issue #61).
+  Grijs betekent: niet beoordeeld **en** niets gevonden;
   mechanisch riool wordt door de meeste checks overgeslagen maar niet door alle, en wat
   er wel op staat kleurt het object. Met een studiegebied komt `Analyseset.buffer` als
   grijze ring mee -- niet de hele schil, die kan het halve net zijn. `status` telt

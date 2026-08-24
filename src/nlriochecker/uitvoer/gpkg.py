@@ -45,7 +45,7 @@ from nlriochecker.checks.verbanden import (
     afvoerpaden,
     verbonden_knopen,
 )
-from nlriochecker.dataset import Conduit, GwswDataset
+from nlriochecker.dataset import Conduit, GwswDataset, Node
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
@@ -385,6 +385,10 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("label", "text"),
         _Kolom("objecttype", "text"),
         _Kolom("stelsel", "text"),
+        # Het aanlegjaar uit `Begindatum`, om op te filteren; leeg als het object er
+        # geen draagt (ATTR-018 meldt dat dan). Het jaar en niet de datum, net als de
+        # rest van de code (`Conduit.begindatum_jaar`).
+        _Kolom("begindatum_jaar", "integer"),
         _Kolom("richting_bob", "text"),
         _Kolom("bob_verval_m", "real"),
         # Het benedenstroomse uitstroompunt dat dit object bereikt, met de padmaat
@@ -954,6 +958,14 @@ def _stelsel_feiten(n_strengen: int, strenglengte: float, bereikt: bool) -> tupl
     return (f"{n_strengen} strengen, {strenglengte:.0f} m", afvoer)
 
 
+def _begindatum_jaar(object_: object) -> int | None:
+    """Het jaartal van de begindatum, of None als het object er geen draagt."""
+    if not isinstance(object_, (Node, Conduit)):
+        return None
+    datum = object_.date("Begindatum")
+    return datum.year if datum is not None else None
+
+
 def _samenvatting(
     run: CheckRun,
     uri: str,
@@ -1000,6 +1012,7 @@ def _samenvatting(
         label,
         objecttype,
         stelsel,
+        _begindatum_jaar(object_),
         richting_bob,
         bob_verval_m,
         afvoer_eindpunt,
