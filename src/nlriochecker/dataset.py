@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 import pyoxigraph
-from rdflib import RDF, RDFS, BNode, Graph, Literal, URIRef
+from rdflib import RDF, RDFS, BNode, URIRef
 from rdflib.term import Node as RdfNode
 from shapely.geometry import LineString, Point
 
@@ -22,6 +22,7 @@ from nlriochecker.geometry import (
     parse_gml,
     parse_gml_z,
 )
+from nlriochecker.graaf import GraafIndex
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 GWSW = "http://data.gwsw.nl/1.6/totaal/"
@@ -317,7 +318,7 @@ class GwswDataset:
     """De ingelezen dataset met de knooppunten, strengen en de klassenhierarchie."""
 
     source: Path
-    graph: Graph
+    graph: GraafIndex
     nodes: dict[str, Node]
     conduits: dict[str, Conduit]
     subclasses: dict[str, frozenset[str]]
@@ -623,7 +624,7 @@ class GwswDataset:
         van `parts_of`, ongewijzigd; sorteren zou de uitvoer van de checks die hierop
         leunen veranderen.
         """
-        delen = [str(deel) for deel in parts_of(self.graph, URIRef(uri))]
+        delen = [str(deel) for deel in parts_of(self.graph, self._subject_term(uri))]
         if wortel is None:
             return delen
         return [deel for deel in delen if self.graph_is_a(deel, wortel)]
@@ -634,7 +635,7 @@ class GwswDataset:
         Ook voor onderdelen die geen `Node` of `Conduit` zijn en dus geen eigen
         labelveld in het domeinmodel hebben.
         """
-        waarde = self.graph.value(URIRef(uri), RDFS.label)
+        waarde = self.graph.value(self._subject_term(uri), RDFS.label)
         return str(waarde) if waarde is not None else None
 
     def onderdeel_aspecten(self, uri: str) -> list[Aspect]:
@@ -643,7 +644,26 @@ class GwswDataset:
         Dezelfde lezing als `_read_aspects`, maar dan als methode: de checks hoeven
         de graaf er niet meer voor aan te raken.
         """
-        return list(_read_aspects(self.graph, URIRef(uri)))
+        return list(_read_aspects(self.graph, self._subject_term(uri)))
+
+    def _subject_term(self, uri: str) -> RdfNode:
+        """De graafterm achter deze URI-tekst: de URIRef, of anders de BNode.
+
+        De `onderdeel_*`-lezers krijgen hun subject als tekst, meestal via
+        `str(subject)` op een term uit `subjects_of_class`. Voor een BNode-subject
+        verloor de vaste `URIRef(uri)`-omweg dan het label en de kenmerken (bevinding
+        uit de review van issue #26): `str(BNode("b1"))` is "b1", en `URIRef("b1")`
+        staat nergens in de graaf. Hier wint de URIRef als die als subject voorkomt;
+        anders telt de gelijknamige BNode. Een tekst die geen van beide is, blijft de
+        URIRef -- hetzelfde lege antwoord als voorheen.
+        """
+        term: RdfNode = URIRef(uri)
+        if self.graph.heeft_subject(term):
+            return term
+        bnode = BNode(uri)
+        if self.graph.heeft_subject(bnode):
+            return bnode
+        return term
 
     def stelsel_leden(self, uri: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
         """De streng- en knoop-URI's die dit stelsel via `hasPart` draagt.
@@ -667,7 +687,7 @@ class GwswDataset:
     def subset(self, uris: Iterable[str]) -> GwswDataset:
         """Dezelfde dataset met alleen deze knopen en verbindingen.
 
-        De rdflib-graaf gaat ongewijzigd mee: hij is de bron waaruit de checks hun
+        De graafindex gaat ongewijzigd mee: hij is de bron waaruit de checks hun
         onderdelen opzoeken, en hem meesnijden zou stilzwijgend gegevens weglaten.
         Alleen `subjects_of_class()` loopt daardoor nog over de volledige export;
         dat zijn de drempels in NET-007 en RVZ, en dat staat in het rapport.
@@ -712,24 +732,24 @@ def _beide_richtingen(
             yield term
 
 
-def parts_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
+def parts_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
     """De onderdelen van een object, in beide schrijfrichtingen van hasPart."""
     return _beide_richtingen(graph.objects(subject, HAS_PART), graph.subjects(IS_PART_OF, subject))
 
 
-def part_holders_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
+def part_holders_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
     """De objecten die dit object als onderdeel bevatten, in beide schrijfrichtingen."""
     return _beide_richtingen(graph.subjects(HAS_PART, subject), graph.objects(subject, IS_PART_OF))
 
 
-def aspects_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
+def aspects_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
     """De aspecten van een object, in beide schrijfrichtingen van hasAspect."""
     return _beide_richtingen(
         graph.objects(subject, HAS_ASPECT), graph.subjects(IS_ASPECT_OF, subject)
     )
 
 
-def aspect_holders_of(graph: Graph, subject: RdfNode) -> Iterator[RdfNode]:
+def aspect_holders_of(graph: GraafIndex, subject: RdfNode) -> Iterator[RdfNode]:
     """De objecten die dit object als aspect dragen, in beide schrijfrichtingen."""
     return _beide_richtingen(
         graph.subjects(HAS_ASPECT, subject), graph.objects(subject, IS_ASPECT_OF)
@@ -759,7 +779,7 @@ def _as_date(waarde: str | None) -> date | None:
     return None
 
 
-def _read_aspects(graph: Graph, subject: RdfNode) -> tuple[Aspect, ...]:
+def _read_aspects(graph: GraafIndex, subject: RdfNode) -> tuple[Aspect, ...]:
     """Leest de kenmerken die via hasAspect aan een object hangen.
 
     Aspecten zonder waarde en zonder verwijzing zijn geen kenmerken maar
@@ -784,7 +804,7 @@ def _read_aspects(graph: Graph, subject: RdfNode) -> tuple[Aspect, ...]:
     return tuple(gevonden)
 
 
-def _read_inwinning(graph: Graph, subject: RdfNode) -> Inwinning | None:
+def _read_inwinning(graph: GraafIndex, subject: RdfNode) -> Inwinning | None:
     """Leest de inwinningsmetagegevens die aan een kenmerk hangen."""
     for aspect in aspects_of(graph, subject):
         if (aspect, RDF.type, KLASSE_INWINNING) not in graph:
@@ -804,7 +824,7 @@ def _read_inwinning(graph: Graph, subject: RdfNode) -> Inwinning | None:
     return None
 
 
-def _aspect_van_klasse(graph: Graph, subject: RdfNode, klasse: URIRef) -> Aspect | None:
+def _aspect_van_klasse(graph: GraafIndex, subject: RdfNode, klasse: URIRef) -> Aspect | None:
     """Het kenmerk van deze klasse dat direct aan het object hangt."""
     for aspect in aspects_of(graph, subject):
         if (aspect, RDF.type, klasse) not in graph:
@@ -820,7 +840,9 @@ def _aspect_van_klasse(graph: Graph, subject: RdfNode, klasse: URIRef) -> Aspect
     return None
 
 
-def _maaiveld_kenmerk(graph: Graph, orientation: RdfNode) -> tuple[Aspect | None, Inwinning | None]:
+def _maaiveld_kenmerk(
+    graph: GraafIndex, orientation: RdfNode
+) -> tuple[Aspect | None, Inwinning | None]:
     """De maaiveldhoogte bij een knooppunt, met de herkomst ervan.
 
     Het GWSW hangt het maaiveld niet aan de put zelf maar aan een aparte
@@ -835,7 +857,7 @@ def _maaiveld_kenmerk(graph: Graph, orientation: RdfNode) -> tuple[Aspect | None
     return None, None
 
 
-def _herkomst(graph: Graph, orientation: RdfNode, aspect: Aspect) -> Inwinning | None:
+def _herkomst(graph: GraafIndex, orientation: RdfNode, aspect: Aspect) -> Inwinning | None:
     """De inwinning van een kenmerk, met terugval op die van de puntgeometrie.
 
     De BrutIS-export van De Wolden en Hoogeveen hangt een record-brede inwinningswijze aan het
@@ -851,7 +873,7 @@ def _herkomst(graph: Graph, orientation: RdfNode, aspect: Aspect) -> Inwinning |
 
 
 def _deksel_kenmerk(
-    graph: Graph, subject: RdfNode, deksel_klassen: frozenset[str]
+    graph: GraafIndex, subject: RdfNode, deksel_klassen: frozenset[str]
 ) -> tuple[Aspect | None, Inwinning | None]:
     """Het putdekselniveau van een put, met de herkomst ervan.
 
@@ -912,9 +934,9 @@ def load_dataset(
         graph, fallback = _parse(dataset_path, fallback_encoding)
         voortgang.stap(label=dataset_path.name)
 
-        ontology = Graph()
+        ontology = GraafIndex()
         for pad in ontology_paths or []:
-            ontology += _parse(Path(pad), fallback_encoding)[0]
+            _parse(Path(pad), fallback_encoding, index=ontology)
             voortgang.stap(label=Path(pad).name)
     finally:
         voortgang.einde_fase()
@@ -1053,7 +1075,7 @@ def _bruikbare_afsluiting(
     return afsluiting if len(afsluiting) > 1 else None
 
 
-def _houders(graph: Graph, orientaties: Iterable[RdfNode]) -> set[str]:
+def _houders(graph: GraafIndex, orientaties: Iterable[RdfNode]) -> set[str]:
     """De objecten die deze orientaties dragen, als URI-teksten."""
     return {
         str(subject)
@@ -1062,7 +1084,7 @@ def _houders(graph: Graph, orientaties: Iterable[RdfNode]) -> set[str]:
     }
 
 
-def _structural_diff(graph: Graph, subclasses: dict[str, frozenset[str]]) -> dict[str, int]:
+def _structural_diff(graph: GraafIndex, subclasses: dict[str, frozenset[str]]) -> dict[str, int]:
     """Vergelijkt de ontologische uitkomst met de structurele herkenning.
 
     Zonder ontologie herkent de lader knopen aan een puntgeometrie en verbindingen
@@ -1105,45 +1127,17 @@ def _structural_diff(graph: Graph, subclasses: dict[str, frozenset[str]]) -> dic
     return verschillen
 
 
-XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
-
-
-def _naar_rdflib(
-    term: pyoxigraph.NamedNode | pyoxigraph.BlankNode | pyoxigraph.Literal,
-) -> RdfNode:
-    """Zet een pyoxigraph-term om naar de bijbehorende rdflib-term.
-
-    Een gewone (ongetypeerde) string-literaal wordt `Literal(waarde)` met datatype `None`,
-    net als rdflib's eigen Turtle-parser. Een expliciet getypeerde `"x"^^xsd:string` is
-    niet te onderscheiden en dus niet exact te reconstrueren: pyoxigraph vouwt die (RDF 1.1)
-    al samen met de gewone vorm tot dezelfde term, terwijl rdflib's parser hem als een aparte
-    term zou bewaren. De byte-voor-byte-gelijkheid van de uitvoer steunt er daarom op dat de
-    ingelezen bestanden geen expliciet `^^xsd:string` dragen (nagegaan voor de totaal-ontologie
-    en de OroX-export), niet op een algemene reconstructiegarantie.
-
-    Andere termsoorten (RDF-ster-triples, benoemde grafen) horen niet in een Turtle-parse en
-    vallen luid om op een `AttributeError` in plaats van stilzwijgend verkeerd om te zetten.
-    """
-    if isinstance(term, pyoxigraph.NamedNode):
-        return URIRef(term.value)
-    if isinstance(term, pyoxigraph.BlankNode):
-        return BNode(term.value)
-    if term.language is not None:
-        return Literal(term.value, lang=term.language)
-    datatype = term.datatype.value
-    if datatype == XSD_STRING:
-        return Literal(term.value)
-    return Literal(term.value, datatype=URIRef(datatype))
-
-
-def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | None]:
+def _parse(
+    path: Path, fallback_encoding: str, index: GraafIndex | None = None
+) -> tuple[GraafIndex, DecodeFallback | None]:
     """Leest een enkel TTL-bestand in, desnoods via een terugvalcodering.
 
     Het parsen zelf gaat via pyoxigraph's Rust-parser (ordegrootten sneller dan rdflib's
-    pure-Python `notation3`); de triples worden daarna overgezet in een gewone
-    `rdflib.Graph`, zodat de checks, de cache en de rest van de lader onveranderd
-    blijven werken. pyoxigraph verlangt UTF-8-bytes, dus de al gedecodeerde tekst wordt
-    opnieuw als UTF-8 gecodeerd -- niet de ruwe bytes, die immers cp850 kunnen zijn.
+    pure-Python `notation3`); de triples vullen in stream-volgorde een `GraafIndex` met
+    rdflib-termen, zodat de checks en de rest van de lader hun vergelijkingen houden.
+    pyoxigraph verlangt UTF-8-bytes, dus de al gedecodeerde tekst wordt opnieuw als
+    UTF-8 gecodeerd -- niet de ruwe bytes, die immers cp850 kunnen zijn. Een meegegeven
+    `index` wordt aangevuld; zo stapelen meerdere ontologiebestanden in een index.
     """
     try:
         rauw = path.read_bytes()
@@ -1152,20 +1146,17 @@ def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | 
 
     tekst, fallback = _decode(path, rauw, fallback_encoding)
 
-    graph = Graph()
+    index = index if index is not None else GraafIndex()
     try:
         quads = pyoxigraph.parse(tekst.encode("utf-8"), format=pyoxigraph.RdfFormat.TURTLE)
         # rdflib waarschuwt bij het bouwen van een literaal met een ongeldige lexicale
         # vorm (de meegeleverde ontologie draagt een xsd:date "20210830" zonder streepjes);
         # net als bij de oude parse hoort die traceback niet in de CLI-uitvoer thuis.
         with _quiet_rdflib():
-            graph.addN(
-                (_naar_rdflib(q.subject), _naar_rdflib(q.predicate), _naar_rdflib(q.object), graph)
-                for q in quads
-            )
+            index.vul_uit(quads)
     except Exception as error:  # pyoxigraph gooit uiteenlopende parsefouten
         raise DatasetError(f"{path}: geen geldige Turtle ({error}).") from error
-    return graph, fallback
+    return index, fallback
 
 
 def _decode(path: Path, rauw: bytes, fallback_encoding: str) -> tuple[str, DecodeFallback | None]:
@@ -1218,7 +1209,7 @@ def _fallback_samples(rauw: bytes, encoding: str, limiet: int = 5) -> list[str]:
     return voorbeelden
 
 
-def _subclass_closure(graph: Graph) -> dict[str, frozenset[str]]:
+def _subclass_closure(graph: GraafIndex) -> dict[str, frozenset[str]]:
     """Berekent per klasse de verzameling van zichzelf en al haar subklassen."""
     kinderen: dict[str, set[str]] = {}
     for kind, ouder in graph.subject_objects(RDFS.subClassOf):
@@ -1240,7 +1231,7 @@ def _subclass_closure(graph: Graph) -> dict[str, frozenset[str]]:
     return afsluiting
 
 
-def _kenmerk_properties(graph: Graph, subclasses: dict[str, frozenset[str]]) -> dict[str, str]:
+def _kenmerk_properties(graph: GraafIndex, subclasses: dict[str, frozenset[str]]) -> dict[str, str]:
     """Per kenmerktype de property die de ontologie voor zijn waarde voorschrijft.
 
     Loopt over de subklassen van `Kenmerk` en houdt alleen de types die een
@@ -1259,18 +1250,18 @@ def _kenmerk_properties(graph: Graph, subclasses: dict[str, frozenset[str]]) -> 
     return gevonden
 
 
-def _label(graph: Graph, subject: RdfNode) -> str:
+def _label(graph: GraafIndex, subject: RdfNode) -> str:
     """Het rdfs:label van een object, of een lege tekst."""
     waarde = graph.value(subject, RDFS.label)
     return str(waarde) if waarde is not None else ""
 
 
-def _types(graph: Graph, subject: RdfNode) -> frozenset[str]:
+def _types(graph: GraafIndex, subject: RdfNode) -> frozenset[str]:
     """Alle rdf:type-waarden van een object."""
     return frozenset(str(waarde) for waarde in graph.objects(subject, RDF.type))
 
 
-def _geometry(graph: Graph, orientation: RdfNode, klasse: URIRef, errors: dict[str, str]):
+def _geometry(graph: GraafIndex, orientation: RdfNode, klasse: URIRef, errors: dict[str, str]):
     """Zoekt de geometrie van een orientatie en geeft die met haar z-waarden terug."""
     for aspect in aspects_of(graph, orientation):
         if (aspect, RDF.type, klasse) not in graph:
@@ -1287,7 +1278,7 @@ def _geometry(graph: Graph, orientation: RdfNode, klasse: URIRef, errors: dict[s
 
 
 def _read_nodes(
-    graph: Graph,
+    graph: GraafIndex,
     errors: dict[str, str],
     knooppunt_klassen: frozenset[str] | None = None,
     deksel_klassen: frozenset[str] | None = None,
@@ -1336,7 +1327,7 @@ def _read_nodes(
     return nodes
 
 
-def _parents(graph: Graph, subject: RdfNode) -> tuple[str, ...]:
+def _parents(graph: GraafIndex, subject: RdfNode) -> tuple[str, ...]:
     """De objecten die dit object via hasPart bevatten, oplopend gesorteerd.
 
     Alle houders en niet de eerste: het GWSW staat er meer dan een toe (een `Put`
@@ -1357,7 +1348,7 @@ def _parents(graph: Graph, subject: RdfNode) -> tuple[str, ...]:
     )
 
 
-def _orientations_of_class(graph: Graph, klassen: frozenset[str]):
+def _orientations_of_class(graph: GraafIndex, klassen: frozenset[str]):
     """De orientaties waarvan het type in deze verzameling klassen valt."""
     gezien = set()
     for klasse in klassen:
@@ -1367,7 +1358,7 @@ def _orientations_of_class(graph: Graph, klassen: frozenset[str]):
                 yield orientation
 
 
-def _orientations_with(graph: Graph, klasse: URIRef):
+def _orientations_with(graph: GraafIndex, klasse: URIRef):
     """De orientaties die via hasAspect een geometrie van dit type dragen."""
     gezien = set()
     for aspect in graph.subjects(RDF.type, klasse):
@@ -1378,7 +1369,7 @@ def _orientations_with(graph: Graph, klasse: URIRef):
 
 
 def _read_conduits(
-    graph: Graph,
+    graph: GraafIndex,
     nodes: dict[str, Node],
     errors: dict[str, str],
     verbinding_klassen: frozenset[str] | None = None,
@@ -1426,7 +1417,7 @@ def _read_conduits(
     return conduits
 
 
-def _is_multipart(graph: Graph, orientation: RdfNode, klasse: URIRef) -> bool:
+def _is_multipart(graph: GraafIndex, orientation: RdfNode, klasse: URIRef) -> bool:
     """Geeft aan of de geometrie van deze orientatie uit meerdere losse delen bestaat.
 
     Twee vormen tellen mee: een GML-literaal met een multi-geometrie erin, en meer
@@ -1442,7 +1433,7 @@ def _is_multipart(graph: Graph, orientation: RdfNode, klasse: URIRef) -> bool:
     return any(is_multipart_literal(literal) for literal in literalen)
 
 
-def _leiding_orientations(graph: Graph):
+def _leiding_orientations(graph: GraafIndex):
     """De orientaties die een begin- of eindpunt van een leiding bevatten."""
     gezien = set()
     for klasse in (*KLASSEN_BEGINPUNT, *KLASSEN_EINDPUNT):
@@ -1453,7 +1444,9 @@ def _leiding_orientations(graph: Graph):
                     yield orientation
 
 
-def _endpoint(graph: Graph, orientation: RdfNode, klassen: tuple[URIRef, ...]) -> RdfNode | None:
+def _endpoint(
+    graph: GraafIndex, orientation: RdfNode, klassen: tuple[URIRef, ...]
+) -> RdfNode | None:
     """Het begin- of eindpunt van een verbinding, van welke soort dan ook."""
     for part in parts_of(graph, orientation):
         if any((part, RDF.type, klasse) in graph for klasse in klassen):
@@ -1462,7 +1455,7 @@ def _endpoint(graph: Graph, orientation: RdfNode, klassen: tuple[URIRef, ...]) -
 
 
 def _connected_node(
-    graph: Graph, endpoint: RdfNode | None, orientation_to_node: dict[str, str]
+    graph: GraafIndex, endpoint: RdfNode | None, orientation_to_node: dict[str, str]
 ) -> str | None:
     """Herleidt de hasConnection van een strengeindpunt naar de put erachter.
 
@@ -1480,13 +1473,13 @@ def _connected_node(
     return None
 
 
-def _connections(graph: Graph, subject: RdfNode):
+def _connections(graph: GraafIndex, subject: RdfNode):
     """De hasConnection-buren van een object, in beide schrijfrichtingen."""
     yield from graph.objects(subject, HAS_CONNECTION)
     yield from graph.subjects(HAS_CONNECTION, subject)
 
 
-def _bob(graph: Graph, endpoint: RdfNode | None, klasse: URIRef) -> Aspect | None:
+def _bob(graph: GraafIndex, endpoint: RdfNode | None, klasse: URIRef) -> Aspect | None:
     """Het BOB-kenmerk dat aan een strengeindpunt hangt, met zijn inwinning."""
     if endpoint is None:
         return None

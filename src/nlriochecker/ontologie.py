@@ -21,6 +21,7 @@ from rdflib import OWL, RDFS, XSD, Graph, URIRef
 from rdflib.collection import Collection
 
 from nlriochecker.dataset import GWSW
+from nlriochecker.graaf import GraafIndex
 
 
 @dataclass(frozen=True)
@@ -90,7 +91,7 @@ def kenmerkbereik(graph: Graph, kenmerk: URIRef) -> Facetbereik | None:
     return facetbereik(graph, datatype)
 
 
-def verwachte_property(graph: Graph, kenmerk: URIRef) -> str | None:
+def verwachte_property(graph: Graph | GraafIndex, kenmerk: URIRef) -> str | None:
     """De property die de ontologie voor de waarde van een kenmerk voorschrijft.
 
     De ontologie hangt onder een kenmerk een `owl:Restriction` die de waarde aan een

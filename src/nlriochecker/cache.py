@@ -19,8 +19,8 @@ import os
 import pickle
 import tempfile
 import time
-from collections.abc import Callable, Iterator
-from dataclasses import dataclass, replace
+from collections.abc import Callable
+from dataclasses import dataclass, fields, replace
 from functools import partial
 from hashlib import sha256
 from pathlib import Path
@@ -29,12 +29,13 @@ from typing import Any, cast
 import pyoxigraph
 import rdflib
 import shapely
-from rdflib import Graph
 
 from nlriochecker import dataset as dataset_module
 from nlriochecker import geometry as geometry_module
+from nlriochecker import graaf as graaf_module
 from nlriochecker import ontologie as ontologie_module
 from nlriochecker.dataset import FALLBACK_ENCODING, GwswDataset, load_dataset
+from nlriochecker.graaf import GraafIndex
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class CacheUitslag:
 
 
 class LuieGraaf:
-    """Een rdflib-graaf die pas van schijf komt als er iets uit gevraagd wordt.
+    """Een graafindex die pas van schijf komt als er iets uit gevraagd wordt.
 
     De checks gebruiken de graaf voor onderdelen die niet in de structuren zitten
     (hasPart, hasConnection, labels van drempels). Dat is een minderheid van de
@@ -71,12 +72,12 @@ class LuieGraaf:
     samen; deze klasse kent zelf geen paden naar de brondata en geen `load_dataset`.
     """
 
-    def __init__(self, pad: Path, herstel: Callable[[], Graph]) -> None:
+    def __init__(self, pad: Path, herstel: Callable[[], GraafIndex]) -> None:
         self._pad = pad
         self._herstel = herstel
-        self._graaf: Graph | None = None
+        self._graaf: GraafIndex | None = None
 
-    def _geladen(self) -> Graph:
+    def _geladen(self) -> GraafIndex:
         """Leest de graaf de eerste keer dat er iets uit gevraagd wordt."""
         if self._graaf is None:
             begin = time.perf_counter()
@@ -111,10 +112,6 @@ class LuieGraaf:
         """Of een triple in de graaf staat."""
         return triple in self._geladen()
 
-    def __iter__(self) -> Iterator[object]:
-        """De triples zelf."""
-        return iter(self._geladen())
-
 
 def cachesleutel(
     dataset_path: Path,
@@ -138,8 +135,10 @@ def cachesleutel(
     haas.update(fallback_encoding.encode("utf-8"))
     # `ontologie` staat erbij sinds `load_dataset` er `kenmerk_property` uit afleidt
     # (ATTR-014): die waarde wordt mee gecachet, dus een wijziging aan de afleiding
-    # moet net als bij de andere twee de sleutel veranderen.
-    for module in (dataset_module, geometry_module, ontologie_module):
+    # moet net als bij de andere twee de sleutel veranderen. `graaf` draagt sinds de
+    # eigen graafindexen de termconversie en de volgordegarantie van de gecachete
+    # graaf; een wijziging daar is net zo goed een andere lader.
+    for module in (dataset_module, geometry_module, graaf_module, ontologie_module):
         # `__file__` is alleen None bij een namespace-pakket; dit zijn gewone modules.
         haas.update(Path(cast(str, module.__file__)).read_bytes())
     for pad in [Path(dataset_path), *sorted(Path(p) for p in ontology_paths)]:
@@ -200,10 +199,10 @@ def laad_met_cache(
             # aanraakt. Is die dan beschadigd, dan herstelt LuieGraaf zichzelf
             # via deze functie in plaats van de hele run te laten crashen.
             herstel = partial(_herlees_graaf, dataset_path, ontology_paths, fallback_encoding)
-            # `LuieGraaf` is geen Graph-subklasse maar een plaatsvervanger die alles
-            # doorgeeft; het veld verwacht een Graph en krijgt hier zijn gedrag.
-            luie = cast(Graph, LuieGraaf(pad_graaf, herstel))
-            dataset = replace(GwswDataset(graph=Graph(), **velden), graph=luie)
+            # `LuieGraaf` is geen GraafIndex-subklasse maar een plaatsvervanger die
+            # alles doorgeeft; het veld verwacht een GraafIndex en krijgt hier zijn gedrag.
+            luie = cast(GraafIndex, LuieGraaf(pad_graaf, herstel))
+            dataset = replace(GwswDataset(graph=GraafIndex(), **velden), graph=luie)
             return dataset, CacheUitslag("cache", sleutel, time.perf_counter() - begin)
 
     dataset = load_dataset(dataset_path, ontology_paths, fallback_encoding, voortgang=voortgang)
@@ -211,8 +210,10 @@ def laad_met_cache(
     return dataset, CacheUitslag("bestand", sleutel, time.perf_counter() - begin, melding)
 
 
-def _herlees_graaf(dataset_path: Path, ontology_paths: list[Path], fallback_encoding: str) -> Graph:
-    """Leest de rdflib-graaf opnieuw uit de brondata; herstelweg voor `LuieGraaf`.
+def _herlees_graaf(
+    dataset_path: Path, ontology_paths: list[Path], fallback_encoding: str
+) -> GraafIndex:
+    """Leest de graafindex opnieuw uit de brondata; herstelweg voor `LuieGraaf`.
 
     Alleen `cache.py` kent paden en `load_dataset`; `LuieGraaf` krijgt enkel deze
     kant-en-klare functie mee en hoeft van beide dus niets te weten.
@@ -223,15 +224,13 @@ def _herlees_graaf(dataset_path: Path, ontology_paths: list[Path], fallback_enco
 def _schrijf(map_: Path, dataset: GwswDataset) -> None:
     """Legt structuren en graaf weg, elk via een tijdelijk bestand.
 
-    `_resolved_nodes` blijft buiten de pickle: het is een `init=False`-veld
-    (`GwswDataset(**velden)` zou erop stuklopen) en een memo die elke instantie
-    vers hoort op te bouwen, geen data.
+    De niet-init-velden (zoals de memo `_resolved_nodes`) blijven buiten de pickle:
+    `GwswDataset(**velden)` zou erop stuklopen, en zo'n memo hoort elke instantie
+    vers op te bouwen. De lijst is afgeleid uit de dataclass zelf, zodat een volgend
+    niet-init-veld niet stil het cacheleespad breekt.
     """
-    velden = {
-        naam: waarde
-        for naam, waarde in vars(dataset).items()
-        if naam not in ("graph", "_resolved_nodes")
-    }
+    overslaan = {"graph"} | {f.name for f in fields(GwswDataset) if not f.init}
+    velden = {naam: waarde for naam, waarde in vars(dataset).items() if naam not in overslaan}
     _schrijf_atomair(map_ / BESTAND_STRUCTUREN, velden)
     _schrijf_atomair(map_ / BESTAND_GRAAF, dataset.graph)
 
