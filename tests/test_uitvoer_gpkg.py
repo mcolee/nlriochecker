@@ -468,6 +468,21 @@ def test_featurelagen_dragen_het_begindatumjaar(tmp_path: Path) -> None:
     assert putten == {"A": None, "B": None}
 
 
+def test_put_zonder_begindatum_kleurt_rood_door_attr018(tmp_path: Path) -> None:
+    """Issue #61: een object zonder aanlegjaar was groen op de kaart, en groen betekent
+    daar 'beoordeeld en niets gevonden'. ATTR-018 hoort het rood te maken."""
+    pad = _schrijf(_run("attr018_zonder_begindatum.ttl"), tmp_path)
+
+    putten = {
+        label: (status, checks_f)
+        for label, status, checks_f in _rijen(pad, "select label, status, checks_f from putten")
+    }
+
+    assert putten["A"][0] == "rood"
+    assert "ATTR-018" in putten["A"][1]
+    assert "ATTR-018" not in putten["B"][1]
+
+
 def test_strengen_dragen_de_bob_richting(tmp_path: Path) -> None:
     pad = _schrijf(_run("hgt_schoon.ttl"), tmp_path)
 

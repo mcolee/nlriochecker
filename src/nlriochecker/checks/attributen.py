@@ -868,9 +868,11 @@ class BegindatumOntbreekt(Check):
             return []
         zonder = sum(1 for conduit in buiten if conduit.date("Begindatum") is None)
         return [
-            f"{len(buiten)} van de {len(alle)} leidingen vallen buiten deze toets omdat ze "
-            "geen vrijvervalrioolleiding zijn (mechanisch riool en andere leidingen); "
-            f"daarvan zijn er {zonder} zonder begindatum."
+            f"{len(buiten)} van de {len(alle)} leidingen "
+            f"{taal.vorm(len(buiten), 'valt', 'vallen')} buiten deze toets omdat ze "
+            f"geen vrijvervalrioolleiding {taal.vorm(len(buiten), 'is', 'zijn')} "
+            "(mechanisch riool en andere leidingen); daarvan "
+            f"{taal.vorm(zonder, 'is', 'zijn')} er {zonder} zonder begindatum."
         ]
 
     def examined(self, context: CheckContext) -> int:
