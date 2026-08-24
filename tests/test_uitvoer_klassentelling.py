@@ -14,15 +14,21 @@ from datetime import date
 from pathlib import Path
 
 from nlriochecker.checkconfig import load_check_config
-from nlriochecker.checks import CheckContext, CheckRun
+from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.bevindingen import _omvang_section, meldingen_json
-from nlriochecker.uitvoer.melding import BRON_DATASET, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    BRON_DATASET,
+    CHECK_HULPSTUKKOPPELING,
+    bouw_meldingen,
+)
 from nlriochecker.uitvoer.omvang import (
     eindpunttelling,
     klassen_op_nul,
     klassentelling,
 )
+
+TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
 # De veertien klassen uit de zes rollen die checks.toml als afhankelijkheid noemt.
 ALLE_KLASSEN = {
@@ -210,3 +216,28 @@ class TestZonderLocatie:
         )
         regels = _zonder_locatie([onherleid])
         assert regels and "geen plek op de kaart" in regels[0]
+
+
+class TestKoppelingsherstel:
+    """Het herstel van de fantoomkoppeling is een datasetsignaal, geen stille reparatie."""
+
+    def _run(self) -> CheckRun:
+        config = load_check_config()
+        config.drempels.rd_y_min = 0.0
+        dataset = load_dataset(TTL_DIR / "dataset_fantoomkoppeling.ttl")
+        return run_checks(CheckContext(dataset=dataset, config=config), ["TOP-001"])
+
+    def test_herstelde_koppelingen_geven_een_systemische_waarschuwing(self) -> None:
+        meldingen = bouw_meldingen(self._run(), date(2026, 8, 24))
+        signaal = [m for m in meldingen if m.check_id == CHECK_HULPSTUKKOPPELING]
+
+        assert len(signaal) == 1
+        assert signaal[0].bron == BRON_DATASET
+        assert signaal[0].ernst == "W" and signaal[0].systemisch is True
+        assert signaal[0].object_uri == "" and signaal[0].foutlocatie is None
+        assert signaal[0].waarde == "1"
+        assert "1 leidingeind" in signaal[0].boodschap and "1 hulpstuk" in signaal[0].boodschap
+
+    def test_het_rapport_noemt_het_herstel(self) -> None:
+        tekst = "\n".join(_omvang_section(self._run()))
+        assert "Herstelde hulpstukkoppelingen" in tekst

@@ -19,7 +19,7 @@ from nlriochecker.checks import CheckOutcome, CheckRun, Dimension, Finding, Seve
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.uitvoer.identiteit import kort, melding_id
 from nlriochecker.uitvoer.locatie import foutlocatie, objectlocatie
-from nlriochecker.uitvoer.omvang import klassen_op_nul
+from nlriochecker.uitvoer.omvang import klassen_op_nul, koppelingsherstel
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +27,16 @@ BRON_REGISTER = "register"
 # De tweede bron naast het register: de GWSW SHACL-nulmeting. Zie `nulbevinding.py`.
 BRON_NULMETING = "nulmeting"
 # De derde bron: een signaal over de dataset zelf, geen gebrek aan een los object. Nu
-# alleen de nul-bewaking van issue #22: een klasse waar een check op leunt maar die
-# nul keer voorkomt. Systemisch, ernst W, zonder object -- telt dus niet mee in de
-# GeoPackage-status (BO-29).
+# de nul-bewaking van issue #22 (een klasse waar een check op leunt maar die nul keer
+# voorkomt) en het koppelingsherstel van issue #60. Systemisch, ernst W, zonder object
+# -- telt dus niet mee in de GeoPackage-status (BO-29).
 BRON_DATASET = "dataset"
 # De check-ID van die nul-bewaking. Geen checkregister-ID: dit is geen check maar een
 # datasetsignaal. `categorie_van` maakt er de categorie `SIG` van.
 CHECK_NULKLASSE = "SIG-nulklasse"
+# Het tweede datasetsignaal: de fantoomkoppeling naar hulpstukken die de lader op
+# naamstam hersteld heeft (issue #60). Zelfde vorm als de nul-bewaking.
+CHECK_HULPSTUKKOPPELING = "SIG-hulpstukkoppeling"
 
 # De dimensietag van elke nulmetingmelding. Een SHACL-nulmeting toetst of de dataset
 # aan een conformiteitsklasse voldoet, en dat is voor elke vorm dezelfde vraag; een
@@ -148,48 +151,87 @@ def _signaalmeldingen(
     scope: str,
     gebruikte_ids: set[str],
 ) -> list[Melding]:
-    """Een systemische waarschuwing per klasse die op nul staat terwijl een check ervan afhangt.
+    """Een systemische waarschuwing per datasetsignaal.
 
     Geen gebrek aan een object maar een signaal over de export: geen object-URI, geen
     plek op de kaart, en systemisch, zodat het de GeoPackage-status niet raakt (BO-29).
     Zonder gebied, net als een nulmetingbevinding die nergens op uitkwam: het is aan
-    geen enkel studiegebied toe te wijzen. Zie issue #22.
+    geen enkel studiegebied toe te wijzen. Twee soorten: een klasse of rol op nul waar
+    een check op leunt (issue #22) en de herstelde fantoomkoppeling naar hulpstukken
+    (issue #60).
     """
-    meldingen = []
-    for signaal in klassen_op_nul(run):
-        kenmerk = _uniek_id(
-            CHECK_NULKLASSE, "", "", {"klasse": signaal.label}, signaal.label, gebruikte_ids
+    meldingen = [
+        _signaalmelding(
+            run,
+            run_datum,
+            scope,
+            gebruikte_ids,
+            CHECK_NULKLASSE,
+            {"klasse": signaal.label},
+            signaal.label,
+            signaal.boodschap,
+            "0",
         )
-        gebruikte_ids.add(kenmerk)
+        for signaal in klassen_op_nul(run)
+    ]
+    herstel = koppelingsherstel(run)
+    if herstel is not None:
         meldingen.append(
-            Melding(
-                melding_id=kenmerk,
-                check_id=CHECK_NULKLASSE,
-                categorie=categorie_van(CHECK_NULKLASSE),
-                bron=BRON_DATASET,
-                ernst=Severity.WARNING.value,
-                dimensie=Dimension.COMPLETENESS.value,
-                object_uri="",
-                object_id="",
-                object_label=signaal.label,
-                object2_uri="",
-                object2_id="",
-                object2_label="",
-                boodschap=signaal.boodschap,
-                waarde="0",
-                drempel="",
-                typering_betrouwbaar=True,
-                cluster_id="",
-                scope=scope,
-                gebied="",
-                prioriteit=3,
-                systemisch=True,
-                foutlocatie=None,
-                run_datum=run_datum.isoformat(),
-                dataset=run.dataset.source.name,
+            _signaalmelding(
+                run,
+                run_datum,
+                scope,
+                gebruikte_ids,
+                CHECK_HULPSTUKKOPPELING,
+                {"signaal": "hulpstukkoppeling"},
+                "hulpstukkoppeling",
+                herstel.boodschap,
+                str(herstel.koppelingen),
             )
         )
     return meldingen
+
+
+def _signaalmelding(
+    run: CheckRun,
+    run_datum: date,
+    scope: str,
+    gebruikte_ids: set[str],
+    check_id: str,
+    onderscheid: dict[str, str],
+    label: str,
+    boodschap: str,
+    waarde: str,
+) -> Melding:
+    """Eén datasetsignaal als melding; registreert zijn ID in `gebruikte_ids`."""
+    kenmerk = _uniek_id(check_id, "", "", onderscheid, label, gebruikte_ids)
+    gebruikte_ids.add(kenmerk)
+    return Melding(
+        melding_id=kenmerk,
+        check_id=check_id,
+        categorie=categorie_van(check_id),
+        bron=BRON_DATASET,
+        ernst=Severity.WARNING.value,
+        dimensie=Dimension.COMPLETENESS.value,
+        object_uri="",
+        object_id="",
+        object_label=label,
+        object2_uri="",
+        object2_id="",
+        object2_label="",
+        boodschap=boodschap,
+        waarde=waarde,
+        drempel="",
+        typering_betrouwbaar=True,
+        cluster_id="",
+        scope=scope,
+        gebied="",
+        prioriteit=3,
+        systemisch=True,
+        foutlocatie=None,
+        run_datum=run_datum.isoformat(),
+        dataset=run.dataset.source.name,
+    )
 
 
 def _nulmeldingen(

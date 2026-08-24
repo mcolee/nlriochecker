@@ -74,6 +74,11 @@ WORTEL_KNOOPPUNT = "Knooppunt"
 WORTEL_VERBINDING = "Verbinding"
 WORTELS_VOOR_HERKENNING = (WORTEL_KNOOPPUNT, WORTEL_VERBINDING)
 
+WORTEL_HULPSTUKORIENTATIE = "Hulpstukorientatie"
+# De staart die de BrutIS-export achter de naam van een hulpstuk plakt in het
+# hasConnection-doel van een leidingeinde, waar de orientatie zelf anders heet.
+FANTOOM_STAART = "_put"
+
 
 @dataclass(frozen=True)
 class Inwinning:
@@ -314,6 +319,23 @@ class DecodeFallback:
 
 
 @dataclass(frozen=True)
+class Koppelingsherstel:
+    """Hoeveel `hasConnection`-doelen de lader op naamstam naar een hulpstuk herleid heeft.
+
+    De BrutIS-export van De Wolden en Hoogeveen koppelt élk leidingeinde dat op een
+    hulpstuk uitkomt aan `<hulpstuk>_put`, een URI zonder type of aspect, terwijl de
+    orientatie `<hulpstuk>_put<n>` heet. Zonder herstel ziet de engine bij alle 1054
+    T-stukken nul leidingen en hangen 3024 strengeinden aan niets. Het herstel is
+    bewust smal (alleen een onbekend doel, alleen als de stam een hulpstukknoop is) en
+    wordt hier geteld, zodat het rapport de aanlevering blijft aanwijzen in plaats van
+    het gebrek stilletjes op te ruimen (issue #60).
+    """
+
+    koppelingen: int = 0
+    hulpstukken: int = 0
+
+
+@dataclass(frozen=True)
 class GwswDataset:
     """De ingelezen dataset met de knooppunten, strengen en de klassenhierarchie."""
 
@@ -332,6 +354,9 @@ class GwswDataset:
     # berekenen van `subclasses` verloren gaat; het is een klein afgeleid woordenboek
     # zoals `subclasses`, niet de hele ontologiegraaf. Leeg zonder klassenkennis.
     kenmerk_property: dict[str, str] = field(default_factory=dict)
+    # Het herstel van de fantoomkoppeling naar hulpstukken (issue #60); nul zonder
+    # fantomen. Het rapport meldt het als datasetsignaal `SIG-hulpstukkoppeling`.
+    koppelingsherstel: Koppelingsherstel = Koppelingsherstel()
     # Memo voor `resolve_network_node`: de klim door hasPart is deterministisch en
     # wordt in een run ruim een miljoen keer met dezelfde argumenten gevraagd.
     # Bewust `init=False`: zo krijgt elke instantie -- ook een `replace()`-afgeleide
@@ -958,8 +983,9 @@ def load_dataset(
     # De afsluiting, niet de kale klasse: zie `_deksel_kenmerk`. Zonder klassenkennis
     # blijft het bij Putdeksel zelf, net als bij elke andere `closure()`.
     deksel = _afsluiting(subclasses, "Putdeksel")
+    hulpstuk = _afsluiting(subclasses, WORTEL_HULPSTUKORIENTATIE)
     nodes = _read_nodes(graph, geometry_errors, knooppunt, deksel)
-    conduits = _read_conduits(graph, nodes, geometry_errors, verbinding)
+    conduits, herstel = _read_conduits(graph, nodes, geometry_errors, verbinding, hulpstuk)
 
     if not nodes and not conduits:
         raise DatasetError(
@@ -977,6 +1003,7 @@ def load_dataset(
         decode_fallback=fallback,
         ontologies=tuple(Path(pad) for pad in ontology_paths or []),
         kenmerk_property=kenmerk_property,
+        koppelingsherstel=herstel,
     )
     # Altijd, en juist ook zonder klassenkennis: dan laat het verschil zien dat de
     # ontologische route nul objecten oplevert en de hele lezing op geometrie rust.
@@ -1378,16 +1405,23 @@ def _read_conduits(
     nodes: dict[str, Node],
     errors: dict[str, str],
     verbinding_klassen: frozenset[str] | None = None,
-) -> dict[str, Conduit]:
+    hulpstuk_klassen: frozenset[str] = frozenset(),
+) -> tuple[dict[str, Conduit], Koppelingsherstel]:
     """Leest de verbindingen: leidingen en andere kanten van het netwerk.
 
     Net als bij de knopen geldt de ontologische definitie (een orientatie van het
     type Verbinding) zodra de ontologie beschikbaar is, met terugval op de
     structurele herkenning via begin- en eindvertices.
+
+    Geeft naast de verbindingen het herstel van de fantoomkoppeling terug (issue #60).
     """
     orientation_to_node = {
         node.orientation: uri for uri, node in nodes.items() if node.orientation is not None
     }
+    hulpstukken = frozenset(
+        uri for uri, node in nodes.items() if node.orientation_types & hulpstuk_klassen
+    )
+    hersteld: list[str] = []
     conduits: dict[str, Conduit] = {}
 
     bron = (
@@ -1410,8 +1444,10 @@ def _read_conduits(
                 label=_label(graph, subject),
                 types=_types(graph, subject),
                 line=line,
-                start_node=_connected_node(graph, begin, orientation_to_node),
-                end_node=_connected_node(graph, eind, orientation_to_node),
+                start_node=_connected_node(
+                    graph, begin, orientation_to_node, hulpstukken, hersteld
+                ),
+                end_node=_connected_node(graph, eind, orientation_to_node, hulpstukken, hersteld),
                 bob_start_aspect=_bob(graph, begin, KLASSE_BOB_BEGIN),
                 bob_end_aspect=_bob(graph, eind, KLASSE_BOB_EIND),
                 aspects=_read_aspects(graph, subject),
@@ -1419,7 +1455,7 @@ def _read_conduits(
                 z_values=tuple(z_waarden),
             )
 
-    return conduits
+    return conduits, Koppelingsherstel(len(hersteld), len(set(hersteld)))
 
 
 def _is_multipart(graph: GraafIndex, orientation: RdfNode, klasse: URIRef) -> bool:
@@ -1460,7 +1496,11 @@ def _endpoint(
 
 
 def _connected_node(
-    graph: GraafIndex, endpoint: RdfNode | None, orientation_to_node: dict[str, str]
+    graph: GraafIndex,
+    endpoint: RdfNode | None,
+    orientation_to_node: dict[str, str],
+    hulpstukken: frozenset[str] = frozenset(),
+    hersteld: list[str] | None = None,
 ) -> str | None:
     """Herleidt de hasConnection van een strengeindpunt naar de put erachter.
 
@@ -1468,13 +1508,25 @@ def _connected_node(
     putorientatie, niet naar de put zelf; die extra stap wordt hier gezet. En
     gwsw:hasConnection is een owl:SymmetricProperty zonder inverse, dus de
     tripel mag ook andersom geschreven zijn; beide richtingen tellen.
+
+    Eén herstel, en niet meer (issue #60): wijst geen enkel doel naar een bekende
+    orientatie, dan wordt per doel de staart `_put` gestript; is de stam een knoop
+    met een Hulpstukorientatie, dan is dat de knoop en gaat het doel in `hersteld`.
+    Ruimer zoeken is gokken op namen, en dat hoort niet in een kritiek pad.
     """
     if endpoint is None:
         return None
-    for target in _connections(graph, endpoint):
-        node_uri = orientation_to_node.get(str(target))
+    doelen = [str(target) for target in _connections(graph, endpoint)]
+    for doel in doelen:
+        node_uri = orientation_to_node.get(doel)
         if node_uri is not None:
             return node_uri
+    for doel in doelen:
+        stam = doel.removesuffix(FANTOOM_STAART)
+        if stam != doel and stam in hulpstukken:
+            if hersteld is not None:
+                hersteld.append(stam)
+            return stam
     return None
 
 

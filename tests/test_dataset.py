@@ -497,3 +497,27 @@ def test_structurele_vergelijking_wordt_juist_zonder_klassenkennis_gevuld(
     assert kaal.structural_diff["knooppunten_wel_geometrie_geen_rol"] == len(kaal.nodes)
     assert kaal.structural_diff["strengen_wel_geometrie_geen_rol"] == len(kaal.conduits)
     assert "knooppunten_zonder_geometrie" not in kaal.structural_diff
+
+
+FANTOOM = TTL_DIR / "dataset_fantoomkoppeling.ttl"
+TOETS = "http://example.org/toets#"
+
+
+def test_fantoomkoppeling_naar_een_hulpstuk_wordt_op_naamstam_hersteld() -> None:
+    """`:L1_e hasConnection :T1_put` bestaat nergens; de stam `:T1` is een T-stuk (issue #60).
+
+    Streng 2 koppelt netjes aan de orientatie en telt niet als herstel; streng 3 wijst
+    naar `:Onbekend_put`, waarvan de stam geen hulpstukknoop is, en blijft los.
+    """
+    from nlriochecker.dataset import Koppelingsherstel
+
+    dataset = load_dataset(FANTOOM)
+
+    assert dataset.conduits[f"{TOETS}L1"].end_node == f"{TOETS}T1"
+    assert dataset.conduits[f"{TOETS}L2"].start_node == f"{TOETS}T1"
+    assert dataset.conduits[f"{TOETS}L3"].end_node is None
+    assert dataset.koppelingsherstel == Koppelingsherstel(koppelingen=1, hulpstukken=1)
+
+
+def test_zonder_fantoomkoppeling_is_er_niets_hersteld(juinen: GwswDataset) -> None:
+    assert juinen.koppelingsherstel.koppelingen == 0

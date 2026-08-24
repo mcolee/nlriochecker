@@ -33,6 +33,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Leidingeinden op een hulpstuk krijgen hun knoop terug** (issue #60). De BrutIS-export
+  koppelt elk leidingeinde dat op een hulpstuk uitkomt aan `<hulpstuk>_put`, een URI die
+  nergens bestaat, waardoor de engine bij alle T-stukken nul leidingen zag. De lader
+  herleidt zo'n doel nu op naamstam naar het hulpstuk -- alleen als geen enkel doel een
+  bekende orientatie is én de stam een knoop met een `Hulpstukorientatie` is -- telt het
+  in `GwswDataset.koppelingsherstel` en meldt het als datasetsignaal
+  `SIG-hulpstukkoppeling` (W, systemisch, zonder object), met een regel in de
+  omvangsectie van het rapport. Stil repareren zou de aanlevering uit beeld halen.
+
 - **BGT-lagen worden op de actuele objectversie gefilterd** (issue #58). Elke ingelezen
   BGT-laag houdt alleen de rijen met `eind_registratie` én `termination_date` leeg
   over; verlopen versies telden tot nu toe in elke ruimtelijke toets mee (op De Wolden

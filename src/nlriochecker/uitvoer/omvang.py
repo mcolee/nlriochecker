@@ -25,6 +25,7 @@ from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
 from nlriochecker.checks.verbanden import verbonden_knopen
 from nlriochecker.dataset import GwswDataset
+from nlriochecker.taal import getal
 
 KOLOMMEN = ["Objecttype", "Stelsel", "Aantal", "Lengte (m)"]
 
@@ -283,3 +284,33 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
                 )
             )
     return signalen
+
+
+@dataclass(frozen=True)
+class HerstelSignaal:
+    """Het datasetsignaal over de herstelde fantoomkoppelingen (issue #60)."""
+
+    koppelingen: int
+    hulpstukken: int
+    boodschap: str
+
+
+def koppelingsherstel(run: CheckRun) -> HerstelSignaal | None:
+    """Het signaal over de fantoomkoppeling, of None als de lader niets hoefde te herstellen.
+
+    Herstel dat je niet meldt is stille interpretatie: de export koppelt leidingeinden
+    aan een orientatie-URI die niet bestaat, en de lader raadt de knoop op naamstam.
+    Dat het rapport dat zegt, houdt de aanlevering aanwijsbaar.
+    """
+    herstel = run.dataset.koppelingsherstel
+    if not herstel.koppelingen:
+        return None
+    return HerstelSignaal(
+        herstel.koppelingen,
+        herstel.hulpstukken,
+        f"De export koppelt {getal(herstel.koppelingen, 'leidingeind', 'leidingeinden')} aan "
+        "een orientatie-URI die niet bestaat (`<hulpstuk>_put`, waar de Hulpstukorientatie van "
+        f"{getal(herstel.hulpstukken, 'hulpstuk', 'hulpstukken')} anders heet). De lader heeft "
+        "die koppelingen op naamstam hersteld zodat de netwerkchecks ze zien; de aanlevering "
+        "zelf is daar niet op verbeterd.",
+    )

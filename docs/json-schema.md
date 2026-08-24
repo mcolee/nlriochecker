@@ -235,9 +235,12 @@ Wat je van zo'n melding moet weten:
 ### Datasetsignalen
 
 Naast het register en de nulmeting draagt de stroom een derde bron: signalen over de
-dataset zelf, te herkennen aan `bron: "dataset"` en `categorie: "SIG"`. Nu is er één
-soort, de nul-bewaking van issue #22: een klasse of rol waar een check op leunt maar
-die nul keer voorkomt in de export. Hun `check_id` is `SIG-nulklasse`, hun `dimensie`
+dataset zelf, te herkennen aan `bron: "dataset"` en `categorie: "SIG"`. Er zijn twee
+soorten: de nul-bewaking van issue #22 (een klasse of rol waar een check op leunt maar
+die nul keer voorkomt; `check_id` `SIG-nulklasse`, `waarde` `"0"`) en het
+koppelingsherstel van issue #60 (de lader heeft `hasConnection`-doelen
+`<hulpstuk>_put` op naamstam naar het hulpstuk herleid; `check_id`
+`SIG-hulpstukkoppeling`, `waarde` het aantal herstelde koppelingen). Hun `dimensie` is
 `Compleetheid`, hun `ernst` altijd `W`.
 
 Wat je van zo'n melding moet weten:

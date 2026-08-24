@@ -53,14 +53,46 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 
 def put(
-    naam: str, label: str, x: float, y: float, klasse: str = "Inspectieput", extra: str = ""
+    naam: str,
+    label: str,
+    x: float,
+    y: float,
+    klasse: str = "Inspectieput",
+    extra: str = "",
+    orientatie: str = "Putorientatie",
 ) -> str:
     return f''':{naam} rdf:type gwsw:{klasse} ; rdfs:label "{label}" ;
     gwsw:hasAspect :{naam}_ori .{extra}
-:{naam}_ori rdf:type gwsw:Putorientatie ;
+:{naam}_ori rdf:type gwsw:{orientatie} ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>{x} {y}</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 '''
+
+
+# Hulpstukken staan niet in de gedeelde prelude: alleen de fixtures van issue #60 hebben
+# ze nodig, mét de functierestrictie waar TOP-022/TOP-023 het verwachte aantal leidingen
+# uit lezen. Een fixture die dit blok opneemt krijgt ook de owl-prefix; een prefixregel
+# mag in Turtle overal op statementniveau staan.
+HULPSTUK_KLASSEN = (
+    "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+    "# Hulpstukken, met de functierestrictie uit de GWSW-ontologie (issue #60).\n"
+    "gwsw:Hulpstukorientatie rdfs:subClassOf gwsw:Knooppunt .\n"
+    "gwsw:Verbindingsstuk rdfs:subClassOf gwsw:Hulpstuk .\n"
+    "gwsw:Afsluitstuk rdfs:subClassOf gwsw:Hulpstuk ,\n"
+    "    [ a owl:Restriction ; owl:onProperty gwsw:functie ;"
+    " owl:hasValue gwsw:AfsluitenVanLeidingen ] .\n"
+    "gwsw:T_stuk rdfs:subClassOf gwsw:Verbindingsstuk ,\n"
+    "    [ a owl:Restriction ; owl:onProperty gwsw:functie ;"
+    " owl:hasValue gwsw:VerbindenVanDrieLeidingen ] .\n"
+    "gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,\n"
+    "    [ a owl:Restriction ; owl:onProperty gwsw:functie ;"
+    " owl:hasValue gwsw:VerbindenVanVierLeidingen ] .\n\n"
+)
+
+
+def hulpstuk(naam: str, label: str, x: float, y: float, klasse: str = "T_stuk") -> str:
+    """Een hulpstuk: als een put, maar met een Hulpstukorientatie als knooppunt."""
+    return put(naam, label, x, y, klasse=klasse, orientatie="Hulpstukorientatie")
 
 
 def leiding(
@@ -1844,6 +1876,27 @@ FIXTURES["selectie_rollen.ttl"] = (
     + leiding("P1", "P1", [(1200.0, 2000.0), (1250.0, 2000.0)], "Val1", None, klasse="Persleiding")
     # Oppervlaktewater is lijnvormig en komt dus bij de verbindingen terecht.
     + leiding("Sloot1", "Sloot1", [(1000.0, 2100.0), (1250.0, 2100.0)], None, None, klasse="Sloot"),
+)
+
+
+# Issue #60, stap 1: de BrutIS-export koppelt elk leidingeinde op een hulpstuk aan
+# `<hulpstuk>_put`, een URI zonder type of aspect, terwijl de orientatie `<hulpstuk>_ori`
+# heet (in De Wolden `_put<n>`). Streng 1 heeft zo'n fantoomdoel en hoort na het herstel
+# aan T1 te hangen; streng 2 koppelt netjes; streng 3 wijst naar een stam die geen
+# hulpstuk is en blijft los.
+FIXTURES["dataset_fantoomkoppeling.ttl"] = (
+    "streng 1 koppelt haar eindpunt aan :T1_put, een URI die niet bestaat; de orientatie "
+    "van T-stuk T1 heet :T1_ori (issue #60)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", None)
+    + ":L1_e gwsw:hasConnection :T1_put .\n"
+    + put("PutB", "B", 1100.0, 2000.0)
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "PutB")
+    + put("PutC", "C", 1050.0, 2050.0)
+    + leiding("L3", "3", [(1050.0, 2050.0), (1050.0, 2000.0)], "PutC", None)
+    + ":L3_e gwsw:hasConnection :Onbekend_put .\n",
 )
 
 

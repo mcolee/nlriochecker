@@ -19,7 +19,7 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 - Turtle hoort utf-8 te zijn, maar de BrutIS-export van De Wolden en Hoogeveen bevat een handvol CP850-bytes in straatnamen. De lader valt terug op een instelbare codering en meldt dat expliciet; nooit stilzwijgend tekens vervangen.
 - Een knoop is een object met een orientatie van het type `Knooppunt` (Putorientatie, Bouwwerkorientatie, Compartimentorientatie, Hulpstukorientatie, Aansluitpunt, Afvoerpunt en verder). Een verbinding is een orientatie van het type `Verbinding`. Herken ze daaraan, niet aan hun geometrie: een knooppunt mag geen punt hebben.
 - `gwsw:hasConnection` is een owl:SymmetricProperty zonder inverse; lees beide schrijfrichtingen.
-- De koppeling wijst naar de ORIENTATIE, niet naar het object, en kan naar een compartiment of hulpstuk wijzen; loop via hasPart omhoog tot een put.
+- De koppeling wijst naar de ORIENTATIE, niet naar het object, en kan naar een compartiment of hulpstuk wijzen; loop via hasPart omhoog tot een put. De BrutIS-export van De Wolden en Hoogeveen koppelt elk leidingeinde op een hulpstuk aan `<hulpstuk>_put`, een URI zonder type of aspect (1122 hulpstukken, 3024 koppelingen). De lader herstelt dat op naamstam -- alleen als het doel onbekend is én de stam een knoop met een Hulpstukorientatie is -- telt het in `GwswDataset.koppelingsherstel` en het rapport meldt het als datasetsignaal `SIG-hulpstukkoppeling` (issue #60).
 - Klassen als Lozingspunt, Overnamepunt en UitlaatPunt zijn Knooppunt-subklassen en staan dus op de orientatie. Overnamepunt bestaat alleen in de totaal-ontologie, niet in de deelmodellen.
 - Welke ontologie je laadt bepaalt de uitkomst; gebruik data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl. Zonder ontologie valt de lader terug op herkenning via geometrie en meldt het verschil. (De harde eis dat `toets` `--ontologie` krijgt, staat in `CLAUDE.md`.)
 
@@ -56,7 +56,9 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 - Een derde bron in dezelfde stroom is het datasetsignaal (`bron = "dataset"`, categorie
   `SIG`): `bouw_meldingen` leest `uitvoer/omvang.klassen_op_nul` en maakt één systemische
   waarschuwing per klasse of rol waar een check op leunt maar die nul keer voorkomt
-  (issue #22). Zonder object en zonder gebied, net als een onherleide nulmelding;
+  (`SIG-nulklasse`, issue #22), en één voor de herstelde fantoomkoppeling naar
+  hulpstukken (`SIG-hulpstukkoppeling`, `uitvoer/omvang.koppelingsherstel`, issue #60).
+  Zonder object en zonder gebied, net als een onherleide nulmelding;
   systemisch, dus buiten `status` en `ergste_ernst` (BO-29). Het afvoereindpunt bewaakt
   per klasse (`Overnamepunt` is het criterium van BO-33), de andere rollen per rol.
   Vervalt zonder klassenhierarchie, want dan herkent `of_class` geen klassen.

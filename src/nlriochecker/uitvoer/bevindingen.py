@@ -25,6 +25,7 @@ from nlriochecker.uitvoer.omvang import (
     eindpunttelling,
     klassen_op_nul,
     klassentelling,
+    koppelingsherstel,
     omvangtabel,
     zonder_geometrie,
 )
@@ -278,6 +279,13 @@ def _omvang_section(run: CheckRun) -> list[str]:
             "gerapporteerd.",
         ]
     regels += _afhankelijkheden_section(run)
+    herstel = koppelingsherstel(run)
+    if herstel is not None:
+        regels += [
+            "",
+            f"> **Herstelde hulpstukkoppelingen:** {herstel.boodschap} Het signaal staat als "
+            "systemische waarschuwing in de meldingenstroom.",
+        ]
     regels += [""]
     return regels
 
