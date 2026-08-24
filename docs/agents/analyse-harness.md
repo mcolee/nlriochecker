@@ -7,13 +7,35 @@ want de code kan schuiven.
 
 ## Dataset-, config- en registry-API
 
-Voor een scratch-script tegen de echte data:
+Voor een scratch-script tegen de echte data — dit recept, verbatim, zodat je de
+signaturen niet elke sessie opnieuw hoeft op te zoeken:
 
-- Laad via de **cache**, niet vers, als het even kan (scheelt de volledige laadtijd).
-- `dataset.conduits` is een **dict** → itereer met `.values()`, niet als lijst.
-- Config laden met **`load_check_config()`**, niet `CheckConfig()`.
+```python
+from pathlib import Path
+
+from nlriochecker.cache import laad_met_cache
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import CheckContext, run_checks
+
+# Cachetreffer = geen parse: seconden i.p.v. de koude ~0,5 min. De cache staat in
+# standaard_cachemap() (~/.cache/nlriochecker); laad_met_cache geeft (dataset, cache).
+dataset, _ = laad_met_cache(
+    Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl"),
+    [Path("data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl")],
+)
+config = load_check_config(Path("configs/dewoldenhoogeveen.toml"))
+context = CheckContext(dataset=dataset, config=config)
+```
+
+- `dataset.nodes` en `dataset.conduits` zijn **dicts** (`dict[str, Node]` /
+  `dict[str, Conduit]`) → itereer met `.values()`, niet als lijst.
+- Geometrie zit op **`Node.point`** (`shapely.Point | None`) en **`Conduit.line`**
+  (`LineString | None`); beide kunnen `None` zijn.
+- Config laden met **`load_check_config()`**, niet `CheckConfig()`; zonder pad krijg je
+  de defaults, met `configs/dewoldenhoogeveen.toml` de projectwaarden.
 - De checks komen uit **`REGISTRY`**; kijk hoe bestaande code eroverheen loopt vóór je de
   iteratievorm gokt.
+- `bevindingen.csv` is **`;`-gescheiden** (zie `uitvoer/herkomst.py`), niet komma.
 - Nieuwe `src/`-bestanden moeten `git add` krijgen vóór de tracked-sweep-test slaagt.
 
 ## Verrassende, maar correcte aantallen
@@ -37,6 +59,12 @@ Bewerk de generator en regenereer; anders valt de bijbehorende drifttest:
 | `docs/dekkingsmatrix.md` | `scripts/dekkingsmatrix.py` |
 | `data/gwsw-vocabulaire-index.json` | `scripts/maak_gwsw_index.py` |
 
+Check dit **vóór** je een fixture aanraakt: met de hand bewerken lijkt lokaal te werken maar
+is een valse start — de drifttest en de review sturen je terug naar de generator (kostte in
+twee sessies ~15 calls herwerk). Een nieuwe fixture: declareer lokale subklassen inline (de
+PRELUDE is over ~140 fixtures gedeeld), draai `uv run python scripts/maak_ttl_fixtures.py`,
+en diff.
+
 ## Drempelrecept: vijf gekoppelde plekken
 
 Eén drempel wijzigen raakt vijf plekken, plus een generator en een drifttest die het geheel
@@ -49,3 +77,24 @@ bewaakt:
 5. een regel onder `## [Unreleased]` in `CHANGELOG.md`.
 
 Een config-drifttest faalt als deze uit elkaar lopen.
+
+## Valkuilen die elke sessie opnieuw kostten
+
+Mechanisch, geen domeinlogica — maar telkens teruggevonden door te zoeken:
+
+- **Een nieuwe check raakt meer dan het drempelrecept.** Naast de vijf plekken hierboven:
+  de check-module zelf (bv. `attributen.py`), de tests, `test_gwsw_vocabulaire.py` (bewaakt
+  materiaal- en aspectnamen), een regel in het checkregister, `scripts/dekkingsmatrix.py`
+  regenereren, een BO in `docs/beslislog.md`, en `CHANGELOG.md`.
+- **Check-ID's in issue-teksten zijn vaak al bezet.** Grep het eerste vrije nummer uit de
+  check-module (`id = "ATTR-0` enz.) in plaats van de aanbeveling in het issue te vertrouwen;
+  ATTR-014/015/016 waren telkens al vergeven toen het issue ze voorstelde.
+- **CI kan "N geslaagd" tonen én toch exit 1 geven.** `.github/workflows/toets.yml` zet
+  `NLRIOCHECKER_MAX_OVERGESLAGEN` (nu 57); wordt die overschreden, dan faalt de run ondanks
+  gehaalde dekking. Bij een onverklaarde rode run: tel eerst de overgeslagen tests.
+- **`gh`-schrijfacties falen soms tijdelijk** (`gh pr create` → GraphQL-permissie/404)
+  terwijl `git push` en reads gewoon werken; opnieuw proberen slaagt meestal. Niet je
+  token-scope of account onderzoeken — dat is dood werk.
+- **Byte-/inhoudsvergelijking van `toets`-gpkg tussen runs:** de `update_time`-kolom in
+  `layer_styles` is een tijdstempel die per schrijfactie verandert; normaliseer hem, anders
+  faalt een verder identieke vergelijking.
