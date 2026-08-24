@@ -147,7 +147,7 @@ def test_putten_zit_echt_binnen_netwerkknopen(rollenset: GwswDataset) -> None:
 
 
 def test_vrijverval_zit_echt_binnen_leidingen(rollenset: GwswDataset) -> None:
-    """Een persleiding is wel een `gwsw:Leiding` maar geen vrijvervalrioolleiding."""
+    """Een persleiding en een loze leiding zijn wel `gwsw:Leiding`, geen vrijvervalrioolleiding."""
     context = context_van(rollenset)
     vrijverval = {conduit.uri for conduit in vrijvervalrioolleidingen(context)}
     alle = {conduit.uri for conduit in leidingen(context)}

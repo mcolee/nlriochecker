@@ -486,6 +486,10 @@ class _LozeKeten:
     strengen: tuple[Conduit, ...]
     inkomend: tuple[Conduit, ...]
     uitgaand: tuple[Conduit, ...]
+    # Actieve strengen die een ketenknoop wel raken maar niet in de afvoerrichting
+    # aansluiten: tegen de richting in, of ernaast. Ze veranderen het geval niet, maar
+    # zonder ze zou "hangt aan geen enkele actieve streng" onwaar kunnen zijn.
+    rakend: tuple[Conduit, ...]
     bovenstrooms: int
 
     @property
@@ -570,16 +574,27 @@ def _bouw_loze_ketens(context: CheckContext) -> tuple[_LozeKeten, ...]:
             {c.uri: c for k in eindknopen for c in actief_per_begin.get(k, [])}.values(),
             key=lambda conduit: conduit.uri,
         )
+        aangesloten = {c.uri for c in inkomend} | {c.uri for c in uitgaand}
+        rakend = sorted(
+            {
+                c.uri: c
+                for k in beginknopen | eindknopen
+                for index in (actief_per_begin, actief_per_eind)
+                for c in index.get(k, [])
+                if c.uri not in aangesloten
+            }.values(),
+            key=lambda conduit: conduit.uri,
+        )
         naam = _uniek_ketennaam(
             f"loos-{groep[0].label or groep[0].uri.rsplit('#', 1)[-1]}", gebruikt
         )
-        gebruikt.add(naam)
         ketens.append(
             _LozeKeten(
                 naam,
                 tuple(groep),
                 tuple(inkomend),
                 tuple(uitgaand),
+                tuple(rakend),
                 _bovenstrooms(beginknopen, actief_per_eind, knoop),
             )
         )
@@ -609,18 +624,36 @@ def _bovenstrooms(
 
 
 def _uniek_ketennaam(naam: str, gebruikt: set[str]) -> str:
-    """Maakt de ketennaam uniek; twee ketens mogen niet hetzelfde ID krijgen."""
-    if naam not in gebruikt:
-        return naam
-    volgnummer = 2
-    while f"{naam}-{volgnummer}" in gebruikt:
-        volgnummer += 1
-    return f"{naam}-{volgnummer}"
+    """Maakt de ketennaam uniek en tekent hem meteen aan in `gebruikt`.
+
+    Uitgeven en aantekenen horen bij elkaar: een beller die het tweede vergeet krijgt
+    stilzwijgend twee ketens met hetzelfde ID.
+    """
+    if naam in gebruikt:
+        volgnummer = 2
+        while f"{naam}-{volgnummer}" in gebruikt:
+            volgnummer += 1
+        naam = f"{naam}-{volgnummer}"
+    gebruikt.add(naam)
+    return naam
 
 
 def _labels(strengen: tuple[Conduit, ...]) -> str:
     """De labels van deze strengen, komma-gescheiden."""
     return ", ".join(conduit.label or conduit.uri for conduit in strengen)
+
+
+def _rakende_zin(keten: _LozeKeten) -> str:
+    """De zin over actieve strengen die een ketenknoop raken zonder erop aan te sluiten."""
+    aantal = len(keten.rakend)
+    if not aantal:
+        return ""
+    return (
+        f" Wel {vorm(aantal, 'raakt', 'raken')} "
+        f"{getal(aantal, 'actieve streng', 'actieve strengen')} een knoop van de keten "
+        f"({_labels(keten.rakend)}); dat is een aansluiting tegen de richting in of naast "
+        "de keten."
+    )
 
 
 class _LozeLeidingen(Check):
@@ -645,30 +678,42 @@ class _LozeLeidingen(Check):
                     keten_strengen=len(keten.strengen),
                     inkomend=_labels(keten.inkomend),
                     uitgaand=_labels(keten.uitgaand),
+                    rakend=_labels(keten.rakend),
                     bovenstrooms=keten.bovenstrooms,
                 )
 
     @staticmethod
     def _boodschap(keten: _LozeKeten) -> str:
-        """De tekst per geval, met de aansluitende actieve strengen bij naam."""
+        """De tekst per geval, met de aansluitende actieve strengen bij naam.
+
+        Elke tekst claimt uitdrukkelijk de administratieve afvoerrichting, want dat is
+        wat het geval toetst. Een actieve streng die een ketenknoop wel raakt maar tegen
+        de richting in of ernaast ligt, verandert het geval niet en wordt daarom apart
+        genoemd; zonder die zin zou "aan geen enkele actieve streng" onwaar zijn.
+        """
         boven = getal(keten.bovenstrooms, "actieve streng", "actieve strengen")
         omvang = f" Bovenstrooms {vorm(keten.bovenstrooms, 'ligt', 'liggen')} {boven}."
         if keten.geval == GEVAL_DOORGAAND:
             return (
-                f"Het actieve riool loopt door deze loze leiding heen: {_labels(keten.inkomend)} "
-                f"komt binnen en {_labels(keten.uitgaand)} gaat verder.{omvang}"
+                "In de administratieve afvoerrichting loopt het actieve riool door deze loze "
+                f"leiding: {_labels(keten.inkomend)} komt binnen en {_labels(keten.uitgaand)} "
+                f"gaat verder.{omvang}"
             )
         if keten.geval == GEVAL_AANVOER:
             return (
-                f"Actief riool ({_labels(keten.inkomend)}) watert af op deze loze leiding, "
-                f"maar er gaat niets verder.{omvang}"
+                "In de administratieve afvoerrichting watert actief riool "
+                f"({_labels(keten.inkomend)}) af op deze loze leiding, maar er gaat niets "
+                f"verder.{omvang}"
             )
         if keten.geval == GEVAL_AFVOER:
             return (
-                f"Deze loze leiding voert af op actief riool ({_labels(keten.uitgaand)}), "
-                "maar er komt niets binnen."
+                "In de administratieve afvoerrichting voert deze loze leiding af op actief "
+                f"riool ({_labels(keten.uitgaand)}), maar er komt niets binnen."
             )
-        return "Deze loze leiding hangt aan geen enkele actieve streng: dode data."
+        return (
+            "In de administratieve afvoerrichting hangt deze loze leiding aan geen enkele "
+            "actieve streng: er komt niets binnen en er gaat niets verder."
+        ) + _rakende_zin(keten)
 
     def notes(self, context: CheckContext) -> list[str]:
         """Telt de ketens en strengen per geval, zodat de lezer het geheel ziet."""
@@ -719,7 +764,7 @@ class LosgekoppeldeLozeLeiding(_LozeLeidingen):
     """ADM-011: een keten van loze leidingen zonder enige actieve aansluiting: dode data."""
 
     id = "ADM-011"
-    title = "Loze leiding zonder enige aansluiting op actief riool"
+    title = "Loze leiding zonder aansluiting op actief riool in de afvoerrichting"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
     gevallen = frozenset({GEVAL_LOSGEKOPPELD})

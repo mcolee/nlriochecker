@@ -1720,6 +1720,22 @@ FIXTURES["adm011_loze_keten_los.ttl"] = (
     ),
 )
 
+# ADM-011: loze streng X1 en actieve streng 9 verlaten allebei put B. In de
+# afvoerrichting komt er niets binnen en gaat er niets verder, dus de keten is
+# losgekoppeld -- maar streng 9 raakt wel een ketenknoop, en dat hoort de lezer te zien.
+FIXTURES["adm011_loze_keten_rakend.ttl"] = (
+    "loze streng X1 hangt in de afvoerrichting aan niets, maar actieve streng 9 verlaat"
+    " dezelfde put B (issue #62)",
+    LOZE_KLASSE
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + put("PutE", "E", 1050.0, 2050.0)
+    + leiding(
+        "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
+    )
+    + leiding("L9", "9", [(1050.0, 2000.0), (1050.0, 2050.0)], "PutB", "PutE"),
+)
+
 # --- BTR ------------------------------------------------------------------
 
 _BTR_PUNTEN = [(1000.0 + 50.0 * i, 2000.0) for i in range(41)]

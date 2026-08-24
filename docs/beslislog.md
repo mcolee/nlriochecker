@@ -2514,7 +2514,11 @@ per check een ernst (`Check.severity`, `test_ernst_en_dimensie_volgen_het_regist
 ADM-011 voor de losgekoppelde keten.
 
 **Richting.** Altijd de administratieve richting, ongeacht `[netwerk] richting`: dat is de bron
-die NET-003 toetst, en een verkeerd gerichte administratie is dáár een bevinding.
+die NET-003 toetst, en een verkeerd gerichte administratie is dáár een bevinding. Ook
+`losgekoppeld` is dus richtingsgebaseerd -- een actieve streng die dezelfde put verlaat als de
+loze streng sluit in de afvoerrichting niet aan -- en daarom noemt het detail `rakend` de actieve
+strengen die een ketenknoop wél raken, tegen de richting in of ernaast; de meldingstekst claimt
+niet meer dan de afvoerrichting.
 
 **Alternatieven.** Melden per keten (verworpen: dan kleurt maar een streng). ADM-006 uitbreiden
 (verworpen: die gaat over `Einddatum`/`Begindatum`, dit over de klasse; en ADM-006 vindt hier

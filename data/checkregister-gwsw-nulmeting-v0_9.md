@@ -71,7 +71,7 @@ gebreken" leest.
 | ADM-008 | Putcompartimenten of -onderdelen zonder onderlinge verbinding binnen de put | W | Consistentie |
 | ADM-009 | Leiding gekoppeld aan de put als geheel waar koppeling aan een compartiment vereist is | W | Consistentie |
 | ADM-010 | Loze leiding (`LozeLeiding` en subklassen: buiten gebruik, nog in de ondergrond) waar actief riool op aansluit. Loze leidingen die een knoop delen vormen een keten; per keten in de administratieve richting: actief riool dat in een beginknoop eindigt (aanvoer), actief riool dat in een eindknoop begint (afvoer), of beide (doorgaand: het actieve riool loopt volgens het model door een buiten gebruik gestelde streng). Melding per loze streng met de keten in `cluster_id` en het aantal actieve strengen bovenstrooms als detail; de nulmeting noemt loze leidingen alleen voor attribuutgebreken, nooit voor hun plaats in het net (issue #62) | F | Consistentie |
-| ADM-011 | Loze leiding in een keten zonder enige aansluiting op actief riool: geen hydraulische fout maar dode data. Zelfde ketenbouw als ADM-010 (issue #62) | W | Consistentie |
+| ADM-011 | Loze leiding in een keten zonder aansluiting op actief riool in de afvoerrichting: geen hydraulische fout maar dode data. Zelfde ketenbouw als ADM-010; actieve strengen die een ketenknoop wel raken maar tegen de richting in of ernaast liggen staan in het detail `rakend` (issue #62) | W | Consistentie |
 
 ## ATTR: Attribuutplausibiliteit
 

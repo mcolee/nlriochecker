@@ -125,6 +125,7 @@ DEFECTEN = [
     ("adm010_loze_keten_aanvoer.ttl", "ADM-010", ["X1"]),
     ("adm010_loze_keten_afvoer.ttl", "ADM-010", ["X1"]),
     ("adm011_loze_keten_los.ttl", "ADM-011", ["X1"]),
+    ("adm011_loze_keten_rakend.ttl", "ADM-011", ["X1"]),
     ("btr006_afgeronde_bobs.ttl", "BTR-006", ["b0"]),
 ]
 
@@ -1007,8 +1008,22 @@ def test_adm011_losgekoppelde_keten_is_een_waarschuwing_en_geen_adm010() -> None
     assert labels(outcome) == ["X1"]
     assert outcome.findings[0].details["geval"] == "losgekoppeld"
     assert outcome.findings[0].details["bovenstrooms"] == 0
+    assert outcome.findings[0].details["rakend"] == ""
     assert labels(uitkomst("adm011_loze_keten_los.ttl", "ADM-010")) == []
     assert labels(uitkomst("adm010_loze_keten_doorgaand.ttl", "ADM-011")) == []
+
+
+def test_adm011_noemt_de_actieve_strengen_die_de_keten_wel_raken() -> None:
+    """Richtingsgebaseerd losgekoppeld, maar niet 'aan niets': streng 9 verlaat dezelfde put."""
+    outcome = uitkomst("adm011_loze_keten_rakend.ttl", "ADM-011")
+
+    assert labels(outcome) == ["X1"]
+    bevinding = outcome.findings[0]
+    assert bevinding.details["geval"] == "losgekoppeld"
+    assert bevinding.details["rakend"] == "9"
+    assert "administratieve afvoerrichting" in bevinding.message
+    assert "9" in bevinding.message
+    assert labels(uitkomst("adm011_loze_keten_rakend.ttl", "ADM-010")) == []
 
 
 def test_adm010_verantwoordt_de_ketens_per_geval() -> None:
