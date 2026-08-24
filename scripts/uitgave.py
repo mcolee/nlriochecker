@@ -314,9 +314,14 @@ def main(argv: list[str] | None = None) -> int:
         # ook een halverwege gefaalde bump moet teruggedraaid kunnen worden.
         gebumpt = True
         versie = bump(argumenten.soort, doel)
-        schrijf_changelog(versie)
 
+        # De poort draait vóór het omschuiven van het wijzigingslog:
+        # `test_het_echte_wijzigingslog_is_verwerkbaar` eist een gevulde
+        # [Unreleased]-sectie, en die is na `schrijf_changelog` per definitie leeg.
+        # De omschuif zelf is door de unittests op `verwerk_changelog` gedekt, en
+        # `controleer_changelog` liep hierboven al over de voor-toestand.
         toets()
+        schrijf_changelog(versie)
 
         leg_vast(versie)
         vastgelegd = True
