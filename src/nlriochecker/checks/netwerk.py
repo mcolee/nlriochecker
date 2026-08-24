@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from collections import deque
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import networkx as nx
-from shapely.geometry import LineString
 
 from nlriochecker.checks.base import (
     Check,
@@ -20,92 +18,10 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import (
     infiltratieleidingen,
     overstortputten,
-    vrijvervalrioolleidingen,
 )
-from nlriochecker.checks.verbanden import deelstelsel_ids
+from nlriochecker.checks.verbanden import _eindpunten, _Netwerk, _netwerk, deelstelsel_ids
 from nlriochecker.dataset import Conduit, GwswDataset, part_holders_of
 from nlriochecker.taal import getal, vorm
-
-
-@dataclass(frozen=True)
-class _Netwerk:
-    """De gerichte vrijvervalgraaf plus de strengen die erin zitten.
-
-    De richting is de administratieve van-naar-richting: van BeginpuntLeiding naar
-    EindpuntLeiding. Dat is de richting die het GWSW-model als afvoerrichting
-    bedoelt; NET-003 toetst later of de geometrie daarmee overeenkomt.
-    """
-
-    graph: nx.DiGraph
-    conduits: list[Conduit]
-    unconnected: list[Conduit]
-    reversed_count: int = 0
-    # Per gerichte kant de strengen die erop liggen, gesorteerd op URI. De graaf zelf
-    # draagt geen kantattributen: in een DiGraph delen parallelle strengen een kant en
-    # zou de laatste de eerste stilzwijgend overschrijven (zie issue #5 en
-    # `afbakening._componentstructuur`, dat hetzelfde patroon bewust vermijdt).
-    strengen_per_kant: dict[tuple[str, str], tuple[Conduit, ...]] = field(default_factory=dict)
-
-
-def _netwerk(context: CheckContext) -> _Netwerk:
-    """Geeft de netwerkgraaf; die wordt per context een keer gebouwd."""
-    return context.cached("netwerk", lambda: _bouw_netwerk(context))
-
-
-def _bouw_netwerk(context: CheckContext) -> _Netwerk:
-    """Bouwt de gerichte graaf: knoop is put of eindpunt, kant is streng."""
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
-
-    conduits = vrijvervalrioolleidingen(context)
-
-    op_bob = context.config.netwerk.richting == "bob"
-    graph = nx.DiGraph()
-    aangesloten: list[Conduit] = []
-    los: list[Conduit] = []
-    omgedraaid = 0
-    per_kant: dict[tuple[str, str], list[Conduit]] = {}
-    for conduit in conduits:
-        begin = dataset.resolve_network_node(conduit.start_node, wortels)
-        eind = dataset.resolve_network_node(conduit.end_node, wortels)
-        if begin is None or eind is None:
-            los.append(conduit)
-            continue
-        if op_bob and _stijgt(conduit):
-            begin, eind = eind, begin
-            omgedraaid += 1
-        graph.add_edge(begin, eind)
-        per_kant.setdefault((begin, eind), []).append(conduit)
-        aangesloten.append(conduit)
-
-    return _Netwerk(
-        graph=graph,
-        conduits=aangesloten,
-        unconnected=los,
-        reversed_count=omgedraaid,
-        strengen_per_kant={
-            kant: tuple(sorted(groep, key=lambda streng: streng.uri))
-            for kant, groep in per_kant.items()
-        },
-    )
-
-
-def _stijgt(conduit: Conduit) -> bool:
-    """Geeft aan of de bodem stijgt van begin- naar eindpunt."""
-    verval = conduit.bob_verval
-    return verval is not None and verval < 0
-
-
-def _eindpunten(context: CheckContext, rol: str) -> set[str]:
-    """De knopen in de graaf die als eindpunt van deze soort afvoer gelden."""
-    netwerk = _netwerk(context)
-    dataset = context.dataset
-    return {
-        uri
-        for wortel in getattr(context.config.klassen, rol)
-        for uri in dataset.of_class(wortel)
-        if uri in netwerk.graph
-    }
 
 
 def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
@@ -129,150 +45,6 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
                 bereikt.add(buur)
                 stapel.append(buur)
     return bereikt
-
-
-@dataclass(frozen=True)
-class Afvoer:
-    """Het benedenstroomse uitstroompunt dat een knoop of streng bereikt.
-
-    `eindpunt` is de URI van het dichtstbijzijnde uitstroompunt, `stappen` het aantal
-    strengen in het pad ernaartoe (0 voor het uitstroompunt zelf), en `meters` de
-    padlengte langs de getekende lijnen van het gekozen pad. `meters` is None zodra een
-    streng op dat pad geen bruikbare lijngeometrie heeft: de stap telt dan wel mee, maar
-    de lengte niet. `meters` slaat op het gekozen pad, niet op "enig kortste pad": ligt
-    er een tweede even kort pad zonder dat gat, dan telt dat hier niet mee.
-    """
-
-    eindpunt: str
-    stappen: int
-    meters: float | None
-
-
-def _uitstroompunten(context: CheckContext) -> set[str]:
-    """De knopen die als uitstroompunt gelden: afvoer- en lozingseindpunten samen."""
-    return _eindpunten(context, "afvoer_eindpunt") | _eindpunten(context, "lozings_eindpunt")
-
-
-def afvoerpaden(context: CheckContext) -> dict[str, Afvoer]:
-    """Per knoop het dichtstbijzijnde benedenstroomse uitstroompunt.
-
-    De uitstroompunten zijn de knopen in de rollen `afvoer_eindpunt` en
-    `lozings_eindpunt` samen; welke klassen dat zijn staat in de projectconfig. Een
-    knoop zonder pad naar enig uitstroompunt staat niet in de uitkomst.
-
-    Bij meer dan een bereikbaar uitstroompunt wint het dichtstbijzijnde in stappen, en
-    bij een gelijk aantal stappen de kleinste URI -- determinisme is een harde eis, twee
-    runs op dezelfde data moeten dezelfde uitkomst geven.
-    """
-    return context.cached(
-        "afvoerpaden", lambda: _afvoerpaden(_netwerk(context), _uitstroompunten(context))
-    )
-
-
-def _afvoerpaden(netwerk: _Netwerk, uitstroompunten: set[str]) -> dict[str, Afvoer]:
-    """Rekent de afvoerpaden uit op de gerichte graaf; zie `afvoerpaden`."""
-    graph = netwerk.graph
-    bron = {uri for uri in uitstroompunten if uri in graph}
-    if not bron:
-        return {}
-
-    stappen = _stappen_tot_uitstroom(graph, bron)
-    eindpunt: dict[str, str] = {}
-    meters: dict[str, float | None] = {}
-    # Van dichtbij naar ver: een knoop leunt op zijn benedenstroomse buur een stap
-    # dichterbij, en die is dan al bepaald.
-    for knoop in sorted(stappen, key=lambda uri: (stappen[uri], uri)):
-        if stappen[knoop] == 0:
-            eindpunt[knoop] = knoop
-            meters[knoop] = 0.0
-            continue
-        dichterbij = [
-            buur for buur in graph.successors(knoop) if stappen.get(buur) == stappen[knoop] - 1
-        ]
-        eindpunt[knoop] = min(eindpunt[buur] for buur in dichterbij)
-        # De volgende stap: de kleinste-URI buur die naar datzelfde uitstroompunt leidt.
-        # De keuze bepaalt welke padlengte we optellen; kleinste URI houdt hem
-        # deterministisch, ook bij parallelle takken naar hetzelfde eindpunt.
-        volgende = min(buur for buur in dichterbij if eindpunt[buur] == eindpunt[knoop])
-        kant = _kantlengte(netwerk, knoop, volgende)
-        vervolg = meters[volgende]
-        meters[knoop] = None if kant is None or vervolg is None else kant + vervolg
-
-    return {
-        knoop: Afvoer(eindpunt=eindpunt[knoop], stappen=stappen[knoop], meters=meters[knoop])
-        for knoop in stappen
-    }
-
-
-def _stappen_tot_uitstroom(graph: nx.DiGraph, bron: set[str]) -> dict[str, int]:
-    """Het minste aantal strengen van elke knoop naar een uitstroompunt.
-
-    Een enkele doorloop over de omgekeerde graaf vanaf alle uitstroompunten tegelijk,
-    net als `_bereikbaar_vanaf`, maar nu met de afstand erbij. Knopen zonder pad naar
-    enig uitstroompunt komen niet in de uitkomst.
-    """
-    omgekeerd = graph.reverse(copy=False)
-    stappen = {uri: 0 for uri in bron}
-    rij: deque[str] = deque(sorted(bron))
-    while rij:
-        knoop = rij.popleft()
-        for buur in omgekeerd[knoop]:
-            if buur not in stappen:
-                stappen[buur] = stappen[knoop] + 1
-                rij.append(buur)
-    return stappen
-
-
-def _kantlengte(netwerk: _Netwerk, begin: str, eind: str) -> float | None:
-    """De lengte van de streng op de kant begin->eind, of None zonder lijngeometrie.
-
-    Bij parallelle strengen op dezelfde kant telt de kleinste-URI streng (de eerste in
-    `strengen_per_kant`), zodat de lengte niet van de invoervolgorde afhangt.
-    """
-    strengen = netwerk.strengen_per_kant.get((begin, eind), ())
-    return _lijnlengte(strengen[0]) if strengen else None
-
-
-def _lijnlengte(conduit: Conduit) -> float | None:
-    """De lengte van de getekende lijn van een streng, of None zonder bruikbare lijn."""
-    lijn = conduit.line
-    if isinstance(lijn, LineString) and not lijn.is_empty:
-        return lijn.length
-    return None
-
-
-def _netwerkstrengen(context: CheckContext) -> frozenset[str]:
-    """De URI's van de aangesloten vrijvervalstrengen in de graaf; een keer per context."""
-    return context.cached(
-        "netwerkstrengen", lambda: frozenset(c.uri for c in _netwerk(context).conduits)
-    )
-
-
-def afvoerpad_van_streng(context: CheckContext, conduit: Conduit) -> Afvoer | None:
-    """Het afvoerpad van een streng: de streng zelf plus het pad vanaf haar eindpunt.
-
-    Alleen voor aangesloten vrijvervalstrengen: een afvoerpad is een vrijverval-begrip.
-    Mechanisch riool (persleidingen) en strengen die niet aan beide zijden op een put
-    uitkomen, horen er niet in en leveren None -- ook al komen ze op een uitstroompunt
-    uit, gepompt riool is geen vrijverval-afvoerpad.
-
-    Verder None als de streng geen herleidbaar eindpunt heeft of vanaf daar geen
-    uitstroompunt bereikt. De streng telt als eerste stap; haar eigen lengte telt bij de
-    meters, en ontbreekt die (geen bruikbare lijngeometrie) dan valt de hele padlengte weg.
-    """
-    if conduit.uri not in _netwerkstrengen(context):
-        return None
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
-    eind = dataset.resolve_network_node(conduit.end_node, wortels)
-    if eind is None:
-        return None
-    vervolg = afvoerpaden(context).get(eind)
-    if vervolg is None:
-        return None
-    eigen = _lijnlengte(conduit)
-    meters = None if eigen is None or vervolg.meters is None else eigen + vervolg.meters
-    return Afvoer(eindpunt=vervolg.eindpunt, stappen=vervolg.stappen + 1, meters=meters)
 
 
 def _eindknoop_notitie(context: CheckContext, netwerk: _Netwerk, rol: str) -> list[str]:

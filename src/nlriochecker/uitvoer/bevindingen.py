@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from nlriochecker.checks import REGISTRY, CheckRun, Severity
+from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import BRON_DATASET, BRON_NULMETING, Melding, bouw_meldingen
@@ -681,7 +681,7 @@ def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
     ids = {
         outcome.check_id
         for outcome in run.outcomes
-        if REGISTRY[outcome.check_id].volledig_bereik or outcome.check_id in geconfigureerd
+        if outcome.volledig_bereik or outcome.check_id in geconfigureerd
     }
     return sorted(ids)
 

@@ -181,6 +181,10 @@ class CheckOutcome:
     dimension: Dimension
     examined: int
     findings: list[Finding]
+    # Uit de checkklasse overgenomen, net als `title` en `severity`: de uitvoerlaag
+    # leest ze van de outcome en hoeft de registry er niet meer bij te halen.
+    id_sleutels: tuple[str, ...]
+    volledig_bereik: bool
     notes: list[str] = field(default_factory=list)
     weggelaten: int = 0
     skeleton: str = ""
@@ -206,6 +210,11 @@ class CheckRun:
     # drempels rapporteren dan waarmee hij getoetst is -- dezelfde reden waarom
     # `meetbereik` hieronder nooit None is.
     config: CheckConfig
+    # De context waarmee de checks daadwerkelijk gedraaid hebben. De schrijvers lezen
+    # hem in plaats van zelf een `CheckContext` te bouwen: een eigen context begint
+    # met een lege cache en kan -- bij een afwijkende opbouw -- een ander afvoerpad
+    # tekenen dan de checks beoordeelden.
+    context: CheckContext = field(compare=False, repr=False)
     unreliable_labels: int = 0
     unreliable_labels_in_dataset: int = 0
     study_area: StudyArea | None = None
@@ -349,6 +358,8 @@ class CheckRun:
                     dimension=outcome.dimension,
                     examined=outcome.examined,
                     findings=binnen_gebied,
+                    id_sleutels=outcome.id_sleutels,
+                    volledig_bereik=outcome.volledig_bereik,
                     notes=outcome.notes,
                     weggelaten=len(outcome.findings) - len(binnen_gebied),
                     skeleton=outcome.skeleton,
@@ -525,6 +536,8 @@ def run_checks(
                     dimension=check.dimension,
                     examined=check.examined(gebruikt),
                     findings=bevindingen,
+                    id_sleutels=check.id_sleutels,
+                    volledig_bereik=check.volledig_bereik,
                     notes=check.notes(gebruikt),
                     skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
                 )
@@ -549,6 +562,7 @@ def run_checks(
             "karakteristiek", lambda: bepaal_karakteristiek(volledig.dataset, context.config)
         ),
         config=context.config,
+        context=context,
         analyseset=context.analyseset,
         treffers=context.treffers,
     )

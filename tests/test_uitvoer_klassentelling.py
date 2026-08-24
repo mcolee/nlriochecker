@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from nlriochecker.checkconfig import load_check_config
-from nlriochecker.checks import CheckRun
+from nlriochecker.checks import CheckContext, CheckRun
 from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.bevindingen import _omvang_section, meldingen_json
 from nlriochecker.uitvoer.melding import BRON_DATASET, bouw_meldingen
@@ -94,8 +94,13 @@ def _run(tmp_path: Path, weglaten: set[str]) -> CheckRun:
     pad = tmp_path / "klassen.ttl"
     pad.write_text(_maak_ttl(ALLE_KLASSEN - weglaten), encoding="utf-8")
     dataset = load_dataset(pad)
+    config = load_check_config()
     return CheckRun(
-        dataset=dataset, outcomes=[], typing_gate_applied=False, config=load_check_config()
+        dataset=dataset,
+        outcomes=[],
+        typing_gate_applied=False,
+        config=config,
+        context=CheckContext(dataset=dataset, config=config),
     )
 
 

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from nlriochecker.checkconfig import CheckConfig
-from nlriochecker.checks import CheckContext, CheckRun, Severity
+from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.checks.selectie import vrijvervalrioolleidingen
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.melding import BRON_REGISTER, Melding
@@ -73,7 +73,7 @@ def rode_draad(run: CheckRun, meldingen: list[Melding]) -> list[str]:
 
 def _richting(run: CheckRun, meldingen: list[Melding], config: CheckConfig) -> list[str]:
     """Benoemt omgekeerde registratie als gezamenlijke oorzaak, met het percentage."""
-    stijgend, meetbaar = _bodemverloop(run, config)
+    stijgend, meetbaar = _bodemverloop(run)
     if not meetbaar:
         return []
     aandeel = stijgend / meetbaar
@@ -103,14 +103,14 @@ def _richting(run: CheckRun, meldingen: list[Melding], config: CheckConfig) -> l
     ]
 
 
-def _bodemverloop(run: CheckRun, config: CheckConfig) -> tuple[int, int]:
+def _bodemverloop(run: CheckRun) -> tuple[int, int]:
     """Telt de vrijvervalstrengen waarvan de bodem stijgt van begin naar eind.
 
-    De selectie komt uit `checks/selectie.py`; de context wordt hier gemaakt over de
-    dataset van de run, want de uitvoerlaag heeft er geen.
+    De selectie komt uit `checks/selectie.py` en leest `run.context`: exact de
+    context waarmee de checks draaiden, inclusief haar cache.
     """
     stijgend = meetbaar = 0
-    for conduit in vrijvervalrioolleidingen(CheckContext(dataset=run.dataset, config=config)):
+    for conduit in vrijvervalrioolleidingen(run.context):
         if conduit.bob_start is None or conduit.bob_end is None:
             continue
         meetbaar += 1

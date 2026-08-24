@@ -6,7 +6,7 @@ from pathlib import Path
 
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext
-from nlriochecker.checks.netwerk import afvoerpad_van_streng, afvoerpaden
+from nlriochecker.checks.verbanden import afvoerpad_van_streng, afvoerpaden
 from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"

@@ -171,6 +171,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `load_check_config()`, waardoor een run met projectconfig met de standaarddrempels
   kon rapporteren. Het veld is nu verplicht en elke schrijver gebruikt `run.config`
   rechtstreeks; de uitkomst van een normale run verandert niet.
+- **De schrijvers lezen de runcontext; de afvoerpadberekening woont in
+  `checks/verbanden.py`**. `CheckRun` draagt nu verplicht `context`: exact de
+  `CheckContext` waarmee de checks draaiden. De GeoPackage- en synthese-schrijvers
+  bouwden er elk een eigen (met lege cache), waardoor de vrijvervalgraaf en de
+  afvoerpaden voor de kaart opnieuw gerekend werden en bij een afwijkende opbouw van
+  de checkuitslag hadden kunnen afwijken; ze lezen nu de gecachte uitkomst van de
+  NET-checks. `Afvoer`, `afvoerpad_van_streng` en `afvoerpaden` zijn daarvoor (met de
+  graafbouw) van `checks/netwerk.py` naar `checks/verbanden.py` verhuisd, en
+  `CheckOutcome` draagt `id_sleutels` en `volledig_bereik` zodat de uitvoerlaag de
+  check-registry niet meer raadpleegt. De uitvoer verandert niet.
 - **TTL-parse via de Rust-parser van `pyoxigraph`** (issue #26, BO-41). Het OroX-TTL wordt
   ingelezen met `pyoxigraph.parse` en daarna overgezet in een gewone `rdflib.Graph`; de checks,
   de cache en de rest van de lader blijven ongewijzigd. `pyoxigraph` is een nieuwe **harde**

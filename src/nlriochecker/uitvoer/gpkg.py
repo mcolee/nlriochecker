@@ -37,9 +37,9 @@ from shapely.ops import unary_union
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
-from nlriochecker.checks.netwerk import Afvoer, afvoerpad_van_streng, afvoerpaden
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer
+from nlriochecker.checks.verbanden import Afvoer, afvoerpad_van_streng, afvoerpaden
 from nlriochecker.dataset import Conduit, GwswDataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
@@ -407,7 +407,7 @@ def _samenvatting_kolommen() -> list[_Kolom]:
     ]
 
 
-def _mechanische_uris(run: CheckRun, config: CheckConfig) -> frozenset[str]:
+def _mechanische_uris(run: CheckRun) -> frozenset[str]:
     """De verbindingen die tot het mechanische stelsel horen.
 
     Het merendeel van de checks slaat ze over -- het checkregister rekent mechanisch
@@ -416,13 +416,11 @@ def _mechanische_uris(run: CheckRun, config: CheckConfig) -> frozenset[str]:
     niets op staat; wat er wel op staat kleurt ze (zie `objectkaart.bepaal_status`).
     Zonder die uitzondering zou 'geen kleur' hier als 'getoetst en in orde' lezen.
 
-    De selectie komt uit `checks/selectie.py` en niet uit een eigen comprehension.
-    Deze laag heeft geen `CheckContext` van de run, dus hij wordt hier gemaakt over
-    de dataset van de run -- onder een studiegebied dus de kern plus de contextschil,
-    net als voorheen.
+    De selectie komt uit `checks/selectie.py` en leest `run.context`: exact de
+    context waarmee de checks draaiden -- onder een studiegebied dus de kern plus
+    de contextschil -- inclusief haar cache.
     """
-    context = CheckContext(dataset=run.dataset, config=config)
-    return frozenset(conduit.uri for conduit in mechanischeleidingen(context))
+    return frozenset(conduit.uri for conduit in mechanischeleidingen(run.context))
 
 
 def _schrijf_features(
@@ -476,13 +474,13 @@ def _schrijf_features(
     metadata = _metadata(run, run_datum)
     stelsels = stelseltypen(run)
     config = run.config
-    mechanisch = _mechanische_uris(run, config)
+    mechanisch = _mechanische_uris(run)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
-    # Het afvoerpad per knoop, een keer gerekend; de strengen leunen erop via
-    # `afvoerpad_van_streng`, dat dezelfde gecachte uitkomst leest.
-    afvoercontext = CheckContext(dataset=run.dataset, config=config)
-    afvoer_per_knoop = afvoerpaden(afvoercontext)
+    # Het afvoerpad per knoop, uit `run.context`: de NET-checks hebben de graaf daar
+    # al gebouwd, en de strengen leunen erop via `afvoerpad_van_streng`, dat
+    # dezelfde gecachte uitkomst leest.
+    afvoer_per_knoop = afvoerpaden(run.context)
 
     tellingen: dict[str, int] = {}
     mechanisch_geschreven = 0
@@ -506,7 +504,7 @@ def _schrijf_features(
                 _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
             )
             afvoer_eindpunt, afvoer_meters, afvoer_stappen = _afvoer_velden(
-                afvoercontext, afvoer_per_knoop, uri, object_
+                run.context, afvoer_per_knoop, uri, object_
             )
             reden = _reden_niet_beoordeeld(uri, binnen, mechanisch, geen_hierarchie)
             if uri in mechanisch:
@@ -541,9 +539,7 @@ def _schrijf_features(
         voortgang.stap(label=laag)
 
     bouwwerken, waterdelen = _schrijf_treffers(verbinding, run, meldingen, config, voortgang)
-    stelsel_aantal = _schrijf_stelsels(
-        verbinding, run, config, afvoercontext, per_object, voortgang
-    )
+    stelsel_aantal = _schrijf_stelsels(verbinding, run, config, run.context, per_object, voortgang)
 
     return _LaagTellingen(
         putten=tellingen["putten"],

@@ -15,7 +15,6 @@ from datetime import date
 from shapely.geometry import Point
 
 from nlriochecker.checkconfig import CheckConfig
-from nlriochecker.checks import REGISTRY as CHECK_REGISTRY
 from nlriochecker.checks import CheckOutcome, CheckRun, Dimension, Finding, Severity
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.uitvoer.identiteit import kort, melding_id
@@ -102,7 +101,7 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
     gebruikte_ids: set[str] = set()
     for outcome in run.outcomes:
         outcome_systemisch = _is_systemisch(outcome, config)
-        sleutels = _id_sleutels(outcome.check_id)
+        sleutels = outcome.id_sleutels
         for finding in outcome.findings:
             # Een check kan een losse bevinding als systemisch merken (ATTR-014 meldt
             # per kenmerk, over de hele export); dat OR't met de populatieratio.
@@ -278,12 +277,6 @@ def _nulprioriteit(run: CheckRun, bevinding: Nulbevinding, kritiek: set[str]) ->
 def categorie_van(check_id: str) -> str:
     """De categorie van een check-ID: TOP-011 wordt TOP."""
     return check_id.split("-", 1)[0]
-
-
-def _id_sleutels(check_id: str) -> tuple[str, ...]:
-    """De detailsleutels waarmee deze check haar bevindingen onderscheidt."""
-    check = CHECK_REGISTRY.get(check_id)
-    return check.id_sleutels if check is not None else ()
 
 
 def _uniek_id_van_finding(finding: Finding, sleutels: tuple[str, ...], gebruikt: set[str]) -> str:

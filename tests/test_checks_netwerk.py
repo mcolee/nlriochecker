@@ -9,8 +9,8 @@ import pytest
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
-from nlriochecker.checks.netwerk import KringloopInNetwerk, _netwerk
-from nlriochecker.checks.verbanden import deelstelsel_ids, verbonden_knopen
+from nlriochecker.checks.netwerk import KringloopInNetwerk
+from nlriochecker.checks.verbanden import _netwerk, deelstelsel_ids, verbonden_knopen
 from nlriochecker.dataset import GWSW, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
