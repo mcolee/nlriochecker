@@ -299,8 +299,8 @@ def koppelingsherstel(run: CheckRun) -> HerstelSignaal | None:
     """Het signaal over de fantoomkoppeling, of None als de lader niets hoefde te herstellen.
 
     Herstel dat je niet meldt is stille interpretatie: de export koppelt leidingeinden
-    aan een orientatie-URI die niet bestaat, en de lader raadt de knoop op naamstam.
-    Dat het rapport dat zegt, houdt de aanlevering aanwijsbaar.
+    aan een `<hulpstuk>_put`-URI die niet bestaat, en de lader raadt de knoop op
+    naamstam. Dat het rapport dat zegt, houdt de aanlevering aanwijsbaar.
     """
     herstel = run.dataset.koppelingsherstel
     if not herstel.koppelingen:
@@ -311,6 +311,7 @@ def koppelingsherstel(run: CheckRun) -> HerstelSignaal | None:
         f"De export koppelt {getal(herstel.koppelingen, 'leidingeind', 'leidingeinden')} aan "
         "een `<hulpstuk>_put`-URI die niet bestaat, waar de Hulpstukorientatie van "
         f"{getal(herstel.hulpstukken, 'hulpstuk', 'hulpstukken')} anders heet. De lader heeft "
-        "die koppelingen op naamstam hersteld zodat de netwerkchecks ze zien; de aanlevering "
-        "zelf is daar niet op verbeterd.",
+        "die koppelingen op naamstam hersteld zodat de hulpstukchecks TOP-022 en TOP-023 ze "
+        "zien; een hulpstuk is geen netwerkknoop, dus de netwerkchecks veranderen er niet "
+        "door. De aanlevering zelf is daar niet op verbeterd.",
     )
