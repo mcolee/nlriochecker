@@ -166,6 +166,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Snellere topologie- en netwerkchecks door ruimtelijke caches en memoisatie**. De
+  puttenzoek (`nearest_node`) en de burenzoek van de strengen gebruiken
+  `STRtree.query(..., predicate="dwithin")` in plaats van per aanroep een gebufferde
+  geometrie; de strenguiteinden worden één keer bepaald bij het bouwen van de
+  topologie-index en de snapping streng-einde→put staat als gedeelde tabel in de
+  contextcache, zodat TOP-001/002/003/021 dezelfde afbeelding delen;
+  `resolve_network_node` is gememoiseerd op de dataset en NET-007 loopt de strengen
+  één keer langs een componenten-dict in plaats van per component over alle strengen.
+  De uitvoer verandert niet (vergelijker: gelijk op alle vier de uitvoervormen); een
+  warme De Wolden en Hoogeveen-run daalt van circa 163 s naar circa 129 s.
 - **`uitvoer/__init__.py` is een lege naamruimte; de orkestratie woont in
   `uitvoer/schrijver.py`**. `schrijf_uitvoer`, `schrijf_uitvoer_gebieden` en de
   `Uitvoer`-dataclasses verhuisden ongewijzigd; importeer ze voortaan uit

@@ -331,6 +331,16 @@ class GwswDataset:
     # berekenen van `subclasses` verloren gaat; het is een klein afgeleid woordenboek
     # zoals `subclasses`, niet de hele ontologiegraaf. Leeg zonder klassenkennis.
     kenmerk_property: dict[str, str] = field(default_factory=dict)
+    # Memo voor `resolve_network_node`: de klim door hasPart is deterministisch en
+    # wordt in een run ruim een miljoen keer met dezelfde argumenten gevraagd.
+    # Bewust `init=False`: zo krijgt elke instantie -- ook een `replace()`-afgeleide
+    # zoals `subset()` -- een eigen, lege memo. Een uitgedunde dataset kan anders
+    # resolven dan de volle export (de wandeling ziet minder knopen), en een via
+    # `replace()` gedeelde dict zou antwoorden tussen de twee laten lekken.
+    # `cache._schrijf` slaat dit veld bij het picklen over.
+    _resolved_nodes: dict[tuple[str, tuple[str, ...]], str | None] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
 
     def is_a(self, uri: str, root: str) -> bool:
         """Geeft aan of dit domeinobject van het type `root` of een subklasse is.
@@ -434,8 +444,19 @@ class GwswDataset:
         koppeling ook naar een compartiment of een hulpstuk. Voor de netwerkanalyse
         telt de put eromheen, dus wordt via hasPart omhooggelopen tot een object van
         een van de opgegeven wortelklassen.
+
+        Gememoiseerd per (uri, wortels): de wandeling is deterministisch en de
+        checks stellen dezelfde vraag ruim een miljoen keer per run. De wortels
+        horen in de sleutel -- in de praktijk zijn ze constant binnen een run, maar
+        een memo die dat stilzwijgend aanneemt zou bij een afwijkende aanroep het
+        verkeerde antwoord teruggeven.
         """
-        return self.klim_naar_knoop(uri, roots)[0]
+        if uri is None:
+            return None
+        sleutel = (uri, tuple(roots))
+        if sleutel not in self._resolved_nodes:
+            self._resolved_nodes[sleutel] = self.klim_naar_knoop(uri, roots)[0]
+        return self._resolved_nodes[sleutel]
 
     def klim_naar_knoop(
         self, uri: str | None, roots: list[str]

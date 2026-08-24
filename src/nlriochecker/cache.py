@@ -221,8 +221,17 @@ def _herlees_graaf(dataset_path: Path, ontology_paths: list[Path], fallback_enco
 
 
 def _schrijf(map_: Path, dataset: GwswDataset) -> None:
-    """Legt structuren en graaf weg, elk via een tijdelijk bestand."""
-    velden = {naam: waarde for naam, waarde in vars(dataset).items() if naam != "graph"}
+    """Legt structuren en graaf weg, elk via een tijdelijk bestand.
+
+    `_resolved_nodes` blijft buiten de pickle: het is een `init=False`-veld
+    (`GwswDataset(**velden)` zou erop stuklopen) en een memo die elke instantie
+    vers hoort op te bouwen, geen data.
+    """
+    velden = {
+        naam: waarde
+        for naam, waarde in vars(dataset).items()
+        if naam not in ("graph", "_resolved_nodes")
+    }
     _schrijf_atomair(map_ / BESTAND_STRUCTUREN, velden)
     _schrijf_atomair(map_ / BESTAND_GRAAF, dataset.graph)
 

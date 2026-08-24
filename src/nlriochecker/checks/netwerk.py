@@ -395,13 +395,22 @@ class ItStelselZonderDrempel(Check):
 
         drempelknopen = self._knopen_met_drempel(context)
 
-        for deel in nx.weakly_connected_components(netwerk.graph):
-            strengen = [
-                conduit
-                for conduit in netwerk.conduits
-                if conduit.uri in infiltratie
-                and dataset.resolve_network_node(conduit.start_node, wortels) in deel
-            ]
+        # Een doorloop over de strengen in plaats van een per component: de dict
+        # wijst elke knoop zijn component aan, en de meldingsvolgorde blijft die
+        # van de componenten met daarbinnen de volgorde van `netwerk.conduits`.
+        componenten = list(nx.weakly_connected_components(netwerk.graph))
+        component_van = {knoop: index for index, deel in enumerate(componenten) for knoop in deel}
+        per_component: dict[int, list[Conduit]] = {}
+        for conduit in netwerk.conduits:
+            if conduit.uri not in infiltratie:
+                continue
+            begin = dataset.resolve_network_node(conduit.start_node, wortels)
+            index = component_van.get(begin) if begin is not None else None
+            if index is not None:
+                per_component.setdefault(index, []).append(conduit)
+
+        for index, deel in enumerate(componenten):
+            strengen = per_component.get(index, [])
             if not strengen or deel & drempelknopen:
                 continue
             for conduit in strengen:
