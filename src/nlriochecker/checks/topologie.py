@@ -35,6 +35,7 @@ from nlriochecker.checks.selectie import (
     netwerkknopen,
     vrijvervalrioolleidingen,
 )
+from nlriochecker.checks.verbanden import verbonden_knopen
 from nlriochecker.dataset import Conduit, Node
 
 
@@ -115,16 +116,6 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
 def _endpoints(conduit: Conduit) -> tuple[Point, Point] | None:
     """Het begin- en eindpunt van de strenggeometrie."""
     return endpoints(conduit.line)
-
-
-def _knopen(context: CheckContext, conduit: Conduit) -> tuple[str | None, str | None]:
-    """De putten waaraan een streng administratief gekoppeld is."""
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
-    return (
-        dataset.resolve_network_node(conduit.start_node, wortels),
-        dataset.resolve_network_node(conduit.end_node, wortels),
-    )
 
 
 def _midden(links: Point, rechts: Point) -> tuple[float, float]:
@@ -636,7 +627,7 @@ class StrengenRakenMetBuffer(Check):
             conduit.uri: half_diameter_m(conduit.breedte_mm, conduit.hoogte_mm)
             for conduit in topologie.lined
         }
-        knopen = {conduit.uri: _knopen(context, conduit) for conduit in topologie.lined}
+        knopen = {conduit.uri: verbonden_knopen(context, conduit) for conduit in topologie.lined}
         # De grootste straal in de dataset bepaalt hoe ver een tegenpartij kan
         # liggen en toch nog binnen de gezamenlijke buffer vallen.
         grootste = max(stralen.values(), default=0.0)
@@ -773,7 +764,7 @@ class ParallelleStrengen(Check):
 
         per_paar: dict[frozenset[str], list[Conduit]] = {}
         for conduit in _topologie(context).all_conduits:
-            begin, eind = _knopen(context, conduit)
+            begin, eind = verbonden_knopen(context, conduit)
             if begin is None or eind is None or begin == eind:
                 continue
             per_paar.setdefault(frozenset((begin, eind)), []).append(conduit)
@@ -820,7 +811,7 @@ class VeelAansluitendeStrengen(Check):
 
         telling: dict[str, list[str]] = {}
         for conduit in _topologie(context).all_conduits:
-            for uri in _knopen(context, conduit):
+            for uri in verbonden_knopen(context, conduit):
                 if uri is not None:
                     telling.setdefault(uri, []).append(conduit.label)
 
@@ -1041,7 +1032,7 @@ class PseudoKnoop(Check):
 
         aansluitend: dict[str, list[Conduit]] = {}
         for conduit in _topologie(context).all_conduits:
-            for uri in _knopen(context, conduit):
+            for uri in verbonden_knopen(context, conduit):
                 if uri in functieloos:
                     aansluitend.setdefault(uri, []).append(conduit)
 

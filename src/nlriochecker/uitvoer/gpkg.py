@@ -39,7 +39,12 @@ from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer
-from nlriochecker.checks.verbanden import Afvoer, afvoerpad_van_streng, afvoerpaden
+from nlriochecker.checks.verbanden import (
+    Afvoer,
+    afvoerpad_van_streng,
+    afvoerpaden,
+    verbonden_knopen,
+)
 from nlriochecker.dataset import Conduit, GwswDataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
@@ -864,7 +869,7 @@ def _schrijf_stelsels(
         rijen.append(
             (
                 _blob(_als_multipolygon(geometrie)),
-                *_stelsel_rij(run.dataset, config, afvoercontext, vlak, per_object, gemeten),
+                *_stelsel_rij(run.dataset, afvoercontext, vlak, per_object, gemeten),
             )
         )
     if rijen:
@@ -901,7 +906,6 @@ def _stelsel_geometrie(
 
 def _stelsel_rij(
     dataset: GwswDataset,
-    config: CheckConfig,
     afvoercontext: CheckContext,
     vlak: Stelselvlak,
     per_object: dict[str, list[Melding]],
@@ -919,8 +923,7 @@ def _stelsel_rij(
     bereikt = any(afvoerpad_van_streng(afvoercontext, conduit) is not None for conduit in conduits)
     putten: set[str] = set()
     for conduit in conduits:
-        for kant in (conduit.start_node, conduit.end_node):
-            knoop = dataset.resolve_network_node(kant, config.klassen.netwerkknopen)
+        for knoop in verbonden_knopen(afvoercontext, conduit):
             if knoop is not None:
                 putten.add(knoop)
     meldingen = per_object.get(vlak.uri, [])

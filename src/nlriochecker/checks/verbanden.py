@@ -179,9 +179,6 @@ def _netwerk(context: CheckContext) -> _Netwerk:
 
 def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     """Bouwt de gerichte graaf: knoop is put of eindpunt, kant is streng."""
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
-
     conduits = vrijvervalrioolleidingen(context)
 
     op_bob = context.config.netwerk.richting == "bob"
@@ -191,8 +188,7 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     omgedraaid = 0
     per_kant: dict[tuple[str, str], list[Conduit]] = {}
     for conduit in conduits:
-        begin = dataset.resolve_network_node(conduit.start_node, wortels)
-        eind = dataset.resolve_network_node(conduit.end_node, wortels)
+        begin, eind = verbonden_knopen(context, conduit)
         if begin is None or eind is None:
             los.append(conduit)
             continue

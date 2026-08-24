@@ -22,8 +22,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar
 
-from rdflib import URIRef
-
 from nlriochecker import taal
 from nlriochecker.checks.base import (
     Check,
@@ -45,7 +43,7 @@ from nlriochecker.checks.verbanden import (
     deelstelsel_ids,
     netwerkdelen,
 )
-from nlriochecker.dataset import Node, part_holders_of, parts_of
+from nlriochecker.dataset import Node, part_holders_of
 
 
 @dataclass(frozen=True)
@@ -132,9 +130,7 @@ def _bouw_drempels(context: CheckContext) -> dict[str, list[Drempel]]:
 
 def _waarde(context: CheckContext, subject, kenmerk: str) -> float | None:
     """De numerieke waarde van een kenmerk dat aan dit object hangt."""
-    from nlriochecker.dataset import _read_aspects
-
-    for aspect in _read_aspects(context.dataset.graph, subject):
+    for aspect in context.dataset.onderdeel_aspecten(str(subject)):
         if aspect.kind == kenmerk:
             return aspect.number
     return None
@@ -142,10 +138,7 @@ def _waarde(context: CheckContext, subject, kenmerk: str) -> float | None:
 
 def _label(context: CheckContext, subject) -> str:
     """Het rdfs:label van een object in de graaf."""
-    from rdflib import RDFS
-
-    waarde = context.dataset.graph.value(subject, RDFS.label)
-    return str(waarde) if waarde is not None else ""
+    return context.dataset.onderdeel_label(str(subject)) or ""
 
 
 def drempelnotitie(context: CheckContext) -> list[str]:
@@ -615,8 +608,8 @@ class BbbZonderLediging(Check):
     def _heeft_voorziening(self, context: CheckContext, node: Node, klassen: list[str]) -> bool:
         """Geeft aan of de BBB een ledigingsvoorziening als onderdeel heeft."""
         dataset = context.dataset
-        for deel in parts_of(dataset.graph, URIRef(node.uri)):
-            if any(dataset.graph_is_a(str(deel), wortel) for wortel in klassen):
+        for deel in dataset.onderdelen(node.uri):
+            if any(dataset.graph_is_a(deel, wortel) for wortel in klassen):
                 return True
         return False
 

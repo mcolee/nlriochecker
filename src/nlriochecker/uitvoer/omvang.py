@@ -23,6 +23,7 @@ import pandas as pd
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
+from nlriochecker.checks.verbanden import verbonden_knopen
 from nlriochecker.dataset import GwswDataset
 
 KOLOMMEN = ["Objecttype", "Stelsel", "Aantal", "Lengte (m)"]
@@ -57,8 +58,7 @@ def stelseltypen(run: CheckRun) -> dict[str, str]:
         if soort is None:
             continue
         per_object[uri] = soort
-        for kant in (conduit.start_node, conduit.end_node):
-            knoop = dataset.resolve_network_node(kant, config.klassen.netwerkknopen)
+        for knoop in verbonden_knopen(run.context, conduit):
             if knoop is not None:
                 per_put[knoop].add(soort)
 

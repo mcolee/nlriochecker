@@ -166,6 +166,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De checks lezen de graaf via een smalle onderdelen-API op `GwswDataset`**. Drie
+  nieuwe methoden -- `onderdelen` (de directe `hasPart`-delen, optioneel gefilterd op een
+  wortelklasse), `onderdeel_label` en `onderdeel_aspecten` -- vervangen de losse
+  `parts_of`/`URIRef`/`graph.value`/`_read_aspects`-aanroepen in de ADM- en RVZ-checks,
+  en de zes losse `resolve_network_node`-paren (topologie, netwerk, graafbouw, omvang,
+  GeoPackage) gaan door het bestaande `verbanden.verbonden_knopen`. De graaftoegang
+  blijft zo binnen `dataset.py`; de uitvoer verandert niet.
 - **`CheckRun.config` is verplicht; de uitvoerlaag leest geen config meer stil bij**.
   Negen plekken in de uitvoerlaag vielen bij een ontbrekende `run.config` terug op
   `load_check_config()`, waardoor een run met projectconfig met de standaarddrempels

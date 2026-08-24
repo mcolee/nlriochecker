@@ -259,8 +259,8 @@ class PuttypePastNietBijLeiding(Check):
         for conduit in index.strengen(node.uri):
             if any(dataset.is_a(conduit.uri, wortel) for wortel in regel.vereist_een_van):
                 return True
-        for deel in parts_of(dataset.graph, URIRef(node.uri)):
-            if any(dataset.graph_is_a(str(deel), wortel) for wortel in regel.vereist_een_van):
+        for deel in dataset.onderdelen(node.uri):
+            if any(dataset.graph_is_a(deel, wortel) for wortel in regel.vereist_een_van):
                 return True
         return False
 
@@ -334,8 +334,7 @@ class PutonderdelenZonderVerbinding(Check):
         """De compartimenten van een put, als URI's."""
         dataset = context.dataset
         gevonden = []
-        for deel in parts_of(dataset.graph, URIRef(node.uri)):
-            uri = str(deel)
+        for uri in dataset.onderdelen(node.uri):
             if uri in dataset.nodes and dataset.nodes[uri].orientation is not None:
                 gevonden.append(uri)
         return gevonden
@@ -447,12 +446,7 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
         GWSW-totaalontologie 1.6 geen enkele klasse, dus geen orientatietype valt onder
         `Compartiment`.
         """
-        dataset = context.dataset
-        return [
-            str(deel)
-            for deel in parts_of(dataset.graph, URIRef(node.uri))
-            if dataset.graph_is_a(str(deel), "Compartiment")
-        ]
+        return context.dataset.onderdelen(node.uri, "Compartiment")
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten compartimenten hebben."""

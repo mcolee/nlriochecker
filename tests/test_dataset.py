@@ -140,6 +140,44 @@ def test_onderdeel_uit_de_graaf_is_op_klasse_te_herkennen() -> None:
     assert dataset.graph_is_a(drempel, "Overstortdrempel")
 
 
+def test_onderdelen_vindt_de_delen_van_een_put() -> None:
+    """`onderdelen` loopt hasPart neerwaarts en filtert desgewenst op een wortelklasse."""
+    dataset = load_dataset(TTL_DIR / "adm007_overstort_met_drempel.ttl")
+    put = "http://example.org/toets#PutO"
+
+    assert dataset.onderdelen(put) == ["http://example.org/toets#DrempelO"]
+    assert dataset.onderdelen(put, "Overstortdrempel") == ["http://example.org/toets#DrempelO"]
+    assert dataset.onderdelen(put, "Compartiment") == []
+    # De volgorde is de graafvolgorde van `parts_of`, zonder sortering.
+    orientatie = "http://example.org/toets#L1_ori"
+    assert dataset.onderdelen(orientatie) == [
+        str(deel) for deel in parts_of(dataset.graph, URIRef(orientatie))
+    ]
+
+
+def test_onderdeel_label_leest_het_label_van_een_willekeurig_subject() -> None:
+    """Ook een onderdeel dat geen knoop of streng is heeft zo een leesbaar label."""
+    dataset = load_dataset(TTL_DIR / "adm007_overstort_met_drempel.ttl")
+
+    assert dataset.onderdeel_label("http://example.org/toets#DrempelO") == "DrempelO"
+    assert dataset.onderdeel_label("http://example.org/toets#L1_b") is None
+
+
+def test_onderdeel_aspecten_geeft_dezelfde_kenmerken_als_de_private_lezing() -> None:
+    """De publieke aspectlezing is exact de private `_read_aspects` op de graaf."""
+    from nlriochecker.dataset import _read_aspects
+
+    dataset = load_dataset(TTL_DIR / "adm007_overstort_met_drempel.ttl")
+    drempel = "http://example.org/toets#DrempelO"
+
+    aspecten = dataset.onderdeel_aspecten(drempel)
+    assert aspecten == list(_read_aspects(dataset.graph, URIRef(drempel)))
+    assert {(aspect.kind, aspect.number) for aspect in aspecten} == {
+        ("Drempelniveau", 9.0),
+        ("Drempelbreedte", 2000.0),
+    }
+
+
 def test_of_class_weigert_een_verbindingsklasse(juinen: GwswDataset) -> None:
     """Een verbindingsklasse als rol levert stil nul op; dat hoort een fout te zijn.
 

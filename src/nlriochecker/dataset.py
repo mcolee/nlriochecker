@@ -592,6 +592,38 @@ class GwswDataset:
             gevonden.extend(self.graph.subjects(RDF.type, URIRef(klasse)))
         return gevonden
 
+    def onderdelen(self, uri: str, wortel: str | None = None) -> list[str]:
+        """De directe onderdelen van een object, optioneel beperkt tot een klasse.
+
+        De neerwaartse tegenhanger van `klim_naar_knoop`: een stap langs hasPart
+        omlaag, in beide schrijfrichtingen. Met een `wortel` blijven alleen de delen
+        over die volgens `graph_is_a` van die klasse zijn -- ook delen die geen knoop
+        of streng zijn, zoals een overstortdrempel. De volgorde is de graafvolgorde
+        van `parts_of`, ongewijzigd; sorteren zou de uitvoer van de checks die hierop
+        leunen veranderen.
+        """
+        delen = [str(deel) for deel in parts_of(self.graph, URIRef(uri))]
+        if wortel is None:
+            return delen
+        return [deel for deel in delen if self.graph_is_a(deel, wortel)]
+
+    def onderdeel_label(self, uri: str) -> str | None:
+        """Het rdfs:label van een willekeurig subject in de graaf, of None.
+
+        Ook voor onderdelen die geen `Node` of `Conduit` zijn en dus geen eigen
+        labelveld in het domeinmodel hebben.
+        """
+        waarde = self.graph.value(URIRef(uri), RDFS.label)
+        return str(waarde) if waarde is not None else None
+
+    def onderdeel_aspecten(self, uri: str) -> list[Aspect]:
+        """De kenmerken die via hasAspect aan een willekeurig subject hangen.
+
+        Dezelfde lezing als `_read_aspects`, maar dan als methode: de checks hoeven
+        de graaf er niet meer voor aan te raken.
+        """
+        return list(_read_aspects(self.graph, URIRef(uri)))
+
     def stelsel_leden(self, uri: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
         """De streng- en knoop-URI's die dit stelsel via `hasPart` draagt.
 

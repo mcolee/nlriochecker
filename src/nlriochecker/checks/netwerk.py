@@ -19,7 +19,13 @@ from nlriochecker.checks.selectie import (
     infiltratieleidingen,
     overstortputten,
 )
-from nlriochecker.checks.verbanden import _eindpunten, _Netwerk, _netwerk, deelstelsel_ids
+from nlriochecker.checks.verbanden import (
+    _eindpunten,
+    _Netwerk,
+    _netwerk,
+    deelstelsel_ids,
+    verbonden_knopen,
+)
 from nlriochecker.dataset import Conduit, GwswDataset, part_holders_of
 from nlriochecker.taal import getal, vorm
 
@@ -724,16 +730,11 @@ class StelseltypeWijktAfVanBuren(Check):
         aan de rand van een stelsel is namelijk terecht anders dan haar buur.
         """
         netwerk = _netwerk(context)
-        dataset = context.dataset
-        wortels = context.config.klassen.netwerkknopen
 
         soorten = {conduit.uri: _stelseltype(context, conduit) for conduit in netwerk.conduits}
         per_knoop: dict[str, list[Conduit]] = {}
         for conduit in netwerk.conduits:
-            for uri in (
-                dataset.resolve_network_node(conduit.start_node, wortels),
-                dataset.resolve_network_node(conduit.end_node, wortels),
-            ):
+            for uri in verbonden_knopen(context, conduit):
                 if uri is not None:
                     per_knoop.setdefault(uri, []).append(conduit)
 
@@ -741,8 +742,7 @@ class StelseltypeWijktAfVanBuren(Check):
             eigen = soorten[conduit.uri]
             if eigen is None:
                 continue
-            begin = dataset.resolve_network_node(conduit.start_node, wortels)
-            eind = dataset.resolve_network_node(conduit.end_node, wortels)
+            begin, eind = verbonden_knopen(context, conduit)
             bovenstrooms = self._buren(per_knoop, begin, conduit.uri, soorten)
             benedenstrooms = self._buren(per_knoop, eind, conduit.uri, soorten)
             # Het register vraagt om afwijking van *boven- en* benedenstroomse
@@ -814,17 +814,13 @@ class KoppelingTussenStelseltypen(Check):
         """
         netwerk = _netwerk(context)
         dataset = context.dataset
-        wortels = context.config.klassen.netwerkknopen
 
         per_knoop: dict[str, dict[str, list[str]]] = {}
         for conduit in netwerk.conduits:
             soort = _stelseltype(context, conduit)
             if soort is None:
                 continue
-            for uri in (
-                dataset.resolve_network_node(conduit.start_node, wortels),
-                dataset.resolve_network_node(conduit.end_node, wortels),
-            ):
+            for uri in verbonden_knopen(context, conduit):
                 if uri is not None:
                     per_knoop.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
 
