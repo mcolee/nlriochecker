@@ -166,6 +166,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`uitvoer/__init__.py` is een lege naamruimte; de orkestratie woont in
+  `uitvoer/schrijver.py`**. `schrijf_uitvoer`, `schrijf_uitvoer_gebieden` en de
+  `Uitvoer`-dataclasses verhuisden ongewijzigd; importeer ze voortaan uit
+  `nlriochecker.uitvoer.schrijver`. Een import van een lichte deelmodule
+  (`uitvoer.identiteit`) trekt daardoor niet langer de hele uitvoerstack binnen, en
+  de vier functie-lokale imports die de oude importkring omzeilden staan weer
+  bovenaan hun module. Twee nieuwe drifttests borgen via een expliciete
+  veld→kolom-afbeelding dat elk `Melding`-veld in `bevindingen.csv` én in de
+  GeoPackage-meldingentabel verantwoord is (met `object2_label` als benoemde
+  weglating: de tabel heeft er nooit een kolom voor gehad). De uitvoer verandert
+  niet.
 - **De checks lezen de graaf via een smalle onderdelen-API op `GwswDataset`**. Drie
   nieuwe methoden -- `onderdelen` (de directe `hasPart`-delen, optioneel gefilterd op een
   wortelklasse), `onderdeel_label` en `onderdeel_aspecten` -- vervangen de losse

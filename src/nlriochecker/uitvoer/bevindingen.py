@@ -80,6 +80,37 @@ CSV_KOLOMMEN = [
     "CFK",
 ]
 
+# Veld → kolom(men): de afbeelding die `meldingen_tabel` hieronder rij voor rij
+# maakt, hier expliciet zodat de drifttest in `tests/test_uitvoer_herkomst.py` kan
+# borgen dat elk `Melding`-veld een CSV-kolom heeft. `foutlocatie` splitst in X en Y.
+CSV_VELD_NAAR_KOLOM: dict[str, tuple[str, ...]] = {
+    "melding_id": ("MeldingID",),
+    "check_id": ("Check",),
+    "categorie": ("Categorie",),
+    "bron": ("Bron",),
+    "ernst": ("Ernst",),
+    "dimensie": ("Dimensie",),
+    "object_uri": ("ObjectURI",),
+    "object_id": ("Object",),
+    "object_label": ("Label",),
+    "object2_uri": ("Object2URI",),
+    "object2_id": ("Object2",),
+    "object2_label": ("Object2Label",),
+    "boodschap": ("Melding",),
+    "waarde": ("Waarde",),
+    "drempel": ("Drempel",),
+    "typering_betrouwbaar": ("TyperingBetrouwbaar",),
+    "cluster_id": ("ClusterID",),
+    "scope": ("Scope",),
+    "gebied": ("Gebied",),
+    "prioriteit": ("Prioriteit",),
+    "systemisch": ("Systemisch",),
+    "foutlocatie": ("X", "Y"),
+    "run_datum": ("RunDatum",),
+    "dataset": ("Dataset",),
+    "cfk": ("CFK",),
+}
+
 
 def write_check_report(
     run: CheckRun,

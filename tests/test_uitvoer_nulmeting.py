@@ -21,9 +21,9 @@ from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import bouw_nulbevindingen
-from nlriochecker.uitvoer import schrijf_uitvoer
 from nlriochecker.uitvoer.bevindingen import FILE_CHECKS_CSV, FILE_CHECKS_JSON
 from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 SHACL_DIR = Path(__file__).parent / "fixtures" / "shacl"

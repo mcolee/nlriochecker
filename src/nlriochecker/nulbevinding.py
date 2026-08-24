@@ -42,6 +42,7 @@ from rdflib import URIRef
 
 from nlriochecker.dataset import GWSW, GwswDataset, aspect_holders_of, part_holders_of
 from nlriochecker.meting import Nulmeting
+from nlriochecker.uitvoer.identiteit import kort
 
 logger = logging.getLogger(__name__)
 
@@ -258,11 +259,6 @@ class _Joiner:
     """
 
     def __init__(self, dataset: GwswDataset) -> None:
-        # Binnen de functie: `uitvoer.identiteit` hangt onder een package die op haar
-        # beurt `checks` binnentrekt, en die leest deze module. Een import bovenaan
-        # zou die kring rond maken.
-        from nlriochecker.uitvoer.identiteit import kort
-
         self._dataset = dataset
         self._objecten = frozenset(dataset.nodes) | frozenset(dataset.conduits)
         self._per_fragment = {kort(uri): uri for uri in self._objecten}

@@ -23,7 +23,7 @@ from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.reporting import write_check_report, write_reports
 from nlriochecker.studiegebied import load_studiegebieden, load_study_area
 from nlriochecker.toetsloop import toets_gebieden
-from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer_gebieden
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 SHACL_DIR = DATA_DIR / "shacl_nulmeting"

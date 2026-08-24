@@ -16,7 +16,7 @@ from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import laad_nulmeting
-from nlriochecker.uitvoer import schrijf_uitvoer
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 from nlriochecker.voortgang import NUL_VOORTGANG, NulVoortgang, Voortgang
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"

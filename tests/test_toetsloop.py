@@ -24,8 +24,8 @@ from nlriochecker.meting import Meetbereik
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
-from nlriochecker.uitvoer import schrijf_uitvoer_gebieden
 from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer_gebieden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"

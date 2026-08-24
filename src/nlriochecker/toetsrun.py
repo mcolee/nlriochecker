@@ -37,7 +37,7 @@ from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.studiegebied import RdGrenzen, Studiegebieden, load_studiegebieden
 from nlriochecker.taal import getal, vorm
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
-from nlriochecker.uitvoer import UitvoerPerGebied, schrijf_uitvoer_gebieden
+from nlriochecker.uitvoer.schrijver import UitvoerPerGebied, schrijf_uitvoer_gebieden
 from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 

@@ -18,9 +18,9 @@ from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import bouw_nulbevindingen
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import toets_gebieden
-from nlriochecker.uitvoer import schrijf_uitvoer, schrijf_uitvoer_gebieden
 from nlriochecker.uitvoer.omvang import omvangtabel
 from nlriochecker.uitvoer.samenvatting import KRUISJE, NIET_GEMETEN, VINKJE
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer, schrijf_uitvoer_gebieden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"

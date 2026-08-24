@@ -1134,6 +1134,42 @@ MELDING_KOLOMMEN = [
     _Kolom("cfk", "text"),
 ]
 
+# Veld → kolom(men): de afbeelding die `_melding_rij` hieronder maakt, hier expliciet
+# zodat de drifttest in `tests/test_uitvoer_herkomst.py` kan borgen dat elk
+# `Melding`-veld in de meldingentabel verantwoord is. `foutlocatie` splitst in x en y;
+# `stapel_aantal` en `stapel_nr` staan er niet in, want die zijn uit de hele lijst
+# afgeleid en horen bij geen enkel veld.
+MELDING_VELD_NAAR_KOLOM: dict[str, tuple[str, ...]] = {
+    "melding_id": ("melding_id",),
+    "object_id": ("feature_id",),
+    "object2_id": ("feature_id_2",),
+    "object_label": ("label",),
+    "check_id": ("check_id",),
+    "bron": ("bron",),
+    "ernst": ("ernst",),
+    "categorie": ("categorie",),
+    "dimensie": ("dimensie",),
+    "boodschap": ("boodschap",),
+    "waarde": ("waarde",),
+    "drempel": ("drempel",),
+    "systemisch": ("systemisch",),
+    "cluster_id": ("cluster_id",),
+    "scope": ("scope",),
+    "gebied": ("gebied",),
+    "prioriteit": ("prioriteit",),
+    "typering_betrouwbaar": ("typering_betrouwbaar",),
+    "run_datum": ("run_datum",),
+    "dataset": ("dataset_versie",),
+    "object_uri": ("gwsw_uri",),
+    "object2_uri": ("gwsw_uri_2",),
+    "foutlocatie": ("x", "y"),
+    "cfk": ("cfk",),
+    # Het tweede object staat in de tabel als `feature_id_2` en `gwsw_uri_2`; zijn
+    # label heeft hier nooit een kolom gehad. Expliciet leeg, zodat de drifttest dit
+    # als bekende weglating leest -- een nieuw veld zonder vermelding valt er wél op.
+    "object2_label": (),
+}
+
 
 def _stapels(meldingen: list[Melding]) -> dict[str, tuple[int, int]]:
     """Per melding het aantal meldingen op haar plek en haar volgnummer daarin.

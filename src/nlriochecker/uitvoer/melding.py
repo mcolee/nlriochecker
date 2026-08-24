@@ -18,6 +18,8 @@ from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckOutcome, CheckRun, Dimension, Finding, Severity
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.uitvoer.identiteit import kort, melding_id
+from nlriochecker.uitvoer.locatie import foutlocatie, objectlocatie
+from nlriochecker.uitvoer.omvang import klassen_op_nul
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +92,6 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
 
     De enige plek waar bevindingen naar uitvoer vertaald worden.
     """
-    from nlriochecker.uitvoer.locatie import foutlocatie
-
     config = run.config
     scope = SCOPE_BINNEN if run.study_area is not None else SCOPE_GEEN_GEBIED
     gebied = run.study_area.gebied if run.study_area is not None else ""
@@ -155,8 +155,6 @@ def _signaalmeldingen(
     Zonder gebied, net als een nulmetingbevinding die nergens op uitkwam: het is aan
     geen enkel studiegebied toe te wijzen. Zie issue #22.
     """
-    from nlriochecker.uitvoer.omvang import klassen_op_nul
-
     meldingen = []
     for signaal in klassen_op_nul(run):
         kenmerk = _uniek_id(
@@ -216,8 +214,6 @@ def _nulmeldingen(
     studiegebied toe te wijzen. Hem het gebied van de run geven zou beweren dat hij
     daarbinnen ligt, en dat is niet gemeten.
     """
-    from nlriochecker.uitvoer.locatie import objectlocatie
-
     meldingen = []
     for bevinding in run.nulbevindingen:
         kenmerk = _uniek_id(

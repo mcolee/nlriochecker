@@ -20,8 +20,8 @@ from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik
-from nlriochecker.uitvoer import schrijf_uitvoer
 from nlriochecker.uitvoer.samenvatting import NIET_GEMETEN, REGEL_EIGEN_CHECKS, VINKJE
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 from nlriochecker.uitvoer.voorbehoud import GEEN_KLASSENHIERARCHIE, markering, voorbehouden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"

@@ -43,8 +43,10 @@ from nlriochecker.reporting import (
     write_coverage_report,
     write_reports,
 )
-from nlriochecker.uitvoer import schrijf_uitvoer
+from nlriochecker.uitvoer import gpkg
 from nlriochecker.uitvoer.bevindingen import (
+    CSV_KOLOMMEN,
+    CSV_VELD_NAAR_KOLOM,
     FILE_CHECKS_CSV,
     FILE_CHECKS_JSON,
     FILE_CHECKS_MARKDOWN,
@@ -61,6 +63,7 @@ from nlriochecker.uitvoer.herkomst import (
     schrijf_markdown,
 )
 from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 BRON = Path(__file__).resolve().parents[1] / "src"
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -344,6 +347,36 @@ def test_meldingen_json_spiegelt_de_dataclass(toets: CheckRun) -> None:
 
     assert rijen
     assert {veld.name for veld in fields(Melding)} == set(rijen[0])
+
+
+def test_csv_kolommen_dekken_elk_meldingveld() -> None:
+    """Elk veld van `Melding` heeft een CSV-kolom, en elke kolom een veld.
+
+    Direct groen geschreven -- de kolomlijst was al compleet. De test is het
+    vangnet: krijgt `Melding` een veld zonder plek in `CSV_VELD_NAAR_KOLOM`, of
+    komt er een kolom bij die geen veld draagt, dan valt hij hier om in plaats van
+    dat de CSV stilzwijgend een gegeven mist dat de JSON wel heeft.
+    """
+    assert set(CSV_VELD_NAAR_KOLOM) == {veld.name for veld in fields(Melding)}
+
+    gedekt = [kolom for kolommen in CSV_VELD_NAAR_KOLOM.values() for kolom in kolommen]
+    assert sorted(gedekt) == sorted(CSV_KOLOMMEN)
+
+
+def test_gpkg_kolommen_dekken_elk_meldingveld() -> None:
+    """Elk veld van `Melding` is in de GeoPackage-meldingentabel verantwoord.
+
+    Direct groen geschreven -- de kolomlijst was al compleet, op één bekende
+    weglating na: `object2_label` heeft in de tabel nooit een kolom gehad en staat
+    daarom expliciet leeg in de afbeelding. De test is het vangnet: een nieuw veld
+    zonder vermelding in `MELDING_VELD_NAAR_KOLOM` valt hier om. `stapel_aantal` en
+    `stapel_nr` zijn uit de hele meldingenlijst afgeleid en horen bij geen veld.
+    """
+    assert set(gpkg.MELDING_VELD_NAAR_KOLOM) == {veld.name for veld in fields(Melding)}
+
+    gedekt = [kolom for kolommen in gpkg.MELDING_VELD_NAAR_KOLOM.values() for kolom in kolommen]
+    namen = [kolom.naam for kolom in gpkg.MELDING_KOLOMMEN]
+    assert sorted(gedekt + ["stapel_aantal", "stapel_nr"]) == sorted(namen)
 
 
 def test_meldingen_json_zet_de_foutlocatie_als_coordinatenpaar(toets: CheckRun) -> None:
