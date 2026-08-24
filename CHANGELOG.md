@@ -166,6 +166,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De rdflib-store is vervangen door eigen graafindexen uit de pyoxigraph-stream**
+  (issue #26). `GwswDataset.graph` is voortaan een `graaf.GraafIndex`: twee dicts
+  (s→p→objecten, p→o→subjecten), in stream-volgorde gevuld uit de pyoxigraph-parse en
+  met rdflib-termen als munteenheid, die precies de door de checks gebruikte
+  leesbewerkingen aanbiedt (`objects`, `subjects`, `value`, `subject_objects`,
+  membership, `len`) met dezelfde antwoorden en volgorde als rdflib's `Memory`-store
+  (`tests/test_graaf.py` toetst elk ervan tegen het rdflib-antwoord). De cache picklet
+  de index (teruglezen circa 6 s in plaats van circa 30 s; gemeten tegen warm herbouwen
+  uit de stream, dat circa 20 s kost), `graaf.py` telt mee in de cachesleutel, en de
+  overslaglijst van de structurenpickle volgt nu de niet-init-velden van de dataclass.
+  De `onderdeel_*`-lezers vinden een BNode-subject voortaan ook (voorheen verarmde de
+  vaste `URIRef`-omweg zo'n onderdeel tot een lege lezing). De uitvoer verandert niet
+  (vergelijker: gelijk op alle vier de uitvoervormen, koud én warm); een koude De
+  Wolden en Hoogeveen-run daalt van circa 195 s naar circa 116 s, een warme van circa
+  129 s naar circa 96 s, en het piekgeheugen van circa 4,0 GB naar circa 2,2 GB.
 - **Snellere topologie- en netwerkchecks door ruimtelijke caches en memoisatie**. De
   puttenzoek (`nearest_node`) en de burenzoek van de strengen gebruiken
   `STRtree.query(..., predicate="dwithin")` in plaats van per aanroep een gebufferde
