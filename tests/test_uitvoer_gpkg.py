@@ -188,6 +188,7 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
     assert [naam for naam, _, _ in stijlen] == [
         "bouwwerken",
         "putten",
+        "stelsels",
         "strengen",
         "waterdelen_zonder_zinker",
     ]
@@ -981,3 +982,74 @@ def test_afvoerpad_zonder_lijn_geeft_stappen_zonder_meters(tmp_path: Path) -> No
         pad, "select afvoer_eindpunt, afvoer_stappen, afvoer_meters from putten where label = 'A'"
     )
     assert (eindpunt, stappen, meters) == ("G", 1, None)
+
+
+def test_stelsels_laag_is_een_multipolygon_in_gpkg_contents(tmp_path: Path) -> None:
+    """De cartografische stelsellaag staat geregistreerd, anders vindt QGIS haar niet."""
+    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+
+    ((soort,),) = _rijen(
+        pad, "select geometry_type_name from gpkg_geometry_columns where table_name = 'stelsels'"
+    )
+    assert soort == "MULTIPOLYGON"
+    contents = {naam for (naam,) in _rijen(pad, "select table_name from gpkg_contents")}
+    assert "stelsels" in contents
+
+
+def test_stelsels_laag_slaat_de_put_bucket_over(tmp_path: Path) -> None:
+    """Alleen stelsels met strengen krijgen een vlak; de hemelwaterbucket valt weg."""
+    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+
+    labels = {label for (label,) in _rijen(pad, "select label from stelsels")}
+
+    assert labels == {"vuilwater-1", "gemengd-1"}
+
+
+def test_stelsels_dragen_type_afvoer_en_omvang(tmp_path: Path) -> None:
+    """Type, bereikt_eindpunt en de tellingen per stelsel.
+
+    Het vuilwaterstelsel bereikt het gemaal (twee strengen van 50 m, samen 100 m);
+    het gemengde stelsel heeft geen afvoerroute (een streng van 50 m).
+    """
+    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+
+    rijen = {
+        label: (stelseltype, bereikt, n_strengen, lengte)
+        for label, stelseltype, bereikt, n_strengen, lengte in _rijen(
+            pad,
+            "select label, stelseltype, bereikt_eindpunt, n_strengen, strenglengte_m from stelsels",
+        )
+    }
+    assert rijen["vuilwater-1"] == ("Vuilwaterstelsel", 1, 2, 100.0)
+    assert rijen["gemengd-1"] == ("GemengdStelsel", 0, 1, 50.0)
+
+
+def test_stelsels_tellen_de_putten_aan_de_strengeinden(tmp_path: Path) -> None:
+    """`n_putten` telt de distinct netwerkknopen aan de eindpunten van de strengen."""
+    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+
+    putten = dict(_rijen(pad, "select label, n_putten from stelsels"))
+
+    assert putten["vuilwater-1"] == 3  # PutA, PutB en het gemaal
+    assert putten["gemengd-1"] == 2  # PutC en PutD
+
+
+def test_stelsels_dragen_een_leesbaar_vlak(tmp_path: Path) -> None:
+    """De geometrie is een leesbare MULTIPOLYGON om de strengen heen."""
+    from shapely import wkb
+
+    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+
+    ((blob,),) = _rijen(pad, "select geom from stelsels where label = 'gemengd-1'")
+    vorm = wkb.loads(bytes(blob)[8:])  # de GPKG-kop (magic, versie, vlaggen, srs) overslaan
+    assert vorm.geom_type == "MultiPolygon"
+    assert not vorm.is_empty
+
+
+def test_runmetadata_telt_de_stelsels(tmp_path: Path) -> None:
+    """`n_stelsels` maakt expliciet hoeveel stelsels een vlak kregen (put-buckets niet)."""
+    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+
+    ((aantal,),) = _rijen(pad, "select n_stelsels from gwsw_run")
+
+    assert aantal == 2

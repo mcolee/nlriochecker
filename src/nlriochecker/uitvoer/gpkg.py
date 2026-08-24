@@ -33,13 +33,14 @@ from pathlib import Path
 
 from shapely.geometry import MultiPolygon
 from shapely.geometry.base import BaseGeometry
+from shapely.ops import unary_union
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.netwerk import Afvoer, afvoerpad_van_streng, afvoerpaden
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer
-from nlriochecker.dataset import Conduit
+from nlriochecker.dataset import Conduit, GwswDataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
@@ -50,6 +51,7 @@ from nlriochecker.uitvoer.objectkaart import (
     popup_html,
 )
 from nlriochecker.uitvoer.omvang import stelseltypen
+from nlriochecker.uitvoer.stelsels import Stelselvlak, lees_stelsels
 from nlriochecker.uitvoer.stijlen.symbolen import bouw_qml
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.uitvoer.voorbehoud import markering
@@ -73,6 +75,7 @@ FEATURELAGEN = (
     "strengen",
     "bouwwerken",
     "waterdelen_zonder_zinker",
+    "stelsels",
 )
 
 # De relaties van EXT-001, van zwaar naar licht. De laag toont de sterkste over de
@@ -89,6 +92,12 @@ REDEN_SCHIL = "ligt naast het studiegebied en niet erin"
 # er niets beoordeeld is; grijs is precies de waarde die dat zegt.
 REDEN_GEEN_KLASSENHIERARCHIE = (
     "deze run kende de klassenhierarchie niet; de checks draaiden over een onvolledige selectie"
+)
+# Een stelsel wordt niet door de eigen checks getoetst -- die draaien op knopen en
+# strengen -- maar alleen door de SHACL-nulmeting. Zonder meting is het dus niet
+# beoordeeld, en groen zou "gemeten en in orde" beweren waar niets gemeten is.
+REDEN_GEEN_NULMETING = (
+    "geen SHACL-nulmeting gedraaid; een stelsel wordt alleen door de nulmeting beoordeeld"
 )
 
 RD_WKT = (
@@ -112,6 +121,7 @@ GEOPACKAGE_STAPPEN = (
     "strengen",
     "bouwwerken",
     "waterdelen_zonder_zinker",
+    "stelsels",
     "meldingen",
     "overzicht_checks",
     "gwsw_run",
@@ -143,6 +153,10 @@ class _LaagTellingen:
     mechanisch: int
     bouwwerken: int
     waterdelen: int
+    # Het aantal stelsels dat een vlak kreeg: de geregistreerde stelsels met strengen.
+    # De put-buckets uit #17 (alleen putten, geen strengen) vallen weg en zitten hier
+    # dus niet in; `n_stelsels` in `gwsw_run` maakt dat expliciet.
+    stelsels: int
 
 
 def schrijf_geopackage(
@@ -527,6 +541,7 @@ def _schrijf_features(
         voortgang.stap(label=laag)
 
     bouwwerken, waterdelen = _schrijf_treffers(verbinding, run, meldingen, config, voortgang)
+    stelsel_aantal = _schrijf_stelsels(verbinding, run, config, afvoercontext, per_object, voortgang)
 
     return _LaagTellingen(
         putten=tellingen["putten"],
@@ -534,6 +549,7 @@ def _schrijf_features(
         mechanisch=mechanisch_geschreven,
         bouwwerken=bouwwerken,
         waterdelen=waterdelen,
+        stelsels=stelsel_aantal,
     )
 
 
@@ -788,6 +804,153 @@ def _waterdeel_aanduiding(treffer: Treffer) -> str:
 def _check_ids(meldingen: list[Melding]) -> str:
     """De checks die naar deze treffer verwijzen, gesorteerd."""
     return ", ".join(sorted({melding.check_id for melding in meldingen}))
+
+
+def _stelsel_kolommen() -> list[_Kolom]:
+    """De kolommen van de laag `stelsels`."""
+    return [
+        _Kolom("feature_id", "text"),
+        _Kolom("label", "text"),
+        _Kolom("stelseltype", "text"),
+        # 1 als ten minste een streng van het stelsel een afvoer- of lozingseindpunt
+        # bereikt (#18), anders 0. De symbologie toont standaard alleen de nullen.
+        _Kolom("bereikt_eindpunt", "integer"),
+        # De distinct netwerkknopen aan de eindpunten van de strengen. De registratie
+        # zet putten in aparte buckets (#17), dus dit is een afleiding uit de graaf,
+        # alleen als teller -- niet de bron van de geometrie.
+        _Kolom("n_putten", "integer"),
+        _Kolom("n_strengen", "integer"),
+        _Kolom("strenglengte_m", "real"),
+        # Het aantal SHACL-overtredingen waarvan de focusnode dit stelsel is (#17). Ze
+        # koppelen via `object_uri` aan de laag; de popup somt ze op.
+        _Kolom("n_meldingen", "integer"),
+        _Kolom("gwsw_uri", "text"),
+        _Kolom("popup_html", "text"),
+    ]
+
+
+def _schrijf_stelsels(
+    verbinding: sqlite3.Connection,
+    run: CheckRun,
+    config: CheckConfig,
+    afvoercontext: CheckContext,
+    per_object: dict[str, list[Melding]],
+    voortgang: Voortgang,
+) -> int:
+    """Schrijft de cartografische laag `stelsels` en geeft het aantal rijen terug.
+
+    Een vlak per geregistreerd stelsel dat strengen draagt (#17, #25): de buffer om zijn
+    strengen, samengevoegd tot een MULTIPOLYGON. De put-buckets uit #17 hebben geen
+    strengen en levert `lees_stelsels` al niet op. De laag beslaat de hele dataset, niet
+    de kern van een studiegebied: een stelsel is aan geen enkel studiegebied toe te
+    wijzen (BO-12), net als de klassentelling in het rapport.
+    """
+    kolommen = _stelsel_kolommen()
+    _maak_featurelaag(
+        verbinding,
+        "stelsels",
+        "MULTIPOLYGON",
+        kolommen,
+        "Geregistreerde stelsels als vlak om hun strengen; standaard tonen alleen de "
+        "stelsels zonder afvoerroute.",
+    )
+    buffer_m = config.drempels.stelselvlak_buffer_m
+    gemeten = run.meetbereik.gemeten
+    rijen = []
+    grenzen: list[tuple[float, float, float, float]] = []
+    for vlak in lees_stelsels(run.dataset):
+        geometrie = _stelsel_geometrie(run.dataset, vlak, buffer_m)
+        if geometrie is None or geometrie.is_empty:
+            continue
+        grenzen.append(geometrie.bounds)
+        rijen.append(
+            (
+                _blob(_als_multipolygon(geometrie)),
+                *_stelsel_rij(run.dataset, config, afvoercontext, vlak, per_object, gemeten),
+            )
+        )
+    if rijen:
+        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
+        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
+        verbinding.executemany(
+            f'insert into "stelsels" (geom, {velden}) values ({plaatshouders})', rijen
+        )
+    _zet_omhullende(verbinding, "stelsels", grenzen)
+    voortgang.stap(label="stelsels")
+    return len(rijen)
+
+
+def _stelsel_geometrie(
+    dataset: GwswDataset, vlak: Stelselvlak, buffer_m: float
+) -> BaseGeometry | None:
+    """De buffer om de strengen van een stelsel, samengevoegd tot een vlak.
+
+    Bewust de strengen en niet de omhullende van alle leden: #17 vond dat een put en de
+    strengen waarop hij aansluit in verschillende stelselobjecten staan, dus de
+    omhullende zou de gemeentebrede put-buckets tot een vlek uitsmeren.
+    """
+    lijnen = [
+        conduit.line
+        for uri in vlak.strengen
+        if (conduit := dataset.conduits.get(uri)) is not None
+        and conduit.line is not None
+        and not conduit.line.is_empty
+    ]
+    if not lijnen:
+        return None
+    return unary_union([lijn.buffer(buffer_m) for lijn in lijnen])
+
+
+def _stelsel_rij(
+    dataset: GwswDataset,
+    config: CheckConfig,
+    afvoercontext: CheckContext,
+    vlak: Stelselvlak,
+    per_object: dict[str, list[Melding]],
+    gemeten: bool,
+) -> tuple[object, ...]:
+    """De attribuutvelden van een stelselvlak, in de volgorde van de kolommen.
+
+    De meldingen die op het stelsel landen zijn de SHACL-overtredingen waarvan de
+    focusnode dit stelsel is (#17): ze koppelen via `object_uri` aan `vlak.uri` en
+    verschijnen zo op de kaart. Zonder nulmeting is het stelsel niet beoordeeld -- de
+    eigen checks toetsen geen stelsel -- en staat de popup op grijs.
+    """
+    conduits = [dataset.conduits[uri] for uri in vlak.strengen if uri in dataset.conduits]
+    strenglengte = sum(conduit.line.length for conduit in conduits if conduit.line is not None)
+    bereikt = any(afvoerpad_van_streng(afvoercontext, conduit) is not None for conduit in conduits)
+    putten: set[str] = set()
+    for conduit in conduits:
+        for kant in (conduit.start_node, conduit.end_node):
+            knoop = dataset.resolve_network_node(kant, config.klassen.netwerkknopen)
+            if knoop is not None:
+                putten.add(knoop)
+    meldingen = per_object.get(vlak.uri, [])
+    kop = Objectkop(
+        label=vlak.label,
+        objecttype=vlak.stelseltype,
+        status=bepaal_status(meldingen, geanalyseerd=gemeten),
+        feiten=_stelsel_feiten(len(vlak.strengen), strenglengte, bereikt),
+        reden="" if gemeten else REDEN_GEEN_NULMETING,
+    )
+    return (
+        vlak.feature_id,
+        vlak.label,
+        vlak.stelseltype,
+        int(bereikt),
+        len(putten),
+        len(vlak.strengen),
+        strenglengte,
+        len(meldingen),
+        vlak.uri,
+        popup_html(kop, meldingen),
+    )
+
+
+def _stelsel_feiten(n_strengen: int, strenglengte: float, bereikt: bool) -> tuple[str, ...]:
+    """De feitenregel in de stelselpopup: de omvang en of er een afvoereindpunt is."""
+    afvoer = "bereikt een afvoereindpunt" if bereikt else "geen afvoerroute"
+    return (f"{n_strengen} strengen, {strenglengte:.0f} m", afvoer)
 
 
 def _samenvatting(
@@ -1166,6 +1329,7 @@ def _schrijf_runmetadata(
         _Kolom("n_mechanisch", "integer"),
         _Kolom("n_bouwwerken", "integer"),
         _Kolom("n_waterdelen", "integer"),
+        _Kolom("n_stelsels", "integer"),
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
@@ -1212,6 +1376,7 @@ def _schrijf_runmetadata(
             tellingen.mechanisch,
             tellingen.bouwwerken,
             tellingen.waterdelen,
+            tellingen.stelsels,
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,

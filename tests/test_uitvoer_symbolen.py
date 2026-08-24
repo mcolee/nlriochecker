@@ -174,11 +174,16 @@ def test_de_opbouw_is_deterministisch(laag: str) -> None:
     assert bouw_qml(laag) == bouw_qml(laag)
 
 
-def test_bouwwerken_en_waterdelen_blijven_gewone_bestanden() -> None:
-    """Hun symbologie is ongewijzigd; alleen de twee objectlagen zijn opgebouwd."""
+def test_de_vlaklagen_blijven_gewone_bestanden() -> None:
+    """De vlaklagen dragen een bestand-QML; alleen de twee objectlagen zijn opgebouwd.
+
+    Bouwwerken en waterdelen hebben een enkele symbologie, en de stelsellaag (#25) een
+    rule-based stijl op `bereikt_eindpunt`; geen van drie volgt de objecttype x
+    status-structuur die `symbolen.py` opbouwt.
+    """
     aanwezig = {pad.name for pad in STIJLEN.glob("*.qml")}
 
-    assert aanwezig == {"bouwwerken.qml", "waterdelen_zonder_zinker.qml"}
+    assert aanwezig == {"bouwwerken.qml", "waterdelen_zonder_zinker.qml", "stelsels.qml"}
 
 
 def test_elk_objecttype_in_de_voorbeelddataset_staat_in_de_tabel(juinen) -> None:

@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Stelselvlakken als GeoPackage-laag** (issue #25). Een nieuwe featurelaag `stelsels`
+  tekent per geregistreerd stelsel (de `hasPart`-boom uit #17) een MULTIPOLYGON: de
+  buffer om zijn strengen, samengevoegd tot één vlak. De bufferafstand is de nieuwe
+  drempel `stelselvlak_buffer_m` (10 m). Elke rij draagt het stelseltype,
+  `bereikt_eindpunt` (of een streng een afvoer- of lozingseindpunt bereikt, uit #18),
+  het aantal putten en strengen, de totale strenglengte en een popup. De put-buckets
+  uit #17 (stelsels met alleen putten, geen strengen) krijgen geen vlak; `gwsw_run`
+  telt de geschreven stelsels in `n_stelsels`. De QGIS-stijl `stelsels.qml` toont
+  standaard alleen de stelsels zonder afvoerroute; de rest zit in de laag maar staat uit.
+
 - **Richtingsdiagnose NET-009** (issue #18, fase 2). De nieuwe check **NET-009** (F,
   Consistentie) meldt per vrijvervalstreng waar de drie richtingssignalen elkaar
   tegenspreken: de administratieve van-naar-richting (de referentie), de tekenrichting
