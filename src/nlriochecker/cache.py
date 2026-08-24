@@ -1,10 +1,10 @@
 """De geparseerde dataset bewaren, zodat een tweede run niet opnieuw hoeft te parsen.
 
-Gemeten op De Wolden en Hoogeveen: het TTL parsen kost sinds pyoxigraph circa 5 s (voorheen
-circa 180 s met rdflib; zie BO-41), de structuren teruglezen circa 2 s en de rdflib-graaf uit
-de pickle teruglezen circa 30 s. Die laatste stap blijft de dure: de graaf wordt daarom pas
-ingelezen als een check hem aanraakt; wie alleen geometrie- en netwerkchecks draait, betaalt
-hem niet.
+Gemeten op De Wolden en Hoogeveen: de structuren teruglezen kost circa 2 s en de graafindex
+uit de pickle teruglezen circa 6 s (91 MB; de rdflib-graaf was circa 30 s). Picklen wint het
+van warm herbouwen uit de pyoxigraph-stream, dat circa 20 s kost -- de parse zelf is snel,
+maar de indexopbouw met rdflib-termen niet. De graaf wordt bovendien pas ingelezen als een
+check hem aanraakt; wie alleen geometrie- en netwerkchecks draait, betaalt hem niet.
 
 Het gevaar van een cache is dat hij achterloopt. De sleutel bevat daarom niet alleen
 de inhoud van de invoerbestanden maar ook de broncode van de lader en de versies van

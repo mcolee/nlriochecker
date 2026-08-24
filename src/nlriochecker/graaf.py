@@ -52,7 +52,7 @@ XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
 
 
 def naar_rdflib(
-    term: pyoxigraph.NamedNode | pyoxigraph.BlankNode | pyoxigraph.Literal,
+    term: pyoxigraph.NamedNode | pyoxigraph.BlankNode | pyoxigraph.Literal | pyoxigraph.Triple,
 ) -> RdfNode:
     """Zet een pyoxigraph-term om naar de bijbehorende rdflib-term.
 
@@ -65,12 +65,14 @@ def naar_rdflib(
     en de OroX-export), niet op een algemene reconstructiegarantie.
 
     Andere termsoorten (RDF-ster-triples, benoemde grafen) horen niet in een Turtle-parse en
-    vallen luid om op een `AttributeError` in plaats van stilzwijgend verkeerd om te zetten.
+    vallen luid om op een `TypeError` in plaats van stilzwijgend verkeerd om te zetten.
     """
     if isinstance(term, pyoxigraph.NamedNode):
         return URIRef(term.value)
     if isinstance(term, pyoxigraph.BlankNode):
         return BNode(term.value)
+    if not isinstance(term, pyoxigraph.Literal):
+        raise TypeError(f"onverwachte termsoort in een Turtle-parse: {term!r}")
     if term.language is not None:
         return Literal(term.value, lang=term.language)
     datatype = term.datatype.value
@@ -90,17 +92,21 @@ class GraafIndex:
     """
 
     def __init__(self) -> None:
-        self._spo: dict[RdfNode, dict[RdfNode, list[RdfNode]]] = {}
+        # De objecten per (s, p) zijn een insertie-geordende dict met None-waarden,
+        # geen lijst: het duplicaatfilter bij het vullen en de membership-test zijn
+        # daarmee O(1). Met een lijst kostte de dedupescan op de De Wolden en
+        # Hoogeveen-export 57 van de 97 seconden -- een gemeentebrede bucket draagt
+        # tienduizenden hasPart-objecten aan hetzelfde subject.
+        self._spo: dict[RdfNode, dict[RdfNode, dict[RdfNode, None]]] = {}
         self._pos: dict[RdfNode, dict[RdfNode, list[RdfNode]]] = {}
         self._aantal = 0
 
     def voeg_toe(self, subject: RdfNode, predicate: RdfNode, object_: RdfNode) -> None:
         """Voegt een triple toe; een duplicaat verandert niets, ook de volgorde niet."""
-        per_predicaat = self._spo.setdefault(subject, {})
-        objecten = per_predicaat.setdefault(predicate, [])
+        objecten = self._spo.setdefault(subject, {}).setdefault(predicate, {})
         if object_ in objecten:
             return
-        objecten.append(object_)
+        objecten[object_] = None
         self._pos.setdefault(predicate, {}).setdefault(object_, []).append(subject)
         self._aantal += 1
 
@@ -111,18 +117,44 @@ class GraafIndex:
         bestaat een keer als rdflib-object en wordt in alle triples gedeeld. Dat
         scheelt op de De Wolden en Hoogeveen-export honderden megabytes -- elke triple
         draagt drie verwijzingen in plaats van drie verse objecten.
+
+        De lus herhaalt `voeg_toe` bewust inline: een functieaanroep per term en per
+        triple kostte op de De Wolden en Hoogeveen-export (1,9 miljoen quads) tientallen
+        seconden. `tests/test_graaf.py` houdt de twee routes gelijk.
         """
         termen: dict[object, RdfNode] = {}
-
-        def term(ruw: object) -> RdfNode:
-            klaar = termen.get(ruw)
-            if klaar is None:
-                klaar = naar_rdflib(ruw)  # type: ignore[arg-type]
-                termen[ruw] = klaar
-            return klaar
-
+        spo = self._spo
+        pos = self._pos
+        aantal = self._aantal
         for quad in quads:
-            self.voeg_toe(term(quad.subject), term(quad.predicate), term(quad.object))
+            ruw_s, ruw_p, ruw_o = quad.subject, quad.predicate, quad.object
+            s = termen.get(ruw_s)
+            if s is None:
+                s = termen[ruw_s] = naar_rdflib(ruw_s)
+            p = termen.get(ruw_p)
+            if p is None:
+                p = termen[ruw_p] = naar_rdflib(ruw_p)
+            o = termen.get(ruw_o)
+            if o is None:
+                o = termen[ruw_o] = naar_rdflib(ruw_o)
+            per_predicaat = spo.get(s)
+            if per_predicaat is None:
+                per_predicaat = spo[s] = {}
+            objecten = per_predicaat.get(p)
+            if objecten is None:
+                objecten = per_predicaat[p] = {}
+            elif o in objecten:
+                continue
+            objecten[o] = None
+            per_object = pos.get(p)
+            if per_object is None:
+                per_object = pos[p] = {}
+            subjecten = per_object.get(o)
+            if subjecten is None:
+                subjecten = per_object[o] = []
+            subjecten.append(s)
+            aantal += 1
+        self._aantal = aantal
 
     def objects(self, subject: RdfNode, predicate: RdfNode) -> Iterator[RdfNode]:
         """De objecten van (subject, predicate), in eerste-toevoegvolgorde."""
@@ -130,16 +162,16 @@ class GraafIndex:
 
     def subjects(self, predicate: RdfNode, object_: RdfNode) -> Iterator[RdfNode]:
         """De subjecten van (predicate, object), in eerste-toevoegvolgorde."""
-        return iter(self._pos.get(predicate, _LEEG).get(object_, ()))
+        return iter(self._pos.get(predicate, _LEEG_POS).get(object_, ()))
 
     def value(self, subject: RdfNode, predicate: RdfNode) -> RdfNode | None:
         """Het eerste object van (subject, predicate), of None."""
         objecten = self._spo.get(subject, _LEEG).get(predicate)
-        return objecten[0] if objecten else None
+        return next(iter(objecten)) if objecten else None
 
     def subject_objects(self, predicate: RdfNode) -> Iterator[tuple[RdfNode, RdfNode]]:
         """Alle (subject, object)-paren van dit predicaat, in pos-groepering."""
-        for object_, subjecten in self._pos.get(predicate, _LEEG).items():
+        for object_, subjecten in self._pos.get(predicate, _LEEG_POS).items():
             for subject in subjecten:
                 yield subject, object_
 
@@ -148,8 +180,7 @@ class GraafIndex:
         return term in self._spo
 
     def __contains__(self, triple: tuple[RdfNode, RdfNode, RdfNode]) -> bool:
-        """Membership van een volledig gebonden triple; de lijstscan is kort --
-        het aantal objecten per (subject, predicaat) is in de praktijk enkele."""
+        """Membership van een volledig gebonden triple, in O(1)."""
         subject, predicate, object_ = triple
         return object_ in self._spo.get(subject, _LEEG).get(predicate, ())
 
@@ -158,5 +189,6 @@ class GraafIndex:
         return self._aantal
 
 
-# Een gedeelde lege dict als terugval, zodat een misser geen nieuwe dict aanmaakt.
-_LEEG: dict[RdfNode, list[RdfNode]] = {}
+# Gedeelde lege dicts als terugval, zodat een misser geen nieuwe dict aanmaakt.
+_LEEG: dict[RdfNode, dict[RdfNode, None]] = {}
+_LEEG_POS: dict[RdfNode, list[RdfNode]] = {}
