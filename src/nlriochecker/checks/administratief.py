@@ -761,7 +761,12 @@ class LozeLeidingAanActiefRiool(_LozeLeidingen):
 
 @register
 class LosgekoppeldeLozeLeiding(_LozeLeidingen):
-    """ADM-011: een keten van loze leidingen zonder enige actieve aansluiting: dode data."""
+    """ADM-011: een keten van loze leidingen zonder aansluiting in de afvoerrichting.
+
+    Richtingsgebaseerd: er komt in de administratieve afvoerrichting niets binnen en er
+    gaat niets verder. Een actieve streng die een ketenknoop wel raakt (tegen de richting
+    in of ernaast) staat in het detail `rakend` en in de tekst.
+    """
 
     id = "ADM-011"
     title = "Loze leiding zonder aansluiting op actief riool in de afvoerrichting"

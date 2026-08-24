@@ -16,8 +16,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 - **ADM-010 en ADM-011: loze leidingen die in het actieve netwerk hangen** (issue #62).
   Loze leidingen (`LozeLeiding`, buiten gebruik) worden tot ketens gegroepeerd; ADM-010
   (F) meldt per loze streng een keten waar actief riool op aansluit (doorgaand, aanvoer
-  of afvoer, in de administratieve richting), ADM-011 (W) een keten die aan niets hangt.
-  De keten staat in `cluster_id`, het aantal actieve strengen bovenstrooms als detail.
+  of afvoer, in de administratieve richting), ADM-011 (W) een keten waar in die richting
+  niets binnenkomt en niets verder gaat. De keten staat in `cluster_id`, het aantal actieve
+  strengen bovenstrooms als detail, en `rakend` noemt de actieve strengen die een
+  ketenknoop wel raken maar tegen de richting in of ernaast liggen.
   Nieuwe rol `[klassen] loze_leiding`. Gemeten op De Wolden en Hoogeveen: 54 loze
   leidingen in 33 ketens -- 3 doorgaand (8 strengen), 11 aanvoer (16), 5 afvoer (14) en
   14 losgekoppeld (16) -- dus 38 F en 16 W. Zie BO-47.
