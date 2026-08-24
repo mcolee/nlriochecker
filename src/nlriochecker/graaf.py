@@ -131,35 +131,39 @@ class GraafIndex:
         spo = self._spo
         pos = self._pos
         aantal = self._aantal
-        for quad in quads:
-            ruw_s, ruw_p, ruw_o = quad.subject, quad.predicate, quad.object
-            s = termen.get(ruw_s)
-            if s is None:
-                s = termen[ruw_s] = naar_rdflib(ruw_s)
-            p = termen.get(ruw_p)
-            if p is None:
-                p = termen[ruw_p] = naar_rdflib(ruw_p)
-            o = termen.get(ruw_o)
-            if o is None:
-                o = termen[ruw_o] = naar_rdflib(ruw_o)
-            per_predicaat = spo.get(s)
-            if per_predicaat is None:
-                per_predicaat = spo[s] = {}
-            objecten = per_predicaat.get(p)
-            if objecten is None:
-                objecten = per_predicaat[p] = {}
-            elif o in objecten:
-                continue
-            objecten[o] = None
-            per_object = pos.get(p)
-            if per_object is None:
-                per_object = pos[p] = {}
-            subjecten = per_object.get(o)
-            if subjecten is None:
-                subjecten = per_object[o] = []
-            subjecten.append(s)
-            aantal += 1
-        self._aantal = aantal
+        try:
+            for quad in quads:
+                ruw_s, ruw_p, ruw_o = quad.subject, quad.predicate, quad.object
+                s = termen.get(ruw_s)
+                if s is None:
+                    s = termen[ruw_s] = naar_rdflib(ruw_s)
+                p = termen.get(ruw_p)
+                if p is None:
+                    p = termen[ruw_p] = naar_rdflib(ruw_p)
+                o = termen.get(ruw_o)
+                if o is None:
+                    o = termen[ruw_o] = naar_rdflib(ruw_o)
+                per_predicaat = spo.get(s)
+                if per_predicaat is None:
+                    per_predicaat = spo[s] = {}
+                objecten = per_predicaat.get(p)
+                if objecten is None:
+                    objecten = per_predicaat[p] = {}
+                elif o in objecten:
+                    continue
+                objecten[o] = None
+                per_object = pos.get(p)
+                if per_object is None:
+                    per_object = pos[p] = {}
+                subjecten = per_object.get(o)
+                if subjecten is None:
+                    subjecten = per_object[o] = []
+                subjecten.append(s)
+                aantal += 1
+        finally:
+            # Ook bij een afgebroken stream klopt de teller met wat er wél in de
+            # index staat.
+            self._aantal = aantal
 
     def objects(self, subject: RdfNode, predicate: RdfNode) -> Iterator[RdfNode]:
         """De objecten van (subject, predicate), in eerste-toevoegvolgorde."""

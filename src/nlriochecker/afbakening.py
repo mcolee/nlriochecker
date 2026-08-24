@@ -33,7 +33,7 @@ class Analyseset:
     # beide uiteinden niet naar een netwerkknoop herleidt (zie `_component`). Ze
     # kunnen daardoor nooit via de component in de schil belanden, ook niet als hun
     # wel herleidbare kant in een geraakte component ligt. Hetzelfde als wat
-    # `checks/netwerk.py` als `unconnected` apart houdt; hier alleen het aantal,
+    # `checks/verbanden.py` als `unconnected` apart houdt; hier alleen het aantal,
     # zodat het rapport kan zeggen wat er niet meegewogen is in plaats van te
     # zwijgen.
     strengen_zonder_netwerkverband: int = 0
@@ -282,7 +282,7 @@ def _componentstructuur(
     slaat deze functie over: hij komt in geen enkele component terecht en kan dus
     nooit via de component in de schil belanden, ook niet als zijn wel herleidbare
     kant in een geraakte component ligt. Dat is hetzelfde antwoord dat de
-    netwerkchecks zelf geven -- `_bouw_netwerk` in `checks/netwerk.py` zet zulke
+    netwerkchecks zelf geven -- `_bouw_netwerk` in `checks/verbanden.py` zet zulke
     strengen apart in `unconnected` en houdt ze buiten de graaf -- maar mag niet
     stilzwijgend gebeuren; het aantal gaat terug naar de aanroeper.
     """

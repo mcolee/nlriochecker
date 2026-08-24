@@ -2263,3 +2263,35 @@ net zo goed ongeldig maakt. Bestaande caches invalideren vanzelf doordat `datase
 strijdig met "minimum code dat het probleem oplost"). De rdflib-store-vulling verder pruimen
 (een ruimtelijk voorfilter, de graaf snoeien tot de triples die de checks raken) is complementair
 en blijft mogelijk vervolg, niet nu.
+
+**Achterhaald (deels).** De opslagkeuze -- overzetten naar een gewone `rdflib.Graph`, met de
+eenmalige circa 45 s -- is achterhaald door [[BO-42]]: de store is vervangen door eigen
+graafindexen. De parsekeuze (`pyoxigraph` als harde afhankelijkheid) staat.
+
+### BO-42 Eigen graafindexen (`GraafIndex`) vervangen de rdflib-store
+
+**Wat.** `GwswDataset.graph` is geen `rdflib.Graph` meer maar een eigen `GraafIndex`
+(`src/nlriochecker/graaf.py`): twee dicts (s→p→objecten en p→o→subjecten), rechtstreeks
+gevuld uit de pyoxigraph-stream, met rdflib-termen (`URIRef`, `BNode`, `Literal`) als
+munteenheid zodat de checks en alle vergelijkingen ongewijzigd blijven. De rdflib-store
+bouwde drie geneste indexen (spo, pos, osp) met per triple dict-in-dict-in-dict-overhead,
+terwijl de checks maar een handvol leesbewerkingen doen, allemaal met gebonden argumenten;
+de moduledocstring van `graaf.py` draagt het volledige leescontract.
+
+**Gemeten.** Koude toetsrun op De Wolden en Hoogeveen: 107 s totaal waarvan laden 27,9 s
+(was 205 s totaal, laden 84,6 s). Warme run 98 s, cache-lezen 2,3 s (was 163 s / 34 s).
+Piek-RSS 1,76 GB (was 3,98 GB). De graafpickle in de cache is 91 MB (was 436 MB).
+
+**Cache: picklen, niet herbouwen.** Beide alternatieven zijn gemeten: de gepicklede index
+laden kost 5,7 s, hem warm herbouwen uit een nieuwe pyoxigraph-parse 19,9 s. Daarom
+pickle't de cache de index; herbouwen verworpen.
+
+**Equivalentie, geborgd.** TDD tegen rdflib's `Memory`-semantiek: `tests/test_graaf.py`
+toetst elke leesbewerking uit het contract tegen het rdflib-antwoord op dezelfde triples,
+inclusief volgorde (eerste-toevoegvolgorde; de pos-groepering van `subject_objects`) en
+dedupe. Daarbovenop is de uitvoer van een volledige `toets` op De Wolden en Hoogeveen
+byte-/inhoudsgelijk aan die van vóór de omzetting, koud én warm.
+
+**Cache-invalidatie.** `graaf.py` telt mee in de cachesleutel, naast `dataset.py`,
+`geometry.py` en `ontologie.py`: een wijziging aan de termconversie of de volgordegarantie
+is net zo goed een andere lader en dus een andere sleutel.

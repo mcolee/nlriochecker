@@ -135,10 +135,10 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 
 ## Cache en voortgang
 - De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
-  over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py` of
-  `geometry.py` wijzigt, krijgt vanzelf een nieuwe cache.
-  De cachemap groeit per sleutel (op De Wolden en Hoogeveen ruim 450 MB); oude sleutels worden niet
-  automatisch opgeruimd.
+  over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py`,
+  `geometry.py`, `ontologie.py` of `graaf.py` wijzigt, krijgt vanzelf een nieuwe cache.
+  De cachemap groeit per sleutel (op De Wolden en Hoogeveen circa 120 MB, waarvan de
+  graafpickle 91 MB); oude sleutels worden niet automatisch opgeruimd.
 - Voortgang bij de zware stappen loopt via het protocol in `voortgang.py`, met
   `NUL_VOORTGANG` als standaardwaarde. Geinstrumenteerd zijn `load_dataset`,
   `laad_nulmeting`, `run_checks` en `schrijf_geopackage`; bij een cachetreffer start er

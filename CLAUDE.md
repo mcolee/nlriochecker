@@ -167,7 +167,7 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - De licentie is EUPL-1.2 (copyleft, en 'toegang tot de wezenlijke functionaliteit'
   telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
   zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
-- Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost sinds pyoxigraph circa anderhalve minuut en bijna 3 GB; zie BO-41).
+- Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost sinds de eigen graafindexen circa een halve minuut koud en de volledige toetsrun piekt onder de 2 GB; zie BO-41 en BO-42).
 - Codekwaliteit: ruff (lint en format), mypy schoon over `src/nlriochecker`
   (`uv run mypy`; `scripts/` en `tests/` vallen er nog buiten), type hints overal,
   Nederlandse docstrings, Engelse code-identifiers. De poort staat in
