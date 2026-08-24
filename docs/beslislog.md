@@ -2212,3 +2212,54 @@ kanttekening geven; een waarde die geen enkel object draagt, verandert geen bevi
 
 **Alternatief.** `AHN5` laten staan (verworpen: bestaat evenmin en is niet de gebruikte
 bron). `AHN6` weghalen (verworpen: verliest de vermelding van de werkelijk gebruikte bron).
+
+### BO-41 `pyoxigraph` als harde afhankelijkheid voor de TTL-parse
+
+**Wat.** De OroX-dataset wordt niet langer door rdflib's pure-Python `notation3`-parser
+ingelezen maar door de Rust-parser van `pyoxigraph` (`pyoxigraph.parse`). De triples worden
+daarna in een gewone `rdflib.Graph` overgezet, zodat de checks, de cache en de rest van de
+lader onveranderd blijven. `pyoxigraph` is een **harde** afhankelijkheid, niet optioneel:
+optioneel zou twee codepaden en twee testmatrices betekenen, en een standaardrun die traag
+blijft terwijl snelheid het hele punt is (issue #26).
+
+**Licentie.** `pyoxigraph` staat onder Apache-2.0 — permissief en EUPL-verenigbaar conform
+[[BO-3]]. De afhankelijkheid dwingt geen copyleft af.
+
+**Waarom alleen `pyoxigraph`, niet `oxrdflib`.** `oxrdflib` levert een Oxigraph-*store* achter
+de rdflib-interface. Twee bezwaren: een Oxigraph-store is niet te picklen
+(`cannot pickle 'pyoxigraph.Store'`), waardoor de graafcache in `cache.py` breekt; en het
+parsen via `Graph(store="Oxigraph").parse()` bleek in de meting niet sneller dan rdflib zelf
+(circa 124 s), want die weg gebruikt de native parser niet. De native `pyoxigraph.parse` doet
+de 1,88 miljoen triples in circa 5 s. Daarom parseren we native en zetten we over naar een
+gewone `rdflib.Graph`; `oxrdflib` is niet nodig.
+
+**Waarom overzetten en niet de checks op de Oxigraph-store draaien.** De checks doen miljoenen
+puntbevragingen (`graph.objects`, `graph.value`, `(s,p,o) in graph`); die tegen een store via
+de Python/Rust-grens draaien zou per bevraging trager kunnen zijn dan rdflib's dicts, en zou
+de cache en de check-semantiek raken -- een groter project met equivalentierisico, precies wat
+het issue afwees. Het overzetten kost eenmalig circa 45 s (Python-invoeging in rdflib's store,
+dezelfde kost die de oude parse ook al betaalde), maar houdt alles erna identiek.
+
+**Equivalentie, geverifieerd.** De eis uit issue #26 is dat de uitkomst aantoonbaar identiek
+blijft. `bevindingen.json` van een volledige `toets` op De Wolden en Hoogeveen is vóór en na de
+omzetting **byte voor byte gelijk** (sha256 `fde7f23a…`), en de `zwaar`-tests houden hun exacte
+aantallen (`conduits == 23440`, `nodes == 23485`, `decode_fallback.byte_count == 5`). Dat de
+export geen blanke knopen bevat en `pyoxigraph` de lexicale vorm van literalen (ook de
+ongeldige `xsd:date "20210830"` in de ontologie) net als rdflib ongemoeid laat, maakt die
+gelijkheid mogelijk. Een gewone string-literaal krijgt in de omzetting datatype `None`, net als
+rdflib's eigen parser. Let op de grens: een expliciet getypeerde `"x"^^xsd:string` zou rdflib's
+parser wél als aparte term bewaren, maar pyoxigraph vouwt die (RDF 1.1) al samen met de gewone
+vorm en levert hem niet apart aan -- die is dus niet te reconstrueren. De byte-gelijkheid steunt
+er daarom op dat de ingelezen bestanden geen expliciet `^^xsd:string` dragen (nagegaan voor de
+totaal-ontologie en de OroX-export), niet op een algemene reconstructiegarantie. Een toekomstige
+invoer met zo'n literaal zou de gelijkheid stil kunnen doorbreken; de byte-vergelijking uit de
+equivalentie-eis vangt dat.
+
+**Cache-invalidatie.** De cachesleutel bevat al de broncode van `dataset.py` en de versies van
+rdflib en shapely; `pyoxigraph.__version__` is toegevoegd, zodat een parser-upgrade de cache
+net zo goed ongeldig maakt. Bestaande caches invalideren vanzelf doordat `dataset.py` wijzigde.
+
+**Alternatief.** Een eigen streaming-TTL-lezer (verworpen in het issue: een project op zich,
+strijdig met "minimum code dat het probleem oplost"). De rdflib-store-vulling verder pruimen
+(een ruimtelijk voorfilter, de graaf snoeien tot de triples die de checks raken) is complementair
+en blijft mogelijk vervolg, niet nu.

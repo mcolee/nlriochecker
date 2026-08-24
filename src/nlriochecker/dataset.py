@@ -10,7 +10,8 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 
-from rdflib import RDF, RDFS, Graph, URIRef
+import pyoxigraph
+from rdflib import RDF, RDFS, BNode, Graph, Literal, URIRef
 from rdflib.term import Node as RdfNode
 from shapely.geometry import LineString, Point
 
@@ -1051,8 +1052,46 @@ def _structural_diff(graph: Graph, subclasses: dict[str, frozenset[str]]) -> dic
     return verschillen
 
 
+XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
+
+
+def _naar_rdflib(
+    term: pyoxigraph.NamedNode | pyoxigraph.BlankNode | pyoxigraph.Literal,
+) -> RdfNode:
+    """Zet een pyoxigraph-term om naar de bijbehorende rdflib-term.
+
+    Een gewone (ongetypeerde) string-literaal wordt `Literal(waarde)` met datatype `None`,
+    net als rdflib's eigen Turtle-parser. Een expliciet getypeerde `"x"^^xsd:string` is
+    niet te onderscheiden en dus niet exact te reconstrueren: pyoxigraph vouwt die (RDF 1.1)
+    al samen met de gewone vorm tot dezelfde term, terwijl rdflib's parser hem als een aparte
+    term zou bewaren. De byte-voor-byte-gelijkheid van de uitvoer steunt er daarom op dat de
+    ingelezen bestanden geen expliciet `^^xsd:string` dragen (nagegaan voor de totaal-ontologie
+    en de OroX-export), niet op een algemene reconstructiegarantie.
+
+    Andere termsoorten (RDF-ster-triples, benoemde grafen) horen niet in een Turtle-parse en
+    vallen luid om op een `AttributeError` in plaats van stilzwijgend verkeerd om te zetten.
+    """
+    if isinstance(term, pyoxigraph.NamedNode):
+        return URIRef(term.value)
+    if isinstance(term, pyoxigraph.BlankNode):
+        return BNode(term.value)
+    if term.language is not None:
+        return Literal(term.value, lang=term.language)
+    datatype = term.datatype.value
+    if datatype == XSD_STRING:
+        return Literal(term.value)
+    return Literal(term.value, datatype=URIRef(datatype))
+
+
 def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | None]:
-    """Leest een enkel TTL-bestand in, desnoods via een terugvalcodering."""
+    """Leest een enkel TTL-bestand in, desnoods via een terugvalcodering.
+
+    Het parsen zelf gaat via pyoxigraph's Rust-parser (ordegrootten sneller dan rdflib's
+    pure-Python `notation3`); de triples worden daarna overgezet in een gewone
+    `rdflib.Graph`, zodat de checks, de cache en de rest van de lader onveranderd
+    blijven werken. pyoxigraph verlangt UTF-8-bytes, dus de al gedecodeerde tekst wordt
+    opnieuw als UTF-8 gecodeerd -- niet de ruwe bytes, die immers cp850 kunnen zijn.
+    """
     try:
         rauw = path.read_bytes()
     except OSError as error:
@@ -1062,9 +1101,16 @@ def _parse(path: Path, fallback_encoding: str) -> tuple[Graph, DecodeFallback | 
 
     graph = Graph()
     try:
+        quads = pyoxigraph.parse(tekst.encode("utf-8"), format=pyoxigraph.RdfFormat.TURTLE)
+        # rdflib waarschuwt bij het bouwen van een literaal met een ongeldige lexicale
+        # vorm (de meegeleverde ontologie draagt een xsd:date "20210830" zonder streepjes);
+        # net als bij de oude parse hoort die traceback niet in de CLI-uitvoer thuis.
         with _quiet_rdflib():
-            graph.parse(data=tekst, format="turtle")
-    except Exception as error:  # rdflib gooit uiteenlopende parsefouten
+            graph.addN(
+                (_naar_rdflib(q.subject), _naar_rdflib(q.predicate), _naar_rdflib(q.object), graph)
+                for q in quads
+            )
+    except Exception as error:  # pyoxigraph gooit uiteenlopende parsefouten
         raise DatasetError(f"{path}: geen geldige Turtle ({error}).") from error
     return graph, fallback
 
@@ -1090,11 +1136,14 @@ def _decode(path: Path, rauw: bytes, fallback_encoding: str) -> tuple[str, Decod
             f"{eerste_positie}) en ook niet te lezen als {fallback_encoding} ({fout})."
         ) from fout
 
-    afwijkend = [byte for byte in rauw if byte > 0x7F]
+    # De niet-ASCII-bytes tellen zonder een Python-lus over alle 112 MB: `translate`
+    # verwijdert in C alle bytes 0x00-0x7F, en wat overblijft zijn er precies de bytes
+    # groter dan 0x7F.
+    byte_count = len(rauw.translate(None, bytes(range(0x80))))
     return tekst, DecodeFallback(
         path=path,
         encoding=fallback_encoding,
-        byte_count=len(afwijkend),
+        byte_count=byte_count,
         samples=_fallback_samples(rauw, fallback_encoding),
     )
 

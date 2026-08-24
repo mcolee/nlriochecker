@@ -6,8 +6,8 @@ hem aanraakt; wie alleen geometrie- en netwerkchecks draait, betaalt hem niet.
 
 Het gevaar van een cache is dat hij achterloopt. De sleutel bevat daarom niet alleen
 de inhoud van de invoerbestanden maar ook de broncode van de lader en de versies van
-rdflib en shapely: wijzigt daar iets, dan is het een andere sleutel en wordt er
-opnieuw ingelezen.
+rdflib, shapely en pyoxigraph: wijzigt daar iets, dan is het een andere sleutel en
+wordt er opnieuw ingelezen.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
 
+import pyoxigraph
 import rdflib
 import shapely
 from rdflib import Graph
@@ -128,7 +129,10 @@ def cachesleutel(
     """
     haas = sha256()
     haas.update(LADER_VERSIE.encode("utf-8"))
-    haas.update(f"rdflib{rdflib.__version__}shapely{shapely.__version__}".encode())
+    haas.update(
+        f"rdflib{rdflib.__version__}shapely{shapely.__version__}"
+        f"pyoxigraph{pyoxigraph.__version__}".encode()
+    )
     haas.update(fallback_encoding.encode("utf-8"))
     # `ontologie` staat erbij sinds `load_dataset` er `kenmerk_property` uit afleidt
     # (ATTR-014): die waarde wordt mee gecachet, dus een wijziging aan de afleiding

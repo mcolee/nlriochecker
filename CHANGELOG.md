@@ -166,6 +166,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **TTL-parse via de Rust-parser van `pyoxigraph`** (issue #26, BO-41). Het OroX-TTL wordt
+  ingelezen met `pyoxigraph.parse` en daarna overgezet in een gewone `rdflib.Graph`; de checks,
+  de cache en de rest van de lader blijven ongewijzigd. `pyoxigraph` is een nieuwe **harde**
+  afhankelijkheid (Apache-2.0, EUPL-verenigbaar). De koude laadtijd van De Wolden en Hoogeveen
+  daalt van circa 157 s naar circa 84 s (piekgeheugen 3207 -> 2796 MB); de parse-stap zelf gaat
+  van circa 150 s naar circa 5 s (de rest is het vullen van rdflib's store, dezelfde kost die de
+  oude parse ook al betaalde). De warme laadtijd (circa 34 s) verandert niet: die leest de
+  gepicklede graaf terug en parseert niet. De uitkomst blijft aantoonbaar identiek:
+  `bevindingen.json` is vóór en na byte voor byte gelijk. Bijkomend opgeruimd: het tellen van de niet-UTF-8-bytes in `_decode` gaat niet
+  meer via een Python-lus over alle 112 MB maar via `bytes.translate` in C. De cachesleutel
+  bevat nu ook `pyoxigraph.__version__`.
 - **`plausibiliteit.toml` onderbouwd met bronnen, en de minimale diameter per stelseltype**
   (issue #20). Elke regel in de plausibiliteitstabellen draagt nu een verplicht `bron`-veld:
   een van de vier harde projectankers (`ontologie`, `checkregister`, `RIONED Kennisbank`,

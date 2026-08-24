@@ -18,6 +18,9 @@ dependencies = [
     "networkx>=3.3",
     "pandas>=2.2",
     "pydantic>=2.7",
+    # pyoxigraph levert de Rust-parser die het OroX-TTL ordegrootten sneller inleest dan
+    # rdflib's pure-Python notation3 (issue #26, BO-41).
+    "pyoxigraph>=0.5",
     "rasterio>=1.5.1",
     "rdflib>=7.0",
     "shapely>=2.0",
