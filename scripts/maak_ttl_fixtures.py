@@ -1348,10 +1348,16 @@ FIXTURES["stelsels_registratie.ttl"] = (
     + put("PutC", "C", 1000.0, 2100.0)
     + put("PutD", "D", 1050.0, 2100.0)
     + put("PutE", "E", 1000.0, 2200.0)
-    + leiding("LV1", "V1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", klasse="Vuilwaterriool")
-    + leiding("LV2", "V2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "Gem", klasse="Vuilwaterriool")
+    + leiding(
+        "LV1", "V1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", klasse="Vuilwaterriool"
+    )
+    + leiding(
+        "LV2", "V2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "Gem", klasse="Vuilwaterriool"
+    )
     + leiding("LG1", "G1", [(1000.0, 2100.0), (1050.0, 2100.0)], "PutC", "PutD")
-    + leiding("LH1", "H1", [(1000.0, 2200.0), (1050.0, 2200.0)], "PutE", None, klasse="Hemelwaterriool")
+    + leiding(
+        "LH1", "H1", [(1000.0, 2200.0), (1050.0, 2200.0)], "PutE", None, klasse="Hemelwaterriool"
+    )
     + stelsel("stelV", "vuilwater-1", "Vuilwaterstelsel", ["LV1", "LV2"])
     + stelsel("stelG", "gemengd-1", "GemengdStelsel", ["LG1"])
     + stelsel("stelH", "hemelwater-bucket", "Hemelwaterstelsel", ["LH1", "PutE"]),
