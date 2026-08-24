@@ -126,12 +126,18 @@ def functie_van_klasse(graph: Graph | GraafIndex, klasse: URIRef) -> str | None:
     `VerbindenVanVierLeidingen`). TOP-022 en TOP-023 lezen daar het verwachte aantal
     leidingen uit (issue #60). Alleen de restricties direct op de klasse; het
     overerven naar subklassen doet `dataset._klassefuncties`.
+
+    Tweeënveertig GWSW-klassen dragen meer dan een functiewaarde (`Zadel` bijvoorbeeld
+    `LeidingaansluitingVerstevigen` en `VerstevigenAansluiting`). De volgorde waarin de
+    graaf ze oplevert ligt niet vast, dus dit geeft de alfabetisch eerste terug: een
+    willekeurige keuze zou dezelfde dataset tussen twee runs anders kunnen toetsen.
     """
     functie = URIRef(GWSW + "functie")
+    waarden = set()
     for restrictie in graph.objects(klasse, RDFS.subClassOf):
         if graph.value(restrictie, OWL.onProperty) != functie:
             continue
         waarde = graph.value(restrictie, OWL.hasValue)
         if waarde is not None:
-            return str(waarde).removeprefix(GWSW)
-    return None
+            waarden.add(str(waarde).removeprefix(GWSW))
+    return min(waarden) if waarden else None

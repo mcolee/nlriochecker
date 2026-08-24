@@ -77,13 +77,20 @@ HULPSTUK_KLASSEN = (
     "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
     "# Hulpstukken, met de functierestrictie uit de GWSW-ontologie (issue #60).\n"
     "gwsw:Hulpstukorientatie rdfs:subClassOf gwsw:Knooppunt .\n"
-    "gwsw:Verbindingsstuk rdfs:subClassOf gwsw:Hulpstuk .\n"
+    # Zoals in de echte ontologie draagt Verbindingsstuk zelf een functie zonder aantal;
+    # T_stuk_Speciaal bestaat daar niet en staat hier om de overerving te toetsen: hij
+    # heeft geen eigen restrictie en moet die van T_stuk krijgen, terwijl T_stuk zelf
+    # zijn eigen restrictie houdt en niet die van Verbindingsstuk erft.
+    "gwsw:Verbindingsstuk rdfs:subClassOf gwsw:Hulpstuk ,\n"
+    "    [ a owl:Restriction ; owl:onProperty gwsw:functie ;"
+    " owl:hasValue gwsw:VerbindenVanLeidingen ] .\n"
     "gwsw:Afsluitstuk rdfs:subClassOf gwsw:Hulpstuk ,\n"
     "    [ a owl:Restriction ; owl:onProperty gwsw:functie ;"
     " owl:hasValue gwsw:AfsluitenVanLeidingen ] .\n"
     "gwsw:T_stuk rdfs:subClassOf gwsw:Verbindingsstuk ,\n"
     "    [ a owl:Restriction ; owl:onProperty gwsw:functie ;"
     " owl:hasValue gwsw:VerbindenVanDrieLeidingen ] .\n"
+    "gwsw:T_stuk_Speciaal rdfs:subClassOf gwsw:T_stuk .\n"
     "gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,\n"
     "    [ a owl:Restriction ; owl:onProperty gwsw:functie ;"
     " owl:hasValue gwsw:VerbindenVanVierLeidingen ] .\n\n"

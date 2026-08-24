@@ -531,7 +531,10 @@ def test_zonder_fantoomkoppeling_is_er_niets_hersteld(juinen: GwswDataset) -> No
 def test_functie_per_klasse_komt_uit_de_restricties() -> None:
     dataset = load_dataset(TTL_DIR / "top022_hulpstuk_te_weinig.ttl")
 
-    assert dataset.functie_per_klasse[f"{GWSW}T_stuk"] == "VerbindenVanDrieLeidingen"
     assert dataset.functie_per_klasse[f"{GWSW}Kruisstuk"] == "VerbindenVanVierLeidingen"
     assert dataset.functie_per_klasse[f"{GWSW}Afsluitstuk"] == "AfsluitenVanLeidingen"
-    assert f"{GWSW}Verbindingsstuk" not in dataset.functie_per_klasse
+    # Een subklasse zonder eigen restrictie erft de functie van haar bovenklasse ...
+    assert dataset.functie_per_klasse[f"{GWSW}T_stuk_Speciaal"] == "VerbindenVanDrieLeidingen"
+    # ... maar een eigen restrictie wint van wat de bovenklasse zou geven.
+    assert dataset.functie_per_klasse[f"{GWSW}T_stuk"] == "VerbindenVanDrieLeidingen"
+    assert dataset.functie_per_klasse[f"{GWSW}Verbindingsstuk"] == "VerbindenVanLeidingen"

@@ -1289,14 +1289,16 @@ def _bouw_hulpstuktelling(context: CheckContext) -> _Hulpstuktelling:
     """Telt per hulpstuk de richtingen: verschillende buurknopen plus losse einden.
 
     Rechtstreeks op `start_node`/`end_node` en niet via `aansluitingen()`: die index
-    herleidt elk eind naar een netwerkknoop, en een hulpstuk is er geen.
+    herleidt elk eind naar een netwerkknoop, en een hulpstuk is er geen. De strengen
+    komen uit de leidingenrol en niet uit `dataset.conduits`: dat laatste bevat ook
+    verbindingen die geen `Leiding` zijn (in het Juinen-voorbeeld 25 om 19).
     """
     dataset = context.dataset
     wortels = context.config.klassen.netwerkknopen
     alle = hulpstukken(context)
     uris = {node.uri for node in alle}
     per_hulpstuk: defaultdict[str, list[tuple[Conduit, str | None]]] = defaultdict(list)
-    for conduit in dataset.conduits.values():
+    for conduit in leidingen(context):
         for eigen, ander in (
             (conduit.start_node, conduit.end_node),
             (conduit.end_node, conduit.start_node),
@@ -1384,11 +1386,15 @@ class _HulpstukAansluitingen(Check):
             return []
         aantal = sum(buiten.values())
         delen = ", ".join(f"{hoeveel} {klasse}" for klasse, hoeveel in sorted(buiten.items()))
+        # Het voorbeeld alleen als er werkelijk een afsluitstuk tussen zit; anders zou
+        # het gaan uitleggen wat er niet staat.
+        voorbeeld = (
+            " Een afsluitstuk met een leiding is precies goed." if "Afsluitstuk" in buiten else ""
+        )
         return [
             f"{getal(aantal, 'hulpstuk', 'hulpstukken')} {vorm(aantal, 'valt', 'vallen')} "
             f"buiten deze toets omdat {vorm(aantal, 'zijn', 'hun')} klasse geen functie met "
-            f"een aantal leidingen draagt ({delen}); een afsluitstuk met een leiding is "
-            "precies goed."
+            f"een aantal leidingen draagt ({delen}).{voorbeeld}"
         ]
 
     def examined(self, context: CheckContext) -> int:

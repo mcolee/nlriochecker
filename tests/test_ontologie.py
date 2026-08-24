@@ -203,6 +203,9 @@ def test_bekende_bereiken_uit_de_echte_ontologie(
         ("Afsluitstuk", "AfsluitenVanLeidingen"),
         # Zijn definitie noemt drie leidingen, het model niet.
         ("Tubelure", None),
+        # Draagt er twee -- LeidingaansluitingVerstevigen en VerstevigenAansluiting --
+        # en levert dus de alfabetisch eerste.
+        ("Zadel", "LeidingaansluitingVerstevigen"),
     ],
 )
 def test_functie_van_klasse_uit_de_echte_ontologie(

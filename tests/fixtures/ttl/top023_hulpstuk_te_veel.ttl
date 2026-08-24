@@ -39,11 +39,13 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 # Hulpstukken, met de functierestrictie uit de GWSW-ontologie (issue #60).
 gwsw:Hulpstukorientatie rdfs:subClassOf gwsw:Knooppunt .
-gwsw:Verbindingsstuk rdfs:subClassOf gwsw:Hulpstuk .
+gwsw:Verbindingsstuk rdfs:subClassOf gwsw:Hulpstuk ,
+    [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:VerbindenVanLeidingen ] .
 gwsw:Afsluitstuk rdfs:subClassOf gwsw:Hulpstuk ,
     [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:AfsluitenVanLeidingen ] .
 gwsw:T_stuk rdfs:subClassOf gwsw:Verbindingsstuk ,
     [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:VerbindenVanDrieLeidingen ] .
+gwsw:T_stuk_Speciaal rdfs:subClassOf gwsw:T_stuk .
 gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,
     [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:VerbindenVanVierLeidingen ] .
 
