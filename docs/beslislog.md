@@ -2386,3 +2386,11 @@ gebruikt bij andere drempels de formulering "projectkeuze, geen externe bron".
 krijgt dan HGT-001 én HGT-002). Onafgerond vergelijken (verworpen: de grenstest "0,100 m meldt" is
 dan onhaalbaar en band en getoond getal kunnen tegenspreken). Een lichtere categorie voor 5–10 cm
 (verworpen: die afwijkingen zeggen niets, dus ze horen niet in de uitvoer).
+
+**Gemeten uitkomst (2026-08-24).** Volledige toets op De Wolden na de wijziging: HGT-001 5811 →
+2847 meldingen (kleinste afwijking 0,100 m, grootste 0,249 m), HGT-002 2128 → 2132 (kleinste
+0,250 m, grootste 11,150 m). Geen enkel object staat in beide checks. De vier meldingen die op
+0,250 m afronden stonden in de baseline nog in HGT-001 en staan nu in HGT-002, dat daarmee tien
+meldingen op precies 0,250 m draagt; de 44 die op 0,100 m afronden staan in HGT-001. De getallen
+zijn gelijk aan wat de baselinerun op afgeronde afwijkingen voorspelde, dus de nieuwe band is de
+enige oorzaak van het verschil.
