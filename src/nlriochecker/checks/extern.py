@@ -946,6 +946,10 @@ class _DekselAfwijking(_AhnCheck):
         De De Wolden en Hoogeveen-export bevat geen `Putdekselniveau`; de `Maaiveldhoogte` bij de
         put is dan de dichtstbijzijnde benadering van de dekselhoogte. Welke van de
         twee gebruikt is staat in de melding.
+
+        De band is halfopen en wordt op millimeters afgerond vergeleken: HGT-001
+        meldt vanaf de waarschuwingsdrempel tot (niet tot en met) de foutdrempel,
+        HGT-002 vanaf de foutdrempel. Zie BO-44.
         """
         drempels = context.config.drempels
         onder = getattr(drempels, self.ondergrens)
@@ -955,10 +959,14 @@ class _DekselAfwijking(_AhnCheck):
             geregistreerd = node.dekselniveau if node.dekselniveau is not None else node.maaiveld
             if geregistreerd is None:
                 continue
-            afwijking = abs(geregistreerd - gemeten)
-            if afwijking <= onder:
+            # Op millimeters afgerond, en dan een halfopen band [onder, boven): een
+            # verschil van precies 0,100 m is in floating point 0,0999... en zou anders
+            # onder de drempel doorglippen, en een object krijgt nooit beide meldingen.
+            # De afgeronde waarde is ook wat de melding toont (BO-44).
+            afwijking = round(abs(geregistreerd - gemeten), 3)
+            if afwijking < onder:
                 continue
-            if boven is not None and afwijking > boven:
+            if boven is not None and afwijking >= boven:
                 continue
             bron = "putdekselniveau" if node.dekselniveau is not None else "maaiveldhoogte"
             wijze = _inwinningswijze(node)
@@ -975,7 +983,7 @@ class _DekselAfwijking(_AhnCheck):
                 node.label,
                 f"{_hoofdletter(met_lidwoord(bron))} ({geregistreerd:.3f} m NAP) wijkt "
                 f"{afwijking:.3f} m af van het AHN ({gemeten:.3f} m NAP).{kanttekening}",
-                afwijking_m=round(afwijking, 3),
+                afwijking_m=afwijking,
                 geregistreerd=geregistreerd,
                 ahn=round(gemeten, 3),
                 bron=bron,
@@ -990,6 +998,18 @@ class _DekselAfwijking(_AhnCheck):
         notities = super().notes(context)
         if context.bronnen is None or self.raster(context) is None:
             return notities
+
+        onder = getattr(context.config.drempels, self.ondergrens)
+        boven = getattr(context.config.drempels, self.bovengrens) if self.bovengrens else None
+        bereik = (
+            f"vanaf een afwijking van {onder:.2f} m tot {boven:.2f} m (daarboven meldt HGT-002)"
+            if boven is not None
+            else f"vanaf een afwijking van {onder:.2f} m"
+        )
+        notities.append(
+            f"Gemeld {bereik}; de afwijking is op millimeters afgerond voordat hij met de "
+            "drempel vergeleken is."
+        )
 
         vergeleken = [node for node, _ in self.monsters(context)]
         notities += _kenmerknotitie(vergeleken)
@@ -1061,10 +1081,10 @@ def _uit_model_node(context: CheckContext, node: Node) -> bool:
 
 @register
 class DekselAfwijkingLicht(_DekselAfwijking):
-    """HGT-001: de deksel- of maaiveldhoogte wijkt meer dan de lichte drempel af."""
+    """HGT-001: de deksel- of maaiveldhoogte wijkt de lichte drempel of meer af."""
 
     id = "HGT-001"
-    title = "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 5 cm"
+    title = "Deksel- of maaiveldhoogte wijkt af van AHN: 10 cm of meer"
     severity = Severity.WARNING
     dimension = Dimension.ACCURACY
     ondergrens = "ahn_afwijking_waarschuwing_m"
@@ -1073,10 +1093,10 @@ class DekselAfwijkingLicht(_DekselAfwijking):
 
 @register
 class DekselAfwijkingFors(_DekselAfwijking):
-    """HGT-002: de deksel- of maaiveldhoogte wijkt meer dan de zware drempel af."""
+    """HGT-002: de deksel- of maaiveldhoogte wijkt de zware drempel of meer af."""
 
     id = "HGT-002"
-    title = "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 25 cm"
+    title = "Deksel- of maaiveldhoogte wijkt af van AHN: 25 cm of meer"
     severity = Severity.ERROR
     dimension = Dimension.ACCURACY
     ondergrens = "ahn_afwijking_fout_m"

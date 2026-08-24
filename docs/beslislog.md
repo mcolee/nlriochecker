@@ -2355,3 +2355,33 @@ en 119 uit de 638. Het restverschil van 8 (226 tegen 234) is niet verklaard; de 
 oorzaak is dat een eindpunt precies op de oever als "erin" telt en het paar dus lozingspunt wordt.
 Dat is een bewuste, behoudende afwijking van de letterlijke eis "beide eindpunten buiten `W`":
 liever een doorkruising missen dan er een melden die er geen is.
+
+### BO-44 HGT-001 waarschuwt vanaf 10 cm AHN-afwijking (inclusief); de banden zijn halfopen en op de millimeter
+
+**Wat.** `ahn_afwijking_waarschuwing_m` gaat van 0,05 naar 0,10 m; `ahn_afwijking_fout_m` blijft
+0,25 m. De vergelijking wordt halfopen: HGT-001 meldt `[0,10 – 0,25)`, HGT-002 `[0,25 – ∞)`, zodat
+een object nooit beide meldingen krijgt. De afwijking wordt op millimeters afgerond voordat hij
+met de drempels vergeleken wordt; dat afgeronde getal is ook wat de melding toont
+(`afwijking_m`). Beide checks noemen de gehanteerde drempel in hun toelichting. Uitgewerkt in
+issue #63.
+
+**Waarom.** Het checkregister v0.9 zegt "meer dan 5 cm", maar 5 cm ligt binnen de onzekerheid van
+de AHN-inwinning zelf: een afwijking van die orde zegt niets over de beheerdata, daar staat
+meetruis naast meetruis. Gemeten op de volledige run van 2026-08-24 lag de mediane HGT-001-afwijking
+op 0,098 m; de nieuwe drempel ligt dus vrijwel op de mediaan en de helft van de 5811 waarschuwingen
+valt weg. De afronding op millimeters is geen cosmetiek: `10,10 − 10,00` is in floating point
+`0,0999…`, en zonder afronding zou een put met precies 0,100 m afwijking onder de inclusieve
+ondergrens doorglippen terwijl de melding "0,100 m" zou tonen.
+
+**Afwijking van het checkregister.** Dit is een bewuste afwijking van de registertekst; de
+registerregels van HGT-001 en HGT-002 zijn bijgewerkt en verwijzen hierheen.
+
+**Openstaand punt voor de auteur.** Draagt deze drempel een externe onderbouwing — een specificatie
+die de systematische en stochastische fout van het AHN kwantificeert — of is het een projectkeuze
+zonder externe bron? Hier is niets ingevuld en geen specificatiegetal verzonnen; `checks.toml`
+gebruikt bij andere drempels de formulering "projectkeuze, geen externe bron".
+
+**Alternatieven.** Alleen de ondergrens inclusief maken (verworpen: een object met precies 0,25 m
+krijgt dan HGT-001 én HGT-002). Onafgerond vergelijken (verworpen: de grenstest "0,100 m meldt" is
+dan onhaalbaar en band en getoond getal kunnen tegenspreken). Een lichtere categorie voor 5–10 cm
+(verworpen: die afwijkingen zeggen niets, dus ze horen niet in de uitvoer).

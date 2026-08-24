@@ -82,8 +82,8 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |
 | --- | --- | --- | --- | --- | --- |
-| HGT-001 | Dekselhoogte wijkt af van AHN: meer dan 5 cm; is de gebruikte hoogte zelf uit een hoogtemodel ingewonnen, dan vergelijkt de check twee modellen en kr… | W | Nauwkeurigheid | geimplementeerd met test | — |
-| HGT-002 | Dekselhoogte wijkt af van AHN: meer dan 25 cm; zelfde kanttekening als HGT-001 | F | Nauwkeurigheid | geimplementeerd met test | — |
+| HGT-001 | Dekselhoogte wijkt af van AHN: 10 cm of meer (v0.9 zei "meer dan 5 cm"; afwijking in BO-44); is de gebruikte hoogte zelf uit een hoogtemodel ingewonn… | W | Nauwkeurigheid | geimplementeerd met test | — |
+| HGT-002 | Dekselhoogte wijkt af van AHN: 25 cm of meer; zelfde kanttekening als HGT-001 | F | Nauwkeurigheid | geimplementeerd met test | — |
 | HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 3 m eronder) | F | Plausibiliteit | geimplementeerd met test | — |
 | HGT-004 | BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem | F | Consistentie | geimplementeerd met test | — |
 | HGT-005 | Tegenverhang bij vrijverval: licht (onder drempel) | W | Plausibiliteit | geimplementeerd met test | — |

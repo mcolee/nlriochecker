@@ -1689,8 +1689,8 @@ FIXTURES["ext_scenario.ttl"] = (
     # Put F ligt op de nodata-vlek van het raster.
     # Put E heeft geen putdekselniveau, net als elke put in De Wolden en Hoogeveen. De hoogtechecks
     # vallen dan terug op de maaiveldhoogte, en die komt hier uit AHN2. Zijn afwijking
-    # is 0,08 m, dus hij komt in HGT-001 terecht.
-    + hoogteput("PutE", "E", EXT_E, mv=10.08, dek=None, mv_wijze="AHN2")
+    # is 0,12 m, dus hij komt in HGT-001 terecht (vanaf 0,10 m, issue #63).
+    + hoogteput("PutE", "E", EXT_E, mv=10.12, dek=None, mv_wijze="AHN2")
     + hoogteput("PutF", "F", EXT_F, mv=12.00, dek=12.00)
     # Lozingsput ver van het water; Lozingsput vlakbij water-1.
     + put("PutL1", "L1", 1005.0, 1990.0, klasse="Lozingsput")
@@ -1748,6 +1748,20 @@ FIXTURES["ext_scenario.ttl"] = (
     + put("PutX", "X", 1103.0, 1984.0)
     + put("PutY", "Y", 1103.0, 1994.0)
     + leiding("L10", "10", [(1103.0, 1984.0), (1103.0, 1994.0)], "PutX", "PutY"),
+)
+
+
+# De vier grensgevallen van issue #63 op het vlakke raster van 10,00 m NAP uit
+# tests/fixtures/gis/ext: 0,099 m zwijgt, 0,100 m is HGT-001 (ondergrens inclusief),
+# 0,249 m blijft HGT-001 en 0,251 m is HGT-002. Geen putdeksel, zoals in De Wolden en
+# Hoogeveen; de maaiveldhoogte is dan het getoetste kenmerk. De afwijking wordt op
+# millimeters afgerond vergeleken, anders is 10,10 - 10,00 in floating point 0,0999.
+FIXTURES["hgt001_grens.ttl"] = (
+    "de halfopen banden van HGT-001 en HGT-002, op de millimeter (issue #63)",
+    hoogteput("Grens099", "099", (1000.0, 1990.0), mv=10.099, dek=None)
+    + hoogteput("Grens100", "100", (1010.0, 1990.0), mv=10.100, dek=None)
+    + hoogteput("Grens249", "249", (1020.0, 1990.0), mv=10.249, dek=None)
+    + hoogteput("Grens251", "251", (1030.0, 1990.0), mv=10.251, dek=None),
 )
 
 

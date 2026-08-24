@@ -27,6 +27,7 @@ from nlriochecker.uitvoer.melding import bouw_meldingen
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
 SCENARIO = TTL_DIR / "ext_scenario.ttl"
+GRENS = TTL_DIR / "hgt001_grens.ttl"
 
 EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-005", "EXT-006", "EXT-007"]
 AHN_IDS = ["HGT-001", "HGT-002", "HGT-003"]
@@ -356,8 +357,40 @@ def test_hgt001_en_hgt002_claimen_geen_dekselhoogte() -> None:
     de titel voedt ook de dekkingsmatrix en het registeroverzicht, dus hij hoort
     beide kenmerken te dekken in plaats van er een te claimen.
     """
-    assert REGISTRY["HGT-001"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 5 cm"
-    assert REGISTRY["HGT-002"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 25 cm"
+    assert REGISTRY["HGT-001"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: 10 cm of meer"
+    assert REGISTRY["HGT-002"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: 25 cm of meer"
+
+
+def test_hgt001_en_hgt002_delen_een_halfopen_band_op_de_millimeter(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """0,099 m zwijgt, 0,100 m meldt (ondergrens inclusief), 0,249 m blijft HGT-001
+    en 0,251 m is HGT-002; geen enkele put krijgt beide meldingen.
+
+    De put met 10,100 m op een raster van 10,000 m bewijst de afronding op
+    millimeters: onafgerond is dat verschil 0,0999 en zou de put zwijgen.
+    """
+    licht = uitkomst("HGT-001", config, bronnen, GRENS)
+    fors = uitkomst("HGT-002", config, bronnen, GRENS)
+
+    assert labels(licht) == ["100", "249"]
+    assert labels(fors) == ["251"]
+    per_label = {f.object_label: f.details["afwijking_m"] for f in licht.findings + fors.findings}
+    assert per_label == {"100": 0.1, "249": 0.249, "251": 0.251}
+
+
+def test_hgt001_en_hgt002_noemen_de_gehanteerde_drempel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Zonder deze regel leest een gehalveerde telling als 'de data is beter geworden'."""
+    licht = uitkomst("HGT-001", config, bronnen, GRENS)
+    fors = uitkomst("HGT-002", config, bronnen, GRENS)
+
+    assert any(
+        "vanaf een afwijking van 0.10 m" in note and "tot 0.25 m" in note for note in licht.notes
+    )
+    assert any("vanaf een afwijking van 0.25 m" in note for note in fors.notes)
+    assert any("millimeter" in note for note in licht.notes)
 
 
 def test_hgt001_benoemt_welk_kenmerk_vergeleken_is(

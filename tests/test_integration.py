@@ -310,9 +310,9 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
         if outcome.check_id.startswith("HGT") or outcome.check_id in {"EXT-001", "EXT-002"}:
             assert any("Buiten studiegebied" in note for note in outcome.notes)
 
-    # Geen enkele put wijkt meer dan 25 cm van het AHN5 af, 15 wel meer dan 5 cm.
+    # Geen enkele put wijkt 25 cm of meer van het AHN5 af, 7 wel 10 cm of meer (issue #63).
     assert len(per_check["HGT-002"].findings) == 0
-    assert len(per_check["HGT-001"].findings) == 15
+    assert len(per_check["HGT-001"].findings) == 7
 
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")

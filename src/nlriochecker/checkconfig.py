@@ -188,7 +188,7 @@ class CheckThresholds(BaseModel):
         return schalen
 
     # HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN.
-    ahn_afwijking_waarschuwing_m: float = Field(default=0.05, gt=0.0)
+    ahn_afwijking_waarschuwing_m: float = Field(default=0.10, gt=0.0)
     ahn_afwijking_fout_m: float = Field(default=0.25, gt=0.0)
     # HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen.
     bob_maximale_diepte_m: float = Field(default=3.0, gt=0.0)

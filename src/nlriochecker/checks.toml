@@ -261,9 +261,12 @@ rondheid_tolerantie_mm = 0.0
 # goed getoetst. Zie BO-39.
 wandruwheid_schalen = [1.0, 10.0]
 
-# HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN. Uit het
-# checkregister: "meer dan 5 cm" (waarschuwing) en "meer dan 25 cm" (fout).
-ahn_afwijking_waarschuwing_m = 0.05
+# HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN. Waarschuwing
+# vanaf 10 cm en fout vanaf 25 cm, beide inclusief: HGT-001 dekt [0,10 - 0,25) en
+# HGT-002 [0,25 - oneindig), vergeleken op millimeters afgerond. Het checkregister v0.9
+# zegt "meer dan 5 cm"; 5 cm ligt binnen de onzekerheid van de AHN-inwinning zelf. De
+# afwijking is vastgelegd in BO-44.
+ahn_afwijking_waarschuwing_m = 0.10
 ahn_afwijking_fout_m = 0.25
 # HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. Uit het
 # checkregister: "meer dan 3 m eronder".

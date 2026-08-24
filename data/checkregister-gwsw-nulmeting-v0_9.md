@@ -96,8 +96,8 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
-| HGT-001 | Dekselhoogte wijkt af van AHN: meer dan 5 cm; is de gebruikte hoogte zelf uit een hoogtemodel ingewonnen, dan vergelijkt de check twee modellen en krijgt de bevinding een kanttekening (wijzen configureerbaar) | W | Nauwkeurigheid |
-| HGT-002 | Dekselhoogte wijkt af van AHN: meer dan 25 cm; zelfde kanttekening als HGT-001 | F | Nauwkeurigheid |
+| HGT-001 | Dekselhoogte wijkt af van AHN: 10 cm of meer (v0.9 zei "meer dan 5 cm"; afwijking in BO-44); is de gebruikte hoogte zelf uit een hoogtemodel ingewonnen, dan vergelijkt de check twee modellen en krijgt de bevinding een kanttekening (wijzen configureerbaar) | W | Nauwkeurigheid |
+| HGT-002 | Dekselhoogte wijkt af van AHN: 25 cm of meer; zelfde kanttekening als HGT-001 | F | Nauwkeurigheid |
 | HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 3 m eronder) | F | Plausibiliteit |
 | HGT-004 | BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem | F | Consistentie |
 | HGT-005 | Tegenverhang bij vrijverval: licht (onder drempel) | W | Plausibiliteit |

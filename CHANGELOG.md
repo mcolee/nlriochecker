@@ -11,6 +11,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gewijzigd
+
+- **HGT-001 waarschuwt vanaf 10 cm AHN-afwijking, inclusief** (issue #63). De
+  waarschuwingsdrempel `ahn_afwijking_waarschuwing_m` gaat van 0,05 naar 0,10 m, omdat
+  5 cm binnen de onzekerheid van de AHN-inwinning zelf ligt. De banden zijn halfopen en
+  worden op millimeters afgerond vergeleken: HGT-001 meldt `[0,10 – 0,25)`, HGT-002
+  `[0,25 – ∞)`; een object krijgt nooit beide meldingen en de toelichting noemt de
+  gehanteerde drempel. Op De Wolden: HGT-001 5811 → 2847 en HGT-002 2128 → 2132 (vier
+  meldingen die op 0,250 m afronden schuiven van W naar F). Zie BO-44.
+
 ### Gerepareerd
 
 - **BGT-lagen worden op de actuele objectversie gefilterd** (issue #58). Elke ingelezen
