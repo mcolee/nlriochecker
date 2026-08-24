@@ -1,7 +1,7 @@
 # Analyse-harness: vaste feiten voor een De Wolden-analyse
 
 Bedoeld voor wie een telling, een before/after of een scratch-script tegen de OroX-dataset
-schrijft. Elke sessie ontdekte dezelfde dingen opnieuw, meestal achter een ~4-minuten/3-GB
+schrijft. Elke sessie ontdekte dezelfde dingen opnieuw, meestal achter een ~1,5-minuut/3-GB
 De Wolden-load, zodat een verkeerde gok duur is. Ken deze feiten vooraf; verifieer bij twijfel,
 want de code kan schuiven.
 

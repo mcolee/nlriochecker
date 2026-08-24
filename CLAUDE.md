@@ -167,7 +167,7 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - De licentie is EUPL-1.2 (copyleft, en 'toegang tot de wezenlijke functionaliteit'
   telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
   zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
-- Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost ruim drie minuten en circa 3 GB).
+- Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost sinds pyoxigraph circa anderhalve minuut en bijna 3 GB; zie BO-41).
 - Codekwaliteit: ruff (lint en format), mypy schoon over `src/nlriochecker`
   (`uv run mypy`; `scripts/` en `tests/` vallen er nog buiten), type hints overal,
   Nederlandse docstrings, Engelse code-identifiers. De poort staat in
@@ -230,7 +230,7 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   aantallen (ATTR-001 vrijverval-subset, HGT-012 nul `HoogtePut`), de gegenereerde bestanden
   die je nooit met de hand bewerkt, en het drempelrecept over vijf gekoppelde plekken. Lees
   het vóór je zelf een telling of een scratch-script tegen de dataset schrijft -- het
-  bespaart de ~4-min/3-GB herlaadronde op een verkeerde gok.
+  bespaart de ~1,5-min/3-GB herlaadronde op een verkeerde gok.
 - Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
   `gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
   niemand een openstaand punt in twee toestanden aantreft.
