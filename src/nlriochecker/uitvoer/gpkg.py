@@ -869,8 +869,8 @@ def _kleinste_afstand(run: CheckRun, sleutel: str, meldingen: list[Melding]) -> 
 def _waterdeel_aanduiding(treffer: Treffer) -> str:
     """Een leesbare aanduiding van een waterdeel: het type plus zijn identificatie.
 
-    `watertype` draagt het type kaal, zodat je erop kunt filteren; deze kolom is voor
-    de lezer, en die heeft aan "waterloop" alleen niet genoeg om er een terug te
+    De kolom `subtype` draagt het type kaal, zodat je erop kunt filteren; dit label is
+    voor de lezer, en die heeft aan "waterloop" alleen niet genoeg om er een terug te
     vinden.
     """
     return f"{treffer.label} {treffer.sleutel.split('/')[-1]}".strip()

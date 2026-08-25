@@ -152,7 +152,7 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
 - De stijlen van `putten` en `strengen` worden opgebouwd uit de tabel in
   `uitvoer/stijlen/symbolen.py` (regelstructuur objecttype x status, ruim honderd
-  bladregels); `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven bestanden. Het
+  bladregels); `vlakken.qml` (rule-based op `soort`) en `stelsels.qml` blijven bestanden. Het
   symbool volgt het GWSW-objecttype, de kleur uitsluitend de kolom `status`. Een stijl
   draagt alleen regels voor de objecttypen die in zijn laag staan; met de hele tabel
   krijgt de lagenboom van QGIS ruim tweehonderd legendaregels. De maptip is een

@@ -279,7 +279,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
     ) -> tuple[str, str]:
         """Legt het geraakte bouwwerk vast en levert sleutel en aanduiding terug.
 
-        De GeoPackage-laag `bouwwerken` wordt hieruit gevuld, gejoind op de meldingen;
+        De GeoPackage-laag `vlakken` wordt hieruit gevuld, gejoind op de meldingen;
         de melding zelf draagt alleen de sleutel en de aanduiding, want een polygoon
         hoort niet in de CSV of de JSON.
         """
