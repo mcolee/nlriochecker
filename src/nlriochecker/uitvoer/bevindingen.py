@@ -277,7 +277,7 @@ def _render_checks(
     # bevindingen samen betekenen, en dat is precies wat een lezer na de vier regels
     # hierboven wil weten -- niet pas achter de tabellen.
     lines += rode_draad(run, meldingen)
-    lines += _verantwoording(run, meldingen, notities, onderdrukking)
+    lines += _verantwoording(run, meldingen, notities, onderdrukking, met_csv=met_csv)
     lines += ["", "## Detailrapportage", ""]
     nulmeting = _detail_nulmeting(run, meldingen)
     lines += nulmeting
@@ -411,6 +411,8 @@ def _verantwoording(
     meldingen: list[Melding],
     notities: Sequence[str] = (),
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    *,
+    met_csv: bool = True,
 ) -> list[str]:
     """Wat er bekeken is, wat niet, en waaronder de rest gelezen moet worden.
 
@@ -566,7 +568,7 @@ def _verantwoording(
             "",
         ]
 
-    lines += _zonder_locatie(meldingen)
+    lines += _zonder_locatie(meldingen, met_csv=met_csv)
     lines += table(_check_summary(run, _per_check(meldingen)), "Samenvatting per check")
 
     skeletten = [outcome for outcome in run.outcomes if outcome.skeleton]
@@ -1028,7 +1030,7 @@ def _clusterduiding(meldingen: list[Melding]) -> list[str]:
     ]
 
 
-def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
+def _zonder_locatie(meldingen: list[Melding], *, met_csv: bool = True) -> list[str]:
     """Meldt hoeveel meldingen geen plek op de kaart kregen, en waarom.
 
     De GeoPackage telt ze in `gwsw_run`, maar wie alleen het rapport leest zou denken
@@ -1055,13 +1057,20 @@ def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
 
     objectloos = [melding for melding in zonder if not melding.object_uri]
     zonder_geometrie = [melding for melding in zonder if melding.object_uri]
+    # Zonder CSV mag die hier niet genoemd worden: dan verwijst het rapport naar een
+    # bestand dat `--uitvoer` heeft uitgezet (issue #66).
+    waar = (
+        f"Ze staan wel in de CSV, in `{FILE_CHECKS_JSON}` en in de meldingentabel van de "
+        "GeoPackage, die de kolommen `x` en `y` draagt"
+        if met_csv
+        else f"Ze staan wel in `{FILE_CHECKS_JSON}` en in de meldingentabel van de GeoPackage, "
+        "die de kolommen `x` en `y` draagt, voor zover die gevraagd zijn"
+    )
     regels = [
         f"> **{getal(len(zonder), 'melding heeft', 'meldingen hebben')} geen plek op de "
         f"kaart** gekregen. {_oorzaak(objectloos, 'wijst', 'wijzen')} geen object aan; "
         f"{_oorzaak(zonder_geometrie, 'staat', 'staan')} op een object zonder bruikbare "
-        f"geometrie. Ze staan wel in de CSV, in `{FILE_CHECKS_JSON}` en in de "
-        "meldingentabel van de GeoPackage, die de kolommen `x` en `y` draagt; alleen "
-        "kleuren ze geen object op de kaart.",
+        f"geometrie. {waar}; alleen kleuren ze geen object op de kaart.",
         "",
     ]
     return regels

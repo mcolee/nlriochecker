@@ -478,6 +478,16 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
 
     assert "1 melding heeft geen plek op de kaart" in tekst
     assert "TOP-013" in tekst
+    assert "in de CSV" in tekst
+
+    # Zonder CSV mag die alinea er niet naar verwijzen (issue #66).
+    markdown_path, _ = write_check_report(
+        run, tmp_path / "zonder", date(2026, 8, 16), meldingen=zonder, met_csv=False
+    )
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "1 melding heeft geen plek op de kaart" in tekst
+    assert "in de CSV" not in tekst
 
 
 def test_rapport_zwijgt_als_elke_melding_een_plek_heeft(tmp_path: Path) -> None:
