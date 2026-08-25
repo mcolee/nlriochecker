@@ -84,7 +84,7 @@ gwsw:Rioolstelsel rdfs:subClassOf gwsw:Stelsel .
     gwsw:hasConnection :PutD_ori .
 
 # Een geregistreerd stelsel (#17): vw_geb_1 hangt via hasPart aan streng L1. De
-# SHACL-focusnode vw_geb_1 is geen knoop of streng, maar koppelt hierdoor aan de
-# stelsellaag (#25) in plaats van nergens op uit te komen.
+# SHACL-focusnode vw_geb_1 is geen knoop of streng; de melding houdt het stelsel als
+# object, maar krijgt geen kaartobject en wordt in het rapport als zodanig geteld (#75).
 :vw_geb_1 rdf:type gwsw:Vuilwaterstelsel ; rdfs:label "vw-1" ;
     gwsw:hasPart :L1 .

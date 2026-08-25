@@ -114,9 +114,9 @@ def bouw_nulbevindingen(
         ernst_rauw, waarde, objecttype, label, cfks = gegevens
         uri = joiner.herleid(focus)
         # Een focusnode die geen knoop of streng is maar wel een geregistreerd stelsel
-        # (#17) krijgt het stelsel zelf als object, zodat de overtreding aan de
-        # stelsellaag koppelt (#25). Het blijft onherleid: een stelsel is geen knoop of
-        # streng, dus het krijgt geen studiegebied en geen foutlocatie (BO-12).
+        # (#17) krijgt het stelsel zelf als object, zodat de melding zegt waarover ze
+        # gaat. Het blijft onherleid: een stelsel is geen knoop of streng, dus het krijgt
+        # geen studiegebied, geen foutlocatie en geen kaartobject (BO-12, #75).
         stelsel_uri = joiner.stelsel(focus) if not uri else ""
         object_uri = uri or stelsel_uri
         object_ = (dataset.nodes.get(uri) or dataset.conduits.get(uri)) if uri else None
@@ -287,15 +287,21 @@ class _Joiner:
         """De URI van het geregistreerde stelsel achter deze focusnode, of leeg.
 
         Voor focusnodes die `herleid` niet op een knoop of streng kreeg: een deel ervan
-        zijn stelselobjecten (`vw_geb_1` c.s.), die #17 blootlegde en die #25 als vlak
-        tekent. Een `CfkTypes_typ`-klassenaam matcht hier niet: die is een klasse, geen
-        instantie, dus `graph_is_a` op de Stelsel-afsluiting geeft False.
+        zijn stelselobjecten (`vw_geb_1` c.s.), die #17 blootlegde. Een
+        `CfkTypes_typ`-klassenaam matcht hier niet: die is een klasse, geen instantie,
+        dus `graph_is_a` op de Stelsel-afsluiting geeft False.
 
-        Alleen een stelsel dat #25 ook als vlak tekent koppelt hier: een lokaal stelsel
-        met alleen strengen. De gemeentebrede `_geb_0`-buckets (strengen naast putten)
-        krijgen geen vlak, dus een melding erop zou naar een niet-bestaande feature
-        wijzen; die blijft objectloos en telt als "nergens op uit". Zelfde regel als
-        `lees_stelsels`, via `dataset.stelsel_leden`.
+        De melding houdt het stelsel als `object_uri`, zodat in de CSV, de JSON en de
+        meldingentabel te zien blijft over welk stelsel de overtreding gaat. Een
+        kaartobject wordt het niet: een stelsel is geen knoop of streng, en sinds issue
+        #75 tekent de GeoPackage er ook geen vlak meer omheen. Het rapport telt deze
+        overtredingen daarom apart onder "geen kaartobject" (`bevindingen.py`).
+
+        Alleen een lokaal stelsel -- met alleen strengen -- koppelt hier, via
+        `dataset.stelsel_leden`. De gemeentebrede `_geb_0`-buckets uit #17 dragen
+        strengen en putten door elkaar heen over de hele gemeente; zo'n bak is geen
+        stelsel waarover een overtreding iets plaatselijks zegt, en die blijft
+        objectloos.
         """
         if not self._basis:
             return ""

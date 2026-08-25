@@ -813,19 +813,19 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         and melding.foutlocatie is None
         and melding.object_uri not in stelsel_uris
     )
+    # Sinds issue #75 tekent de GeoPackage geen stelselvlakken meer, dus een overtreding
+    # op een geregistreerd stelsel komt net zomin op de kaart als een op een klassenaam.
+    # Ze staan daarom in een telling: ze laten wegvallen zou lezen als "alles bekeken".
+    zonder_kaartobject = zonder_object + op_stelsel
     regels += [
         "",
-        f"> **{getal(zonder_object, 'overtreding kwam', 'overtredingen kwamen')} "
-        f"nergens op uit** en {vorm(zonder_object, 'staat', 'staan')} dus niet op de "
-        "kaart: de focusnode is een klassenaam uit `CfkTypes_typ` en wijst geen object aan. "
-        "Ze staan wel in dit rapport en in de meldingentabel, met een leeg gebied -- ze "
-        "zijn aan geen enkel studiegebied toe te wijzen.",
-        "",
-        f"> **{getal(op_stelsel, 'overtreding staat', 'overtredingen staan')} op een "
-        f"stelsel** en {vorm(op_stelsel, 'verschijnt', 'verschijnen')} op de laag `stelsels` "
-        "in de GeoPackage (#25): de focusnode is een geregistreerd stelsel (#17), geen knoop "
-        "of streng. Ze dragen geen eigen punt en zijn aan geen studiegebied toe te wijzen "
-        "(BO-12).",
+        f"> **{getal(zonder_kaartobject, 'overtreding kreeg', 'overtredingen kregen')} "
+        f"geen kaartobject** en {vorm(zonder_kaartobject, 'staat', 'staan')} dus niet op de "
+        f"kaart: {zonder_object} met een klassenaam uit `CfkTypes_typ` als focusnode en "
+        f"{op_stelsel} op een geregistreerd stelsel (#17). Een klassenaam wijst geen object "
+        "aan, en een stelsel is geen knoop of streng -- sinds issue #75 tekent de GeoPackage "
+        "er ook geen vlak meer omheen. Ze staan wel in dit rapport en in de meldingentabel, "
+        "met een leeg gebied: ze zijn aan geen enkel studiegebied toe te wijzen (BO-12).",
         "",
         f"> **{getal(zonder_plek, 'overtreding staat', 'overtredingen staan')} op een "
         f"object zonder bruikbare geometrie** en {vorm(zonder_plek, 'kreeg', 'kregen')} "

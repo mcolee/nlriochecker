@@ -179,10 +179,13 @@ def test_het_rapport_noemt_de_nulmeting_en_wat_er_niet_op_de_kaart_kwam(tmp_path
 
     assert "GWSW-nulmeting" in tekst
     assert "MdsPlan" in tekst and "MdsProj" in tekst
-    # Alleen de klassenaam `Rioolstelsel` komt nog nergens op uit; `vw_geb_1` is een
-    # geregistreerd stelsel en landt sinds #25 op de stelsellaag.
-    assert "1 overtreding kwam nergens op uit" in tekst
-    assert "1 overtreding staat op een stelsel" in tekst
+    # Twee overtredingen komen niet op de kaart: de klassenaam `Rioolstelsel` uit
+    # `CfkTypes_typ` en het geregistreerde stelsel `vw_geb_1`. Sinds issue #75 tekent de
+    # GeoPackage geen stelselvlakken meer, dus die tweede hoort ook hier geteld te worden
+    # in plaats van stil te verdwijnen.
+    assert "2 overtredingen kregen geen kaartobject" in tekst
+    assert "1 met een klassenaam uit `CfkTypes_typ`" in tekst
+    assert "1 op een geregistreerd stelsel" in tekst
 
 
 def test_zonder_nulmeting_schrijft_het_rapport_geen_nulmetingblok(tmp_path: Path) -> None:

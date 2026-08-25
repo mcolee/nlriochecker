@@ -82,11 +82,11 @@ def test_een_klassenaam_uit_cfktypes_komt_nergens_op_uit(
 def test_focusnode_op_een_stelsel_koppelt_aan_dat_stelsel(
     bevindingen: list[Nulbevinding], joinset: GwswDataset
 ) -> None:
-    """Een geregistreerd stelsel als focusnode krijgt het stelsel zelf als object (#25).
+    """Een geregistreerd stelsel als focusnode krijgt het stelsel zelf als object (#17).
 
-    Zo koppelt de overtreding aan de stelsellaag in de GeoPackage in plaats van nergens
-    op uit te komen. Het blijft `herleid=False`: het object is geen knoop of streng, dus
-    het krijgt geen studiegebied en geen foutlocatie (BO-12).
+    Zo blijft in de uitvoer staan over welk stelsel de overtreding gaat. Het blijft
+    `herleid=False`: het object is geen knoop of streng, dus het krijgt geen
+    studiegebied, geen foutlocatie en geen kaartobject (BO-12, #75).
     """
     stelsel = _een(bevindingen, "Vuilwaterstelsel_Lozingspunt_card", "vw_geb_1")
 
