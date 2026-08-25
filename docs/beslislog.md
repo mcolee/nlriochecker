@@ -2550,3 +2550,30 @@ meldingen), en leeg bij alle 14 losgekoppelde ketens. De zin over een rakende ac
 staat alleen in de ADM-011-tekst -- daar was ze nodig -- en komt op De Wolden en Hoogeveen dus
 in geen enkele melding voor; alleen de fixture dekt haar. Voor ADM-010 blijft `rakend` een
 detailveld zonder eigen zin, want daar zegt de tekst al welke strengen aansluiten.
+
+### BO-48 De CI-poort classificeert overslagen op reden; de telgrens vervalt
+
+**Wat.** `NLRIOCHECKER_MAX_OVERGESLAGEN` (een bovengrens op het aantal overgeslagen tests)
+vervalt. Met `NLRIOCHECKER_STRIKTE_OVERSLAG` gezet (CI, en `scripts/runnerpoort.py`) laat
+`tests/conftest.py` de run vallen op elke test-overslag waarvan de reden geen `data/` en geen
+`BO-` noemt, met nodeid en reden in de uitvoer. `NLRIOCHECKER_MIN_GESLAAGD` en
+`NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN` blijven. `scripts/runnerpoort.py` draait de poort lokaal
+in de runner-conditie en leest grenzen en pytest-regel uit de workflow.
+
+**Waarom.** De telgrens telde ook de bedoelde overslagen mee -- 57 van de 58 op de runner zijn
+tests die de ontologie, het Juinen-voorbeeld, de SHACL-rapporten of de externe bronnen nodig
+hebben, en die staan daar niet -- en klapte daardoor twee keer in twee dagen op legitieme groei
+(24-08: 51 → grens 57; 25-08: 59 → grens 65). Wat hij moest vangen is een fixture die niet
+meekomt, een generator die niet gedraaid is of een tool die ontbreekt: overslagen met een
+ándere reden. Op reden classificeren vangt precies die, zonder getal dat met de suite mee
+moet, en is strenger dan de oude marge van zes.
+
+**Conventie die dit oplegt.** Een skip-reden zegt waar hij vandaan komt: "… staat niet in
+data/" voor echte data, het BO-nummer voor een bewuste uitzondering. Een reden die geen van
+beide draagt is op CI rood -- ook als de overslag terecht was; dan is de reden fout, niet de
+poort.
+
+**Alternatieven.** De telgrens blijven herijken (verworpen: twee keer in twee dagen, en elke
+herijking is handwerk dat de volgende sessie herhaalt). Een aparte lijst verwachte tests
+(verworpen: dubbele administratie die achterloopt). Alleen de lokale runnerpoort (verworpen:
+vangt de fout vóór de push, maar de grens zelf blijft verkeerd).

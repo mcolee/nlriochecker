@@ -45,6 +45,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De CI-poort classificeert overslagen op reden; de telgrens vervalt** (BO-48).
+  `NLRIOCHECKER_MAX_OVERGESLAGEN` telde ook de bedoelde, datagebonden overslagen mee en
+  klapte twee keer op legitieme testgroei. Met `NLRIOCHECKER_STRIKTE_OVERSLAG` is voortaan
+  elke test-overslag zonder `data/` of `BO-` in zijn reden een harde fout. Nieuw:
+  `scripts/runnerpoort.py` draait dezelfde poort lokaal in de conditie van de CI-runner
+  (alleen getrackte `data/`, geen PyQGIS, dezelfde grenzen uit de workflow).
+
 - **HGT-001 waarschuwt vanaf 10 cm AHN-afwijking, inclusief** (issue #63). De
   waarschuwingsdrempel `ahn_afwijking_waarschuwing_m` gaat van 0,05 naar 0,10 m, omdat
   5 cm binnen de onzekerheid van de AHN-inwinning zelf ligt. De banden zijn halfopen en

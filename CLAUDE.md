@@ -195,7 +195,10 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   (of doet werk over dat al gedaan was). Zie `docs/agents/issue-tracker.md`.
 - Kleine stappen; na elke werkende stap een commit. De **mechanische poort** --
   `uv run ruff check` en `uv run ruff format`, `uv run mypy`, `uv run pytest` (zonder
-  `zwaar`) -- draait bij elke commit die `src/**.py` raakt. Kies daarbovenop de review
+  `zwaar`) -- draait bij elke commit die `src/**.py` raakt. Vóór een push die tests
+  toevoegt die echte data laden: `uv run python scripts/runnerpoort.py` -- dezelfde poort
+  in de conditie van de CI-runner (alleen getrackte `data/`, geen PyQGIS, strikte
+  overslagbewaking). Kies daarbovenop de review
   naar het **risico** van de wijziging, niet naar de omvang:
   - **Docs/config** (geen `src/**.py`, bv. deze regel): geen poort en geen review, alleen
     de drifttests die de wijziging raakt (bv. `test_indexversie_staat_in_claude_md`).

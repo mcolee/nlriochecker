@@ -348,8 +348,10 @@ Dezelfde vijf stappen (ruff lint, ruff format, mypy, pytest en een dekkingsonder
 draaien in CI op elke push naar `main` of `dev` (`.github/workflows/toets.yml`) en in
 `scripts/uitgave.py` bij een uitgave. Een schone kloon mist de niet-getrackte delen van
 `data/`; de tests die daarop leunen slaan dan over, en CI bewaakt met
-`NLRIOCHECKER_MIN_GESLAAGD` en `NLRIOCHECKER_MAX_OVERGESLAGEN` dat dat er niet te veel
-worden.
+`NLRIOCHECKER_MIN_GESLAAGD` dat er genoeg tests overblijven en met
+`NLRIOCHECKER_STRIKTE_OVERSLAG` dat elke overslag een verklaarde reden heeft (zijn reden
+noemt `data/` of een BO-nummer). Die runner-conditie speel je lokaal na met
+`uv run python scripts/runnerpoort.py`.
 
 Testdekking meet je met het commando hierboven; `pytest-cov` staat bewust niet in de
 dev-groep en wordt per run met `--with` opgelost. Beide poorten dwingen een ondergrens van
