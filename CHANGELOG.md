@@ -21,7 +21,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en als optioneel veld
   `onderdrukt` in de JSON-envelop (`schema_versie` blijft 1.1). Een object waarvan alle
   meldingen onderdrukt zijn is grijs op de kaart met die reden. De CSV draagt de lijsten niet.
-  `configs/dewoldenhoogeveen.toml` onderdrukt het mechanische riool. Gemeten effect: zie BO-49.
+  `configs/dewoldenhoogeveen.toml` onderdrukt het mechanische riool. Op De Wolden en Hoogeveen
+  vallen zo 10.345 meldingen weg en gaan 3652 strengen van gekleurd naar grijs (BO-49).
 
 - **ADM-010 en ADM-011: loze leidingen die in het actieve netwerk hangen** (issue #62).
   Loze leidingen (`LozeLeiding`, buiten gebruik) worden tot ketens gegroepeerd; ADM-010

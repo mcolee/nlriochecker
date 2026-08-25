@@ -2604,3 +2604,14 @@ TOML). De checks zelf op `[klassen] mechanisch` laten filteren (verworpen: dan v
 kruisingsmelding op de vrijvervalstreng, en de nulmeting filtert niet). Een kolom in de CSV (verworpen:
 dezelfde reden als bij de CFK-set, BO-7). Het JSON-veld altijd schrijven (verworpen: een run zonder
 lijsten blijft byte-voor-byte gelijk, zoals bij `markering`).
+
+**Gemeten uitkomst (2026-08-25).** Volledige toets op De Wolden en Hoogeveen met de projectconfig:
+10.345 meldingen onderdrukt van de 167.571 (1832 uit het register, 8513 uit de nulmeting, nul uit de
+dataset-laag), per klasse MechanischeTransportleiding 9917 en MechanischeRioolleiding 428. De grootste
+posten zijn nulmetingsvormen op de leiding zelf -- LengteLeiding_val 1955, EindpuntLeiding_Knooppunt_card
+1672, HoogteLeiding_val 1193, BreedteLeiding_val 1193, BeginpuntLeiding_Knooppunt_card 1030 -- en van de
+eigen checks ATTR-017 962, TOP-010 367 en TOP-011 365. `n_mechanisch` blijft 3720 en de per-check-tellingen
+van de toets veranderen niet: het is een uitvoerkeuze. In de laag `strengen` gingen 3652 strengen van
+gekleurd (2719 rood, 933 oranje) naar grijs met de reden "meldingen onderdrukt"; de overige 68 mechanische
+strengen waren al grijs, en de laag `putten` verandert niet. Koekangerveld: van 17 gekleurde mechanische
+strengen (13 rood, 4 oranje) naar 0, alle 20 grijs, 48 meldingen onderdrukt.
