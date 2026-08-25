@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import _modulewijde_overslagen, _onverwachte_overslagen, _reden
+from conftest import STRIKT_ENV, _modulewijde_overslagen, _onverwachte_overslagen, _reden, _strikt
 
 
 def test_modulewijde_overslag_telt_alleen_collectreports() -> None:
@@ -75,3 +75,22 @@ def test_alleen_een_onverklaarde_overslag_is_onverwacht() -> None:
             "de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
         )
     ]
+
+
+def test_de_vlag_staat_uit_bij_leeg_en_bij_nul(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`NLRIOCHECKER_STRIKTE_OVERSLAG=0` hoort uit te staan.
+
+    Een kale `os.environ.get` leest de string "0" als aan; wie de vlag bewust uitzet zou
+    de controle dan juist ingeschakeld krijgen.
+    """
+    monkeypatch.setenv(STRIKT_ENV, "1")
+    assert _strikt() is True
+
+    monkeypatch.setenv(STRIKT_ENV, "0")
+    assert _strikt() is False
+
+    monkeypatch.setenv(STRIKT_ENV, "")
+    assert _strikt() is False
+
+    monkeypatch.delenv(STRIKT_ENV)
+    assert _strikt() is False

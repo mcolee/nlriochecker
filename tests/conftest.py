@@ -173,6 +173,15 @@ def _onverwachte_overslagen(overgeslagen: list[object]) -> list[tuple[str, str]]
     ]
 
 
+def _strikt() -> bool:
+    """Of de strikte overslagcontrole aanstaat.
+
+    Niet gezet of leeg is uit, en "0" ook: `os.environ.get` alleen leest "0" als aan,
+    zodat een run die de vlag bewust uitzet hem juist ingeschakeld zou krijgen.
+    """
+    return os.environ.get(STRIKT_ENV, "") not in ("", "0")
+
+
 def _grens(naam: str, rapporteur: pytest.TerminalReporter) -> int | None:
     """De waarde van een grensvariabele, of None als hij niet gezet of onleesbaar is."""
     waarde = os.environ.get(naam)
@@ -219,7 +228,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             red=True,
         )
         gezakt = True
-    if os.environ.get(STRIKT_ENV):
+    if _strikt():
         onverwacht = _onverwachte_overslagen(overgeslagen_rapporten)
         if onverwacht:
             rapporteur.write_line(
@@ -230,7 +239,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
                 red=True,
             )
             for nodeid, reden in onverwacht:
-                rapporteur.write_line(f"  {nodeid}: {reden}", red=True)
+                rapporteur.write_line(f"  {nodeid}: {reden or '(geen reden opgegeven)'}", red=True)
             gezakt = True
     if maximum_module is not None and modulewijd > maximum_module:
         rapporteur.write_line(

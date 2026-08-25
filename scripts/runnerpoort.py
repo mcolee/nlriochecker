@@ -54,10 +54,12 @@ def getrackte_databestanden() -> list[Path]:
 
 
 def main() -> int:
+    """Zet data/ opzij, draait de CI-pytest-regel op de getrackte rest en zet data/ terug."""
     if OPZIJ.exists():
         raise SystemExit(
-            f"{OPZIJ.name}/ bestaat al: een eerdere run is niet netjes teruggezet. Zet hem zelf "
-            f"terug (mv {OPZIJ.name} data) en probeer opnieuw."
+            f"{OPZIJ.name}/ bestaat al: een eerdere run is niet netjes teruggezet. Zet hem terug "
+            f"met `mv {OPZIJ.name} data` -- maar alleen als `data/` niet bestaat; bestaat hij wel, "
+            "ruim die eerst op. Probeer daarna opnieuw."
         )
     if not DATA.is_dir():
         raise SystemExit("data/ ontbreekt; er valt niets na te bootsen")
@@ -78,6 +80,12 @@ def main() -> int:
         return subprocess.run(opdracht, cwd=WORTEL, env=omgeving, check=False).returncode
     finally:
         shutil.rmtree(DATA, ignore_errors=True)
+        if DATA.exists():
+            raise SystemExit(
+                f"kon de tijdelijke data/ niet opruimen; de echte data staat nog in {OPZIJ.name}/. "
+                "Ruim data/ met de hand op en zet daarna terug met: mv "
+                f"{OPZIJ.name} data"
+            )
         OPZIJ.rename(DATA)
         print("data/ teruggezet")
 

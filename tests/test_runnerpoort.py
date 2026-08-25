@@ -6,6 +6,8 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
+from conftest import MAXIMUM_MODULE_OVERGESLAGEN_ENV, MINIMUM_ENV, STRIKT_ENV
+
 WORTEL = Path(__file__).resolve().parents[1]
 SCRIPT = WORTEL / "scripts" / "runnerpoort.py"
 
@@ -23,15 +25,16 @@ RUNNERPOORT = script()
 
 
 def test_de_grenzen_komen_uit_de_workflow() -> None:
-    """Het script leest de CI-grenzen uit toets.yml, zodat er maar een waarheid is."""
+    """Het script leest de CI-grenzen uit toets.yml, zodat er maar een waarheid is.
+
+    De namen komen uit `conftest.py` en niet als stringliteraal: hernoemt iemand daar een
+    variabele zonder de workflow bij te werken, dan valt deze test in plaats van dat CI
+    stilzwijgend een controle minder draait.
+    """
     omgeving = RUNNERPOORT.ci_omgeving()
 
-    assert set(omgeving) == {
-        "NLRIOCHECKER_MIN_GESLAAGD",
-        "NLRIOCHECKER_STRIKTE_OVERSLAG",
-        "NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN",
-    }
-    assert omgeving["NLRIOCHECKER_STRIKTE_OVERSLAG"] == "1"
+    assert set(omgeving) == {MINIMUM_ENV, STRIKT_ENV, MAXIMUM_MODULE_OVERGESLAGEN_ENV}
+    assert omgeving[STRIKT_ENV] == "1"
 
 
 def test_de_pytest_regel_is_die_van_de_ci() -> None:

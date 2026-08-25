@@ -37,3 +37,7 @@ data/*
 # Ook hier geldt: een uitzondering werkt alleen omdat hierboven 'data/*' staat en
 # niet 'data/'; met 'data/' is de map zelf uitgesloten en kijkt git er niet in.
 !data/gwsw-vocabulaire-index.json
+
+# De tijdelijke opzij-map van scripts/runnerpoort.py: de echte data/ staat daar tijdens
+# de run en na een crash. Zonder deze regel wist `git clean -fd` hem.
+/data_runnerpoort_opzij/
