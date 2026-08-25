@@ -163,13 +163,31 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   zonder marge). Een tekort boven `[bronnen] dekking_tolerantie_m` (standaard 0) is een
   harde fout: een te kleine bron geeft stilte in plaats van bevindingen. Ontbrekende
   bronnen blijven toegestaan. Zie BO-19.
+- De vierde featurelaag is `gemengd_zonder_overstort` (MULTIPOLYGON, issue #75, BO-57):
+  één vlak per gemengd deelstelsel waarop RVZ-006 aansloeg, als buffer
+  (`[drempels] gemengd_zonder_overstort_buffer_m`, 10 m) om de vrijvervalstrengen van de
+  hele samenhangende component. De rijen komen uit de **meldingen van díé uitvoer**,
+  gegroepeerd op `cluster_id` -- dezelfde strikte aansluiting als bij `vlakken`, zodat de
+  laag na afbakening of onderdrukking niet meer kan tonen dan de uitslag; de geometrie
+  komt uit `run.context`, de graaf waarop de check draaide. Kolommen: `cluster_id` (het
+  deelstelsel-ID dat RVZ-006, NET-001 en NET-002 delen), `n_knopen`, `n_strengen`,
+  `strenglengte_m`, `n_meldingen` (één per gemengde streng) en `popup_html`; `gwsw_run`
+  telt de laag in `n_gemengd_zonder_overstort`. Een deelstelsel waarvan geen enkele streng
+  een bruikbare lijn draagt krijgt geen vlak -- zijn meldingen staan wel in de
+  meldingentabel en op hun eigen streng in `strengen`. De vroegere laag `stelsels` (#25)
+  bestaat niet meer: zij groepeerde strengen via de GWSW-stelselregistratie, en die
+  groepering is niet betrouwbaar. Gevolg voor de nulmeting: een SHACL-overtreding waarvan
+  de focusnode een geregistreerd stelsel is houdt haar stelsel als `object_uri` maar krijgt
+  géén kaartobject; het rapport telt haar samen met de `CfkTypes_typ`-klassenamen in de
+  regel "geen kaartobject" (op De Wolden 567 van de 578).
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
 - De stijlen van `putten` en `strengen` worden opgebouwd uit de tabel in
   `uitvoer/stijlen/symbolen.py` (regelstructuur objecttype x status, ruim honderd
-  bladregels); `vlakken.qml` (rule-based op `soort`) en `stelsels.qml` blijven bestanden. Het
-  symbool volgt het GWSW-objecttype, de kleur uitsluitend de kolom `status`. Een stijl
+  bladregels); `vlakken.qml` (rule-based op `soort`) en `gemengd_zonder_overstort.qml`
+  (één vlaksymbool) blijven bestanden. Het symbool volgt het GWSW-objecttype, de kleur
+  uitsluitend de kolom `status`. Een stijl
   draagt alleen regels voor de objecttypen die in zijn laag staan; met de hele tabel
   krijgt de lagenboom van QGIS ruim tweehonderd legendaregels. De maptip is een
   expressie van een regel op `popup_html`; het stijlblok staat in de QML en niet in

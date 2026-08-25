@@ -2910,3 +2910,68 @@ alleen valse bevindingen wegnemen.
 leidingen) in de buurt "Verspreide huizen Koekange". Die bestond vóór deze wijziging ook al en
 gaat niet over de bereikbaarheid maar over de leidingtelling rond een hulpstuk op de
 gebiedsrand. Niet in dit issue aangepakt; hij hoort in een eigen issue thuis.
+
+### BO-57 De laag `stelsels` vervalt; RVZ-006 meldt per gemengde streng en krijgt een eigen vlak
+
+**Wat.** Drie samenhangende besluiten uit issue #75, allemaal op dezelfde polygooncode.
+
+1. De cartografische laag `stelsels` verdwijnt uit de GeoPackage, met haar stijl `stelsels.qml`,
+   de module `uitvoer/stelsels.py` en de kolom `n_stelsels` in `gwsw_run`. De kolom `stelsel` op
+   `putten` en `strengen` (`uitvoer/omvang.stelseltypen`) blijft: dat is een labeling per object en
+   geen vlak.
+2. RVZ-006 meldt per **gemengde streng** (`GemengdRiool` en subklassen, via `[klassen] stelseltypen`)
+   van het falende deelstelsel, in plaats van één bevinding op `sorted(deel)[0]`. Alle bevindingen
+   van hetzelfde deel dragen dezelfde `cluster_id`, dezelfde die NET-001 en NET-002 gebruiken. Het
+   zwaartepunt als foutlocatie vervalt: de melding zit op haar eigen streng. `examined` telt sindsdien
+   de gemengde strengen en niet meer de netwerkdelen.
+3. Daarvoor in de plaats komt de laag **`gemengd_zonder_overstort`** (MULTIPOLYGON, met eigen QML): een
+   vlak per gemengd deelstelsel waarop RVZ-006 aansloeg, als buffer om de vrijvervalstrengen van de
+   hele component. De buffer heet daarom `gemengd_zonder_overstort_buffer_m` (10 m, ongewijzigd) en
+   `gwsw_run` telt de laag in `n_gemengd_zonder_overstort`.
+
+**Waarom.** De stelsellaag groepeerde strengen via de GWSW-stelselregistratie, en de auteur heeft
+vastgesteld dat die groepering niet betrouwbaar is. Wat de laag liet zien -- wel of geen afvoerroute --
+is bovendien een eigenschap van het **netwerk** (`afvoerpad_van_streng`) en niet van de
+stelselhiërarchie; die hiërarchie wordt door geen enkele check gebruikt. Een kaartlaag die op een
+onbetrouwbare groepering een netwerkfeit tekent, wijst de lezer de verkeerde kant op.
+
+RVZ-006 hing aan de lexicografisch eerste knoop van een deelstelsel. Er ís geen GWSW-object "gemengd
+stelsel" -- gemengd volgt uit het leidingtype -- dus die knoop was een willekeurige drager, en op de
+kaart moest een zwaartepunt goedmaken dat het gebrek niet bij die ene put zat. NET-001 lost hetzelfde
+probleem (een subsysteem dat iets mist) al per streng op; RVZ-006 doet dat nu ook, en het vlak toont
+waar het deelstelsel ligt. Dat vlak komt uit de **meldingen van deze uitvoer** en niet uit de graaf
+alleen -- dezelfde strikte aansluiting als bij de trefferlaag (BO-18/BO-50), zodat laag en uitslag niet
+uit elkaar kunnen lopen na afbakening of onderdrukking.
+
+**Meting (De Wolden en Hoogeveen, `scripts/analyse_rvz006_per_streng.py`, `b9d6060` tegen `7000b5e`).**
+
+| | vóór | ná |
+|---|---|---|
+| RVZ-006 gemeentebreed | 99 bevindingen op 99 deelstelsels (794 onderzocht) | **1062** op **99** deelstelsels (7784 onderzocht) |
+| RVZ-006 Koekangerveld (gebiedsrun) | 2 op 2 deelstelsels (10 onderzocht) | **26** op **2** deelstelsels (26 onderzocht) |
+| nulmeting zonder kaartobject | 578 (11 + 567) | 578 (11 + 567) |
+
+Het aantal falende deelstelsels staat stil -- de selectie verandert niet, alleen de korrel. De 1062 is
+dus geen nieuwe uitslag maar dezelfde uitslag per streng: gemiddeld 10,7 gemengde strengen per falend
+deel, tegen 9,8 over alle 794 delen.
+
+**De nulmetingjoin mag niet stil vallen.** Een SHACL-overtreding waarvan de focusnode een geregistreerd
+stelsel is (`vw_geb_1` c.s.) landde sinds #25 op de stelsellaag. Zonder die laag komt zij nergens meer
+op de kaart, en stilte leest als "alles gecontroleerd". De melding houdt haar stelsel als `object_uri`
+-- zodat CSV, JSON en meldingentabel blijven zeggen waarover zij gaat -- en het rapport telt haar samen
+met de klassenaam-overtredingen in één regel "geen kaartobject", met de opsplitsing in dezelfde zin. Op
+De Wolden gaat het om 567 van de 578; die 567 waren dus precies de inhoud van de vervallen laag.
+
+**Alternatieven.** De stelsellaag laten staan en alleen RVZ-006 verfijnen (verworpen: de laag tekent een
+netwerkfeit op een onbetrouwbare groepering, en twee vlakkenlagen over hetzelfde net verwarren). Het
+nieuwe vlak uit de graaf opbouwen in plaats van uit de meldingen (verworpen: dan kan de laag na
+afbakening of onderdrukking meer tonen dan de uitslag). De stelseloverduidingen als eigen laag houden
+(verworpen: één rij per stelsel zonder betrouwbare geometrie is precies wat hier vervalt). De
+`stelsel`-kolom op `putten`/`strengen` meenemen in de opruiming (verworpen: die labeling komt uit
+`stelseltypen` en niet uit de registratieboom, en niemand heeft haar ter discussie gesteld).
+
+**Contractbreuk.** De laag `stelsels` en de kolom `n_stelsels` in `gwsw_run` bestaan niet meer;
+QGIS-projecten die erop wezen moeten opnieuw gekoppeld worden. De drempel `stelselvlak_buffer_m` heet
+`gemengd_zonder_overstort_buffer_m` -- een projectconfig met de oude naam wordt geweigerd
+(`extra="forbid"`). RVZ-006 levert op dezelfde data meer meldingen dan voorheen; een vergelijking met
+een meetmoment van vóór deze wijziging telt appels en peren, en `vergelijk` zegt dat niet.

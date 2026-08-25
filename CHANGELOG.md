@@ -27,6 +27,25 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De stelsellaag maakt plaats voor een RVZ-006-vlak, en RVZ-006 meldt per gemengde
+  streng** (issue #75, BO-57). De cartografische laag `stelsels` groepeerde strengen via de
+  GWSW-stelselregistratie -- een groepering die niet betrouwbaar is -- en toonde er een
+  netwerkfeit op (wel of geen afvoerroute). Zij vervalt, met `uitvoer/stelsels.py`,
+  `stelsels.qml` en de kolom `n_stelsels` in `gwsw_run`; de kolom `stelsel` op `putten` en
+  `strengen` blijft. RVZ-006 hangt zijn bevinding niet langer aan de lexicografisch eerste
+  knoop van een gemengd deelstelsel maar aan **elke gemengde streng** ervan, met een
+  gedeelde `cluster_id` zodat rapport en kaart ze als één deelstelsel groeperen; het
+  zwaartepunt als foutlocatie vervalt en `examined` telt nu de gemengde strengen. Nieuw is
+  de laag **`gemengd_zonder_overstort`** (MULTIPOLYGON, met eigen QML): een vlak per
+  gemengd deelstelsel waarop RVZ-006 aansloeg, als buffer om de strengen van de hele
+  component, gebouwd uit de meldingen van díé uitvoer. De drempel `stelselvlak_buffer_m`
+  heet daarom `gemengd_zonder_overstort_buffer_m` (10 m, ongewijzigd) en `gwsw_run` telt de
+  laag in `n_gemengd_zonder_overstort`. Op De Wolden en Hoogeveen gaat RVZ-006 van **99**
+  naar **1062** bevindingen op dezelfde **99** deelstelsels (Koekangerveld 2 → **26** op 2);
+  de selectie verandert niet, alleen de korrel. Een SHACL-overtreding op een geregistreerd
+  stelsel landde op de vervallen laag en zou nu stil van de kaart verdwijnen; het rapport
+  telt haar daarom expliciet als "geen kaartobject" (op De Wolden 567 van de 578). Meetscript:
+  `scripts/analyse_rvz006_per_streng.py`.
 - **Drukriolering is traceerbaar: het persnet telt mee in de bereikbaarheidsgraaf en een
   lozingspunt is een geldig vuilwater-eindpunt** (issue #72). `_bouw_netwerk` levert naast
   de gerichte vrijvervalgraaf een tweede laag `_Netwerk.bereikbaarheid`: dezelfde graaf plus
