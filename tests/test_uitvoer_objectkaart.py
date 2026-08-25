@@ -179,6 +179,21 @@ class TestPopup:
         assert "<li" not in html
         assert "ATTR-014" not in html
 
+    def test_alleen_systemische_meldingen_leest_niet_als_geen_meldingen(self) -> None:
+        """De slotregel zegt al wat er is; "geen meldingen" zou dat tegenspreken.
+
+        Op de vlakkenlaag staat er bovendien een kopregel boven die het aantal gemelde
+        strengen noemt.
+        """
+        html = popup_html(Objectkop("A", "Inspectieput", STATUS_GROEN), [_melding(systemisch=True)])
+
+        assert "Geen meldingen op dit object" not in html
+
+    def test_zonder_enige_melding_staat_er_nog_wel_dat_er_niets_is(self) -> None:
+        html = popup_html(Objectkop("A", "Inspectieput", STATUS_GROEN), [])
+
+        assert "Geen meldingen op dit object" in html
+
     def test_de_popup_zegt_hoeveel_systemische_meldingen_ze_weglaat(self) -> None:
         """Een groen object met alleen systemische meldingen mag niet zwijgen.
 

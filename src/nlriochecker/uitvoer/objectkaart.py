@@ -145,7 +145,11 @@ def popup_html(kop: Objectkop, meldingen: Sequence[Melding]) -> str:
         regels.append("</ul>")
         if rest:
             regels.append(f'<div class="x">… en nog {rest} andere</div>')
-    else:
+    elif not systemisch:
+        # Alleen als er echt niets is. Draagt het object enkel systemische meldingen,
+        # dan zegt de regel hieronder wat er is en hoeveel; "geen meldingen" zou dat in
+        # dezelfde popup tegenspreken -- op de vlakkenlaag zelfs naast een kopregel die
+        # het aantal gemelde strengen noemt.
         regels.append('<div class="z">Geen meldingen op dit object.</div>')
 
     if systemisch:
