@@ -79,6 +79,38 @@ def test_zonder_schil_geeft_net001_een_valse_bevinding() -> None:
     assert met_schil.outcomes[0].findings == []
 
 
+def test_de_schil_haalt_de_route_door_het_persnet_erbij() -> None:
+    """De gelijkwaardigheidseis van BO-12 houdt ook als de route gepompt is (BO-56).
+
+    Sinds issue #72 loopt de bereikbaarheid van NET-001/NET-002 door het mechanische
+    riool, en sinds issue #73 is een pompput zelf geen eindpunt meer. Bakende de
+    contextschil zich alleen op de vrijvervalcomponent af, dan valt het gemaal achter
+    de persleiding buiten de analyseset en meldt een gebiedsrun een streng die de
+    gemeentebrede run niet meldt.
+
+    De fixture zet dat gemaal achter twee drukleidingen op 450 m van de kern, ver
+    buiten de contextbuffer van 50 m, zodat het alleen via de mechanische kanten mee
+    kan komen. De tweede helft is de controle: zonder schil slaat NET-001 wel aan.
+    """
+    dataset = load_dataset(TTL_DIR / "afbakening_persnet.ttl")
+    area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    assert {"G", "d2"} <= _labels(dataset, analyseset.schil)
+
+    alleen_kern = run_checks(
+        CheckContext(dataset=dataset.subset(analyseset.kern), config=config), ["NET-001"]
+    )
+    met_schil = run_checks(CheckContext(dataset=analyseset.dataset, config=config), ["NET-001"])
+    volledig = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+
+    assert alleen_kern.outcomes[0].findings, "zonder schil hoort NET-001 juist aan te slaan"
+    assert met_schil.outcomes[0].findings == volledig.outcomes[0].findings == []
+
+
 def test_de_buffer_haalt_ongekoppelde_buren_erbij() -> None:
     """TOP-005 en de EXT-checks kijken naar nabijheid zonder netwerkverband.
 
