@@ -64,6 +64,8 @@ extend-exclude = [
     "docs/superpowers/plans/2026-08-24-issue-62-adm010-loze-leidingen.md",
     "docs/superpowers/plans/2026-08-24-issue-63-hgt001-drempel.md",
     "docs/superpowers/plans/2026-08-25-ci-overslagbewaking.md",
+    "docs/superpowers/plans/2026-08-25-issue-65-onderdrukking.md",
+    "docs/superpowers/plans/2026-08-25-issue-66-uitvoer-optie.md",
 ]
 
 [tool.ruff.lint]
