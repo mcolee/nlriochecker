@@ -28,6 +28,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from html import escape
 
+from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.melding import BRON_NULMETING, Melding
 
 # De vier statuswaarden, en geen vijfde. De symbologie filtert erop, dus een waarde
@@ -108,18 +109,23 @@ def bepaal_status(meldingen: Sequence[Melding], *, geanalyseerd: bool) -> str:
 def popup_html(kop: Objectkop, meldingen: Sequence[Melding]) -> str:
     """Bouwt de popup-inhoud van een object als HTML-fragment.
 
-    De meldingen staan op systemisch, dan prioriteit, dan check-ID. Die eerste sleutel
-    is er omdat de status dezelfde regel volgt: zonder haar kan een rood object vijf
-    systemische nulmetingmeldingen tonen en de fout die hem rood maakte achter "en nog
-    N andere" verstoppen. Op de Koekangerveld-run overkwam dat 6 van de 44 gekleurde
-    objecten; op de volledige export, waar twee derde van de nulmetingmeldingen
-    systemisch is, zou het de regel worden.
+    Systemische meldingen staan er niet bij (issue #76). Zij zijn dezelfde structurele
+    kwestie op (vrijwel) elk object van dit type: per object getoond verdringen ze de
+    gebreken die dít object van zijn buren onderscheiden -- op de volledige export is
+    twee derde van de nulmetingmeldingen systemisch. Ze worden wel geteld, met een
+    afsluitende regel; stilzwijgend weglaten zou lezen als "hier is niets gevonden".
+    De losse rijen blijven in de meldingentabel, de CSV en de JSON staan.
+
+    Wat overblijft staat op prioriteit, dan check-ID, dan melding-ID: de zwaarste
+    eerst, zodat de cap van vijf niet de melding wegsnijdt die de status bepaalde.
 
     Alles wat uit de brondata komt wordt geescaped: een label met een `<` mag de popup
     niet breken.
     """
+    systemisch = sum(1 for melding in meldingen if melding.systemisch)
     gesorteerd = sorted(
-        meldingen, key=lambda m: (m.systemisch, m.prioriteit, m.check_id, m.melding_id)
+        (melding for melding in meldingen if not melding.systemisch),
+        key=lambda m: (m.prioriteit, m.check_id, m.melding_id),
     )
     getoond = gesorteerd[:MAX_MELDINGEN_IN_POPUP]
     rest = len(gesorteerd) - len(getoond)
@@ -142,12 +148,13 @@ def popup_html(kop: Objectkop, meldingen: Sequence[Melding]) -> str:
     else:
         regels.append('<div class="z">Geen meldingen op dit object.</div>')
 
-    systemisch = sum(1 for melding in gesorteerd if melding.systemisch)
     if systemisch:
-        meervoud = "meldingen tellen" if systemisch > 1 else "melding telt"
         regels.append(
-            f'<div class="n">{systemisch} systemische {meervoud} niet mee in '
-            "de status: die vorm slaat op vrijwel elk object van dit type aan.</div>"
+            f'<div class="n">{getal(systemisch, "systemische melding", "systemische meldingen")} '
+            f"{vorm(systemisch, 'telt', 'tellen')} niet mee in de status en "
+            f"{vorm(systemisch, 'staat', 'staan')} hier niet: die vorm slaat op vrijwel elk "
+            f"object van dit type aan. In de meldingentabel {vorm(systemisch, 'staat', 'staan')} "
+            "zij wel.</div>"
         )
 
     regels.append("</div>")
@@ -178,8 +185,6 @@ def _meldingregel(melding: Melding) -> str:
         delen.append(f'<span class="v">waarde {escape(melding.waarde)}</span>')
     if melding.drempel:
         delen.append(f'<span class="d">drempel {escape(melding.drempel)}</span>')
-    if melding.systemisch:
-        delen.append('<span class="y">systemisch</span>')
     delen.append(f'<span class="h">{_herkomst(melding)}</span>')
     delen.append("</li>")
     return "".join(delen)

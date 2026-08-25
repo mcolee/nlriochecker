@@ -169,28 +169,38 @@ class TestPopup:
         assert "<li" not in html
         assert "geen" in html.lower()
 
-    def test_systemische_meldingen_worden_als_zodanig_getoond(self) -> None:
-        """Een groen object met alleen systemische meldingen mag niet zwijgen."""
+    def test_systemische_meldingen_staan_niet_in_de_lijst(self) -> None:
+        """Dezelfde kwestie op vrijwel elk object hoort niet per object in de popup (#76)."""
+        html = popup_html(
+            Objectkop("A", "Inspectieput", STATUS_GROEN),
+            [_melding(systemisch=True, check_id="ATTR-014")],
+        )
+
+        assert "<li" not in html
+        assert "ATTR-014" not in html
+
+    def test_de_popup_zegt_hoeveel_systemische_meldingen_ze_weglaat(self) -> None:
+        """Een groen object met alleen systemische meldingen mag niet zwijgen.
+
+        Weglaten zonder tellen leest als "hier is niets gevonden"; dat is het niet.
+        """
         html = popup_html(Objectkop("A", "Inspectieput", STATUS_GROEN), [_melding(systemisch=True)])
 
-        assert "systemisch" in html
+        assert "1 systemische melding" in html
+        assert "telt niet mee in de status" in html
 
-    def test_de_popup_zegt_waarom_de_systemische_meldingen_niet_meetellen(self) -> None:
-        """Anders leest een groene kop met drie rode kruisen eronder als een fout."""
-        html = popup_html(Objectkop("A", "Inspectieput", STATUS_GROEN), [_melding(systemisch=True)])
-
-        assert "tellen niet mee in de status" in html or "telt niet mee in de status" in html
-
-    def test_een_niet_systemische_melding_staat_boven_de_systemische(self) -> None:
-        """De cap van vijf mag niet net de melding wegsnijden die de status bepaalde."""
+    def test_de_cap_van_vijf_telt_alleen_de_getoonde_meldingen(self) -> None:
+        """De weggelaten systemische meldingen mogen geen "en nog N andere" opleveren."""
         meldingen = [
             _melding("F", check_id=f"NULMETING-Vorm_{n}_card", systemisch=True) for n in range(1, 8)
         ]
-        meldingen.append(_melding("F", check_id="RVZ-006"))
+        meldingen += [_melding("F", check_id=f"RVZ-{n:03d}") for n in range(1, 4)]
 
         html = popup_html(Objectkop("A", "Inspectieput", STATUS_ROOD), meldingen)
 
-        assert "RVZ-006" in html
+        assert html.count("<li") == 3
+        assert "en nog" not in html
+        assert "7 systemische meldingen" in html
 
     def test_de_inhoud_wordt_geescaped(self) -> None:
         """Labels en boodschappen komen uit de brondata en mogen niets breken."""

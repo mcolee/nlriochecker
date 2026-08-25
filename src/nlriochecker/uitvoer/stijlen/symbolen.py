@@ -274,7 +274,7 @@ MAPTIP = """<style>
   .e-F .e { color: #b2182b; }
   .e-W .e { color: #e08214; }
   .gwsw-popup .c { font-weight: bold; margin-right: 4px; }
-  .gwsw-popup .v, .gwsw-popup .d, .gwsw-popup .y, .gwsw-popup .h {
+  .gwsw-popup .v, .gwsw-popup .d, .gwsw-popup .h {
     color: #666; font-size: 8pt; margin-left: 5px;
   }
   .gwsw-popup .x, .gwsw-popup .z, .gwsw-popup .n {
