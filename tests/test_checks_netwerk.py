@@ -24,9 +24,9 @@ def _outcome(bestand: str, check_id: str, config: CheckConfig | None = None) -> 
     return run_checks(context, [check_id]).outcomes[0]
 
 
-def _labels(bestand: str, check_id: str) -> list[str]:
+def _labels(bestand: str, check_id: str, config: CheckConfig | None = None) -> list[str]:
     """De labels van de gevonden objecten."""
-    return sorted(finding.object_label for finding in _outcome(bestand, check_id).findings)
+    return sorted(finding.object_label for finding in _outcome(bestand, check_id, config).findings)
 
 
 @pytest.mark.parametrize("check_id", NET_IDS)
@@ -210,16 +210,88 @@ def test_eindpuntklassen_komen_uit_de_config(tmp_path: Path) -> None:
     assert any("buiten de netwerkanalyse" in notitie for notitie in gevonden.notes)
 
 
-def test_lozingspunt_telt_niet_als_afvoerpad_voor_vuilwater() -> None:
-    """Een gemengde streng die alleen een lozingsput bereikt is niet in orde.
+def test_lozingspunt_telt_als_afvoerpad_voor_vuilwater(tmp_path: Path) -> None:
+    """Een gemengde streng die een lozingsput bereikt is in orde (BO-53).
 
-    NET-001 vraagt een gemaal of overnamepunt, NET-002 een lozingspunt. Met een
-    gedeelde eindpuntlijst zou de gemengde streng ten onrechte goedgekeurd worden.
+    Vuilwater loost in Nederland niet meer rechtstreeks op oppervlaktewater, dus een
+    lozingspunt is per definitie een geldig afvoereindpunt; er valt geen echt gebrek
+    mee te maskeren. De tweede helft is de controle: haal de lozingsput uit
+    `lozings_eindpunt` en streng "1" wordt wel gemeld, zodat de lege lijst hierboven
+    niet ook groen zou zijn als de klasse nooit werd opgezocht.
     """
     bestand = "net001_alleen_lozingspunt.ttl"
 
-    assert _labels(bestand, "NET-001") == ["1"]
+    assert _labels(bestand, "NET-001") == []
     assert _labels(bestand, "NET-002") == []
+
+    zonder_lozing = _testconfig(
+        tmp_path,
+        "zonder_lozing",
+        "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Gemaal']\nlozings_eindpunt = []\nvuilwater = ['GemengdRiool']\n",
+    )
+    assert _labels(bestand, "NET-001", zonder_lozing) == ["1"]
+
+
+# De drukrioleringsketen laat Pompunit bewust buiten `afvoer_eindpunt`: met het
+# noodverband uit BO-33 erbij is de pompput zelf al een eindpunt en bewijst de fixture
+# niets over de route erachter.
+_DRUKRIOLERING_KLASSEN = (
+    "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+    "mechanisch = ['MechanischeRioolleiding']\nafvoer_eindpunt = ['Gemaal']\n"
+    "lozings_eindpunt = ['Lozingsput']\nvuilwater = ['Vuilwaterriool']\n"
+)
+
+
+def test_drukriolering_bereikt_het_gemaal_door_het_hulpstuk(tmp_path: Path) -> None:
+    """Het persnet telt als connectiviteit, ook waar het op een T-stuk samenkomt (BO-54).
+
+    Het T-stuk klimt via hasPart niet naar een put, dus `resolve_network_node` geeft er
+    None voor; zonder terugval op de rauwe koppeling versplintert elke T het persnet en
+    blijft het gemaal erachter onbereikbaar. De controle draait dezelfde fixture met een
+    lege `mechanisch`-lijst: dan is er geen route en wordt streng "1" wel gemeld.
+    """
+    bestand = "net001_drukriolering_gemaal.ttl"
+    config = _testconfig(tmp_path, "druk_gemaal", _DRUKRIOLERING_KLASSEN)
+    dataset = load_dataset(TTL_DIR / bestand)
+
+    assert (
+        dataset.resolve_network_node("http://example.org/toets#T1", config.klassen.netwerkknopen)
+        is None
+    )
+
+    assert _labels(bestand, "NET-001", config) == []
+
+    zonder_mechanisch = _testconfig(
+        tmp_path,
+        "druk_zonder_mech",
+        _DRUKRIOLERING_KLASSEN.replace("['MechanischeRioolleiding']", "[]"),
+    )
+    assert _labels(bestand, "NET-001", zonder_mechanisch) == ["1"]
+
+
+def test_drukriolering_die_op_een_lozingsput_uitkomt_is_afgevoerd(tmp_path: Path) -> None:
+    """Dezelfde keten, maar het persnet loost op een lozingsput in plaats van een gemaal.
+
+    De twee wijzigingen van issue #72 samen: het persnet is doorlopend (BO-54) en het
+    lozingspunt aan het eind telt als vuilwater-eindpunt (BO-53).
+    """
+    bestand = "net001_drukriolering_lozingsput.ttl"
+    config = _testconfig(tmp_path, "druk_lozing", _DRUKRIOLERING_KLASSEN)
+
+    assert _labels(bestand, "NET-001", config) == []
+
+    zonder_lozing = _testconfig(
+        tmp_path, "druk_zonder_lozing", _DRUKRIOLERING_KLASSEN.replace("['Lozingsput']", "[]")
+    )
+    assert _labels(bestand, "NET-001", zonder_lozing) == ["1"]
+
+
+def _testconfig(tmp_path: Path, naam: str, klassen: str) -> CheckConfig:
+    """Een projectconfig met alleen de klassen die de test nodig heeft."""
+    pad = tmp_path / f"{naam}.toml"
+    pad.write_text(f"[klassen]\n{klassen}[nulmeting]\nvereiste_cfk = ['Hyd']\n", encoding="utf-8")
+    return load_check_config(pad)
 
 
 def test_notitie_meldt_strengen_die_tegen_de_bob_in_lopen(tmp_path: Path) -> None:
@@ -252,8 +324,13 @@ def test_notitie_telt_doodlopende_eindknopen() -> None:
     outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
 
     notitie = next(n for n in outcome.notes if "watert af op" in n)
-    assert "loopt dood" in notitie
-    assert "Inspectieput" in notitie
+    assert "de overige 1 loopt dood" in notitie
+    # De soortnaam is het beheerobject en niet zijn orientatie: het GWSW hangt de
+    # topologische rol aan een orientatie-aspect, en `types_of()` voegt die aspecttypen
+    # bewust bij de objecttypen. Alfabetisch sorteren liet "Putorientatie" winnen van
+    # "Inspectieput", waardoor de toelichting aspecten leek te tellen in plaats van putten.
+    assert "Inspectieput 1" in notitie
+    assert "orientatie" not in notitie
 
 
 def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> None:
@@ -290,23 +367,19 @@ def _labels_op(pad: Path, check_id: str, config: CheckConfig | None) -> list[str
     return sorted(finding.object_label for finding in outcome.findings)
 
 
-def test_eindknoopverdeling_noemt_het_beheerobject_niet_zijn_orientatie() -> None:
-    """De soortnaam van een eindknoop hoort het beheerobject te zijn.
+def test_uitlaatconstructie_is_geen_doodlopende_eindknoop_voor_vuilwater() -> None:
+    """Een gemengde streng die op een uitlaatconstructie eindigt loopt niet dood (BO-53).
 
-    Het GWSW hangt de topologische rol aan een orientatie-aspect, en `types_of()`
-    voegt die aspecttypen bewust bij de objecttypen (Lozingspunt en UitlaatPunt
-    staan er immers op). Alfabetisch sorteren liet daardoor "Bouwwerkorientatie"
-    winnen van "Uitlaatconstructie" en "Putorientatie" van "Rioolput", waardoor de
-    toelichting aspecten leek te tellen in plaats van bouwwerken.
+    Tot issue #72 was dit de fixture waarop NET-001 een doodlopende Bouwwerk-eindknoop
+    telde. Nu het lozingspunt als geldig vuilwater-eindpunt geldt, is die uitlaat een
+    uitstroompunt en blijft er geen doodlopende eindknoop over. Dat de soortnaam in de
+    verdeling het beheerobject is en niet zijn orientatie, bewaakt
+    `test_beheerobjecttype_negeert_de_orientatie` op deze fixture.
     """
     outcome = _outcome("net001_bouwwerk_eindknoop.ttl", "NET-001")
 
-    verdeling = next(note for note in outcome.notes if "dood" in note)
-    assert "Uitlaatconstructie 1" in verdeling
-    assert "orientatie" not in verdeling
-    # En meteen de getalcongruentie: een eindknoop is er een, geen "1 eindknopen".
-    assert "1 eindknoop;" in verdeling
-    assert "de overige 1 loopt dood" in verdeling
+    assert outcome.findings == []
+    assert not any("loopt dood" in note for note in outcome.notes)
 
 
 def test_orientatie_aspecten_zijn_geen_knoop_in_de_netwerkgraaf() -> None:

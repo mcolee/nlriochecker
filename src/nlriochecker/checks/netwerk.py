@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
 import networkx as nx
@@ -33,6 +33,10 @@ from nlriochecker.taal import getal, vorm
 def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     """De knopen die stroomafwaarts een van deze eindpunten bereiken.
 
+    Over de bereikbaarheidsgraaf, dus inclusief het mechanische riool als ongerichte
+    connectiviteit: een vrijvervalstreng die op een pompput eindigt voert wel degelijk
+    af, langs het persnet naar het gemaal erachter (BO-54).
+
     Een enkele doorloop over de omgekeerde graaf vanaf alle eindpunten tegelijk.
     Per eindpunt afzonderlijk zoeken kost O(eindpunten x graaf): De Wolden en Hoogeveen heeft
     893 gemalen op ruim 20.000 knopen, en dat loopt in de tientallen miljoenen
@@ -41,7 +45,7 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     if not endpoints:
         return set()
 
-    omgekeerd = netwerk.graph.reverse(copy=False)
+    omgekeerd = netwerk.bereikbaarheid.reverse(copy=False)
     bereikt = {uri for uri in endpoints if uri in omgekeerd}
     stapel = list(bereikt)
     while stapel:
@@ -53,20 +57,35 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     return bereikt
 
 
-def _eindknoop_notitie(context: CheckContext, netwerk: _Netwerk, rol: str) -> list[str]:
+def _eindpuntset(context: CheckContext, rollen: Sequence[str]) -> set[str]:
+    """De knopen die als eindpunt van een van deze afvoerrollen gelden."""
+    gevonden: set[str] = set()
+    for rol in rollen:
+        gevonden |= _eindpunten(context, rol)
+    return gevonden
+
+
+def _eindknoop_notitie(
+    context: CheckContext, netwerk: _Netwerk, rollen: Sequence[str]
+) -> list[str]:
     """Beschrijft waar het vrijverval op uitkomt en wat daarvan als uitstroom telt.
 
     Een streng zonder afvoerpad is zelden een los gebrek: het netwerk watert af op
     een beperkt aantal eindknopen, en als die niet als uitstroompunt herkend worden
     slaat de check aan op alles wat erachter ligt. Deze telling maakt zichtbaar of
     het om ontbrekende uitstroomobjecten gaat.
+
+    Een eindknoop die zelf geen uitstroompunt is maar er wel een bereikt -- een
+    pompput met een persleiding naar het gemaal -- loopt niet dood en telt hier niet
+    mee; anders zou de notitie het persnet als gebrek presenteren.
     """
     sinks = [uri for uri in netwerk.graph if netwerk.graph.out_degree(uri) == 0]
     if not sinks:
         return []
 
-    endpoints = _eindpunten(context, rol)
-    doodlopend = [uri for uri in sinks if uri not in endpoints]
+    endpoints = _eindpuntset(context, rollen)
+    bereikt = _bereikbaar_vanaf(netwerk, endpoints)
+    doodlopend = [uri for uri in sinks if uri not in bereikt]
     if not doodlopend:
         return []
 
@@ -81,8 +100,8 @@ def _eindknoop_notitie(context: CheckContext, netwerk: _Netwerk, rol: str) -> li
     uitstroom = len(sinks) - len(doodlopend)
     return [
         f"Het vrijverval watert af op {getal(len(sinks), 'eindknoop', 'eindknopen')}; "
-        f"{uitstroom} daarvan {vorm(uitstroom, 'geldt', 'gelden')} als uitstroompunt van dit "
-        f"soort; de overige {len(doodlopend)} {vorm(len(doodlopend), 'loopt', 'lopen')} dood "
+        f"{uitstroom} daarvan {vorm(uitstroom, 'bereikt', 'bereiken')} een uitstroompunt van "
+        f"dit soort; de overige {len(doodlopend)} {vorm(len(doodlopend), 'loopt', 'lopen')} dood "
         f"({top}). Alles wat daarachter ligt telt daardoor als zonder afvoerpad."
     ]
 
@@ -92,21 +111,27 @@ def _soort(context: CheckContext, uri: str) -> str:
     return context.dataset.beheerobjecttype(uri) or "onbekend"
 
 
-def _richtingsverlies(context: CheckContext, netwerk: _Netwerk, rol: str | None) -> tuple[int, int]:
+def _richtingsverlies(
+    context: CheckContext, netwerk: _Netwerk, rollen: Sequence[str]
+) -> tuple[int, int]:
     """Splitst de onbereikbare knopen in twee oorzaken.
 
     Een knoop kan een eindpunt missen omdat zijn netwerkdeel er geen bevat, of omdat
     het eindpunt er wel is maar niet in de gevolgde richting ligt. Dat onderscheid
     bepaalt of je naar ontbrekende objecten of naar verkeerde richtingen moet kijken.
+
+    Op de bereikbaarheidsgraaf, dezelfde waarop de check zelf telt: op het zuivere
+    vrijverval zou een deel dat zijn gemaal via het persnet bereikt hier als "zonder
+    enig eindpunt" verschijnen.
     """
-    if rol is None:
+    if not rollen:
         return 0, 0
 
-    endpoints = _eindpunten(context, rol)
+    endpoints = _eindpuntset(context, rollen)
     bereikt = _bereikbaar_vanaf(netwerk, endpoints)
 
     zonder = met = 0
-    for deel in nx.weakly_connected_components(netwerk.graph):
+    for deel in nx.weakly_connected_components(netwerk.bereikbaarheid):
         onbereikt = len(deel - bereikt)
         if deel & endpoints:
             met += onbereikt
@@ -127,7 +152,7 @@ def _bob_tegen_de_richting(netwerk: _Netwerk) -> tuple[int, int]:
     return tegendraads, meetbaar
 
 
-def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str]:
+def _netwerk_notities(context: CheckContext, rollen: Sequence[str] = ()) -> list[str]:
     """Beschrijft welke objecten niet in de netwerkanalyse konden meedoen."""
     netwerk = _netwerk(context)
     notities = []
@@ -144,10 +169,10 @@ def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str
             "van-naar-richting."
         )
 
-    if rol is not None:
-        notities.extend(_eindknoop_notitie(context, netwerk, rol))
+    if rollen:
+        notities.extend(_eindknoop_notitie(context, netwerk, rollen))
 
-    zonder, in_deel_met_eindpunt = _richtingsverlies(context, netwerk, rol)
+    zonder, in_deel_met_eindpunt = _richtingsverlies(context, netwerk, rollen)
     if in_deel_met_eindpunt:
         notities.append(
             f"{in_deel_met_eindpunt} knopen liggen in een netwerkdeel dat wel een eindpunt "
@@ -170,8 +195,9 @@ def _netwerk_notities(context: CheckContext, rol: str | None = None) -> list[str
             "tot die tijd verdienen de bereikbaarheidsuitkomsten een slag om de arm."
         )
 
-    if rol is not None and not _eindpunten(context, rol):
-        klassen = ", ".join(getattr(context.config.klassen, rol)) or "geen geconfigureerd"
+    if rollen and not _eindpuntset(context, rollen):
+        namen = [naam for rol in rollen for naam in getattr(context.config.klassen, rol)]
+        klassen = ", ".join(namen) or "geen geconfigureerd"
         notities.append(
             f"De graaf bevat geen enkel eindpunt van het gevraagde soort ({klassen}); "
             "deze check slaat daardoor op elke streng aan."
@@ -183,7 +209,9 @@ class _ZonderAfvoerpad(Check):
     """Gedeelde basis voor de bereikbaarheidschecks."""
 
     stelselrol: str
-    eindpuntrol: str
+    # Meer dan een rol mag: NET-001 accepteert naast het afvoereindpunt ook het
+    # lozingspunt (BO-53). De eindpuntverzameling is de vereniging van hun knopen.
+    eindpuntrollen: tuple[str, ...]
     doel: str
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -214,13 +242,15 @@ class _ZonderAfvoerpad(Check):
         melden, de ander om te duiden hoeveel deelstelsels het betreft. Zonder deze
         gedeelde bron zouden ze uit elkaar kunnen lopen.
         """
-        sleutel = f"onbereikbaar:{self.stelselrol}:{self.eindpuntrol}"
+        sleutel = f"onbereikbaar:{self.stelselrol}:{'+'.join(self.eindpuntrollen)}"
         return context.cached(sleutel, lambda: self._bouw_onbereikbaar(context))
 
     def _bouw_onbereikbaar(self, context: CheckContext) -> tuple[list[tuple[Conduit, str]], bool]:
         """Loopt de strengen van dit stelseltype langs en houdt de onbereikbare over."""
         netwerk = _netwerk(context)
-        endpoints = _eindpunten(context, self.eindpuntrol)
+        endpoints: set[str] = set()
+        for rol in self.eindpuntrollen:
+            endpoints |= _eindpunten(context, rol)
         bereikt = _bereikbaar_vanaf(netwerk, endpoints)
         dataset = context.dataset
         wortels = context.config.klassen.netwerkknopen
@@ -251,7 +281,7 @@ class _ZonderAfvoerpad(Check):
         afgebakend is. Hier geteld zou de duiding het aantal deelstelsels van het
         hele werkbereik van de check melden bij de bevindingen van een enkele buurt.
         """
-        return _netwerk_notities(context, self.eindpuntrol)
+        return _netwerk_notities(context, self.eindpuntrollen)
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""
@@ -260,17 +290,24 @@ class _ZonderAfvoerpad(Check):
 
 @register
 class VuilwaterZonderAfvoerpad(_ZonderAfvoerpad):
-    """NET-001: vuilwater of gemengd zonder pad naar gemaal of overnamepunt."""
+    """NET-001: vuilwater of gemengd zonder pad naar gemaal, overnamepunt of lozingspunt.
+
+    Het lozingspunt telt sinds issue #72 mee (BO-53): vuilwater loost in Nederland
+    niet meer rechtstreeks op oppervlaktewater, dus een lozingspunt is per definitie
+    een geldig afvoereindpunt en er valt geen echt gebrek mee te maskeren.
+    """
 
     id = "NET-001"
-    title = "Vuilwater- of gemengde streng zonder afvoerpad naar gemaal of overnamepunt"
+    title = (
+        "Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt"
+    )
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("lozingspunten", "mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "vuilwater"
-    eindpuntrol = "afvoer_eindpunt"
-    doel = "een gemaal of overnamepunt"
+    eindpuntrollen = ("afvoer_eindpunt", "lozings_eindpunt")
+    doel = "een gemaal, overnamepunt of lozingspunt"
 
 
 @register
@@ -281,10 +318,10 @@ class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
     title = "Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("lozingspunten", "vrijvervalrioolleidingen")
+    rollen = ("lozingspunten", "mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "hemelwater"
-    eindpuntrol = "lozings_eindpunt"
+    eindpuntrollen = ("lozings_eindpunt",)
     doel = "een lozingspunt of overnamepunt"
 
 
@@ -296,7 +333,7 @@ class KringloopInNetwerk(Check):
     title = "Cirkels (kringlopen) in het vrijvervalnetwerk"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -381,7 +418,12 @@ class ItStelselZonderDrempel(Check):
     title = "IT-stelsel zonder drempel"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
-    rollen = ("infiltratieleidingen", "overstortputten", "vrijvervalrioolleidingen")
+    rollen = (
+        "infiltratieleidingen",
+        "mechanischeleidingen",
+        "overstortputten",
+        "vrijvervalrioolleidingen",
+    )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -486,7 +528,7 @@ class OrientatieTegenAfvoerrichting(Check):
     title = "Strengorientatie tegen de afvoerrichting in"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -662,7 +704,7 @@ class RichtingssignalenSprekenElkaarTegen(Check):
     title = "Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -741,7 +783,7 @@ class StelseltypeWijktAfVanBuren(Check):
     title = "Stelseltype streng wijkt af van boven- en benedenstroomse buren"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -827,7 +869,7 @@ class KoppelingTussenStelseltypen(Check):
     title = "Koppelingen tussen verschillende stelseltypen"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -881,7 +923,7 @@ class VeelLozingspuntenInDeelstelsel(Check):
     title = "Opvallend veel lozingspunten binnen een klein deelstelsel"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("lozingspunten", "vrijvervalrioolleidingen")
+    rollen = ("lozingspunten", "mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -924,7 +966,7 @@ class VeelLozingspuntenInDeelstelsel(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt wat er buiten de graaf viel."""
-        return _netwerk_notities(context, "lozings_eindpunt")
+        return _netwerk_notities(context, ("lozings_eindpunt",))
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen in de graaf."""

@@ -20,7 +20,7 @@ import networkx as nx
 from shapely.geometry import LineString
 
 from nlriochecker.checks.base import CheckContext
-from nlriochecker.checks.selectie import vrijvervalrioolleidingen
+from nlriochecker.checks.selectie import mechanischeleidingen, vrijvervalrioolleidingen
 from nlriochecker.dataset import Conduit, Node
 
 
@@ -159,9 +159,16 @@ class _Netwerk:
     De richting is de administratieve van-naar-richting: van BeginpuntLeiding naar
     EindpuntLeiding. Dat is de richting die het GWSW-model als afvoerrichting
     bedoelt; NET-003 toetst later of de geometrie daarmee overeenkomt.
+
+    `bereikbaarheid` is diezelfde graaf plus het mechanische riool als ongerichte
+    connectiviteit; alleen de bereikbaarheidsvraag ("komt dit water ergens uit?")
+    leest die. `graph` blijft het zuivere vrijverval, want kringlopen (NET-004),
+    stelseltypen (NET-005/006) en de afvoerpadanalyse zijn vrijverval-begrippen en
+    zouden op de ongerichte kanten onzin opleveren. Zie BO-54.
     """
 
     graph: nx.DiGraph
+    bereikbaarheid: nx.DiGraph
     conduits: list[Conduit]
     unconnected: list[Conduit]
     reversed_count: int = 0
@@ -201,6 +208,7 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
 
     return _Netwerk(
         graph=graph,
+        bereikbaarheid=_met_mechanische_connectiviteit(context, graph),
         conduits=aangesloten,
         unconnected=los,
         reversed_count=omgedraaid,
@@ -211,6 +219,32 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     )
 
 
+def _met_mechanische_connectiviteit(context: CheckContext, vrijverval: nx.DiGraph) -> nx.DiGraph:
+    """De vrijvervalgraaf plus het mechanische riool als ongerichte kanten (BO-54).
+
+    Ongericht, want een persleiding is pompgestuurd en haar administratieve
+    van-naar-richting vertrouwen we niet; voor de vraag of het water ergens uitkomt
+    telt alleen de connectiviteit. Beide richtingen als kant, zodat de gerichte
+    doorloop van `_bereikbaar_vanaf` er in beide richtingen doorheen kan.
+
+    Waar `resolve_network_node` geen netwerkknoop oplevert valt de kant terug op de
+    rauwe koppeling. Het persnet komt namelijk samen op hulpstukken (T-stukken), en
+    die klimmen via hasPart niet naar een put; zonder terugval versplintert elke T
+    het persnet in losse stukken en blijft het gemaal erachter onbereikbaar. Met de
+    terugval is het hulpstuk een doorgeefknoop.
+    """
+    graaf: nx.DiGraph = vrijverval.copy()
+    for conduit in mechanischeleidingen(context):
+        begin, eind = verbonden_knopen(context, conduit)
+        begin = begin or conduit.start_node
+        eind = eind or conduit.end_node
+        if begin is None or eind is None:
+            continue
+        graaf.add_edge(begin, eind)
+        graaf.add_edge(eind, begin)
+    return graaf
+
+
 def _stijgt(conduit: Conduit) -> bool:
     """Geeft aan of de bodem stijgt van begin- naar eindpunt."""
     verval = conduit.bob_verval
@@ -218,14 +252,20 @@ def _stijgt(conduit: Conduit) -> bool:
 
 
 def _eindpunten(context: CheckContext, rol: str) -> set[str]:
-    """De knopen in de graaf die als eindpunt van deze soort afvoer gelden."""
+    """De knopen in de graaf die als eindpunt van deze soort afvoer gelden.
+
+    Getoetst op de bereikbaarheidsgraaf en niet op het zuivere vrijverval: een gemaal
+    dat alleen aan het persnet hangt is wel degelijk een eindpunt, maar komt in de
+    vrijvervalgraaf niet voor. Die graaf is een deelverzameling van deze, dus voor de
+    lezers die met vrijvervalknopen werken verandert er niets.
+    """
     netwerk = _netwerk(context)
     dataset = context.dataset
     return {
         uri
         for wortel in getattr(context.config.klassen, rol)
         for uri in dataset.of_class(wortel)
-        if uri in netwerk.graph
+        if uri in netwerk.bereikbaarheid
     }
 
 

@@ -1397,6 +1397,55 @@ FIXTURES["net_afvoerpad_mechanisch.ttl"] = (
 )
 
 
+# De drukrioleringsklassen, inline: de gedeelde prelude kent ze niet. Pompunit is een
+# Rioolput, Drukleiding een MechanischeRioolleiding en die weer een Rioolleiding; het
+# T-stuk waarop het persnet samenkomt komt uit HULPSTUK_KLASSEN.
+DRUKRIOLERING_KLASSEN = (
+    "gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .\n"
+    "gwsw:MechanischeRioolleiding rdfs:subClassOf gwsw:Rioolleiding .\n"
+    "gwsw:Drukleiding rdfs:subClassOf gwsw:MechanischeRioolleiding .\n\n"
+)
+
+# NET-001 (#72): drukriolering. De vuilwaterstreng '1' eindigt op een pompunit en komt
+# alleen door het persnet bij het gemaal uit: drukleiding, T-stuk, drukleiding. Het
+# T-stuk is geen netwerkknoop -- het klimt via hasPart niet naar een put, dus
+# `resolve_network_node` geeft er None voor -- zodat het persnet zonder de terugval op
+# de rauwe koppeling in stukken uiteenvalt. Zie BO-54.
+FIXTURES["net001_drukriolering_gemaal.ttl"] = (
+    "geen; vuilwaterstreng '1' bereikt het gemaal alleen via pompunit -> drukleiding "
+    "-> T-stuk -> drukleiding -> gemaal",
+    DRUKRIOLERING_KLASSEN
+    + HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("Pomp", "P", 1050.0, 2000.0, klasse="Pompunit")
+    + hulpstuk("T1", "T", 1100.0, 2000.0)
+    + gemaal("Gem", "G", (1150.0, 2000.0))
+    + leiding(
+        "L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Pomp", klasse="Vuilwaterriool"
+    )
+    + leiding("D1", "d1", [(1050.0, 2000.0), (1100.0, 2000.0)], "Pomp", "T1", klasse="Drukleiding")
+    + leiding("D2", "d2", [(1100.0, 2000.0), (1150.0, 2000.0)], "T1", "Gem", klasse="Drukleiding"),
+)
+
+# NET-001 (#72): dezelfde keten, maar het persnet komt op een lozingsput uit in plaats
+# van op een gemaal. Vuilwater loost in Nederland niet meer rechtstreeks op
+# oppervlaktewater, dus een lozingspunt is een geldig vuilwater-eindpunt (BO-53).
+FIXTURES["net001_drukriolering_lozingsput.ttl"] = (
+    "geen; vuilwaterstreng '1' bereikt alleen via het persnet een lozingsput, geen gemaal",
+    DRUKRIOLERING_KLASSEN
+    + HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("Pomp", "P", 1050.0, 2000.0, klasse="Pompunit")
+    + hulpstuk("T1", "T", 1100.0, 2000.0)
+    + put("Loz", "L", 1150.0, 2000.0, klasse="Lozingsput")
+    + leiding(
+        "L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Pomp", klasse="Vuilwaterriool"
+    )
+    + leiding("D1", "d1", [(1050.0, 2000.0), (1100.0, 2000.0)], "Pomp", "T1", klasse="Drukleiding")
+    + leiding("D2", "d2", [(1100.0, 2000.0), (1150.0, 2000.0)], "T1", "Loz", klasse="Drukleiding"),
+)
+
+
 # De subklassehierarchie van de stelselfamilie, inline: de gedeelde prelude kent haar
 # niet, en haar aan de prelude toevoegen zou alle 140 fixtures herschrijven.
 STELSEL_HIERARCHIE = """gwsw:Vuilwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
