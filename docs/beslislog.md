@@ -2880,7 +2880,8 @@ NET-001, alle met méér bevindingen in de gebiedsrun en geen enkele met minder;
 wijziging zijn het er **0**. De afwijking bestond al vóór dit issue -- met `Pompunit` nog als
 eindpunt weken er 7 af, een gevolg van #72 dat het #72-verslag als openstaand punt naar dit
 issue doorschoof. Op een bredere steekproef van 8 buurten over alle 99 checks: 12 afwijkende
-checks (NET-001 in alle acht, plus TOP-001, TOP-006, TOP-011, TOP-023) vóór, 1 erna.
+checks (NET-001 in alle acht, plus TOP-001, TOP-006, TOP-011, TOP-023) vóór, 1 erna. Het meetscript staat als
+`scripts/analyse_contextschil_persnet.py` in de repo.
 
 **De prijs, en waarom hij aanvaardbaar is.** De analysesets van de 88 buurten samen groeien van
 303.570 naar 518.101 objecten (1,7x); de grootste gaat naar 15.739 van de 46.925 objecten in de
