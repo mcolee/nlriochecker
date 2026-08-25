@@ -8,6 +8,7 @@ Zonder die eigenschap is rapportage per gebied niet te vertrouwen.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -176,13 +177,18 @@ def test_onbekend_gebied_faalt_met_de_beschikbare_namen() -> None:
         gebieden.selecteer(["Oost"])
 
 
-def _schrijf(bestand: str, doel: Path, ttl: str = "hgt010_diameterverjonging.ttl"):
+def _schrijf(
+    bestand: str,
+    doel: Path,
+    ttl: str = "hgt010_diameterverjonging.ttl",
+    config: CheckConfig | None = None,
+):
     """Draait de toetsloop en schrijft de uitvoer weg."""
     gebieden = load_studiegebieden(GIS_DIR / bestand)
     runs = toets_gebieden(
         load_dataset(TTL_DIR / ttl),
         gebieden,
-        _config(),
+        config or _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
     )
     return runs, schrijf_uitvoer_gebieden(
@@ -246,6 +252,41 @@ def test_synthese_telt_unieke_en_meervoudige_meldingen(tmp_path: Path) -> None:
     per_gebied = sum(len(bouw_meldingen(run.run, RUNDATUM)) for run in runs)
     assert "in meer dan een gebied" in tekst
     assert totaal["aantal_meldingen"] < per_gebied
+
+
+def test_synthese_telt_de_onderdrukte_meldingen_over_alle_gebieden(tmp_path: Path) -> None:
+    """Issue #65: wat `[rapport]` uit de stroom hield, staat ook in de totaalsynthese.
+
+    De som over de gebieden, niet ontdubbeld -- net als de kolom Meldingen ernaast; de
+    telling per check en per klasse staat in de verantwoording van elk gebied.
+    """
+    config = _config()
+    config.rapport.onderdruk_klassen = ["Leiding"]
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path, config=config)
+    assert uitvoer.synthese is not None
+
+    tekst = uitvoer.synthese.read_text(encoding="utf-8")
+    treffer = re.search(r"Over alle gebieden samen zijn (\d+) meldingen onderdrukt", tekst)
+    totaal = json.loads((tmp_path / "totaal" / "bevindingen.json").read_text(encoding="utf-8"))
+
+    assert treffer is not None, tekst
+    assert int(treffer.group(1)) > 0
+    assert "op grond van `[rapport]`" in tekst
+    # Dezelfde som in de totaal-JSON: twee uitvoervormen die uit elkaar lopen is precies
+    # wat de gedeelde meldingenstroom uitsluit.
+    assert totaal["onderdrukt"] == {
+        "klassen": ["Leiding"],
+        "checks": [],
+        "meldingen": int(treffer.group(1)),
+    }
+
+
+def test_synthese_zwijgt_zonder_onderdrukking(tmp_path: Path) -> None:
+    """Geen keuze om te verantwoorden, dus geen regel."""
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path)
+
+    assert uitvoer.synthese is not None
+    assert "onderdrukt" not in uitvoer.synthese.read_text(encoding="utf-8")
 
 
 def test_synthese_vermeldt_een_selectie(tmp_path: Path) -> None:

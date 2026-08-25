@@ -2577,3 +2577,30 @@ poort.
 herijking is handwerk dat de volgende sessie herhaalt). Een aparte lijst verwachte tests
 (verworpen: dubbele administratie die achterloopt). Alleen de lokale runnerpoort (verworpen:
 vangt de fout vóór de push, maar de grens zelf blijft verkeerd).
+
+### BO-49 Meldingen onderdrukken per klasse en per check is een uitvoerkeuze, op één plek, met telling
+
+**Wat.** `[rapport]` krijgt `onderdruk_klassen` (GWSW-wortelklassen; subklassen via de ontologie) en
+`onderdruk_checks` (check-ID's), beide standaard leeg. `bouw_meldingenstroom` houdt ná het samenstellen
+van de drie bronnen elke melding uit de stroom waarvan het check-ID op de tweede lijst staat of waarvan
+het hoofdobject (`object_uri`, niet `object2_uri`) onder een klasse van de eerste valt, en telt per check
+en per klasse wat wegviel. Rapport (verantwoording), `totaal/synthese.md`, `gwsw_run`
+(`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en de JSON-envelop (`onderdrukt`,
+optioneel) dragen de telling; de CSV niet. Een object waarvan alle meldingen onderdrukt zijn wordt grijs
+met de reden "meldingen onderdrukt op grond van de projectconfiguratie", die vóór "mechanisch" gaat. Een
+onbekend check-ID faalt bij het laden. De Wolden onderdrukt `MechanischeRioolleiding` en
+`MechanischeTransportleiding`, dezelfde wortels als `[klassen] mechanisch`. Uitgewerkt in issue #65.
+
+**Waarom.** Het checkregister rekent mechanisch riool buiten scope, maar TOP-010, TOP-011 en de
+SHACL-nulmeting melden er toch op (Koekangerveld: 17 van de 20 mechanische strengen gekleurd). De
+kaartregel van BO-29 -- grijs wint niet van een gebrek -- is juist en blijft; wat weg moet is de melding
+zelf, vóór hij een schrijver bereikt, anders lopen de vier uitvoervormen uit elkaar. Daarom één plek
+(`bouw_meldingenstroom`) en geen filter per schrijver. Het is een uitvoerkeuze en geen toetskeuze:
+`examined` en de systemisch-bepaling veranderen niet, anders zou een onderdrukte klasse de noemer van
+een andere check verschuiven. De telling staat erbij omdat stilte leest als "alles gecontroleerd".
+
+**Alternatieven.** Een CLI-vlag (verworpen: de keuze is projectgebonden en hoort reproduceerbaar in de
+TOML). De checks zelf op `[klassen] mechanisch` laten filteren (verworpen: dan verdwijnt ook de
+kruisingsmelding op de vrijvervalstreng, en de nulmeting filtert niet). Een kolom in de CSV (verworpen:
+dezelfde reden als bij de CFK-set, BO-7). Het JSON-veld altijd schrijven (verworpen: een run zonder
+lijsten blijft byte-voor-byte gelijk, zoals bij `markering`).

@@ -62,7 +62,12 @@ from nlriochecker.uitvoer.herkomst import (
     schrijf_json,
     schrijf_markdown,
 )
-from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    GEEN_ONDERDRUKKING,
+    Melding,
+    Onderdrukking,
+    bouw_meldingen,
+)
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 BRON = Path(__file__).resolve().parents[1] / "src"
@@ -551,6 +556,9 @@ def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> Non
         typeringspoort_toegepast=True,
         markering="een voorbehoud",
         gebieden=["Koekange", "Ruinen"],
+        onderdrukking=Onderdrukking(
+            klassen=("Leiding",), checks=("TOP-001",), per_check={"TOP-001": 1}, per_klasse={}
+        ),
     )
     document = json.loads(pad.read_text(encoding="utf-8"))
     doc = (Path(__file__).resolve().parents[1] / "docs" / "json-schema.md").read_text(
@@ -664,3 +672,28 @@ def test_totaal_json_noemt_alle_gebieden(tmp_path: Path) -> None:
 
     assert document["gebied"] is None
     assert document["gebieden"] == ["Noord", "Zuid"]
+
+
+def test_json_zonder_onderdrukking_draagt_het_veld_niet(tmp_path: Path) -> None:
+    """Optioneel en additief: een run zonder lijsten blijft byte-voor-byte gelijk (BO-49)."""
+    zonder = _envelop(tmp_path / "zonder.json")
+    leeg = _envelop(tmp_path / "leeg.json", onderdrukking=GEEN_ONDERDRUKKING)
+
+    assert "onderdrukt" not in zonder
+    assert "onderdrukt" not in leeg
+    assert (tmp_path / "zonder.json").read_text(encoding="utf-8") == (
+        tmp_path / "leeg.json"
+    ).read_text(encoding="utf-8")
+
+
+def test_json_met_onderdrukking_draagt_de_lijsten_en_de_telling(tmp_path: Path) -> None:
+    """De telling hoort bij de run; de CSV draagt hem niet (BO-49)."""
+    document = _envelop(
+        tmp_path / "b.json",
+        onderdrukking=Onderdrukking(
+            klassen=("Leiding",), checks=("TOP-001",), per_check={"TOP-001": 1}, per_klasse={}
+        ),
+    )
+
+    assert document["onderdrukt"] == {"klassen": ["Leiding"], "checks": ["TOP-001"], "meldingen": 1}
+    assert document["schema_versie"] == "1.1"

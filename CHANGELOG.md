@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Meldingen onderdrukken per klasse en per check** (issue #65). `[rapport]` krijgt
+  `onderdruk_klassen` (GWSW-wortelklassen, subklassen via de ontologie) en `onderdruk_checks`
+  (check-ID's; een onbekend ID faalt bij het laden). Het filter zit op één plek, in de
+  meldingenstroom vóór elke schrijver, en telt per check en per klasse wat wegviel: in de
+  verantwoording van het rapport, in `totaal/synthese.md`, in `gwsw_run`
+  (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en als optioneel veld
+  `onderdrukt` in de JSON-envelop (`schema_versie` blijft 1.1). Een object waarvan alle
+  meldingen onderdrukt zijn is grijs op de kaart met die reden. De CSV draagt de lijsten niet.
+  `configs/dewoldenhoogeveen.toml` onderdrukt het mechanische riool. Gemeten effect: zie BO-49.
+
 - **ADM-010 en ADM-011: loze leidingen die in het actieve netwerk hangen** (issue #62).
   Loze leidingen (`LozeLeiding`, buiten gebruik) worden tot ketens gegroepeerd; ADM-010
   (F) meldt per loze streng een keten waar actief riool op aansluit (doorgaand, aanvoer

@@ -49,7 +49,14 @@ from nlriochecker.dataset import Conduit, GwswDataset, Node
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
-from nlriochecker.uitvoer.melding import BRON_NULMETING, BRON_REGISTER, Melding, categorie_van
+from nlriochecker.uitvoer.melding import (
+    BRON_NULMETING,
+    BRON_REGISTER,
+    GEEN_ONDERDRUKKING,
+    Melding,
+    Onderdrukking,
+    categorie_van,
+)
 from nlriochecker.uitvoer.objectkaart import (
     Objectkop,
     bepaal_status,
@@ -91,6 +98,10 @@ RELATIE_STERKTE = ("binnen", "kruist", "nabij")
 # "in orde", en dat is het niet.
 REDEN_MECHANISCH = "mechanisch riool, dat de meeste checks overslaan"
 REDEN_SCHIL = "ligt naast het studiegebied en niet erin"
+# De projectconfiguratie houdt de meldingen van deze klasse uit de stroom (BO-49). Niet
+# hetzelfde als "mechanisch": dat zegt dat de checks er grotendeels overheen lopen, dit
+# dat de uitkomst bewust niet gerapporteerd wordt -- ook op een klasse die wel getoetst is.
+REDEN_ONDERDRUKT = "meldingen onderdrukt op grond van de projectconfiguratie"
 # Deze reden geldt niet voor een object maar voor de hele run: zonder klassenhierarchie
 # heeft de lader knopen en strengen op geometrie herkend en draaiden de checks over een
 # onvolledige selectie. Groen zou hier "beoordeeld en niets gevonden" beweren, terwijl
@@ -171,6 +182,7 @@ def schrijf_geopackage(
     run_datum: date,
     *,
     voortgang: Voortgang = NUL_VOORTGANG,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> Path:
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
 
@@ -178,6 +190,10 @@ def schrijf_geopackage(
     bevatten alleen objecten binnen of snijdend met het gebied. De checks draaiden
     op de kern plus de contextschil (ruim genoeg voor randeffectvrije netwerkchecks),
     dus wat hier buiten valt is bewust weggelaten, niet over het hoofd gezien.
+
+    `onderdrukking` komt uit de meldingenstroom en gaat naar `gwsw_run`: de meldingen
+    die `[rapport]` wegliet zitten niet in `meldingen`, en zonder die telling zou het
+    bestand niet zeggen dat er iets weggelaten is (BO-49).
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)
@@ -197,7 +213,7 @@ def schrijf_geopackage(
         voortgang.stap(label="meldingen")
         _schrijf_overzicht(verbinding, run, meldingen)
         voortgang.stap(label="overzicht_checks")
-        _schrijf_runmetadata(verbinding, run, meldingen, run_datum, tellingen)
+        _schrijf_runmetadata(verbinding, run, meldingen, run_datum, tellingen, onderdrukking)
         voortgang.stap(label="gwsw_run")
         _schrijf_stijlen(verbinding)
         voortgang.stap(label="layer_styles")
@@ -432,6 +448,21 @@ def _mechanische_uris(run: CheckRun) -> frozenset[str]:
     return frozenset(conduit.uri for conduit in mechanischeleidingen(run.context))
 
 
+def _onderdrukte_uris(run: CheckRun) -> frozenset[str]:
+    """De objecten waarvan `[rapport]` de meldingen uit de stroom houdt (BO-49).
+
+    Uit de configuratie en niet uit de meldingen: een object van een onderdrukte klasse
+    hoort ook grijs te lezen als er toevallig niets op stond. Anders zou de kaart bij het
+    ene object "niet gerapporteerd" en bij het andere "beoordeeld en in orde" zeggen op
+    grond van hetzelfde besluit.
+    """
+    return frozenset(
+        uri
+        for wortel in run.config.rapport.onderdruk_klassen
+        for uri in run.dataset.of_class(wortel)
+    )
+
+
 def _schrijf_features(
     verbinding: sqlite3.Connection,
     run: CheckRun,
@@ -484,6 +515,7 @@ def _schrijf_features(
     stelsels = stelseltypen(run)
     config = run.config
     mechanisch = _mechanische_uris(run)
+    onderdrukt = _onderdrukte_uris(run)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
     # Het afvoerpad per knoop, uit `run.context`: de NET-checks hebben de graaf daar
@@ -515,7 +547,7 @@ def _schrijf_features(
             afvoer_eindpunt, afvoer_meters, afvoer_stappen = _afvoer_velden(
                 run.context, afvoer_per_knoop, uri, object_
             )
-            reden = _reden_niet_beoordeeld(uri, binnen, mechanisch, geen_hierarchie)
+            reden = _reden_niet_beoordeeld(uri, binnen, onderdrukt, mechanisch, geen_hierarchie)
             if uri in mechanisch:
                 mechanisch_geschreven += 1
             rijen.append(
@@ -587,10 +619,14 @@ def _afvoer_velden(
 def _reden_niet_beoordeeld(
     uri: str,
     binnen: frozenset[str] | None,
+    onderdrukt: frozenset[str],
     mechanisch: frozenset[str],
     geen_klassenhierarchie: bool = False,
 ) -> str:
     """Waarom dit object buiten de beoordeling viel, of leeg als het erbinnen lag.
+
+    Onderdrukking gaat vóór mechanisch: ook een niet-mechanische onderdrukte klasse hoort
+    grijs te lezen en niet groen; voor De Wolden vallen de twee samen.
 
     Mechanisch riool gaat voor de ring: het wordt door de meeste checks overgeslagen,
     ook binnen de kern, en dat is de scherpere reden om te noemen. De reden staat er
@@ -602,6 +638,8 @@ def _reden_niet_beoordeeld(
     dit ene object van zijn buren onderscheiden. Voor de status maakt de volgorde niet
     uit -- elke reden zet hem op grijs zolang er niets op het object staat.
     """
+    if uri in onderdrukt:
+        return REDEN_ONDERDRUKT
     if uri in mechanisch:
         return REDEN_MECHANISCH
     if binnen is not None and uri not in binnen:
@@ -1355,6 +1393,7 @@ def _schrijf_runmetadata(
     meldingen: list[Melding],
     run_datum: date,
     tellingen: _LaagTellingen,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> None:
     """Schrijft een enkele rij met alles wat het bestand herleidbaar maakt."""
     kolommen = [
@@ -1385,6 +1424,13 @@ def _schrijf_runmetadata(
         _Kolom("dataset_objecten", "integer"),
         _Kolom("cfk_set", "text"),
         _Kolom("volledig", "integer"),
+        # Wat `[rapport]` uit de meldingenstroom hield (BO-49): de twee lijsten uit de
+        # projectconfiguratie en hoeveel meldingen erdoor wegvielen. Die meldingen staan
+        # in geen enkele tabel van dit bestand; zonder deze telling zou de kaart zwijgen
+        # over wat er weggelaten is.
+        _Kolom("onderdruk_klassen", "text"),
+        _Kolom("onderdruk_checks", "text"),
+        _Kolom("meldingen_onderdrukt", "integer"),
         # De runbrede voorbehouden als een tekst, samengesteld door
         # `uitvoer.voorbehoud`; leeg als er niets voor te behouden valt. Dezelfde
         # string die boven het Markdown-rapport staat en in de JSON-envelop.
@@ -1432,6 +1478,9 @@ def _schrijf_runmetadata(
             stel.volledig_aantal if stel is not None else None,
             run.meetbereik.cfk_tekst,
             int(run.meetbereik.volledig),
+            ", ".join(onderdrukking.klassen),
+            ", ".join(onderdrukking.checks),
+            onderdrukking.totaal,
             markering(run) or "",
         ),
     )

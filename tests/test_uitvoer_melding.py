@@ -346,7 +346,7 @@ def _run_onderdrukt(
 
 
 def _zonder_signalen(meldingen: list[Melding]) -> list[Melding]:
-    """De meldingen met een hoofdobject, los van de datasetsignalen (issue #22)."""
+    """De meldingen die niet uit de datasetsignalen komen (issue #22)."""
     return [melding for melding in meldingen if melding.bron != BRON_DATASET]
 
 
@@ -394,6 +394,21 @@ def test_onderdrukking_per_check_gaat_voor_en_telt_een_melding_maar_een_keer() -
     assert stroom.onderdrukking.per_check == {"TOP-011": 1}
     assert stroom.onderdrukking.per_klasse == {}
     assert stroom.onderdrukking.totaal == 1
+
+
+def test_de_eerste_treffende_wortel_uit_de_lijst_krijgt_de_telling() -> None:
+    """De volgorde van de lijst beslist: `Leiding` staat vooraan en telt de persleiding.
+
+    Beide wortels dekken L2; zonder die regel zou een melding onder twee wortels kunnen
+    vallen en zou de som van de tellingen hoger zijn dan het aantal weggevallen meldingen.
+    """
+    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
+    stroom = bouw_meldingenstroom(
+        _run_onderdrukt(["Leiding", "MechanischeTransportleiding"], [], nul), RUNDATUM
+    )
+
+    assert stroom.onderdrukking.per_klasse == {"Leiding": 2}
+    assert stroom.onderdrukking.totaal == 2
 
 
 def test_een_melding_zonder_object_valt_nooit_op_klasse_weg() -> None:

@@ -100,6 +100,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `volledig` | boolean | Waar als `cfk_set` gelijk is aan de volledige set uit `checks.toml`. Onwaar bij een deelset én bij een run zonder nulmeting. |
 | `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
 | `markering` | string | *Optioneel.* De runbrede voorbehouden van deze run als een tekst voor een lezer, dezelfde die boven het Markdown-rapport staat en in de kolom `markering` van `gwsw_run`. Twee voorbehouden worden twee alinea's, gescheiden door een lege regel. Het veld ontbreekt als er niets voor te behouden valt. |
+| `onderdrukt` | object | *Optioneel.* Wat `[rapport]` in de projectconfiguratie uit de stroom hield: `klassen` (array van string, de wortelklassen), `checks` (array van string, de check-ID's) en `meldingen` (integer, hoeveel meldingen wegvielen). Het veld ontbreekt als beide lijsten leeg zijn. In `totaal/bevindingen.json` is `meldingen` de som over de gebieden, niet ontdubbeld -- net als de kolom Meldingen in de synthese. De CSV draagt de lijsten niet: de keuze hoort bij de run, niet bij de melding. |
 | `aantal_meldingen` | integer | Het aantal elementen in `meldingen`. Redundant, maar zo kan een afnemer een afgekapt bestand herkennen. |
 | `meldingen` | array van object | De meldingen, gesorteerd op `melding_id`. |
 
@@ -126,6 +127,18 @@ andere enveloppevelden af te leiden is, en voor een lezer die de JSON naast het 
 legt. Het kwam erbij zonder de schemaversie te verhogen, net als `gebied` en `gebieden`:
 wie het niet kent, leest het bestand zoals voorheen. De CSV draagt het bewust niet -- een
 voorbehoud hoort bij de run en niet bij elke rij.
+
+### Over `onderdrukt`
+
+`[rapport] onderdruk_klassen` en `onderdruk_checks` houden meldingen uit de stroom vóór
+enige uitvoervorm ze ziet; dit veld zegt welke lijsten dat waren en hoeveel meldingen
+erdoor wegvielen.
+
+De onderdrukte meldingen worden nergens bewaard -- niet in dit bestand, niet in de CSV,
+niet in de GeoPackage. Wie ze wil zien, draait de toets opnieuw zonder de twee lijsten.
+
+Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering`:
+wie het niet kent leest het bestand zoals voorheen.
 
 ### Over `gebied` en `gebieden`
 
@@ -334,7 +347,7 @@ Het tweede nummer telt op bij een achterwaarts verenigbare *wijziging* die een b
 afnemer merkt -- niet bij een puur optioneel, additief veld. Zo'n veld laat een afnemer die
 het niet kent het bestand lezen zoals voorheen; het valt daarom onder de lijst hieronder en
 verhoogt de versie niet. Het nummer staat op `1.1`: die stap van `1.0` viel samen met het
-veld `cfk`, maar de latere velden `gebied`, `gebieden` en `markering` -- alle optioneel en
+veld `cfk`, maar de latere velden `gebied`, `gebieden`, `markering` en `onderdrukt` -- alle optioneel en
 additief -- kwamen er binnen `1.1` bij, zonder verhoging. Pin daarom op het **hoofdnummer**
 (`schema_versie.split(".")[0] == "1"`), niet op de volledige string: `1.1` duidt niet één
 vaste enveloppevorm aan.

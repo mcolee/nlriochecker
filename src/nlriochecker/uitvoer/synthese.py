@@ -21,7 +21,12 @@ from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.checks.selectie import vrijvervalrioolleidingen
 from nlriochecker.taal import getal, vorm
-from nlriochecker.uitvoer.melding import BRON_REGISTER, Melding
+from nlriochecker.uitvoer.melding import (
+    BRON_REGISTER,
+    GEEN_ONDERDRUKKING,
+    Melding,
+    Onderdrukking,
+)
 from nlriochecker.uitvoer.tabel import table
 
 ERNST_FOUT = Severity.ERROR.value
@@ -41,6 +46,10 @@ class GebiedsSamenvatting:
     weggelaten: int
     kern_objecten: int
     meldingen: list[Melding]
+    # Wat `[rapport]` uit de stroom van dit gebied hield (BO-49). De totaalsynthese telt
+    # de gebieden op; de telling per check en per klasse staat in de verantwoording van
+    # elk gebied.
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING
 
 
 # De checks die samen op een verkeerd geregistreerde afvoerrichting wijzen.
@@ -260,6 +269,17 @@ def totaalsynthese(
         f"({len(alle_ids)}) hoger dan het aantal unieke meldingen; er is niet ontdubbeld "
         f"tussen gebieden.",
         "",
+    ]
+    if any(deel.onderdrukking.actief for deel in gebieden):
+        onderdrukt = sum(deel.onderdrukking.totaal for deel in gebieden)
+        regels += [
+            f"Over alle gebieden samen zijn {onderdrukt} meldingen onderdrukt op grond van "
+            "`[rapport]` (som over de gebieden, niet ontdubbeld; de telling per check en per "
+            "klasse staat in de verantwoording van elk gebied).",
+            "",
+        ]
+
+    regels += [
         *table(per_gebied, "Per gebied"),
         "",
         *table(_per_gebied_en_check(gebieden), "Meldingen per gebied en check"),

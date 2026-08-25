@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import xml.etree.ElementTree as ET
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -24,9 +25,17 @@ from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik
+from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import _lees_geopackage, load_study_area
-from nlriochecker.uitvoer.gpkg import GEOPACKAGE_STAPPEN, RD_NEW, schrijf_geopackage
+from nlriochecker.uitvoer.gpkg import (
+    GEOPACKAGE_STAPPEN,
+    RD_NEW,
+    REDEN_MECHANISCH,
+    REDEN_ONDERDRUKT,
+    schrijf_geopackage,
+)
 from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -1118,3 +1127,90 @@ def test_stelselmelding_uit_de_nulmeting_landt_op_de_stelsellaag(tmp_path: Path)
     )
     assert n_meldingen >= 1
     assert "Vuilwaterstelsel_Lozingspunt_card" in popup
+
+
+# Issue #65: onderdrukking uit `[rapport]`. De fixture: vrijvervalstreng L1 (GemengdRiool)
+# kruist persleiding L2 (Persleiding). TOP-011 meldt het paar een keer, met L1 als
+# hoofdobject en L2 als tweede object; de nulbevinding hieronder geeft L2 een eigen
+# melding, zodat er iets te onderdrukken valt.
+def _run_onderdrukt(klassen: Sequence[str], checks: Sequence[str] = ()) -> CheckRun:
+    """TOP-011 op de kruisingsfixture, met de twee lijsten uit `[rapport]` gezet."""
+    config = _config()
+    config.rapport.onderdruk_klassen = list(klassen)
+    config.rapport.onderdruk_checks = list(checks)
+    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl")
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
+    return replace(run, nulbevindingen=(_nulbevinding_op_de_persleiding(),))
+
+
+def _nulbevinding_op_de_persleiding() -> Nulbevinding:
+    """Een nulmetingmelding op L2, het enige gebrek dat de persleiding zelf draagt."""
+    return Nulbevinding(
+        check_id="NULMETING-Put_HoogtePut_card",
+        vorm="Put_HoogtePut_card",
+        focus_node="L2",
+        ernst="F",
+        object_uri="http://example.org/toets#L2",
+        object_label="2",
+        objecttype="Persleiding",
+        boodschap="aantal voorkomens wijkt af (exact=1)",
+        waarde="te weinig voorkomens",
+        cfk=("MdsPlan",),
+        systemisch=False,
+        herleid=True,
+    )
+
+
+def _strengen_uit_de_stroom(run: CheckRun, map_: Path) -> dict[str, dict]:
+    """Schrijft de uitvoer uit de echte meldingenstroom en leest de laag `strengen`."""
+    uitvoer = schrijf_uitvoer(run, map_, RUNDATUM, met_json=False)
+    assert uitvoer.geopackage is not None
+    return {rij["feature_id"]: rij for rij in _laagrijen(uitvoer.geopackage, "strengen")}
+
+
+def test_een_onderdrukte_persleiding_is_grijs_met_de_reden(tmp_path: Path) -> None:
+    """Alle meldingen weg -> grijs; en de reden is de onderdrukking, niet 'mechanisch'."""
+    rijen = _strengen_uit_de_stroom(_run_onderdrukt(["MechanischeTransportleiding"]), tmp_path)
+
+    assert rijen["L2"]["status"] == "grijs"
+    assert REDEN_ONDERDRUKT in rijen["L2"]["popup_html"]
+    assert REDEN_MECHANISCH not in rijen["L2"]["popup_html"]
+    assert rijen["L1"]["status"] != "grijs"
+    assert REDEN_ONDERDRUKT not in rijen["L1"]["popup_html"]
+
+
+def test_een_niet_mechanische_onderdrukte_klasse_leest_grijs_en_niet_groen(
+    tmp_path: Path,
+) -> None:
+    """Grijs met de onderdrukkingsreden; groen zou 'beoordeeld en niets gevonden' beweren."""
+    rijen = _strengen_uit_de_stroom(_run_onderdrukt(["GemengdRiool"]), tmp_path)
+
+    assert rijen["L1"]["status"] == "grijs"
+    assert REDEN_ONDERDRUKT in rijen["L1"]["popup_html"]
+    # L2 is niet onderdrukt en blijft grijs om de oude reden: mechanisch riool.
+    assert rijen["L2"]["status"] == "rood"
+    assert REDEN_MECHANISCH in rijen["L2"]["popup_html"]
+
+
+def test_gwsw_run_draagt_de_lijsten_en_de_telling(tmp_path: Path) -> None:
+    """De keuze hoort bij de run, dus in `gwsw_run` en niet op elke melding."""
+    uitvoer = schrijf_uitvoer(
+        _run_onderdrukt(["MechanischeTransportleiding"]), tmp_path, RUNDATUM, met_json=False
+    )
+
+    assert uitvoer.geopackage is not None
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("MechanischeTransportleiding", "", 1)]
+
+
+def test_gwsw_run_zonder_onderdrukking_telt_nul(tmp_path: Path) -> None:
+    """Zonder lijsten blijft de tabel zeggen dat er niets weggehouden is."""
+    uitvoer = schrijf_uitvoer(_run_onderdrukt([]), tmp_path, RUNDATUM, met_json=False)
+
+    assert uitvoer.geopackage is not None
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("", "", 0)]

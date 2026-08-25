@@ -7,6 +7,7 @@ herkomstblokken met de fouten voorop.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -15,7 +16,7 @@ from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
-from nlriochecker.nulbevinding import bouw_nulbevindingen
+from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import toets_gebieden
 from nlriochecker.uitvoer.omvang import omvangtabel
@@ -273,3 +274,52 @@ class TestVerantwoordingBlijft:
         assert "typeringspoort" in tekst
         assert "Analyseset:" in tekst
         assert "Externe bronnen" in tekst
+
+
+class TestOnderdrukking:
+    """Issue #65: wat `[rapport]` uit de stroom houdt, staat in de verantwoording.
+
+    De fixture: vrijvervalstreng L1 kruist persleiding L2; TOP-011 meldt het paar een
+    keer, met L1 als hoofdobject. De nulbevinding geeft L2 een eigen melding, en die
+    is het enige wat `MechanischeTransportleiding` hier onderdrukt.
+    """
+
+    @staticmethod
+    def _run_onderdrukt(klassen: Sequence[str]) -> CheckRun:
+        config = _config()
+        config.rapport.onderdruk_klassen = list(klassen)
+        dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl")
+        run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
+        return replace(
+            run,
+            nulbevindingen=(
+                Nulbevinding(
+                    check_id="NULMETING-Put_HoogtePut_card",
+                    vorm="Put_HoogtePut_card",
+                    focus_node="L2",
+                    ernst="F",
+                    object_uri="http://example.org/toets#L2",
+                    object_label="2",
+                    objecttype="Persleiding",
+                    boodschap="aantal voorkomens wijkt af (exact=1)",
+                    waarde="te weinig voorkomens",
+                    cfk=("MdsPlan",),
+                    systemisch=False,
+                    herleid=True,
+                ),
+            ),
+        )
+
+    def test_de_verantwoording_telt_wat_er_onderdrukt_is(self, tmp_path: Path) -> None:
+        """Stilte leest als "alles gecontroleerd"; de telling hoort in het rapport."""
+        tekst = _rapport(self._run_onderdrukt(["MechanischeTransportleiding"]), tmp_path)
+
+        assert "**1 melding onderdrukt**" in tekst
+        assert "per check: geen" in tekst
+        assert "per klasse: MechanischeTransportleiding 1" in tekst
+
+    def test_zonder_lijsten_zwijgt_het_rapport_erover(self, tmp_path: Path) -> None:
+        """Geen keuze om te verantwoorden, dus geen alinea."""
+        tekst = _rapport(self._run_onderdrukt([]), tmp_path)
+
+        assert "onderdrukt" not in tekst

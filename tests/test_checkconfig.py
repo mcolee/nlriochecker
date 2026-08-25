@@ -204,7 +204,7 @@ def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
 
 # De configuratiemodellen met drempelvormige velden, met de TOML-sectie waarin ze
 # horen. `CheckThresholds` was de enige die #28 afdekte; de acht velden daarbuiten
-# (`context_buffer_m`, `hoogte_band_m`, `dekking_tolerantie_m`, de vier van `[rapport]`)
+# (`context_buffer_m`, `hoogte_band_m`, `dekking_tolerantie_m`, de velden van `[rapport]`)
 # vielen buiten elke bewaking, en een negende veld zou morgen hetzelfde gat heropenen.
 # `ClassRoots`, `NulmetingOptions` en `NamingOptions` staan er niet bij: die dragen geen
 # drempels maar klassenlijsten, en de eerste twee zijn al verplicht.

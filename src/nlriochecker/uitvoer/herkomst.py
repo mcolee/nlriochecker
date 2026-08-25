@@ -27,6 +27,7 @@ from pathlib import Path
 import pandas as pd
 
 from nlriochecker import __version__
+from nlriochecker.uitvoer.melding import Onderdrukking
 
 # De pakketnaam uit de modulenaam zelf, om hem niet naast `pyproject.toml` een
 # tweede keer op te schrijven -- dezelfde reden waarom het versienummer uit de
@@ -112,6 +113,7 @@ def schrijf_json(
     markering: str | None = None,
     gebied: str | None = None,
     gebieden: list[str] | None = None,
+    onderdrukking: Onderdrukking | None = None,
 ) -> Path:
     """Schrijft de meldingenstroom als JSON, met een envelop die de run beschrijft.
 
@@ -146,6 +148,11 @@ def schrijf_json(
     beide velden, zodat zo'n bestand byte-voor-byte blijft zoals het was; een afnemer
     die de velden leest, moet ze dus als optioneel behandelen (zie
     `docs/json-schema.md`).
+
+    `onderdrukt` zegt wat `[rapport]` uit de meldingenstroom hield: de twee lijsten en
+    hoeveel meldingen erdoor wegvielen (BO-49). Ook dit veld is optioneel en additief --
+    het staat er alleen als de projectconfiguratie iets onderdrukt, zodat een run zonder
+    lijsten byte-voor-byte blijft zoals hij was en `SCHEMA_VERSIE` niet omhoog hoeft.
     """
     document: dict[str, object] = {
         "schema_versie": SCHEMA_VERSIE,
@@ -163,6 +170,12 @@ def schrijf_json(
         "volledig": volledig,
         "typeringspoort_toegepast": typeringspoort_toegepast,
     }
+    if onderdrukking is not None and onderdrukking.actief:
+        document["onderdrukt"] = {
+            "klassen": list(onderdrukking.klassen),
+            "checks": list(onderdrukking.checks),
+            "meldingen": onderdrukking.totaal,
+        }
     if markering:
         document["markering"] = markering
     document |= {

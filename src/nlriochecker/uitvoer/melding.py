@@ -105,6 +105,8 @@ class Onderdrukking:
     systemisch-bepaling zien deze lijsten niet.
     """
 
+    # Bevroren maar niet hashbaar: de twee tellingen zijn dicts. Vergelijken (`==`) kan
+    # wel, en dat is alles wat de uitvoer ervan vraagt.
     klassen: tuple[str, ...] = ()
     checks: tuple[str, ...] = ()
     per_check: dict[str, int] = field(default_factory=dict)
@@ -177,7 +179,13 @@ def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
 
 
 def _onderdrukte_klasse(run: CheckRun, object_uri: str, klassen: list[str]) -> str | None:
-    """De eerste wortel uit de lijst waar het object onder valt, of None."""
+    """De eerste wortel uit de lijst waar het object onder valt, of None.
+
+    `is_a` is de smalle variant: hij kent alleen knopen en strengen, dus een onderdeel
+    dat via `hasPart` onder een put hangt -- een overstortdrempel, een
+    ledigingsvoorziening -- valt er nooit onder. De onderdrukking werkt daarmee op
+    knopen en strengen, en dat is precies waar de kaart en de checks over gaan.
+    """
     if not object_uri:
         return None
     return next((wortel for wortel in klassen if run.dataset.is_a(object_uri, wortel)), None)

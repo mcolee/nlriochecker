@@ -62,6 +62,14 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   systemisch, dus buiten `status` en `ergste_ernst` (BO-29). Het afvoereindpunt bewaakt
   per klasse (`Overnamepunt` is het criterium van BO-33), de andere rollen per rol.
   Vervalt zonder klassenhierarchie, want dan herkent `of_class` geen klassen.
+- `bouw_meldingenstroom` past als laatste stap de onderdrukking uit `[rapport]` toe:
+  `onderdruk_klassen` op het hoofdobject via `is_a` (nooit op `object2_uri`),
+  `onderdruk_checks` op het check-ID, eerst op check en dan op klasse, elke melding
+  hooguit een keer geteld. Hij telt per check en per klasse en geeft een
+  `Meldingenstroom` terug (meldingen plus `Onderdrukking`). Wat wegvalt bereikt geen
+  enkele schrijver. Het rapport (verantwoording), `totaal/synthese.md`, `gwsw_run`
+  (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en de JSON-envelop
+  (`onderdrukt`) dragen de telling; de CSV niet. Zie BO-49.
 - Het bevindingenrapport van `toets` leest van gebied naar detail: gebiedsnaam als
   titel, aantallen (objecttype x stelseltype over de kern, leidingen ook in meters),
   managementsamenvatting (een regel per CFK plus de eigen checks; vinkje = nul fouten),
@@ -101,7 +109,10 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   uit `Begindatum`, leeg zonder datum; ATTR-018 meldt dat gat per object, issue #61).
   Grijs betekent: niet beoordeeld **en** niets gevonden;
   mechanisch riool wordt door de meeste checks overgeslagen maar niet door alle, en wat
-  er wel op staat kleurt het object. Met een studiegebied komt `Analyseset.buffer` als
+  er wel op staat kleurt het object. Een object van een klasse uit `[rapport]
+  onderdruk_klassen` is grijs met de reden `REDEN_ONDERDRUKT`, die vóór "mechanisch"
+  gaat: ook een niet-mechanische onderdrukte klasse hoort grijs te lezen en niet groen
+  (BO-49). Met een studiegebied komt `Analyseset.buffer` als
   grijze ring mee -- niet de hele schil, die kan het halve net zijn. `status` telt
   systemische meldingen niet mee, net als `ergste_ernst`. `meldinglocaties` bestaat niet meer; de
   tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. De statusregel en

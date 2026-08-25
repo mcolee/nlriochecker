@@ -20,7 +20,14 @@ import pandas as pd
 from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
-from nlriochecker.uitvoer.melding import BRON_DATASET, BRON_NULMETING, Melding, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    BRON_DATASET,
+    BRON_NULMETING,
+    GEEN_ONDERDRUKKING,
+    Melding,
+    Onderdrukking,
+    bouw_meldingen,
+)
 from nlriochecker.uitvoer.omvang import (
     eindpunttelling,
     klassen_op_nul,
@@ -119,6 +126,8 @@ def write_check_report(
     run_datum: date | None = None,
     meldingen: list[Melding] | None = None,
     notities: Sequence[str] = (),
+    *,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> tuple[Path, Path]:
     """Schrijft de bevindingen van de check-engine als Markdown en CSV.
 
@@ -128,6 +137,10 @@ def write_check_report(
     `notities` zijn opmerkingen over de invoer die de run zelf niet kent, zoals de
     geometrieen die het studiegebiedbestand niet mocht bijdragen. Ze horen in het
     rapport: wat niet bekeken is, mag niet alleen in het logboek staan.
+
+    `onderdrukking` komt uit dezelfde stroom als de meldingen en gaat naar de
+    verantwoording: wat `[rapport]` wegliet staat in geen enkele uitvoervorm, en zwijgen
+    zou lezen als "alles gecontroleerd" (BO-49).
     """
     output_dir = prepare(output_dir)
     run_datum = run_datum or date.today()
@@ -137,7 +150,7 @@ def write_check_report(
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
         f"# {_titel(run)}",
-        _render_checks(run, meldingen, notities),
+        _render_checks(run, meldingen, notities, onderdrukking),
         run_datum,
         markering=markering(run),
     )
@@ -228,7 +241,10 @@ def _titel(run: CheckRun) -> str:
 
 
 def _render_checks(
-    run: CheckRun, meldingen: list[Melding], notities: Sequence[str] = ()
+    run: CheckRun,
+    meldingen: list[Melding],
+    notities: Sequence[str] = (),
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> list[str]:
     """Stelt de romp van het bevindingenrapport samen; de kop komt uit `schrijf_markdown`.
 
@@ -243,7 +259,7 @@ def _render_checks(
     # bevindingen samen betekenen, en dat is precies wat een lezer na de vier regels
     # hierboven wil weten -- niet pas achter de tabellen.
     lines += rode_draad(run, meldingen)
-    lines += _verantwoording(run, meldingen, notities)
+    lines += _verantwoording(run, meldingen, notities, onderdrukking)
     lines += ["", "## Detailrapportage", ""]
     nulmeting = _detail_nulmeting(run, meldingen)
     lines += nulmeting
@@ -358,7 +374,10 @@ def _samenvatting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
 
 
 def _verantwoording(
-    run: CheckRun, meldingen: list[Melding], notities: Sequence[str] = ()
+    run: CheckRun,
+    meldingen: list[Melding],
+    notities: Sequence[str] = (),
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> list[str]:
     """Wat er bekeken is, wat niet, en waaronder de rest gelezen moet worden.
 
@@ -455,6 +474,8 @@ def _verantwoording(
                 "",
             ]
 
+    lines += _onderdrukking_section(onderdrukking)
+
     if run.analyseset is not None:
         stel = run.analyseset
         zin = (
@@ -526,6 +547,33 @@ def _verantwoording(
             "",
         ]
     return lines
+
+
+def _onderdrukking_section(onderdrukking: Onderdrukking) -> list[str]:
+    """Wat `[rapport]` uit de meldingenstroom hield, en waar het gebleven is.
+
+    De alinea staat er zodra de projectconfiguratie iets onderdrukt, ook als er nul
+    meldingen wegvielen: de keuze zelf hoort verantwoord te worden, en "nul" is daarvan
+    de uitslag. Zwijgen zou lezen als "alles gecontroleerd" (BO-49).
+    """
+    if not onderdrukking.actief:
+        return []
+    return [
+        f"**{getal(onderdrukking.totaal, 'melding onderdrukt', 'meldingen onderdrukt')}** op "
+        f"grond van `[rapport]` in de projectconfiguratie — per check: "
+        f"{_telling(onderdrukking.per_check)}; per klasse: "
+        f"{_telling(onderdrukking.per_klasse)}. Die meldingen staan in geen enkele "
+        "uitvoervorm; wie ze wil zien draait zonder `onderdruk_klassen` en "
+        "`onderdruk_checks`.",
+        "",
+    ]
+
+
+def _telling(aantallen: dict[str, int]) -> str:
+    """Een telling als `TOP-011 3, ATTR-001 2`, gesorteerd op sleutel; leeg is "geen"."""
+    if not aantallen:
+        return "geen"
+    return ", ".join(f"{sleutel} {aantallen[sleutel]}" for sleutel in sorted(aantallen))
 
 
 def _per_check(meldingen: list[Melding]) -> dict[str, list[Melding]]:

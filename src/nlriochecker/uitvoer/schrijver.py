@@ -1,8 +1,10 @@
 """De orkestratie van de vier uitvoervormen: Markdown, CSV, GeoPackage en JSON.
 
 `schrijf_uitvoer` is de enige ingang die ze alle vier tegelijk wegschrijft. Hij
-bouwt de meldingenlijst een keer en geeft hem aan elke schrijver door, zodat de vier
-uitvoervormen niet uit elkaar kunnen lopen.
+bouwt de meldingenstroom een keer -- meldingen plus de onderdrukking die `[rapport]`
+erop toepaste -- en geeft hem aan elke schrijver door, zodat de vier uitvoervormen
+niet uit elkaar kunnen lopen. Wat de onderdrukking wegliet bereikt geen van hen; drie
+van de vier dragen de telling ervan (BO-49).
 
 `schrijf_uitvoer_gebieden` doet hetzelfde voor een run over meerdere
 studiegebied-features: per gebied een submap met dezelfde vier vormen, plus een
@@ -17,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from nlriochecker.checkconfig import ReportOptions
 from nlriochecker.checks import CheckRun
 from nlriochecker.studiegebied import MAP_TOTAAL
 from nlriochecker.taal import getal
@@ -30,7 +33,12 @@ from nlriochecker.uitvoer.bevindingen import (
 )
 from nlriochecker.uitvoer.gpkg import schrijf_geopackage
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_json, schrijf_markdown
-from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    Melding,
+    Meldingenstroom,
+    Onderdrukking,
+    bouw_meldingenstroom,
+)
 from nlriochecker.uitvoer.synthese import GebiedsSamenvatting, totaalsynthese
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.uitvoer.voorbehoud import markering
@@ -74,7 +82,7 @@ def schrijf_uitvoer(
     met_json: bool = True,
     voortgang: Voortgang = NUL_VOORTGANG,
     gebied: str | None = None,
-    meldingen: list[Melding] | None = None,
+    stroom: Meldingenstroom | None = None,
     notities: Sequence[str] = (),
 ) -> Uitvoer:
     """Schrijft rapport, archief, GIS-uitvoer en JSON uit dezelfde meldingenstroom.
@@ -83,16 +91,27 @@ def schrijf_uitvoer(
     hem er niet voor zonder zelf `prepare` te roepen.
 
     `gebied` komt in de JSON-envelop terecht en is alleen gevuld bij een run over
-    meerdere studiegebied-features; `meldingen` mag de beller meegeven om dezelfde
-    lijst ook voor de totaalsynthese te gebruiken. `notities` gaan naar het rapport
-    en melden wat het studiegebiedbestand niet mocht bijdragen.
+    meerdere studiegebied-features; `stroom` mag de beller meegeven om dezelfde
+    meldingen en dezelfde onderdrukkingstelling ook voor de totaalsynthese te
+    gebruiken. `notities` gaan naar het rapport en melden wat het studiegebiedbestand
+    niet mocht bijdragen.
     """
     run_datum = run_datum or date.today()
-    meldingen = meldingen if meldingen is not None else bouw_meldingen(run, run_datum)
+    stroom = stroom if stroom is not None else bouw_meldingenstroom(run, run_datum)
+    meldingen = stroom.meldingen
 
-    markdown, csv = write_check_report(run, output_dir, run_datum, meldingen, notities)
+    markdown, csv = write_check_report(
+        run, output_dir, run_datum, meldingen, notities, onderdrukking=stroom.onderdrukking
+    )
     geopackage = (
-        schrijf_geopackage(run, meldingen, output_dir, run_datum, voortgang=voortgang)
+        schrijf_geopackage(
+            run,
+            meldingen,
+            output_dir,
+            run_datum,
+            voortgang=voortgang,
+            onderdrukking=stroom.onderdrukking,
+        )
         if met_geopackage
         else None
     )
@@ -107,6 +126,7 @@ def schrijf_uitvoer(
             typeringspoort_toegepast=run.typing_gate_applied,
             markering=markering(run),
             gebied=gebied,
+            onderdrukking=stroom.onderdrukking,
         )
         if met_json
         else None
@@ -152,7 +172,7 @@ def schrijf_uitvoer_gebieden(
     per_gebied: dict[str, Uitvoer] = {}
     verzameld: list[GebiedsSamenvatting] = []
     for gebiedsrun in runs:
-        meldingen = bouw_meldingen(gebiedsrun.run, run_datum)
+        stroom = bouw_meldingenstroom(gebiedsrun.run, run_datum)
         per_gebied[gebiedsrun.naam] = schrijf_uitvoer(
             gebiedsrun.run,
             Path(output_dir) / gebiedsrun.map,
@@ -161,7 +181,7 @@ def schrijf_uitvoer_gebieden(
             met_json=met_json,
             voortgang=voortgang,
             gebied=gebiedsrun.naam,
-            meldingen=meldingen,
+            stroom=stroom,
             notities=overgeslagen,
         )
         analyseset = gebiedsrun.run.analyseset
@@ -171,7 +191,8 @@ def schrijf_uitvoer_gebieden(
                 oppervlak_ha=gebiedsrun.gebied.area_ha if gebiedsrun.gebied is not None else 0.0,
                 weggelaten=gebiedsrun.run.weggelaten,
                 kern_objecten=len(analyseset.kern) if analyseset is not None else 0,
-                meldingen=meldingen,
+                meldingen=stroom.meldingen,
+                onderdrukking=stroom.onderdrukking,
             )
         )
 
@@ -234,8 +255,31 @@ def _schrijf_totaal(
             typeringspoort_toegepast=eerste.typing_gate_applied,
             markering=markering(eerste),
             gebieden=[gebiedsrun.naam for gebiedsrun in runs],
+            onderdrukking=_som_onderdrukking(verzameld, eerste.config.rapport),
         )
         if met_json
         else None
     )
     return synthese, totaal_csv, totaal_json
+
+
+def _som_onderdrukking(
+    verzameld: Sequence[GebiedsSamenvatting], rapport: ReportOptions
+) -> Onderdrukking:
+    """De onderdrukking van alle gebieden samen, als som en niet ontdubbeld.
+
+    Dezelfde regel als de kolom Meldingen in de synthese: een object op een gebiedsgrens
+    telt in elk rakend gebied mee. Ontdubbelen zou een derde getal opleveren dat noch bij
+    de gebiedsrapporten noch bij de synthese aansluit. De twee lijsten komen uit de
+    projectconfiguratie, die voor alle gebieden dezelfde is.
+    """
+    per_check: dict[str, int] = {}
+    per_klasse: dict[str, int] = {}
+    for deel in verzameld:
+        for sleutel, aantal in deel.onderdrukking.per_check.items():
+            per_check[sleutel] = per_check.get(sleutel, 0) + aantal
+        for sleutel, aantal in deel.onderdrukking.per_klasse.items():
+            per_klasse[sleutel] = per_klasse.get(sleutel, 0) + aantal
+    return Onderdrukking(
+        tuple(rapport.onderdruk_klassen), tuple(rapport.onderdruk_checks), per_check, per_klasse
+    )

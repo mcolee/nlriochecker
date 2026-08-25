@@ -119,7 +119,9 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   JSON-envelop. NIET in de CSV: de CFK-set hoort bij de run en niet bij de melding, dus
   hij wordt geen kolom op elke rij. Gevolg dat je moet kennen: twee `bevindingen.csv`
   uit een volle en een deelrun zijn aan het bestand zelf niet te onderscheiden; lees ze
-  naast het rapport of de JSON. Een
+  naast het rapport of de JSON. Hetzelfde geldt voor de onderdrukking uit `[rapport]`
+  (issue #65): een CSV met en zonder `onderdruk_klassen`/`onderdruk_checks` ziet er
+  hetzelfde uit; de telling staat in het rapport, in `gwsw_run` en in de JSON. Een
   rapport voor een niet-gekozen CFK is een fout, geen stille overslag, en `vergelijk`
   weigert twee meetmomenten met ongelijke sets. Een `toets` zonder `--shacl` is een
   eigen toestand ("niet gemeten"), los van volledig en van deelset. De drie toestanden
