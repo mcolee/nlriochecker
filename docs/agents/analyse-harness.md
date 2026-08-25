@@ -90,8 +90,13 @@ Mechanisch, geen domeinlogica — maar telkens teruggevonden door te zoeken:
   check-module (`id = "ATTR-0` enz.) in plaats van de aanbeveling in het issue te vertrouwen;
   ATTR-014/015/016 waren telkens al vergeven toen het issue ze voorstelde.
 - **CI kan "N geslaagd" tonen én toch exit 1 geven.** `.github/workflows/toets.yml` zet
-  `NLRIOCHECKER_MAX_OVERGESLAGEN` (nu 57); wordt die overschreden, dan faalt de run ondanks
-  gehaalde dekking. Bij een onverklaarde rode run: tel eerst de overgeslagen tests.
+  `NLRIOCHECKER_MAX_OVERGESLAGEN` (nu 65); wordt die overschreden, dan faalt de run ondanks
+  gehaalde dekking. Bij een onverklaarde rode run: tel eerst de overgeslagen tests. Simuleer
+  de runner-conditie lokaal met alleen de twee getrackte `data/`-bestanden (checkregister en
+  vocabulaire-index) in een tijdelijke `data/`, plus 1 voor de PyQGIS-moduleskip die de
+  runner wel en een machine met QGIS niet telt. Elke test die de echte ontologie of het
+  Juinen-voorbeeld laadt telt op de runner als overslag; een nieuwe parametrisatie telt
+  per geval.
 - **`gh`-schrijfacties falen soms tijdelijk** (`gh pr create` → GraphQL-permissie/404)
   terwijl `git push` en reads gewoon werken; opnieuw proberen slaagt meestal. Niet je
   token-scope of account onderzoeken — dat is dood werk.
