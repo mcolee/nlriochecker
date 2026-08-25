@@ -40,7 +40,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   gemengd deelstelsel waarop RVZ-006 aansloeg, als buffer om de strengen van de hele
   component, gebouwd uit de meldingen van díé uitvoer. De drempel `stelselvlak_buffer_m`
   heet daarom `gemengd_zonder_overstort_buffer_m` (10 m, ongewijzigd) en `gwsw_run` telt de
-  laag in `n_gemengd_zonder_overstort`. Op De Wolden en Hoogeveen gaat RVZ-006 van **99**
+  laag in `n_gemengd_zonder_overstort`, met `n_gemengd_zonder_vlak` ernaast voor de gemelde
+  deelstelsels waarvan geen enkele streng een bruikbare lijn draagt; een `cluster_id` die de
+  graaf niet kent is een harde fout, net als bij de trefferlaag. Op De Wolden en Hoogeveen gaat RVZ-006 van **99**
   naar **1062** bevindingen op dezelfde **99** deelstelsels (Koekangerveld 2 → **26** op 2);
   de selectie verandert niet, alleen de korrel. Een SHACL-overtreding op een geregistreerd
   stelsel landde op de vervallen laag en zou nu stil van de kaart verdwijnen; het rapport

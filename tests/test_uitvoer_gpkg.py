@@ -21,7 +21,7 @@ from shapely.geometry import box
 from gpkghelper import schrijf_vlakken
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import CheckContext, CheckRun, run_checks
+from nlriochecker.checks import CheckContext, CheckRun, Severity, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
@@ -1159,9 +1159,44 @@ def test_runmetadata_telt_de_gemengde_deelstelsels(tmp_path: Path) -> None:
     """`n_gemengd_zonder_overstort` maakt expliciet hoeveel vlakken er geschreven zijn."""
     pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    ((aantal,),) = _rijen(pad, "select n_gemengd_zonder_overstort from gwsw_run")
+    rij = _rijen(pad, "select n_gemengd_zonder_overstort, n_gemengd_zonder_vlak from gwsw_run")
 
-    assert aantal == 1
+    assert rij == [(1, 0)]
+
+
+def test_gemengd_deelstelsel_zonder_geometrie_wordt_geteld(tmp_path: Path) -> None:
+    """Een deelstelsel dat niet te tekenen is, verdwijnt niet stilzwijgend.
+
+    De fixture meldt RVZ-006 op een gemengde streng zonder bruikbare lijn: er valt geen
+    vlak omheen te tekenen, maar "dit deelstelsel bestaat niet" en "we konden het niet
+    tekenen" horen in het bestand uit elkaar te houden zijn. De laag blijft leeg en
+    `n_gemengd_zonder_vlak` telt het geval.
+    """
+    run = _run("rvz006_gemengd_zonder_geometrie.ttl", "RVZ-006")
+    assert run.count(Severity.ERROR) == 1  # de melding is er wel
+
+    pad = _schrijf(run, tmp_path)
+
+    assert _rijen(pad, "select count(*) from gemengd_zonder_overstort") == [(0,)]
+    rij = _rijen(pad, "select n_gemengd_zonder_overstort, n_gemengd_zonder_vlak from gwsw_run")
+    assert rij == [(0, 1)]
+
+
+def test_onbekend_deelstelsel_id_faalt_luid(tmp_path: Path) -> None:
+    """Een `cluster_id` die de graaf niet kent is een interne tegenspraak, geen datageval.
+
+    De check en deze schrijver lezen dezelfde `deelstelsel_ids` van dezelfde context, dus
+    zo'n ID kan alleen ontstaan als die afspraak breekt. De laag zou dan stil kleiner zijn
+    dan de uitslag -- precies wat `_vul_trefferlaag` bij de trefferlaag afvangt.
+    """
+    run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+    meldingen = [
+        replace(melding, cluster_id="ds-bestaat-niet") if melding.check_id == "RVZ-006" else melding
+        for melding in bouw_meldingen(run, RUNDATUM)
+    ]
+
+    with pytest.raises(PipelineError, match="ds-bestaat-niet"):
+        schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
 
 
 # Issue #65: onderdrukking uit `[rapport]`. De fixture: vrijvervalstreng L1 (GemengdRiool)

@@ -167,9 +167,13 @@ class _LaagTellingen:
     # issue #67 één laag `vlakken` in plaats van `bouwwerken` en `waterdelen_zonder_zinker`.
     vlakken: int
     # De gemengde deelstelsels waarop RVZ-006 aansloeg en die een vlak kregen (issue
-    # #75). Een deelstelsel waarvan geen enkele streng een bruikbare lijn heeft levert
-    # geen vlak op en zit hier dus niet in.
+    # #75).
     gemengd_zonder_overstort: int
+    # En de deelstelsels waarop RVZ-006 wél aansloeg maar die geen vlak konden krijgen,
+    # omdat geen enkele streng ervan een bruikbare lijn draagt. Ze staan in geen enkele
+    # rij van de laag; zonder deze telling zou "dit deelstelsel bestaat niet" niet van
+    # "we konden het niet tekenen" te onderscheiden zijn.
+    gemengd_zonder_vlak: int
 
 
 def schrijf_geopackage(
@@ -601,7 +605,9 @@ def _schrijf_features(
         voortgang.stap(label=laag)
 
     vlakken = _schrijf_treffers(verbinding, run, meldingen, voortgang)
-    gemengd = _schrijf_gemengd_zonder_overstort(verbinding, run, config, meldingen, voortgang)
+    gemengd, zonder_vlak = _schrijf_gemengd_zonder_overstort(
+        verbinding, run, config, meldingen, voortgang
+    )
 
     return _LaagTellingen(
         putten=tellingen["putten"],
@@ -609,6 +615,7 @@ def _schrijf_features(
         mechanisch=mechanisch_geschreven,
         vlakken=vlakken,
         gemengd_zonder_overstort=gemengd,
+        gemengd_zonder_vlak=zonder_vlak,
     )
 
 
@@ -923,8 +930,8 @@ def _schrijf_gemengd_zonder_overstort(
     config: CheckConfig,
     meldingen: list[Melding],
     voortgang: Voortgang,
-) -> int:
-    """Schrijft de laag `gemengd_zonder_overstort` en geeft het aantal rijen terug.
+) -> tuple[int, int]:
+    """Schrijft de laag `gemengd_zonder_overstort`; geeft rijen en niet-tekenbare terug.
 
     Een vlak per gemengd deelstelsel waarop RVZ-006 aansloeg (issue #75): de buffer om
     de vrijvervalstrengen van de hele samenhangende component, samengevoegd tot een
@@ -933,16 +940,29 @@ def _schrijf_gemengd_zonder_overstort(
     geometrie.
 
     Strikte aansluiting, net als bij de trefferlaag: de rijen komen uit de meldingen van
-    déze uitvoer, gegroepeerd op hun `cluster_id`. De laag kan dus niet groter of kleiner
-    zijn dan de uitslag -- na afbakening tot een studiegebied of na onderdrukking uit
+    déze uitvoer, gegroepeerd op hun `cluster_id`. De laag kan daardoor niet groter zijn
+    dan de uitslag -- na afbakening tot een studiegebied of na onderdrukking uit
     `[rapport]` verdwijnen de vlakken mee met hun meldingen. De geometrie komt uit
     `run.context`: dezelfde graaf waarop de check draaide. Met een studiegebied loopt zo'n
     vlak door tot buiten de kern -- een deelstelsel houdt niet op bij de gebiedsgrens, en
     de component is de eenheid waarover RVZ-006 oordeelt.
 
-    Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt levert geen vlak
-    op. Dat is geen stille weglating: zijn meldingen staan gewoon in de meldingentabel en
-    op hun eigen streng in de laag `strengen`.
+    Wat er gegarandeerd is, en wat niet. Twee dingen kunnen de laag kleiner maken dan het
+    aantal gemelde deelstelsels, en ze worden verschillend behandeld:
+
+    * **Een `cluster_id` die de graaf niet kent** is geen datatoestand maar een interne
+      tegenspraak: de check en deze schrijver lezen dezelfde `deelstelsel_ids` van dezelfde
+      context. Dat faalt luid, precies zoals `_vul_trefferlaag` doet bij een melding die
+      naar een niet-geregistreerde treffer wijst.
+    * **Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt** is wel een
+      datatoestand: er valt niets te tekenen. Zo'n deelstelsel levert geen rij op maar
+      wordt geteld en komt in `gwsw_run` als `n_gemengd_zonder_vlak` terecht, naast
+      `n_gemengd_zonder_overstort` dat de geschreven rijen telt. Zonder die telling zou
+      een lezer "dit deelstelsel bestaat niet" niet kunnen onderscheiden van "we konden
+      het niet tekenen". De meldingen zelf staan gewoon in de meldingentabel en op hun
+      eigen streng in de laag `strengen`.
+
+    Geeft het aantal geschreven rijen terug plus het aantal deelstelsels zonder vlak.
     """
     kolommen = _gemengd_kolommen()
     _maak_featurelaag(
@@ -960,14 +980,25 @@ def _schrijf_gemengd_zonder_overstort(
 
     buffer_m = config.drempels.gemengd_zonder_overstort_buffer_m
     knopen_per_cluster = _knopen_per_cluster(run)
+    onbekend = sorted(cluster for cluster in per_cluster if cluster not in knopen_per_cluster)
+    if onbekend:
+        raise PipelineError(
+            f"laag 'gemengd_zonder_overstort': {len(onbekend)} melding(en) dragen een "
+            f"deelstelsel-ID dat de graaf van deze run niet kent "
+            f"({', '.join(onbekend[:5])}). De laag zou stil kleiner zijn dan de uitslag; "
+            f"controleer of de check en deze schrijver dezelfde context lezen."
+        )
+
     index = aansluitingen(run.context, "vrijvervalleiding")
     rijen = []
+    zonder_vlak = 0
     grenzen: list[tuple[float, float, float, float]] = []
     for cluster in sorted(per_cluster):
-        knopen = knopen_per_cluster.get(cluster, frozenset())
+        knopen = knopen_per_cluster[cluster]
         conduits = _strengen_van_cluster(index, knopen)
         geometrie = _gemengd_geometrie(conduits, buffer_m)
         if geometrie is None or geometrie.is_empty:
+            zonder_vlak += 1
             continue
         grenzen.append(geometrie.bounds)
         rijen.append(
@@ -985,7 +1016,7 @@ def _schrijf_gemengd_zonder_overstort(
         )
     _zet_omhullende(verbinding, "gemengd_zonder_overstort", grenzen)
     voortgang.stap(label="gemengd_zonder_overstort")
-    return len(rijen)
+    return len(rijen), zonder_vlak
 
 
 def _knopen_per_cluster(run: CheckRun) -> dict[str, frozenset[str]]:
@@ -1498,6 +1529,10 @@ def _schrijf_runmetadata(
         _Kolom("n_mechanisch", "integer"),
         _Kolom("n_vlakken", "integer"),
         _Kolom("n_gemengd_zonder_overstort", "integer"),
+        # De gemelde deelstelsels die geen vlak konden krijgen (issue #75): geen enkele
+        # streng ervan draagt een bruikbare lijn. Ze staan in geen rij van de laag, dus
+        # zonder deze kolom zou het bestand erover zwijgen.
+        _Kolom("n_gemengd_zonder_vlak", "integer"),
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
@@ -1551,6 +1586,7 @@ def _schrijf_runmetadata(
             tellingen.mechanisch,
             tellingen.vlakken,
             tellingen.gemengd_zonder_overstort,
+            tellingen.gemengd_zonder_vlak,
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,

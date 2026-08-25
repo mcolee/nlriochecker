@@ -2929,6 +2929,19 @@ gebiedsrand. Niet in dit issue aangepakt; hij hoort in een eigen issue thuis.
    hele component. De buffer heet daarom `gemengd_zonder_overstort_buffer_m` (10 m, ongewijzigd) en
    `gwsw_run` telt de laag in `n_gemengd_zonder_overstort`.
 
+**Wat de laag garandeert.** Zij kan niet groter zijn dan de uitslag, want haar rijen komen uit de
+meldingen. Kleiner kan zij worden om twee redenen, en die krijgen bewust een verschillende
+behandeling. Een `cluster_id` die de graaf van de run niet kent is een **interne tegenspraak** --
+check en schrijver lezen dezelfde `deelstelsel_ids` van dezelfde context -- en faalt luid met een
+`PipelineError`, dezelfde lijn die `_vul_trefferlaag` volgt bij een melding die naar een
+niet-geregistreerde treffer wijst. Een deelstelsel waarvan geen enkele streng een bruikbare lijn
+draagt is wél een datatoestand: er valt niets te tekenen. Dat levert geen rij op maar wordt geteld
+in de kolom `n_gemengd_zonder_vlak` van `gwsw_run`, naast `n_gemengd_zonder_overstort`. Zonder die
+telling kan een lezer "dit deelstelsel bestaat niet" niet onderscheiden van "we konden het niet
+tekenen" -- en dat is precies de stilte die dit project niet toestaat. Op De Wolden komt het geval
+vandaag niet voor (99 van de 99 gemelde deelstelsels krijgen een vlak); juist daarom zou het zonder
+telling onopgemerkt blijven zodra het wél gebeurt.
+
 **Waarom.** De stelsellaag groepeerde strengen via de GWSW-stelselregistratie, en de auteur heeft
 vastgesteld dat die groepering niet betrouwbaar is. Wat de laag liet zien -- wel of geen afvoerroute --
 is bovendien een eigenschap van het **netwerk** (`afvoerpad_van_streng`) en niet van de

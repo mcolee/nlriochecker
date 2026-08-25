@@ -172,10 +172,19 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   komt uit `run.context`, de graaf waarop de check draaide. Kolommen: `cluster_id` (het
   deelstelsel-ID dat RVZ-006, NET-001 en NET-002 delen), `n_knopen`, `n_strengen`,
   `strenglengte_m`, `n_meldingen` (één per gemengde streng) en `popup_html`; `gwsw_run`
-  telt de laag in `n_gemengd_zonder_overstort`. Een deelstelsel waarvan geen enkele streng
-  een bruikbare lijn draagt krijgt geen vlak -- zijn meldingen staan wel in de
-  meldingentabel en op hun eigen streng in `strengen`. De vroegere laag `stelsels` (#25)
-  bestaat niet meer: zij groepeerde strengen via de GWSW-stelselregistratie, en die
+  telt de laag in `n_gemengd_zonder_overstort`, net zoals `n_vlakken` de laag `vlakken`
+  telt. Twee dingen kunnen de laag kleiner maken dan het aantal gemelde deelstelsels, en
+  ze worden verschillend behandeld. Een `cluster_id` die de graaf van de run niet kent is
+  een **harde fout** (`PipelineError`): de check en de schrijver lezen dezelfde
+  `deelstelsel_ids` van dezelfde context, dus dat is een interne tegenspraak en geen
+  datatoestand -- dezelfde lijn als `_vul_trefferlaag` bij een niet-geregistreerde
+  treffer. Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt is wél een
+  datatoestand: er valt niets te tekenen, dus het krijgt geen rij, maar het wordt geteld
+  in de kolom **`n_gemengd_zonder_vlak`** van `gwsw_run`. Zonder die telling zou "dit
+  deelstelsel bestaat niet" niet van "we konden het niet tekenen" te onderscheiden zijn.
+  De meldingen zelf staan hoe dan ook in de meldingentabel en op hun eigen streng in
+  `strengen`. De vroegere laag `stelsels` (#25) bestaat niet meer: zij groepeerde
+  strengen via de GWSW-stelselregistratie, en die
   groepering is niet betrouwbaar. Gevolg voor de nulmeting: een SHACL-overtreding waarvan
   de focusnode een geregistreerd stelsel is houdt haar stelsel als `object_uri` maar krijgt
   géén kaartobject; het rapport telt haar samen met de `CfkTypes_typ`-klassenamen in de

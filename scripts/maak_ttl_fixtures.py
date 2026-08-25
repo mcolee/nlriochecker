@@ -1624,6 +1624,19 @@ FIXTURES["rvz006_gemengd_zonder_overstort.ttl"] = (
     + hoogteleiding("L2", "2", [B, C], "PutB", "PutC", bob=(8.55, 8.50)),
 )
 
+# RVZ-006 (issue #75): hetzelfde gebrek, maar geen enkele streng draagt een bruikbare
+# lijn -- de posList telt één punt, zoals `net_afvoerpad_zonder_lijn.ttl`. De bevindingen
+# komen er gewoon (de check leest de graaf, niet de geometrie), maar er valt geen vlak
+# `gemengd_zonder_overstort` omheen te tekenen. De GeoPackage telt zo'n deelstelsel in
+# `n_gemengd_zonder_vlak` in plaats van het stil weg te laten.
+FIXTURES["rvz006_gemengd_zonder_geometrie.ttl"] = (
+    "een gemengd deelstelsel zonder overstort waarvan de enige streng geen bruikbare "
+    "lijngeometrie heeft",
+    hoogteput("PutA", "A", A)
+    + hoogteput("PutB", "B", B)
+    + hoogteleiding("L1", "1", [A], "PutA", "PutB", bob=(8.60, 8.55)),
+)
+
 # RVZ-006, tweede tak (issue #23): wel een overstort, geen afvoereindpunt.
 FIXTURES["rvz006_gemengd_zonder_afvoereindpunt.ttl"] = (
     "een gemengd deelstelsel met overstort maar zonder afvoereindpunt (gemaal of overnamepunt)",
