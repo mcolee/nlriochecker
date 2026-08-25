@@ -113,13 +113,6 @@ REDEN_ONDERDRUKT = (
 REDEN_GEEN_KLASSENHIERARCHIE = (
     "deze run kende de klassenhierarchie niet; de checks draaiden over een onvolledige selectie"
 )
-# Een stelsel wordt niet door de eigen checks getoetst -- die draaien op knopen en
-# strengen -- maar alleen door de SHACL-nulmeting. Zonder meting is het dus niet
-# beoordeeld, en groen zou "gemeten en in orde" beweren waar niets gemeten is.
-REDEN_GEEN_NULMETING = (
-    "geen SHACL-nulmeting gedraaid; een stelsel wordt alleen door de nulmeting beoordeeld"
-)
-
 RD_WKT = (
     'PROJCS["Amersfoort / RD New",GEOGCS["Amersfoort",DATUM["Amersfoort",'
     'SPHEROID["Bessel 1841",6377397.155,299.1528128]],PRIMEM["Greenwich",0],'

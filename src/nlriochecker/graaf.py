@@ -17,8 +17,8 @@ inclusief volgorde:
   `parts_of`/`aspects_of`/`part_holders_of`/`aspect_holders_of` -- met als externe
   aanroepers ook `checks/netwerk.py` en `checks/randvoorzieningen.py` -- ,
   `_read_aspects`, `_types`, `_connections`), `checks/administratief.py`
-  (hasConnection), `nulbevinding.py` (`_ouders`), `uitvoer/stelsels.py` (`_label`) en
-  `ontologie.verwachte_property` (de restrictiebron kan deze index zijn).
+  (hasConnection), `nulbevinding.py` (`_ouders`) en `ontologie.verwachte_property` (de
+  restrictiebron kan deze index zijn).
 - ``subjects(predicate, object)`` -- beide gebonden. `dataset.py`
   (`subjects_of_class`, de vier hasPart/hasAspect-lezers -- zie hierboven voor hun
   externe aanroepers -- , `_orientations_of_class`, `_orientations_with`,
