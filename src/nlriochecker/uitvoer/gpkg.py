@@ -936,7 +936,9 @@ def _schrijf_gemengd_zonder_overstort(
     déze uitvoer, gegroepeerd op hun `cluster_id`. De laag kan dus niet groter of kleiner
     zijn dan de uitslag -- na afbakening tot een studiegebied of na onderdrukking uit
     `[rapport]` verdwijnen de vlakken mee met hun meldingen. De geometrie komt uit
-    `run.context`: dezelfde graaf waarop de check draaide.
+    `run.context`: dezelfde graaf waarop de check draaide. Met een studiegebied loopt zo'n
+    vlak door tot buiten de kern -- een deelstelsel houdt niet op bij de gebiedsgrens, en
+    de component is de eenheid waarover RVZ-006 oordeelt.
 
     Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt levert geen vlak
     op. Dat is geen stille weglating: zijn meldingen staan gewoon in de meldingentabel en
