@@ -21,7 +21,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   declaratie tegen de feitelijke code (`tests/checkdeclaratie_analyse.py`,
   `tests/test_checkdeclaraties.py`) en een tweede tegen de ontologie
   (`tests/test_checkdeclaraties_ontologie.py`). De index draagt daarvoor twee nieuwe
-  blokken `aspecten_van` en `onderdelen_van`.
+  blokken `aspecten_van` en `onderdelen_van`. Het rapport toont per eigen check een regel
+  "Toetst ⟨klassen⟩ op ⟨kenmerken⟩", en `docs/dekkingsmatrix.md` krijgt een kolom
+  *Rollen · kenmerken*.
 
 ### Gewijzigd
 

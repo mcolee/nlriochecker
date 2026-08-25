@@ -2655,3 +2655,40 @@ wijst). `stelsels` mee in `vlakken` trekken (verworpen: dat zijn GWSW-objecten, 
 **Contractbreuk.** De lagen `bouwwerken` en `waterdelen_zonder_zinker` en de kolommen `n_bouwwerken`/
 `n_waterdelen` in `gwsw_run` bestaan niet meer; QGIS-projecten die erop wezen moeten opnieuw gekoppeld
 worden aan `vlakken`.
+
+### BO-51 Elke check declareert `rollen` en `kenmerken`; putdiepte/putbodem toetsen op `Rioolput`
+
+**Wat.** Elke geregistreerde check declareert twee `ClassVar`s (issue #64): `rollen` (namen uit
+`selectie._ROLLEN` -- de populatie die hij langsloopt) en `kenmerken` (GWSW-kenmerknamen zoals de code ze
+aan `aspect`/`number`/`reference`/`date` geeft, of een `config:<pad>`-verwijzing voor ATTR-013, of `*` voor
+ATTR-014). `register()` weigert een check zonder beide; ze reizen mee op `CheckOutcome` en voeden de
+rapportregel "Toetst ⟨klassen⟩ op ⟨kenmerken⟩" en de dekkingsmatrix. Twee drifttests bewaken ze: een
+AST-sweep tegen de feitelijke code (`checkdeclaratie_analyse.py`) en een tweede tegen de ontologie, die
+leunt op twee nieuwe indexblokken `aspecten_van`/`onderdelen_van` (per klasse de directe
+`hasAspect`/`hasPart`-doelen, beide richtingen gevouwen omdat het GWSW `isAspectOf`/`isPartOf` als inverse
+declareert). Een nieuwe rol `rioolputten` (`gwsw:Rioolput`) vervangt `netwerkknopen` in HGT-012 (putdiepte)
+en HGT-015 (putbodem).
+
+**Waarom.** Tot nu toe stond nergens over welke GWSW-begrippen een check ging, en het was voor geen enkele
+check nagelopen. De putdiepte (deksel minus bodem) en het daaruit afgeleide bodemniveau hangen aan een put
+mét een deksel; een gemaal of uitlaat draagt geen `HoogtePut` en geen `Putdekselniveau`. `Rioolput` is in de
+ontologie letterlijk "een put met een verwijderbare deksel", en dat is de klassegrens die deze twee checks
+horen te trekken.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`).** `netwerkknopen` telt 22.363 objecten,
+`rioolputten` 20.756: het verschil van 1.607 is 893 Rioolgemaal, 712 Uitlaatconstructie, 1 Kolk en 1
+Drainageput -- klassen zonder deksel en zonder `HoogtePut`. Het aantal bevindingen van HGT-012 en HGT-015
+verandert *niet* (0 vóór, 0 na): deze export bevat geen enkele `HoogtePut`, dus beide checks sloegen elk
+object al over. Wat verandert is `examined` (van 22.363 naar 20.756) en de noemer van hun toelichting: die
+telde 1.607 gemalen en uitlaten mee die het kenmerk structureel nooit konden dragen, en las daarmee als een
+bredere toets dan hij was.
+
+**Grens.** De overige checks die een dekselkenmerk op `netwerkknopen` of op de put aan een streng-uiteinde
+lezen (HGT-001/002/004/011/016/017/018, BTR-006) zijn *niet* gewijzigd: ze vallen terug op de maaiveldhoogte,
+en of die terugval op een gemaal aanvaardbaar is of de populatie tot `rioolputten` moet krimpen is een
+domeinkeuze. Ze staan met reden op de uitzonderingslijst van de ontologietest en zijn als tabel aan de auteur
+voorgelegd (sluitcomment issue #64). `Maaiveldhoogte` hangt via `hasConnection` aan de `Maaiveldorientatie`
+en is daarom vanaf geen klasse bereikbaar in de index (die alleen `hasAspect`/`hasPart` volgt); die staat als
+globale uitzondering. De nul-bewaking uit `omvang.py` is bewust niet op de declaraties omgebouwd: de
+handlijst dekt via `via_onderdeel`/`per_klasse` gevallen (overstortdrempel, afvoereindpunt) die de rolnamen
+niet uitdrukken, en dat omzetten raakt een goed geteste uitvoerlaag; voorgelegd aan de auteur.

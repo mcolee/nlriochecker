@@ -110,7 +110,19 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   Draai daarbij ook `uv run python scripts/maak_gwsw_index.py`: dat schrijft de getrackte
   afgeleide `data/gwsw-vocabulaire-index.json` opnieuw, waarmee de vocabulairetest ook op
   CI draait (BO-32). Vergeet je het, dan valt `test_index_volgt_de_ontologie`; werk je de
-  index bij zonder deze regel, dan valt `test_indexversie_staat_in_claude_md`.
+  index bij zonder deze regel, dan valt `test_indexversie_staat_in_claude_md`. Sinds issue
+  #64 draagt die index naast `termen` en `subklasse_van` ook `aspecten_van` en
+  `onderdelen_van` (per klasse de directe `hasAspect`/`hasPart`-doelen, beide richtingen
+  gevouwen); daarop leunt de drifttest die elke checkdeclaratie (`rollen`, `kenmerken`)
+  tegen de ontologie houdt (`tests/test_checkdeclaraties_ontologie.py`).
+- **Elke check declareert `rollen` en `kenmerken`** (issue #64, BO-51). Een nieuwe of
+  gewijzigde check moet zeggen over welke GWSW-populatie hij gaat (`rollen`, namen uit
+  `selectie._ROLLEN`) en welke kenmerken hij leest (`kenmerken`, GWSW-namen, of
+  `config:<pad>`/`*`); `register()` weigert een check zonder beide. Twee drifttests bewaken
+  het: `test_declaratie_volgt_de_code` (AST-sweep) en `test_declaratie_past_bij_de_ontologie`.
+  Verander je wat een check selecteert of leest, werk dan de declaratie bij -- de AST-sweep
+  valt anders. De dekselchecks putdiepte/putbodem (HGT-012/015) toetsen op de rol
+  `rioolputten` (`gwsw:Rioolput`), niet op elke `netwerkknoop`.
 - Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
   MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
   foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk`; zonder die
