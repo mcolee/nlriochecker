@@ -70,6 +70,41 @@ def ouders_uit_graaf(graaf: Graph) -> dict[str, list[str]]:
     return {naam: sorted(soorten) for naam, soorten in sorted(ouders.items())}
 
 
+def _relatie_uit_graaf(graaf: Graph, voorwaarts: str, achterwaarts: str) -> dict[str, list[str]]:
+    """Per GWSW-klasse de directe doelen van een relatie, in beide richtingen gevouwen.
+
+    De ontologie hangt onder een klasse blanknode-restricties aan `rdfs:subClassOf`:
+    `[ a owl:Restriction ; owl:onProperty gwsw:hasAspect ; owl:onClass gwsw:X ]`. Ze komen
+    in twee richtingen voor, want het GWSW declareert `isAspectOf owl:inverseOf hasAspect`
+    en `isPartOf owl:inverseOf hasPart`: `Putdekselniveau` hangt aan `Dekselorientatie` als
+    `Putdekselniveau isAspectOf Dekselorientatie`, niet als `Dekselorientatie hasAspect
+    Putdekselniveau`. Deze functie vouwt beide tot dezelfde kant, zodat `aspecten_van`
+    (`voorwaarts=hasAspect`, `achterwaarts=isAspectOf`) en `onderdelen_van` (`hasPart`,
+    `isPartOf`) de volledige directe buren dragen. Alleen directe kanten, net als
+    `subklasse_van`; de drifttest bouwt de bereikbaarheid daaruit op.
+    """
+    voor = URIRef(f"{GWSW}{voorwaarts}")
+    achter = URIRef(f"{GWSW}{achterwaarts}")
+    kanten: dict[str, set[str]] = {}
+    for houder, restrictie in graaf.subject_objects(RDFS.subClassOf):
+        if not isinstance(houder, URIRef) or not str(houder).startswith(GWSW):
+            continue
+        if (restrictie, RDF.type, OWL.Restriction) not in graaf:
+            continue
+        prop = graaf.value(restrictie, OWL.onProperty)
+        doel = graaf.value(restrictie, OWL.onClass)
+        if not isinstance(doel, URIRef) or not str(doel).startswith(GWSW):
+            continue
+        bron = str(houder).removeprefix(GWSW)
+        naar = str(doel).removeprefix(GWSW)
+        if prop == voor:
+            kanten.setdefault(bron, set()).add(naar)
+        elif prop == achter:
+            # De inverse: `houder achterwaarts doel` betekent `doel voorwaarts houder`.
+            kanten.setdefault(naar, set()).add(bron)
+    return {naam: sorted(doelen) for naam, doelen in sorted(kanten.items())}
+
+
 def versie_uit_graaf(graaf: Graph) -> str:
     """De `owl:versionInfo` van de ontologie, letterlijk overgenomen.
 
@@ -99,13 +134,16 @@ def documenttekst(ttl: Path) -> str:
         "gwsw_versie": versie_uit_graaf(graaf),
         "script": Path(__file__).relative_to(WORTEL).as_posix(),
     }
-    regels = ["{"]
-    regels += [f"  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}," for k, v in kop.items()]
-    for blok, inhoud in (
+    blokken = (
         ("termen", termen_uit_graaf(graaf)),
         ("subklasse_van", ouders_uit_graaf(graaf)),
-    ):
-        komma_blok = "," if blok != "subklasse_van" else ""
+        ("aspecten_van", _relatie_uit_graaf(graaf, "hasAspect", "isAspectOf")),
+        ("onderdelen_van", _relatie_uit_graaf(graaf, "hasPart", "isPartOf")),
+    )
+    regels = ["{"]
+    regels += [f"  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}," for k, v in kop.items()]
+    for blok_nr, (blok, inhoud) in enumerate(blokken, start=1):
+        komma_blok = "," if blok_nr != len(blokken) else ""
         regels.append(f'  "{blok}": {{')
         namen = list(inhoud)
         for nummer, naam in enumerate(namen, start=1):
@@ -130,10 +168,12 @@ def main() -> None:
     # Het aantal sleutels is dus niet het aantal relaties. Beide staan er, met hun
     # eigen naam, want het verkeerde label is eerder in BO-32 beland.
     print(
-        f"{DOEL.relative_to(WORTEL)}: {len(document['termen'])} termen en "
+        f"{DOEL.relative_to(WORTEL)}: {len(document['termen'])} termen, "
         f"{len(document['subklasse_van'])} klassen met een superklasse "
         f"({sum(len(ouders) for ouders in document['subklasse_van'].values())} "
-        f"subklasserelaties) geschreven."
+        f"subklasserelaties), {len(document['aspecten_van'])} klassen met een aspect en "
+        f"{len(document['onderdelen_van'])} klassen met een onderdeel geschreven "
+        f"({DOEL.stat().st_size / 1024:.0f} kB)."
     )
 
 
