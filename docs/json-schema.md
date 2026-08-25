@@ -10,7 +10,7 @@ nog te bouwen package die er mutatievoorstellen voor Kikker of BrutIS uit afleid
 Wie de bevindingen met het oog leest heeft `bevindingen.md`; wie ze in Excel of QGIS
 wil heeft `bevindingen.csv`.
 
-Uitzetten kan met `--geen-json`, symmetrisch met `--geen-gpkg`.
+Uitzetten kan door `json` weg te laten uit `--uitvoer` (`toets --uitvoer csv --uitvoer gpkg`).
 
 ## Waarom alleen `toets`
 

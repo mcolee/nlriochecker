@@ -127,9 +127,14 @@ def write_check_report(
     meldingen: list[Melding] | None = None,
     notities: Sequence[str] = (),
     *,
+    met_csv: bool = True,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path | None]:
     """Schrijft de bevindingen van de check-engine als Markdown en CSV.
+
+    Het Markdown-rapport komt er altijd: het draagt de markering en het voorbehoud,
+    en zonder rapport zou een run zijn eigen beperkingen nergens zeggen. De CSV komt
+    op verzoek; `met_csv=False` levert `None` in plaats van een pad.
 
     De beller mag de meldingenlijst meegeven; dan schrijven Markdown, CSV en de
     GeoPackage aantoonbaar dezelfde verzameling weg.
@@ -159,8 +164,11 @@ def write_check_report(
         markering=markering(run),
     )
 
-    csv_path = Path(output_dir) / FILE_CHECKS_CSV
-    schrijf_csv(meldingen_tabel(meldingen), csv_path)
+    csv_path = (
+        schrijf_csv(meldingen_tabel(meldingen), Path(output_dir) / FILE_CHECKS_CSV)
+        if met_csv
+        else None
+    )
 
     return markdown_path, csv_path
 

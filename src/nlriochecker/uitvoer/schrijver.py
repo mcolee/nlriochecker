@@ -1,13 +1,15 @@
 """De orkestratie van de vier uitvoervormen: Markdown, CSV, GeoPackage en JSON.
 
-`schrijf_uitvoer` is de enige ingang die ze alle vier tegelijk wegschrijft. Hij
-bouwt de meldingenstroom een keer -- meldingen plus de onderdrukking die `[rapport]`
-erop toepaste -- en geeft hem aan elke schrijver door, zodat de vier uitvoervormen
-niet uit elkaar kunnen lopen. Wat de onderdrukking wegliet bereikt geen van hen; drie
-van de vier dragen de telling ervan (BO-49).
+`schrijf_uitvoer` is de enige ingang die ze wegschrijft. Het Markdown-rapport komt er
+altijd -- het draagt de markering en het voorbehoud -- en de andere drie naar keuze
+(`met_csv`, `met_geopackage`, `met_json`). Hij bouwt de meldingenstroom een keer --
+meldingen plus de onderdrukking die `[rapport]` erop toepaste -- en geeft hem aan elke
+schrijver door, zodat de uitvoervormen niet uit elkaar kunnen lopen. Wat de
+onderdrukking wegliet bereikt geen van hen; drie van de vier dragen de telling ervan
+(BO-49).
 
 `schrijf_uitvoer_gebieden` doet hetzelfde voor een run over meerdere
-studiegebied-features: per gebied een submap met dezelfde vier vormen, plus een
+studiegebied-features: per gebied een submap met dezelfde vormen, plus een
 `totaal/` met de synthese en de unieke meldingen. Ook daar komt geen nieuwe
 schrijver aan te pas.
 """
@@ -56,7 +58,8 @@ class Uitvoer:
     """De geschreven bestanden van een toets."""
 
     markdown: Path
-    csv: Path
+    # `None` als de CSV niet gevraagd is (`--uitvoer` zonder `csv`).
+    csv: Path | None
     geopackage: Path | None
     json: Path | None
 
@@ -78,6 +81,7 @@ def schrijf_uitvoer(
     output_dir: Path,
     run_datum: date | None = None,
     *,
+    met_csv: bool = True,
     met_geopackage: bool = True,
     met_json: bool = True,
     voortgang: Voortgang = NUL_VOORTGANG,
@@ -86,6 +90,9 @@ def schrijf_uitvoer(
     notities: Sequence[str] = (),
 ) -> Uitvoer:
     """Schrijft rapport, archief, GIS-uitvoer en JSON uit dezelfde meldingenstroom.
+
+    Het rapport wordt altijd geschreven; `met_csv`, `met_geopackage` en `met_json`
+    zeggen welke bijproducten ernaast komen.
 
     De JSON komt na het rapport: `write_check_report` maakt de uitvoermap aan. Zet
     hem er niet voor zonder zelf `prepare` te roepen.
@@ -101,7 +108,13 @@ def schrijf_uitvoer(
     meldingen = stroom.meldingen
 
     markdown, csv = write_check_report(
-        run, output_dir, run_datum, meldingen, notities, onderdrukking=stroom.onderdrukking
+        run,
+        output_dir,
+        run_datum,
+        meldingen,
+        notities,
+        met_csv=met_csv,
+        onderdrukking=stroom.onderdrukking,
     )
     geopackage = (
         schrijf_geopackage(
@@ -139,6 +152,7 @@ def schrijf_uitvoer_gebieden(
     output_dir: Path,
     run_datum: date | None = None,
     *,
+    met_csv: bool = True,
     met_geopackage: bool = True,
     met_json: bool = True,
     voortgang: Voortgang = NUL_VOORTGANG,
@@ -161,6 +175,7 @@ def schrijf_uitvoer_gebieden(
                     alleen.run,
                     output_dir,
                     run_datum,
+                    met_csv=met_csv,
                     met_geopackage=met_geopackage,
                     met_json=met_json,
                     voortgang=voortgang,
@@ -177,6 +192,7 @@ def schrijf_uitvoer_gebieden(
             gebiedsrun.run,
             Path(output_dir) / gebiedsrun.map,
             run_datum,
+            met_csv=met_csv,
             met_geopackage=met_geopackage,
             met_json=met_json,
             voortgang=voortgang,
@@ -197,7 +213,7 @@ def schrijf_uitvoer_gebieden(
         )
 
     synthese, totaal_csv, totaal_json = _schrijf_totaal(
-        runs, verzameld, output_dir, run_datum, beschikbaar, overgeslagen, met_json
+        runs, verzameld, output_dir, run_datum, beschikbaar, overgeslagen, met_csv, met_json
     )
     return UitvoerPerGebied(
         per_gebied=per_gebied,
@@ -214,8 +230,9 @@ def _schrijf_totaal(
     run_datum: date,
     beschikbaar: Sequence[str],
     overgeslagen: Sequence[str],
+    met_csv: bool,
     met_json: bool,
-) -> tuple[Path, Path, Path | None]:
+) -> tuple[Path, Path | None, Path | None]:
     """Schrijft de synthese en de unieke meldingen over alle gebieden.
 
     Geen GeoPackage: de featurelagen zijn per gebied afgebakend, en een unie ervan
@@ -243,7 +260,7 @@ def _schrijf_totaal(
         run_datum,
         markering=markering(eerste),
     )
-    totaal_csv = schrijf_csv(meldingen_tabel(unieke), doel / FILE_CHECKS_CSV)
+    totaal_csv = schrijf_csv(meldingen_tabel(unieke), doel / FILE_CHECKS_CSV) if met_csv else None
     totaal_json = (
         schrijf_json(
             doel / FILE_CHECKS_JSON,

@@ -284,6 +284,16 @@ def test_json_kan_uit(tmp_path: Path) -> None:
     assert not any(FILE_CHECKS_JSON in regel for regel in uitslag.regels())
 
 
+def test_csv_kan_uit(tmp_path: Path) -> None:
+    """`met_csv=False` laat de CSV weg; het rapport blijft (issue #66)."""
+    uitslag = toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",), met_csv=False)
+
+    geschreven = uitslag.uitvoer.per_gebied[""]
+    assert geschreven.csv is None
+    assert geschreven.markdown.exists()
+    assert not any(FILE_CHECKS_CSV in regel for regel in uitslag.regels())
+
+
 def test_geopackage_kan_aan(tmp_path: Path) -> None:
     """De GIS-uitvoer staat standaard aan en levert een bestand op."""
     opdracht = Toetsopdracht(

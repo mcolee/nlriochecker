@@ -212,8 +212,10 @@ De rapporten van `analyseer`, `dekking` en `vergelijk` zijn ongewijzigd.
 ### Uitvoer
 
 `analyseer`, `dekking` en `vergelijk` schrijven Markdown en CSV. `toets` schrijft
-daarnaast een GeoPackage met de bevindingen op locatie (`--geen-gpkg` slaat die over) en
-`bevindingen.json` met de volledige meldingenstroom (`--geen-json` slaat die over). Dat
+daarnaast een GeoPackage met de bevindingen op locatie en `bevindingen.json` met de
+volledige meldingenstroom. Met `--uitvoer csv|json|gpkg` (herhaalbaar; standaard alle
+drie) kies je welke van die drie bijproducten er komen; het Markdown-rapport wordt altijd
+geschreven, want het draagt de markering en het voorbehoud. Dat
 JSON-bestand is een geversioneerd contract voor machinale verwerking; zie
 [docs/json-schema.md](docs/json-schema.md). `--output` staat standaard op `uitvoer/`.
 Invoerbestanden worden nooit overschreven.

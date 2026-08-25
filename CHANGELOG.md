@@ -60,6 +60,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`toets --uitvoer csv|json|gpkg` vervangt `--geen-gpkg` en `--geen-json`** (issue #66).
+  Eén bevestigende, herhaalbare optie zegt welke bijproducten er naast het Markdown-rapport
+  komen; standaard alle drie, en ook de CSV is nu uit te zetten. Het rapport wordt altijd
+  geschreven: het draagt de markering en het voorbehoud. De twee oude vlaggen vervallen
+  zonder alias; wie ze opgeeft krijgt de gewone optiefout. `Toetsopdracht` krijgt `met_csv`
+  en `Uitvoer.csv` kan `None` zijn.
+
 - **`schrijf_uitvoer` neemt `stroom=` in plaats van `meldingen=`** (issue #65). Wie de vier
   uitvoervormen zelf aanstuurt gaf een `list[Melding]` mee; dat is nu een `Meldingenstroom`
   (`uitvoer.melding.bouw_meldingenstroom`), zodat de meldingen en de telling van de

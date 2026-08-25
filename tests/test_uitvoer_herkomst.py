@@ -513,7 +513,7 @@ def test_json_zonder_geopackage_blijft_geschreven(toets: CheckRun, tmp_path: Pat
     assert uitvoer.json is not None
 
 
-def test_geen_json_laat_het_bestand_weg(toets: CheckRun, tmp_path: Path) -> None:
+def test_zonder_json_laat_het_bestand_weg(toets: CheckRun, tmp_path: Path) -> None:
     """Wie de JSON niet wil, houdt de andere drie."""
     uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_json=False)
 

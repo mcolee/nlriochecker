@@ -45,7 +45,7 @@ from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 class Toetsopdracht:
     """Wat er getoetst moet worden: de paden en de keuzes van de gebruiker.
 
-    De vlaggen staan bevestigend (`met_geopackage`, niet `geen_gpkg`), zodat ze
+    De vlaggen staan bevestigend (`met_geopackage`, niet zijn ontkenning), zodat ze
     aansluiten op `schrijf_uitvoer_gebieden` en niet als dubbele ontkenning lezen
     zodra je ze programmatisch zet.
     """
@@ -65,6 +65,7 @@ class Toetsopdracht:
     # Bewust doorgaan zonder klassenhierarchie. Zonder ontologie en zonder deze vlag
     # weigert `voer_toets_uit`; zie `_eis_ontologie`.
     geen_ontologie: bool = False
+    met_csv: bool = True
     met_geopackage: bool = True
     met_json: bool = True
     gebruik_cache: bool = True
@@ -244,6 +245,7 @@ def voer_toets_uit(
     uitvoer = schrijf_uitvoer_gebieden(
         runs,
         opdracht.uitvoermap,
+        met_csv=opdracht.met_csv,
         met_geopackage=opdracht.met_geopackage,
         met_json=opdracht.met_json,
         voortgang=voortgang,

@@ -532,16 +532,16 @@ def compare_command(
     ),
 )
 @click.option(
-    "--geen-gpkg",
-    "geen_gpkg",
-    is_flag=True,
-    help="Sla de GeoPackage-export over; schrijf alleen het rapport en de CSV.",
-)
-@click.option(
-    "--geen-json",
-    "geen_json",
-    is_flag=True,
-    help="Sla de JSON-export over; schrijf alleen het rapport, de CSV en de GeoPackage.",
+    "--uitvoer",
+    "uitvoervormen",
+    multiple=True,
+    type=click.Choice(["csv", "json", "gpkg"]),
+    default=("csv", "json", "gpkg"),
+    show_default=True,
+    help=(
+        "Welke bijproducten naast het Markdown-rapport geschreven worden; meermaals "
+        "toegestaan. Het rapport wordt altijd geschreven."
+    ),
 )
 @click.option(
     "--geen-cache",
@@ -570,8 +570,7 @@ def check_command(
     bronnen_dir: Path | None,
     cfk_keuze: tuple[str, ...],
     gebied_keuze: tuple[str, ...],
-    geen_gpkg: bool,
-    geen_json: bool,
+    uitvoervormen: tuple[str, ...],
     geen_cache: bool,
     cache_dir: Path | None,
     output_dir: Path,
@@ -591,8 +590,9 @@ def check_command(
         bronnen=bronnen_dir,
         cfk=cfk_keuze,
         uitvoermap=output_dir,
-        met_geopackage=not geen_gpkg,
-        met_json=not geen_json,
+        met_csv="csv" in uitvoervormen,
+        met_geopackage="gpkg" in uitvoervormen,
+        met_json="json" in uitvoervormen,
         gebruik_cache=not geen_cache,
         cachemap=cache_dir,
     )

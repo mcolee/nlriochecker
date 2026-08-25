@@ -182,6 +182,7 @@ def _schrijf(
     doel: Path,
     ttl: str = "hgt010_diameterverjonging.ttl",
     config: CheckConfig | None = None,
+    **opties,
 ):
     """Draait de toetsloop en schrijft de uitvoer weg."""
     gebieden = load_studiegebieden(GIS_DIR / bestand)
@@ -192,7 +193,12 @@ def _schrijf(
         meetbereik=Meetbereik.niet_gemeten(()),
     )
     return runs, schrijf_uitvoer_gebieden(
-        runs, doel, RUNDATUM, beschikbaar=gebieden.beschikbaar, overgeslagen=gebieden.overgeslagen
+        runs,
+        doel,
+        RUNDATUM,
+        beschikbaar=gebieden.beschikbaar,
+        overgeslagen=gebieden.overgeslagen,
+        **opties,
     )
 
 
@@ -205,6 +211,16 @@ def test_twee_gebieden_leveren_twee_submappen_en_een_totaal(tmp_path: Path) -> N
     assert (tmp_path / "totaal" / "bevindingen.csv").exists()
     assert uitvoer.totaal_json is not None
     assert set(uitvoer.per_gebied) == {"Noord", "Zuid"}
+
+
+def test_zonder_csv_schrijft_ook_totaal_geen_csv(tmp_path: Path) -> None:
+    """Issue #66: `met_csv=False` geldt per gebied én voor `totaal/`."""
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path, met_csv=False, met_geopackage=False)
+
+    assert uitvoer.totaal_csv is None
+    assert all(geschreven.csv is None for geschreven in uitvoer.per_gebied.values())
+    assert not list(tmp_path.rglob("bevindingen.csv"))
+    assert uitvoer.synthese is not None and uitvoer.synthese.exists()
 
 
 def test_een_gebied_schrijft_zonder_submap(tmp_path: Path) -> None:
