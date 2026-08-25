@@ -14,6 +14,25 @@ Gebruik de `gh` CLI voor alle bewerkingen.
 
 Het repo volgt uit `git remote -v`; `gh` leidt dat vanzelf af binnen een kloon.
 
+## Huisstijl van een issue
+
+Een `ready-for-agent`-issue is zelf de specificatie; de agent leest niets anders vooraf. Vaste
+opbouw, in deze volgorde (zie #62 en #63 als voorbeeld):
+
+1. **Het probleem** met gemeten getallen op De Wolden, en wat het níét is (de aangrenzende
+   check of het mechanisme dat er lijkt op maar iets anders doet).
+2. **Wat er verandert**, met bestand:regel voor elke plek, en de keuzes die al gemaakt zijn.
+3. **Verwacht effect op De Wolden** — het getal dat de agent na afloop moet meten.
+4. **Waar het overal staat** — een tabel over code, config, tests, docs, `CHANGELOG.md` en een
+   BO-nummer in `docs/beslislog.md` als er een domeinregel verschuift.
+5. **Verificatie** — de fixture-test, de poort, de meting, en de reviewzwaarte
+   (`CLAUDE.md`, Werkwijze).
+6. **Aannames** die niet met de auteur zijn afgestemd; de agent corrigeert ze in een comment.
+
+Getallen in een issue komen uit een run of uit `CHANGELOG.md`/`docs/beslislog.md`, nooit uit
+het geheugen; een aanname over een vrij check-ID controleer je in de check-module
+(`id = "…"`), want die nummers zijn vaak al bezet.
+
 ## Pull requests als triagekanaal
 
 **PR's als verzoekkanaal: nee.** _(Zet op `ja` als dit repo externe PR's als functieverzoek behandelt; `/triage` leest deze vlag.)_

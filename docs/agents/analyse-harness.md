@@ -37,6 +37,30 @@ context = CheckContext(dataset=dataset, config=config)
   iteratievorm gokt.
 - `bevindingen.csv` is **`;`-gescheiden** (zie `uitvoer/herkomst.py`), niet komma.
 - Nieuwe `src/`-bestanden moeten `git add` krijgen vóór de tracked-sweep-test slaagt.
+- **Welke objecten "vrijverval", "mechanisch", "put" of "lozingspunt" zijn, staat in
+  `checks/selectie.py`** (één rolfunctie per rol, klassen uit `[klassen]` in de config). Niet
+  opnieuw uit de ontologie afleiden: dat kostte 4 calls en gaf een andere grens dan de checks
+  hanteren.
+- **Er is geen `sqlite3`-CLI** op deze machine. Een GeoPackage lees je met
+  `python3 -c 'import sqlite3'` of `ogrinfo -q -sql`.
+- **Een scratch-script tegen De Wolden overschrijdt de 2-minuten-timeout van een
+  voorgrond-Bash.** Start het vanaf de eerste poging met `run_in_background`; het meldt zich.
+  De `nohup` + `until … sleep`-omweg kostte in één sessie 16 calls en een hangend proces.
+- **Laad zwaar spul één keer en pickle het in het scratchpad** (`raw.pkl`, `_alle.pkl`): een
+  GeoPackage plus de BGT-lagen (97k waterdelen) per vraag opnieuw inlezen kostte een sessie
+  14 herlaadbeurten van elk tientallen seconden.
+
+## Bestaande runs en meetscripts
+
+- `uitvoer/` (git-ignored) bevat volledige `toets`-runs: `volledig_24082026/` is de
+  0.3.0-baseline (162.046 meldingen, met `steekproef_checks.gpkg`) en `issue58/` t/m
+  `issue63/` zijn de nametingen per issue — `issue62/` is de recentste. **Tel eerst daarop**
+  (`bevindingen.json`) voordat je een nieuwe run van ~6 minuten start; noem in je verslag
+  welke run je gebruikte, want de baseline dateert van vóór #60–#63.
+- **Een meetscript dat een getal in een issue of BO onderbouwt, bewaar je** — in het
+  scratchpad volstaat niet. Zet het onder `scripts/` of naast het verslag in `docs/`, met de
+  commit-hash van de dataset-lader erin. Op 24-08 bleef een 234-telling alleen als inline
+  heredoc bestaan; de volgende sessie kwam op 319 en het verschil is nooit herleid (BO-43).
 
 ## Verrassende, maar correcte aantallen
 
@@ -45,6 +69,16 @@ zijn geen bug:
 
 - **ATTR-001** toetst de vrijverval-subset (~17603 strengen), niet alle conduits (~23440).
 - **HGT-012** leest `HoogtePut`; De Wolden levert daar **0** instanties.
+- **Baseline ná #60–#63 (0.3.0 + Unreleased, 25-08):** HGT-001 5811 → **2847** en HGT-002
+  **2132** (drempel 10 cm inclusief, BO-44); ATTR-018 **9274** (9063 putten, 211 strengen);
+  TOP-022 **224** en TOP-023 **37** op 1054 T-stukken; ADM-010/011 **54** loze leidingen in 33
+  ketens (38 F, 16 W); EXT-001 **455**, EXT-003 **319** doorkruisingen op 281 strengen,
+  EXT-007 **71**; `SIG-hulpstukkoppeling` 3024 herstelde leidingeinden naar 1122 hulpstukken.
+  Bron: `CHANGELOG.md` onder Unreleased en de BO's 43–47; een run die hiervan afwijkt vraagt om
+  een verklaring, niet om een nieuwe waarheid.
+- **NET-001/NET-002** telden op 24-08 9062 en 3054 bevindingen, vóór de laderfix van #60
+  (3024 losse strengeinden → 0); die twee cijfers zijn verouderd, meet ze opnieuw voor je ze
+  citeert.
 - Een before/after-telling moet door de **echte pijplijn** (`markeer_vulwaarden` vóór de
   checks). Een losstaand snel script mist die markering en geeft afwijkende cijfers die later
   niet met de geleverde getallen kloppen.
@@ -86,6 +120,10 @@ Mechanisch, geen domeinlogica — maar telkens teruggevonden door te zoeken:
   de check-module zelf (bv. `attributen.py`), de tests, `test_gwsw_vocabulaire.py` (bewaakt
   materiaal- en aspectnamen), een regel in het checkregister, `scripts/dekkingsmatrix.py`
   regenereren, een BO in `docs/beslislog.md`, en `CHANGELOG.md`.
+- **Het volgende BO-nummer**: `grep -n '^### BO-' docs/beslislog.md | tail -1`; een nieuw BO
+  komt chronologisch onderaan. Drie sessies zochten dit in 12 calls bij elkaar.
+- **De huisstijl van een issue** staat in `docs/agents/issue-tracker.md`; lees die in plaats
+  van een bestaande issue-body te reverse-engineeren.
 - **Check-ID's in issue-teksten zijn vaak al bezet.** Grep het eerste vrije nummer uit de
   check-module (`id = "ATTR-0` enz.) in plaats van de aanbeveling in het issue te vertrouwen;
   ATTR-014/015/016 waren telkens al vergeven toen het issue ze voorstelde.
