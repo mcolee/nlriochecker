@@ -5547,7 +5547,7 @@
     "DWADebietRecreatie": ["Inwinning"],
     "DWADebietTotaal": ["Inwinning"],
     "DXA": ["BXAd", "DXAb", "DXAg"],
-    "Deksel": ["BreedteDeksel", "DiameterDeksel", "HoogteDeksel", "LengteDeksel", "VormDeksel"],
+    "Deksel": ["BreedteDeksel", "DiameterDeksel", "HoogteDeksel", "LengteDeksel", "MateriaalDeksel", "VormDeksel"],
     "Dekselorientatie": ["Punt", "Putdekselniveau"],
     "DiagnosePersleidingincident": ["BeschrijvingWaarneming", "WaargenomenDefect"],
     "DiameterLeiding": ["Inwinning"],

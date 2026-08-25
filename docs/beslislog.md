@@ -2683,7 +2683,16 @@ object al over. Wat verandert is `examined` (van 22.363 naar 20.756) en de noeme
 telde 1.607 gemalen en uitlaten mee die het kenmerk structureel nooit konden dragen, en las daarmee als een
 bredere toets dan hij was.
 
-**Grens.** De overige checks die een dekselkenmerk op `netwerkknopen` of op de put aan een streng-uiteinde
+**Grens van de ontologietest.** De toets is een ondergrens, geen uitputtende lijst: de declaratie is plat
+(welke rollen, welke kenmerken -- niet welk kenmerk op welke rol), dus een smalle mede-gedeclareerde rol kan
+een kenmerk afdekken en de vlag onderdrukken. Zo mist de toets `(HGT-016, HoogtePut)` -- HGT-016 leest de
+putbodem op `netwerkknopen` net als het wél gevlagde HGT-004, maar declareert daarnaast `valconstructies`
+(die `HoogtePut` draagt) als overslagverzameling. De volledige domeinkeuzelijst is daarom de auteurstabel,
+niet de toets; een sluitende oplossing (kenmerken per rol) is uitgesteld. Het indexblok leest naast
+`owl:onClass` ook `owl:someValuesFrom`/`owl:allValuesFrom`, zodat een forward-only binding als
+`Deksel hasAspect MateriaalDeksel` niet ontbreekt.
+
+**Grens (populatie).** De overige checks die een dekselkenmerk op `netwerkknopen` of op de put aan een streng-uiteinde
 lezen (HGT-001/002/004/011/016/017/018, BTR-006) zijn *niet* gewijzigd: ze vallen terug op de maaiveldhoogte,
 en of die terugval op een gemaal aanvaardbaar is of de populatie tot `rioolputten` moet krimpen is een
 domeinkeuze. Ze staan met reden op de uitzonderingslijst van de ontologietest en zijn als tabel aan de auteur

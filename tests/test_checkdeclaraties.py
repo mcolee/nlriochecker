@@ -20,8 +20,13 @@ from __future__ import annotations
 import pytest
 
 import nlriochecker.checks  # noqa: F401  (vult de registry)
-from checkdeclaratie_analyse import analyseer_alle_checks
+from checkdeclaratie_analyse import DERIVED_PROPS, analyseer_alle_checks
 from nlriochecker.checks.base import REGISTRY, Check, Dimension, Severity, SkeletonCheck, register
+from nlriochecker.dataset import Conduit, Node
+
+# De eigenschappen van `Node`/`Conduit` die geen GWSW-kenmerk lezen maar de geometrie: de
+# z-waarde uit de GML-lijn. Ze horen daarom niet in `DERIVED_PROPS`.
+GEOMETRIE_EIGENSCHAPPEN = frozenset({"z_start", "z_end"})
 
 DECLARATIES = analyseer_alle_checks()
 CHECK_IDS = sorted(REGISTRY)
@@ -57,6 +62,24 @@ def test_elke_check_declareert_beide() -> None:
         if not hasattr(REGISTRY[cid], "rollen") or not hasattr(REGISTRY[cid], "kenmerken")
     ]
     assert not ontbreekt, f"checks zonder declaratie: {ontbreekt}"
+
+
+def test_derived_props_dekt_elke_eigenschap() -> None:
+    """Elke waardedragende `Node`/`Conduit`-eigenschap staat in `DERIVED_PROPS`.
+
+    De AST-sweep vertaalt een eigenschapslezing (`node.bovenkant`) naar haar GWSW-kenmerk
+    via `DERIVED_PROPS`. Zet iemand er een nieuwe eigenschap bij zonder die tabel bij te
+    werken, dan ziet de sweep dat kenmerk niet -- een stille valse groen. Deze test dwingt
+    af dat elke eigenschap óf een kenmerk oplevert (in de tabel) óf uitdrukkelijk als
+    geometrie is uitgezonderd.
+    """
+    for klass in (Node, Conduit):
+        eigenschappen = {naam for naam in dir(klass) if isinstance(getattr(klass, naam), property)}
+        ongedekt = eigenschappen - set(DERIVED_PROPS) - GEOMETRIE_EIGENSCHAPPEN
+        assert not ongedekt, (
+            f"{klass.__name__}-eigenschappen zonder vertaling in DERIVED_PROPS: {sorted(ongedekt)}. "
+            "Voeg ze toe (met hun GWSW-kenmerk) of aan GEOMETRIE_EIGENSCHAPPEN."
+        )
 
 
 def test_register_weigert_check_zonder_declaratie() -> None:

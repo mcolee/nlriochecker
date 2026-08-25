@@ -21,6 +21,20 @@ bereikbaar vanaf `Bergbezinkbassin`, dus "∃ wortel" zou een dekselkenmerk op
 rol" eist dat de hele populatie het kenmerk kan dragen, en dat is precies wat een gemaal
 in `netwerkknopen` breekt.
 
+**Grens van de garantie -- de test is een ondergrens, geen uitputtende lijst.** De
+declaratie is een platte verzameling rollen en een platte verzameling kenmerken; ze legt
+niet vast wélk kenmerk op wélke rol gelezen wordt. Declareert een check naast een brede
+rol die het kenmerk niet volledig draagt óók een smalle rol die dat wél doet -- ook als
+die smalle rol alleen als overslagverzameling op `.uri` gelezen wordt -- dan dekt de smalle
+rol het kenmerk af en valt de vlag weg. Zo mist deze test `(HGT-016, HoogtePut)`: HGT-016
+leest de putbodem (`HoogtePut`) op `netwerkknopen` (incl. gemalen), net als het wél
+gevlagde HGT-004, maar declareert daarnaast `valconstructies` (`Valput`, `Zandvangput`,
+beide met `HoogtePut`) als overslagverzameling, en die dekt het af. De volledige lijst
+domeinkeuzes staat daarom in de auteurstabel (sluitcomment issue #64), niet in deze test;
+HGT-016 staat daar als geheel op. Een sluitende oplossing vraagt een sweep die kenmerken
+per rol bijhoudt; dat is bewust uitgesteld (de meerkost weegt niet op tegen deze ene,
+gedocumenteerde blinde vlek).
+
 De overgebleven afwijkingen staan met reden in `UITZONDERINGEN`; de domeinkeuzes daarin
 gaan als tabel naar de auteur (sluitcomment van issue #64). Een afwijking die niet meer
 optreedt maakt de test óók rood, zodat de lijst niet stil veroudert.
@@ -194,6 +208,13 @@ def _schendingen() -> dict[tuple[str, str], list[str]]:
             check = REGISTRY[check_id]
             nietleeg = {rol: wortels for rol in check.rollen if (wortels := _wortels(rol, klassen))}
             if not nietleeg:
+                # Een check zonder (niet-lege) rol valt hier buiten: RVZ-011 haalt zijn
+                # putten via de overstortdrempel-index (`drempels_per_put`, engine-navigatie)
+                # en niet via een rol, dus `rollen = ()`. Zijn dekselkenmerk staat feitelijk
+                # op overstortputten (een Rioolput, mét deksel), dus dat is correct, maar het
+                # wordt hier niet tegen de ontologie gehouden. Een check die zijn hele
+                # populatie via engine-navigatie haalt, ontsnapt zo aan deze bewaking; nu is
+                # dat alleen RVZ-011, met reden.
                 continue
             for kenmerk in _concrete_kenmerken(check):
                 if kenmerk in GLOBALE_UITZONDERINGEN:

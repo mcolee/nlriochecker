@@ -74,14 +74,18 @@ def _relatie_uit_graaf(graaf: Graph, voorwaarts: str, achterwaarts: str) -> dict
     """Per GWSW-klasse de directe doelen van een relatie, in beide richtingen gevouwen.
 
     De ontologie hangt onder een klasse blanknode-restricties aan `rdfs:subClassOf`:
-    `[ a owl:Restriction ; owl:onProperty gwsw:hasAspect ; owl:onClass gwsw:X ]`. Ze komen
-    in twee richtingen voor, want het GWSW declareert `isAspectOf owl:inverseOf hasAspect`
-    en `isPartOf owl:inverseOf hasPart`: `Putdekselniveau` hangt aan `Dekselorientatie` als
-    `Putdekselniveau isAspectOf Dekselorientatie`, niet als `Dekselorientatie hasAspect
-    Putdekselniveau`. Deze functie vouwt beide tot dezelfde kant, zodat `aspecten_van`
-    (`voorwaarts=hasAspect`, `achterwaarts=isAspectOf`) en `onderdelen_van` (`hasPart`,
-    `isPartOf`) de volledige directe buren dragen. Alleen directe kanten, net als
-    `subklasse_van`; de drifttest bouwt de bereikbaarheid daaruit op.
+    `[ a owl:Restriction ; owl:onProperty gwsw:hasAspect ; owl:onClass gwsw:X ]`. Het
+    doel staat als `owl:onClass` (het gros), maar een handvol `hasAspect`-restricties
+    bindt via `owl:someValuesFrom` en twee `hasPart`-restricties via `owl:allValuesFrom`
+    (`Deksel hasAspect MateriaalDeksel` heeft alleen die vorm); alle drie tellen als de
+    directe buur. Ze komen bovendien in twee richtingen voor, want het GWSW declareert
+    `isAspectOf owl:inverseOf hasAspect` en `isPartOf owl:inverseOf hasPart`:
+    `Putdekselniveau` hangt aan `Dekselorientatie` als `Putdekselniveau isAspectOf
+    Dekselorientatie`, niet als `Dekselorientatie hasAspect Putdekselniveau`. Deze functie
+    vouwt beide tot dezelfde kant, zodat `aspecten_van` (`voorwaarts=hasAspect`,
+    `achterwaarts=isAspectOf`) en `onderdelen_van` (`hasPart`, `isPartOf`) de volledige
+    directe buren dragen. Alleen directe kanten, net als `subklasse_van`; de drifttest
+    bouwt de bereikbaarheid daaruit op.
     """
     voor = URIRef(f"{GWSW}{voorwaarts}")
     achter = URIRef(f"{GWSW}{achterwaarts}")
@@ -92,7 +96,11 @@ def _relatie_uit_graaf(graaf: Graph, voorwaarts: str, achterwaarts: str) -> dict
         if (restrictie, RDF.type, OWL.Restriction) not in graaf:
             continue
         prop = graaf.value(restrictie, OWL.onProperty)
-        doel = graaf.value(restrictie, OWL.onClass)
+        doel = (
+            graaf.value(restrictie, OWL.onClass)
+            or graaf.value(restrictie, OWL.someValuesFrom)
+            or graaf.value(restrictie, OWL.allValuesFrom)
+        )
         if not isinstance(doel, URIRef) or not str(doel).startswith(GWSW):
             continue
         bron = str(houder).removeprefix(GWSW)
