@@ -27,13 +27,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
-- **De putdiepte- en putbodemchecks toetsen op `Rioolput`, niet op elk netwerkknoop**
+- **De putdiepte-, putbodem- en dekselchecks toetsen op `Rioolput`, niet op elk netwerkknoop**
   (issue #64). Een nieuwe rol `rioolputten` (`[klassen] rioolput = ["Rioolput"]`) vervangt
-  `netwerkknopen` in HGT-012 (putdiepte) en HGT-015 (putbodem): `HoogtePut` en het
-  daaruit afgeleide bodemniveau hangen aan een put met een deksel, niet aan een gemaal of
-  uitlaat. De overige dekselchecks die op `netwerkknopen` of op de put aan het
-  streng-uiteinde lezen (HGT-001/002/004/011/016/017/018, BTR-006) staan met reden op de
-  uitzonderingslijst van de ontologietest en gaan als domeinkeuze naar de auteur.
+  `netwerkknopen` in HGT-012 (putdiepte) en HGT-015 (putbodem); in HGT-004, HGT-016 en
+  HGT-017 wordt alleen de deksel-/bodemtak tot de rioolputten beperkt, terwijl de
+  bovenkanttak (met terugval op maaiveld) breed blijft. `HoogtePut` en het daaruit afgeleide
+  bodemniveau hangen aan een put met een deksel, niet aan een gemaal of uitlaat. HGT-001/002/011/018
+  en BTR-006 blijven op `netwerkknopen` (de maaiveld-terugval is zinvol voor elk object) en
+  staan met reden op de uitzonderingslijst van de ontologietest.
 
 - **Meldingen onderdrukken per klasse en per check** (issue #65). `[rapport]` krijgt
   `onderdruk_klassen` (GWSW-wortelklassen, subklassen via de ontologie) en `onderdruk_checks`

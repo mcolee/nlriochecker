@@ -77,8 +77,9 @@ def test_derived_props_dekt_elke_eigenschap() -> None:
         eigenschappen = {naam for naam in dir(klass) if isinstance(getattr(klass, naam), property)}
         ongedekt = eigenschappen - set(DERIVED_PROPS) - GEOMETRIE_EIGENSCHAPPEN
         assert not ongedekt, (
-            f"{klass.__name__}-eigenschappen zonder vertaling in DERIVED_PROPS: {sorted(ongedekt)}. "
-            "Voeg ze toe (met hun GWSW-kenmerk) of aan GEOMETRIE_EIGENSCHAPPEN."
+            f"{klass.__name__}-eigenschappen zonder vertaling in DERIVED_PROPS: "
+            f"{sorted(ongedekt)}. Voeg ze toe met hun GWSW-kenmerk, of aan "
+            "GEOMETRIE_EIGENSCHAPPEN."
         )
 
 

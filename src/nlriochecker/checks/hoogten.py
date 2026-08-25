@@ -137,7 +137,7 @@ class BobBuitenDePut(_StrengCheck):
     title = "BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("netwerkknopen", "rioolputten", "vrijvervalrioolleidingen")
     kenmerken = (
         "BobBeginpuntLeiding",
         "BobEindpuntLeiding",
@@ -147,7 +147,14 @@ class BobBuitenDePut(_StrengCheck):
     )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst elke BOB tegen het bovenkant- en bodemniveau van zijn put."""
+        """Toetst elke BOB tegen het bovenkant- en bodemniveau van zijn put.
+
+        De bodemtoets alleen op rioolput-uiteinden: het bodemniveau volgt uit dekselniveau
+        min `HoogtePut`, en die dragen alleen putten met een deksel; een gemaal of uitlaat
+        heeft geen afleidbare bodem. De bovenkanttoets valt terug op de maaiveldhoogte en
+        geldt daarom voor elk uiteinde (issue #64).
+        """
+        rioolput_uris = {node.uri for node in rioolputten(context)}
         for uiteinde in _uiteinden(context):
             if uiteinde.bob is None:
                 continue
@@ -166,6 +173,8 @@ class BobBuitenDePut(_StrengCheck):
                     bron=_bovenkant_bron(node),
                     put=node.label,
                 )
+            if node.uri not in rioolput_uris:
+                continue
             bodem = node.bodem
             if bodem is not None and uiteinde.bob < bodem:
                 yield self.finding(
@@ -183,12 +192,13 @@ class BobBuitenDePut(_StrengCheck):
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt welk deel van de toets niet uitgevoerd kon worden."""
         knopen = netwerkknopen(context)
+        putten = rioolputten(context)
         zonder_boven = sum(1 for node in knopen if node.bovenkant is None)
-        zonder_bodem = sum(1 for node in knopen if node.bodem is None)
+        zonder_bodem = sum(1 for node in putten if node.bodem is None)
         notities = [
             "Het GWSW kent geen kenmerk `Putbodemniveau`; de bodem volgt uit het "
             "bovenkantniveau min `HoogtePut`. Ontbreekt een van die twee, dan blijft de "
-            "bodemtoets achterwege."
+            "bodemtoets achterwege. De bodemtoets loopt alleen over de rioolputten."
         ]
         if zonder_boven:
             notities.append(
@@ -197,7 +207,7 @@ class BobBuitenDePut(_StrengCheck):
             )
         if zonder_bodem:
             notities.append(
-                f"{zonder_bodem} van de {len(knopen)} putten hebben geen afleidbaar "
+                f"{zonder_bodem} van de {len(putten)} rioolputten hebben geen afleidbaar "
                 "bodemniveau; daar is de bodemtoets overgeslagen."
             )
         return notities
@@ -854,7 +864,7 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
     title = "BOB van aansluitende streng ligt meer dan drempel boven de putbodem"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("netwerkknopen", "valconstructies", "vrijvervalrioolleidingen")
+    rollen = ("rioolputten", "valconstructies", "vrijvervalrioolleidingen")
     kenmerken = (
         "BobBeginpuntLeiding",
         "BobEindpuntLeiding",
@@ -864,12 +874,19 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
     )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Zoekt strengen die hoog in de put binnenkomen zonder verklaring."""
+        """Zoekt strengen die hoog in de put binnenkomen zonder verklaring.
+
+        Alleen op rioolput-uiteinden: de putbodem volgt uit dekselniveau min `HoogtePut`
+        en is er niet op een gemaal of uitlaat (issue #64).
+        """
         drempel = context.config.drempels.bob_sprong_m
         valput_uris = {node.uri for node in valconstructies(context)}
+        rioolput_uris = {node.uri for node in rioolputten(context)}
 
         for uiteinde in _uiteinden(context):
             node = uiteinde.node
+            if node.uri not in rioolput_uris:
+                continue
             bodem = node.bodem
             if uiteinde.bob is None or bodem is None or node.uri in valput_uris:
                 continue
@@ -894,8 +911,13 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
             context,
             "afleidbaar bodemniveau",
             lambda node: node.bodem,
-            objecten=netwerkknopen(context),
+            objecten=rioolputten(context),
+            soort="rioolputten",
         )
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal rioolputten."""
+        return len(rioolputten(context))
 
 
 @register
@@ -906,7 +928,7 @@ class ZWaardeWijktAf(_StrengCheck):
     title = "Z-waarde uit de geometrie wijkt af van de administratieve BOB of dekselhoogte"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("rioolputten", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "Putdekselniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -932,7 +954,7 @@ class ZWaardeWijktAf(_StrengCheck):
                     drempel_m=drempel,
                 )
 
-        for node in netwerkknopen(context):
+        for node in rioolputten(context):
             niveau = node.dekselniveau
             if node.z is None or niveau is None or abs(node.z - niveau) <= drempel:
                 continue
@@ -962,8 +984,8 @@ class ZWaardeWijktAf(_StrengCheck):
         return [f"{plat} van de {len(strengen)} strengen hebben een geometrie zonder z-waarde."]
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen plus putten."""
-        return len(vrijvervalrioolleidingen(context)) + len(netwerkknopen(context))
+        """Het aantal strengen plus rioolputten."""
+        return len(vrijvervalrioolleidingen(context)) + len(rioolputten(context))
 
 
 @register

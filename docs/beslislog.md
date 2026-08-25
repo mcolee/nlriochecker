@@ -2667,7 +2667,8 @@ AST-sweep tegen de feitelijke code (`checkdeclaratie_analyse.py`) en een tweede 
 leunt op twee nieuwe indexblokken `aspecten_van`/`onderdelen_van` (per klasse de directe
 `hasAspect`/`hasPart`-doelen, beide richtingen gevouwen omdat het GWSW `isAspectOf`/`isPartOf` als inverse
 declareert). Een nieuwe rol `rioolputten` (`gwsw:Rioolput`) vervangt `netwerkknopen` in HGT-012 (putdiepte)
-en HGT-015 (putbodem).
+en HGT-015 (putbodem); in HGT-004, HGT-016 en HGT-017 wordt alleen de deksel-/bodemtak tot de rioolputten
+beperkt, terwijl de bovenkanttak (met terugval op maaiveld) breed blijft.
 
 **Waarom.** Tot nu toe stond nergens over welke GWSW-begrippen een check ging, en het was voor geen enkele
 check nagelopen. De putdiepte (deksel minus bodem) en het daaruit afgeleide bodemniveau hangen aan een put
@@ -2685,19 +2686,19 @@ bredere toets dan hij was.
 
 **Grens van de ontologietest.** De toets is een ondergrens, geen uitputtende lijst: de declaratie is plat
 (welke rollen, welke kenmerken -- niet welk kenmerk op welke rol), dus een smalle mede-gedeclareerde rol kan
-een kenmerk afdekken en de vlag onderdrukken. Zo mist de toets `(HGT-016, HoogtePut)` -- HGT-016 leest de
-putbodem op `netwerkknopen` net als het wél gevlagde HGT-004, maar declareert daarnaast `valconstructies`
-(die `HoogtePut` draagt) als overslagverzameling. De volledige domeinkeuzelijst is daarom de auteurstabel,
-niet de toets; een sluitende oplossing (kenmerken per rol) is uitgesteld. Het indexblok leest naast
+een kenmerk afdekken en de vlag onderdrukken. Het geval dat dit blootlegde was `(HGT-016, HoogtePut)`; met
+de reparatie hierboven toetst HGT-016 de bodem op `rioolputten` en is die blinde vlek nu leeg, al blijft ze
+theoretisch bestaan. Een sluitende oplossing (kenmerken per rol) is bewust uitgesteld. Het indexblok leest naast
 `owl:onClass` ook `owl:someValuesFrom`/`owl:allValuesFrom`, zodat een forward-only binding als
 `Deksel hasAspect MateriaalDeksel` niet ontbreekt.
 
-**Grens (populatie).** De overige checks die een dekselkenmerk op `netwerkknopen` of op de put aan een streng-uiteinde
-lezen (HGT-001/002/004/011/016/017/018, BTR-006) zijn *niet* gewijzigd: ze vallen terug op de maaiveldhoogte,
-en of die terugval op een gemaal aanvaardbaar is of de populatie tot `rioolputten` moet krimpen is een
-domeinkeuze. Ze staan met reden op de uitzonderingslijst van de ontologietest en zijn als tabel aan de auteur
-voorgelegd (sluitcomment issue #64). `Maaiveldhoogte` hangt via `hasConnection` aan de `Maaiveldorientatie`
+**Grens (populatie).** De auteur koos (na de tabel in de sluitcomment) om HGT-004, HGT-016 en HGT-017 hun
+deksel-/bodemtak tot `rioolputten` te laten beperken, en HGT-001/002/011/018 en BTR-006 *ongewijzigd* te
+laten: die vallen terug op de maaiveldhoogte, en die terugval is zinvol voor elk object -- restrictie tot
+`rioolputten` zou de maaiveld-vs-AHN/z-toets op gemalen en uitlaten laten vervallen. Die vijf staan met reden
+op de uitzonderingslijst van de ontologietest. `Maaiveldhoogte` hangt via `hasConnection` aan de `Maaiveldorientatie`
 en is daarom vanaf geen klasse bereikbaar in de index (die alleen `hasAspect`/`hasPart` volgt); die staat als
 globale uitzondering. De nul-bewaking uit `omvang.py` is bewust niet op de declaraties omgebouwd: de
 handlijst dekt via `via_onderdeel`/`per_klasse` gevallen (overstortdrempel, afvoereindpunt) die de rolnamen
-niet uitdrukken, en dat omzetten raakt een goed geteste uitvoerlaag; voorgelegd aan de auteur.
+niet uitdrukken, en dat omzetten raakt een goed geteste uitvoerlaag. De auteur koos dit als los vervolg,
+buiten #64.

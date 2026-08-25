@@ -26,14 +26,13 @@ declaratie is een platte verzameling rollen en een platte verzameling kenmerken;
 niet vast wélk kenmerk op wélke rol gelezen wordt. Declareert een check naast een brede
 rol die het kenmerk niet volledig draagt óók een smalle rol die dat wél doet -- ook als
 die smalle rol alleen als overslagverzameling op `.uri` gelezen wordt -- dan dekt de smalle
-rol het kenmerk af en valt de vlag weg. Zo mist deze test `(HGT-016, HoogtePut)`: HGT-016
-leest de putbodem (`HoogtePut`) op `netwerkknopen` (incl. gemalen), net als het wél
-gevlagde HGT-004, maar declareert daarnaast `valconstructies` (`Valput`, `Zandvangput`,
-beide met `HoogtePut`) als overslagverzameling, en die dekt het af. De volledige lijst
-domeinkeuzes staat daarom in de auteurstabel (sluitcomment issue #64), niet in deze test;
-HGT-016 staat daar als geheel op. Een sluitende oplossing vraagt een sweep die kenmerken
-per rol bijhoudt; dat is bewust uitgesteld (de meerkost weegt niet op tegen deze ene,
-gedocumenteerde blinde vlek).
+rol het kenmerk af en valt de vlag weg. Het ene geval dat dit in deze codebase blootlegde
+was `(HGT-016, HoogtePut)`: HGT-016 las de putbodem op `netwerkknopen` maar declareerde
+daarnaast `valconstructies` (met `HoogtePut`), die het afdekte. Dat is met de reparatie
+weg -- HGT-016 toetst de bodem nu op `rioolputten` -- dus op dit moment triggert geen enkele
+check de blinde vlek. Ze blijft theoretisch bestaan; een sluitende oplossing vraagt een
+sweep die kenmerken per rol bijhoudt, en dat is bewust uitgesteld (de meerkost weegt niet
+op tegen deze inmiddels lege blinde vlek).
 
 De overgebleven afwijkingen staan met reden in `UITZONDERINGEN`; de domeinkeuzes daarin
 gaan als tabel naar de auteur (sluitcomment van issue #64). Een afwijking die niet meer
@@ -88,24 +87,8 @@ UITZONDERINGEN: dict[tuple[str, str], str] = {
         "maaiveld-vs-AHN-toets op gemalen/uitlaten laten vervallen -- keuze voor de auteur."
     ),
     ("HGT-002", "Putdekselniveau"): ("[domeinkeuze] Als HGT-001, zware drempel."),
-    ("HGT-004", "HoogtePut"): (
-        "[domeinkeuze] BOB tegen de bodem van de put aan het streng-uiteinde; de bodem volgt "
-        "uit dekselniveau min `HoogtePut`, gelezen op `netwerkknopen` incl. gemalen."
-    ),
-    ("HGT-004", "Putdekselniveau"): (
-        "[domeinkeuze] BOB tegen het dekselniveau van de put aan het streng-uiteinde "
-        "(`netwerkknopen`), met terugval op maaiveld."
-    ),
     ("HGT-011", "Putdekselniveau"): (
         "[domeinkeuze] Leest het bovenkantniveau (deksel/maaiveld) op `netwerkknopen`."
-    ),
-    ("HGT-016", "Putdekselniveau"): (
-        "[domeinkeuze] BOB boven de putbodem, gelezen op de put aan het streng-uiteinde "
-        "(`netwerkknopen`); de bodem gebruikt het dekselniveau."
-    ),
-    ("HGT-017", "Putdekselniveau"): (
-        "[domeinkeuze] Vergelijkt de z-waarde van de putgeometrie met het dekselniveau op "
-        "`netwerkknopen` incl. gemalen."
     ),
     ("HGT-018", "Putdekselniveau"): (
         "[domeinkeuze] Leest het bovenkantniveau (deksel/maaiveld) op de put aan het "
