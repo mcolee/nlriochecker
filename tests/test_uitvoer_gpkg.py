@@ -7,6 +7,7 @@ met `sqlite3` terug, zodat lees- en schrijfkant elkaar in de gaten houden.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
@@ -34,7 +35,7 @@ from nlriochecker.uitvoer.gpkg import (
     REDEN_ONDERDRUKT,
     schrijf_geopackage,
 )
-from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.uitvoer.melding import bouw_meldingen, bouw_meldingenstroom
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -1214,3 +1215,68 @@ def test_gwsw_run_zonder_onderdrukking_telt_nul(tmp_path: Path) -> None:
         uitvoer.geopackage,
         "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
     ) == [("", "", 0)]
+
+
+def test_gwsw_run_draagt_ook_de_onderdrukte_checks(tmp_path: Path) -> None:
+    """De tweede lijst loopt door dezelfde stroom; hier vallen beide soorten weg."""
+    uitvoer = schrijf_uitvoer(
+        _run_onderdrukt(["MechanischeTransportleiding"], ["TOP-011"]),
+        tmp_path,
+        RUNDATUM,
+        met_json=False,
+    )
+
+    assert uitvoer.geopackage is not None
+    # TOP-011 op de vrijvervalstreng valt op check weg, de nulmelding op de persleiding
+    # op klasse: samen twee.
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("MechanischeTransportleiding", "TOP-011", 2)]
+
+
+def test_een_klasse_zonder_objecten_onderdrukt_niets_maar_wordt_wel_verantwoord(
+    tmp_path: Path,
+) -> None:
+    """Actief met nul weggevallen meldingen: de keuze staat er, de uitslag is nul.
+
+    De fixture kent geen enkel `Rioolgemaal`. Alle drie de uitvoervormen die de telling
+    dragen horen dan hetzelfde te zeggen; zwijgen zou de keuze onzichtbaar maken.
+    """
+    uitvoer = schrijf_uitvoer(_run_onderdrukt(["Rioolgemaal"]), tmp_path, RUNDATUM)
+
+    assert uitvoer.geopackage is not None and uitvoer.json is not None
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    assert "**0 meldingen onderdrukt**" in uitvoer.markdown.read_text(encoding="utf-8")
+    assert document["onderdrukt"] == {"klassen": ["Rioolgemaal"], "checks": [], "meldingen": 0}
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("Rioolgemaal", "", 0)]
+
+
+def test_de_grijze_objecten_en_de_telling_komen_uit_dezelfde_onderdrukking(
+    tmp_path: Path,
+) -> None:
+    """Eén bron voor beide, en dat is het argument -- niet de config van de run.
+
+    Zou de laag de klassenlijst uit `run.config` lezen, dan levert een beller die de
+    stroom zelf samenstelt een bestand op waarin objecten grijs staan met een reden die
+    `gwsw_run` niet noemt.
+    """
+    run = _run_onderdrukt(["MechanischeTransportleiding"])
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    zonder = schrijf_geopackage(run, stroom.meldingen, tmp_path / "zonder", RUNDATUM)
+    met = schrijf_geopackage(
+        run, stroom.meldingen, tmp_path / "met", RUNDATUM, onderdrukking=stroom.onderdrukking
+    )
+
+    kolommen = "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run"
+    popups_zonder = {rij["feature_id"]: rij["popup_html"] for rij in _laagrijen(zonder, "strengen")}
+    popups_met = {rij["feature_id"]: rij["popup_html"] for rij in _laagrijen(met, "strengen")}
+
+    assert _rijen(zonder, kolommen) == [("", "", 0)]
+    assert all(REDEN_ONDERDRUKT not in popup for popup in popups_zonder.values())
+    assert _rijen(met, kolommen) == [("MechanischeTransportleiding", "", 1)]
+    assert REDEN_ONDERDRUKT in popups_met["L2"]

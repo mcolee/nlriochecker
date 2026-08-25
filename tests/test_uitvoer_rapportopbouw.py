@@ -19,6 +19,7 @@ from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import toets_gebieden
+from nlriochecker.uitvoer.bevindingen import _telling
 from nlriochecker.uitvoer.omvang import omvangtabel
 from nlriochecker.uitvoer.samenvatting import KRUISJE, NIET_GEMETEN, VINKJE
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer, schrijf_uitvoer_gebieden
@@ -322,4 +323,9 @@ class TestOnderdrukking:
         """Geen keuze om te verantwoorden, dus geen alinea."""
         tekst = _rapport(self._run_onderdrukt([]), tmp_path)
 
-        assert "onderdrukt" not in tekst
+        assert "op grond van `[rapport]`" not in tekst
+
+    def test_de_telling_staat_gesorteerd_en_zegt_geen_bij_niets(self) -> None:
+        """Gesorteerd op sleutel: anders verschilt de zin tussen twee runs op dezelfde data."""
+        assert _telling({"TOP-011": 3, "ATTR-001": 2}) == "ATTR-001 2, TOP-011 3"
+        assert _telling({}) == "geen"

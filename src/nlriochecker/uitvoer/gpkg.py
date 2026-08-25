@@ -191,9 +191,11 @@ def schrijf_geopackage(
     op de kern plus de contextschil (ruim genoeg voor randeffectvrije netwerkchecks),
     dus wat hier buiten valt is bewust weggelaten, niet over het hoofd gezien.
 
-    `onderdrukking` komt uit de meldingenstroom en gaat naar `gwsw_run`: de meldingen
-    die `[rapport]` wegliet zitten niet in `meldingen`, en zonder die telling zou het
-    bestand niet zeggen dat er iets weggelaten is (BO-49).
+    `onderdrukking` komt uit de meldingenstroom en is de enige bron voor beide dingen
+    die zij hier bepaalt: welke objecten grijs worden met `REDEN_ONDERDRUKT` en wat
+    `gwsw_run` daarover meldt. De meldingen die `[rapport]` wegliet zitten niet in
+    `meldingen`, en zonder die telling zou het bestand niet zeggen dat er iets
+    weggelaten is (BO-49).
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)
@@ -208,7 +210,9 @@ def schrijf_geopackage(
     try:
         verbinding = sqlite3.connect(doel)
         _leg_fundament(verbinding)
-        tellingen = _schrijf_features(verbinding, run, meldingen, binnen, run_datum, voortgang)
+        tellingen = _schrijf_features(
+            verbinding, run, meldingen, binnen, run_datum, voortgang, onderdrukking
+        )
         _schrijf_meldingen(verbinding, meldingen)
         voortgang.stap(label="meldingen")
         _schrijf_overzicht(verbinding, run, meldingen)
@@ -448,19 +452,20 @@ def _mechanische_uris(run: CheckRun) -> frozenset[str]:
     return frozenset(conduit.uri for conduit in mechanischeleidingen(run.context))
 
 
-def _onderdrukte_uris(run: CheckRun) -> frozenset[str]:
+def _onderdrukte_uris(run: CheckRun, klassen: tuple[str, ...]) -> frozenset[str]:
     """De objecten waarvan `[rapport]` de meldingen uit de stroom houdt (BO-49).
 
-    Uit de configuratie en niet uit de meldingen: een object van een onderdrukte klasse
-    hoort ook grijs te lezen als er toevallig niets op stond. Anders zou de kaart bij het
-    ene object "niet gerapporteerd" en bij het andere "beoordeeld en in orde" zeggen op
-    grond van hetzelfde besluit.
+    De klassen komen uit de meegegeven `Onderdrukking` en niet uit `run.config`: dan
+    hebben de grijze objecten en de telling in `gwsw_run` dezelfde bron, en kan een
+    beller die de stroom zelf samenstelde geen bestand krijgen waarin objecten grijs
+    staan met een reden die de runtabel niet noemt.
+
+    Niet uit de meldingen: een object van een onderdrukte klasse hoort ook grijs te lezen
+    als er toevallig niets op stond. Anders zou de kaart bij het ene object "niet
+    gerapporteerd" en bij het andere "beoordeeld en in orde" zeggen op grond van
+    hetzelfde besluit.
     """
-    return frozenset(
-        uri
-        for wortel in run.config.rapport.onderdruk_klassen
-        for uri in run.dataset.of_class(wortel)
-    )
+    return frozenset(uri for wortel in klassen for uri in run.dataset.of_class(wortel))
 
 
 def _schrijf_features(
@@ -470,15 +475,16 @@ def _schrijf_features(
     binnen: frozenset[str] | None,
     run_datum: date,
     voortgang: Voortgang = NUL_VOORTGANG,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> _LaagTellingen:
     """Schrijft de twee objectlagen plus de twee lagen met externe objecten.
 
     Naast de beoordeelde objecten komt erin wat de checks wel zagen maar niet
     beoordeelden: mechanisch riool, dat volgens het checkregister buiten scope valt,
-    en de contextschil van een studiegebied. Beide krijgen status `grijs` met de reden
-    in hun popup. Ze weglaten zou de kaart bij de gebiedsgrens laten ophouden alsof
-    daar niets ligt, en een lege mechanische laag zou als "geen mechanisch riool
-    aanwezig" lezen.
+    de klassen uit `onderdrukking`, en de contextschil van een studiegebied. Alle drie
+    krijgen status `grijs` met de reden in hun popup. Ze weglaten zou de kaart bij de
+    gebiedsgrens laten ophouden alsof daar niets ligt, en een lege mechanische laag zou
+    als "geen mechanisch riool aanwezig" lezen.
 
     Kende de run de klassenhierarchie niet, dan geldt dat voor *elk* object: de checks
     hebben dan over een onvolledige selectie gedraaid en er valt niets te beoordelen.
@@ -507,7 +513,8 @@ def _schrijf_features(
         "strengen",
         "LINESTRING",
         kolommen,
-        "Verbindingen met de uitslag per object; mechanisch riool staat er grijs bij.",
+        "Verbindingen met de uitslag per object; mechanisch riool en een onderdrukte "
+        "klasse staan er grijs bij.",
     )
 
     per_object = _meldingen_per_object(meldingen)
@@ -515,7 +522,7 @@ def _schrijf_features(
     stelsels = stelseltypen(run)
     config = run.config
     mechanisch = _mechanische_uris(run)
-    onderdrukt = _onderdrukte_uris(run)
+    onderdrukt = _onderdrukte_uris(run, onderdrukking.klassen)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
     # Het afvoerpad per knoop, uit `run.context`: de NET-checks hebben de graaf daar

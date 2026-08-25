@@ -286,7 +286,7 @@ def test_synthese_zwijgt_zonder_onderdrukking(tmp_path: Path) -> None:
     _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path)
 
     assert uitvoer.synthese is not None
-    assert "onderdrukt" not in uitvoer.synthese.read_text(encoding="utf-8")
+    assert "op grond van `[rapport]`" not in uitvoer.synthese.read_text(encoding="utf-8")
 
 
 def test_synthese_vermeldt_een_selectie(tmp_path: Path) -> None:
