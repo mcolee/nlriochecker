@@ -311,6 +311,22 @@ FIXTURES["top011_hartlijnkruising.ttl"] = (
     + leiding("L2", "2", [(1025.0, 1975.0), (1025.0, 2025.0)], "PutC", "PutD"),
 )
 
+# Issue #65: dezelfde kruising, maar streng 2 is een persleiding. TOP-011 meldt het paar
+# een keer, met de vrijvervalstreng als hoofdobject en de persleiding als tweede object;
+# die melding hoort te blijven staan als `[rapport] onderdruk_klassen` op de mechanische
+# wortel staat, want de onderdrukking kijkt naar het hoofdobject en niet naar object2.
+FIXTURES["onderdruk_persleiding.ttl"] = (
+    "een vrijvervalstreng kruist een persleiding; onderdrukking per klasse (issue #65)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1025.0, 1975.0)
+    + put("PutD", "D", 1025.0, 2025.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding(
+        "L2", "2", [(1025.0, 1975.0), (1025.0, 2025.0)], "PutC", "PutD", klasse="Persleiding"
+    ),
+)
+
 # TOP-013: drie strengen tussen hetzelfde putpaar.
 FIXTURES["top013_parallel.ttl"] = (
     "drie strengen verbinden dezelfde twee putten",

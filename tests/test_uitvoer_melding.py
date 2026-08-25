@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -12,7 +13,15 @@ from nlriochecker.dataset import load_dataset
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import load_study_area
 from nlriochecker.uitvoer.identiteit import melding_id
-from nlriochecker.uitvoer.melding import _is_systemisch, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    BRON_DATASET,
+    BRON_NULMETING,
+    GEEN_ONDERDRUKKING,
+    Melding,
+    _is_systemisch,
+    bouw_meldingen,
+    bouw_meldingenstroom,
+)
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -313,3 +322,99 @@ def test_prioriteit_volgt_dezelfde_regel_als_bij_een_eigen_check() -> None:
     (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
     assert melding.prioriteit == 3
+
+
+# Issue #65: onderdrukking per klasse en per check, in `bouw_meldingenstroom` en nergens
+# anders. De fixture: vrijvervalstreng L1 kruist persleiding L2. TOP-011 meldt het paar
+# een keer, met L1 als hoofdobject en L2 als tweede object; daarnaast levert deze kleine
+# fixture zeven SIG-nulklassemeldingen zonder hoofdobject, die hier buiten beschouwing
+# blijven (`_zonder_signalen`) behalve waar juist bewezen wordt dat ze blijven staan.
+PERSLEIDING = "http://example.org/toets#L2"
+VRIJVERVAL = "http://example.org/toets#L1"
+
+
+def _run_onderdrukt(
+    klassen: Sequence[str] = (), checks: Sequence[str] = (), *bevindingen: Nulbevinding
+) -> CheckRun:
+    """TOP-011 op de kruisingsfixture, met de twee lijsten uit `[rapport]` gezet."""
+    config = _config()
+    config.rapport.onderdruk_klassen = list(klassen)
+    config.rapport.onderdruk_checks = list(checks)
+    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl")
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
+    return replace(run, nulbevindingen=tuple(bevindingen))
+
+
+def _zonder_signalen(meldingen: list[Melding]) -> list[Melding]:
+    """De meldingen met een hoofdobject, los van de datasetsignalen (issue #22)."""
+    return [melding for melding in meldingen if melding.bron != BRON_DATASET]
+
+
+def test_zonder_lijsten_verandert_er_niets() -> None:
+    stroom = bouw_meldingenstroom(_run_onderdrukt(), RUNDATUM)
+
+    assert [m.object_uri for m in _zonder_signalen(stroom.meldingen)] == [VRIJVERVAL]
+    assert stroom.onderdrukking == GEEN_ONDERDRUKKING
+    assert not stroom.onderdrukking.actief
+    assert bouw_meldingen(_run_onderdrukt(), RUNDATUM) == stroom.meldingen
+
+
+def test_onderdrukking_per_klasse_haalt_het_hoofdobject_weg_en_laat_het_tweede_object_staan() -> (
+    None
+):
+    """De persleiding verliest haar nulmetingmelding; de kruisingsmelding op de
+    vrijvervalstreng, die de persleiding als object2 noemt, blijft."""
+    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
+    stroom = bouw_meldingenstroom(
+        _run_onderdrukt(["MechanischeTransportleiding"], [], nul), RUNDATUM
+    )
+
+    over = _zonder_signalen(stroom.meldingen)
+    assert [m.object_uri for m in over] == [VRIJVERVAL]
+    assert over[0].object2_uri == PERSLEIDING
+    # Een: TOP-011 meldt het paar een keer, met de vrijvervalstreng als hoofdobject, dus
+    # alleen de nulmetingmelding op de persleiding valt hier weg.
+    assert stroom.onderdrukking.per_klasse == {"MechanischeTransportleiding": 1}
+    assert stroom.onderdrukking.per_check == {}
+    assert stroom.onderdrukking.totaal == 1
+    assert stroom.onderdrukking.actief
+    assert stroom.onderdrukking.klassen == ("MechanischeTransportleiding",)
+
+
+def test_onderdrukking_per_check_gaat_voor_en_telt_een_melding_maar_een_keer() -> None:
+    """Een melding die op check én klasse zou wegvallen telt alleen bij de check.
+
+    `Leiding` en niet `MechanischeTransportleiding`, want alleen onder die wortel valt de
+    TOP-011-melding op de vrijvervalstreng ook op klasse weg -- pas dan is er iets om
+    voorrang over te geven.
+    """
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], ["TOP-011"]), RUNDATUM)
+
+    assert _zonder_signalen(stroom.meldingen) == []
+    assert stroom.onderdrukking.per_check == {"TOP-011": 1}
+    assert stroom.onderdrukking.per_klasse == {}
+    assert stroom.onderdrukking.totaal == 1
+
+
+def test_een_melding_zonder_object_valt_nooit_op_klasse_weg() -> None:
+    """Een onherleide nulmelding en de datasetsignalen hebben geen hoofdobject, dus geen
+    klasse; alleen de TOP-011-melding op de vrijvervalstreng valt op `Leiding` weg."""
+    los = _nulbevinding(object_uri="", object_label="", objecttype="", herleid=False)
+    zonder = bouw_meldingenstroom(_run_onderdrukt([], [], los), RUNDATUM)
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], [], los), RUNDATUM)
+
+    assert [m.bron for m in _zonder_signalen(stroom.meldingen)] == [BRON_NULMETING]
+    assert len(stroom.meldingen) == len(zonder.meldingen) - 1
+    assert stroom.onderdrukking.per_klasse == {"Leiding": 1}
+
+
+def test_onderdrukking_raakt_examined_en_systemisch_niet() -> None:
+    """Een uitvoerkeuze, geen toetskeuze: de check zelf ziet de lijsten niet."""
+    met = _run_onderdrukt(["MechanischeTransportleiding"], [])
+    zonder = _run_onderdrukt()
+
+    assert [o.examined for o in met.outcomes] == [o.examined for o in zonder.outcomes]
+    assert [len(o.findings) for o in met.outcomes] == [len(o.findings) for o in zonder.outcomes]
+    assert _is_systemisch(met.outcomes[0], met.config) == _is_systemisch(
+        zonder.outcomes[0], zonder.config
+    )

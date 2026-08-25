@@ -416,6 +416,12 @@ max_bevindingen_per_check = 0
 systemisch_drempel = 0.80
 # Versie van het checkregister waaraan deze run getoetst is.
 register_versie = "v0.9"
+# Meldingen die de uitvoer niet halen (issue #65): wortelklassen van het hoofdobject
+# (subklassen via de ontologie) en check-ID's. Een uitvoerkeuze, geen toetskeuze: de
+# checks draaien ongewijzigd, het rapport telt wat er wegviel. Standaard leeg; De Wolden
+# zet hier het mechanische riool. Zie BO-49.
+onderdruk_klassen = []
+onderdruk_checks = []
 
 # Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
 # draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de

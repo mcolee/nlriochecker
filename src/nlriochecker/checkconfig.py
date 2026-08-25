@@ -438,6 +438,28 @@ class ReportOptions(BaseModel):
     systemisch_drempel: float = Field(default=0.80, gt=0.0, le=1.0)
     # Versie van het checkregister, voor de metadata in de GIS-uitvoer.
     register_versie: str = "v0.9"
+    # Issue #65: meldingen die de uitvoer niet haalt. Wortelklassen (subklassen via de
+    # ontologie) van het hoofdobject, en check-ID's. Een uitvoerkeuze: de checks draaien
+    # ongewijzigd, `bouw_meldingenstroom` filtert en telt. De CSV draagt de lijsten niet,
+    # om dezelfde reden als de CFK-set; zie BO-49.
+    onderdruk_klassen: list[str] = Field(default_factory=list)
+    onderdruk_checks: list[str] = Field(default_factory=list)
+
+    @field_validator("onderdruk_checks")
+    @classmethod
+    def _bekende_check_ids(cls, check_ids: list[str]) -> list[str]:
+        """Weigert een check-ID dat het register niet kent; dat zou stil niets onderdrukken."""
+        # Lazy: `checks/base.py` importeert deze module, dus een import op moduleniveau
+        # is een kringimport. Bij het valideren is het register allang geladen.
+        from nlriochecker.checks import REGISTRY
+
+        onbekend = [check_id for check_id in check_ids if check_id not in REGISTRY]
+        if onbekend:
+            raise ValueError(
+                f"onderdruk_checks kent {', '.join(onbekend)} niet; bekende checks: "
+                f"{', '.join(sorted(REGISTRY))}"
+            )
+        return check_ids
 
 
 class CheckConfig(BaseModel):

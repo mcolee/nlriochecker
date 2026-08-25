@@ -412,6 +412,12 @@ max_bevindingen_per_check = 0
 systemisch_drempel = 0.80
 # Versie van het checkregister waaraan deze run getoetst is.
 register_versie = "v0.9"
+# Meldingen die de uitvoer niet halen (issue #65): het mechanische riool, dezelfde twee
+# wortels als `[klassen] mechanisch`. Het checkregister rekent mechanisch riool buiten
+# scope; wat TOP-010/TOP-011 en de nulmeting er toch op melden, blijft zo uit rapport en
+# kaart en wordt in de verantwoording geteld. Zie BO-49.
+onderdruk_klassen = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
+onderdruk_checks = []
 
 # Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
 # draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de

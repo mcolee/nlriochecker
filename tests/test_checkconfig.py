@@ -173,6 +173,28 @@ def test_rapportinstellingen_hebben_bruikbare_defaults() -> None:
     assert rapport.max_bevindingen_per_check == 0
     assert rapport.systemisch_drempel == 0.80
     assert rapport.register_versie == "v0.9"
+    assert rapport.onderdruk_klassen == []
+    assert rapport.onderdruk_checks == []
+
+
+def test_onbekend_onderdruk_check_id_faalt_bij_het_laden(tmp_path: Path) -> None:
+    """Een typefout in `onderdruk_checks` zou stil niets onderdrukken (issue #65)."""
+    bron = default_check_config_path().read_text(encoding="utf-8")
+    pad = tmp_path / "checks.toml"
+    pad.write_text(
+        bron.replace("onderdruk_checks = []", 'onderdruk_checks = ["XYZ-999"]'), encoding="utf-8"
+    )
+
+    with pytest.raises(ConfigError, match="XYZ-999"):
+        load_check_config(pad)
+
+
+def test_de_projectconfig_onderdrukt_het_mechanische_riool() -> None:
+    """De Wolden: dezelfde twee wortels als `[klassen] mechanisch` (issue #56, #65)."""
+    config = load_check_config(PROJECTCONFIG)
+
+    assert config.rapport.onderdruk_klassen == config.klassen.mechanisch
+    assert config.rapport.onderdruk_checks == []
 
 
 def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:

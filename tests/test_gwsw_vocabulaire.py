@@ -205,6 +205,10 @@ def _termen_uit_config(pad: Path | None, herkomst: str) -> list[Term]:
         Term(naam, f"{herkomst} [vulwaarden] hoogte_kenmerken")
         for naam in config.vulwaarden.hoogte_kenmerken
     ]
+    termen += [
+        Term(naam, f"{herkomst} [rapport] onderdruk_klassen")
+        for naam in config.rapport.onderdruk_klassen
+    ]
     return termen
 
 
@@ -448,6 +452,8 @@ BRONSENTINELS: tuple[tuple[str, str], ...] = (
     ("configs/dewoldenhoogeveen.toml [[puttyperegels]]", "Overstortput"),
     ("configs/dewoldenhoogeveen.toml [inwinning]", "AHN4"),
     ("configs/dewoldenhoogeveen.toml [vulwaarden]", "Maaiveldhoogte"),
+    # `checks.toml` laat de lijst leeg; alleen de projectconfig levert hier een term.
+    ("configs/dewoldenhoogeveen.toml [rapport]", "MechanischeRioolleiding"),
     ("plausibiliteit.toml [[materiaal_diameter]]", "Beton"),
     ("plausibiliteit.toml [[materiaal_begindatum]]", "PVC"),
     ("plausibiliteit.toml [[materiaal_vorm]]", "PVC"),

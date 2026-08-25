@@ -4,12 +4,16 @@ Markdown, CSV en GeoPackage lezen alle drie uit deze lijst. Dat is geen afspraak
 maar een eigenschap van de code: er is geen pad waarlangs een schrijver zelf nog
 een `Finding` interpreteert, dus kunnen de drie uitvoervormen niet uit elkaar
 lopen.
+
+Hier zit ook de onderdrukking uit `[rapport]` (`onderdruk_klassen`,
+`onderdruk_checks`): `bouw_meldingenstroom` filtert en telt als laatste stap, zodat
+wat wegvalt geen enkele schrijver bereikt. Zie BO-49.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from shapely.geometry import Point
@@ -90,11 +94,97 @@ class Melding:
     cfk: tuple[str, ...] = ()
 
 
-def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
-    """Zet alle bevindingen van een run om in meldingen.
+@dataclass(frozen=True)
+class Onderdrukking:
+    """Wat er op grond van `[rapport]` uit de meldingenstroom is gehouden.
 
-    De enige plek waar bevindingen naar uitvoer vertaald worden.
+    `klassen` en `checks` zijn de twee lijsten uit de projectconfiguratie; `per_check`
+    en `per_klasse` tellen wat erdoor wegviel. Een melding valt hooguit een keer weg:
+    eerst op check-ID, dan op de klasse van het hoofdobject, in de volgorde van de
+    lijst. Een uitvoerkeuze, geen toetskeuze: de checks, `examined` en de
+    systemisch-bepaling zien deze lijsten niet.
     """
+
+    klassen: tuple[str, ...] = ()
+    checks: tuple[str, ...] = ()
+    per_check: dict[str, int] = field(default_factory=dict)
+    per_klasse: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def actief(self) -> bool:
+        """Of de projectconfiguratie iets onderdrukt -- ook als er nul meldingen wegvielen."""
+        return bool(self.klassen or self.checks)
+
+    @property
+    def totaal(self) -> int:
+        """Hoeveel meldingen er in totaal wegvielen."""
+        return sum(self.per_check.values()) + sum(self.per_klasse.values())
+
+
+GEEN_ONDERDRUKKING = Onderdrukking()
+
+
+@dataclass(frozen=True)
+class Meldingenstroom:
+    """De meldingen die de schrijvers krijgen, plus wat er vóór hen uit is gehouden."""
+
+    meldingen: list[Melding]
+    onderdrukking: Onderdrukking
+
+
+def bouw_meldingenstroom(run: CheckRun, run_datum: date) -> Meldingenstroom:
+    """Zet alle bevindingen van een run om in meldingen en past de onderdrukking toe.
+
+    De enige plek waar bevindingen naar uitvoer vertaald worden, en de enige plek waar
+    `[rapport] onderdruk_klassen` en `onderdruk_checks` gelezen worden: wat hier wegvalt
+    bereikt geen enkele schrijver. Zie BO-49.
+    """
+    return _onderdruk(_alle_meldingen(run, run_datum), run)
+
+
+def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
+    """Alleen de meldingen, voor wie de telling van de onderdrukking niet nodig heeft."""
+    return bouw_meldingenstroom(run, run_datum).meldingen
+
+
+def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
+    """Houdt de meldingen uit de stroom die `[rapport]` onderdrukt, en telt ze.
+
+    Eerst op check-ID, dan op de klasse van het hoofdobject (`object_uri`, niet
+    `object2_uri`) in de volgorde van de lijst; een melding telt hooguit een keer. Een
+    melding zonder hoofdobject heeft geen klasse en valt dus nooit op klasse weg.
+    """
+    rapport = run.config.rapport
+    checks = set(rapport.onderdruk_checks)
+    per_check: dict[str, int] = {}
+    per_klasse: dict[str, int] = {}
+    over: list[Melding] = []
+    for melding in meldingen:
+        if melding.check_id in checks:
+            per_check[melding.check_id] = per_check.get(melding.check_id, 0) + 1
+            continue
+        klasse = _onderdrukte_klasse(run, melding.object_uri, rapport.onderdruk_klassen)
+        if klasse is not None:
+            per_klasse[klasse] = per_klasse.get(klasse, 0) + 1
+            continue
+        over.append(melding)
+    return Meldingenstroom(
+        over,
+        Onderdrukking(
+            tuple(rapport.onderdruk_klassen), tuple(rapport.onderdruk_checks), per_check, per_klasse
+        ),
+    )
+
+
+def _onderdrukte_klasse(run: CheckRun, object_uri: str, klassen: list[str]) -> str | None:
+    """De eerste wortel uit de lijst waar het object onder valt, of None."""
+    if not object_uri:
+        return None
+    return next((wortel for wortel in klassen if run.dataset.is_a(object_uri, wortel)), None)
+
+
+def _alle_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
+    """De drie bronnen samengesteld, vóór de onderdrukking."""
     config = run.config
     scope = SCOPE_BINNEN if run.study_area is not None else SCOPE_GEEN_GEBIED
     gebied = run.study_area.gebied if run.study_area is not None else ""
