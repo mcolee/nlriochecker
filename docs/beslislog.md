@@ -2804,3 +2804,17 @@ voorspelde 8467/7 voor #72 én #73 samen (Pompunit uit `afvoer_eindpunt`); dit i
 Pompunit als eindpunt staan en komt daarmee onder die grens uit, zoals verwacht. De zeven die in
 Koekangerveld overblijven horen echt zonder route te zijn. Onderbouwing en de causale trace:
 `scripts/analyse_afvoer_pompunit.py`.
+
+**Ook NET-002, en dat is gewogen.** `_bereikbaar_vanaf` is gedeeld, dus het persnet telt ook voor
+de hemelwatercheck mee: NET-002 gaat van **3054** naar **3031** (Koekangerveld 0 → 0, geen enkele
+nieuwe bevinding in beide checks -- de wijziging kan alleen bereikbaarheid toevoegen). Alle 23
+weggevallen bevindingen liggen in drie deelstelsels, gebruiken minstens één mechanische kant en
+komen op een `Lozingsput` uit; 21 van de 23 lopen daarbij uitsluitend mét de geregistreerde
+richting mee, dus de ongerichtheid is er geen tweede versoepeling bovenop. Het typische geval is
+een hemelwaterstelsel dat op een `Rioolgemaal` afwatert waarvan de drukleiding op de lozingsput
+uitkomt (bv. `364786-319522-1`: negen vrijvervalstappen naar gemaal `ElBP0184`, dan drukleiding
+`ElBP0184-El1G0124-1` naar lozingsput `El1G0124`). Dat is precies wat NET-002 vraagt -- een pad
+naar een lozingspunt -- en dat het laatste stuk gepompt is maakt het niet minder waar. De
+domeinredenering van BO-53 speelt hier niet mee: NET-002 vroeg altijd al om een lozingspunt, alleen
+de route ernaartoe verandert. Vastgelegd in
+`tests/test_checks_netwerk.py::test_hemelwater_door_het_persnet_geldt_ook_als_afgevoerd`.

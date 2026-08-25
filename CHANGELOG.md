@@ -38,7 +38,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `afvoer_eindpunt` ook `lozings_eindpunt` als eindpunt -- vuilwater loost in Nederland niet
   meer rechtstreeks op oppervlaktewater, dus een lozingspunt is per definitie een geldig
   afvoereindpunt. Op De Wolden en Hoogeveen gaat NET-001 daarmee van **9062** naar **7978**
-  bevindingen, in Koekangerveld van **24** naar **7**. Alle 939 niet-oplosbare tussenknopen
+  bevindingen, in Koekangerveld van **24** naar **7**; NET-002 volgt hetzelfde persnet en gaat
+  van **3054** naar **3031** (alle 23 komen langs het persnet op een lozingsput uit). Geen van
+  beide checks krijgt er een bevinding bij. Alle 939 niet-oplosbare tussenknopen
   in het persnet blijken hulpstukken te zijn. De negen NET-checks declareren voortaan ook de
   rol `mechanischeleidingen`. Zie BO-53 en BO-54.
 

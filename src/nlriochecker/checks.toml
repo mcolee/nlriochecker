@@ -18,13 +18,17 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
-# Mechanisch riool valt buiten scope (zie het checkregister). Deze lijst filtert
-# echter geen enkele check: dat mechanisch riool buiten de analyse blijft komt
-# doordat de checks op `vrijvervalleiding` selecteren en niet doordat deze klassen
-# hier staan. Haar enige lezer is `uitvoer/gpkg.py` via `selectie.mechanischeleidingen`,
-# en die bepaalt uitsluitend de kaartkleur: een mechanische streng blijft in de laag
-# `strengen` maar krijgt status `grijs` zolang er niets op staat, zodat "geen kleur"
-# daar niet als "getoetst en in orde" leest.
+# Mechanisch riool wordt zelf niet getoetst (zie het checkregister): geen enkele check
+# meldt over een mechanische streng, want ze selecteren op `vrijvervalleiding`. Deze lijst
+# heeft sinds issue #72 twee lezers, en de tweede stuurt wel degelijk uitkomsten.
+#  - `uitvoer/gpkg.py` (via `selectie.mechanischeleidingen`) bepaalt de kaartkleur: een
+#    mechanische streng blijft in de laag `strengen` maar krijgt status `grijs` zolang er
+#    niets op staat, zodat "geen kleur" daar niet als "getoetst en in orde" leest.
+#  - `checks/verbanden._bouw_netwerk` legt deze leidingen als ONGERICHTE kanten in de
+#    bereikbaarheidsgraaf, doorlopend via hulpstukken. Daarmee bepaalt deze lijst mee of
+#    NET-001 en NET-002 een vrijvervalstreng als afgevoerd zien: een streng die op een
+#    pompput eindigt bereikt het gemaal erachter via het persnet. Leeg laten schakelt dat
+#    uit en meldt de hele drukriolering weer als onbereikbaar. Zie BO-54.
 # De twee ontologische wortels in plaats van de losse bladen: `MechanischeRioolleiding`
 # dekt Drukleiding, Luchtpersleiding en Vacuumleiding; `MechanischeTransportleiding` dekt
 # Persleiding, Leidingsegment en Spoelleiding. Dat sluit het gat met de symbolentabel,

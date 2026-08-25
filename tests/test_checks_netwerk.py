@@ -250,6 +250,12 @@ def test_drukriolering_bereikt_het_gemaal_door_het_hulpstuk(tmp_path: Path) -> N
     None voor; zonder terugval op de rauwe koppeling versplintert elke T het persnet en
     blijft het gemaal erachter onbereikbaar. De controle draait dezelfde fixture met een
     lege `mechanisch`-lijst: dan is er geen route en wordt streng "1" wel gemeld.
+
+    De fixture pint meteen aanname 1 van issue #72 vast: de laatste drukleiding staat
+    administratief van het gemaal naar het T-stuk geregistreerd. Een persleiding is
+    pompgestuurd en die richting zegt niets, dus de mechanische kant hoort ongericht te
+    zijn. Zou hij alleen in de geregistreerde richting gelegd worden, dan is er geen
+    kant naar het gemaal toe en valt deze test om.
     """
     bestand = "net001_drukriolering_gemaal.ttl"
     config = _testconfig(tmp_path, "druk_gemaal", _DRUKRIOLERING_KLASSEN)
@@ -258,6 +264,13 @@ def test_drukriolering_bereikt_het_gemaal_door_het_hulpstuk(tmp_path: Path) -> N
     assert (
         dataset.resolve_network_node("http://example.org/toets#T1", config.klassen.netwerkknopen)
         is None
+    )
+    # De route loopt tegen de registratie van 'd2' in: gemaal -> T-stuk staat er, en de
+    # bereikbaarheid moet de andere kant op.
+    d2 = next(streng for streng in dataset.conduits.values() if streng.label == "d2")
+    assert (d2.start_node, d2.end_node) == (
+        "http://example.org/toets#Gem",
+        "http://example.org/toets#T1",
     )
 
     assert _labels(bestand, "NET-001", config) == []
@@ -285,6 +298,30 @@ def test_drukriolering_die_op_een_lozingsput_uitkomt_is_afgevoerd(tmp_path: Path
         tmp_path, "druk_zonder_lozing", _DRUKRIOLERING_KLASSEN.replace("['Lozingsput']", "[]")
     )
     assert _labels(bestand, "NET-001", zonder_lozing) == ["1"]
+
+
+def test_hemelwater_door_het_persnet_geldt_ook_als_afgevoerd(tmp_path: Path) -> None:
+    """De bereikbaarheidsgraaf is gedeeld, dus NET-002 volgt het persnet ook (BO-54).
+
+    Dit is een bewust gevolg en geen bijvangst: `_bereikbaar_vanaf` is dezelfde functie
+    voor beide bereikbaarheidschecks, en een hemelwaterstreng die op een pompput eindigt
+    voert langs het persnet af. De domeinredenering van BO-53 (een lozingspunt is een
+    geldig VUILWATER-eindpunt) speelt hier niet mee: NET-002 vroeg altijd al om een
+    lozingspunt. Wat verandert is alleen de route ernaartoe. De controlehelft laat zien
+    dat de route echt door het persnet loopt.
+    """
+    bestand = "net002_drukriolering_lozingsput.ttl"
+    klassen = _DRUKRIOLERING_KLASSEN + "hemelwater = ['Hemelwaterriool']\n"
+    config = _testconfig(tmp_path, "net002_druk", klassen)
+
+    assert _labels(bestand, "NET-002", config) == []
+
+    zonder_mechanisch = _testconfig(
+        tmp_path,
+        "net002_zonder_mech",
+        klassen.replace("['MechanischeRioolleiding']", "[]"),
+    )
+    assert _labels(bestand, "NET-002", zonder_mechanisch) == ["1"]
 
 
 def _testconfig(tmp_path: Path, naam: str, klassen: str) -> CheckConfig:

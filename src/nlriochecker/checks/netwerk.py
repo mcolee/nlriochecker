@@ -120,19 +120,23 @@ def _richtingsverlies(
     het eindpunt er wel is maar niet in de gevolgde richting ligt. Dat onderscheid
     bepaalt of je naar ontbrekende objecten of naar verkeerde richtingen moet kijken.
 
-    Op de bereikbaarheidsgraaf, dezelfde waarop de check zelf telt: op het zuivere
-    vrijverval zou een deel dat zijn gemaal via het persnet bereikt hier als "zonder
-    enig eindpunt" verschijnen.
+    De DELEN komen van de bereikbaarheidsgraaf, want een deel kan zijn gemaal via het
+    persnet bereiken en zou op het zuivere vrijverval ten onrechte als "zonder enig
+    eindpunt" verschijnen. Het AANTAL telt alleen de vrijvervalknopen: een hulpstuk of
+    een knoop die uitsluitend aan het persnet hangt wordt door geen enkele NET-check
+    beoordeeld (mechanisch riool valt buiten het checkregister), en zou hier als
+    ongemelde last verschijnen in een getal dat de lezer op de bevindingen betrekt.
     """
     if not rollen:
         return 0, 0
 
     endpoints = _eindpuntset(context, rollen)
     bereikt = _bereikbaar_vanaf(netwerk, endpoints)
+    vrijverval = set(netwerk.graph)
 
     zonder = met = 0
     for deel in nx.weakly_connected_components(netwerk.bereikbaarheid):
-        onbereikt = len(deel - bereikt)
+        onbereikt = len((deel & vrijverval) - bereikt)
         if deel & endpoints:
             met += onbereikt
         else:

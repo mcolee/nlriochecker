@@ -44,9 +44,10 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
-# Mechanisch riool valt buiten scope (zie het checkregister). Deze klassen komen
-# niet in de analyse maar wel in de GIS-uitvoer, in een eigen grijze laag; een leeg
-# kaartbeeld daar zou anders als "geen gebreken" lezen. De twee ontologische wortels in
+# Mechanisch riool wordt zelf niet getoetst (zie het checkregister), maar deze lijst
+# stuurt wel twee dingen: de grijze laag in de GIS-uitvoer (een leeg kaartbeeld daar zou
+# anders als "geen gebreken" lezen) en, sinds issue #72, de ongerichte connectiviteit in
+# de bereikbaarheidsgraaf van NET-001 en NET-002 (BO-54). De twee ontologische wortels in
 # plaats van de losse bladen (issue #56): `MechanischeRioolleiding` dekt Druk-, Lucht-
 # pers- en Vacuumleiding, `MechanischeTransportleiding` dekt Pers-, Leidingsegment- en
 # Spoelleiding, en dat sluit het gat met de symbolentabel. De Wolden en Hoogeveen telt eronder alleen

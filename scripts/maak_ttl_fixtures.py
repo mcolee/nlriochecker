@@ -1407,13 +1407,16 @@ DRUKRIOLERING_KLASSEN = (
 )
 
 # NET-001 (#72): drukriolering. De vuilwaterstreng '1' eindigt op een pompunit en komt
-# alleen door het persnet bij het gemaal uit: drukleiding, T-stuk, drukleiding. Het
-# T-stuk is geen netwerkknoop -- het klimt via hasPart niet naar een put, dus
-# `resolve_network_node` geeft er None voor -- zodat het persnet zonder de terugval op
-# de rauwe koppeling in stukken uiteenvalt. Zie BO-54.
+# alleen door het persnet bij het gemaal uit: drukleiding, T-stuk, drukleiding. Twee
+# dingen zitten er bewust in. Het T-stuk is geen netwerkknoop -- het klimt via hasPart
+# niet naar een put, dus `resolve_network_node` geeft er None voor -- zodat het persnet
+# zonder de terugval op de rauwe koppeling in stukken uiteenvalt. En de laatste
+# drukleiding 'd2' staat administratief van het GEMAAL naar het T-stuk geregistreerd:
+# alleen omdat de mechanische kanten ongericht zijn loopt de route er toch doorheen.
+# Zie BO-54; `net001_drukriolering_lozingsput.ttl` dekt de meelopende registratie.
 FIXTURES["net001_drukriolering_gemaal.ttl"] = (
     "geen; vuilwaterstreng '1' bereikt het gemaal alleen via pompunit -> drukleiding "
-    "-> T-stuk -> drukleiding -> gemaal",
+    "-> T-stuk -> drukleiding, waarvan de laatste tegen de looprichting in geregistreerd staat",
     DRUKRIOLERING_KLASSEN
     + HULPSTUK_KLASSEN
     + put("PutA", "A", 1000.0, 2000.0)
@@ -1424,7 +1427,7 @@ FIXTURES["net001_drukriolering_gemaal.ttl"] = (
         "L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Pomp", klasse="Vuilwaterriool"
     )
     + leiding("D1", "d1", [(1050.0, 2000.0), (1100.0, 2000.0)], "Pomp", "T1", klasse="Drukleiding")
-    + leiding("D2", "d2", [(1100.0, 2000.0), (1150.0, 2000.0)], "T1", "Gem", klasse="Drukleiding"),
+    + leiding("D2", "d2", [(1150.0, 2000.0), (1100.0, 2000.0)], "Gem", "T1", klasse="Drukleiding"),
 )
 
 # NET-001 (#72): dezelfde keten, maar het persnet komt op een lozingsput uit in plaats
@@ -1440,6 +1443,25 @@ FIXTURES["net001_drukriolering_lozingsput.ttl"] = (
     + put("Loz", "L", 1150.0, 2000.0, klasse="Lozingsput")
     + leiding(
         "L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Pomp", klasse="Vuilwaterriool"
+    )
+    + leiding("D1", "d1", [(1050.0, 2000.0), (1100.0, 2000.0)], "Pomp", "T1", klasse="Drukleiding")
+    + leiding("D2", "d2", [(1100.0, 2000.0), (1150.0, 2000.0)], "T1", "Loz", klasse="Drukleiding"),
+)
+
+# NET-002 (#72): dezelfde keten met een HEMELWATERstreng ervoor. De bereikbaarheidsgraaf
+# is gedeeld, dus het persnet telt ook voor NET-002 mee; deze fixture legt dat gedrag
+# vast in plaats van het onopgemerkt te laten. Zie BO-54 en de meting daarin.
+FIXTURES["net002_drukriolering_lozingsput.ttl"] = (
+    "geen; hemelwaterstreng '1' bereikt de lozingsput alleen via pompunit -> drukleiding "
+    "-> T-stuk -> drukleiding",
+    DRUKRIOLERING_KLASSEN
+    + HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("Pomp", "P", 1050.0, 2000.0, klasse="Pompunit")
+    + hulpstuk("T1", "T", 1100.0, 2000.0)
+    + put("Loz", "L", 1150.0, 2000.0, klasse="Lozingsput")
+    + leiding(
+        "L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Pomp", klasse="Hemelwaterriool"
     )
     + leiding("D1", "d1", [(1050.0, 2000.0), (1100.0, 2000.0)], "Pomp", "T1", klasse="Drukleiding")
     + leiding("D2", "d2", [(1100.0, 2000.0), (1150.0, 2000.0)], "T1", "Loz", klasse="Drukleiding"),

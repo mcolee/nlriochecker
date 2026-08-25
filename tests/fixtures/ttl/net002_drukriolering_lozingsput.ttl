@@ -34,7 +34,7 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: geen; vuilwaterstreng '1' bereikt het gemaal alleen via pompunit -> drukleiding -> T-stuk -> drukleiding, waarvan de laatste tegen de looprichting in geregistreerd staat
+# DEFECT: geen; hemelwaterstreng '1' bereikt de lozingsput alleen via pompunit -> drukleiding -> T-stuk -> drukleiding
 
 gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .
 gwsw:MechanischeRioolleiding rdfs:subClassOf gwsw:Rioolleiding .
@@ -68,12 +68,12 @@ gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,
 :T1_ori rdf:type gwsw:Hulpstukorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1100.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
-:Gem rdf:type gwsw:Rioolgemaal ; rdfs:label "G" ;
-    gwsw:hasAspect :Gem_ori .
-:Gem_ori rdf:type gwsw:Putorientatie ;
+:Loz rdf:type gwsw:Lozingsput ; rdfs:label "L" ;
+    gwsw:hasAspect :Loz_ori .
+:Loz_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1150.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
-:L1 rdf:type gwsw:Vuilwaterriool ; rdfs:label "1" ;
+:L1 rdf:type gwsw:Hemelwaterriool ; rdfs:label "1" ;
     gwsw:hasAspect :L1_ori .
 :L1_ori rdf:type gwsw:Leidingorientatie ;
     gwsw:hasPart :L1_b , :L1_e ;
@@ -98,8 +98,8 @@ gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,
 :D2_ori rdf:type gwsw:Leidingorientatie ;
     gwsw:hasPart :D2_b , :D2_e ;
     gwsw:hasAspect [ rdf:type gwsw:Lijn ;
-        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1150.0 2000.0 1100.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1100.0 2000.0 1150.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
 :D2_b rdf:type gwsw:BeginpuntLeiding .
 :D2_e rdf:type gwsw:EindpuntLeiding .
-:D2_b gwsw:hasConnection :Gem_ori .
-:D2_e gwsw:hasConnection :T1_ori .
+:D2_b gwsw:hasConnection :T1_ori .
+:D2_e gwsw:hasConnection :Loz_ori .
