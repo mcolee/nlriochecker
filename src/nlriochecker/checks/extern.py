@@ -228,6 +228,8 @@ class KruisingMetBouwwerk(_ExterneCheck):
     title = "Kruising of nabijheid van BGT-panden en overige bouwwerken"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     rol = "bgt_pand"
     soort = "vrijvervalstrengen en putten"
 
@@ -593,6 +595,8 @@ class KruisingMetWatergang(_WatergangKruising):
     title = "Kruising met watergang (waterschaps- of BGT-data)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("VormLeiding",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke streng die een BGT-waterdeel echt doorkruist.
@@ -662,6 +666,8 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
     title = "Kruising met watergang zonder registratie als zinker"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("VormLeiding",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt doorkruisingen waarvan de streng geen kruisingsconstructie is."""
@@ -724,6 +730,8 @@ class StrengOpParticulierTerrein(SkeletonCheck):
     title = "Streng op of nabij particulier terrein (op basis van BRK-percelen)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ()
     markering = MARKERING_BUITEN_SCOPE
     reden = (
         "BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron "
@@ -741,6 +749,8 @@ class PutZonderBgtDeksel(_ExterneCheck):
     title = "Put zonder BGT-putdeksel binnen X m"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("netwerkknopen",)
+    kenmerken = ()
     rol = "bgt_putdeksel"
     soort = "putten"
 
@@ -778,6 +788,8 @@ class BgtDekselZonderPut(_ExterneCheck):
     title = "BGT-putdeksel zonder put in de beheerdata"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("netwerkknopen",)
+    kenmerken = ()
     rol = "bgt_putdeksel"
     soort = "putten"
 
@@ -857,6 +869,8 @@ class LozingspuntZonderWatergang(_ExterneCheck):
     title = "Lozingspunt zonder watergang binnen X m"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("lozingspunten",)
+    kenmerken = ()
     rol = "bgt_water"
     soort = "lozingspunten"
 
@@ -1101,6 +1115,8 @@ class DekselAfwijkingLicht(_DekselAfwijking):
     title = "Deksel- of maaiveldhoogte wijkt af van AHN: 10 cm of meer"
     severity = Severity.WARNING
     dimension = Dimension.ACCURACY
+    rollen = ("netwerkknopen",)
+    kenmerken = ("Maaiveldhoogte", "Putdekselniveau")
     ondergrens = "ahn_afwijking_waarschuwing_m"
     bovengrens = "ahn_afwijking_fout_m"
 
@@ -1113,6 +1129,8 @@ class DekselAfwijkingFors(_DekselAfwijking):
     title = "Deksel- of maaiveldhoogte wijkt af van AHN: 25 cm of meer"
     severity = Severity.ERROR
     dimension = Dimension.ACCURACY
+    rollen = ("netwerkknopen",)
+    kenmerken = ("Maaiveldhoogte", "Putdekselniveau")
     ondergrens = "ahn_afwijking_fout_m"
     bovengrens = None
 
@@ -1125,6 +1143,8 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
     title = "BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 3 m eronder)"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elke BOB die op een toetsbare put uitkomt tegen het AHN."""

@@ -266,6 +266,8 @@ class VuilwaterZonderAfvoerpad(_ZonderAfvoerpad):
     title = "Vuilwater- of gemengde streng zonder afvoerpad naar gemaal of overnamepunt"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "vuilwater"
     eindpuntrol = "afvoer_eindpunt"
     doel = "een gemaal of overnamepunt"
@@ -279,6 +281,8 @@ class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
     title = "Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("lozingspunten", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "hemelwater"
     eindpuntrol = "lozings_eindpunt"
     doel = "een lozingspunt of overnamepunt"
@@ -292,6 +296,8 @@ class KringloopInNetwerk(Check):
     title = "Cirkels (kringlopen) in het vrijvervalnetwerk"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elk deel van de graaf waarin een kringloop zit.
@@ -375,6 +381,8 @@ class ItStelselZonderDrempel(Check):
     title = "IT-stelsel zonder drempel"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
+    rollen = ("infiltratieleidingen", "overstortputten", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt samenhangende delen met infiltratieleidingen maar zonder drempel.
@@ -478,6 +486,8 @@ class OrientatieTegenAfvoerrichting(Check):
     title = "Strengorientatie tegen de afvoerrichting in"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst of de bodem daalt van de administratieve begin- naar de eindput.
@@ -652,6 +662,8 @@ class RichtingssignalenSprekenElkaarTegen(Check):
     title = "Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke streng waarvan de drie richtingssignalen elkaar tegenspreken.
@@ -729,6 +741,8 @@ class StelseltypeWijktAfVanBuren(Check):
     title = "Stelseltype streng wijkt af van boven- en benedenstroomse buren"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen die als enige van hun soort tussen andere soorten liggen.
@@ -813,6 +827,8 @@ class KoppelingTussenStelseltypen(Check):
     title = "Koppelingen tussen verschillende stelseltypen"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke knoop waarop strengen van meer dan een stelseltype uitkomen.
@@ -865,6 +881,8 @@ class VeelLozingspuntenInDeelstelsel(Check):
     title = "Opvallend veel lozingspunten binnen een klein deelstelsel"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("lozingspunten", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Telt de lozingspunten per samenhangend deel van het netwerk.

@@ -105,6 +105,8 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
     title = "Diameter past niet bij materiaal"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding", "MateriaalLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de grootste profielmaat met het bereik uit de tabel."""
@@ -183,6 +185,8 @@ class DiameterOnderMinimum(_StrengCheck):
     title = "Diameter kleiner dan rond 200 mm"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt strengen waarvan de grootste profielmaat onder het stelselminimum ligt."""
@@ -264,6 +268,8 @@ class MateriaalPastNietBijBegindatum(_StrengCheck):
     title = "Materiaal past niet bij begindatum"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("Begindatum", "MateriaalLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het begindatumjaar met het tijdvak waarin het materiaal bestond."""
@@ -333,6 +339,8 @@ class VormVersusAfmetingen(_StrengCheck):
     title = "Vorm versus afmetingen inconsistent"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding", "VormLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de verhouding tussen breedte en hoogte tegen de profielvorm.
@@ -410,6 +418,8 @@ class EenhedenfoutBinnenBereik(_StrengCheck):
     # Deze check meldt per profielmaat, niet per strengeinde: breedte en hoogte van
     # dezelfde streng zijn twee bevindingen en horen twee melding-ID's te krijgen.
     id_sleutels = ("kenmerk",)
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt maten die zelf geen handelsmaat zijn maar maal tien wel.
@@ -463,6 +473,16 @@ class DiameterGroterDanPut(_StrengCheck):
     title = "Strengdiameter groter dan afmeting van de aangesloten put"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("putten", "vrijvervalrioolleidingen")
+    kenmerken = (
+        "BreedteBouwwerk",
+        "BreedteLeiding",
+        "BreedtePut",
+        "DiameterPut",
+        "HoogteLeiding",
+        "LengteBouwwerk",
+        "LengtePut",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de profielmaat met de grootste binnenmaat van de put.
@@ -589,6 +609,8 @@ class WandruwheidPastNietBijMateriaal(_LeidingCheck):
     title = "Wandruwheid past niet bij materiaal"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen",)
+    kenmerken = ("MateriaalLeiding", "WandruwheidBinnenboven", "WandruwheidBinnenonder")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke leiding waarvan de wandruwheid buiten de band van haar materiaal valt."""
@@ -705,6 +727,8 @@ class VormPutVersusAfmetingen(_PutCheck):
     title = "Vorm put versus afmetingen inconsistent"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("putten",)
+    kenmerken = ("BreedtePut", "LengtePut", "VormPut")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke ronde put waarvan breedte en lengte meer dan de tolerantie schelen.
@@ -763,6 +787,8 @@ class BegindatumBuitenBereik(_StrengCheck):
     title = "Begindatum in de toekomst of voor 1870"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("putten", "vrijvervalrioolleidingen")
+    kenmerken = ("Begindatum",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de begindatum van strengen en putten op een aannemelijk bereik."""
@@ -838,6 +864,8 @@ class BegindatumOntbreekt(Check):
     title = "Begindatum ontbreekt"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
+    rollen = ("leidingen", "putten", "vrijvervalrioolleidingen")
+    kenmerken = ("Begindatum",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke vrijvervalstreng en elke put zonder `Begindatum`."""
@@ -901,6 +929,8 @@ class BegindatumVulwaardejaar(Check):
     # net als ATTR-014 rekent deze detector daarom over de volledige export, zodat het
     # aandeel niet per gebied verschilt.
     volledig_bereik = True
+    rollen = ("putten", "vrijvervalrioolleidingen")
+    kenmerken = ("Begindatum",)
 
     def _jaren(self, context: CheckContext) -> Counter[int]:
         """Telt per jaartal de gedateerde strengen en putten samen (een keer per context)."""
@@ -980,6 +1010,8 @@ class StrenglengteBuitenBereik(_StrengCheck):
     title = "Strenglengte korter dan X m of langer dan X m"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("LengteLeiding",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de administratieve lengte op het geconfigureerde bereik."""
@@ -1019,6 +1051,8 @@ class LengteWijktAfVanGeometrie(_StrengCheck):
     title = "Geometrische lengte wijkt meer dan X% af van administratieve lengte"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("LengteLeiding",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de lengte van de hartlijn met de administratieve lengte."""
@@ -1070,6 +1104,8 @@ class LeidingmateriaalPastNietBijPut(_StrengCheck):
     title = "Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("MateriaalBouwwerk", "MateriaalLeiding", "MateriaalPut")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het leidingmateriaal met dat van de aangesloten putten."""
@@ -1129,6 +1165,8 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
     title = "Materiaal past niet bij profielvorm"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("MateriaalLeiding", "VormLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de profielvorm tegen de vormen die bij het materiaal horen."""
@@ -1178,6 +1216,8 @@ class HoogteOpVulwaarde(Check):
     title = "Hoogtekenmerk op vulwaarde (rond 0 m NAP) geregistreerd als meting"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("config:vulwaarden.hoogte_kenmerken",)
 
     def _objecten(self, context: CheckContext) -> list[Node | Conduit]:
         """De objecten die een hoogtekenmerk kunnen dragen: knopen plus strengen."""
@@ -1332,6 +1372,8 @@ class PropertyTegenOntologie(Check):
     dimension = Dimension.CONSISTENCY
     id_sleutels = ("kenmerk",)
     volledig_bereik = True
+    rollen = ()
+    kenmerken = ("*",)
 
     def _tellingen(self, context: CheckContext) -> dict[str, _PropertyTelling]:
         return context.cached("attr014:tellingen", lambda: _property_tellingen(context))

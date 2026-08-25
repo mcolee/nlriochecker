@@ -134,6 +134,14 @@ class BobBuitenDePut(_StrengCheck):
     title = "BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = (
+        "BobBeginpuntLeiding",
+        "BobEindpuntLeiding",
+        "HoogtePut",
+        "Maaiveldhoogte",
+        "Putdekselniveau",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elke BOB tegen het bovenkant- en bodemniveau van zijn put."""
@@ -249,6 +257,8 @@ class TegenverhangLicht(_Tegenverhang):
     title = "Tegenverhang bij vrijverval: licht (onder drempel)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     ondergrens = "tegenverhang_licht_m"
     bovengrens = "tegenverhang_fors_m"
 
@@ -261,6 +271,8 @@ class TegenverhangFors(_Tegenverhang):
     title = "Tegenverhang bij vrijverval: fors (boven drempel)"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     ondergrens = "tegenverhang_fors_m"
     bovengrens = None
 
@@ -297,6 +309,8 @@ class OnvoldoendeVerhang(_StrengCheck):
     title = "Verhang vuilwater of gemengd onder de RIONED-staffel per diameter"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen", "vuilwaterleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "BreedteLeiding", "LengteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst het verval per meter tegen het minimale afschot per diameter.
@@ -378,6 +392,8 @@ class ExtreemVerhang(_StrengCheck):
     title = "Extreem verhang (steiler dan bijv. 1:50), indicatie verwisselde BOB's"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "LengteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt strengen die steiler dalen dan een op zoveel."""
@@ -429,6 +445,8 @@ class BobSprongZonderValput(_KnoopVergelijking):
     title = "BOB-sprong tussen aansluitende strengen boven drempel zonder valput"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen", "valconstructies", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de BOB van aanvoer en afvoer op elke put."""
@@ -474,6 +492,8 @@ class DiameterverjongingInAfvoerrichting(_KnoopVergelijking):
     title = "Diameterverjonging in afvoerrichting (benedenstrooms kleiner dan bovenstrooms)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de grootste aanvoerdiameter met de grootste afvoerdiameter."""
@@ -505,6 +525,8 @@ class DrempelBuitenBereik(_PutCheck):
     title = "Overstortdrempel lager dan BOB aanvoerende streng of hoger dan maaiveld"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BobEindpuntLeiding", "Maaiveldhoogte", "Putdekselniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elk drempelniveau tegen de aanvoerende BOB en het maaiveld."""
@@ -563,6 +585,8 @@ class PutdiepteBuitenBereik(_PutCheck):
     title = "Putdiepte (deksel minus bodem) kleiner dan X m of groter dan X m"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen",)
+    kenmerken = ("HoogtePut",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst `HoogtePut` tegen het bereik van `Dt_HoogtePut` (0,5-4,0 m).
@@ -605,6 +629,14 @@ class GronddekkingBuitenBereik(_StrengCheck):
     title = "Gronddekking op bovenkant buis kleiner dan 0,5 m of groter dan 4 m"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = (
+        "BobBeginpuntLeiding",
+        "BobEindpuntLeiding",
+        "BreedteLeiding",
+        "HoogteLeiding",
+        "Maaiveldhoogte",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Berekent per strengeinde de dekking tussen maaiveld en buiskruin."""
@@ -661,6 +693,8 @@ class VerhangVolgtMaaiveldNiet(_StrengCheck):
     title = "Leidingverhang past niet bij het maaiveldverloop tussen de putten"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "Maaiveldhoogte")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het verval van de bodem met dat van het maaiveld."""
@@ -725,6 +759,14 @@ class PutbodemBuitenMarge(_PutCheck):
     title = "Putbodemniveau buiten marge ten opzichte van de laagste aansluitende BOB"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = (
+        "BobBeginpuntLeiding",
+        "BobEindpuntLeiding",
+        "HoogtePut",
+        "Maaiveldhoogte",
+        "Putdekselniveau",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de putbodem met de laagste BOB die op de put uitkomt."""
@@ -780,6 +822,14 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
     title = "BOB van aansluitende streng ligt meer dan drempel boven de putbodem"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen", "valconstructies", "vrijvervalrioolleidingen")
+    kenmerken = (
+        "BobBeginpuntLeiding",
+        "BobEindpuntLeiding",
+        "HoogtePut",
+        "Maaiveldhoogte",
+        "Putdekselniveau",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen die hoog in de put binnenkomen zonder verklaring."""
@@ -819,6 +869,8 @@ class ZWaardeWijktAf(_StrengCheck):
     title = "Z-waarde uit de geometrie wijkt af van de administratieve BOB of dekselhoogte"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "Putdekselniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de z uit de GML met de BOB's en met het dekselniveau."""
@@ -885,6 +937,15 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
     title = "Buiskruin (BOB plus diameter/hoogtemaat) boven maaiveld of dekselniveau"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = (
+        "BobBeginpuntLeiding",
+        "BobEindpuntLeiding",
+        "BreedteLeiding",
+        "HoogteLeiding",
+        "Maaiveldhoogte",
+        "Putdekselniveau",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Telt de profielhoogte bij de BOB op en vergelijkt met de bovenkant."""

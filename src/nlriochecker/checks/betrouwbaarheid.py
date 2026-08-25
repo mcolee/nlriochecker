@@ -43,6 +43,8 @@ class HoogteZonderInwinningsmetagegevens(_Metagegevensskelet):
     )
     severity = Severity.WARNING
     dimension = Dimension.TRACEABILITY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     reden = (
         "Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat 25.546 keer "
         "`WijzeVanInwinning` en geen enkele `DatumInwinning`, dus de datumhelft van deze "
@@ -64,6 +66,8 @@ class InwinningNietGemeten(_Metagegevensskelet):
     title = "Kritieke kenmerken ingewonnen via schatting, plan of ontwerp in plaats van meting"
     severity = Severity.WARNING
     dimension = Dimension.TRACEABILITY
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     reden = (
         "Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden en Hoogeveen wel op de "
         "kritieke hoogtekenmerken, maar op te weinig ervan om een uitslag op te baseren: "
@@ -82,6 +86,8 @@ class InwinningsdatumTeOud(_Metagegevensskelet):
     title = "Inwinningsdatum BOB ouder dan drempel, afhankelijk van grondsoort"
     severity = Severity.WARNING
     dimension = Dimension.TIMELINESS
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     reden = (
         "Niet gebouwd in deze fase. Er is geen enkele `DatumInwinning` in de "
         "De Wolden en Hoogeveen-export, en er is geen grondsoortenkaart aangeleverd om de drempel "
@@ -97,6 +103,8 @@ class GrondwaterstandBuitenBereik(_Metagegevensskelet):
     title = "Geregistreerde grondwaterstand boven maaiveld of meer dan 5 m onder maaiveld"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("netwerkknopen",)
+    kenmerken = ()
     reden = (
         "Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat geen enkel "
         "`Grondwaterniveau`-kenmerk; er valt niets te toetsen."
@@ -111,6 +119,8 @@ class ToestandsgegevensTeOud(_Metagegevensskelet):
     title = "Toestands- of inspectiegegevens ouder dan drempel, gewogen naar risicoligging"
     severity = Severity.WARNING
     dimension = Dimension.TIMELINESS
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     reden = (
         "Niet gebouwd in deze fase. De export bevat geen inspectie- of toestandsgegevens, "
         "en de weging naar risicoligging (spoor, dijk, wegfunctie) vraagt bronnen die niet "
@@ -128,6 +138,8 @@ class SystematischAfgerondeHoogtewaarden(Check):
     )
     severity = Severity.WARNING
     dimension = Dimension.PRECISION
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "Maaiveldhoogte", "Putdekselniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meet per kenmerksoort welk deel van de waarden op het raster valt.

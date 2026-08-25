@@ -214,6 +214,8 @@ class LosliggendePut(Check):
     title = "Losliggende putten (geen enkele streng aangesloten)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt putten zonder strengeindpunt binnen de snapping-tolerantie.
@@ -292,6 +294,8 @@ class LosliggendeStreng(_StrengPutAansluiting):
     title = "Losliggende strengen (aan geen van beide zijden een put)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     verwacht = 0
 
     def melding(self, tolerantie: float) -> str:
@@ -307,6 +311,8 @@ class StrengMetEenPut(_StrengPutAansluiting):
     title = "Streng met slechts aan een zijde een put"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     verwacht = 1
 
     def melding(self, tolerantie: float) -> str:
@@ -322,6 +328,8 @@ class NietGesneptStrengeinde(Check):
     title = "Strengeindpunt niet gesnapt op putlocatie (afstand > tolerantie)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de administratieve koppeling met de geometrische afstand."""
@@ -372,6 +380,8 @@ class DubbelePut(Check):
     title = "Dubbele putten: twee knopen binnen tolerantie"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt putparen die dichter bij elkaar liggen dan de tolerantie."""
@@ -420,6 +430,8 @@ class StrengMetZelfdePut(Check):
     title = "Streng met dezelfde put aan begin- en eindpunt"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen waarvan beide uiteinden naar dezelfde put verwijzen."""
@@ -453,6 +465,8 @@ class OverlappendeStreng(Check):
     title = "Dubbel ingetekende of (deels) overlappende strengen"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengparen die over een aanzienlijke lengte samenvallen.
@@ -502,6 +516,8 @@ class DegeneratieveGeometrie(Check):
     title = "Nul-lengte, zelfkruisende of anderszins degeneratieve geometrie"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen zonder bruikbare lijn.
@@ -555,6 +571,8 @@ class StrengNietRecht(Check):
     title = "Vrijvervalstreng niet recht van put tot put (bogen, knikpunten zonder put)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meet hoe ver de hartlijn van de rechte put-putverbinding afwijkt.
@@ -598,6 +616,8 @@ class BuitenRdBereik(Check):
     title = "Objecten buiten beheergebied of buiten valide RD-bereik, ontbrekende coordinaten"
     severity = Severity.ERROR
     dimension = Dimension.ACCURACY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elke knoop en streng op aanwezige, geldige RD-coordinaten."""
@@ -657,6 +677,8 @@ class StrengenRakenMetBuffer(Check):
     title = "Streng met buffer op basis van diameter kruist of raakt andere strengen"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengparen waarvan de buizen elkaar in het platte vlak raken.
@@ -756,6 +778,8 @@ class Hartlijnkruising(Check):
     title = "Hartlijnkruisingen strengen onderling (zonder buffer)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengparen waarvan de hartlijnen elkaar echt snijden.
@@ -806,6 +830,8 @@ class ParallelleStrengen(Check):
     title = "Meer dan twee parallelle strengen tussen hetzelfde putpaar"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Telt de strengen per putpaar en meldt de paren boven het maximum."""
@@ -853,6 +879,8 @@ class VeelAansluitendeStrengen(Check):
     title = "Meer dan vier aansluitende strengen op een put"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Telt per put hoeveel strengen erop aansluiten."""
@@ -891,6 +919,8 @@ class MultipartGeometrie(Check):
     title = "Streng of put met multipart-geometrie (meerdere losse delen in een feature)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elk object waarvan de GML-literaal uit meerdere delen bestaat.
@@ -934,6 +964,8 @@ class OngeldigeGeometrie(Check):
     title = "Ongeldige geometrie volgens OGC Simple Features (ST_IsValid)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke geometrie die shapely als ongeldig aanmerkt."""
@@ -975,6 +1007,8 @@ class NietSimpeleGeometrie(Check):
     title = "Niet-simple geometrie (ST_IsSimple: spikes, herhaalde structuren)"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke lijn die zichzelf raakt of kruist."""
@@ -1010,6 +1044,8 @@ class DubbeleVertexOfSpike(Check):
     title = "Opeenvolgende dubbele vertices of spikes (hoek nabij 0 graden) in strenggeometrie"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt herhaalde punten en hoeken die vrijwel terugkeren over zichzelf."""
@@ -1062,6 +1098,8 @@ class PseudoKnoop(Check):
     title = "Pseudo-knoop: twee strengen gescheiden door een functieloze knoop"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("functieloze_knopen", "leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BreedteLeiding", "HoogteLeiding", "MateriaalLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt functieloze knopen met precies twee gelijk gekenmerkte strengen.
@@ -1140,6 +1178,8 @@ class OmgekeerdeDigitalisatie(Check):
     title = "Digitalisatierichting komt niet overeen met de administratieve van-naar-richting"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het eerste lijnpunt met de administratieve beginput.
@@ -1180,6 +1220,8 @@ class PutNaastDoorlopendeStreng(Check):
     title = "Put valt niet samen met enig strengeindpunt maar ligt wel naast of op een streng"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Verfijnt TOP-001: ligt de losliggende put toch op een streng?
@@ -1410,6 +1452,8 @@ class HulpstukMetTeWeinigAansluitingen(_HulpstukAansluitingen):
     title = "Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("hulpstukken", "leidingen")
+    kenmerken = ()
     te_veel = False
 
 
@@ -1421,4 +1465,6 @@ class HulpstukMetTeVeelAansluitingen(_HulpstukAansluitingen):
     title = "Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("hulpstukken", "leidingen")
+    kenmerken = ()
     te_veel = True

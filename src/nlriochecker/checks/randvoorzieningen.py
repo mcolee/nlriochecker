@@ -236,6 +236,8 @@ class RandvoorzieningNietAangesloten(Check):
     title = "Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("bergbezinkvoorzieningen", "overstortputten")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt overstortputten en BBB's zonder enige aangesloten streng.
@@ -337,6 +339,8 @@ class OverstortZonderDrempelniveau(_OverstortZonderDrempelkenmerk):
     title = "Overstort zonder geregistreerde drempelhoogte"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("overstortputten",)
+    kenmerken = ("Drempelbreedte", "Drempelniveau")
     kenmerk = "Drempelniveau"
     omschrijving = "drempelniveau"
 
@@ -353,6 +357,8 @@ class OverstortZonderDrempelbreedte(_OverstortZonderDrempelkenmerk):
     title = "Overstort zonder geregistreerde drempelbreedte"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("overstortputten",)
+    kenmerken = ("Drempelbreedte", "Drempelniveau")
     kenmerk = "Drempelbreedte"
     omschrijving = "drempelbreedte"
 
@@ -369,6 +375,8 @@ class ExterneOverstortZonderWater(Check):
     title = "Externe overstort zonder ontvangend oppervlaktewater binnen X m"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("oppervlaktewaterobjecten", "overstortputten")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt overstortputten zonder GWSW-oppervlaktewater binnen de afstand.
@@ -423,6 +431,8 @@ class OverstortOpVerkeerdStelsel(Check):
     title = "Overstort aangesloten op een hemelwater- of IT-stelsel"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("overstortputten", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt overstorten waarvan de aanvoer hemelwater of infiltratie is.
@@ -468,6 +478,8 @@ class GemengdDeelstelselZonderOverstort(Check):
     title = "Gemengd deelstelsel zonder externe overstort/BBB of zonder afvoereindpunt"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("bergbezinkvoorzieningen", "overstortputten", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt gemengde deelstelsels zonder overstort of zonder afvoereindpunt.
@@ -518,7 +530,7 @@ class GemengdDeelstelselZonderOverstort(Check):
 class _BbbKenmerk(Check):
     """Basis voor de checks op ontbrekende BBB-kenmerken."""
 
-    kenmerken: tuple[str, ...] = ()
+    kenmerken: ClassVar[tuple[str, ...]] = ()
     ontbreekt: str = ""
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -555,6 +567,7 @@ class BbbZonderBerging(_BbbKenmerk):
     title = "BBB zonder geregistreerde bergingsinhoud of afmetingen"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen")
     kenmerken = (
         "Inhoud",
         "NettoBerging",
@@ -574,6 +587,8 @@ class BbbZonderLediging(Check):
     title = "BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BBB's zonder geregistreerde lediging.
@@ -634,6 +649,8 @@ class BbbZonderNooduitlaat(Check):
     title = "BBB zonder nooduitlaat of externe overstortdrempel"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen", "overstortleidingen")
+    kenmerken = ("Drempelbreedte", "Drempelniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BBB's zonder overstortdrempel en zonder overstortleiding."""
@@ -672,6 +689,8 @@ class InterneOverstortZelfdeStelseltype(Check):
     title = "Interne overstort waarbij beide zijden hetzelfde stelseltype hebben"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("overstortleidingen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het stelseltype aan weerszijden van een overstortleiding.
@@ -742,6 +761,8 @@ class OnvoldoendeWaking(Check):
     title = "Waking overstortdrempel kleiner dan 0,40 m (dekselniveau minus drempelniveau)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ()
+    kenmerken = ("Drempelbreedte", "Drempelniveau", "Maaiveldhoogte", "Putdekselniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Berekent de waking per drempel en toetst die op het minimum."""

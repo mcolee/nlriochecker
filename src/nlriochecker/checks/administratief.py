@@ -41,6 +41,8 @@ class NietUniekeIdentificatie(Check):
     # Dubbele identificaties kunnen overal in de export zitten, niet alleen in de
     # analyseset; deze check draait daarom altijd op de volledige export.
     volledig_bereik = True
+    rollen = ("leidingen", "netwerkknopen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt labels die aan meer dan een object hangen.
@@ -92,6 +94,8 @@ class NaamgevingWijktAfVanConventie(Check):
     title = "Naamgeving knopen en strengen wijkt af van conventie (patroon configureerbaar)"
     severity = Severity.ERROR
     dimension = Dimension.COMPLIANCE
+    rollen = ("leidingen", "netwerkknopen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de labels tegen de regex-patronen uit de projectconfig.
@@ -158,6 +162,8 @@ class VervallenObjectInActiefNetwerk(Check):
     title = "Vervallen of geplande objecten die topologisch meedoen in het actieve netwerk"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen")
+    kenmerken = ("Begindatum", "Einddatum")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt objecten met een einddatum in het verleden of een begindatum in de toekomst.
@@ -228,6 +234,8 @@ class PuttypePastNietBijLeiding(Check):
     title = "Puttype past niet bij het type aangesloten leiding"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ()
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de netwerkfunctie van elk puttype tegen de regels uit de config.
@@ -305,6 +313,8 @@ class PutonderdelenZonderVerbinding(Check):
     title = "Putcompartimenten of -onderdelen zonder onderlinge verbinding binnen de put"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("netwerkknopen",)
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt putten met meerdere onderdelen die niet aan elkaar hangen.
@@ -400,6 +410,8 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
     title = "Leiding gekoppeld aan de put als geheel waar koppeling aan een compartiment vereist is"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("netwerkknopen",)
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen die aan een gecompartimenteerde put als geheel hangen.
@@ -756,6 +768,8 @@ class LozeLeidingAanActiefRiool(_LozeLeidingen):
     title = "Loze leiding waar actief riool op aansluit (doorgaand, aanvoer of afvoer)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "lozeleidingen")
+    kenmerken = ()
     gevallen = frozenset({GEVAL_DOORGAAND, GEVAL_AANVOER, GEVAL_AFVOER})
 
 
@@ -772,4 +786,6 @@ class LosgekoppeldeLozeLeiding(_LozeLeidingen):
     title = "Loze leiding zonder aansluiting op actief riool in de afvoerrichting"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "lozeleidingen")
+    kenmerken = ()
     gevallen = frozenset({GEVAL_LOSGEKOPPELD})

@@ -188,6 +188,10 @@ class CheckOutcome:
     notes: list[str] = field(default_factory=list)
     weggelaten: int = 0
     skeleton: str = ""
+    # Issue #64: overgenomen uit de checkklasse, net als `id_sleutels`. De uitvoerlaag
+    # bouwt er de toelichtingsregel "Toetst <klassen> op <kenmerken>" mee op.
+    rollen: tuple[str, ...] = ()
+    kenmerken: tuple[str, ...] = ()
 
     @property
     def unreliable_count(self) -> int:
@@ -413,6 +417,17 @@ class Check(ABC):
     # in `config.studiegebied.volledige_dataset_checks`; `run_checks` telt beide
     # bronnen mee.
     volledig_bereik: ClassVar[bool] = False
+    # Issue #64: de GWSW-populatie en -kenmerken die deze check declareert. `rollen` zijn
+    # namen uit `selectie._ROLLEN` -- de populatie die de check langsloopt. `kenmerken`
+    # zijn GWSW-kenmerknamen zoals de code ze aan `aspect`/`number`/`reference`/`date`
+    # geeft, of een `config:<pad>`-verwijzing als de lijst uit de configuratie komt
+    # (ATTR-013), of `*` voor een check die over alle kenmerken gaat (ATTR-014). Geen
+    # default: `register()` weigert een check die er niet allebei declareert, zodat een
+    # nieuwe check niet stilzwijgend zonder herkomst de registry in glipt. De twee
+    # drifttests in `tests/test_checkdeclaraties.py` houden ze tegen de code en de
+    # ontologie.
+    rollen: ClassVar[tuple[str, ...]]
+    kenmerken: ClassVar[tuple[str, ...]]
 
     @abstractmethod
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -478,9 +493,20 @@ REGISTRY: dict[str, type[Check]] = {}
 
 
 def register(check: type[Check]) -> type[Check]:
-    """Registreert een check onder haar ID uit het checkregister."""
+    """Registreert een check onder haar ID uit het checkregister.
+
+    Weigert een check die `rollen` of `kenmerken` niet declareert (issue #64): zonder die
+    twee draagt de uitslag geen herkomst en ontsnapt de check aan de drifttests. Een
+    lege declaratie (`()`) mag; het ontbreken ervan niet.
+    """
     if check.id in REGISTRY:
         raise ValueError(f"check-ID {check.id} is al geregistreerd")
+    for veld in ("rollen", "kenmerken"):
+        if not hasattr(check, veld):
+            raise ValueError(
+                f"check-ID {check.id} declareert geen `{veld}`; elke check moet zijn "
+                "GWSW-populatie en -kenmerken benoemen (issue #64)."
+            )
     REGISTRY[check.id] = check
     return check
 
@@ -540,6 +566,8 @@ def run_checks(
                     volledig_bereik=check.volledig_bereik,
                     notes=check.notes(gebruikt),
                     skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
+                    rollen=check.rollen,
+                    kenmerken=check.kenmerken,
                 )
             )
             voortgang.stap(label=check.id)

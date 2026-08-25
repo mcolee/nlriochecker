@@ -13,6 +13,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Elke check declareert zijn GWSW-rollen en -kenmerken** (issue #64). `Check` krijgt
+  `rollen` (namen uit `selectie._ROLLEN`: de populatie die de check langsloopt) en
+  `kenmerken` (GWSW-kenmerknamen, of een `config:<pad>`-verwijzing voor ATTR-013, of `*`
+  voor ATTR-014). `register()` weigert een check die er niet allebei declareert; de
+  velden reizen mee op `CheckOutcome`. Twee drifttests bewaken ze: een AST-sweep houdt de
+  declaratie tegen de feitelijke code (`tests/checkdeclaratie_analyse.py`,
+  `tests/test_checkdeclaraties.py`) en een tweede tegen de ontologie.
+
 - **Meldingen onderdrukken per klasse en per check** (issue #65). `[rapport]` krijgt
   `onderdruk_klassen` (GWSW-wortelklassen, subklassen via de ontologie) en `onderdruk_checks`
   (alleen ID's uit het checkregister; een onbekend ID faalt bij het laden -- een
