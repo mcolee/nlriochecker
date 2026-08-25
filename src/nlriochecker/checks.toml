@@ -26,6 +26,7 @@ streng = ["Leiding"]
 #    niets op staat, zodat "geen kleur" daar niet als "getoetst en in orde" leest. Sinds
 #    issue #74 bepaalt dezelfde lijst daar ook de richtingspijl: een mechanische streng
 #    krijgt `richting_bob = onbekend` (grijze pijl), ook als zij wel een BOB-verval draagt.
+#    Dat verval blijft in `bob_verval_m` staan; alleen de pijl vervalt.
 #  - `checks/verbanden._bouw_netwerk` legt deze leidingen als ONGERICHTE kanten in de
 #    bereikbaarheidsgraaf, doorlopend via hulpstukken. Daarmee bepaalt deze lijst mee of
 #    NET-001 en NET-002 een vrijvervalstreng als afgevoerd zien: een streng die op een

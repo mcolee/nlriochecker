@@ -545,6 +545,10 @@ def test_persleiding_met_bob_krijgt_geen_vrijvervalrichting(tmp_path: Path) -> N
     de getekende lijn). De vrijvervalstreng hoort daar `mee` van te krijgen; de
     persleiding hoort grijs te blijven, want een pijl zou daar een fysiek onjuiste
     stroomrichting tekenen.
+
+    Alleen de pijl vervalt. `bob_verval_m` is een gemeten waarde en geen bewering over
+    de stroomrichting, dus die blijft op de persleiding gewoon staan -- anders was zij
+    niet meer te onderscheiden van een mechanische leiding zonder BOB.
     """
     pad = _schrijf(_run("richting_persleiding_met_bob.ttl"), tmp_path)
 
@@ -556,17 +560,22 @@ def test_persleiding_met_bob_krijgt_geen_vrijvervalrichting(tmp_path: Path) -> N
     }
 
     assert strengen["1"] == ("mee", pytest.approx(0.50))
-    assert strengen["p"] == ("onbekend", None)
+    assert strengen["p"] == ("onbekend", pytest.approx(0.50))
 
 
 def test_popup_van_een_persleiding_noemt_waarom_er_geen_richting_staat(tmp_path: Path) -> None:
     """Grijs zonder reden leest als "niet te bepalen"; hier is het een eigenschap van
-    de leiding, en de popup hoort dat te zeggen."""
+    de leiding, en de popup hoort dat te zeggen.
+
+    De regel spreekt van "mechanische leiding" en niet van "persleiding": de rol dekt
+    zes klassen, en op een Vacuumleiding zou "persleiding" de objecttyperegel erboven
+    tegenspreken.
+    """
     pad = _schrijf(_run("richting_persleiding_met_bob.ttl"), tmp_path)
 
     popups = dict(_rijen(pad, "select label, popup_html from strengen"))
 
-    assert "persleiding — geen vrijvervalrichting" in popups["p"]
+    assert "mechanische leiding — geen vrijvervalrichting" in popups["p"]
     assert "BOB-richting niet te bepalen" not in popups["p"]
     assert "BOB-verval loopt met de getekende lijn mee" in popups["1"]
 

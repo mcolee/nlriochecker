@@ -6,10 +6,12 @@ pompgestuurd en draagt geen betrouwbare vrijverval-BOB. Meestal viel zo'n leidin
 `onbekend` terug omdat het BOB ontbreekt; dit script telt de gevallen waarin dat niet zo
 was en de kaart dus een fysiek onjuiste groene of rode pijl tekende.
 
-Het roept `_richting_bob` twee keer aan op exact de populatie die de GeoPackage-schrijver
-als mechanisch beschouwt (`selectie.mechanischeleidingen`, `[klassen] mechanisch`): een
-keer met `mechanisch=False` (het gedrag van vóór #74) en een keer met `mechanisch=True`
-(erna). Het schrijft de dataset niet weg -- dat scheelt een volle toetsrun.
+Het roept `_richting_bob` aan op exact de populatie die de GeoPackage-schrijver als
+mechanisch beschouwt (`selectie.mechanischeleidingen`, `[klassen] mechanisch`). Dat is de
+uitkomst van vóór #74. Sinds #74 zet `_schrijf_features` de richting van elke leiding uit
+die populatie op `onbekend`, dus het "na"-getal is per constructie nul; het script telt
+het toch, zodat de twee kolommen naast elkaar staan. Het schrijft de dataset niet weg --
+dat scheelt een volle toetsrun.
 
 Gemeten op De Wolden en Hoogeveen (3720 mechanische leidingen), commit f3e520b:
 
@@ -29,13 +31,12 @@ from __future__ import annotations
 import sys
 from collections import Counter
 from pathlib import Path
-from types import SimpleNamespace
 
 from nlriochecker.cache import laad_met_cache
 from nlriochecker.checkconfig import load_check_config
-from nlriochecker.checks import CheckContext
+from nlriochecker.checks import CheckContext, CheckRun
 from nlriochecker.checks.selectie import mechanischeleidingen
-from nlriochecker.uitvoer.gpkg import _richting_bob
+from nlriochecker.uitvoer.gpkg import RICHTING_ONBEKEND, _richting_bob
 
 DATASET = Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl")
 ONTOLOGIE = Path("data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl")
@@ -47,16 +48,22 @@ def main() -> None:
     dataset, _ = laad_met_cache(DATASET, [ONTOLOGIE])
     config = load_check_config(config_pad)
     context = CheckContext(dataset=dataset, config=config)
-    # `_richting_bob` leest van de run alleen `run.dataset`; een volle CheckRun zou hier
-    # een toetsronde van minuten kosten zonder dat het cijfer verandert.
-    run = SimpleNamespace(dataset=dataset)
+    # Een run zonder uitkomsten: `_richting_bob` leest er alleen `run.dataset` uit, en
+    # `run_checks` draaien zou minuten kosten zonder dat het cijfer verandert.
+    run = CheckRun(
+        dataset=dataset,
+        outcomes=[],
+        typing_gate_applied=False,
+        config=config,
+        context=context,
+    )
 
     leidingen = mechanischeleidingen(context)
     voor: Counter[str] = Counter()
     na: Counter[str] = Counter()
     for conduit in leidingen:
-        voor[_richting_bob(run, conduit, config, mechanisch=False)[0]] += 1
-        na[_richting_bob(run, conduit, config, mechanisch=True)[0]] += 1
+        voor[_richting_bob(run, conduit, config)[0]] += 1
+        na[RICHTING_ONBEKEND] += 1
 
     print(f"mechanische leidingen: {len(leidingen)}")
     print(f"voor issue #74: {dict(voor)} -> {voor['mee'] + voor['tegen']} onjuiste pijlen")

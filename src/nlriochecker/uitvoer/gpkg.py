@@ -374,22 +374,13 @@ def _blob(geometrie: BaseGeometry) -> bytes:
 # --------------------------------------------------------------------------- #
 
 
-def _richting_bob(
-    run: CheckRun, conduit: Conduit, config: CheckConfig, *, mechanisch: bool = False
-) -> tuple[str, float | None]:
+def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple[str, float | None]:
     """De BOB-richting ten opzichte van de getekende lijn, en het verval erlangs.
 
     Het BOB-verval is administratief: van beginpunt naar eindpunt. De pijl op de
     kaart volgt de getekende lijn. Loopt de lijn andersom dan de administratie, dan
     keert het teken om -- anders zou de kaart het tegenovergestelde tonen van wat er
     staat.
-
-    Een mechanische leiding krijgt geen richting, ook niet als zij wel een BOB draagt
-    (issue #74). Zij is pompgestuurd: het water loopt er niet met het bodemverval mee,
-    dus een groene of rode pijl zou een stroomrichting tekenen die er fysiek niet is.
-    Meestal viel zo'n leiding al op `onbekend` terug omdat het BOB ontbreekt, maar dat
-    was toeval; op De Wolden en Hoogeveen kregen 44 van de 3720 mechanische strengen wel
-    een richting. De kolom staat daarom vóór het BOB gelezen wordt al vast.
 
     Is de tekenrichting niet te bepalen (`richting_van_geometrie` geeft None: geen
     lijngeometrie, geen herleidbare putten, of dezelfde put aan beide zijden), dan is
@@ -399,9 +390,11 @@ def _richting_bob(
     zonder bekende tekenrichting is er geen waarde die dat eerlijk uitdrukt. De rij
     krijgt dan `onbekend` met een lege waarde, net als bij een ontbrekend of nul
     BOB-verval.
+
+    Deze functie weet niets van mechanisch riool: dat de *pijl* daar wegvalt is een
+    besluit van de schrijver en staat op de enige plek waar de mechanische populatie
+    bekend is (`_schrijf_features`, issue #74). Het verval zelf blijft er wel staan.
     """
-    if mechanisch:
-        return RICHTING_ONBEKEND, None
     verval = conduit.bob_verval
     if verval is None or verval == 0.0:
         return RICHTING_ONBEKEND, verval
@@ -564,10 +557,19 @@ def _schrijf_features(
             grenzen.append(geometrie.bounds)
             is_mechanisch = uri in mechanisch
             richting, verval = (
-                _richting_bob(run, object_, config, mechanisch=is_mechanisch)
-                if isinstance(object_, Conduit)
-                else ("", None)
+                _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
             )
+            # Een mechanische leiding is pompgestuurd: het water loopt er niet met het
+            # bodemverval mee, dus een groene of rode pijl zou een stroomrichting tekenen
+            # die er fysiek niet is (issue #74). Alleen de pijl vervalt -- het verval zelf
+            # blijft in `bob_verval_m` staan, want dat is een gemeten waarde en geen
+            # bewering over de stroomrichting. De popupregel zegt waarom er geen pijl is;
+            # zonder die eigen tekst zou hij "niet te bepalen" beweren waar de leiding er
+            # domweg geen heeft.
+            if is_mechanisch:
+                richting, richting_woord = RICHTING_ONBEKEND, RICHTING_MECHANISCH
+            else:
+                richting_woord = richting
             afvoer_eindpunt, afvoer_meters, afvoer_stappen = _afvoer_velden(
                 run.context, afvoer_per_knoop, uri, object_
             )
@@ -583,14 +585,14 @@ def _schrijf_features(
                         object_,
                         per_object.get(uri, []),
                         metadata,
-                        stelsels.get(uri, ""),
-                        richting,
-                        verval,
-                        afvoer_eindpunt,
-                        afvoer_meters,
-                        afvoer_stappen,
-                        reden,
-                        is_mechanisch,
+                        stelsel=stelsels.get(uri, ""),
+                        richting_bob=richting,
+                        richting_woord=richting_woord,
+                        bob_verval_m=verval,
+                        afvoer_eindpunt=afvoer_eindpunt,
+                        afvoer_meters=afvoer_meters,
+                        afvoer_stappen=afvoer_stappen,
+                        reden=reden,
                     ),
                 )
             )
@@ -1055,20 +1057,27 @@ def _samenvatting(
     object_: object,
     eigen: list[Melding],
     metadata: tuple[str, str, str],
+    *,
     stelsel: str = "",
     richting_bob: str = "",
+    richting_woord: str = "",
     bob_verval_m: float | None = None,
     afvoer_eindpunt: str = "",
     afvoer_meters: float | None = None,
     afvoer_stappen: int | None = None,
     reden: str = "",
-    mechanisch: bool = False,
 ) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen.
 
-    `mechanisch` gaat alleen naar de popup: `richting_bob` staat op mechanisch riool
-    altijd op `onbekend`, en zonder deze vlag zou de regel eronder "niet te bepalen"
-    zeggen waar de leiding er domweg geen heeft (issue #74).
+    De staart is met opzet keyword-only: acht velden op een rij met door elkaar heen
+    str-, bool-, `float | None`- en `int | None`-gleuven laten zich positioneel
+    verwisselen zonder dat mypy iets zegt, en dan schrijft de rij stil de verkeerde
+    kolom.
+
+    `richting_bob` is wat er in de kolom komt; `richting_woord` de sleutel waaronder de
+    popup hem verwoordt. Op mechanisch riool lopen die twee uiteen (issue #74): de kolom
+    staat op `onbekend` zodat de grijze stijl hem pakt, maar de popupregel zegt dat zo'n
+    leiding geen vrijvervalrichting *heeft* in plaats van dat hij niet te bepalen was.
 
     `reden` is gevuld als dit object niet beoordeeld is; dan is de status grijs en
     noemt de popup waarom. De status volgt verder dezelfde regel als `ergste_ernst`:
@@ -1092,7 +1101,7 @@ def _samenvatting(
         label=label,
         objecttype=objecttype,
         status=status,
-        feiten=_feiten(object_, stelsel, richting_bob, mechanisch),
+        feiten=_feiten(object_, stelsel, richting_woord),
         reden=reden,
     )
     return (
@@ -1125,7 +1134,11 @@ def _samenvatting(
 # De sleutel waaronder een mechanische leiding haar popupregel krijgt. Geen waarde van
 # de kolom `richting_bob` -- die staat op zo'n leiding op `onbekend`, zodat de grijze
 # stijl hergebruikt wordt -- maar een vierde sleutel in de tabel hieronder, zodat de
-# popup twee dingen uit elkaar houdt die op de kaart dezelfde kleur hebben.
+# popup twee dingen uit elkaar houdt die op de kaart dezelfde kleur hebben. De tekst
+# spreekt van "mechanische leiding" en niet van "persleiding": de rol
+# `mechanischeleidingen` dekt zes klassen, en op De Wolden en Hoogeveen zijn 172 van de
+# 3720 een Vacuumleiding of Drukleiding. Die zouden anders een popupregel krijgen die
+# hun eigen `objecttype`-regel een paar pixels hoger tegenspreekt.
 RICHTING_MECHANISCH = "mechanisch"
 
 # Hoe de kolom `richting_bob` in de popup gelezen wordt. De logica erachter blijft
@@ -1134,13 +1147,11 @@ RICHTING_IN_WOORDEN = {
     RICHTING_MEE: "BOB-verval loopt met de getekende lijn mee",
     RICHTING_TEGEN: "BOB-verval loopt tegen de getekende lijn in",
     RICHTING_ONBEKEND: "BOB-richting niet te bepalen",
-    RICHTING_MECHANISCH: "persleiding — geen vrijvervalrichting",
+    RICHTING_MECHANISCH: "mechanische leiding — geen vrijvervalrichting",
 }
 
 
-def _feiten(
-    object_: object, stelsel: str, richting_bob: str, mechanisch: bool = False
-) -> tuple[str, ...]:
+def _feiten(object_: object, stelsel: str, richting_woord: str) -> tuple[str, ...]:
     """De losse feiten die in de kopregel van de popup horen.
 
     Alleen bij een verbinding: stelsel, de getekende lengte en de BOB-richtingsregel.
@@ -1150,8 +1161,8 @@ def _feiten(
     popup hoort te zeggen wat er op de kaart staat. Wijken de twee af, dan is dat een
     bevinding van ATTR-009 en die staat in de lijst eronder.
 
-    Op een mechanische leiding staat de richting altijd op `onbekend`; de regel zegt
-    dan waarom er geen is in plaats van dat hij niet te bepalen viel (issue #74).
+    `richting_woord` is de sleutel in `RICHTING_IN_WOORDEN` en niet per se de waarde van
+    de kolom `richting_bob`: op mechanisch riool lopen die twee uiteen (issue #74).
     """
     if not isinstance(object_, Conduit):
         return ()
@@ -1160,9 +1171,8 @@ def _feiten(
         feiten.append(f"Stelsel: {stelsel}")
     if object_.line is not None and not object_.line.is_empty:
         feiten.append(f"Lengte: {object_.line.length:.1f} m")
-    if richting_bob:
-        sleutel = RICHTING_MECHANISCH if mechanisch else richting_bob
-        feiten.append(RICHTING_IN_WOORDEN.get(sleutel, richting_bob))
+    if richting_woord:
+        feiten.append(RICHTING_IN_WOORDEN.get(richting_woord, richting_woord))
     return tuple(feiten)
 
 

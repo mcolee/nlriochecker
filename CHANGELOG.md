@@ -63,17 +63,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   onbereikbaar melden. Zie BO-55 en BO-56.
 
 - **Geen vrijvervalrichting meer op gepompte leidingen** (issue #74). De richtingspijl in
-  de laag `strengen` komt uit het BOB-verval, maar een mechanische leiding (rol
-  `mechanischeleidingen`: persleiding, drukleiding, vacuumleiding) is pompgestuurd en
-  draagt geen betrouwbare vrijverval-BOB. `_richting_bob` geeft daarvoor voortaan
-  `onbekend` terug vóór het BOB gelezen wordt, in plaats van er toevallig op terug te
-  vallen: op De Wolden en Hoogeveen kregen **44** van de 3720 mechanische strengen (23 mee,
-  21 tegen) een fysiek onjuiste groene of rode pijl, nu **0**. In de GeoPackage van 24-08
-  zijn dat er 22; die dateert van vóór de laderfix van issue #60, die 22 van deze leidingen
-  alsnog een herleidbare tekenrichting gaf. De grijze
-  `onbekend`-stijl wordt hergebruikt (geen QML-wijziging); alleen de popupregel splitst en
-  zegt op zo'n leiding "persleiding — geen vrijvervalrichting" in plaats van "BOB-richting
-  niet te bepalen".
+  de laag `strengen` komt uit het BOB-verval, maar een mechanische leiding is pompgestuurd
+  en draagt geen betrouwbare vrijverval-BOB. De schrijver zet `richting_bob` daarom op
+  `onbekend` voor elke leiding uit de rol `mechanischeleidingen` (`[klassen] mechanisch`:
+  `MechanischeRioolleiding` met Drukleiding, Luchtpersleiding en Vacuumleiding, en
+  `MechanischeTransportleiding` met Persleiding, Leidingsegment en Spoelleiding), in plaats
+  van daar toevallig op terug te vallen: op De Wolden en Hoogeveen kregen **44** van de 3720
+  mechanische strengen (23 mee, 21 tegen) een fysiek onjuiste groene of rode pijl, nu **0**.
+  In de GeoPackage van 24-08 zijn dat er 22; die dateert van vóór de laderfix van issue #60,
+  die 22 van deze leidingen alsnog een herleidbare tekenrichting gaf. **Alleen de pijl
+  vervalt:** `bob_verval_m` wordt precies zo berekend als voorheen en blijft op zo'n leiding
+  staan, want dat is een gemeten waarde en geen bewering over de stroomrichting -- zonder
+  haar was een mechanische leiding mét BOB niet meer te onderscheiden van een zonder. De
+  grijze `onbekend`-stijl wordt hergebruikt (geen QML-wijziging); alleen de popupregel
+  splitst en zegt op zo'n leiding "mechanische leiding — geen vrijvervalrichting" in plaats
+  van "BOB-richting niet te bepalen".
 
 - **De nul-bewaking en de rollentelling leiden hun rollen uit de checkdeclaraties af**
   (issue #71, vervolg op #64). `omvang._rollen` was een handlijst van zes rollen; nu
