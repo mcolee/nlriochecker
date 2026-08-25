@@ -91,16 +91,36 @@ JUINEN_AANTALLEN = {
 }
 
 
+def test_rol_velden_dekt_elke_rol() -> None:
+    """`_ROL_VELDEN` (voor de uitvoer) noemt elke rol en geen andere."""
+    from nlriochecker.checks.selectie import _ROL_VELDEN
+
+    assert set(_ROL_VELDEN) == set(_ROLLEN)
+
+
+def test_klassen_van_rol_leest_de_config() -> None:
+    """`klassen_van_rol` levert de wortelklassen uit `[klassen]` per rol."""
+    from nlriochecker.checks.selectie import klassen_van_rol
+
+    klassen = load_check_config().klassen
+    assert klassen_van_rol("rioolputten", klassen) == ["Rioolput"]
+    assert klassen_van_rol("putten", klassen) == ["Put"]
+
+
 def test_rollenlijst_is_volledig() -> None:
     """`_ROLLEN` noemt elke publieke selectie van de module, en niets anders.
 
     Zonder deze test is `_ROLLEN` een tweede plek om aan te denken: een vijftiende
     selectie die er niet in belandt, blijft ongetoetst zonder dat iets rood wordt.
     """
+    # `klassen_van_rol` is een opzoekfunctie voor de uitvoer, geen selectie (issue #64).
+    geen_selectie = {"klassen_van_rol"}
     publiek = {
         naam
         for naam, functie in inspect.getmembers(selectie, inspect.isfunction)
-        if not naam.startswith("_") and functie.__module__ == selectie.__name__
+        if not naam.startswith("_")
+        and functie.__module__ == selectie.__name__
+        and naam not in geen_selectie
     }
     assert set(_ROLLEN) == publiek
 

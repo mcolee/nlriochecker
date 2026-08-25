@@ -293,3 +293,37 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "lozeleidingen": lozeleidingen,
     "oppervlaktewaterobjecten": oppervlaktewaterobjecten,
 }
+
+
+# Per rol het `[klassen]`-veld dat haar wortelklassen draagt. De rolfuncties hierboven
+# lezen `context.config.klassen.<veld>`; deze tabel maakt datzelfde opvraagbaar zonder een
+# context, voor de toelichtingsregel per check in het rapport en de dekkingsmatrix (issue
+# #64). `test_checks_selectie` bewaakt dat de sleutels gelijk blijven aan `_ROLLEN`.
+_ROL_VELDEN: dict[str, str] = {
+    "netwerkknopen": "netwerkknopen",
+    "putten": "put",
+    "rioolputten": "rioolput",
+    "lozingspunten": "lozings_eindpunt",
+    "overstortputten": "overstortput",
+    "bergbezinkvoorzieningen": "bergbezinkvoorziening",
+    "valconstructies": "valconstructie",
+    "functieloze_knopen": "functieloze_knoop",
+    "hulpstukken": "hulpstuk",
+    "leidingen": "streng",
+    "vrijvervalrioolleidingen": "vrijvervalleiding",
+    "overstortleidingen": "overstortleiding",
+    "bergbezinkleidingen": "bergbezinkleiding",
+    "vuilwaterleidingen": "vuilwater",
+    "infiltratieleidingen": "infiltratie",
+    "mechanischeleidingen": "mechanisch",
+    "lozeleidingen": "loze_leiding",
+    "oppervlaktewaterobjecten": "oppervlaktewater",
+}
+
+
+def klassen_van_rol(rol: str, klassen) -> list[str]:
+    """De wortelklassen van een rol in deze `[klassen]`-configuratie.
+
+    `netwerkknopen` is een samengestelde property; de andere rollen lezen één veld.
+    """
+    return list(getattr(klassen, _ROL_VELDEN[rol]))

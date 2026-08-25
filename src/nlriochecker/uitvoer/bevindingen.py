@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 from nlriochecker.checks import CheckRun, Severity
+from nlriochecker.checks.selectie import klassen_van_rol
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import (
@@ -671,6 +672,37 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     return [*regels, ""]
 
 
+def _kenmerk_labels(outcome, config) -> list[str]:
+    """De gedeclareerde kenmerken van een check als leesbare labels.
+
+    Een `config:<pad>`-verwijzing (ATTR-013) wordt naar de geconfigureerde lijst
+    opgelost, `*` (ATTR-014) naar "alle kenmerken".
+    """
+    labels: list[str] = []
+    for kenmerk in outcome.kenmerken:
+        if kenmerk == "*":
+            labels.append("alle kenmerken")
+        elif kenmerk.startswith("config:"):
+            waarde: object = config
+            for deel in kenmerk.removeprefix("config:").split("."):
+                waarde = getattr(waarde, deel, None)
+            if isinstance(waarde, list | tuple):
+                labels.extend(str(w) for w in waarde)
+        else:
+            labels.append(kenmerk)
+    return labels
+
+
+def _toetst_regel(outcome, config) -> str:
+    """De regel "Toetst <klassen> op <kenmerken>" onder een eigen check (issue #64)."""
+    klassen = sorted({k for rol in outcome.rollen for k in klassen_van_rol(rol, config.klassen)})
+    klassen_txt = ", ".join(klassen) if klassen else "de hele export"
+    kenmerken = _kenmerk_labels(outcome, config)
+    if not kenmerken:
+        return f"Toetst {klassen_txt} (structuur en geometrie, geen kenmerk)."
+    return f"Toetst {klassen_txt} op {', '.join(kenmerken)}."
+
+
 def _detail_eigen(
     run: CheckRun, meldingen: list[Melding], *, genummerd: bool, met_csv: bool = True
 ) -> list[str]:
@@ -695,6 +727,7 @@ def _detail_eigen(
             f"{outcome.examined} bekeken objecten."
             f"{markering}",
         ]
+        regels += ["", f"_{_toetst_regel(outcome, run.config)}_"]
         for note in outcome.notes:
             regels += ["", f"> {note}"]
         regels += _clusterduiding(eigen)
