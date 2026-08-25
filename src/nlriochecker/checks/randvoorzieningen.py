@@ -37,13 +37,14 @@ from nlriochecker.checks.selectie import (
     oppervlaktewaterobjecten,
     overstortleidingen,
     overstortputten,
+    vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import (
     aansluitingen,
     deelstelsel_ids,
     netwerkdelen,
 )
-from nlriochecker.dataset import Node, part_holders_of
+from nlriochecker.dataset import Conduit, Node, part_holders_of
 
 
 @dataclass(frozen=True)
@@ -161,26 +162,6 @@ def drempelnotitie(context: CheckContext) -> list[str]:
     return notities
 
 
-def _zwaartepunt(context: CheckContext, knopen: set[str]) -> tuple[float, float] | None:
-    """Het gemiddelde van de knooppunten van een deelstelsel.
-
-    Een melding over een deelstelsel hangt aan een enkele knoop, maar hoort op de
-    kaart midden in dat deel te staan; anders lijkt het gebrek bij die ene put te
-    zitten.
-    """
-    punten = [
-        node.point
-        for uri in knopen
-        if (node := context.dataset.nodes.get(uri)) is not None and node.point is not None
-    ]
-    if not punten:
-        return None
-    return (
-        sum(punt.x for punt in punten) / len(punten),
-        sum(punt.y for punt in punten) / len(punten),
-    )
-
-
 def _stelseldelen(context: CheckContext) -> list[set[str]]:
     """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen.
 
@@ -191,17 +172,33 @@ def _stelseldelen(context: CheckContext) -> list[set[str]]:
     return netwerkdelen(context)
 
 
-def _stelseltypen_van(context: CheckContext, knopen: set[str]) -> set[str]:
-    """De stelseltypen van de strengen binnen dit deel van het netwerk."""
+def _gemengde_strengen_van(context: CheckContext, knopen: set[str]) -> list[Conduit]:
+    """De gemengde strengen binnen dit deel van het netwerk, op URI gesorteerd.
+
+    "Gemengd" is geen eigen GWSW-object maar een eigenschap van de leiding
+    (`GemengdRiool` en haar subklassen, via `[klassen] stelseltypen`). Deze strengen
+    zijn dus de dragers van een gebrek aan het deelstelsel als geheel: RVZ-006 meldt
+    op elk van hen (issue #75). De volgorde is die van de URI, zodat twee runs op
+    dezelfde data dezelfde meldingen in dezelfde volgorde opleveren.
+    """
     index = aansluitingen(context, "vrijvervalleiding")
     klassen = context.config.klassen
-    soorten: set[str] = set()
+    gevonden: dict[str, Conduit] = {}
     for knoop in knopen:
         for conduit in index.strengen(knoop):
-            soort = klassen.stelseltype(conduit.types, context.dataset.closure)
-            if soort is not None:
-                soorten.add(soort)
-    return soorten
+            if klassen.stelseltype(conduit.types, context.dataset.closure) == "gemengd":
+                gevonden[conduit.uri] = conduit
+    return [gevonden[uri] for uri in sorted(gevonden)]
+
+
+def _gemengde_strengen(context: CheckContext) -> list[Conduit]:
+    """Alle gemengde vrijvervalstrengen: de populatie waarover RVZ-006 oordeelt."""
+    klassen = context.config.klassen
+    return [
+        conduit
+        for conduit in vrijvervalrioolleidingen(context)
+        if klassen.stelseltype(conduit.types, context.dataset.closure) == "gemengd"
+    ]
 
 
 def _afvoereindpunten(context: CheckContext) -> set[str]:
@@ -490,6 +487,13 @@ class GemengdDeelstelselZonderOverstort(Check):
         externe overstort/BBB bij hoogwater, en via een afvoereindpunt (gemaal of
         overnamepunt) in de gewone toestand. Ontbreekt een van beide, dan is het
         stelsel onvolledig geregistreerd; de melding noemt welke eis faalt.
+
+        De bevinding hangt per gemengde streng van het falende deel (issue #75) en
+        niet meer op de lexicografisch eerste knoop ervan. Er is geen GWSW-object
+        "gemengd stelsel" om het gebrek aan te hangen -- gemengd volgt uit het
+        leidingtype -- dus de gemengde strengen zijn de dragers, net zoals NET-001
+        een subsysteem dat iets mist per streng meldt. De gedeelde `cluster_id`
+        houdt zichtbaar dat het om één deelstelsel gaat en niet om losse gebreken.
         """
         randvoorzieningen = {node.uri for node in overstortputten(context)}
         randvoorzieningen |= {node.uri for node in bergbezinkvoorzieningen(context)}
@@ -497,36 +501,37 @@ class GemengdDeelstelselZonderOverstort(Check):
         clusters = deelstelsel_ids(context)
 
         for deel in _stelseldelen(context):
-            if "gemengd" not in _stelseltypen_van(context, deel):
+            strengen = _gemengde_strengen_van(context, deel)
+            if not strengen:
                 continue
             heeft_overstort = bool(deel & randvoorzieningen)
             heeft_eindpunt = bool(deel & afvoereindpunten)
             if heeft_overstort and heeft_eindpunt:
                 continue
-            knopen = sorted(deel)
-            uri = knopen[0]
-            node = context.dataset.nodes.get(uri)
-            yield self.finding(
-                context,
-                uri,
-                node.label if node is not None else uri,
-                f"Ligt in een gemengd deelstelsel van {len(deel)} knopen "
-                f"{_rvz006_gebrek(heeft_overstort, heeft_eindpunt)}.",
-                knopen_in_deelstelsel=len(deel),
-                cluster_id=clusters.get(uri, ""),
-                foutlocatie=_zwaartepunt(context, deel),
-            )
+            cluster = clusters.get(min(deel), "")
+            for conduit in strengen:
+                yield self.finding(
+                    context,
+                    conduit.uri,
+                    conduit.label,
+                    f"Ligt in een gemengd deelstelsel van {len(deel)} knopen "
+                    f"{_rvz006_gebrek(heeft_overstort, heeft_eindpunt)}.",
+                    knopen_in_deelstelsel=len(deel),
+                    gemengde_strengen=len(strengen),
+                    cluster_id=cluster,
+                )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Legt uit dat de melding op een representatieve knoop hangt."""
+        """Legt uit waaraan de melding hangt en waar het gebrek werkelijk zit."""
         return [
-            "De bevinding hangt per deelstelsel aan een enkele knoop; het gebrek zit in het "
-            "deelstelsel als geheel, niet in die knoop."
+            "Het gebrek zit in het deelstelsel als geheel; de bevinding hangt aan elke "
+            "gemengde streng ervan, want een gemengd stelsel is geen GWSW-object. De "
+            "bevindingen van hetzelfde deelstelsel dragen dezelfde `cluster_id`."
         ]
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal samenhangende delen van het vrijvervalnetwerk."""
-        return len(_stelseldelen(context))
+        """Het aantal gemengde vrijvervalstrengen."""
+        return len(_gemengde_strengen(context))
 
 
 class _BbbKenmerk(Check):

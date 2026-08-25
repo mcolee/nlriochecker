@@ -1611,11 +1611,17 @@ FIXTURES["rvz005_overstort_op_hemelwater.ttl"] = (
     ),
 )
 
+# RVZ-006 (issue #75): twee gemengde strengen in hetzelfde deelstelsel. De check meldt
+# sinds #75 per gemengde streng en niet meer op een representatieve knoop, dus de fixture
+# heeft er twee nodig om te laten zien dat beide bevindingen dezelfde `cluster_id` dragen
+# en samen één vlak `gemengd_zonder_overstort` opleveren.
 FIXTURES["rvz006_gemengd_zonder_overstort.ttl"] = (
-    "een gemengd deelstelsel zonder enige overstort of bergbezinkvoorziening",
+    "een gemengd deelstelsel van twee strengen zonder enige overstort of bergbezinkvoorziening",
     hoogteput("PutA", "A", A)
     + hoogteput("PutB", "B", B)
-    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),
+    + hoogteput("PutC", "C", C)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55))
+    + hoogteleiding("L2", "2", [B, C], "PutB", "PutC", bob=(8.55, 8.50)),
 )
 
 # RVZ-006, tweede tak (issue #23): wel een overstort, geen afvoereindpunt.

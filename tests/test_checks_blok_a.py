@@ -109,7 +109,8 @@ DEFECTEN = [
     ("rvz002_overstort_zonder_drempel.ttl", "RVZ-003", ["O"]),
     ("rvz004_overstort_zonder_water.ttl", "RVZ-004", ["O"]),
     ("rvz005_overstort_op_hemelwater.ttl", "RVZ-005", ["O"]),
-    ("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006", ["A"]),
+    # Sinds #75 per gemengde streng: het deelstelsel telt er twee.
+    ("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006", ["1", "2"]),
     ("rvz007_bbb_zonder_berging.ttl", "RVZ-007", ["BBB"]),
     ("rvz008_bbb_zonder_lediging.ttl", "RVZ-008", ["BBB"]),
     ("rvz009_bbb_zonder_nooduitlaat.ttl", "RVZ-009", ["BBB"]),
@@ -688,11 +689,25 @@ def test_btr_skeletten_melden_hun_markering(check_id: str) -> None:
     assert any("vereist inwinningsmetagegevens" in note for note in outcome.notes)
 
 
+def test_rvz006_meldt_per_gemengde_streng() -> None:
+    """Sinds issue #75 hangt de bevinding aan de gemengde strengen, niet aan een knoop.
+
+    Het gebrek zit in het deelstelsel als geheel, maar een deelstelsel is geen
+    GWSW-object; de dragers zijn de gemengde strengen ervan. Beide strengen van de
+    fixture krijgen een eigen bevinding.
+    """
+    outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+
+    assert labels(outcome) == ["1", "2"]
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
+    assert all(bevinding.object_uri in dataset.conduits for bevinding in outcome.findings)
+
+
 def test_rvz006_draagt_hetzelfde_deelstelsel_id_als_de_net_checks() -> None:
     """RVZ-006 en NET-001 melden over hetzelfde deelstelsel.
 
     Alleen met een gedeeld ID is in rapport en GIS te zien dat het om hetzelfde
-    stuk net gaat; anders lijkt het twee losse gebreken.
+    stuk net gaat; anders lijken twee gemengde strengen twee losse gebreken.
     """
     dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
     context = CheckContext(dataset=dataset, config=fixtureconfig())
@@ -700,34 +715,22 @@ def test_rvz006_draagt_hetzelfde_deelstelsel_id_als_de_net_checks() -> None:
 
     outcome = run_checks(context, ["RVZ-006"]).outcomes[0]
 
-    bevinding = outcome.findings[0]
-    assert bevinding.details["cluster_id"] == ids[bevinding.object_uri]
+    clusters = {bevinding.details["cluster_id"] for bevinding in outcome.findings}
+    assert len(outcome.findings) == 2
+    assert len(clusters) == 1
+    assert clusters <= set(ids.values())
 
 
-def test_rvz006_zet_het_zwaartepunt_van_het_deelstelsel_als_foutlocatie() -> None:
-    """Het gebrek zit in het deelstelsel, niet in de knoop waar de melding aan hangt.
+def test_rvz006_zet_geen_eigen_foutlocatie_meer() -> None:
+    """De melding zit op de streng zelf, dus de gewone objectlocatie volstaat.
 
-    Op de kaart hoort de melding daarom midden in dat deel te staan.
+    Het zwaartepunt van het deelstelsel was er om een melding op een willekeurige
+    knoop midden in het deel te zetten; per streng is dat niet meer nodig en zou het
+    de melding juist van haar eigen streng wegtrekken.
     """
-    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
-    context = CheckContext(dataset=dataset, config=fixtureconfig())
-    ids = deelstelsel_ids(context)
+    outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
 
-    bevinding = run_checks(context, ["RVZ-006"]).outcomes[0].findings[0]
-
-    cluster = ids[bevinding.object_uri]
-    punten = [
-        dataset.nodes[uri].point
-        for uri, deel in ids.items()
-        if deel == cluster and dataset.nodes.get(uri) is not None
-        if dataset.nodes[uri].point is not None
-    ]
-    verwacht_x = sum(punt.x for punt in punten) / len(punten)
-    verwacht_y = sum(punt.y for punt in punten) / len(punten)
-    x, y = bevinding.details["foutlocatie"]
-
-    assert x == pytest.approx(verwacht_x)
-    assert y == pytest.approx(verwacht_y)
+    assert all("foutlocatie" not in bevinding.details for bevinding in outcome.findings)
 
 
 def test_rvz006_zonder_afvoereindpunt_noemt_alleen_die_reden() -> None:
@@ -747,10 +750,10 @@ def test_rvz006_zonder_beide_noemt_beide_redenen() -> None:
     """Een gemengd deel zonder overstort en zonder afvoereindpunt noemt beide redenen."""
     outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
 
-    assert len(outcome.findings) == 1
-    boodschap = outcome.findings[0].message
-    assert "zonder enige externe overstort of bergbezinkvoorziening" in boodschap
-    assert "en zonder afvoereindpunt (gemaal of overnamepunt)" in boodschap
+    assert len(outcome.findings) == 2
+    for bevinding in outcome.findings:
+        assert "zonder enige externe overstort of bergbezinkvoorziening" in bevinding.message
+        assert "en zonder afvoereindpunt (gemaal of overnamepunt)" in bevinding.message
 
 
 def test_rvz006_telt_een_pompunit_niet_als_afvoereindpunt() -> None:
@@ -762,10 +765,10 @@ def test_rvz006_telt_een_pompunit_niet_als_afvoereindpunt() -> None:
     """
     outcome = uitkomst("rvz006_gemengd_alleen_pompunit.ttl", "RVZ-006")
 
-    assert len(outcome.findings) == 1
-    boodschap = outcome.findings[0].message
-    assert "zonder afvoereindpunt (gemaal of overnamepunt)" in boodschap
-    assert "externe overstort" not in boodschap
+    assert labels(outcome) == ["1", "2"]
+    for bevinding in outcome.findings:
+        assert "zonder afvoereindpunt (gemaal of overnamepunt)" in bevinding.message
+        assert "externe overstort" not in bevinding.message
 
 
 def test_rvz006_met_overstort_en_afvoereindpunt_zwijgt() -> None:
