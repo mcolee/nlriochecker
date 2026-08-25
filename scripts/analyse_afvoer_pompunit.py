@@ -58,10 +58,7 @@ def main() -> None:
     basis = netwerk.graph
     wortels = config.klassen.netwerkknopen
     gezocht = {
-        u
-        for w in config.klassen.vuilwater
-        for u in dataset.of_class(w)
-        if u in dataset.conduits
+        u for w in config.klassen.vuilwater for u in dataset.of_class(w) if u in dataset.conduits
     }
     mech = mechanischeleidingen(context)
     afvoer = config.klassen.afvoer_eindpunt
