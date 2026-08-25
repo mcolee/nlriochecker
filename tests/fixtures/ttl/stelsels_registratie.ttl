@@ -34,7 +34,7 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: geen; twee lokale stelsels met alleen strengen (vuilwater bereikt een gemaal, gemengd niet) plus een gemeentebrede bucket met strengen en putten die geen vlak krijgt
+# DEFECT: geen; twee lokale stelsels met alleen strengen plus een gemeentebrede bucket met strengen en putten
 
 gwsw:Vuilwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
 gwsw:GemengdStelsel rdfs:subClassOf gwsw:Rioolstelsel .

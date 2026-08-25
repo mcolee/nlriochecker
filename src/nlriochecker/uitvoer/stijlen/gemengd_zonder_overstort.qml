@@ -1,14 +1,11 @@
-<!-- Default-stijl voor de cartografische stelsellaag (#25). Rule-based op
-     `bereikt_eindpunt`: de stelsels zonder afvoerroute staan aan en vallen rood op;
-     de stelsels die wél een afvoereindpunt bereiken zitten in de laag maar staan uit
-     (checkstate="0"), zodat de gebruiker ze zelf kan aanzetten. `styleCategories`
-     noemt MapTips, anders leest QGIS het mapTip-element niet terug uit layer_styles. -->
+<!-- Default-stijl voor de laag `gemengd_zonder_overstort` (issue #75): de gemengde
+     deelstelsels waarop RVZ-006 aansloeg, als vlak om hun strengen. Eén vlaksymbool en
+     geen regels: elke rij in deze laag is een gebrek, dus er valt niets te filteren.
+     De vervallen stelsellaag bevatte ook de goede stelsels en had die filter wel nodig.
+     `styleCategories` noemt MapTips, anders leest QGIS het mapTip-element niet terug
+     uit layer_styles. -->
 <qgis version="3.28" styleCategories="Symbology|MapTips">
-  <renderer-v2 type="RuleRenderer" forceraster="0" symbollevels="0">
-    <rules key="{bb000000-0000-4000-8000-000000000000}">
-      <rule filter="&quot;bereikt_eindpunt&quot; = 0" symbol="0" label="Geen afvoerroute" key="{bb000000-0000-4000-8000-000000000001}"/>
-      <rule filter="&quot;bereikt_eindpunt&quot; &lt;&gt; 0" symbol="1" label="Bereikt een afvoereindpunt" checkstate="0" key="{bb000000-0000-4000-8000-000000000002}"/>
-    </rules>
+  <renderer-v2 type="singleSymbol" forceraster="0" symbollevels="0">
     <symbols>
       <symbol type="fill" name="0" alpha="1">
         <layer class="SimpleFill">
@@ -17,15 +14,6 @@
           <prop k="outline_color" v="215,48,39,255"/>
           <prop k="outline_width" v="0.6"/>
           <prop k="outline_style" v="solid"/>
-        </layer>
-      </symbol>
-      <symbol type="fill" name="1" alpha="1">
-        <layer class="SimpleFill">
-          <prop k="color" v="120,120,120,0"/>
-          <prop k="style" v="no"/>
-          <prop k="outline_color" v="120,120,120,255"/>
-          <prop k="outline_width" v="0.3"/>
-          <prop k="outline_style" v="dash"/>
         </layer>
       </symbol>
     </symbols>

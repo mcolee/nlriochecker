@@ -31,13 +31,13 @@ def test_standaardconfig_laadt() -> None:
     assert config.drempels.dubbele_put_tolerantie_m == 0.30
 
 
-def test_stelselvlak_buffer_heeft_een_default() -> None:
-    """De bufferafstand van de cartografische stelsellaag (#25).
+def test_gemengd_zonder_overstort_buffer_heeft_een_default() -> None:
+    """De bufferafstand van de vlakkenlaag `gemengd_zonder_overstort` (#25, #75).
 
     Projectkeuze zonder externe bron; 10 m buffert elke strenglijn tot een lint van
-    20 m breed, zodat de strengen van een stelsel langs een straat samenvloeien.
+    20 m breed, zodat de strengen van een deelstelsel langs een straat samenvloeien.
     """
-    assert load_check_config().drempels.stelselvlak_buffer_m == 10.0
+    assert load_check_config().drempels.gemengd_zonder_overstort_buffer_m == 10.0
 
 
 def test_maximale_strenglengte_volgt_de_ontologie() -> None:

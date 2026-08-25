@@ -177,13 +177,13 @@ def test_de_opbouw_is_deterministisch(laag: str) -> None:
 def test_de_vlaklagen_blijven_gewone_bestanden() -> None:
     """De vlaklagen dragen een bestand-QML; alleen de twee objectlagen zijn opgebouwd.
 
-    De vlakkenlaag (#67) is rule-based op `soort` en de stelsellaag (#25) op
-    `bereikt_eindpunt`; geen van beide volgt de objecttype x status-structuur die
+    De vlakkenlaag (#67) is rule-based op `soort` en `gemengd_zonder_overstort` (#75)
+    is een enkel vlaksymbool; geen van beide volgt de objecttype x status-structuur die
     `symbolen.py` opbouwt.
     """
     aanwezig = {pad.name for pad in STIJLEN.glob("*.qml")}
 
-    assert aanwezig == {"vlakken.qml", "stelsels.qml"}
+    assert aanwezig == {"vlakken.qml", "gemengd_zonder_overstort.qml"}
 
 
 def test_elk_objecttype_in_de_voorbeelddataset_staat_in_de_tabel(juinen) -> None:

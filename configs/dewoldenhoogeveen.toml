@@ -361,9 +361,9 @@ ext_putdeksel_afstand_m = 2.0
 ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0
 
-# #25: bufferafstand om de strengen van een stelsel voor de cartografische laag
-# `stelsels`. Projectkeuze, geen externe bron.
-stelselvlak_buffer_m = 10.0
+# #75: bufferafstand om de strengen van een gemengd deelstelsel voor de cartografische
+# laag `gemengd_zonder_overstort`. Projectkeuze, geen externe bron.
+gemengd_zonder_overstort_buffer_m = 10.0
 
 [netwerk]
 # Hoe de afvoerrichting van een vrijvervalstreng bepaald wordt.

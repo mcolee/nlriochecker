@@ -199,20 +199,19 @@ def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_g
     } <= labels
 
 
-def test_de_stelsellaag_toont_standaard_alleen_de_stelsels_zonder_afvoerroute(
-    qgis_app, geschreven_gpkg: Path
-) -> None:
-    """De kern van #25: de laag opent met alleen de probleemgevallen aan.
+def test_de_gemengde_deelstelsellaag_laadt_haar_stijl(qgis_app, geschreven_gpkg: Path) -> None:
+    """De vlakkenlaag van #75 draagt haar eigen stijl, ook als ze leeg is.
 
-    Beide regels zitten in de stijl -- de gebruiker kan de rest zelf aanzetten -- maar
-    alleen de regel die op `bereikt_eindpunt = 0` filtert staat standaard aan.
+    Elke rij in deze laag is een gebrek (RVZ-006 sloeg er aan), dus er is niets te
+    filteren: een enkel vlaksymbool volstaat en de maptip toont de meldingen.
     """
-    vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=stelsels", "st", "ogr")
+    vector = qgis_core.QgsVectorLayer(
+        f"{geschreven_gpkg}|layername=gemengd_zonder_overstort", "gzo", "ogr"
+    )
     boodschap, gelukt = vector.loadDefaultStyle()
 
-    assert gelukt, f"stelsels: {boodschap}"
-    actief = {regel.label(): regel.active() for regel in vector.renderer().rootRule().children()}
-    assert actief == {"Geen afvoerroute": True, "Bereikt een afvoereindpunt": False}
+    assert gelukt, f"gemengd_zonder_overstort: {boodschap}"
+    assert vector.mapTipTemplate()
 
 
 def test_de_vlakkenlaag_toont_de_drie_soorten(qgis_app, geschreven_gpkg: Path) -> None:

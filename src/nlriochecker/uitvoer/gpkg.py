@@ -40,12 +40,14 @@ from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer
 from nlriochecker.checks.verbanden import (
+    Aansluitingen,
     Afvoer,
+    aansluitingen,
     afvoerpad_van_streng,
     afvoerpaden,
-    verbonden_knopen,
+    deelstelsel_ids,
 )
-from nlriochecker.dataset import Conduit, GwswDataset, Node
+from nlriochecker.dataset import Conduit, Node
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
@@ -63,7 +65,6 @@ from nlriochecker.uitvoer.objectkaart import (
     popup_html,
 )
 from nlriochecker.uitvoer.omvang import stelseltypen
-from nlriochecker.uitvoer.stelsels import Stelselvlak, lees_stelsels
 from nlriochecker.uitvoer.stijlen.symbolen import bouw_qml
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.uitvoer.voorbehoud import markering
@@ -86,7 +87,7 @@ FEATURELAGEN = (
     "putten",
     "strengen",
     "vlakken",
-    "stelsels",
+    "gemengd_zonder_overstort",
 )
 
 # De relaties van EXT-001, van zwaar naar licht. De laag toont de sterkste over de
@@ -139,7 +140,7 @@ GEOPACKAGE_STAPPEN = (
     "putten",
     "strengen",
     "vlakken",
-    "stelsels",
+    "gemengd_zonder_overstort",
     "meldingen",
     "overzicht_checks",
     "gwsw_run",
@@ -172,10 +173,10 @@ class _LaagTellingen:
     # De externe vlakken (pand, bouwwerk, water) waarnaar een EXT-melding wijst; sinds
     # issue #67 één laag `vlakken` in plaats van `bouwwerken` en `waterdelen_zonder_zinker`.
     vlakken: int
-    # Het aantal stelsels dat een vlak kreeg: de geregistreerde stelsels met strengen.
-    # De put-buckets uit #17 (alleen putten, geen strengen) vallen weg en zitten hier
-    # dus niet in; `n_stelsels` in `gwsw_run` maakt dat expliciet.
-    stelsels: int
+    # De gemengde deelstelsels waarop RVZ-006 aansloeg en die een vlak kregen (issue
+    # #75). Een deelstelsel waarvan geen enkele streng een bruikbare lijn heeft levert
+    # geen vlak op en zit hier dus niet in.
+    gemengd_zonder_overstort: int
 
 
 def schrijf_geopackage(
@@ -607,14 +608,14 @@ def _schrijf_features(
         voortgang.stap(label=laag)
 
     vlakken = _schrijf_treffers(verbinding, run, meldingen, voortgang)
-    stelsel_aantal = _schrijf_stelsels(verbinding, run, config, run.context, per_object, voortgang)
+    gemengd = _schrijf_gemengd_zonder_overstort(verbinding, run, config, meldingen, voortgang)
 
     return _LaagTellingen(
         putten=tellingen["putten"],
         strengen=tellingen["strengen"],
         mechanisch=mechanisch_geschreven,
         vlakken=vlakken,
-        stelsels=stelsel_aantal,
+        gemengd_zonder_overstort=gemengd,
     )
 
 
@@ -898,149 +899,160 @@ def _check_ids(meldingen: list[Melding]) -> str:
     return ", ".join(sorted({melding.check_id for melding in meldingen}))
 
 
-def _stelsel_kolommen() -> list[_Kolom]:
-    """De kolommen van de laag `stelsels`."""
+# De check waarvan de bevindingen de laag `gemengd_zonder_overstort` vullen. Eén laag,
+# één check: elke rij is een gemengd deelstelsel waarop RVZ-006 aansloeg.
+CHECK_GEMENGD_ZONDER_OVERSTORT = "RVZ-006"
+
+# Wat de popup boven de meldingenlijst als objecttype toont. Geen GWSW-klassenaam: een
+# gemengd deelstelsel is geen GWSW-object maar een afleiding uit de graaf, en die naam
+# hoort dat te zeggen in plaats van een klasse te suggereren die niet bestaat.
+SOORT_GEMENGD_DEELSTELSEL = "gemengd deelstelsel"
+
+
+def _gemengd_kolommen() -> list[_Kolom]:
+    """De kolommen van de laag `gemengd_zonder_overstort`."""
     return [
-        _Kolom("feature_id", "text"),
-        _Kolom("label", "text"),
-        _Kolom("stelseltype", "text"),
-        # 1 als ten minste een streng van het stelsel een afvoer- of lozingseindpunt
-        # bereikt (#18), anders 0. De symbologie toont standaard alleen de nullen.
-        _Kolom("bereikt_eindpunt", "integer"),
-        # De distinct netwerkknopen aan de eindpunten van de strengen. De registratie
-        # zet putten in aparte buckets (#17), dus dit is een afleiding uit de graaf,
-        # alleen als teller -- niet de bron van de geometrie.
-        _Kolom("n_putten", "integer"),
+        # Het deelstelsel-ID dat RVZ-006, NET-001 en NET-002 delen (`deelstelsel_ids`);
+        # ook de sleutel waarop de meldingen van deze laag te koppelen zijn.
+        _Kolom("cluster_id", "text"),
+        _Kolom("n_knopen", "integer"),
         _Kolom("n_strengen", "integer"),
         _Kolom("strenglengte_m", "real"),
-        # Het aantal SHACL-overtredingen waarvan de focusnode dit stelsel is (#17). Ze
-        # koppelen via `object_uri` aan de laag; de popup somt ze op.
+        # Het aantal RVZ-006-meldingen op dit deelstelsel: één per gemengde streng.
         _Kolom("n_meldingen", "integer"),
-        _Kolom("gwsw_uri", "text"),
         _Kolom("popup_html", "text"),
     ]
 
 
-def _schrijf_stelsels(
+def _schrijf_gemengd_zonder_overstort(
     verbinding: sqlite3.Connection,
     run: CheckRun,
     config: CheckConfig,
-    afvoercontext: CheckContext,
-    per_object: dict[str, list[Melding]],
+    meldingen: list[Melding],
     voortgang: Voortgang,
 ) -> int:
-    """Schrijft de cartografische laag `stelsels` en geeft het aantal rijen terug.
+    """Schrijft de laag `gemengd_zonder_overstort` en geeft het aantal rijen terug.
 
-    Een vlak per geregistreerd stelsel dat strengen draagt (#17, #25): de buffer om zijn
-    strengen, samengevoegd tot een MULTIPOLYGON. De put-buckets uit #17 hebben geen
-    strengen en levert `lees_stelsels` al niet op. De laag beslaat de hele dataset, niet
-    de kern van een studiegebied: een stelsel is aan geen enkel studiegebied toe te
-    wijzen (BO-12), net als de klassentelling in het rapport.
+    Een vlak per gemengd deelstelsel waarop RVZ-006 aansloeg (issue #75): de buffer om
+    de vrijvervalstrengen van de hele samenhangende component, samengevoegd tot een
+    MULTIPOLYGON. De bevindingen zelf hangen aan de gemengde strengen; dit vlak toont
+    waar dat deelstelsel ligt, want een deelstelsel is geen GWSW-object met een eigen
+    geometrie.
+
+    Strikte aansluiting, net als bij de trefferlaag: de rijen komen uit de meldingen van
+    déze uitvoer, gegroepeerd op hun `cluster_id`. De laag kan dus niet groter of kleiner
+    zijn dan de uitslag -- na afbakening tot een studiegebied of na onderdrukking uit
+    `[rapport]` verdwijnen de vlakken mee met hun meldingen. De geometrie komt uit
+    `run.context`: dezelfde graaf waarop de check draaide.
+
+    Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt levert geen vlak
+    op. Dat is geen stille weglating: zijn meldingen staan gewoon in de meldingentabel en
+    op hun eigen streng in de laag `strengen`.
     """
-    kolommen = _stelsel_kolommen()
+    kolommen = _gemengd_kolommen()
     _maak_featurelaag(
         verbinding,
-        "stelsels",
+        "gemengd_zonder_overstort",
         "MULTIPOLYGON",
         kolommen,
-        "Geregistreerde stelsels als vlak om hun strengen; standaard tonen alleen de "
-        "stelsels zonder afvoerroute.",
+        "Gemengde deelstelsels zonder externe overstort/BBB of zonder afvoereindpunt "
+        "(RVZ-006), als vlak om de strengen van het deelstelsel.",
     )
-    buffer_m = config.drempels.stelselvlak_buffer_m
-    gemeten = run.meetbereik.gemeten
+    per_cluster: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        if melding.check_id == CHECK_GEMENGD_ZONDER_OVERSTORT and melding.cluster_id:
+            per_cluster[melding.cluster_id].append(melding)
+
+    buffer_m = config.drempels.gemengd_zonder_overstort_buffer_m
+    knopen_per_cluster = _knopen_per_cluster(run)
+    index = aansluitingen(run.context, "vrijvervalleiding")
     rijen = []
     grenzen: list[tuple[float, float, float, float]] = []
-    for vlak in lees_stelsels(run.dataset):
-        geometrie = _stelsel_geometrie(run.dataset, vlak, buffer_m)
+    for cluster in sorted(per_cluster):
+        knopen = knopen_per_cluster.get(cluster, frozenset())
+        conduits = _strengen_van_cluster(index, knopen)
+        geometrie = _gemengd_geometrie(conduits, buffer_m)
         if geometrie is None or geometrie.is_empty:
             continue
         grenzen.append(geometrie.bounds)
         rijen.append(
             (
                 _blob(_als_multipolygon(geometrie)),
-                *_stelsel_rij(run.dataset, afvoercontext, vlak, per_object, gemeten),
+                *_gemengd_rij(cluster, knopen, conduits, per_cluster[cluster]),
             )
         )
     if rijen:
         plaatshouders = ", ".join("?" * (len(kolommen) + 1))
         velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
         verbinding.executemany(
-            f'insert into "stelsels" (geom, {velden}) values ({plaatshouders})', rijen
+            f'insert into "gemengd_zonder_overstort" (geom, {velden}) values ({plaatshouders})',
+            rijen,
         )
-    _zet_omhullende(verbinding, "stelsels", grenzen)
-    voortgang.stap(label="stelsels")
+    _zet_omhullende(verbinding, "gemengd_zonder_overstort", grenzen)
+    voortgang.stap(label="gemengd_zonder_overstort")
     return len(rijen)
 
 
-def _stelsel_geometrie(
-    dataset: GwswDataset, vlak: Stelselvlak, buffer_m: float
-) -> BaseGeometry | None:
-    """De buffer om de strengen van een stelsel, samengevoegd tot een vlak.
+def _knopen_per_cluster(run: CheckRun) -> dict[str, frozenset[str]]:
+    """De knopen van elk vrijverval-deelstelsel, omgekeerd uit `deelstelsel_ids`."""
+    gevonden: dict[str, set[str]] = defaultdict(set)
+    for uri, cluster in deelstelsel_ids(run.context).items():
+        gevonden[cluster].add(uri)
+    return {cluster: frozenset(knopen) for cluster, knopen in gevonden.items()}
 
-    Bewust de strengen en niet de omhullende van alle leden: #17 vond dat een put en de
-    strengen waarop hij aansluit in verschillende stelselobjecten staan, dus de
-    omhullende zou de gemeentebrede put-buckets tot een vlek uitsmeren.
-    """
+
+def _strengen_van_cluster(index: Aansluitingen, knopen: frozenset[str]) -> list[Conduit]:
+    """De vrijvervalstrengen die op de knopen van dit deelstelsel uitkomen, ontdubbeld."""
+    gevonden: dict[str, Conduit] = {}
+    for knoop in sorted(knopen):
+        for conduit in index.strengen(knoop):
+            gevonden[conduit.uri] = conduit
+    return [gevonden[uri] for uri in sorted(gevonden)]
+
+
+def _gemengd_geometrie(conduits: list[Conduit], buffer_m: float) -> BaseGeometry | None:
+    """De buffer om de strengen van een deelstelsel, samengevoegd tot een vlak."""
     lijnen = [
         conduit.line
-        for uri in vlak.strengen
-        if (conduit := dataset.conduits.get(uri)) is not None
-        and conduit.line is not None
-        and not conduit.line.is_empty
+        for conduit in conduits
+        if conduit.line is not None and not conduit.line.is_empty
     ]
     if not lijnen:
         return None
     return unary_union([lijn.buffer(buffer_m) for lijn in lijnen])
 
 
-def _stelsel_rij(
-    dataset: GwswDataset,
-    afvoercontext: CheckContext,
-    vlak: Stelselvlak,
-    per_object: dict[str, list[Melding]],
-    gemeten: bool,
+def _gemengd_rij(
+    cluster: str,
+    knopen: frozenset[str],
+    conduits: list[Conduit],
+    meldingen: list[Melding],
 ) -> tuple[object, ...]:
-    """De attribuutvelden van een stelselvlak, in de volgorde van de kolommen.
+    """De attribuutvelden van een gemengd-deelstelselvlak, in kolomvolgorde.
 
-    De meldingen die op het stelsel landen zijn de SHACL-overtredingen waarvan de
-    focusnode dit stelsel is (#17): ze koppelen via `object_uri` aan `vlak.uri` en
-    verschijnen zo op de kaart. Zonder nulmeting is het stelsel niet beoordeeld -- de
-    eigen checks toetsen geen stelsel -- en staat de popup op grijs.
+    De status is die van de meldingen erop -- er staat er per definitie minstens één,
+    anders was er geen vlak -- dus grijs komt hier niet voor en `geanalyseerd` staat
+    vast op waar.
     """
-    conduits = [dataset.conduits[uri] for uri in vlak.strengen if uri in dataset.conduits]
     strenglengte = sum(conduit.line.length for conduit in conduits if conduit.line is not None)
-    bereikt = any(afvoerpad_van_streng(afvoercontext, conduit) is not None for conduit in conduits)
-    putten: set[str] = set()
-    for conduit in conduits:
-        for knoop in verbonden_knopen(afvoercontext, conduit):
-            if knoop is not None:
-                putten.add(knoop)
-    meldingen = per_object.get(vlak.uri, [])
     kop = Objectkop(
-        label=vlak.label,
-        objecttype=vlak.stelseltype,
-        status=bepaal_status(meldingen, geanalyseerd=gemeten),
-        feiten=_stelsel_feiten(len(vlak.strengen), strenglengte, bereikt),
-        reden="" if gemeten else REDEN_GEEN_NULMETING,
+        label=cluster,
+        objecttype=SOORT_GEMENGD_DEELSTELSEL,
+        status=bepaal_status(meldingen, geanalyseerd=True),
+        feiten=(
+            f"{len(knopen)} knopen, {len(conduits)} strengen, {strenglengte:.0f} m",
+            f"{len(meldingen)} gemengde strengen gemeld",
+        ),
+        reden="",
     )
     return (
-        vlak.feature_id,
-        vlak.label,
-        vlak.stelseltype,
-        int(bereikt),
-        len(putten),
-        len(vlak.strengen),
+        cluster,
+        len(knopen),
+        len(conduits),
         strenglengte,
         len(meldingen),
-        vlak.uri,
         popup_html(kop, meldingen),
     )
-
-
-def _stelsel_feiten(n_strengen: int, strenglengte: float, bereikt: bool) -> tuple[str, ...]:
-    """De feitenregel in de stelselpopup: de omvang en of er een afvoereindpunt is."""
-    afvoer = "bereikt een afvoereindpunt" if bereikt else "geen afvoerroute"
-    return (f"{n_strengen} strengen, {strenglengte:.0f} m", afvoer)
 
 
 def _begindatum_jaar(object_: object) -> int | None:
@@ -1490,7 +1502,7 @@ def _schrijf_runmetadata(
         _Kolom("n_strengen", "integer"),
         _Kolom("n_mechanisch", "integer"),
         _Kolom("n_vlakken", "integer"),
-        _Kolom("n_stelsels", "integer"),
+        _Kolom("n_gemengd_zonder_overstort", "integer"),
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
@@ -1543,7 +1555,7 @@ def _schrijf_runmetadata(
             tellingen.strengen,
             tellingen.mechanisch,
             tellingen.vlakken,
-            tellingen.stelsels,
+            tellingen.gemengd_zonder_overstort,
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,

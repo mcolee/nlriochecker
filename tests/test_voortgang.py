@@ -135,7 +135,7 @@ def test_geopackagefase_zet_een_stap_per_laag(tmp_path: Path) -> None:
         "putten",
         "strengen",
         "vlakken",
-        "stelsels",
+        "gemengd_zonder_overstort",
         "meldingen",
         "overzicht_checks",
         "gwsw_run",

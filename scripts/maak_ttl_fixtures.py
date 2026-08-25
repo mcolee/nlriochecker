@@ -1513,19 +1513,19 @@ gwsw:Rioolstelsel rdfs:subClassOf gwsw:Stelsel .
 
 
 def stelsel(naam: str, label: str, klasse: str, leden: list[str]) -> str:
-    """Een geregistreerd stelselobject dat zijn leden via `hasPart` draagt (#17, #25)."""
+    """Een geregistreerd stelselobject dat zijn leden via `hasPart` draagt (#17)."""
     delen = " , ".join(f":{lid}" for lid in leden)
     return f':{naam} rdf:type gwsw:{klasse} ; rdfs:label "{label}" ;\n    gwsw:hasPart {delen} .\n'
 
 
-# #25: de geregistreerde stelselboom die #17 blootlegde. Twee lokale stelsels met alleen
-# strengen -- een vuilwaterstelsel dat een gemaal bereikt en een gemengd stelsel zonder
-# afvoerroute -- plus een gemeentebrede `_geb_0`-bucket die naast een streng ook putten
-# bevat (#17). De bucket krijgt geen vlak: zulke buckets liggen over de hele gemeente en
-# zouden een uitgesmeerde vlek geven. `stelselvlak_buffer_m` bepaalt de bufferbreedte.
+# De geregistreerde stelselboom die #17 blootlegde: twee lokale stelsels met alleen
+# strengen plus een gemeentebrede `_geb_0`-bucket die naast een streng ook putten bevat.
+# `dataset.stelsel_leden` scheidt die twee; de nulmetingjoin gebruikt dat onderscheid om
+# een stelsel als focusnode te herkennen. Sinds issue #75 tekent de GeoPackage geen
+# stelselvlakken meer, dus deze fixture voedt alleen nog die regel.
 FIXTURES["stelsels_registratie.ttl"] = (
-    "geen; twee lokale stelsels met alleen strengen (vuilwater bereikt een gemaal, "
-    "gemengd niet) plus een gemeentebrede bucket met strengen en putten die geen vlak krijgt",
+    "geen; twee lokale stelsels met alleen strengen plus een gemeentebrede bucket met "
+    "strengen en putten",
     STELSEL_HIERARCHIE
     + put("PutA", "A", 1000.0, 2000.0)
     + put("PutB", "B", 1050.0, 2000.0)

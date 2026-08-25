@@ -196,8 +196,8 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
     )
 
     assert [naam for naam, _, _ in stijlen] == [
+        "gemengd_zonder_overstort",
         "putten",
-        "stelsels",
         "strengen",
         "vlakken",
     ]
@@ -1085,103 +1085,83 @@ def test_afvoerpad_zonder_lijn_geeft_stappen_zonder_meters(tmp_path: Path) -> No
     assert (eindpunt, stappen, meters) == ("G", 1, None)
 
 
-def test_stelsels_laag_is_een_multipolygon_in_gpkg_contents(tmp_path: Path) -> None:
-    """De cartografische stelsellaag staat geregistreerd, anders vindt QGIS haar niet."""
+def test_de_stelsellaag_bestaat_niet_meer(tmp_path: Path) -> None:
+    """Issue #75: de laag groepeerde strengen via de GWSW-stelselregistratie.
+
+    Die groepering is niet betrouwbaar, en de wel/geen-afvoerroute die zij toonde is
+    een netwerk-eigenschap. De laag is daarom weg; de `stelsel`-kolom op `putten` en
+    `strengen` blijft (dat is een labeling, geen vlak).
+    """
     pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
 
+    contents = {naam for (naam,) in _rijen(pad, "select table_name from gpkg_contents")}
+    assert "stelsels" not in contents
+    kolommen = {rij[1] for rij in _rijen(pad, "pragma table_info(strengen)")}
+    assert "stelsel" in kolommen
+
+
+def test_gemengd_zonder_overstort_is_een_multipolygon_in_gpkg_contents(tmp_path: Path) -> None:
+    """De nieuwe vlakkenlaag staat geregistreerd, anders vindt QGIS haar niet."""
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
     ((soort,),) = _rijen(
-        pad, "select geometry_type_name from gpkg_geometry_columns where table_name = 'stelsels'"
+        pad,
+        "select geometry_type_name from gpkg_geometry_columns "
+        "where table_name = 'gemengd_zonder_overstort'",
     )
     assert soort == "MULTIPOLYGON"
     contents = {naam for (naam,) in _rijen(pad, "select table_name from gpkg_contents")}
-    assert "stelsels" in contents
+    assert "gemengd_zonder_overstort" in contents
 
 
-def test_stelsels_laag_slaat_de_put_bucket_over(tmp_path: Path) -> None:
-    """Alleen stelsels met strengen krijgen een vlak; de hemelwaterbucket valt weg."""
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+def test_gemengd_zonder_overstort_geeft_een_vlak_per_deelstelsel(tmp_path: Path) -> None:
+    """De twee RVZ-006-bevindingen van hetzelfde deel leveren samen een vlak op.
 
-    labels = {label for (label,) in _rijen(pad, "select label from stelsels")}
-
-    assert labels == {"vuilwater-1", "gemengd-1"}
-
-
-def test_stelsels_dragen_type_afvoer_en_omvang(tmp_path: Path) -> None:
-    """Type, bereikt_eindpunt en de tellingen per stelsel.
-
-    Het vuilwaterstelsel bereikt het gemaal (twee strengen van 50 m, samen 100 m);
-    het gemengde stelsel heeft geen afvoerroute (een streng van 50 m).
+    Het vlak omvat de hele component (drie knopen, twee strengen van 50 m) en telt de
+    meldingen die erop landden.
     """
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    rijen = {
-        label: (stelseltype, bereikt, n_strengen, lengte)
-        for label, stelseltype, bereikt, n_strengen, lengte in _rijen(
-            pad,
-            "select label, stelseltype, bereikt_eindpunt, n_strengen, strenglengte_m from stelsels",
-        )
-    }
-    assert rijen["vuilwater-1"] == ("Vuilwaterstelsel", 1, 2, 100.0)
-    assert rijen["gemengd-1"] == ("GemengdStelsel", 0, 1, 50.0)
+    rijen = _rijen(
+        pad,
+        "select cluster_id, n_knopen, n_strengen, strenglengte_m, n_meldingen "
+        "from gemengd_zonder_overstort",
+    )
 
-
-def test_stelsels_tellen_de_putten_aan_de_strengeinden(tmp_path: Path) -> None:
-    """`n_putten` telt de distinct netwerkknopen aan de eindpunten van de strengen."""
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
-
-    putten = dict(_rijen(pad, "select label, n_putten from stelsels"))
-
-    assert putten["vuilwater-1"] == 3  # PutA, PutB en het gemaal
-    assert putten["gemengd-1"] == 2  # PutC en PutD
+    assert len(rijen) == 1
+    cluster, n_knopen, n_strengen, lengte, n_meldingen = rijen[0]
+    assert cluster.startswith("ds-")
+    assert (n_knopen, n_strengen, lengte, n_meldingen) == (3, 2, 100.0, 2)
 
 
-def test_stelsels_dragen_een_leesbaar_vlak(tmp_path: Path) -> None:
-    """De geometrie is een leesbare MULTIPOLYGON om de strengen heen."""
+def test_gemengd_zonder_overstort_draagt_een_leesbaar_vlak(tmp_path: Path) -> None:
+    """De geometrie is een leesbare MULTIPOLYGON om de strengen van de component."""
     from shapely import wkb
 
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    ((blob,),) = _rijen(pad, "select geom from stelsels where label = 'gemengd-1'")
+    ((blob,),) = _rijen(pad, "select geom from gemengd_zonder_overstort")
     vorm = wkb.loads(bytes(blob)[8:])  # de GPKG-kop (magic, versie, vlaggen, srs) overslaan
     assert vorm.geom_type == "MultiPolygon"
     assert not vorm.is_empty
+    # Twee strengen van 50 m met 10 m buffer: een lint van ruim 100 x 20 m.
+    assert vorm.bounds == pytest.approx((990.0, 1990.0, 1110.0, 2010.0), abs=0.5)
 
 
-def test_runmetadata_telt_de_stelsels(tmp_path: Path) -> None:
-    """`n_stelsels` maakt expliciet hoeveel stelsels een vlak kregen (put-buckets niet)."""
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+def test_gemengd_zonder_overstort_blijft_leeg_zonder_bevinding(tmp_path: Path) -> None:
+    """Zonder RVZ-006-melding blijft de laag leeg; ze volgt de uitslag, niet de graaf."""
+    pad = _schrijf(_run("rvz_schoon.ttl", "RVZ-006"), tmp_path)
 
-    ((aantal,),) = _rijen(pad, "select n_stelsels from gwsw_run")
-
-    assert aantal == 2
+    assert _rijen(pad, "select count(*) from gemengd_zonder_overstort") == [(0,)]
 
 
-def test_stelselmelding_uit_de_nulmeting_landt_op_de_stelsellaag(tmp_path: Path) -> None:
-    """De bonus van #25: een SHACL-overtreding op een stelsel komt op zijn vlak.
+def test_runmetadata_telt_de_gemengde_deelstelsels(tmp_path: Path) -> None:
+    """`n_gemengd_zonder_overstort` maakt expliciet hoeveel vlakken er geschreven zijn."""
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    De focusnode `vw_geb_1` is geen knoop of streng maar een geregistreerd stelsel; de
-    join koppelt de overtreding aan de stelsel-URI, en zo verschijnt ze op de kaart via
-    het stelselvlak in plaats van nergens op uit te komen.
-    """
-    from nlriochecker.meting import laad_nulmeting
-    from nlriochecker.nulbevinding import bouw_nulbevindingen
+    ((aantal,),) = _rijen(pad, "select n_gemengd_zonder_overstort from gwsw_run")
 
-    shacl = Path(__file__).parent / "fixtures" / "shacl"
-    rapporten = [shacl / "join_mdsplan.csv", shacl / "join_mdsproj.csv"]
-    nulmeting = laad_nulmeting(rapporten, VEREIST[1:])
-    basis = _run("nulmeting_join.ttl")
-    nulbevindingen = bouw_nulbevindingen(nulmeting, basis.dataset, 0.80)
-    run = replace(
-        basis, nulbevindingen=nulbevindingen, meetbereik=Meetbereik.van(VEREIST, VEREIST[1:])
-    )
-
-    pad = _schrijf(run, tmp_path)
-
-    ((n_meldingen, popup),) = _rijen(
-        pad, "select n_meldingen, popup_html from stelsels where label = 'vw-1'"
-    )
-    assert n_meldingen >= 1
-    assert "Vuilwaterstelsel_Lozingspunt_card" in popup
+    assert aantal == 1
 
 
 # Issue #65: onderdrukking uit `[rapport]`. De fixture: vrijvervalstreng L1 (GemengdRiool)

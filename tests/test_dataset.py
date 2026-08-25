@@ -538,3 +538,24 @@ def test_functie_per_klasse_komt_uit_de_restricties() -> None:
     # ... maar een eigen restrictie wint van wat de bovenklasse zou geven.
     assert dataset.functie_per_klasse[f"{GWSW}T_stuk"] == "VerbindenVanDrieLeidingen"
     assert dataset.functie_per_klasse[f"{GWSW}Verbindingsstuk"] == "VerbindenVanLeidingen"
+
+
+def test_stelsel_leden_scheidt_lokale_stelsels_van_buckets() -> None:
+    """De regel waarmee de nulmetingjoin een stelsel als focusnode herkent (#17).
+
+    Een lokaal stelsel draagt alleen strengen; een gemeentebrede `_geb_0`-bucket draagt
+    strengen en putten door elkaar heen. `nulbevinding._Joiner.stelsel` gebruikt dat
+    onderscheid om de overtreding aan het stelsel te koppelen.
+    """
+    dataset = load_dataset(TTL_DIR / "stelsels_registratie.ttl")
+
+    lokaal = buckets = 0
+    for subject in dataset.subjects_of_class("Stelsel"):
+        strengen, knopen = dataset.stelsel_leden(str(subject))
+        if strengen and not knopen:
+            lokaal += 1
+        elif strengen and knopen:
+            buckets += 1
+
+    assert lokaal == 2  # vuilwater-1 en gemengd-1
+    assert buckets == 1  # de hemelwater-bucket met een streng én een put
