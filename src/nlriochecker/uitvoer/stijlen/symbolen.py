@@ -14,8 +14,8 @@ regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 44
 knooptypen en 40 verbindingstypen in deze tabel zijn dat 220 respectievelijk 200
 bladregels met evenzoveel symbolen. Met de hand is dat ruim vierduizend regels XML
 waarin een tikfout de kaart stil leegtrekt, en waarin de typenlijst op twee plekken
-zou staan. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven wel gewone
-bestanden: die hebben een enkel symbool en veranderen niet.
+zou staan. `vlakken.qml` en `stelsels.qml` blijven wel gewone bestanden: die hebben een
+vaste regelstructuur (drie soorten, twee afvoertoestanden) die niet met de data meeschaalt.
 
 Een opgebouwde stijl draagt alleen regels voor de objecttypen die werkelijk in zijn
 laag staan; die krijgt hij van de schrijver mee. Dat is niet alleen zuiniger maar

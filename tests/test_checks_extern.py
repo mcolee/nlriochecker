@@ -475,15 +475,23 @@ def test_ext003_wijst_het_geraakte_waterdeel_aan(
     }
 
 
-def test_ext002_registreert_geen_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
-    """De laag volgt EXT-003; kruisingen met een duiker horen er bewust buiten."""
+def test_ext002_registreert_zijn_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Sinds issue #67 registreert EXT-002 elk doorkruist waterdeel als treffer.
+
+    Zo krijgt ook een waterdeel dat alleen deze check ziet -- een echte doorkruising door
+    een geregistreerde zinker of duiker -- een vlak in de laag `vlakken`, en deelt een
+    waterdeel dat beide checks raken één sleutel met EXT-003.
+    """
     dataset = load_dataset(SCENARIO)
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-002"])
 
-    assert len(run.treffers) == 0
     assert run.findings
+    # Elke melding wijst een geregistreerde treffer aan, allemaal waterdelen.
+    aangewezen = {f.details["object2_uri"] for f in run.findings}
+    assert aangewezen == {t.sleutel for t in run.treffers}
+    assert all(t.bron == "bgt_water" for t in run.treffers)
 
 
 def test_ext003_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:

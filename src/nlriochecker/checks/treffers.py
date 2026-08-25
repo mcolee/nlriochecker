@@ -1,7 +1,8 @@
 """Het trefferregister: de externe objecten die de checks tijdens een run raken.
 
-De GeoPackage krijgt twee lagen met de BGT- en BAG-objecten waarnaar EXT-meldingen
-verwijzen. De geometrie van zo'n object hoort niet in `Finding.details` -- dat zou de
+De GeoPackage krijgt één laag `vlakken` met de BGT- en BAG-objecten waarnaar EXT-meldingen
+verwijzen (pand, bouwwerk, water; issue #67). De geometrie van zo'n object hoort niet in
+`Finding.details` -- dat zou de
 CSV en de JSON met WKB vervuilen -- en de schrijver mag de externe lagen niet zelf
 bevragen, want dan kunnen laag en testuitkomst uit elkaar lopen. Daarom registreert de
 check de treffer op het moment dat hij de bevinding bouwt, en joint de schrijver later

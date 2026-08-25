@@ -215,6 +215,19 @@ def test_de_stelsellaag_toont_standaard_alleen_de_stelsels_zonder_afvoerroute(
     assert actief == {"Geen afvoerroute": True, "Bereikt een afvoereindpunt": False}
 
 
+def test_de_vlakkenlaag_toont_de_drie_soorten(qgis_app, geschreven_gpkg: Path) -> None:
+    """De kern van #67: één laag met een regel per soort (pand, bouwwerk, water).
+
+    De regels staan vast in de QML, ook op een lege laag; ze filteren elk op `soort`.
+    """
+    vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=vlakken", "v", "ogr")
+    boodschap, gelukt = vector.loadDefaultStyle()
+
+    assert gelukt, f"vlakken: {boodschap}"
+    labels = {regel.label() for regel in vector.renderer().rootRule().children()}
+    assert labels == {"Pand (BGT/BAG)", "Overig bouwwerk (BGT)", "Waterdeel (BGT)"}
+
+
 def _renderer_symbolen(renderer):
     """De symbolen van een renderer, met regels (rule-based) of zonder (simpel).
 

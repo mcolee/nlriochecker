@@ -196,11 +196,10 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
     )
 
     assert [naam for naam, _, _ in stijlen] == [
-        "bouwwerken",
         "putten",
         "stelsels",
         "strengen",
-        "waterdelen_zonder_zinker",
+        "vlakken",
     ]
     for _, qml, standaard in stijlen:
         assert standaard == 1
@@ -603,71 +602,81 @@ def _laagrijen(pad: Path, laag: str) -> list[dict]:
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_bouwwerkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) -> None:
-    """De kerntest: niets erbij, niets eraf."""
+def test_vlakkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) -> None:
+    """De kerntest: niets erbij, niets eraf. Eén laag voor EXT-001, EXT-002 en EXT-003."""
     run = _ext_run()
     meldingen = bouw_meldingen(run, RUNDATUM)
     pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
 
-    verwacht = {m.object2_uri for m in meldingen if m.check_id == "EXT-001"}
+    verwacht = {
+        m.object2_uri
+        for m in meldingen
+        if m.check_id in ("EXT-001", "EXT-002", "EXT-003") and m.object2_uri
+    }
 
-    assert {rij["id"] for rij in _laagrijen(pad, "bouwwerken")} == verwacht
-
-
-@pytest.mark.skipif(
-    not (GIS_DIR / "ext" / "ahn.tif").exists(),
-    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
-)
-def test_bouwwerk_wordt_ontdubbeld_met_de_sterkste_relatie(tmp_path: Path) -> None:
-    """Vier objecten raken hetzelfde pand: een rij, vier meldingen, binnen wint."""
-    run = _ext_run()
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
-
-    rijen = _laagrijen(pad, "bouwwerken")
-
-    assert len(rijen) == 1
-    assert rijen[0]["id"] == "bgt:pand/pand-1"
-    assert rijen[0]["bron"] == "bgt_pand"
-    assert rijen[0]["bronbestand"] == "bgt.gpkg"
-    assert rijen[0]["label"] == "pand pand-1"
-    assert rijen[0]["relatie"] == "binnen"
-    assert rijen[0]["afstand_min_m"] == 0.0
-    assert rijen[0]["aantal_meldingen"] == 4
-    assert rijen[0]["check_ids"] == "EXT-001"
+    assert {rij["id"] for rij in _laagrijen(pad, "vlakken")} == verwacht
 
 
 @pytest.mark.skipif(
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_waterdelenlaag_volgt_ext003_en_niet_ext002(tmp_path: Path) -> None:
-    """Streng 3 kruist water-2 met een duiker; dat waterdeel hoort er niet in."""
+def test_pandvlak_wordt_ontdubbeld_met_de_sterkste_relatie(tmp_path: Path) -> None:
+    """Vier objecten raken hetzelfde pand: één rij, vier meldingen, binnen wint."""
     run = _ext_run()
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
-    rijen = _laagrijen(pad, "waterdelen_zonder_zinker")
+    panden = [rij for rij in _laagrijen(pad, "vlakken") if rij["soort"] == "pand"]
 
-    # Water-5 en water-7 komen erbij: streng 9 doorkruist beide greppels (issue #59).
-    assert [rij["id"] for rij in rijen] == [
+    assert len(panden) == 1
+    assert panden[0]["id"] == "bgt:pand/pand-1"
+    assert panden[0]["soort"] == "pand"
+    assert panden[0]["bron"] == "bgt_pand"
+    assert panden[0]["bronbestand"] == "bgt.gpkg"
+    assert panden[0]["label"] == "pand pand-1"
+    assert panden[0]["relatie"] == "binnen"
+    assert panden[0]["afstand_min_m"] == 0.0
+    assert panden[0]["aantal_meldingen"] == 4
+    assert panden[0]["check_ids"] == "EXT-001"
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_watervlak_draagt_beide_checks_en_ook_de_ext002_zinker(tmp_path: Path) -> None:
+    """Water valt niet meer weg: EXT-002 registreert nu zijn treffer (issue #67).
+
+    Water-1/5/7 worden door zowel EXT-002 als EXT-003 gemeld en dragen beide ID's;
+    water-2 wordt door streng 3 (een duiker) doorkruist -- EXT-003 slaat dat over, maar
+    EXT-002 niet -- en krijgt daardoor toch een vlak, met alleen EXT-002.
+    """
+    run = _ext_run()
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    water = {rij["id"]: rij for rij in _laagrijen(pad, "vlakken") if rij["soort"] == "water"}
+
+    assert set(water) == {
         "bgt:waterdeel/water-1",
+        "bgt:waterdeel/water-2",
         "bgt:waterdeel/water-5",
         "bgt:waterdeel/water-7",
-    ]
-    assert rijen[0]["watertype"] == "waterloop"
-    assert rijen[0]["aantal_meldingen"] == 1
-    assert rijen[0]["check_ids"] == "EXT-003"
-    assert rijen[0]["buffer_m"] == _config().drempels.ext_watergang_buffer_m
+    }
+    assert water["bgt:waterdeel/water-1"]["check_ids"] == "EXT-002, EXT-003"
+    assert water["bgt:waterdeel/water-2"]["check_ids"] == "EXT-002"
+    # Water draagt geen relatie of afstand -- die gelden alleen voor pand en bouwwerk.
+    assert water["bgt:waterdeel/water-1"]["relatie"] == ""
+    assert water["bgt:waterdeel/water-1"]["afstand_min_m"] is None
 
 
-def test_lege_lagen_bestaan_en_zijn_geregistreerd(tmp_path: Path) -> None:
-    """Een run zonder EXT-treffers heeft beide lagen, leeg, met stijl en registratie."""
+def test_lege_vlakkenlaag_bestaat_en_is_geregistreerd(tmp_path: Path) -> None:
+    """Een run zonder EXT-treffers heeft de laag `vlakken`, leeg, met stijl en registratie."""
     pad = _schrijf(_run("schoon.ttl"), tmp_path)
 
-    for laag in ("bouwwerken", "waterdelen_zonder_zinker"):
-        assert _rijen(pad, f'select count(*) from "{laag}"')[0][0] == 0
-        geregistreerd = _rijen(pad, "select count(*) from gpkg_contents where table_name = ?", laag)
-        gestyled = _rijen(pad, "select count(*) from layer_styles where f_table_name = ?", laag)
-        assert (geregistreerd[0][0], gestyled[0][0]) == (1, 1)
+    assert _rijen(pad, 'select count(*) from "vlakken"')[0][0] == 0
+    geregistreerd = _rijen(pad, "select count(*) from gpkg_contents where table_name = 'vlakken'")
+    gestyled = _rijen(pad, "select count(*) from layer_styles where f_table_name = 'vlakken'")
+    assert (geregistreerd[0][0], gestyled[0][0]) == (1, 1)
 
 
 def _bronnen_met_pand(
@@ -712,9 +721,10 @@ def test_nabij_geval_komt_in_de_laag(tmp_path: Path) -> None:
     run = _run_met_bronnen(bronnen, "EXT-001")
 
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
-    rijen = _laagrijen(pad, "bouwwerken")
+    rijen = _laagrijen(pad, "vlakken")
 
     assert [rij["id"] for rij in rijen] == ["bgt:pand/p-nabij"]
+    assert rijen[0]["soort"] == "pand"
     assert rijen[0]["relatie"] == "nabij"
     assert rijen[0]["aantal_meldingen"] == 2
     assert rijen[0]["afstand_min_m"] == 0.5
@@ -730,7 +740,7 @@ def test_bron_zonder_id_levert_een_geo_sleutel(tmp_path: Path) -> None:
     run = _run_met_bronnen(bronnen, "EXT-001")
 
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
-    rijen = _laagrijen(pad, "bouwwerken")
+    rijen = _laagrijen(pad, "vlakken")
 
     assert rijen[0]["id"].startswith("geo:")
     assert any("geo:" in note for note in run.outcomes[0].notes)
@@ -756,30 +766,32 @@ def test_geo_sleutel_is_stabiel_over_runs(tmp_path: Path) -> None:
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_runmetadata_telt_de_trefferlagen_mee(tmp_path: Path) -> None:
-    """De aantallen per laag horen ook in gwsw_run te staan, net als de andere lagen."""
+def test_runmetadata_telt_de_vlakkenlaag_mee(tmp_path: Path) -> None:
+    """Het aantal vlakken hoort ook in gwsw_run te staan, net als de andere lagen."""
     run = _ext_run()
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
-    rij = _rijen(pad, "select n_bouwwerken, n_waterdelen from gwsw_run")[0]
+    (aantal,) = _rijen(pad, "select n_vlakken from gwsw_run")[0]
 
-    # Drie waterdelen: EXT-003 meldt sinds issue #59 ook water-5 en water-7, de twee
-    # greppels die streng 9 doorkruist.
-    assert rij == (1, 3)
+    # Vijf vlakken: één pand, drie waterdelen die EXT-003 meldt (water-1/5/7) plus water-2
+    # dat alleen EXT-002 ziet, dat sinds issue #67 ook een treffer registreert.
+    assert aantal == 5
+    assert aantal == len(_laagrijen(pad, "vlakken"))
 
 
 @pytest.mark.skipif(
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_waterdeel_label_noemt_type_en_identificatie(tmp_path: Path) -> None:
-    """`watertype` is om op te filteren, `label` is om iets in terug te vinden."""
+def test_watervlak_subtype_noemt_type_en_label_de_identificatie(tmp_path: Path) -> None:
+    """`subtype` is om op te filteren, `label` is om iets in terug te vinden."""
     run = _ext_run()
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
-    rij = _laagrijen(pad, "waterdelen_zonder_zinker")[0]
+    rij = next(r for r in _laagrijen(pad, "vlakken") if r["id"] == "bgt:waterdeel/water-1")
 
-    assert rij["watertype"] == "waterloop"
+    assert rij["soort"] == "water"
+    assert rij["subtype"] == "waterloop"
     assert rij["label"] == "waterloop water-1"
 
 

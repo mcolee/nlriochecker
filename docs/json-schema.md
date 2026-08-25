@@ -208,13 +208,16 @@ bewegen:
   in [docs/beslislog.md](beslislog.md) voor de tabel per check.
 
 De geometrie van het externe object zit **niet** in de JSON -- die zou als WKB in het
-contract belanden. Wie hem wil, vindt het object in de GeoPackage: de lagen
-`bouwwerken` en `waterdelen_zonder_zinker` dragen dezelfde sleutel in hun kolom `id`.
+contract belanden. Wie hem wil, vindt het object in de GeoPackage: de laag `vlakken`
+draagt dezelfde sleutel in haar kolom `id` (issue #67). De kolom `soort` (`pand`,
+`bouwwerk`, `water`) scheidt de categorieën die vroeger in de aparte lagen `bouwwerken`
+en `waterdelen_zonder_zinker` stonden; `check_ids` somt de checks op die naar het vlak
+wijzen.
 
-Voor EXT-002 geldt daarbij een voorbehoud: de laag `waterdelen_zonder_zinker` volgt
-alleen EXT-003. Een waterdeel dat wél doorkruist wordt maar door een geregistreerde
-zinker levert dus een EXT-002-melding met `object2_uri` en géén rij in die laag; de
-sleutel is dan alleen in de JSON te vinden.
+EXT-002 registreert sinds issue #67 ook zijn treffer. Een waterdeel dat wél doorkruist
+wordt maar door een geregistreerde zinker levert dus zowel een EXT-002-melding met
+`object2_uri` als een rij in `vlakken` (met `check_ids = "EXT-002"`); raken beide checks
+hetzelfde waterdeel, dan is het één rij met `check_ids = "EXT-002, EXT-003"`.
 
 ### Meldingen uit de nulmeting
 

@@ -125,14 +125,23 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   de opmaak van de popup staan in `uitvoer/objectkaart.py`; `gpkg.py` levert alleen de
   feiten die alleen hij kent (stelsel, lengte, BOB-richting) als kant-en-klare regels
   aan. Zie BO-29.
-- De GeoPackage draagt naast de rioleringslagen `bouwwerken` (EXT-001) en
-  `waterdelen_zonder_zinker` (EXT-003): de externe objecten waarnaar de meldingen van
-  díé uitvoer verwijzen, gejoind op het trefferregister (`checks/treffers.py`) via
-  `object2_uri`. De schrijver bevraagt zelf nooit een externe bron -- dan zouden laag en
-  uitslag uit elkaar kunnen lopen. Eén beperking erft mee en blijft staan: EXT-001
-  meldt alleen het sterkste bouwwerk (BO-17). De watergangcheck geeft elke echte
-  doorkruising per streng terug; de `break` na het eerste waterdeel is met BO-43
-  vervallen. Zie ook BO-18.
+- De GeoPackage draagt naast de rioleringslagen één laag `vlakken` (MULTIPOLYGON) met de
+  externe objecten waarnaar de meldingen van díé uitvoer verwijzen, gejoind op het
+  trefferregister (`checks/treffers.py`) via `object2_uri` (BO-50, issue #67). De kolom
+  `soort` scheidt de drie categorieën (`pand`, `bouwwerk`, `water`) en volgt op één plek
+  uit `Treffer.bron` (`bgt_pand`/`bag_pand` → `pand`, `bgt_bouwwerk` → `bouwwerk`,
+  `bgt_water` → `water`). `subtype` draagt voor water het BGT-`type` (waterloop, greppel;
+  uit `Treffer.label`) en voor pand en bouwwerk het BGT-type uit `Treffer.attributen`;
+  `relatie` en `afstand_min_m` gelden alleen voor pand en bouwwerk (EXT-001) en blijven
+  leeg bij water. `check_ids` somt de checks op die naar het vlak wijzen: een waterdeel
+  dat zowel EXT-002 als EXT-003 raakt draagt beide. De vroegere `buffer_m` vervalt --
+  dat is runmetadata en staat in `gwsw_run` (`n_vlakken` telt de laag). De schrijver
+  bevraagt zelf nooit een externe bron -- dan zouden laag en uitslag uit elkaar kunnen
+  lopen. Eén beperking erft mee en blijft staan: EXT-001 meldt alleen het sterkste
+  bouwwerk (BO-17). EXT-002 registreert sinds issue #67 zijn treffer (het doorkruiste
+  waterdeel), zodat ook een kruising door een geregistreerde zinker een vlak krijgt; de
+  watergangcheck geeft elke echte doorkruising per streng terug (de `break` na het eerste
+  waterdeel is met BO-43 vervallen). Zie ook BO-18.
 - Aangeleverde externe bronnen worden bij het laden getoetst op dekking van
   `bronnen.studiegebied` (vectorlagen plus de grootste EXT-zoekafstand, het raster
   zonder marge). Een tekort boven `[bronnen] dekking_tolerantie_m` (standaard 0) is een

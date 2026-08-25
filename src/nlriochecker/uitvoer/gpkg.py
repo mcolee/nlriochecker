@@ -85,8 +85,7 @@ RICHTING_ONBEKEND = "onbekend"
 FEATURELAGEN = (
     "putten",
     "strengen",
-    "bouwwerken",
-    "waterdelen_zonder_zinker",
+    "vlakken",
     "stelsels",
 )
 
@@ -139,8 +138,7 @@ RD_WKT = (
 GEOPACKAGE_STAPPEN = (
     "putten",
     "strengen",
-    "bouwwerken",
-    "waterdelen_zonder_zinker",
+    "vlakken",
     "stelsels",
     "meldingen",
     "overzicht_checks",
@@ -171,8 +169,9 @@ class _LaagTellingen:
     # Hoeveel van die lijnen mechanisch riool zijn; ze staan sinds issue #13 tussen de
     # strengen met status `grijs` in plaats van in een eigen laag.
     mechanisch: int
-    bouwwerken: int
-    waterdelen: int
+    # De externe vlakken (pand, bouwwerk, water) waarnaar een EXT-melding wijst; sinds
+    # issue #67 één laag `vlakken` in plaats van `bouwwerken` en `waterdelen_zonder_zinker`.
+    vlakken: int
     # Het aantal stelsels dat een vlak kreeg: de geregistreerde stelsels met strengen.
     # De put-buckets uit #17 (alleen putten, geen strengen) vallen weg en zitten hier
     # dus niet in; `n_stelsels` in `gwsw_run` maakt dat expliciet.
@@ -481,7 +480,7 @@ def _schrijf_features(
     voortgang: Voortgang = NUL_VOORTGANG,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> _LaagTellingen:
-    """Schrijft de twee objectlagen plus de twee lagen met externe objecten.
+    """Schrijft de twee objectlagen plus de vlakkenlaag met externe objecten.
 
     Naast de beoordeelde objecten komt erin wat de checks wel zagen maar niet
     beoordeelden: mechanisch riool, dat volgens het checkregister buiten scope valt,
@@ -590,15 +589,14 @@ def _schrijf_features(
         tellingen[laag] = len(rijen)
         voortgang.stap(label=laag)
 
-    bouwwerken, waterdelen = _schrijf_treffers(verbinding, run, meldingen, config, voortgang)
+    vlakken = _schrijf_treffers(verbinding, run, meldingen, voortgang)
     stelsel_aantal = _schrijf_stelsels(verbinding, run, config, run.context, per_object, voortgang)
 
     return _LaagTellingen(
         putten=tellingen["putten"],
         strengen=tellingen["strengen"],
         mechanisch=mechanisch_geschreven,
-        bouwwerken=bouwwerken,
-        waterdelen=waterdelen,
+        vlakken=vlakken,
         stelsels=stelsel_aantal,
     )
 
@@ -660,10 +658,33 @@ def _reden_niet_beoordeeld(
     return ""
 
 
-def _bouwwerk_kolommen() -> list[_Kolom]:
-    """De kolommen van de laag `bouwwerken`."""
+# De EXT-checks die een extern vlak aanwijzen. Alleen hun meldingen worden op het
+# trefferregister gejoind; een andere check met een `object2_uri` (een SHACL-paar) wijst
+# geen extern object aan en hoort niet in deze laag.
+VLAK_CHECKS = ("EXT-001", "EXT-002", "EXT-003")
+
+# De soort van een vlak volgt op één plek uit `Treffer.bron`: de rol waarmee de check hem
+# registreerde. Panden komen uit twee bronnen (BGT en BAG) maar zijn dezelfde soort.
+VLAK_SOORT = {
+    "bgt_pand": "pand",
+    "bag_pand": "pand",
+    "bgt_bouwwerk": "bouwwerk",
+    "bgt_water": "water",
+}
+
+
+def _vlak_kolommen() -> list[_Kolom]:
+    """De kolommen van de laag `vlakken`.
+
+    Eén laag voor de drie soorten externe vlakken (pand, bouwwerk, water). `relatie` en
+    `afstand_min_m` gelden alleen voor pand en bouwwerk (EXT-001) en blijven leeg bij
+    water; `buffer_m` uit de oude waterdelenlaag vervalt -- dat is runmetadata en staat
+    in `gwsw_run`.
+    """
     return [
         _Kolom("id", "text"),
+        _Kolom("soort", "text"),
+        _Kolom("subtype", "text"),
         _Kolom("bron", "text"),
         _Kolom("bronbestand", "text"),
         _Kolom("label", "text"),
@@ -674,27 +695,42 @@ def _bouwwerk_kolommen() -> list[_Kolom]:
     ]
 
 
-def _waterdeel_kolommen() -> list[_Kolom]:
-    """De kolommen van de laag `waterdelen_zonder_zinker`."""
-    return [
-        _Kolom("id", "text"),
-        _Kolom("watertype", "text"),
-        _Kolom("bronbestand", "text"),
-        _Kolom("label", "text"),
-        _Kolom("aantal_meldingen", "integer"),
-        _Kolom("check_ids", "text"),
-        _Kolom("buffer_m", "real"),
-    ]
+def _vlak_subtype(treffer: Treffer) -> str:
+    """Het subtype van een vlak: voor water het BGT-type, anders de BGT-functie of het BGT-type.
+
+    Voor water leest de check het BGT-`type`-veld in `Treffer.label` (waterloop, greppel);
+    voor pand en bouwwerk staat het BGT-type in `Treffer.attributen` onder `type`. Panden
+    dragen die kolom vaak niet en krijgen dan een leeg subtype.
+    """
+    if treffer.bron == "bgt_water":
+        return treffer.label
+    return str(treffer.attributen.get("type") or "")
+
+
+def _vlak_label(treffer: Treffer) -> str:
+    """Een leesbaar label voor een vlak.
+
+    Voor water is dat het type plus de identificatie (`_waterdeel_aanduiding`); voor pand
+    en bouwwerk draagt `Treffer.label` de aanduiding die EXT-001 al maakte.
+    """
+    if treffer.bron == "bgt_water":
+        return _waterdeel_aanduiding(treffer)
+    return treffer.label
 
 
 def _schrijf_treffers(
     verbinding: sqlite3.Connection,
     run: CheckRun,
     meldingen: list[Melding],
-    config: CheckConfig,
     voortgang: Voortgang,
-) -> tuple[int, int]:
-    """Schrijft de externe objecten waarnaar de EXT-meldingen verwijzen.
+) -> int:
+    """Schrijft de laag `vlakken`: de externe objecten waarnaar de EXT-meldingen verwijzen.
+
+    Eén laag voor pand, bouwwerk en water (issue #67); de soort staat in de kolom `soort`
+    en volgt uit `Treffer.bron`. Een waterdeel dat zowel EXT-002 als EXT-003 raakt krijgt
+    één rij met beide check-ID's; een waterdeel dat alleen EXT-002 ziet -- een echte
+    doorkruising door een geregistreerde zinker -- krijgt sindsdien ook een vlak, omdat
+    EXT-002 zijn treffer nu registreert.
 
     Strikte aansluiting: de rijen komen uit de meldingen van déze uitvoer, gejoind op
     het trefferregister van de run (`checks/treffers.py`). Deze schrijver bevraagt
@@ -707,65 +743,48 @@ def _schrijf_treffers(
     meldt per object alleen het sterkste bouwwerk (BO-17). De watergangcheck geeft
     sinds BO-43 elke echte doorkruising terug, ook meerdere per streng.
     """
+    kolommen = _vlak_kolommen()
     _maak_featurelaag(
         verbinding,
-        "bouwwerken",
+        "vlakken",
         "MULTIPOLYGON",
-        _bouwwerk_kolommen(),
-        "BGT- en BAG-bouwwerken waarnaar een EXT-001-melding verwijst.",
+        kolommen,
+        "Externe vlakken (BGT-panden, overige bouwwerken en BGT-waterdelen) waarnaar een "
+        "EXT-melding verwijst; de soort staat in de kolom `soort`.",
     )
-    _maak_featurelaag(
-        verbinding,
-        "waterdelen_zonder_zinker",
-        "MULTIPOLYGON",
-        _waterdeel_kolommen(),
-        "BGT-waterdelen waarnaar een EXT-003-melding verwijst.",
-    )
-
-    aantal_bouwwerken = _vul_trefferlaag(
+    aantal = _vul_trefferlaag(
         verbinding,
         run,
-        "bouwwerken",
-        _bouwwerk_kolommen(),
-        _groepeer_op_treffer(meldingen, "EXT-001"),
+        "vlakken",
+        kolommen,
+        _groepeer_op_treffer(meldingen, *VLAK_CHECKS),
         lambda treffer, verwijzend: (
             treffer.sleutel,
+            VLAK_SOORT[treffer.bron],
+            _vlak_subtype(treffer),
             treffer.bron,
             treffer.bronbestand,
-            treffer.label,
+            _vlak_label(treffer),
             _sterkste_relatie(verwijzend),
             _kleinste_afstand(run, treffer.sleutel, verwijzend),
             len(verwijzend),
             _check_ids(verwijzend),
         ),
     )
-    voortgang.stap(label="bouwwerken")
-
-    aantal_waterdelen = _vul_trefferlaag(
-        verbinding,
-        run,
-        "waterdelen_zonder_zinker",
-        _waterdeel_kolommen(),
-        _groepeer_op_treffer(meldingen, "EXT-003"),
-        lambda treffer, verwijzend: (
-            treffer.sleutel,
-            treffer.label,
-            treffer.bronbestand,
-            _waterdeel_aanduiding(treffer),
-            len(verwijzend),
-            _check_ids(verwijzend),
-            config.drempels.ext_watergang_buffer_m,
-        ),
-    )
-    voortgang.stap(label="waterdelen_zonder_zinker")
-    return aantal_bouwwerken, aantal_waterdelen
+    voortgang.stap(label="vlakken")
+    return aantal
 
 
-def _groepeer_op_treffer(meldingen: list[Melding], check_id: str) -> dict[str, list[Melding]]:
-    """De meldingen van een check, gegroepeerd op het externe object dat ze aanwijzen."""
+def _groepeer_op_treffer(meldingen: list[Melding], *check_ids: str) -> dict[str, list[Melding]]:
+    """De meldingen van de gegeven checks, gegroepeerd op het externe object dat ze aanwijzen.
+
+    Twee checks kunnen naar hetzelfde vlak wijzen (EXT-002 en EXT-003 naar één waterdeel);
+    ze belanden dan in dezelfde groep en de rij draagt beide check-ID's.
+    """
+    gekozen = set(check_ids)
     per_treffer: dict[str, list[Melding]] = defaultdict(list)
     for melding in meldingen:
-        if melding.check_id == check_id and melding.object2_uri:
+        if melding.check_id in gekozen and melding.object2_uri:
             per_treffer[melding.object2_uri].append(melding)
     return per_treffer
 
@@ -1427,8 +1446,7 @@ def _schrijf_runmetadata(
         _Kolom("n_putten", "integer"),
         _Kolom("n_strengen", "integer"),
         _Kolom("n_mechanisch", "integer"),
-        _Kolom("n_bouwwerken", "integer"),
-        _Kolom("n_waterdelen", "integer"),
+        _Kolom("n_vlakken", "integer"),
         _Kolom("n_stelsels", "integer"),
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
@@ -1481,8 +1499,7 @@ def _schrijf_runmetadata(
             tellingen.putten,
             tellingen.strengen,
             tellingen.mechanisch,
-            tellingen.bouwwerken,
-            tellingen.waterdelen,
+            tellingen.vlakken,
             tellingen.stelsels,
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,

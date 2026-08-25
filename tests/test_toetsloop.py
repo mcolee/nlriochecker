@@ -477,8 +477,8 @@ def test_treffers_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
     noord = next((tmp_path / "uit" / "noord").glob("*.gpkg"))
     zuid = next((tmp_path / "uit" / "zuid").glob("*.gpkg"))
 
-    assert _laag_ids(noord, "bouwwerken") == ["bgt:pand/p-noord"]
-    assert _laag_ids(zuid, "bouwwerken") == []
+    assert _laag_ids(noord, "vlakken") == ["bgt:pand/p-noord"]
+    assert _laag_ids(zuid, "vlakken") == []
 
 
 def _ext_bronnen(bron: Path, panden: list[tuple[dict[str, str], object]]) -> object:
@@ -530,8 +530,8 @@ def test_grenspand_staat_in_beide_gebieden(tmp_path: Path) -> None:
     noord = next((tmp_path / "uit" / "noord").glob("*.gpkg"))
     zuid = next((tmp_path / "uit" / "zuid").glob("*.gpkg"))
 
-    assert _laag_ids(noord, "bouwwerken") == ["bgt:pand/p-grens"]
-    assert _laag_ids(zuid, "bouwwerken") == ["bgt:pand/p-grens"]
+    assert _laag_ids(noord, "vlakken") == ["bgt:pand/p-grens"]
+    assert _laag_ids(zuid, "vlakken") == ["bgt:pand/p-grens"]
 
 
 def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: Path) -> None:
@@ -559,7 +559,7 @@ def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: 
 
     noord = next(run for run in runs if run.naam == "Noord")
     aangewezen = {m.object2_uri for m in bouw_meldingen(noord.run, RUNDATUM) if m.object2_uri}
-    geschreven = set(_laag_ids(next((tmp_path / "uit" / "noord").glob("*.gpkg")), "bouwwerken"))
+    geschreven = set(_laag_ids(next((tmp_path / "uit" / "noord").glob("*.gpkg")), "vlakken"))
 
     assert aangewezen == {"bgt:pand/p-noord"}
     assert geschreven == aangewezen

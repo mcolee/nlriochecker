@@ -476,14 +476,19 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
     try:
         geschreven = {
-            laag: {rij[0] for rij in verbinding.execute(f'select id from "{laag}"')}
-            for laag in ("bouwwerken", "waterdelen_zonder_zinker")
+            rij[0]: rij[1] for rij in verbinding.execute('select id, soort from "vlakken"')
         }
     finally:
         verbinding.close()
 
-    for laag, check_id in (("bouwwerken", "EXT-001"), ("waterdelen_zonder_zinker", "EXT-003")):
-        verwacht = {m.object2_uri for m in meldingen if m.check_id == check_id and m.object2_uri}
-        assert geschreven[laag] == verwacht
-        assert all(sleutel.startswith(("bgt:", "bag:")) for sleutel in geschreven[laag])
-    assert geschreven["bouwwerken"]
+    # Eén laag `vlakken` (issue #67): exact de verzameling treffers waar EXT-001, EXT-002
+    # en EXT-003 samen naar wijzen, niets erbij en niets eraf.
+    verwacht = {
+        m.object2_uri
+        for m in meldingen
+        if m.check_id in ("EXT-001", "EXT-002", "EXT-003") and m.object2_uri
+    }
+    assert set(geschreven) == verwacht
+    assert all(sleutel.startswith(("bgt:", "bag:")) for sleutel in geschreven)
+    assert set(geschreven.values()) <= {"pand", "bouwwerk", "water"}
+    assert geschreven

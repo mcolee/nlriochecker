@@ -2626,3 +2626,32 @@ oranje) naar grijs met de reden "klasse onderdrukt"; de overige 68 mechanische s
 (en dragen die reden nu ook, want hij hoort bij de klasse en niet bij weggevallen meldingen),
 en de laag `putten` verandert niet. Koekangerveld: van 17 gekleurde mechanische strengen (13 rood, 4 oranje)
 naar 0, alle 20 grijs, 48 meldingen onderdrukt.
+
+### BO-50 Eén vlakkenlaag `vlakken` voor de externe objecten, met de soort als kolom
+
+**Wat.** De GeoPackage draagt de externe objecten waarnaar de EXT-meldingen verwijzen in één laag
+`vlakken` (MULTIPOLYGON) in plaats van de aparte lagen `bouwwerken` (EXT-001) en
+`waterdelen_zonder_zinker` (EXT-003) (issue #67). De kolom `soort` (`pand`, `bouwwerk`, `water`) scheidt de
+categorieën en volgt op één plek uit `Treffer.bron`; `subtype` draagt het BGT-type, `relatie` en
+`afstand_min_m` gelden alleen voor pand en bouwwerk (leeg bij water), en `check_ids` somt de checks op die
+naar het vlak wijzen. De vroegere `buffer_m` vervalt -- runmetadata, staat in `gwsw_run`, waar `n_vlakken`
+de laag telt. Er komt één stijl `vlakken.qml`, rule-based op `soort` met drie regels. EXT-002 registreert
+voortaan zijn treffer onder dezelfde sleutel als EXT-003 (`bouw_sleutel(VOORVOEGSEL["bgt_water"], …)`),
+zodat een waterdeel dat beide checks raken één rij met beide check-ID's krijgt en een waterdeel dat alleen
+EXT-002 ziet -- een echte doorkruising door een geregistreerde zinker -- toch een vlak krijgt.
+
+**Waarom.** Net als bij `putten` en `strengen`: één laag per geometriesoort, met de opmaak per categorie in
+de laag, is eenvoudiger te koppelen en te stijlen dan drie parallelle lagen met eigen kolommen en QML. De
+doorkruiste waterdelen van EXT-002 stonden sinds issue #59 wel als `object2` in de melding maar nergens op
+de kaart, omdat de oude waterdelenlaag alleen EXT-003 volgde; met de merge en de EXT-002-registratie krijgen
+ze eindelijk een vlak. De strikte aansluiting op het trefferregister (BO-18) blijft: de schrijver bevraagt
+geen bron, dus laag en uitslag lopen niet uit elkaar.
+
+**Alternatieven.** De twee lagen houden en een derde toevoegen voor EXT-002 (verworpen: nog meer parallelle
+lagen, terwijl de geometriesoort dezelfde is). De volledige bronvlakken als achtergrond meeschrijven
+(verworpen: BO-18 -- 81.661 actuele panden zouden de GeoPackage opblazen zonder dat een melding ernaar
+wijst). `stelsels` mee in `vlakken` trekken (verworpen: dat zijn GWSW-objecten, geen externe bron).
+
+**Contractbreuk.** De lagen `bouwwerken` en `waterdelen_zonder_zinker` en de kolommen `n_bouwwerken`/
+`n_waterdelen` in `gwsw_run` bestaan niet meer; QGIS-projecten die erop wezen moeten opnieuw gekoppeld
+worden aan `vlakken`.

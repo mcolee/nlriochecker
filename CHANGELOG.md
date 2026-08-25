@@ -60,6 +60,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Eén GeoPackage-laag `vlakken` vervangt `bouwwerken` en `waterdelen_zonder_zinker`**
+  (issue #67). De externe objecten waarnaar de EXT-meldingen verwijzen staan nu in één laag
+  (MULTIPOLYGON) met de kolom `soort` (`pand`, `bouwwerk`, `water`); `subtype`, `relatie` en
+  `afstand_min_m` (leeg bij water) en `check_ids` vervangen de aparte kolommen, en `buffer_m`
+  vervalt (runmetadata, staat in `gwsw_run`). Eén stijl `vlakken.qml`, rule-based op `soort`,
+  vervangt de twee oude QML's. EXT-002 registreert voortaan zijn doorkruiste waterdeel als
+  treffer, zodat het eindelijk een vlak krijgt: een waterdeel dat zowel EXT-002 als EXT-003
+  raakt is één rij met `check_ids = "EXT-002, EXT-003"`. In `gwsw_run` vervangt `n_vlakken` de
+  kolommen `n_bouwwerken` en `n_waterdelen`. **Contractbreuk:** de lagen `bouwwerken` en
+  `waterdelen_zonder_zinker` bestaan niet meer; QGIS-projecten die erop wezen moeten opnieuw
+  gekoppeld worden aan `vlakken`. Op De Wolden en Hoogeveen met Koekangerveld als bereik: zie
+  BO-50.
+
 - **`toets --uitvoer csv|json|gpkg` vervangt `--geen-gpkg` en `--geen-json`** (issue #66).
   Eén bevestigende, herhaalbare optie zegt welke bijproducten er naast het Markdown-rapport
   komen; standaard alle drie, en ook de CSV is nu uit te zetten. Het rapport wordt altijd

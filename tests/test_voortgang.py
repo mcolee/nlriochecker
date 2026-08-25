@@ -121,7 +121,7 @@ def test_checksfase_zet_een_stap_per_check() -> None:
 
 
 def test_geopackagefase_zet_een_stap_per_laag(tmp_path: Path) -> None:
-    """Negen tabellen en lagen, negen stappen."""
+    """Acht tabellen en lagen, acht stappen."""
     opnemer = Opnemer()
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -130,12 +130,11 @@ def test_geopackagefase_zet_een_stap_per_laag(tmp_path: Path) -> None:
 
     schrijf_uitvoer(run, tmp_path, RUNDATUM, voortgang=opnemer)
 
-    assert opnemer.fasen() == [("GeoPackage", 9)]
+    assert opnemer.fasen() == [("GeoPackage", 8)]
     assert opnemer.labels("GeoPackage") == [
         "putten",
         "strengen",
-        "bouwwerken",
-        "waterdelen_zonder_zinker",
+        "vlakken",
         "stelsels",
         "meldingen",
         "overzicht_checks",

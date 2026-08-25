@@ -601,15 +601,29 @@ class KruisingMetWatergang(_WatergangKruising):
         aangeleverd en valt in deze fase buiten scope.
         """
         for kruising in self.kruisingen(context):
-            soort = kruising.rij.get("type") or "waterdeel"
+            soort = str(kruising.rij.get("type") or "waterdeel")
             # Het waterdeel gaat als tweede object mee, anders krijgen twee
             # doorkruisingen van dezelfde streng dezelfde melding-ID en valt de tweede
-            # terug op een volgnummer dat van de verwerkingsvolgorde afhangt. Een
-            # treffer wordt hier bewust niet geregistreerd: de GeoPackage-laag
-            # `waterdelen_zonder_zinker` volgt EXT-003 (BO-17).
+            # terug op een volgnummer dat van de verwerkingsvolgorde afhangt.
             sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], kruising.rij, kruising.vorm)
             if terugval:
                 context.treffers.meld_zonder_id(self.id, kruising.laag.source.name)
+            # De treffer wordt onder dezelfde sleutel als EXT-003 geregistreerd, zodat de
+            # laag `vlakken` een waterdeel dat beide checks raken één rij met beide
+            # check-ID's geeft en een waterdeel dat alleen deze check ziet (een echte
+            # doorkruising door een geregistreerde zinker) toch een vlak krijgt (issue #67).
+            context.treffers.registreer(
+                Treffer(
+                    sleutel=sleutel,
+                    bron="bgt_water",
+                    label=soort,
+                    bronbestand=kruising.laag.source.name,
+                    geometrie=kruising.vorm,
+                    attributen=dict(kruising.rij),
+                ),
+                check_id=self.id,
+                object_uri=kruising.conduit.uri,
+            )
             yield self.finding(
                 context,
                 kruising.conduit.uri,
