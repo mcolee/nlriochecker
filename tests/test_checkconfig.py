@@ -95,6 +95,76 @@ def test_afvoereindpunt_is_overnamepunt_en_gemaal() -> None:
     assert load_check_config().klassen.afvoer_eindpunt == ["Overnamepunt", "Gemaal"]
 
 
+def test_pompunit_eruit_zonder_persnet_is_een_configuratiefout(tmp_path: Path) -> None:
+    """De voorwaarde onder BO-55 wordt afgedwongen, niet aangenomen.
+
+    `load_check_config` valideert een projectbestand op zichzelf en legt het NIET over
+    `checks.toml` heen: een projectconfig die `mechanisch` weglaat krijgt een lege lijst.
+    Staat `Pompunit` dan ook niet meer in `afvoer_eindpunt`, dan is de pompput geen
+    eindpunt en is er geen persnet om achterlangs bij het gemaal te komen -- precies de
+    toestand met +645 valse NET-001-bevindingen waar BO-33 voor waarschuwde en waarvoor
+    issue #73 op #72 moest wachten. Zonder deze poort zou zo'n config stil draaien: de
+    nul-bewaking laat een rol met een lege klassenlijst juist weg, dus ook daar komt geen
+    signaal vandaan.
+    """
+    pad = tmp_path / "zonder_persnet.toml"
+    pad.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Overnamepunt', 'Gemaal']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError) as fout:
+        load_check_config(pad)
+
+    boodschap = str(fout.value)
+    assert "afvoer_eindpunt" in boodschap
+    assert "mechanisch" in boodschap
+    assert "BO-55" in boodschap
+
+
+def test_persnet_of_pompunit_maakt_de_config_wel_geldig(tmp_path: Path) -> None:
+    """Beide uitwegen werken: het persnet declareren, of Pompunit laten staan.
+
+    De tweede is de toestand van vóór issue #73 en blijft geldig; een project dat de
+    drukriolering niet kan traceren hoort haar pompputten als eindpunt te houden.
+    """
+    basis = (
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Overnamepunt', 'Gemaal']\n{extra}"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
+    )
+    met_persnet = tmp_path / "met_persnet.toml"
+    met_persnet.write_text(
+        basis.format(extra="mechanisch = ['MechanischeRioolleiding']\n"), encoding="utf-8"
+    )
+    met_pompunit = tmp_path / "met_pompunit.toml"
+    met_pompunit.write_text(
+        basis.format(extra="").replace("'Gemaal'", "'Gemaal', 'Pompunit'"), encoding="utf-8"
+    )
+
+    assert load_check_config(met_persnet).klassen.mechanisch == ["MechanischeRioolleiding"]
+    assert "Pompunit" in load_check_config(met_pompunit).klassen.afvoer_eindpunt
+
+
+def test_een_lege_eindpuntlijst_valt_buiten_de_poort(tmp_path: Path) -> None:
+    """Zonder enig afvoereindpunt gaat de poort van BO-55 niet op.
+
+    Dan is er geen pompput-zonder-uitweg maar een config die NET-001 helemaal geen
+    eindpunt geeft; dat is een andere, meteen zichtbare toestand, en de vele minimale
+    testconfigs in deze suite leunen erop.
+    """
+    pad = tmp_path / "leeg.toml"
+    pad.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        encoding="utf-8",
+    )
+
+    assert load_check_config(pad).klassen.afvoer_eindpunt == []
+
+
 def test_netwerkknopen_bundelen_putten_en_eindpunten() -> None:
     knopen = load_check_config().klassen.netwerkknopen
 

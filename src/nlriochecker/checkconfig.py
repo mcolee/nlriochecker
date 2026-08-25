@@ -79,6 +79,39 @@ class ClassRoots(BaseModel):
     # NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen.
     stelseltypen: dict[str, list[str]] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def _pompunit_heeft_een_uitweg(self) -> Self:
+        """Zonder persnet mag `Pompunit` niet uit `afvoer_eindpunt` verdwijnen (BO-55).
+
+        Een pompput is een overdrachtspunt naar de drukriolering: de streng die erop
+        eindigt voert af langs het persnet naar het gemaal erachter. `checks/verbanden.
+        _met_mechanische_connectiviteit` legt die route alleen als `mechanisch` klassen
+        noemt, en `afbakening._componentstructuur` neemt hem alleen dan in de
+        contextschil op. Is die lijst leeg terwijl `Pompunit` geen eindpunt meer is, dan
+        meldt NET-001 elke vrijvervalstreng die op een pompput uitkomt als
+        onbereikbaar -- op De Wolden en Hoogeveen 645 valse bevindingen. Precies daarom
+        wachtte issue #73 op #72.
+
+        Deze poort hoort hier en niet bij de nul-bewaking: `load_check_config` valideert
+        een projectbestand op zichzelf en legt het niet over `checks.toml` heen, dus een
+        weggelaten `mechanisch` levert een lege lijst op, en een rol zonder klassen valt
+        uit de rollentelling weg (BO-52) in plaats van een signaal te geven.
+
+        Een lege `afvoer_eindpunt` valt erbuiten: dan is er in het geheel geen
+        afvoereindpunt en is de uitkomst van NET-001 meteen zichtbaar iets anders. Dat is
+        een eigen toestand, geen pompput zonder uitweg.
+        """
+        if self.afvoer_eindpunt and not self.mechanisch and "Pompunit" not in self.afvoer_eindpunt:
+            raise ValueError(
+                "[klassen] afvoer_eindpunt noemt geen 'Pompunit' terwijl [klassen] "
+                "mechanisch leeg is. Een pompput is dan geen afvoereindpunt en er is geen "
+                "persnet om achterlangs een gemaal te bereiken, zodat NET-001 elke "
+                "vrijvervalstreng op een pompput als onbereikbaar meldt. Noem de "
+                "mechanische leidingklassen in 'mechanisch' (aanbevolen), of houd "
+                "'Pompunit' in 'afvoer_eindpunt' zoals voor issue #73. Zie BO-55."
+            )
+        return self
+
     @property
     def netwerkknopen(self) -> list[str]:
         """De klassen die als knooppunt in de netwerkgraaf meetellen.

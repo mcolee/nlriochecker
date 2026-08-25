@@ -228,6 +228,7 @@ def test_lozingspunt_telt_als_afvoerpad_voor_vuilwater(tmp_path: Path) -> None:
         tmp_path,
         "zonder_lozing",
         "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "mechanisch = ['MechanischeRioolleiding']\n"
         "afvoer_eindpunt = ['Gemaal']\nlozings_eindpunt = []\nvuilwater = ['GemengdRiool']\n",
     )
     assert _labels(bestand, "NET-001", zonder_lozing) == ["1"]
@@ -275,12 +276,7 @@ def test_drukriolering_bereikt_het_gemaal_door_het_hulpstuk(tmp_path: Path) -> N
 
     assert _labels(bestand, "NET-001", config) == []
 
-    zonder_mechanisch = _testconfig(
-        tmp_path,
-        "druk_zonder_mech",
-        _DRUKRIOLERING_KLASSEN.replace("['MechanischeRioolleiding']", "[]"),
-    )
-    assert _labels(bestand, "NET-001", zonder_mechanisch) == ["1"]
+    assert _labels(bestand, "NET-001", _zonder_persnet(config)) == ["1"]
 
 
 def test_drukriolering_die_op_een_lozingsput_uitkomt_is_afgevoerd(tmp_path: Path) -> None:
@@ -316,12 +312,7 @@ def test_hemelwater_door_het_persnet_geldt_ook_als_afgevoerd(tmp_path: Path) -> 
 
     assert _labels(bestand, "NET-002", config) == []
 
-    zonder_mechanisch = _testconfig(
-        tmp_path,
-        "net002_zonder_mech",
-        klassen.replace("['MechanischeRioolleiding']", "[]"),
-    )
-    assert _labels(bestand, "NET-002", zonder_mechanisch) == ["1"]
+    assert _labels(bestand, "NET-002", _zonder_persnet(config)) == ["1"]
 
 
 def test_pompunit_zonder_persnet_is_geen_afvoereindpunt(tmp_path: Path) -> None:
@@ -346,6 +337,20 @@ def test_pompunit_zonder_persnet_is_geen_afvoereindpunt(tmp_path: Path) -> None:
         "afvoer_eindpunt = ['Gemaal', 'Pompunit']\nvuilwater = ['Vuilwaterriool']\n",
     )
     assert _labels(bestand, "NET-001", met_pompunit) == []
+
+
+def _zonder_persnet(config: CheckConfig) -> CheckConfig:
+    """Dezelfde config met het persnet uitgezet, voor de controlehelften.
+
+    Bewust niet als TOML: `KlassenConfig._pompunit_heeft_een_uitweg` weigert sinds BO-55
+    een geschreven config die `mechanisch` leeg laat terwijl `Pompunit` geen eindpunt is
+    -- dat is de valse-positieventoestand van BO-33. Die poort bewaakt wat iemand als
+    projectconfig opschrijft; hier wordt de lijst na de validatie leeggemaakt om te tonen
+    dat de route echt door het persnet loopt en niet ergens anders vandaan komt.
+    """
+    zonder = config.model_copy(deep=True)
+    zonder.klassen.mechanisch = []
+    return zonder
 
 
 def _testconfig(tmp_path: Path, naam: str, klassen: str) -> CheckConfig:
@@ -408,6 +413,7 @@ def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> Non
     op_bob = tmp_path / "bob.toml"
     op_bob.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "mechanisch = ['MechanischeRioolleiding']\n"
         "afvoer_eindpunt = ['Gemaal']\nvuilwater = ['GemengdRiool']\n"
         "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
         "[netwerk]\nrichting = 'bob'\n",

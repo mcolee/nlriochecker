@@ -2851,6 +2851,22 @@ gaat van **98** naar **99**; de ene nieuwe bevinding is deelstelsel `ds-Ko2G0002
 gemengd, wel een overstort maar als enig eindpunt een pompunit). Negen bestaande
 RVZ-006-boodschappen wijzigen alleen van tekst.
 
+**Voorwaarde, en die wordt afgedwongen.** Dit besluit klopt alleen zolang de route achter de
+pompput traceerbaar is, en dat is precies zolang `[klassen] mechanisch` klassen noemt:
+`_met_mechanische_connectiviteit` legt de kanten alleen dan, en `_componentstructuur` neemt de
+route alleen dan in de contextschil op (BO-56). `load_check_config` valideert een projectbestand
+**op zichzelf** en legt het niet over `checks.toml` heen, dus een projectconfig die deze nieuwe
+`afvoer_eindpunt` overneemt maar `mechanisch` weglaat, krijgt een lege lijst en belandt stil in
+de +645-toestand van BO-33. De nul-bewaking vangt dat niet: een gedeclareerde rol zonder
+klassen valt juist uit de rollentelling weg (BO-52), dus er komt geen `SIG-nulklasse`. Daarom
+weigert `KlassenConfig._pompunit_heeft_een_uitweg` de combinatie "`afvoer_eindpunt` niet leeg,
+zonder `Pompunit`" met "`mechanisch` leeg", met een foutmelding die beide sleutels en dit
+BO-nummer noemt. Een lege `afvoer_eindpunt` valt er bewust buiten: dan is er in het geheel geen
+afvoereindpunt, een eigen en meteen zichtbare toestand waar de minimale testconfigs op leunen.
+De twee controlehelften die het persnet juist uitzetten om te bewijzen dat de route erdoorheen
+loopt, maken `mechanisch` daarom ná de validatie leeg (`_zonder_persnet` in
+`tests/test_checks_netwerk.py`); de poort bewaakt wat iemand als projectconfig opschrijft.
+
 **Teksten die meeveranderden.** De deelreden van RVZ-006 (`_rvz006_gebrek`) luidt "zonder
 afvoereindpunt (gemaal of overnamepunt)", net als de RVZ-006-regel van het checkregister; de
 rapportregel onder de eindpunttelling noemt alleen `Gemaal` nog als noodverband. De

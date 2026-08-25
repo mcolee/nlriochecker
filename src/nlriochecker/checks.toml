@@ -58,6 +58,10 @@ loze_leiding = ["LozeLeiding"]
 # onbereikbaar gold. Sinds issue #72 dragen de mechanische leidingen de
 # bereikbaarheidsgraaf (zie `mechanisch` hierboven), dus een streng die op een
 # pompput eindigt wordt op haar echte route beoordeeld. Zie BO-55.
+# LET OP -- deze lijst en `mechanisch` hierboven hangen samen: `Pompunit` mag hier
+# alleen ontbreken zolang `mechanisch` klassen noemt. Zonder persnet is een streng
+# die op een pompput eindigt nergens meer heen, en meldt NET-001 haar vals als
+# onbereikbaar. `KlassenConfig` weigert die combinatie (BO-55).
 afvoer_eindpunt = ["Overnamepunt", "Gemaal"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie

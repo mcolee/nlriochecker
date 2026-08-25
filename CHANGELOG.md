@@ -56,7 +56,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `afbakening._componentstructuur` de mechanische leidingen nu ook in de componentgraaf:
   zonder het persnet in de contextschil viel het gemaal achter de persleiding buiten de
   analyseset, en week een gebiedsrun af van de gemeentebrede run -- 17 van de 88 CBS-buurten,
-  nu 0. De analysesets van die 88 buurten groeien daarmee 1,7x. Zie BO-55 en BO-56.
+  nu 0. De analysesets van die 88 buurten groeien daarmee 1,7x. Omdat een projectconfig
+  standalone gevalideerd wordt en niet over `checks.toml` heen gelegd, weigert
+  `KlassenConfig` voortaan de combinatie van een `afvoer_eindpunt` zonder `Pompunit` met
+  een lege `mechanisch`: zonder persnet zou NET-001 elke streng op een pompput vals als
+  onbereikbaar melden. Zie BO-55 en BO-56.
 
 - **De nul-bewaking en de rollentelling leiden hun rollen uit de checkdeclaraties af**
   (issue #71, vervolg op #64). `omvang._rollen` was een handlijst van zes rollen; nu

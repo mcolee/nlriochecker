@@ -110,7 +110,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |
 | --- | --- | --- | --- | --- | --- | --- |
-| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse) | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt,… | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-003 | Strengorientatie tegen de afvoerrichting in | F | Consistentie | geimplementeerd met test | mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk | F | Consistentie | geimplementeerd met test | mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |

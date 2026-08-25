@@ -125,7 +125,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
-| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse) | F | Consistentie |
+| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt, dus de configuratie moet de mechanische leidingklassen noemen zodat de route door het persnet traceerbaar is | F | Consistentie |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie |
 | NET-003 | Strengorientatie tegen de afvoerrichting in | F | Consistentie |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk | F | Consistentie |
