@@ -374,13 +374,22 @@ def _blob(geometrie: BaseGeometry) -> bytes:
 # --------------------------------------------------------------------------- #
 
 
-def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple[str, float | None]:
+def _richting_bob(
+    run: CheckRun, conduit: Conduit, config: CheckConfig, *, mechanisch: bool = False
+) -> tuple[str, float | None]:
     """De BOB-richting ten opzichte van de getekende lijn, en het verval erlangs.
 
     Het BOB-verval is administratief: van beginpunt naar eindpunt. De pijl op de
     kaart volgt de getekende lijn. Loopt de lijn andersom dan de administratie, dan
     keert het teken om -- anders zou de kaart het tegenovergestelde tonen van wat er
     staat.
+
+    Een mechanische leiding krijgt geen richting, ook niet als zij wel een BOB draagt
+    (issue #74). Zij is pompgestuurd: het water loopt er niet met het bodemverval mee,
+    dus een groene of rode pijl zou een stroomrichting tekenen die er fysiek niet is.
+    Meestal viel zo'n leiding al op `onbekend` terug omdat het BOB ontbreekt, maar dat
+    was toeval; op De Wolden en Hoogeveen kregen 44 van de 3720 mechanische strengen wel
+    een richting. De kolom staat daarom vóór het BOB gelezen wordt al vast.
 
     Is de tekenrichting niet te bepalen (`richting_van_geometrie` geeft None: geen
     lijngeometrie, geen herleidbare putten, of dezelfde put aan beide zijden), dan is
@@ -391,6 +400,8 @@ def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple
     krijgt dan `onbekend` met een lege waarde, net als bij een ontbrekend of nul
     BOB-verval.
     """
+    if mechanisch:
+        return RICHTING_ONBEKEND, None
     verval = conduit.bob_verval
     if verval is None or verval == 0.0:
         return RICHTING_ONBEKEND, verval
@@ -551,14 +562,17 @@ def _schrijf_features(
             if geometrie is None or geometrie.is_empty:
                 continue
             grenzen.append(geometrie.bounds)
+            is_mechanisch = uri in mechanisch
             richting, verval = (
-                _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
+                _richting_bob(run, object_, config, mechanisch=is_mechanisch)
+                if isinstance(object_, Conduit)
+                else ("", None)
             )
             afvoer_eindpunt, afvoer_meters, afvoer_stappen = _afvoer_velden(
                 run.context, afvoer_per_knoop, uri, object_
             )
             reden = _reden_niet_beoordeeld(uri, binnen, onderdrukt, mechanisch, geen_hierarchie)
-            if uri in mechanisch:
+            if is_mechanisch:
                 mechanisch_geschreven += 1
             rijen.append(
                 (
@@ -576,6 +590,7 @@ def _schrijf_features(
                         afvoer_meters,
                         afvoer_stappen,
                         reden,
+                        is_mechanisch,
                     ),
                 )
             )
@@ -1047,8 +1062,13 @@ def _samenvatting(
     afvoer_meters: float | None = None,
     afvoer_stappen: int | None = None,
     reden: str = "",
+    mechanisch: bool = False,
 ) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen.
+
+    `mechanisch` gaat alleen naar de popup: `richting_bob` staat op mechanisch riool
+    altijd op `onbekend`, en zonder deze vlag zou de regel eronder "niet te bepalen"
+    zeggen waar de leiding er domweg geen heeft (issue #74).
 
     `reden` is gevuld als dit object niet beoordeeld is; dan is de status grijs en
     noemt de popup waarom. De status volgt verder dezelfde regel als `ergste_ernst`:
@@ -1072,7 +1092,7 @@ def _samenvatting(
         label=label,
         objecttype=objecttype,
         status=status,
-        feiten=_feiten(object_, stelsel, richting_bob),
+        feiten=_feiten(object_, stelsel, richting_bob, mechanisch),
         reden=reden,
     )
     return (
@@ -1102,16 +1122,25 @@ def _samenvatting(
     )
 
 
+# De sleutel waaronder een mechanische leiding haar popupregel krijgt. Geen waarde van
+# de kolom `richting_bob` -- die staat op zo'n leiding op `onbekend`, zodat de grijze
+# stijl hergebruikt wordt -- maar een vierde sleutel in de tabel hieronder, zodat de
+# popup twee dingen uit elkaar houdt die op de kaart dezelfde kleur hebben.
+RICHTING_MECHANISCH = "mechanisch"
+
 # Hoe de kolom `richting_bob` in de popup gelezen wordt. De logica erachter blijft
 # ongewijzigd (`_richting_bob`); dit is alleen de verwoording.
 RICHTING_IN_WOORDEN = {
     RICHTING_MEE: "BOB-verval loopt met de getekende lijn mee",
     RICHTING_TEGEN: "BOB-verval loopt tegen de getekende lijn in",
     RICHTING_ONBEKEND: "BOB-richting niet te bepalen",
+    RICHTING_MECHANISCH: "persleiding — geen vrijvervalrichting",
 }
 
 
-def _feiten(object_: object, stelsel: str, richting_bob: str) -> tuple[str, ...]:
+def _feiten(
+    object_: object, stelsel: str, richting_bob: str, mechanisch: bool = False
+) -> tuple[str, ...]:
     """De losse feiten die in de kopregel van de popup horen.
 
     Alleen bij een verbinding: stelsel, de getekende lengte en de BOB-richtingsregel.
@@ -1120,6 +1149,9 @@ def _feiten(object_: object, stelsel: str, richting_bob: str) -> tuple[str, ...]
     De lengte is die van de getekende lijn en niet het kenmerk `LengteLeiding`: de
     popup hoort te zeggen wat er op de kaart staat. Wijken de twee af, dan is dat een
     bevinding van ATTR-009 en die staat in de lijst eronder.
+
+    Op een mechanische leiding staat de richting altijd op `onbekend`; de regel zegt
+    dan waarom er geen is in plaats van dat hij niet te bepalen viel (issue #74).
     """
     if not isinstance(object_, Conduit):
         return ()
@@ -1129,7 +1161,8 @@ def _feiten(object_: object, stelsel: str, richting_bob: str) -> tuple[str, ...]
     if object_.line is not None and not object_.line.is_empty:
         feiten.append(f"Lengte: {object_.line.length:.1f} m")
     if richting_bob:
-        feiten.append(RICHTING_IN_WOORDEN.get(richting_bob, richting_bob))
+        sleutel = RICHTING_MECHANISCH if mechanisch else richting_bob
+        feiten.append(RICHTING_IN_WOORDEN.get(sleutel, richting_bob))
     return tuple(feiten)
 
 

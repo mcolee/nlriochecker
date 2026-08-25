@@ -2320,6 +2320,30 @@ FIXTURES["dataset_meervoudig_objecttype.ttl"] = (
 )
 
 
+# Issue #74: de richtingspijl in de GeoPackage komt uit het BOB-verval, maar een
+# persleiding is pompgestuurd en draagt geen vrijverval-BOB. Beide leidingen hier dragen
+# hetzelfde verval (8,00 -> 7,50, dalend langs de getekende lijn); de vrijvervalstreng
+# hoort daarvan `mee` te krijgen en de persleiding `onbekend`.
+FIXTURES["richting_persleiding_met_bob.ttl"] = (
+    "geen; een persleiding met een BOB-verval naast een vrijvervalstreng met hetzelfde "
+    "verval (issue #74)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1000.0, 2050.0)
+    + put("PutD", "D", 1050.0, 2050.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", bob=(8.00, 7.50))
+    + leiding(
+        "P1",
+        "p",
+        [(1000.0, 2050.0), (1050.0, 2050.0)],
+        "PutC",
+        "PutD",
+        klasse="Persleiding",
+        bob=(8.00, 7.50),
+    ),
+)
+
+
 def render(defect: str, inhoud: str) -> str:
     """De volledige tekst van een fixture: de prelude, de DEFECT-regel en de inhoud.
 

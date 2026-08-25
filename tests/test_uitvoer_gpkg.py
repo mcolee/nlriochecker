@@ -538,6 +538,39 @@ def test_onbepaalbare_tekenrichting_geeft_onbekend_geen_administratief_terugvalt
     assert verval is None
 
 
+def test_persleiding_met_bob_krijgt_geen_vrijvervalrichting(tmp_path: Path) -> None:
+    """Issue #74: een gepompte leiding draagt geen betrouwbare vrijverval-BOB.
+
+    Beide strengen in de fixture dragen hetzelfde verval (8,00 naar 7,50, dalend langs
+    de getekende lijn). De vrijvervalstreng hoort daar `mee` van te krijgen; de
+    persleiding hoort grijs te blijven, want een pijl zou daar een fysiek onjuiste
+    stroomrichting tekenen.
+    """
+    pad = _schrijf(_run("richting_persleiding_met_bob.ttl"), tmp_path)
+
+    strengen = {
+        label: (richting, verval)
+        for label, richting, verval in _rijen(
+            pad, "select label, richting_bob, bob_verval_m from strengen"
+        )
+    }
+
+    assert strengen["1"] == ("mee", pytest.approx(0.50))
+    assert strengen["p"] == ("onbekend", None)
+
+
+def test_popup_van_een_persleiding_noemt_waarom_er_geen_richting_staat(tmp_path: Path) -> None:
+    """Grijs zonder reden leest als "niet te bepalen"; hier is het een eigenschap van
+    de leiding, en de popup hoort dat te zeggen."""
+    pad = _schrijf(_run("richting_persleiding_met_bob.ttl"), tmp_path)
+
+    popups = dict(_rijen(pad, "select label, popup_html from strengen"))
+
+    assert "persleiding — geen vrijvervalrichting" in popups["p"]
+    assert "BOB-richting niet te bepalen" not in popups["p"]
+    assert "BOB-verval loopt met de getekende lijn mee" in popups["1"]
+
+
 def test_runmetadata_noemt_de_cfk_set_en_of_die_volledig_is(tmp_path: Path) -> None:
     """De CFK-set hoort bij de run, dus in gwsw_run en niet op elke melding."""
     run = replace(_run("schoon.ttl"), meetbereik=Meetbereik.van(VEREIST, ["Hyd", "MdsPlan"]))

@@ -129,7 +129,12 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. De statusregel en
   de opmaak van de popup staan in `uitvoer/objectkaart.py`; `gpkg.py` levert alleen de
   feiten die alleen hij kent (stelsel, lengte, BOB-richting) als kant-en-klare regels
-  aan. Zie BO-29.
+  aan. Op een mechanische leiding (rol `mechanischeleidingen`) staat `richting_bob`
+  altijd op `onbekend`, ook als zij een BOB-verval draagt: zij is pompgestuurd, dus dat
+  verval zegt niets over de stroomrichting en een groene of rode pijl zou een richting
+  tekenen die er fysiek niet is. De grijze `onbekend`-stijl wordt daarvoor hergebruikt;
+  alleen de popupregel splitst ("persleiding -- geen vrijvervalrichting" in plaats van
+  "BOB-richting niet te bepalen"). Zie issue #74 en BO-29.
 - De GeoPackage draagt naast de rioleringslagen één laag `vlakken` (MULTIPOLYGON) met de
   externe objecten waarnaar de meldingen van díé uitvoer verwijzen, gejoind op het
   trefferregister (`checks/treffers.py`) via `object2_uri` (BO-50, issue #67). De kolom
