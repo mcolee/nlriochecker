@@ -419,7 +419,10 @@ register_versie = "v0.9"
 # Meldingen die de uitvoer niet halen (issue #65): wortelklassen van het hoofdobject
 # (subklassen via de ontologie) en check-ID's. Een uitvoerkeuze, geen toetskeuze: de
 # checks draaien ongewijzigd, het rapport telt wat er wegviel. Standaard leeg; De Wolden
-# zet hier het mechanische riool. Zie BO-49.
+# zet hier het mechanische riool. In `onderdruk_checks` horen alleen ID's uit het
+# checkregister; een nulmetingsvorm (`NULMETING-...`) of een datasetsignaal (`SIG-...`)
+# staat niet in het register en wordt geweigerd -- die onderdruk je via de klasse van
+# het object. Zie BO-49.
 onderdruk_klassen = []
 onderdruk_checks = []
 

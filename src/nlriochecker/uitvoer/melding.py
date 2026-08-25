@@ -98,11 +98,20 @@ class Melding:
 class Onderdrukking:
     """Wat er op grond van `[rapport]` uit de meldingenstroom is gehouden.
 
-    `klassen` en `checks` zijn de twee lijsten uit de projectconfiguratie; `per_check`
-    en `per_klasse` tellen wat erdoor wegviel. Een melding valt hooguit een keer weg:
-    eerst op check-ID, dan op de klasse van het hoofdobject, in de volgorde van de
-    lijst. Een uitvoerkeuze, geen toetskeuze: de checks, `examined` en de
-    systemisch-bepaling zien deze lijsten niet.
+    `klassen` en `checks` zijn de twee lijsten uit de projectconfiguratie. Een melding
+    valt hooguit een keer weg: eerst op check-ID, dan op de klasse van het hoofdobject,
+    in de volgorde van de lijst.
+
+    De twee tellingen beantwoorden verschillende vragen en zijn daarom geen partitie.
+    `per_check` telt **elke** weggevallen melding onder haar check-ID, ongeacht of ze op
+    check of op klasse wegviel: dat is wat een lezer naast de kolom Bevindingen nodig
+    heeft, want die daalt met alles wat wegviel. Zonder die regel las een check waarvan
+    alle bevindingen op klasse wegvielen als "0 bevindingen" met "per check: geen" in de
+    verantwoording (TOP-007 op De Wolden: 7 → 0). `per_klasse` telt alleen het deel dat
+    op klasse wegviel, per wortel. Optellen doe je dus over `per_check` -- zie `totaal`.
+
+    Een uitvoerkeuze, geen toetskeuze: de checks, `examined` en de systemisch-bepaling
+    zien deze lijsten niet.
     """
 
     # Bevroren maar niet hashbaar: de twee tellingen zijn dicts. Vergelijken (`==`) kan
@@ -119,8 +128,13 @@ class Onderdrukking:
 
     @property
     def totaal(self) -> int:
-        """Hoeveel meldingen er in totaal wegvielen."""
-        return sum(self.per_check.values()) + sum(self.per_klasse.values())
+        """Hoeveel meldingen er in totaal wegvielen.
+
+        Alleen over `per_check`: elke weggevallen melding draagt een check-ID en staat
+        daar dus precies een keer in. `per_klasse` erbij optellen zou het deel dat op
+        klasse wegviel dubbel tellen.
+        """
+        return sum(self.per_check.values())
 
 
 GEEN_ONDERDRUKKING = Onderdrukking()
@@ -153,8 +167,11 @@ def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
     """Houdt de meldingen uit de stroom die `[rapport]` onderdrukt, en telt ze.
 
     Eerst op check-ID, dan op de klasse van het hoofdobject (`object_uri`, niet
-    `object2_uri`) in de volgorde van de lijst; een melding telt hooguit een keer. Een
-    melding zonder hoofdobject heeft geen klasse en valt dus nooit op klasse weg.
+    `object2_uri`) in de volgorde van de lijst; een melding valt hooguit een keer weg.
+    Een melding zonder hoofdobject heeft geen klasse en valt dus nooit op klasse weg.
+
+    Wat op klasse wegvalt telt in beide tellingen mee: onder haar wortel in `per_klasse`
+    en onder haar check-ID in `per_check`. Zie `Onderdrukking` voor de reden.
     """
     rapport = run.config.rapport
     checks = set(rapport.onderdruk_checks)
@@ -162,14 +179,18 @@ def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
     per_klasse: dict[str, int] = {}
     over: list[Melding] = []
     for melding in meldingen:
-        if melding.check_id in checks:
-            per_check[melding.check_id] = per_check.get(melding.check_id, 0) + 1
+        op_check = melding.check_id in checks
+        klasse = (
+            None
+            if op_check
+            else _onderdrukte_klasse(run, melding.object_uri, rapport.onderdruk_klassen)
+        )
+        if not op_check and klasse is None:
+            over.append(melding)
             continue
-        klasse = _onderdrukte_klasse(run, melding.object_uri, rapport.onderdruk_klassen)
+        per_check[melding.check_id] = per_check.get(melding.check_id, 0) + 1
         if klasse is not None:
             per_klasse[klasse] = per_klasse.get(klasse, 0) + 1
-            continue
-        over.append(melding)
     return Meldingenstroom(
         over,
         Onderdrukking(

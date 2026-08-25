@@ -99,8 +99,8 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `cfk_set` | array van string | De conformiteitsklassen waarop getoetst is, gesorteerd. Leeg als er geen nulmeting is meegegeven. |
 | `volledig` | boolean | Waar als `cfk_set` gelijk is aan de volledige set uit `checks.toml`. Onwaar bij een deelset én bij een run zonder nulmeting. |
 | `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
-| `markering` | string | *Optioneel.* De runbrede voorbehouden van deze run als een tekst voor een lezer, dezelfde die boven het Markdown-rapport staat en in de kolom `markering` van `gwsw_run`. Twee voorbehouden worden twee alinea's, gescheiden door een lege regel. Het veld ontbreekt als er niets voor te behouden valt. |
 | `onderdrukt` | object | *Optioneel.* Wat `[rapport]` in de projectconfiguratie uit de stroom hield: `klassen` (array van string, de wortelklassen), `checks` (array van string, de check-ID's) en `meldingen` (integer, hoeveel meldingen wegvielen). Het veld ontbreekt als beide lijsten leeg zijn. In `totaal/bevindingen.json` is `meldingen` de som over de gebieden, niet ontdubbeld -- net als de kolom Meldingen in de synthese. De CSV draagt de lijsten niet: de keuze hoort bij de run, niet bij de melding. |
+| `markering` | string | *Optioneel.* De runbrede voorbehouden van deze run als een tekst voor een lezer, dezelfde die boven het Markdown-rapport staat en in de kolom `markering` van `gwsw_run`. Twee voorbehouden worden twee alinea's, gescheiden door een lege regel. Het veld ontbreekt als er niets voor te behouden valt. |
 | `aantal_meldingen` | integer | Het aantal elementen in `meldingen`. Redundant, maar zo kan een afnemer een afgekapt bestand herkennen. |
 | `meldingen` | array van object | De meldingen, gesorteerd op `melding_id`. |
 
@@ -132,10 +132,14 @@ voorbehoud hoort bij de run en niet bij elke rij.
 
 `[rapport] onderdruk_klassen` en `onderdruk_checks` houden meldingen uit de stroom vóór
 enige uitvoervorm ze ziet; dit veld zegt welke lijsten dat waren en hoeveel meldingen
-erdoor wegvielen.
+erdoor wegvielen. `checks` bevat alleen ID's uit het checkregister: een nulmetingsvorm
+(`NULMETING-...`) of een datasetsignaal (`SIG-...`) staat er niet in en wordt bij het
+laden geweigerd -- die onderdruk je via de klasse van het object.
 
 De onderdrukte meldingen worden nergens bewaard -- niet in dit bestand, niet in de CSV,
 niet in de GeoPackage. Wie ze wil zien, draait de toets opnieuw zonder de twee lijsten.
+De uitsplitsing per check en per klasse staat alleen in het Markdown-rapport; hier staat
+het totaal, waarin elke weggevallen melding een keer telt.
 
 Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering`:
 wie het niet kent leest het bestand zoals voorheen.

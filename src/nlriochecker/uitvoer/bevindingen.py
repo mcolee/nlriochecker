@@ -26,7 +26,7 @@ from nlriochecker.uitvoer.melding import (
     GEEN_ONDERDRUKKING,
     Melding,
     Onderdrukking,
-    bouw_meldingen,
+    bouw_meldingenstroom,
 )
 from nlriochecker.uitvoer.omvang import (
     eindpunttelling,
@@ -140,12 +140,16 @@ def write_check_report(
 
     `onderdrukking` komt uit dezelfde stroom als de meldingen en gaat naar de
     verantwoording: wat `[rapport]` wegliet staat in geen enkele uitvoervorm, en zwijgen
-    zou lezen als "alles gecontroleerd" (BO-49).
+    zou lezen als "alles gecontroleerd" (BO-49). Bouwt deze functie de meldingen zelf,
+    dan komt hij uit diezelfde stroom: het argument alleen honoreren zou een rapport
+    opleveren dat wél gefilterd is maar dat nergens zegt.
     """
     output_dir = prepare(output_dir)
     run_datum = run_datum or date.today()
     if meldingen is None:
-        meldingen = bouw_meldingen(run, run_datum)
+        stroom = bouw_meldingenstroom(run, run_datum)
+        meldingen = stroom.meldingen
+        onderdrukking = stroom.onderdrukking
 
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
@@ -555,6 +559,11 @@ def _onderdrukking_section(onderdrukking: Onderdrukking) -> list[str]:
     De alinea staat er zodra de projectconfiguratie iets onderdrukt, ook als er nul
     meldingen wegvielen: de keuze zelf hoort verantwoord te worden, en "nul" is daarvan
     de uitslag. Zwijgen zou lezen als "alles gecontroleerd" (BO-49).
+
+    "Per check" telt alle weggevallen meldingen per check-ID -- precies het verschil met
+    de kolom Bevindingen in de tabel eronder, ook als ze op klasse wegvielen. "Per
+    klasse" telt het deel dat op klasse wegviel. De twee zijn dus geen partitie en
+    tellen niet bij elkaar op.
     """
     if not onderdrukking.actief:
         return []

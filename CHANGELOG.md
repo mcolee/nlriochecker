@@ -15,12 +15,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 - **Meldingen onderdrukken per klasse en per check** (issue #65). `[rapport]` krijgt
   `onderdruk_klassen` (GWSW-wortelklassen, subklassen via de ontologie) en `onderdruk_checks`
-  (check-ID's; een onbekend ID faalt bij het laden). Het filter zit op één plek, in de
-  meldingenstroom vóór elke schrijver, en telt per check en per klasse wat wegviel: in de
+  (alleen ID's uit het checkregister; een onbekend ID faalt bij het laden -- een
+  nulmetingsvorm of datasetsignaal onderdruk je via de klasse). Het filter zit op één plek,
+  in de meldingenstroom vóór elke schrijver, en telt wat wegviel: in de
   verantwoording van het rapport, in `totaal/synthese.md`, in `gwsw_run`
   (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en als optioneel veld
-  `onderdrukt` in de JSON-envelop (`schema_versie` blijft 1.1). Een object waarvan alle
-  meldingen onderdrukt zijn is grijs op de kaart met die reden. De CSV draagt de lijsten niet.
+  `onderdrukt` in de JSON-envelop (`schema_versie` blijft 1.1). "Per check" telt élke
+  weggevallen melding onder haar check-ID -- precies het verschil met de kolom Bevindingen --
+  en "per klasse" het deel dat op klasse wegviel. Elk object van een onderdrukte klasse is
+  grijs op de kaart, ook zonder meldingen erop, met de reden "klasse onderdrukt in de
+  projectconfiguratie; meldingen erop komen niet in de uitvoer". De CSV draagt de lijsten niet.
   `configs/dewoldenhoogeveen.toml` onderdrukt het mechanische riool. Op De Wolden en Hoogeveen
   vallen zo 10345 meldingen weg en gaan 3652 strengen van gekleurd naar grijs (BO-49).
 
@@ -55,6 +59,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   9274 bevindingen (9063 putten, 211 strengen), niet systemisch. Zie BO-45.
 
 ### Gewijzigd
+
+- **`schrijf_uitvoer` neemt `stroom=` in plaats van `meldingen=`** (issue #65). Wie de vier
+  uitvoervormen zelf aanstuurt gaf een `list[Melding]` mee; dat is nu een `Meldingenstroom`
+  (`uitvoer.melding.bouw_meldingenstroom`), zodat de meldingen en de telling van de
+  onderdrukking niet los van elkaar kunnen raken. Zonder argument bouwt hij de stroom zelf;
+  alleen een beller die de lijst expliciet meegaf, past zijn aanroep aan.
 
 - **De CI-poort classificeert overslagen op reden; de telgrens vervalt** (BO-48).
   `NLRIOCHECKER_MAX_OVERGESLAGEN` telde ook de bedoelde, datagebonden overslagen mee en

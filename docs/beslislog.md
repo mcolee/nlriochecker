@@ -2583,13 +2583,18 @@ vangt de fout vóór de push, maar de grens zelf blijft verkeerd).
 **Wat.** `[rapport]` krijgt `onderdruk_klassen` (GWSW-wortelklassen; subklassen via de ontologie) en
 `onderdruk_checks` (check-ID's), beide standaard leeg. `bouw_meldingenstroom` houdt ná het samenstellen
 van de drie bronnen elke melding uit de stroom waarvan het check-ID op de tweede lijst staat of waarvan
-het hoofdobject (`object_uri`, niet `object2_uri`) onder een klasse van de eerste valt, en telt per check
-en per klasse wat wegviel. Rapport (verantwoording), `totaal/synthese.md`, `gwsw_run`
-(`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en de JSON-envelop (`onderdrukt`,
-optioneel) dragen de telling; de CSV niet. Een object waarvan alle meldingen onderdrukt zijn wordt grijs
-met de reden "meldingen onderdrukt op grond van de projectconfiguratie", die vóór "mechanisch" gaat. Een
-onbekend check-ID faalt bij het laden. De Wolden onderdrukt `MechanischeRioolleiding` en
-`MechanischeTransportleiding`, dezelfde wortels als `[klassen] mechanisch`. Uitgewerkt in issue #65.
+het hoofdobject (`object_uri`, niet `object2_uri`) onder een klasse van de eerste valt. Hij telt twee
+dingen die geen partitie zijn: `per_check` telt élke weggevallen melding onder haar check-ID -- ook wat op
+klasse wegviel, want dat is precies het verschil met de kolom Bevindingen van die check -- en `per_klasse`
+alleen het deel dat op klasse wegviel. Het totaal is dus de som over `per_check`. Rapport
+(verantwoording), `totaal/synthese.md`, `gwsw_run` (`onderdruk_klassen`, `onderdruk_checks`,
+`meldingen_onderdrukt`) en de JSON-envelop (`onderdrukt`, optioneel) dragen de telling; de CSV niet. Elk
+object van een onderdrukte klasse wordt grijs met de reden "klasse onderdrukt in de projectconfiguratie;
+meldingen erop komen niet in de uitvoer" -- ook een object waarop niets gevonden was, want de reden hoort
+bij de klasse -- en die reden gaat vóór "mechanisch". Een onbekend check-ID faalt bij het laden; alleen
+register-ID's zijn toegestaan, een nulmetingsvorm of datasetsignaal onderdruk je via de klasse. De Wolden
+onderdrukt `MechanischeRioolleiding` en `MechanischeTransportleiding`, dezelfde wortels als
+`[klassen] mechanisch`. Uitgewerkt in issue #65.
 
 **Waarom.** Het checkregister rekent mechanisch riool buiten scope, maar TOP-010, TOP-011 en de
 SHACL-nulmeting melden er toch op (Koekangerveld: 17 van de 20 mechanische strengen gekleurd). De
@@ -2610,10 +2615,14 @@ meldingen onderdrukt van de 167.571 (1.832 uit het register, 8.513 uit de nulmet
 dataset-laag), per klasse MechanischeTransportleiding 9.917 en MechanischeRioolleiding 428. De grootste
 posten zijn nulmetingsvormen op de leiding zelf -- LengteLeiding_val 1.955, EindpuntLeiding_Knooppunt_card
 1.672, HoogteLeiding_val 1.193, BreedteLeiding_val 1.193, BeginpuntLeiding_Knooppunt_card 1.030 -- en van de
-eigen checks ATTR-017 962, TOP-010 367 en TOP-011 365. `n_mechanisch` blijft 3.720 en de kolom Bekeken
+eigen checks ATTR-017 962, TOP-010 367 en TOP-011 365. Dat zijn de getallen die de verantwoording achter
+"per check" zet: die telling loopt over álle weggevallen meldingen, ook die op klasse wegvielen -- anders
+zou een check waarvan alle bevindingen wegvielen (TOP-007, 7 → 0) er met "geen" naast staan.
+`n_mechanisch` blijft 3.720 en de kolom Bekeken
 (`examined`, 23.440) en de systemisch-bepaling per check veranderen niet: het is een uitvoerkeuze; de kolom
 Bevindingen in het rapport daalt per check met wat wegviel (TOP-010 2.551 → 2.184, TOP-011 2.237 → 1.872,
 TOP-006 197 → 81, TOP-007 7 → 0). In de laag `strengen` gingen 3.652 strengen van gekleurd (2.719 rood, 933
-oranje) naar grijs met de reden "meldingen onderdrukt"; de overige 68 mechanische strengen waren al grijs,
+oranje) naar grijs met de reden "klasse onderdrukt"; de overige 68 mechanische strengen waren al grijs
+(en dragen die reden nu ook, want hij hoort bij de klasse en niet bij weggevallen meldingen),
 en de laag `putten` verandert niet. Koekangerveld: van 17 gekleurde mechanische strengen (13 rood, 4 oranje)
 naar 0, alle 20 grijs, 48 meldingen onderdrukt.

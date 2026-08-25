@@ -54,7 +54,8 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   put of streng; komt hij nergens op uit, dan blijft de melding staan zonder object en
   met een leeg gebied, en het rapport telt die gevallen. Zie BO-28.
 - Een derde bron in dezelfde stroom is het datasetsignaal (`bron = "dataset"`, categorie
-  `SIG`): `bouw_meldingen` leest `uitvoer/omvang.klassen_op_nul` en maakt één systemische
+  `SIG`): `_alle_meldingen` (binnen `bouw_meldingenstroom`) leest
+  `uitvoer/omvang.klassen_op_nul` en maakt één systemische
   waarschuwing per klasse of rol waar een check op leunt maar die nul keer voorkomt
   (`SIG-nulklasse`, issue #22), en één voor de herstelde fantoomkoppeling naar
   hulpstukken (`SIG-hulpstukkoppeling`, `uitvoer/omvang.koppelingsherstel`, issue #60).
@@ -64,12 +65,15 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   Vervalt zonder klassenhierarchie, want dan herkent `of_class` geen klassen.
 - `bouw_meldingenstroom` past als laatste stap de onderdrukking uit `[rapport]` toe:
   `onderdruk_klassen` op het hoofdobject via `is_a` (nooit op `object2_uri`),
-  `onderdruk_checks` op het check-ID, eerst op check en dan op klasse, elke melding
-  hooguit een keer geteld. Hij telt per check en per klasse en geeft een
-  `Meldingenstroom` terug (meldingen plus `Onderdrukking`). Wat wegvalt bereikt geen
-  enkele schrijver. Het rapport (verantwoording), `totaal/synthese.md`, `gwsw_run`
-  (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en de JSON-envelop
-  (`onderdrukt`) dragen de telling; de CSV niet. Zie BO-49.
+  `onderdruk_checks` op het check-ID, eerst op check en dan op klasse; een melding valt
+  hooguit een keer weg. Hij geeft een `Meldingenstroom` terug (meldingen plus
+  `Onderdrukking`) met twee tellingen die geen partitie zijn: `per_check` telt élke
+  weggevallen melding onder haar check-ID -- precies het verschil met de kolom
+  Bevindingen, ook als ze op klasse wegviel -- en `per_klasse` alleen het deel dat op
+  klasse wegviel. `Onderdrukking.totaal` telt daarom alleen `per_check`. Wat wegvalt
+  bereikt geen enkele schrijver. Het rapport (verantwoording), `totaal/synthese.md`,
+  `gwsw_run` (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en de
+  JSON-envelop (`onderdrukt`) dragen de telling; de CSV niet. Zie BO-49.
 - Het bevindingenrapport van `toets` leest van gebied naar detail: gebiedsnaam als
   titel, aantallen (objecttype x stelseltype over de kern, leidingen ook in meters),
   managementsamenvatting (een regel per CFK plus de eigen checks; vinkje = nul fouten),
@@ -109,10 +113,12 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   uit `Begindatum`, leeg zonder datum; ATTR-018 meldt dat gat per object, issue #61).
   Grijs betekent: niet beoordeeld **en** niets gevonden;
   mechanisch riool wordt door de meeste checks overgeslagen maar niet door alle, en wat
-  er wel op staat kleurt het object. Een object van een klasse uit `[rapport]
-  onderdruk_klassen` is grijs met de reden `REDEN_ONDERDRUKT`, die vóór "mechanisch"
-  gaat: ook een niet-mechanische onderdrukte klasse hoort grijs te lezen en niet groen
-  (BO-49). Met een studiegebied komt `Analyseset.buffer` als
+  er wel op staat kleurt het object. **Elk** object van een klasse uit `[rapport]
+  onderdruk_klassen` is grijs met de reden `REDEN_ONDERDRUKT` ("klasse onderdrukt in de
+  projectconfiguratie; meldingen erop komen niet in de uitvoer"), ook een object waarop
+  niets gevonden was: de reden hoort bij de klasse en niet bij weggevallen meldingen. Hij
+  gaat vóór "mechanisch", want ook een niet-mechanische onderdrukte klasse hoort grijs te
+  lezen en niet groen (BO-49). Met een studiegebied komt `Analyseset.buffer` als
   grijze ring mee -- niet de hele schil, die kan het halve net zijn. `status` telt
   systemische meldingen niet mee, net als `ergste_ernst`. `meldinglocaties` bestaat niet meer; de
   tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. De statusregel en

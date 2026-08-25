@@ -101,7 +101,11 @@ REDEN_SCHIL = "ligt naast het studiegebied en niet erin"
 # De projectconfiguratie houdt de meldingen van deze klasse uit de stroom (BO-49). Niet
 # hetzelfde als "mechanisch": dat zegt dat de checks er grotendeels overheen lopen, dit
 # dat de uitkomst bewust niet gerapporteerd wordt -- ook op een klasse die wel getoetst is.
-REDEN_ONDERDRUKT = "meldingen onderdrukt op grond van de projectconfiguratie"
+# De reden is een eigenschap van de klasse en niet van dit object: hij staat er ook op een
+# object waarop niets gevonden was, en mag dus geen weggevallen meldingen suggereren.
+REDEN_ONDERDRUKT = (
+    "klasse onderdrukt in de projectconfiguratie; meldingen erop komen niet in de uitvoer"
+)
 # Deze reden geldt niet voor een object maar voor de hele run: zonder klassenhierarchie
 # heeft de lader knopen en strengen op geometrie herkend en draaiden de checks over een
 # onvolledige selectie. Groen zou hier "beoordeeld en niets gevonden" beweren, terwijl

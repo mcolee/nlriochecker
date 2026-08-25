@@ -373,16 +373,17 @@ def test_onderdrukking_per_klasse_haalt_het_hoofdobject_weg_en_laat_het_tweede_o
     assert [m.object_uri for m in over] == [VRIJVERVAL]
     assert over[0].object2_uri == PERSLEIDING
     # Een: TOP-011 meldt het paar een keer, met de vrijvervalstreng als hoofdobject, dus
-    # alleen de nulmetingmelding op de persleiding valt hier weg.
+    # alleen de nulmetingmelding op de persleiding valt hier weg. Ze staat in beide
+    # tellingen: onder haar wortel en onder haar check-ID.
     assert stroom.onderdrukking.per_klasse == {"MechanischeTransportleiding": 1}
-    assert stroom.onderdrukking.per_check == {}
+    assert stroom.onderdrukking.per_check == {"NULMETING-Put_HoogtePut_card": 1}
     assert stroom.onderdrukking.totaal == 1
     assert stroom.onderdrukking.actief
     assert stroom.onderdrukking.klassen == ("MechanischeTransportleiding",)
 
 
 def test_onderdrukking_per_check_gaat_voor_en_telt_een_melding_maar_een_keer() -> None:
-    """Een melding die op check én klasse zou wegvallen telt alleen bij de check.
+    """Een melding die op check én klasse zou wegvallen telt niet mee in `per_klasse`.
 
     `Leiding` en niet `MechanischeTransportleiding`, want alleen onder die wortel valt de
     TOP-011-melding op de vrijvervalstreng ook op klasse weg -- pas dan is er iets om
@@ -400,7 +401,7 @@ def test_de_eerste_treffende_wortel_uit_de_lijst_krijgt_de_telling() -> None:
     """De volgorde van de lijst beslist: `Leiding` staat vooraan en telt de persleiding.
 
     Beide wortels dekken L2; zonder die regel zou een melding onder twee wortels kunnen
-    vallen en zou de som van de tellingen hoger zijn dan het aantal weggevallen meldingen.
+    vallen en zou de som van `per_klasse` hoger zijn dan het aantal weggevallen meldingen.
     """
     nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
     stroom = bouw_meldingenstroom(
@@ -409,6 +410,27 @@ def test_de_eerste_treffende_wortel_uit_de_lijst_krijgt_de_telling() -> None:
 
     assert stroom.onderdrukking.per_klasse == {"Leiding": 2}
     assert stroom.onderdrukking.totaal == 2
+
+
+def test_een_klassetreffer_telt_in_beide_tellingen_maar_een_keer_in_het_totaal() -> None:
+    """De twee tellingen beantwoorden verschillende vragen en zijn geen partitie.
+
+    `per_check` is het verschil met de kolom Bevindingen -- ook een check waarvan alle
+    bevindingen op klasse wegvielen hoort er met zijn aantal in te staan, want anders
+    leest hij als "0 bevindingen" met "per check: geen" ernaast. `per_klasse` zegt onder
+    welke wortel dat gebeurde. `totaal` telt alleen `per_check`, dus elke melding een
+    keer.
+    """
+    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], [], nul), RUNDATUM)
+
+    assert stroom.onderdrukking.per_check == {
+        "TOP-011": 1,
+        "NULMETING-Put_HoogtePut_card": 1,
+    }
+    assert stroom.onderdrukking.per_klasse == {"Leiding": 2}
+    assert stroom.onderdrukking.totaal == 2
+    assert len(_zonder_signalen(stroom.meldingen)) == 0
 
 
 def test_een_melding_zonder_object_valt_nooit_op_klasse_weg() -> None:
@@ -421,6 +443,7 @@ def test_een_melding_zonder_object_valt_nooit_op_klasse_weg() -> None:
     assert [m.bron for m in _zonder_signalen(stroom.meldingen)] == [BRON_NULMETING]
     assert len(stroom.meldingen) == len(zonder.meldingen) - 1
     assert stroom.onderdrukking.per_klasse == {"Leiding": 1}
+    assert stroom.onderdrukking.per_check == {"TOP-011": 1}
 
 
 def test_onderdrukking_raakt_examined_en_systemisch_niet() -> None:

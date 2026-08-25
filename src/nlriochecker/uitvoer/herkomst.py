@@ -23,11 +23,16 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from nlriochecker import __version__
-from nlriochecker.uitvoer.melding import Onderdrukking
+
+if TYPE_CHECKING:
+    # Alleen voor de annotatie: deze module is de onderste laag van de uitvoer en hoeft
+    # de meldingenstroom niet te kennen om een envelop te schrijven.
+    from nlriochecker.uitvoer.melding import Onderdrukking
 
 # De pakketnaam uit de modulenaam zelf, om hem niet naast `pyproject.toml` een
 # tweede keer op te schrijven -- dezelfde reden waarom het versienummer uit de
@@ -119,9 +124,10 @@ def schrijf_json(
 
     Bedoeld als stabiel contract voor een afnemer die er mutatievoorstellen uit
     afleidt. De meldingen komen kant-en-klaar binnen via `meldingen_json`; deze
-    functie interpreteert geen enkel veld, precies zoals `schrijf_csv` een
+    functie interpreteert er geen enkel veld van, precies zoals `schrijf_csv` een
     kant-en-klare tabel krijgt. Zo kan de JSON niet uit de pas lopen met de andere
-    drie uitvoervormen.
+    drie uitvoervormen. De enveloppewaarden leest hij wel -- ze komen als losse
+    argumenten binnen en worden hier tot velden gemaakt.
 
     De sortering op `melding_id` maakt twee runs op dezelfde data diffbaar; zonder
     haar is elke trendvergelijking tussen twee bestanden ruis. Zie

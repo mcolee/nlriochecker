@@ -19,7 +19,7 @@ from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import toets_gebieden
-from nlriochecker.uitvoer.bevindingen import _telling
+from nlriochecker.uitvoer.bevindingen import _telling, write_check_report
 from nlriochecker.uitvoer.omvang import omvangtabel
 from nlriochecker.uitvoer.samenvatting import KRUISJE, NIET_GEMETEN, VINKJE
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer, schrijf_uitvoer_gebieden
@@ -312,11 +312,16 @@ class TestOnderdrukking:
         )
 
     def test_de_verantwoording_telt_wat_er_onderdrukt_is(self, tmp_path: Path) -> None:
-        """Stilte leest als "alles gecontroleerd"; de telling hoort in het rapport."""
+        """Stilte leest als "alles gecontroleerd"; de telling hoort in het rapport.
+
+        De weggevallen melding staat in beide tellingen: onder haar check-ID, want de
+        kolom Bevindingen van die check daalde ermee, en onder de wortel die haar
+        wegnam.
+        """
         tekst = _rapport(self._run_onderdrukt(["MechanischeTransportleiding"]), tmp_path)
 
         assert "**1 melding onderdrukt**" in tekst
-        assert "per check: geen" in tekst
+        assert "per check: NULMETING-Put_HoogtePut_card 1" in tekst
         assert "per klasse: MechanischeTransportleiding 1" in tekst
 
     def test_zonder_lijsten_zwijgt_het_rapport_erover(self, tmp_path: Path) -> None:
@@ -324,6 +329,22 @@ class TestOnderdrukking:
         tekst = _rapport(self._run_onderdrukt([]), tmp_path)
 
         assert "op grond van `[rapport]`" not in tekst
+
+    def test_een_rapport_dat_zijn_eigen_meldingen_bouwt_verantwoordt_de_onderdrukking(
+        self, tmp_path: Path
+    ) -> None:
+        """`write_check_report` zonder meldingenlijst filtert; dan moet hij het ook zeggen.
+
+        Hij bouwt de stroom dan zelf, en die is al onderdrukt. Alleen het argument
+        honoreren leverde een rapport op dat wél gefilterd was maar zweeg.
+        """
+        markdown, _ = write_check_report(
+            self._run_onderdrukt(["MechanischeTransportleiding"]), tmp_path, RUNDATUM
+        )
+
+        tekst = markdown.read_text(encoding="utf-8")
+        assert "op grond van `[rapport]`" in tekst
+        assert "**1 melding onderdrukt**" in tekst
 
     def test_de_telling_staat_gesorteerd_en_zegt_geen_bij_niets(self) -> None:
         """Gesorteerd op sleutel: anders verschilt de zin tussen twee runs op dezelfde data."""
