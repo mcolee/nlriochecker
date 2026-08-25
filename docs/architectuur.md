@@ -27,8 +27,12 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 ### Studiegebied (data/gis_koekangerveld/, data/gis_dewoldenhoogeveen/)
 - GeoPackage of GeoJSON, gelezen met stdlib sqlite3 plus shapely; geen extra afhankelijkheid. Moet in EPSG:28992 staan, net als de GWSW-coordinaten; herprojecteren doen we niet.
 - Analyseer de kern plus een contextschil, rapporteer de kern. De schil is de
-  samenhangende vrijvervalcomponent waar de kern in ligt plus een buffer om het gebied;
-  precies zo groot dat NET-001 en NET-002 geen valse bevindingen geven. Zonder
+  samenhangende component waar de kern in ligt plus een buffer om het gebied; precies zo
+  groot dat NET-001 en NET-002 geen valse bevindingen geven. Die component loopt sinds
+  issue #73 over vrijverval EN persnet: de bereikbaarheid volgt sinds #72 de mechanische
+  leidingen (BO-54) en een pompput is zelf geen eindpunt meer (BO-55), dus zonder het
+  persnet in de schil valt het gemaal erachter buiten de analyseset. Zie BO-56 voor de
+  meting (17 van de 88 buurten weken af) en de prijs (analyseset 1,7x). Zonder
   studiegebied draait alles op de volledige dataset. Meld altijd hoeveel bevindingen
   buiten het gebied vielen en hoe groot kern, schil en export zijn.
 - Bevat het bestand meer dan een feature, dan rapporteert `toets` per feature: een submap

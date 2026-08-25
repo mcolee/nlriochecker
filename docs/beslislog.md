@@ -2818,3 +2818,78 @@ naar een lozingspunt -- en dat het laatste stuk gepompt is maakt het niet minder
 domeinredenering van BO-53 speelt hier niet mee: NET-002 vroeg altijd al om een lozingspunt, alleen
 de route ernaartoe verandert. Vastgelegd in
 `tests/test_checks_netwerk.py::test_hemelwater_door_het_persnet_geldt_ook_als_afgevoerd`.
+
+### BO-55 `Pompunit` is geen afvoereindpunt; het noodverband uit BO-33 krimpt tot `Gemaal`
+
+**Wat.** `[klassen] afvoer_eindpunt` is `["Overnamepunt", "Gemaal"]` geworden, in
+`src/nlriochecker/checks.toml` en in `configs/dewoldenhoogeveen.toml`. Deze ene lijst voedt
+NET-001 (`_eindpunten` in `checks/verbanden.py`) en RVZ-006 (`_afvoereindpunten` in
+`checks/randvoorzieningen.py`), dus beide erven de correctie. Dit verfijnt BO-33; het draait
+hem niet terug, want `Gemaal` blijft er om precies dezelfde reden in staan (nul
+`Overnamepunt` in deze aanlevering) en met hetzelfde loslaatcriterium.
+
+**Waarom ontologisch.** `gwsw:Pompunit` is een `Rioolput` in het mechanische stelsel, geen
+`Gemaal` (dat is een `Bouwwerk`) en geen `Overnamepunt` (een `Aansluitpunt`, met de
+NEN 3300-definitie van overdracht). Een pompput is een **overdrachtspunt naar de
+drukriolering**, niet het einde van de afvoer. Dat einde is een gemaal of overnamepunt --
+of, sinds BO-53, een lozingspunt.
+
+**Waarom nu pas.** BO-33 zette `Pompunit` er bewust in als noodverband: de graaf traverseerde
+het mechanische riool niet, dus zonder pompput-als-eindpunt gold heel de drukriolering als
+onbereikbaar (+645 vuilwater/gemengd-strengen op De Wolden en Hoogeveen, waarvan 3 in
+Koekangerveld; `scripts/analyse_afvoer_pompunit.py`). Dat waren valse positieven: het water
+werd wel afgevoerd, wij konden het alleen niet traceren. Issue #72 heft die reden op (BO-54:
+mechanische connectiviteit door hulpstukken; BO-53: het lozingspunt telt mee), en pas daarna
+mag `Pompunit` eruit.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`, door de echte pijplijn met
+`markeer_vulwaarden` vóór de checks).** NET-001 gaat van **7978** naar **8467** bevindingen op
+17451 onderzochte strengen; Koekangerveld blijft op **7**. Dat is exact wat het onderbouwende
+issue voorspelde voor #72 + #73 samen (rij `(c'+L)` van `scripts/analyse_afvoer_pompunit.py`).
+NET-002 blijft **3031**: die check leest `lozings_eindpunt`, niet `afvoer_eindpunt`. RVZ-006
+gaat van **98** naar **99**; de ene nieuwe bevinding is deelstelsel `ds-Ko2G0002` (35 knopen,
+gemengd, wel een overstort maar als enig eindpunt een pompunit). Negen bestaande
+RVZ-006-boodschappen wijzigen alleen van tekst.
+
+**Teksten die meeveranderden.** De deelreden van RVZ-006 (`_rvz006_gebrek`) luidt "zonder
+afvoereindpunt (gemaal of overnamepunt)", net als de RVZ-006-regel van het checkregister; de
+rapportregel onder de eindpunttelling noemt alleen `Gemaal` nog als noodverband. De
+NET-001-regel van het register was door #72 al bijgewerkt naar "gemaal, overnamepunt of
+lozingspunt". Vastgelegd in `tests/test_checkconfig.py::test_afvoereindpunt_is_overnamepunt_en_gemaal`,
+`tests/test_checks_netwerk.py::test_pompunit_zonder_persnet_is_geen_afvoereindpunt` en
+`tests/test_checks_blok_a.py::test_rvz006_telt_een_pompunit_niet_als_afvoereindpunt`.
+
+### BO-56 De contextschil loopt door het persnet, anders houdt de gelijkwaardigheid niet
+
+**Wat.** `_componentstructuur` in `afbakening.py` legt naast de vrijvervalleidingen ook de
+mechanische leidingen (`[klassen] mechanisch`) als kanten in de componentgraaf, met dezelfde
+terugval op de rauwe koppeling als `_met_mechanische_connectiviteit` (BO-54). De contextschil
+van een studiegebied is daardoor de samenhangende component over vrijverval **én** persnet.
+
+**Waarom.** BO-12 eist gelijkwaardigheid: de meldingen van een gebied zijn gelijk aan die van
+een losse run over dat gebied, en aan een gemeentebrede run beperkt tot dat gebied. Sinds
+issue #72 loopt de bereikbaarheid van NET-001/NET-002 door het persnet en sinds BO-55 is een
+pompput zelf geen eindpunt meer. Bakende de schil zich dan nog op het zuivere vrijverval af,
+dan viel het gemaal achter de persleiding buiten de analyseset en meldde een gebiedsrun
+strengen die de gemeentebrede run niet meldt. Het commentaar dat de mechanische leidingen hier
+bewust buiten hield ("de NET-checks volgen ze niet") was met #72 onwaar geworden.
+
+**Meting (88 CBS-buurten van De Wolden en Hoogeveen, per buurt de gebiedsrun tegen de
+gemeentebrede run beperkt tot dezelfde kern).** Met de oude schil weken **17** buurten af op
+NET-001, alle met méér bevindingen in de gebiedsrun en geen enkele met minder; met deze
+wijziging zijn het er **0**. De afwijking bestond al vóór dit issue -- met `Pompunit` nog als
+eindpunt weken er 7 af, een gevolg van #72 dat het #72-verslag als openstaand punt naar dit
+issue doorschoof. Op een bredere steekproef van 8 buurten over alle 99 checks: 12 afwijkende
+checks (NET-001 in alle acht, plus TOP-001, TOP-006, TOP-011, TOP-023) vóór, 1 erna.
+
+**De prijs, en waarom hij aanvaardbaar is.** De analysesets van de 88 buurten samen groeien van
+303.570 naar 518.101 objecten (1,7x); de grootste gaat naar 15.739 van de 46.925 objecten in de
+export. Dat is de vrees uit het oude commentaar -- "de schil dijt uit tot de hele gemeente" --
+in gemeten vorm: een derde van de export in het zwaarste geval, geen geheel. De schil wordt
+bovendien nooit kern, dus wat erbij komt kan geen bevinding in het gebied opleveren; het kan
+alleen valse bevindingen wegnemen.
+
+**Wat er niet mee opgelost is.** Eén afwijking blijft staan: TOP-023 (hulpstuk met te veel
+leidingen) in de buurt "Verspreide huizen Koekange". Die bestond vóór deze wijziging ook al en
+gaat niet over de bereikbaarheid maar over de leidingtelling rond een hulpstuk op de
+gebiedsrand. Niet in dit issue aangepakt; hij hoort in een eigen issue thuis.

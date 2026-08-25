@@ -144,7 +144,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | RVZ-003 | Overstort zonder geregistreerde drempelbreedte (Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt | W | Compleetheid |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie |
-| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal, pompunit of overnamepunt) | F | Plausibiliteit |
+| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal of overnamepunt) | F | Plausibiliteit |
 | RVZ-007 | BBB zonder geregistreerde bergingsinhoud of afmetingen | W | Compleetheid |
 | RVZ-008 | BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel | W | Compleetheid |
 | RVZ-009 | BBB zonder nooduitlaat of externe overstortdrempel | W | Compleetheid |
