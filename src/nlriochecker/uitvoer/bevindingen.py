@@ -717,6 +717,11 @@ def _detail_eigen(
 
     `genummerd` is onwaar als er geen nulmetingblok boven staat -- zonder `--shacl` is
     er geen blok 1, en dan is "2. Eigen checks" een verwijzing naar niets.
+
+    Systemische bevindingen staan niet in de tabel maar in een generieke regel eronder
+    (issue #76), net zoals het nulmetingblok per SHACL-vorm samenvat. De vlag zit op de
+    melding, dus de scheiding gaat per melding: een check waarvan maar een deel
+    systemisch is toont de rest gewoon per object.
     """
     per_check = _per_check(meldingen)
     kop = "### 2. Eigen checks" if genummerd else "### Eigen checks"
@@ -741,23 +746,61 @@ def _detail_eigen(
         if not eigen:
             regels += ["", "_geen bevindingen_"]
             continue
-        regels += [""]
-        maximum = _maximum_per_check(run)
-        getoond = eigen if maximum == 0 else eigen[:maximum]
-        regels += table(_findings_frame(getoond), f"Bevindingen ({len(eigen)})")
-        weggelaten = len(eigen) - len(getoond)
-        if weggelaten:
-            waar = (
-                f"de volledige lijst staat in `{FILE_CHECKS_CSV}`"
-                if met_csv
-                else f"de CSV is met `--uitvoer` uitgezet, de volledige lijst staat in "
-                f"`{FILE_CHECKS_JSON}` of de GeoPackage, voor zover die gevraagd zijn"
+        systemisch = [melding for melding in eigen if melding.systemisch]
+        per_object = [melding for melding in eigen if not melding.systemisch]
+        if per_object:
+            regels += [""]
+            maximum = _maximum_per_check(run)
+            getoond = per_object if maximum == 0 else per_object[:maximum]
+            regels += table(_findings_frame(getoond), f"Bevindingen ({len(per_object)})")
+            weggelaten = len(per_object) - len(getoond)
+            if weggelaten:
+                regels += [
+                    "",
+                    f"_{getal(weggelaten, 'bevinding', 'bevindingen')} niet getoond; "
+                    f"{_volledige_lijst(met_csv)}._",
+                ]
+        if systemisch:
+            regels += _systemische_regel(
+                len(systemisch), outcome.examined, alle=not per_object, met_csv=met_csv
             )
-            regels += [
-                "",
-                f"_{getal(weggelaten, 'bevinding', 'bevindingen')} niet getoond; {waar}._",
-            ]
     return regels
+
+
+def _volledige_lijst(met_csv: bool) -> str:
+    """Waar de volledige lijst staat, als deelzin; zonder CSV noemt hij haar niet.
+
+    Naar een met `--uitvoer` uitgezette CSV verwijzen stuurt de lezer naar een bestand
+    dat er niet is, juist voor de bevindingen die het rapport zelf weglaat (issue #66).
+    """
+    if met_csv:
+        return f"de volledige lijst staat in `{FILE_CHECKS_CSV}`"
+    return (
+        f"de CSV is met `--uitvoer` uitgezet, de volledige lijst staat in "
+        f"`{FILE_CHECKS_JSON}` of de GeoPackage, voor zover die gevraagd zijn"
+    )
+
+
+def _systemische_regel(aantal: int, examined: int, *, alle: bool, met_csv: bool) -> list[str]:
+    """De generieke regel voor systemische bevindingen (issue #76).
+
+    Check, aantal en bekeken populatie, in de vorm die het nulmetingblok per SHACL-vorm
+    al gebruikt; de check zelf staat in de kop erboven. Een systemische bevinding is
+    dezelfde structurele kwestie op (vrijwel) elk object -- zelf gedeclareerd door de
+    check of afgeleid uit de populatieratio -- en per object opgesomd verdringt zij wat
+    dit object van zijn buren onderscheidt. `alle` is onwaar als er ook niet-systemische
+    bevindingen zijn; dan staat de regel onder hun tabel.
+
+    De rijen zelf blijven in de CSV, de JSON en de meldingentabel van de GeoPackage
+    staan: die zijn een archief, en het weglaten is een keuze van de weergave.
+    """
+    aanhef = "Systemisch" if alle else "Daarnaast systemisch"
+    return [
+        "",
+        f"_{aanhef}: {getal(aantal, 'bevinding', 'bevindingen')} op {examined} bekeken "
+        f"objecten -- dezelfde kwestie op vrijwel elk object, dus dit rapport toont "
+        f"{vorm(aantal, 'haar', 'ze')} niet per object; {_volledige_lijst(met_csv)}._",
+    ]
 
 
 def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:

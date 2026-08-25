@@ -86,6 +86,15 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   nulmeting per SHACL-vorm, dan de eigen checks, elk met de fouten voorop. De
   aantallen komen uit `uitvoer/omvang.py`, de samenvatting uit
   `uitvoer/samenvatting.py`. Zie BO-31.
+- Systemische bevindingen staan in het rapport en in de popup **generiek**, niet per
+  object (issue #76): `_detail_eigen` vervangt hun rijen door een regel met check,
+  aantal en bekeken populatie -- dezelfde vorm waarin het nulmetingblok per SHACL-vorm
+  samenvat -- en `objectkaart.popup_html` laat ze weg en telt ze in een afsluitende
+  regel. De scheiding gaat per melding (`Melding.systemisch`, zelf gedeclareerd of uit
+  de populatieratio), dus een check waarvan maar een deel systemisch is toont de rest
+  gewoon per object. CSV, JSON en de meldingentabel van de GeoPackage houden elke rij
+  met haar vlag: dat zijn archieven en een publiek contract, en alleen de mensgerichte
+  views vouwen samen.
 - De runbrede markering boven een rapport wordt samengesteld in
   `uitvoer/voorbehoud.py`, en nergens anders. Er kan meer dan een voorbehoud tegelijk
   gelden -- een `--cfk`-deelset op een run met `--geen-ontologie` -- en
@@ -125,7 +134,8 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   gaat vóór "mechanisch", want ook een niet-mechanische onderdrukte klasse hoort grijs te
   lezen en niet groen (BO-49). Met een studiegebied komt `Analyseset.buffer` als
   grijze ring mee -- niet de hele schil, die kan het halve net zijn. `status` telt
-  systemische meldingen niet mee, net als `ergste_ernst`. `meldinglocaties` bestaat niet meer; de
+  systemische meldingen niet mee, net als `ergste_ernst`, en sinds issue #76 staan ze
+  ook niet meer in de popup -- alleen geteld, in de afsluitende regel. `meldinglocaties` bestaat niet meer; de
   tabel `meldingen` draagt de foutlocatie in de kolommen `x` en `y`. De statusregel en
   de opmaak van de popup staan in `uitvoer/objectkaart.py`; `gpkg.py` levert alleen de
   feiten die alleen hij kent (stelsel, lengte, BOB-richting) als kant-en-klare regels

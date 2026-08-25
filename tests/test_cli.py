@@ -563,7 +563,10 @@ def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
         kop = f"## {check_id} — "
         assert kop in tekst
         staart = tekst.split(kop, 1)[1]
-        assert f"Bevindingen ({aantal})" in staart.split("\n## ", 1)[0]
+        blok = staart.split("\n## ", 1)[0]
+        # Een systemische check draagt geen tabel per object maar een generieke regel
+        # met hetzelfde aantal (issue #76); beide vormen tellen dus mee.
+        assert f"Bevindingen ({aantal})" in blok or f"Systemisch: {aantal} bevinding" in blok
 
 
 def test_cfk_met_onbekende_waarde_somt_de_toegestane_op(

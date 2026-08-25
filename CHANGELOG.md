@@ -27,6 +27,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Systemische bevindingen staan generiek in het rapport en in de popup** (issue #76).
+  Een systemische bevinding is dezelfde structurele kwestie op (vrijwel) elk object; per
+  object opgesomd verdringt zij de gebreken die dat object van zijn buren onderscheiden.
+  De detailsectie van een eigen check vervangt haar rijen daarom door een regel met
+  check, aantal en bekeken populatie -- dezelfde vorm waarin het nulmetingblok al per
+  SHACL-vorm samenvat -- en de GeoPackage-popup laat ze weg en telt ze in een
+  afsluitende regel. De scheiding gaat per melding: is maar een deel van de bevindingen
+  systemisch, dan staat de rest gewoon per object. CSV, JSON en de meldingentabel van de
+  GeoPackage veranderen niet: daar blijft elke rij staan, met haar `systemisch`-vlag.
 - **De stelsellaag maakt plaats voor een RVZ-006-vlak, en RVZ-006 meldt per gemengde
   streng** (issue #75, BO-57). De cartografische laag `stelsels` groepeerde strengen via de
   GWSW-stelselregistratie -- een groepering die niet betrouwbaar is -- en toonde er een

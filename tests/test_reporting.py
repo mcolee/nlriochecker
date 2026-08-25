@@ -360,27 +360,31 @@ def test_rapport_toont_standaard_alle_bevindingen(tmp_path: Path) -> None:
 
 
 def test_afkap_is_configureerbaar_en_wordt_gemeld(tmp_path: Path) -> None:
+    # NET-001 op deze fixture: 4 bevindingen op 6 bekeken strengen, dus onder de
+    # systemischdrempel en daarmee een check die nog een tabel per object krijgt.
+    # TOP-013 sloeg op zijn eigen fixture op alle drie de strengen aan en wordt sinds
+    # issue #76 als een generieke regel getoond, zonder tabel om af te kappen.
     config = _fixtureconfig()
     config.rapport.max_bevindingen_per_check = 1
-    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
+    run = _checkrun("net004_parallelle_strengen.ttl", "NET-001", config=config)
 
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")
 
-    assert "2 bevindingen niet getoond" in tekst
+    assert "3 bevindingen niet getoond" in tekst
 
 
 def test_de_afkapmelding_wijst_niet_naar_een_uitgezette_csv(tmp_path: Path) -> None:
     """Juist de weggelaten bevindingen mogen niet naar een ontbrekend bestand wijzen."""
     config = _fixtureconfig()
     config.rapport.max_bevindingen_per_check = 1
-    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
+    run = _checkrun("net004_parallelle_strengen.ttl", "NET-001", config=config)
 
     markdown_path, csv_path = write_check_report(run, tmp_path, met_csv=False)
     tekst = markdown_path.read_text(encoding="utf-8")
 
     assert csv_path is None
-    assert "2 bevindingen niet getoond" in tekst
+    assert "3 bevindingen niet getoond" in tekst
     assert "bevindingen.csv" not in tekst
     assert "de CSV is met `--uitvoer` uitgezet" in tekst
 
@@ -451,7 +455,10 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     )
     tekst = markdown_path.read_text(encoding="utf-8")
 
-    assert "Bevindingen (2)" in tekst
+    # TOP-013 slaat op deze fixture op alle drie de strengen aan en is dus systemisch;
+    # sinds issue #76 staat zo'n check als generieke regel in het rapport. Het aantal
+    # komt nog steeds uit de meegegeven stroom en niet uit `run.outcomes`.
+    assert "Systemisch: 2 bevindingen op" in tekst
     assert "| TOP-013 |" in tekst and "| 2 |" in tekst
     assert len(pd.read_csv(csv_path, sep=";", encoding="utf-8")) == 2
 

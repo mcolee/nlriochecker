@@ -7,11 +7,15 @@ herkomstblokken met de fouten voorop.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
+
+from helpers_melding import melding as _basismelding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.dataset import load_dataset
@@ -20,6 +24,7 @@ from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 from nlriochecker.studiegebied import load_studiegebieden
 from nlriochecker.toetsloop import toets_gebieden
 from nlriochecker.uitvoer.bevindingen import _telling, write_check_report
+from nlriochecker.uitvoer.melding import Melding
 from nlriochecker.uitvoer.omvang import omvangtabel
 from nlriochecker.uitvoer.samenvatting import KRUISJE, NIET_GEMETEN, VINKJE
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer, schrijf_uitvoer_gebieden
@@ -350,3 +355,122 @@ class TestOnderdrukking:
         """Gesorteerd op sleutel: anders verschilt de zin tussen twee runs op dezelfde data."""
         assert _telling({"TOP-011": 3, "ATTR-001": 2}) == "ATTR-001 2, TOP-011 3"
         assert _telling({}) == "geen"
+
+
+class TestSystemischGeneriek:
+    """Issue #76: een systemische bevinding hoort generiek, niet per object.
+
+    Systemisch is dezelfde structurele kwestie op (vrijwel) elk object -- zelf
+    gedeclareerd door de check (ATTR-014/015, `SIG-*`) of afgeleid uit de
+    populatieratio. Per object opgesomd verdringt zij de gebreken die dit object van
+    zijn buren onderscheiden; de nulmeting vat om die reden al per SHACL-vorm samen.
+    De CSV en de JSON houden hun rijen wel: die zijn een archief, geen rapport.
+
+    Gemengd (een deel van de meldingen systemisch) volgt dezelfde regel per melding:
+    de niet-systemische staan per object, de systemische in de generieke regel.
+    """
+
+    @staticmethod
+    def _melding(label: str, *, systemisch: bool) -> Melding:
+        """Een TOP-013-melding op een eigen object; de run levert alleen de outcome."""
+        return _basismelding(
+            melding_id=f"TOP-013-{label}",
+            check_id="TOP-013",
+            object_label=label,
+            boodschap=f"Streng {label} loopt parallel aan een andere.",
+            systemisch=systemisch,
+        )
+
+    @staticmethod
+    def _tekst(meldingen: list[Melding], tmp_path: Path) -> str:
+        """Het rapport van de TOP-013-fixture met een meegegeven meldingenstroom."""
+        run = _run("top013_parallel.ttl", "TOP-013")
+        markdown, _ = write_check_report(run, tmp_path, RUNDATUM, meldingen=meldingen)
+        return markdown.read_text(encoding="utf-8")
+
+    def test_een_systemische_check_krijgt_een_generieke_regel(self, tmp_path: Path) -> None:
+        """Geen tabel per object, maar een regel in de stijl van de nulmeting."""
+        meldingen = [self._melding(label, systemisch=True) for label in ("A", "B", "C")]
+
+        tekst = self._tekst(meldingen, tmp_path)
+
+        assert "**Bevindingen (3)**" not in tekst
+        assert "Streng A loopt parallel" not in tekst
+        assert "Systemisch: 3 bevindingen op" in tekst
+        assert "niet per object" in tekst
+
+    def test_een_gemengde_check_toont_alleen_de_niet_systemische_per_object(
+        self, tmp_path: Path
+    ) -> None:
+        """De vlag zit op de melding, dus de weergave volgt haar per melding."""
+        meldingen = [
+            self._melding("A", systemisch=True),
+            self._melding("B", systemisch=True),
+            self._melding("C", systemisch=False),
+        ]
+
+        tekst = self._tekst(meldingen, tmp_path)
+
+        assert "**Bevindingen (1)**" in tekst
+        assert "Streng C loopt parallel" in tekst
+        assert "Streng A loopt parallel" not in tekst
+        assert "Daarnaast systemisch: 2 bevindingen op" in tekst
+
+    def test_zonder_systemische_meldingen_verandert_er_niets(self, tmp_path: Path) -> None:
+        """De gewone weergave blijft de gewone weergave."""
+        meldingen = [self._melding(label, systemisch=False) for label in ("A", "B", "C")]
+
+        tekst = self._tekst(meldingen, tmp_path)
+
+        assert "**Bevindingen (3)**" in tekst
+        assert "Streng A loopt parallel" in tekst
+        assert "Systemisch:" not in tekst
+
+    def test_een_check_zonder_bevindingen_krijgt_geen_generieke_regel(self, tmp_path: Path) -> None:
+        """Nul bevindingen is geen systemische check; "_geen bevindingen_" blijft staan."""
+        tekst = self._tekst([], tmp_path)
+
+        assert "_geen bevindingen_" in tekst
+        assert "Systemisch:" not in tekst
+
+    def test_zonder_bekeken_objecten_noemt_de_regel_er_nul(self, tmp_path: Path) -> None:
+        """Een zelf gedeclareerde systemische bevinding kan op een lege populatie staan.
+
+        De populatieratio slaat dan niet aan (delen door nul), maar de check mag zijn
+        eigen bevinding nog steeds systemisch noemen. De regel hoort dan "0 bekeken
+        objecten" te melden en geen aandeel te suggereren dat niet gemeten is.
+        """
+        run = _run("top013_parallel.ttl", "TOP-013")
+        leeg = replace(run, outcomes=tuple(replace(o, examined=0) for o in run.outcomes))
+
+        markdown, _ = write_check_report(
+            leeg, tmp_path, RUNDATUM, meldingen=[self._melding("A", systemisch=True)]
+        )
+        tekst = markdown.read_text(encoding="utf-8")
+
+        assert "Systemisch: 1 bevinding op 0 bekeken objecten" in tekst
+
+    def test_de_csv_en_de_json_houden_de_systemische_rijen(self, tmp_path: Path) -> None:
+        """Publiek contract: alleen de mensgerichte views vouwen samen.
+
+        Met de drempel op 10% slaat NET-001 op deze fixture aan als systemische check
+        (1 van de 3 strengen). Het rapport vouwt hem samen; CSV en JSON houden de rij
+        met haar vlag.
+        """
+        config = _config()
+        config.rapport.systemisch_drempel = 0.1
+        dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+        run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+
+        uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)
+        tekst = uitvoer.markdown.read_text(encoding="utf-8")
+        assert uitvoer.csv is not None and uitvoer.json is not None
+        tabel = pd.read_csv(uitvoer.csv, sep=";", encoding="utf-8")
+        rijen = json.loads(uitvoer.json.read_text(encoding="utf-8"))["meldingen"]
+
+        uit_csv = tabel[tabel["Check"] == "NET-001"]
+        assert len(uit_csv) == 1
+        assert bool(uit_csv["Systemisch"].iloc[0])
+        assert [r for r in rijen if r["check_id"] == "NET-001" and r["systemisch"]]
+        assert "**Bevindingen (1)**" not in tekst
+        assert "Systemisch: 1 bevinding op" in tekst
