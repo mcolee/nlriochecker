@@ -233,9 +233,9 @@ def test_lozingspunt_telt_als_afvoerpad_voor_vuilwater(tmp_path: Path) -> None:
     assert _labels(bestand, "NET-001", zonder_lozing) == ["1"]
 
 
-# De drukrioleringsketen laat Pompunit bewust buiten `afvoer_eindpunt`: met het
-# noodverband uit BO-33 erbij is de pompput zelf al een eindpunt en bewijst de fixture
-# niets over de route erachter.
+# De drukrioleringsketen laat Pompunit buiten `afvoer_eindpunt`, net als de
+# meegeleverde config sinds BO-55: was de pompput zelf al een eindpunt, dan bewees de
+# fixture niets over de route erachter.
 _DRUKRIOLERING_KLASSEN = (
     "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
     "mechanisch = ['MechanischeRioolleiding']\nafvoer_eindpunt = ['Gemaal']\n"
