@@ -185,7 +185,7 @@ class TestEindpunttelling:
     def test_toont_elke_afvoereindpuntklasse_met_haar_aantal(self, tmp_path: Path) -> None:
         tabel = eindpunttelling(_run(tmp_path, {"Overnamepunt"}))
         rijen = dict(zip(tabel["Klasse"], tabel["Aantal"], strict=True))
-        assert rijen == {"Overnamepunt": 0, "Gemaal": 1, "Pompunit": 1}
+        assert rijen == {"Overnamepunt": 0, "Gemaal": 1}
 
 
 class TestKlassentelling:
@@ -199,8 +199,9 @@ class TestKlassentelling:
     def test_telt_een_rol_over_haar_klassen(self, tmp_path: Path) -> None:
         tabel = klassentelling(_run(tmp_path, set()))
         rijen = dict(zip(tabel["Rol"], tabel["Aantal"], strict=True))
-        # afvoereindpunt telt Overnamepunt + Gemaal + Pompunit.
-        assert rijen["afvoereindpunt"] == 3
+        # afvoereindpunt telt Overnamepunt + Gemaal; Pompunit hoort er sinds BO-55
+        # niet meer bij.
+        assert rijen["afvoereindpunt"] == 2
 
 
 class TestOmvangSectie:

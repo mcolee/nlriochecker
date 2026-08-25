@@ -154,7 +154,7 @@ class _Rol:
     een valse nul melden.
 
     `per_klasse` kiest het niveau van de nul-bewaking. Bij het afvoereindpunt draagt
-    elke klasse een eigen betekenis -- `Gemaal` en `Pompunit` zijn het noodverband,
+    elke klasse een eigen betekenis -- `Gemaal` is het noodverband,
     `Overnamepunt` het echte overdrachtspunt (BO-33) -- dus daar telt elke lege klasse
     als een signaal. De andere rollen bevatten alternatieve schrijfwijzen van dezelfde
     rol (een export gebruikt `Lozingsput` OF `Lozingspunt`, niet allebei); daar zou een
@@ -195,7 +195,7 @@ def _rollen(config: CheckConfig) -> list[_Rol]:
     telling en de nul-bewaking niet meer op een handlijst leunen. Twee bewakingen drukken
     geen `selectie._ROLLEN`-rol uit en blijven daarom expliciet (BO-52):
 
-    - het **afvoereindpunt** (`Overnamepunt`, `Gemaal`, `Pompunit`) wordt per klasse
+    - het **afvoereindpunt** (`Overnamepunt`, `Gemaal`) wordt per klasse
       bewaakt, want elke klasse draagt een eigen betekenis -- noodverband versus echt
       overdrachtspunt (BO-33) -- en er is geen rol `afvoer_eindpunt`;
     - de **overstortdrempel** is een `Overstortdrempel`-onderdeel zonder eigen geometrie
@@ -268,7 +268,7 @@ def eindpunttelling(run: CheckRun) -> pd.DataFrame:
     """Een rij per afvoereindpuntklasse, met hoeveel instanties de check ervan ziet.
 
     Het is de betrouwbaarheidsregel voor NET-001: zolang `Overnamepunt` op nul staat,
-    leunt de bereikbaarheid op het noodverband `Gemaal`/`Pompunit` (BO-33). Zodra hij
+    leunt de bereikbaarheid op het noodverband `Gemaal` (BO-33). Zodra hij
     een getal boven nul toont, kan dat noodverband weg. Zie issue #22.
     """
     config = run.config

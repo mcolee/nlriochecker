@@ -1467,6 +1467,41 @@ FIXTURES["net002_drukriolering_lozingsput.ttl"] = (
     + leiding("D2", "d2", [(1100.0, 2000.0), (1150.0, 2000.0)], "T1", "Loz", klasse="Drukleiding"),
 )
 
+# NET-001 (#73): een pompunit is een overdrachtspunt naar de drukriolering en geen
+# afvoereindpunt (BO-55). Deze keten heeft geen persleiding achter de pompunit, dus
+# streng '1' komt nergens uit en hoort gemeld te worden. Het tegenbeeld staat hierboven:
+# met een persnet erachter zwijgt NET-001 wel.
+FIXTURES["net001_pompunit_zonder_persnet.ttl"] = (
+    "vuilwaterstreng '1' eindigt op een pompunit zonder persleiding erachter: geen afvoerpad",
+    "gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .\n\n"
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("Pomp", "P", 1050.0, 2000.0, klasse="Pompunit")
+    + leiding(
+        "L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Pomp", klasse="Vuilwaterriool"
+    ),
+)
+
+# Afbakening (#73): de kern kan het gemaal alleen via het persnet bereiken, en dat
+# gemaal ligt ver buiten de contextbuffer van 50 m. Zonder de mechanische kanten in
+# de componentberekening valt de route buiten de contextschil en meldt een
+# gebiedsrun streng '1' terwijl de gemeentebrede run zwijgt -- precies de
+# gelijkwaardigheid die BO-12 eist. Het gebied is `tests/fixtures/gis/
+# afbakening_gebied.geojson` (990-1060 x 1990-2010).
+FIXTURES["afbakening_persnet.ttl"] = (
+    "geen; vuilwaterstreng '1' in de kern bereikt het gemaal alleen via twee drukleidingen",
+    DRUKRIOLERING_KLASSEN
+    + HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("Pomp", "P", 1050.0, 2000.0, klasse="Pompunit")
+    + hulpstuk("T1", "T", 1200.0, 2000.0)
+    + gemaal("Gem", "G", (1500.0, 2000.0))
+    + leiding(
+        "L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "Pomp", klasse="Vuilwaterriool"
+    )
+    + leiding("D1", "d1", [(1050.0, 2000.0), (1200.0, 2000.0)], "Pomp", "T1", klasse="Drukleiding")
+    + leiding("D2", "d2", [(1200.0, 2000.0), (1500.0, 2000.0)], "T1", "Gem", klasse="Drukleiding"),
+)
+
 
 # De subklassehierarchie van de stelselfamilie, inline: de gedeelde prelude kent haar
 # niet, en haar aan de prelude toevoegen zou alle 140 fixtures herschrijven.
@@ -1590,6 +1625,20 @@ FIXTURES["rvz006_gemengd_zonder_afvoereindpunt.ttl"] = (
     + put("PutO", "O", B[0], B[1], klasse="Overstortput", extra=kenmerken("PutO", **STANDAARDPUT))
     + drempel("PutO", "DrempelO", niveau=9.0, breedte=2000.0)
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55)),
+)
+
+# RVZ-006 (issue #73): dezelfde tak, maar het deelstelsel eindigt op een pompunit. Die
+# is een overdrachtspunt naar de drukriolering en geen afvoereindpunt (BO-55), dus het
+# gemengde stelsel mist nog steeds zijn eindpunt.
+FIXTURES["rvz006_gemengd_alleen_pompunit.ttl"] = (
+    "een gemengd deelstelsel met overstort waarvan het enige eindpunt een pompunit is",
+    "gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .\n\n"
+    + hoogteput("PutA", "A", A)
+    + put("PutO", "O", B[0], B[1], klasse="Overstortput", extra=kenmerken("PutO", **STANDAARDPUT))
+    + drempel("PutO", "DrempelO", niveau=9.0, breedte=2000.0)
+    + put("Pomp", "P", C[0], C[1], klasse="Pompunit", extra=kenmerken("Pomp", **STANDAARDPUT))
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutO", bob=(8.60, 8.55))
+    + hoogteleiding("L2", "2", [B, C], "PutO", "Pomp", bob=(8.55, 8.50)),
 )
 
 

@@ -739,7 +739,7 @@ def test_rvz006_zonder_afvoereindpunt_noemt_alleen_die_reden() -> None:
 
     assert len(outcome.findings) == 1
     boodschap = outcome.findings[0].message
-    assert "zonder afvoereindpunt (gemaal, pompunit of overnamepunt)" in boodschap
+    assert "zonder afvoereindpunt (gemaal of overnamepunt)" in boodschap
     assert "externe overstort" not in boodschap
 
 
@@ -750,7 +750,22 @@ def test_rvz006_zonder_beide_noemt_beide_redenen() -> None:
     assert len(outcome.findings) == 1
     boodschap = outcome.findings[0].message
     assert "zonder enige externe overstort of bergbezinkvoorziening" in boodschap
-    assert "en zonder afvoereindpunt (gemaal, pompunit of overnamepunt)" in boodschap
+    assert "en zonder afvoereindpunt (gemaal of overnamepunt)" in boodschap
+
+
+def test_rvz006_telt_een_pompunit_niet_als_afvoereindpunt() -> None:
+    """Een pompput is een overdrachtspunt naar de drukriolering, geen eindpunt (BO-55).
+
+    RVZ-006 leest dezelfde lijst `afvoer_eindpunt` als NET-001, dus het gemengde
+    deelstelsel dat alleen op een pompunit uitkomt mist nog steeds zijn eindpunt.
+    De melding noemt precies die ene reden: de overstort is er wel.
+    """
+    outcome = uitkomst("rvz006_gemengd_alleen_pompunit.ttl", "RVZ-006")
+
+    assert len(outcome.findings) == 1
+    boodschap = outcome.findings[0].message
+    assert "zonder afvoereindpunt (gemaal of overnamepunt)" in boodschap
+    assert "externe overstort" not in boodschap
 
 
 def test_rvz006_met_overstort_en_afvoereindpunt_zwijgt() -> None:

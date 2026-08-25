@@ -346,8 +346,8 @@ def _afhankelijkheden_section(run: CheckRun) -> list[str]:
     De omvangtabel erboven telt object- en stelseltype maar zwijgt over overstorten,
     gemalen, overnamepunten en bergbezinkvoorzieningen -- juist de objecten waar de
     netwerkchecks op leunen. Deze telling maakt zichtbaar of ze er zijn. De
-    afvoereindpuntregel apart, want zij is het criterium om het `Gemaal`/`Pompunit`-
-    noodverband van NET-001 los te laten (BO-33): zodra `Overnamepunt` boven nul komt.
+    afvoereindpuntregel apart, want zij is het criterium om het `Gemaal`-noodverband
+    van NET-001 los te laten (BO-33): zodra `Overnamepunt` boven nul komt.
 
     Zonder klassenhierarchie herkent `of_class` geen klassen; elke telling zou dan nul
     zijn. De sectie vervalt in dat geval -- het rapport draagt daarvoor al zijn
@@ -375,7 +375,7 @@ def _afhankelijkheden_section(run: CheckRun) -> list[str]:
     regels += table(eindpunttelling(run), "Afvoereindpunten per klasse")
     regels += [
         "",
-        "> `Gemaal` en `Pompunit` staan als noodverband voor `Overnamepunt` in de "
+        "> `Gemaal` staat als noodverband voor `Overnamepunt` in de "
         "bereikbaarheidstoets (NET-001, BO-33). Toont `Overnamepunt` een getal boven "
         "nul, dan kan dat noodverband weg.",
     ]

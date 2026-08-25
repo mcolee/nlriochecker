@@ -79,6 +79,22 @@ def test_mechanisch_riool_is_geconfigureerd() -> None:
     assert config.klassen.mechanisch == ["MechanischeRioolleiding", "MechanischeTransportleiding"]
 
 
+def test_afvoereindpunt_is_overnamepunt_en_gemaal() -> None:
+    """`Pompunit` hoort niet in `afvoer_eindpunt` (BO-55, verfijnt BO-33).
+
+    Een pompput is een overdrachtspunt naar de drukriolering, geen einde van de
+    afvoer; sinds issue #72 is het persnet erachter traceerbaar, dus de streng die
+    erop eindigt wordt via de bereikbaarheidsgraaf beoordeeld en niet meer door de
+    pompput zelf als eindpunt te tellen. `Gemaal` blijft staan zolang `Overnamepunt`
+    nul instanties heeft (het loslaatcriterium van BO-33).
+
+    Deze lijst voedt NET-001 (`_eindpunten`) en RVZ-006 (`_afvoereindpunten`); wie
+    haar wijzigt verschuift beide checks tegelijk, en dat hoort een bewuste daad met
+    een BO te zijn.
+    """
+    assert load_check_config().klassen.afvoer_eindpunt == ["Overnamepunt", "Gemaal"]
+
+
 def test_netwerkknopen_bundelen_putten_en_eindpunten() -> None:
     knopen = load_check_config().klassen.netwerkknopen
 

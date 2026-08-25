@@ -205,11 +205,13 @@ def _stelseltypen_van(context: CheckContext, knopen: set[str]) -> set[str]:
 
 
 def _afvoereindpunten(context: CheckContext) -> set[str]:
-    """De knopen die als afvoereindpunt gelden: gemaal, pompunit of overnamepunt.
+    """De knopen die als afvoereindpunt gelden: gemaal of overnamepunt.
 
     Dezelfde klassen als NET-001 gebruikt (`klassen.afvoer_eindpunt`), zodat de twee
     checks over hetzelfde begrip oordelen. `of_class` sluit de subklassen in, dus
-    `Gemaal` dekt de 893 `Rioolgemaal` van De Wolden zonder ze los op te sommen.
+    `Gemaal` dekt de 893 `Rioolgemaal` van De Wolden zonder ze los op te sommen. Een
+    `Pompunit` telt sinds issue #73 niet mee: dat is een overdrachtspunt naar de
+    drukriolering, geen einde van de afvoer (BO-55).
     """
     dataset = context.dataset
     return {
@@ -220,7 +222,7 @@ def _afvoereindpunten(context: CheckContext) -> set[str]:
 def _rvz006_gebrek(heeft_overstort: bool, heeft_eindpunt: bool) -> str:
     """De deelreden voor RVZ-006: welke van de twee eisen het deelstelsel mist."""
     zonder_overstort = "zonder enige externe overstort of bergbezinkvoorziening"
-    zonder_eindpunt = "zonder afvoereindpunt (gemaal, pompunit of overnamepunt)"
+    zonder_eindpunt = "zonder afvoereindpunt (gemaal of overnamepunt)"
     if not heeft_overstort and not heeft_eindpunt:
         return f"{zonder_overstort} en {zonder_eindpunt}"
     if not heeft_overstort:

@@ -324,6 +324,30 @@ def test_hemelwater_door_het_persnet_geldt_ook_als_afgevoerd(tmp_path: Path) -> 
     assert _labels(bestand, "NET-002", zonder_mechanisch) == ["1"]
 
 
+def test_pompunit_zonder_persnet_is_geen_afvoereindpunt(tmp_path: Path) -> None:
+    """Een pompput is een overdrachtspunt naar de drukriolering, geen eindpunt (BO-55).
+
+    Draait bewust op de MEEGELEVERDE config: het is de lijst `afvoer_eindpunt` in
+    `checks.toml` die hier bewezen wordt, niet een testlijst. Zonder persleiding
+    achter de pompunit komt streng "1" nergens uit en hoort ze gemeld te worden.
+
+    De controlehelft zet `Pompunit` terug in `afvoer_eindpunt`: dan zwijgt de check
+    weer. Zonder die helft zou de melding hierboven ook groen zijn als de streng om
+    een heel andere reden buiten de graaf viel.
+    """
+    bestand = "net001_pompunit_zonder_persnet.ttl"
+
+    assert _labels(bestand, "NET-001") == ["1"]
+
+    met_pompunit = _testconfig(
+        tmp_path,
+        "met_pompunit",
+        "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Gemaal', 'Pompunit']\nvuilwater = ['Vuilwaterriool']\n",
+    )
+    assert _labels(bestand, "NET-001", met_pompunit) == []
+
+
 def _testconfig(tmp_path: Path, naam: str, klassen: str) -> CheckConfig:
     """Een projectconfig met alleen de klassen die de test nodig heeft."""
     pad = tmp_path / f"{naam}.toml"
