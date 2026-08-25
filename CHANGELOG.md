@@ -27,6 +27,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Drukriolering is traceerbaar: het persnet telt mee in de bereikbaarheidsgraaf en een
+  lozingspunt is een geldig vuilwater-eindpunt** (issue #72). `_bouw_netwerk` levert naast
+  de gerichte vrijvervalgraaf een tweede laag `_Netwerk.bereikbaarheid`: dezelfde graaf plus
+  de mechanische leidingen als **ongerichte** kanten, doorlopend via hulpstukken (waar
+  `resolve_network_node` niets oplevert valt de kant terug op de rauwe koppeling, zodat een
+  T-stuk een doorgeefknoop wordt in plaats van een breuk). Alleen `_bereikbaar_vanaf`,
+  `_eindpunten` en de notities eromheen lezen die laag; kringlopen, stelseltypen en de
+  afvoerpadanalyse blijven op het zuivere vrijverval. NET-001 accepteert daarnaast naast
+  `afvoer_eindpunt` ook `lozings_eindpunt` als eindpunt -- vuilwater loost in Nederland niet
+  meer rechtstreeks op oppervlaktewater, dus een lozingspunt is per definitie een geldig
+  afvoereindpunt. Op De Wolden en Hoogeveen gaat NET-001 daarmee van **9062** naar **7978**
+  bevindingen, in Koekangerveld van **24** naar **7**. Alle 939 niet-oplosbare tussenknopen
+  in het persnet blijken hulpstukken te zijn. De negen NET-checks declareren voortaan ook de
+  rol `mechanischeleidingen`. Zie BO-53 en BO-54.
+
 - **De nul-bewaking en de rollentelling leiden hun rollen uit de checkdeclaraties af**
   (issue #71, vervolg op #64). `omvang._rollen` was een handlijst van zes rollen; nu
   verzamelt hij de rollen die de geregistreerde checks in `check.rollen` declareren, lost

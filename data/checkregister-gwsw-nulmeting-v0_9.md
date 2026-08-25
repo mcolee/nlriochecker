@@ -19,8 +19,9 @@ samenhangend net redeneren: zonder de rest van de component zou een streng die h
 uit loopt ten onrechte als doodlopend gelden. De buffer is nodig voor de checks die naar
 nabijheid kijken zonder netwerkverband: TOP-005, TOP-006, TOP-010, TOP-011, TOP-021 en de
 EXT-checks. Mechanische leidingen doen bewust niet mee aan de component; ze verbinden
-deelgebieden onderling en zouden de schil tot de hele gemeente laten uitdijen, terwijl de
-NET-checks ze niet volgen.
+deelgebieden onderling en zouden de schil tot de hele gemeente laten uitdijen. Binnen de
+analyseset volgen de bereikbaarheidschecks NET-001 en NET-002 ze sinds issue #72 wel, als
+ongerichte connectiviteit (BO-54); de afbakening van de schil blijft vrijverval.
 
 Checks die over de hele populatie gaan in plaats van over losse objecten — ADM-002, unieke
 identificaties — draaien altijd op de volledige export. Welke dat zijn is configureerbaar.
@@ -124,7 +125,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
-| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal of overnamepunt (bereikbaarheidsanalyse) | F | Consistentie |
+| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse) | F | Consistentie |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie |
 | NET-003 | Strengorientatie tegen de afvoerrichting in | F | Consistentie |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk | F | Consistentie |
@@ -207,7 +208,7 @@ uitkomst geven. De ID's worden niet hergebruikt.
 1. Verplaatst naar de issuetracker: [#8 EXT-004 bouwen op BRK-percelen](https://github.com/mcolee/nlriochecker/issues/8).
 2. Afgehandeld (2026-08-19). Alle vijf staan als instelbare waarde in `[drempels]` van de projectconfiguratie, met de standaard tussen haakjes: snapping-tolerantie (`snapping_tolerantie_m`, 0,10 m), min/max strenglengte (`minimale_strenglengte_m` 1 m en `maximale_strenglengte_m` 200 m, ATTR-008), minimaal verhang voor vuilwater en gemengd (HGT-007; sinds issue #29 geen enkele waarde meer maar de RIONED-diameterstaffel `[[verhang_staffel]]`, met 1:250 voor de kleinste leidingen tot 1:1000 voor de grootste), valput-drempel (`bob_sprong_m`, 0,25 m, HGT-009 en HGT-016) en de bufferafstanden van de EXT-checks (`ext_pand_buffer_m`, `ext_watergang_buffer_m`, `ext_putdeksel_afstand_m`, `ext_lozingspunt_water_afstand_m`, `ext_perceel_buffer_m`). Er staat geen drempel hardgecodeerd in de engine.
 3. Afgehandeld (2026-08-19). `naamgeving.putpatroon` en `naamgeving.strengpatroon` in de projectconfiguratie nemen elk een regex, en een onbruikbaar patroon faalt bij het laden in plaats van tijdens de run. Er is bewust geen standaardpatroon: staat er geen, dan draait ADM-003 niet en meldt het rapport dat met zoveel woorden, want een verzonnen conventie zou elke dataset afkeuren. `examined` telt dan ook alleen de objectsoorten waarvoor wel een patroon geldt.
-4. Buiten scope: persleiding- en gemaalconsistentiechecks (mechanisch); gemalen en overnamepunten doen wel mee als eindpunt in NET-001.
+4. Buiten scope: persleiding- en gemaalconsistentiechecks (mechanisch); gemalen, overnamepunten en lozingspunten doen wel mee als eindpunt in NET-001, en het mechanische riool telt sinds issue #72 als ongerichte connectiviteit mee in de bereikbaarheidsgraaf (BO-53 en BO-54). Getoetst wordt het mechanische riool niet.
 5. RVZ-008 (lediging BBB) raakt de scopegrens: lediging loopt in de praktijk vaak via een gemaal. De check toetst alleen of er een ledigingsroute geregistreerd staat, niet het gemaal zelf. NB: de nulmeting dekt dit niet (Ledigingsvoorziening heeft in beide CFK's, Mds en Hyd, max=1 en geen min-eis); alleen als er wel een ledigingsvoorziening geregistreerd is, eist Hyd daarin minimaal een pomp.
 6. Afgehandeld (2026-08-19). Empirisch vastgesteld op de De Wolden-export en vastgelegd in de beslislog: overstorten staan er als `Overstortput` met een `Overstortleiding` eraan; losse `Overstortdrempel`-objecten met `Drempelniveau` en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel kent. `checks/randvoorzieningen.py` leest daarom beide vormen en meldt in de toelichting welke het in deze dataset heeft aangetroffen; de klassen staan in `[klassen]` van de projectconfiguratie (`overstortput`, `overstortleiding`, `drempel`). RVZ-004 t/m RVZ-011 zijn gebouwd en draaien. NB: dezelfde vraag speelt voor `Overnamepunt` en voor het IT-stelsel. Die twee zijn eerder ten onrechte als ontbrekende GWSW-begrippen opgeschreven; de ontologie kent ze wel (`Overnamepunt` als subklasse van `Aansluitpunt`, het IT-stelsel als `Infiltratiestelsel` met zijn subklasse `DrainageInfiltratieTransportStelsel`), maar de De Wolden-export levert nul `Overnamepunt`-instanties. Wat er wel en niet uit volgt staat in BO-33 en BO-34 van de beslislog; het spoor loopt via [#11](https://github.com/mcolee/nlriochecker/issues/11).
 7. Afgehandeld: schrapronde uitgevoerd en geactualiseerd naar toetsbasis Mds, zie tabel Geschrapte checks. Afwijkingen ten opzichte van de oorspronkelijke verwachting: ADM-002 en ADM-003 blijven staan (duplicaat-ID's smelten in RDF geruisloos samen respectievelijk geen patroontoetsing), ADM-008/009 blijven staan (in de nulmeting-beschrijving expliciet aangemerkt als externe validatie), ATTR-011 is juist wel geschrapt; RVZ-003 was dat ook maar is in v0.9 teruggehaald (issue #6). In het proces borgen dat beide nulmeting-rapporten (Mds en Hyd) beschikbaar zijn en dat de typeringsscore als voorwaarde geldt.

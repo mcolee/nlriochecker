@@ -2738,3 +2738,69 @@ het er vijf: `Overnamepunt`, `overstortdrempel`, `bergbezinkvoorzieningen` (deze
 terecht: staat de rol op nul terwijl een check erop toetst, dan heeft die check niets te beoordelen en hoort
 dat in het rapport. De telling zelf sluit aan op BO-51: `netwerkknopen` 22.363, `rioolputten` 20.756,
 `putten` 20.758.
+
+### BO-53 Een lozingspunt is een geldig vuilwater-eindpunt voor NET-001
+
+**Wat.** NET-001 (vuilwater/gemengd zonder afvoerpad) accepteerde alleen de rol
+`afvoer_eindpunt` (`Overnamepunt`, `Gemaal`, `Pompunit`). Sinds issue #72 telt daarnaast
+`lozings_eindpunt` (`Lozingspunt`, `UitlaatPunt`, `Lozingsput`, `Uitlaatconstructie`) mee; de
+eindpuntverzameling van de check is de vereniging van beide rollen. Titel, `doel`-tekst, de
+NET-001-regel in het checkregister en de dekkingsmatrix zijn meegegaan.
+
+**Waarom.** Vuilwater loost in Nederland niet meer rechtstreeks op oppervlaktewater. Komt een
+vuilwater- of gemengde streng op een lozingspunt uit, dan is dat per definitie het punt waar het
+water het stelsel verlaat -- of dat nu een overstort, een uitlaatconstructie of een
+overdrachtspunt naar de zuivering is. Er valt dus geen echt gebrek mee te maskeren, terwijl het
+omgekeerde wel gebeurde: elke streng achter zo'n uitlaat werd als "zonder afvoerpad" gemeld.
+
+**Wat het intrekt.** De oude regel stond als test vast (`test_lozingspunt_telt_niet_als_afvoerpad_voor_vuilwater`)
+met de redenering "NET-001 vraagt een gemaal of overnamepunt, NET-002 een lozingspunt; met een
+gedeelde eindpuntlijst zou de gemengde streng ten onrechte goedgekeurd worden". Die redenering
+gold de scheiding tussen de twee checks, niet het domein. De scheiding blijft: NET-002 accepteert
+géén gemaal, alleen een lozingspunt. Alleen NET-001 is verruimd, niet symmetrisch.
+
+**Meting (De Wolden en Hoogeveen, door de echte pijplijn).** Samen met BO-54 gaat NET-001 van
+9062 naar 7978 bevindingen; Koekangerveld van 24 naar 7. Zie de meting bij BO-54.
+
+### BO-54 Het mechanische riool telt als ongerichte connectiviteit, doorlopend via hulpstukken
+
+**Wat.** `checks/verbanden._bouw_netwerk` levert sinds issue #72 naast de gerichte
+vrijvervalgraaf (`_Netwerk.graph`) een tweede laag: `_Netwerk.bereikbaarheid`, dezelfde graaf plus
+de mechanische leidingen (rol `mechanischeleidingen`, `[klassen] mechanisch`) als kanten in beide
+richtingen. Alleen de bereikbaarheidsvraag leest die laag -- `_bereikbaar_vanaf` (NET-001/NET-002),
+`_eindpunten` en de notities eromheen. Kringlopen (NET-004), stelseltypen (NET-005/006) en de
+afvoerpadanalyse (`afvoerpaden`, `afvoerpad_van_streng`) blijven op het zuivere vrijverval: dat
+zijn vrijverval-begrippen, en ongerichte kanten zouden er onzin van maken -- elke persleiding zou
+in NET-004 als kringloop van twee knopen verschijnen.
+
+**Waarom ongericht.** Een persleiding is pompgestuurd; haar administratieve van-naar-richting
+zegt niets over de stroomrichting en wordt elders ook niet vertrouwd (de grijze persleiding-pijlen
+in de GIS-uitvoer). Voor de vraag of het water ergens uitkomt telt alleen de connectiviteit.
+
+**Waarom via de rauwe koppeling.** `resolve_network_node` klimt via `hasPart` naar een put. Het
+persnet komt samen op hulpstukken (`T_stuk`, `Hulpstukorientatie`) en die klimmen nergens naartoe,
+dus zo'n knoop resolvet naar `None`: 1914 van de 3720 mechanische leidingen (51%) hebben geen twee
+oplosbare knopen. Elke T zou het persnet in stukken hakken en het gemaal erachter onbereikbaar
+laten. De kant valt daarom terug op de rauwe `Conduit.start_node`/`end_node`, zodat het hulpstuk
+een doorgeefknoop wordt. `resolve_network_node` zelf blijft ongemoeid: die voedt de puttellingen en
+de ADM-checks, en globaal wijzigen is een te groot risico-oppervlak.
+
+**Aanname nagemeten.** Alle 939 niet-oplosbare tussenknopen in het persnet van De Wolden en
+Hoogeveen zijn hulpstukken; er is er geen enkele die dat niet is. De terugval raakt dus precies de
+hulpstukken en niets anders.
+
+**Gevolg voor de declaraties.** `_bouw_netwerk` leest hierdoor de rol `mechanischeleidingen`, en
+de AST-sweep van BO-51 ziet dat vanuit elke NET-check die de graaf bouwt. NET-001 t/m NET-009
+declareren die rol daarom nu. Dat trekt de opmerking in BO-52 in dat "`mechanische leiding`
+verdwijnt omdat geen check die rol declareert": de rol staat weer in de rollentelling en in de
+`SIG-nulklasse`-bewaking, met de negen NET-checks als leunende checks. Voor een dataset zonder
+mechanisch riool levert dat een nul-signaal op; dat is de bedoelde betekenis van die bewaking
+(een populatie waar checks op leunen komt niet voor), niet een gebrek in de aanlevering.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`, door de echte pijplijn met
+`markeer_vulwaarden` vóór de checks).** NET-001 gaat van **9062** naar **7978** bevindingen op
+17451 onderzochte strengen; binnen Koekangerveld van **24** naar **7**. Het onderbouwende issue
+voorspelde 8467/7 voor #72 én #73 samen (Pompunit uit `afvoer_eindpunt`); dit issue alleen laat
+Pompunit als eindpunt staan en komt daarmee onder die grens uit, zoals verwacht. De zeven die in
+Koekangerveld overblijven horen echt zonder route te zijn. Onderbouwing en de causale trace:
+`scripts/analyse_afvoer_pompunit.py`.
