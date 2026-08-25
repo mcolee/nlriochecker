@@ -29,6 +29,11 @@ class ClassRoots(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     put: list[str] = Field(min_length=1)
+    # Issue #64: de putten met een verwijderbare deksel (`gwsw:Rioolput`). Enger dan
+    # `put`: de dekselchecks (putdiepte, putbodem) horen hier, niet op elke Put en niet op
+    # een gemaal. De ontologie definieert Rioolput als "een put met een verwijderbare
+    # deksel"; alleen daaraan hangen `Putdekselniveau` en de putdiepte betekenis.
+    rioolput: list[str] = Field(default_factory=lambda: ["Rioolput"])
     vrijvervalleiding: list[str] = Field(min_length=1)
     # TOP-001 vraagt of er *enige* streng aansluit, niet of er een vrijvervalstreng
     # aansluit; een put aan een persleiding is niet losliggend.

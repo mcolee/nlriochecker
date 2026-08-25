@@ -19,7 +19,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   voor ATTR-014). `register()` weigert een check die er niet allebei declareert; de
   velden reizen mee op `CheckOutcome`. Twee drifttests bewaken ze: een AST-sweep houdt de
   declaratie tegen de feitelijke code (`tests/checkdeclaratie_analyse.py`,
-  `tests/test_checkdeclaraties.py`) en een tweede tegen de ontologie.
+  `tests/test_checkdeclaraties.py`) en een tweede tegen de ontologie
+  (`tests/test_checkdeclaraties_ontologie.py`). De index draagt daarvoor twee nieuwe
+  blokken `aspecten_van` en `onderdelen_van`.
+
+### Gewijzigd
+
+- **De putdiepte- en putbodemchecks toetsen op `Rioolput`, niet op elk netwerkknoop**
+  (issue #64). Een nieuwe rol `rioolputten` (`[klassen] rioolput = ["Rioolput"]`) vervangt
+  `netwerkknopen` in HGT-012 (putdiepte) en HGT-015 (putbodem): `HoogtePut` en het
+  daaruit afgeleide bodemniveau hangen aan een put met een deksel, niet aan een gemaal of
+  uitlaat. De overige dekselchecks die op `netwerkknopen` of op de put aan het
+  streng-uiteinde lezen (HGT-001/002/004/011/016/017/018, BTR-006) staan met reden op de
+  uitzonderingslijst van de ontologietest en gaan als domeinkeuze naar de auteur.
 
 - **Meldingen onderdrukken per klasse en per check** (issue #65). `[rapport]` krijgt
   `onderdruk_klassen` (GWSW-wortelklassen, subklassen via de ontologie) en `onderdruk_checks`

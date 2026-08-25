@@ -83,6 +83,18 @@ def putten(context: CheckContext) -> list[Node]:
     return _knopen(context, "sel:putten", context.config.klassen.put)
 
 
+def rioolputten(context: CheckContext) -> list[Node]:
+    """De rioolputten: `gwsw:Rioolput` en haar subklassen (inspectie-, lozings-, overstortput, ...).
+
+    Enger dan `putten`: alleen de putten met een verwijderbare deksel. De ontologie
+    definieert `Rioolput` als "een put met een verwijderbare deksel", en alleen daaraan
+    hangen het `Putdekselniveau` (via de `Dekselorientatie`) en daarmee de putdiepte
+    betekenis. Een `Kolk`, een `Drainageput` of een gemaal is wel (of geen) `Put` maar
+    geen `Rioolput` en valt erbuiten. Issue #64.
+    """
+    return _knopen(context, "sel:rioolputten", context.config.klassen.rioolput)
+
+
 def lozingspunten(context: CheckContext) -> list[Node]:
     """De punten waar het afvalwater het stelsel verlaat of binnenkomt.
 
@@ -264,6 +276,7 @@ def oppervlaktewaterobjecten(context: CheckContext) -> list[Node | Conduit]:
 _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "netwerkknopen": netwerkknopen,
     "putten": putten,
+    "rioolputten": rioolputten,
     "lozingspunten": lozingspunten,
     "overstortputten": overstortputten,
     "bergbezinkvoorzieningen": bergbezinkvoorzieningen,

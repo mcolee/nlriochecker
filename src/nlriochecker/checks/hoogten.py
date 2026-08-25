@@ -26,6 +26,7 @@ from nlriochecker.checks.base import (
 )
 from nlriochecker.checks.selectie import (
     netwerkknopen,
+    rioolputten,
     valconstructies,
     vrijvervalrioolleidingen,
     vuilwaterleidingen,
@@ -70,15 +71,17 @@ def _ontbreekt(
     context: CheckContext,
     kenmerk: str,
     kies,
-    objecten: list | None = None,
+    objecten: list,
     soort: str = "putten",
 ) -> list[str]:
     """Een toelichting als een hoogtekenmerk in deze dataset nauwelijks voorkomt.
 
     De telling gaat over de objecten die de check zelf bekijkt; een strengcheck die
-    over putten telt zou een getal noemen dat niet bij haar eenheid past.
+    over putten telt zou een getal noemen dat niet bij haar eenheid past. `objecten` is
+    daarom verplicht: een verborgen `netwerkknopen`-default zou de rol-declaratie van de
+    beller vertroebelen (de AST-sweep van issue #64 ziet de default en niet het
+    doorgegeven argument).
     """
-    objecten = netwerkknopen(context) if objecten is None else objecten
     if not objecten:
         return []
     zonder = sum(1 for object_ in objecten if kies(object_) is None)
@@ -585,7 +588,7 @@ class PutdiepteBuitenBereik(_PutCheck):
     title = "Putdiepte (deksel minus bodem) kleiner dan X m of groter dan X m"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("netwerkknopen",)
+    rollen = ("rioolputten",)
     kenmerken = ("HoogtePut",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -595,11 +598,15 @@ class PutdiepteBuitenBereik(_PutCheck):
         millimeters geregistreerd. Deksel min bodem zou hier hetzelfde getal
         opleveren, want de bodem wordt juist uit die twee afgeleid. Een negatieve
         of nul-diepte valt vanzelf onder de ondergrens.
+
+        Alleen op `rioolputten`: `HoogtePut` en de putdiepte (deksel minus bodem)
+        hangen aan een put met een deksel. Een gemaal of uitlaat draagt geen
+        `HoogtePut`; die stonden tot issue #64 mee in de populatie (`netwerkknopen`).
         """
         minimum = context.config.drempels.minimale_putdiepte_m
         maximum = context.config.drempels.maximale_putdiepte_m
 
-        for node in netwerkknopen(context):
+        for node in rioolputten(context):
             diepte = node.hoogte_m
             if diepte is None:
                 continue
@@ -617,8 +624,18 @@ class PutdiepteBuitenBereik(_PutCheck):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel putten geen hoogte hebben."""
-        return _ontbreekt(context, "puthoogte (`HoogtePut`)", lambda node: node.number("HoogtePut"))
+        """Meldt hoeveel rioolputten geen hoogte hebben."""
+        return _ontbreekt(
+            context,
+            "puthoogte (`HoogtePut`)",
+            lambda node: node.number("HoogtePut"),
+            objecten=rioolputten(context),
+            soort="rioolputten",
+        )
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal rioolputten."""
+        return len(rioolputten(context))
 
 
 @register
@@ -693,7 +710,7 @@ class VerhangVolgtMaaiveldNiet(_StrengCheck):
     title = "Leidingverhang past niet bij het maaiveldverloop tussen de putten"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "Maaiveldhoogte")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -759,7 +776,7 @@ class PutbodemBuitenMarge(_PutCheck):
     title = "Putbodemniveau buiten marge ten opzichte van de laagste aansluitende BOB"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("rioolputten", "vrijvervalrioolleidingen")
     kenmerken = (
         "BobBeginpuntLeiding",
         "BobEindpuntLeiding",
@@ -769,7 +786,12 @@ class PutbodemBuitenMarge(_PutCheck):
     )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Vergelijkt de putbodem met de laagste BOB die op de put uitkomt."""
+        """Vergelijkt de putbodem met de laagste BOB die op de put uitkomt.
+
+        Alleen op `rioolputten`: het bodemniveau volgt uit dekselniveau min `HoogtePut`,
+        en die dragen alleen putten met een deksel. Een gemaal of uitlaat stond tot issue
+        #64 mee in de populatie (`netwerkknopen`) maar heeft geen afleidbaar bodemniveau.
+        """
         drempels = context.config.drempels
         boven_marge = drempels.putbodem_boven_bob_m
         zonk_marge = drempels.putbodem_zonk_m
@@ -781,7 +803,7 @@ class PutbodemBuitenMarge(_PutCheck):
             uri = uiteinde.node.uri
             laagste[uri] = min(laagste.get(uri, uiteinde.bob), uiteinde.bob)
 
-        for node in netwerkknopen(context):
+        for node in rioolputten(context):
             bodem = node.bodem
             bob = laagste.get(node.uri)
             if bodem is None or bob is None:
@@ -810,8 +832,18 @@ class PutbodemBuitenMarge(_PutCheck):
                 )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel putten geen afleidbaar bodemniveau hebben."""
-        return _ontbreekt(context, "afleidbaar bodemniveau", lambda node: node.bodem)
+        """Meldt hoeveel rioolputten geen afleidbaar bodemniveau hebben."""
+        return _ontbreekt(
+            context,
+            "afleidbaar bodemniveau",
+            lambda node: node.bodem,
+            objecten=rioolputten(context),
+            soort="rioolputten",
+        )
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal rioolputten."""
+        return len(rioolputten(context))
 
 
 @register
@@ -858,7 +890,12 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt de afhankelijkheid van het afgeleide bodemniveau."""
-        return _ontbreekt(context, "afleidbaar bodemniveau", lambda node: node.bodem)
+        return _ontbreekt(
+            context,
+            "afleidbaar bodemniveau",
+            lambda node: node.bodem,
+            objecten=netwerkknopen(context),
+        )
 
 
 @register
@@ -937,7 +974,7 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
     title = "Buiskruin (BOB plus diameter/hoogtemaat) boven maaiveld of dekselniveau"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = (
         "BobBeginpuntLeiding",
         "BobEindpuntLeiding",

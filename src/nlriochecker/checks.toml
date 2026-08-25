@@ -9,6 +9,11 @@
 
 [klassen]
 put = ["Put"]
+# Issue #64: de putten met een verwijderbare deksel. De dekselchecks (putdiepte HGT-012,
+# putbodem HGT-015/016) toetsen hierop en niet op elke Put -- een gemaal of een kolk
+# draagt geen Putdekselniveau. Rioolput dekt Inspectieput, Lozingsput, Overstortput,
+# Valput en de rest via de ontologie.
+rioolput = ["Rioolput"]
 vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.

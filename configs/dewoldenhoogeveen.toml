@@ -37,6 +37,9 @@
 
 [klassen]
 put = ["Put"]
+# Issue #64: de dekselchecks (putdiepte HGT-012, putbodem HGT-015) toetsen op de putten
+# met een deksel, niet op elke Put of op een gemaal.
+rioolput = ["Rioolput"]
 vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.

@@ -53,6 +53,9 @@ def context_van(dataset: GwswDataset) -> CheckContext:
 ROLLENSET_AANTALLEN = {
     "netwerkknopen": 7,
     "putten": 5,
+    # Alle vijf de putten in de fixture zijn een Rioolput-subklasse (inspectie-, lozings-,
+    # overstort-, loze en valput); een gemaal of uitlaat zit er niet bij. Issue #64.
+    "rioolputten": 5,
     "lozingspunten": 2,
     "overstortputten": 1,
     "bergbezinkvoorzieningen": 1,
