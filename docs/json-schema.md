@@ -273,7 +273,7 @@ Wat je van zo'n melding moet weten:
   van de GeoPackage (BO-29) en verschijnt niet in `overzicht_checks`; hij hoort bij de
   omvangtabel van het rapport, niet bij de per-check-boekhouding.
 - **`object_label`** draagt de aanduiding: een klassenaam (`Overnamepunt`) bij het
-  afvoereindpunt, een rolnaam (`lozingseindpunt`) bij de andere rollen.
+  afvoereindpunt, een rolnaam (`lozingspunten`) bij de andere rollen.
 - **Alleen met klassenhierarchie.** Zonder ontologie herkent de lader geen klassen en
   worden er geen datasetsignalen geschreven; het rapport draagt daarvoor al zijn
   voorbehoud.

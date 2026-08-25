@@ -2702,3 +2702,39 @@ globale uitzondering. De nul-bewaking uit `omvang.py` is bewust niet op de decla
 handlijst dekt via `via_onderdeel`/`per_klasse` gevallen (overstortdrempel, afvoereindpunt) die de rolnamen
 niet uitdrukken, en dat omzetten raakt een goed geteste uitvoerlaag. De auteur koos dit als los vervolg,
 buiten #64.
+
+### BO-52 De nul-bewaking leidt haar rollen uit de checkdeclaraties af; twee bewakingen blijven expliciet
+
+**Wat.** `omvang._rollen` (de bron voor de rollentelling en de `SIG-nulklasse`-bewaking) was een handlijst
+van zes rollen. Sinds issue #71 verzamelt hij de rollen die de geregistreerde checks in `check.rollen`
+declareren (`_gedeclareerde_rollen()` over de `REGISTRY`), lost ze via `selectie.klassen_van_rol` op naar hun
+`[klassen]`-wortels en telt via `of_class`. De nul-melding noemt voortaan de check-ID's die op de lege rol
+leunen -- het gat uit issue #22, nu generiek. `klassen_op_nul` en `klassentelling` lezen dezelfde lijst, dus
+de "Per rol"-tabel en de nul-signalen kunnen niet meer uiteenlopen.
+
+**Waarom expliciet, niet één bron.** Twee bewakingen drukken geen `selectie._ROLLEN`-rol uit en zijn niet
+via `klassen_van_rol` bereikbaar; ze blijven daarom als aparte regels vóór de afgeleide lijst staan:
+- het **afvoereindpunt** (`Overnamepunt`, `Gemaal`, `Pompunit`) wordt *per klasse* bewaakt, want elke klasse
+  draagt een eigen betekenis -- noodverband (`Gemaal`/`Pompunit`) versus echt overdrachtspunt
+  (`Overnamepunt`), BO-33 -- en er is geen rol `afvoer_eindpunt`;
+- de **overstortdrempel** is een `Overstortdrempel`-onderdeel zonder eigen geometrie dat via
+  `subjects_of_class` geteld wordt (NET-007 leest hem zo), niet via `of_class`, en heeft evenmin een rol.
+Ze in dezelfde bron vatten zou een neprol of een tweede `_ROL_VELDEN`-ingang zonder selectiefunctie vergen
+en `test_checks_selectie` breken. De check-attributie van deze twee is de canonieke check (NET-001 resp.
+NET-007), niet een uitputtende afleiding zoals bij de gedeclareerde rollen; dat volstaat en houdt de melding
+kort.
+
+**Gevolg voor het rapport.** De "Per rol"-tabel gaat van 6 naar 19 rijen en gebruikt de `_ROLLEN`-rolnamen
+(`putten`, `leidingen`, `lozingspunten`, ...) in plaats van zes zelfgekozen labels; `lozingseindpunt` heet
+nu `lozingspunten`, en `mechanische leiding` verdwijnt omdat geen check die rol declareert (mechanisch riool
+valt buiten het checkregister). Een gedeclareerde rol zonder geconfigureerde klassen (een project mag
+`functieloze_knoop` leeg laten) valt weg: zonder verwachte populatie is er niets op nul te melden.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`).** Vóór #71 stonden drie signalen op
+nul: `Overnamepunt` (afvoereindpunt per klasse), `bergbezinkvoorziening` en `overstortdrempel`. Ná #71 zijn
+het er vijf: `Overnamepunt`, `overstortdrempel`, `bergbezinkvoorzieningen` (dezelfde rol, nu onder haar
+`_ROLLEN`-naam), plus twee *nieuwe* signalen die de oude handlijst niet dekte -- `oppervlaktewaterobjecten`
+(0 in de export, RVZ-004 leunt erop) en `valconstructies` (0, HGT-009 en HGT-016 leunen erop). Beide zijn
+terecht: staat de rol op nul terwijl een check erop toetst, dan heeft die check niets te beoordelen en hoort
+dat in het rapport. De telling zelf sluit aan op BO-51: `netwerkknopen` 22.363, `rioolputten` 20.756,
+`putten` 20.758.

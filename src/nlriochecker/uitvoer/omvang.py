@@ -23,9 +23,11 @@ import pandas as pd
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
+from nlriochecker.checks.base import REGISTRY
+from nlriochecker.checks.selectie import klassen_van_rol
 from nlriochecker.checks.verbanden import verbonden_knopen
 from nlriochecker.dataset import GwswDataset
-from nlriochecker.taal import getal
+from nlriochecker.taal import getal, vorm
 
 KOLOMMEN = ["Objecttype", "Stelsel", "Aantal", "Lengte (m)"]
 
@@ -158,29 +160,69 @@ class _Rol:
     rol (een export gebruikt `Lozingsput` OF `Lozingspunt`, niet allebei); daar zou een
     signaal per klasse elke ongebruikte schrijfwijze als gebrek melden. Zij waarschuwen
     daarom pas als de hele rol leeg is.
+
+    `checks` zijn de check-ID's die op deze rol leunen; de nul-melding noemt ze (het gat
+    uit issue #22, nu generiek). Voor een gedeclareerde rol komen ze uit de registry,
+    voor de twee speciale bewakingen is het de canonieke check (NET-001, NET-007).
     """
 
     label: str
     klassen: tuple[str, ...]
     via_onderdeel: bool
+    checks: tuple[str, ...]
     per_klasse: bool = False
 
 
-def _rollen(config: CheckConfig) -> list[_Rol]:
-    """De klassenlijsten uit `checks.toml` waar de zwaarste checks van afhangen.
+def _gedeclareerde_rollen() -> dict[str, tuple[str, ...]]:
+    """Per gedeclareerde rol de check-ID's die haar in `check.rollen` noemen.
 
-    Geen eigen configlijst: precies de bestaande rollen, zodat een klasse die iemand
-    later aan een lijst toevoegt vanzelf in de telling en de nul-bewaking verschijnt.
+    De bron voor de rollentelling en de nul-bewaking (issue #71): precies de rollen waar
+    een geregistreerde check op leunt, met de checks erbij zodat de nul-melding ze kan
+    noemen. Gesorteerd voor een stabiele uitvoer.
+    """
+    per_rol: defaultdict[str, list[str]] = defaultdict(list)
+    for check in REGISTRY.values():
+        for rol in check.rollen:
+            per_rol[rol].append(check.id)
+    return {rol: tuple(sorted(ids)) for rol, ids in per_rol.items()}
+
+
+def _rollen(config: CheckConfig) -> list[_Rol]:
+    """De rollen waar de checks op leunen: hun declaraties plus twee vaste bewakingen.
+
+    Sinds issue #71 leidt deze lijst de rollen af uit wat de geregistreerde checks in
+    `check.rollen` declareren (via `selectie.klassen_van_rol` naar hun klassen), zodat de
+    telling en de nul-bewaking niet meer op een handlijst leunen. Twee bewakingen drukken
+    geen `selectie._ROLLEN`-rol uit en blijven daarom expliciet (BO-52):
+
+    - het **afvoereindpunt** (`Overnamepunt`, `Gemaal`, `Pompunit`) wordt per klasse
+      bewaakt, want elke klasse draagt een eigen betekenis -- noodverband versus echt
+      overdrachtspunt (BO-33) -- en er is geen rol `afvoer_eindpunt`;
+    - de **overstortdrempel** is een `Overstortdrempel`-onderdeel zonder eigen geometrie
+      dat via `subjects_of_class` geteld wordt (NET-007), niet via `of_class`, en heeft
+      evenmin een rol.
+
+    Een gedeclareerde rol zonder geconfigureerde klassen (een project mag
+    `functieloze_knoop` leeg laten) valt weg: zonder verwachte populatie is er niets op
+    nul te melden.
     """
     klassen = config.klassen
-    return [
-        _Rol("afvoereindpunt", tuple(klassen.afvoer_eindpunt), False, per_klasse=True),
-        _Rol("lozingseindpunt", tuple(klassen.lozings_eindpunt), False),
-        _Rol("bergbezinkvoorziening", tuple(klassen.bergbezinkvoorziening), False),
-        _Rol("overstortdrempel", tuple(klassen.drempel), True),
-        _Rol("infiltratieleiding", tuple(klassen.infiltratie), False),
-        _Rol("mechanische leiding", tuple(klassen.mechanisch), False),
+    speciaal = [
+        _Rol(
+            "afvoereindpunt",
+            tuple(klassen.afvoer_eindpunt),
+            False,
+            ("NET-001",),
+            per_klasse=True,
+        ),
+        _Rol("overstortdrempel", tuple(klassen.drempel), True, ("NET-007",)),
     ]
+    gedeclareerd = [
+        _Rol(rol, tuple(rolklassen), False, checks)
+        for rol, checks in sorted(_gedeclareerde_rollen().items())
+        if (rolklassen := klassen_van_rol(rol, klassen))
+    ]
+    return speciaal + gedeclareerd
 
 
 def _aantal_klasse(dataset: GwswDataset, klasse: str, via_onderdeel: bool) -> int:
@@ -266,24 +308,33 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
     for rol in _rollen(run.config):
         if rol.per_klasse:
             signalen += [
-                NulSignaal(
-                    klasse,
-                    f"Geen enkele {klasse} in de export, terwijl de afvoereindpuntrol "
-                    "(NET-001) erop leunt. Wat op deze klasse toetst, heeft niets te beoordelen.",
-                )
+                NulSignaal(klasse, _per_klasse_boodschap(klasse, rol))
                 for klasse in rol.klassen
                 if _aantal_klasse(dataset, klasse, rol.via_onderdeel) == 0
             ]
         elif _aantal_rol(dataset, rol) == 0:
-            signalen.append(
-                NulSignaal(
-                    rol.label,
-                    f"Geen enkel object in de rol {rol.label} ({', '.join(rol.klassen)}) in de "
-                    "export, terwijl een check erop leunt. Wat op deze rol toetst, heeft niets "
-                    "te beoordelen.",
-                )
-            )
+            signalen.append(NulSignaal(rol.label, _rol_boodschap(rol)))
     return signalen
+
+
+def _rol_boodschap(rol: _Rol) -> str:
+    """De nul-melding voor een hele lege rol, met de checks die erop leunen."""
+    checks = ", ".join(rol.checks)
+    return (
+        f"Geen enkel object in de rol {rol.label} ({', '.join(rol.klassen)}) in de "
+        f"export, terwijl {checks} erop {vorm(len(rol.checks), 'leunt', 'leunen')}. "
+        "Wat op deze rol toetst, heeft niets te beoordelen."
+    )
+
+
+def _per_klasse_boodschap(klasse: str, rol: _Rol) -> str:
+    """De nul-melding voor een lege afvoereindpuntklasse, met de check die erop leunt."""
+    checks = ", ".join(rol.checks)
+    return (
+        f"Geen enkele {klasse} in de export, terwijl {checks} op de rol {rol.label} "
+        f"{vorm(len(rol.checks), 'leunt', 'leunen')} (BO-33). Wat op deze klasse toetst, "
+        "heeft niets te beoordelen."
+    )
 
 
 @dataclass(frozen=True)

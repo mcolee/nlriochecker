@@ -23,6 +23,7 @@ from nlriochecker.uitvoer.melding import (
     bouw_meldingen,
 )
 from nlriochecker.uitvoer.omvang import (
+    _rollen,
     eindpunttelling,
     klassen_op_nul,
     klassentelling,
@@ -30,28 +31,26 @@ from nlriochecker.uitvoer.omvang import (
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
-# De veertien klassen uit de zes rollen die checks.toml als afhankelijkheid noemt.
-ALLE_KLASSEN = {
-    "Overnamepunt",
-    "Gemaal",
-    "Pompunit",
-    "Lozingspunt",
-    "UitlaatPunt",
-    "Lozingsput",
-    "Uitlaatconstructie",
-    "Bergbezinkbassin",
-    "Bergingsbassin",
-    "Bezinkbassin",
-    "Overstortdrempel",
-    "Infiltratieriool",
-    "MechanischeRioolleiding",
-    "MechanischeTransportleiding",
-}
+# Elke klasse waar een gedeclareerde of speciale rol op leunt, uit dezelfde bron als
+# de code (issue #71). De nul-bewaking loopt sinds #71 over álle gedeclareerde rollen,
+# niet meer over een handlijst van zes; de fixture moet daarom voor elke rolklasse een
+# instantie kunnen bevatten, zodat "alle klassen aanwezig" ook echt nul signalen geeft.
+ALLE_KLASSEN = {klasse for rol in _rollen(load_check_config()) for klasse in rol.klassen}
 
 # Klassen die het GWSW op de orientatie van een knoop legt (subklassen van Aansluitpunt).
 _ORIENTATIE_KLASSEN = {"Overnamepunt", "Lozingspunt", "UitlaatPunt"}
 # Klassen die als streng in de graaf staan.
-_CONDUIT_KLASSEN = {"Infiltratieriool", "MechanischeRioolleiding", "MechanischeTransportleiding"}
+_CONDUIT_KLASSEN = {
+    "Leiding",
+    "VrijvervalRioolleiding",
+    "Infiltratieriool",
+    "Overstortleiding",
+    "Bergbezinkleiding",
+    "Bergingsleiding",
+    "Vuilwaterriool",
+    "GemengdRiool",
+    "LozeLeiding",
+}
 # Onderdelen zonder eigen geometrie, alleen via subjects_of_class te vinden.
 _ONDERDEEL_KLASSEN = {"Overstortdrempel"}
 
@@ -121,14 +120,41 @@ class TestKlassenOpNul:
     def test_een_ongebruikte_alternatieve_schrijfwijze_geeft_geen_signaal(
         self, tmp_path: Path
     ) -> None:
-        # lozingseindpunt heeft vier klassen; ontbreekt er een terwijl de rol als
+        # lozingspunten heeft vier klassen; ontbreekt er een terwijl de rol als
         # geheel gevuld is, dan is dat geen gebrek maar een andere schrijfwijze.
         assert klassen_op_nul(_run(tmp_path, {"Lozingspunt"})) == []
 
     def test_een_hele_lege_rol_geeft_een_signaal_op_rolniveau(self, tmp_path: Path) -> None:
         leeg = {"Lozingspunt", "UitlaatPunt", "Lozingsput", "Uitlaatconstructie"}
         op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, leeg))}
-        assert op_nul == {"lozingseindpunt"}
+        assert op_nul == {"lozingspunten"}
+
+    def test_een_lege_gedeclareerde_rol_geeft_een_signaal(self, tmp_path: Path) -> None:
+        # Sinds #71 bewaakt de nul-signalering elke gedeclareerde rol, niet alleen de
+        # zes uit de oude handlijst: ontbreekt `Put`, dan staat de rol `putten` op nul.
+        op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, {"Put"}))}
+        assert "putten" in op_nul
+
+    def test_de_boodschap_noemt_de_checks_die_op_de_rol_leunen(self, tmp_path: Path) -> None:
+        # Het gat uit #22, nu generiek: de melding noemt welke checks op de lege rol
+        # leunen. `putten` wordt onder meer door ATTR-006 gedeclareerd.
+        signaal = next(s for s in klassen_op_nul(_run(tmp_path, {"Put"})) if s.label == "putten")
+        assert "ATTR-006" in signaal.boodschap
+
+    def test_de_afvoereindpuntmelding_noemt_de_check(self, tmp_path: Path) -> None:
+        signaal = next(s for s in klassen_op_nul(_run(tmp_path, {"Gemaal"})) if s.label == "Gemaal")
+        assert "NET-001" in signaal.boodschap
+
+
+class TestGedeclareerdeRollen:
+    def test_elke_gedeclareerde_rol_krijgt_een_bewaking(self) -> None:
+        # `_rollen` moet elke rol dekken die een geregistreerde check declareert,
+        # anders bewaakt de code een rol niet die een check wel nodig heeft.
+        from nlriochecker.checks.base import REGISTRY
+
+        bewaakt = {rol.label for rol in _rollen(load_check_config())}
+        gedeclareerd = {rol for check in REGISTRY.values() for rol in check.rollen}
+        assert gedeclareerd <= bewaakt
 
 
 class TestSignaalMelding:

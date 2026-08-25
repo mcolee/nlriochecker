@@ -27,6 +27,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De nul-bewaking en de rollentelling leiden hun rollen uit de checkdeclaraties af**
+  (issue #71, vervolg op #64). `omvang._rollen` was een handlijst van zes rollen; nu
+  verzamelt hij de rollen die de geregistreerde checks in `check.rollen` declareren, lost
+  ze via `selectie.klassen_van_rol` op naar klassen en telt via `of_class`. De
+  `SIG-nulklasse`-melding noemt voortaan welke checks op de lege rol leunen (het gat uit
+  issue #22, nu generiek). De twee bewakingen die geen `selectie._ROLLEN`-rol uitdrukken
+  blijven expliciet: het afvoereindpunt per klasse (`Overnamepunt`/`Gemaal`/`Pompunit`,
+  BO-33) en de overstortdrempel via `subjects_of_class` (NET-007). De "Per rol"-tabel en
+  de nul-signalen lezen dezelfde bron en lopen niet meer uiteen. Zie BO-52.
+
 - **De putdiepte-, putbodem- en dekselchecks toetsen op `Rioolput`, niet op elk netwerkknoop**
   (issue #64). Een nieuwe rol `rioolputten` (`[klassen] rioolput = ["Rioolput"]`) vervangt
   `netwerkknopen` in HGT-012 (putdiepte) en HGT-015 (putbodem); in HGT-004, HGT-016 en

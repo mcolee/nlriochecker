@@ -364,7 +364,14 @@ def _afhankelijkheden_section(run: CheckRun) -> list[str]:
             "",
         ]
     regels += table(klassentelling(run), "Per rol")
-    regels += [""]
+    regels += [
+        "",
+        "> Elke rij is een eigen rol waarop een of meer checks selecteren; de rollen "
+        "kunnen elkaar overlappen (`netwerkknopen` omvat onder meer de putten, "
+        "lozingspunten en bergbezinkvoorzieningen). De aantallen zijn niet bedoeld om "
+        "op te tellen.",
+        "",
+    ]
     regels += table(eindpunttelling(run), "Afvoereindpunten per klasse")
     regels += [
         "",
