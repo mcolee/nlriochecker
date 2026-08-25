@@ -67,8 +67,9 @@ jobs:
       # tool die hier ontbreekt. Geen getal meer om te herijken. Lokaal na te spelen met
       # `uv run python scripts/runnerpoort.py`. De controle zelf staat in tests/conftest.py.
       NLRIOCHECKER_STRIKTE_OVERSLAG: "1"
-      # De bovengrens op modulewijde overslagen. Anders dan de twee hierboven beweegt hij
-      # niet mee met suitegroei: een hele module die met `allow_module_level=True`
+      # De bovengrens op modulewijde overslagen. Net als de strikte vlag hierboven, en
+      # anders dan de ondergrens op "geslaagd", beweegt hij niet mee met suitegroei:
+      # een hele module die met `allow_module_level=True`
       # afhaakt is precies "een fixturemap die niet meekomt", en dat is wat de poort wil
       # vangen. Vandaag 1 op deze runner -- tests/test_uitvoer_qgis.py, want ubuntu-latest
       # heeft geen PyQGIS. Komt er een tweede bij, dan is er een module weggevallen.

@@ -176,8 +176,8 @@ def _onverwachte_overslagen(overgeslagen: list[object]) -> list[tuple[str, str]]
 def _strikt() -> bool:
     """Of de strikte overslagcontrole aanstaat.
 
-    Niet gezet of leeg is uit, en "0" ook: `os.environ.get` alleen leest "0" als aan,
-    zodat een run die de vlag bewust uitzet hem juist ingeschakeld zou krijgen.
+    Niet gezet of leeg is uit, en "0" ook. Een kale `os.environ.get` zou "0" als aan
+    lezen, zodat een run die de vlag bewust uitzet hem juist ingeschakeld kreeg.
     """
     return os.environ.get(STRIKT_ENV, "") not in ("", "0")
 
