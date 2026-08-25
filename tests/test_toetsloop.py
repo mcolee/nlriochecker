@@ -223,6 +223,17 @@ def test_zonder_csv_schrijft_ook_totaal_geen_csv(tmp_path: Path) -> None:
     assert uitvoer.synthese is not None and uitvoer.synthese.exists()
 
 
+def test_de_synthese_noemt_alleen_de_geschreven_totaalbestanden(tmp_path: Path) -> None:
+    """Issue #66: een verwijzing naar een uitgezette CSV stuurt de lezer naar niets."""
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path, met_csv=False, met_geopackage=False)
+
+    assert uitvoer.synthese is not None
+    tekst = uitvoer.synthese.read_text(encoding="utf-8")
+
+    assert "`bevindingen.json` hiernaast bevat" in tekst
+    assert "bevindingen.csv" not in tekst
+
+
 def test_een_gebied_schrijft_zonder_submap(tmp_path: Path) -> None:
     _, uitvoer = _schrijf("buurt_noord.gpkg", tmp_path)
 

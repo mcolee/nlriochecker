@@ -202,11 +202,17 @@ def totaalsynthese(
     beschikbaar: Sequence[str],
     overgeslagen: Sequence[str],
     dataset: str = "",
+    *,
+    met_csv: bool = True,
+    met_json: bool = True,
 ) -> list[str]:
     """Stelt de romp van de totaalsynthese over meerdere studiegebieden samen.
 
     `dataset` staat in de romp en niet meer in de titel: die noemt sinds issue #16 het
     gebied waar het rapport over gaat, hier "Totaal (N gebieden)".
+
+    `met_csv` en `met_json` zeggen welke totaalbestanden er naast de synthese komen;
+    de slotzin noemt alleen die (issue #66).
 
     Per gebied de omvang en de meldingen, en daarboven het totaal over alle
     gebieden. Objecten op een gebiedsgrens tellen in elk rakend gebied mee (zie
@@ -284,12 +290,30 @@ def totaalsynthese(
         "",
         *table(_per_gebied_en_check(gebieden), "Meldingen per gebied en check"),
         "",
-        "De bestanden per gebied staan in de submappen; `bevindingen.csv` en "
-        "`bevindingen.json` hiernaast bevatten de unieke meldingen over alle gebieden, "
-        "waarbij een melding uit meerdere gebieden het gebied van zijn eerste voorkomen "
-        "draagt.",
+        _totaalbestanden(met_csv, met_json),
     ]
     return regels
+
+
+def _totaalbestanden(met_csv: bool, met_json: bool) -> str:
+    """Welke totaalbestanden er naast de synthese staan; noemt alleen de geschreven.
+
+    Ze onvoorwaardelijk noemen zou de lezer naar bestanden sturen die `--uitvoer`
+    heeft uitgezet (issue #66).
+    """
+    naast = [naam for naam, gevraagd in (("csv", met_csv), ("json", met_json)) if gevraagd]
+    if not naast:
+        return (
+            "De bestanden per gebied staan in de submappen; de synthese hiernaast is het "
+            "enige totaalbestand, want CSV en JSON zijn met `--uitvoer` uitgezet."
+        )
+    bestanden = " en ".join(f"`bevindingen.{soort}`" for soort in naast)
+    bevatten = "bevat" if len(naast) == 1 else "bevatten"
+    return (
+        f"De bestanden per gebied staan in de submappen; {bestanden} hiernaast {bevatten} de "
+        "unieke meldingen over alle gebieden, waarbij een melding uit meerdere gebieden het "
+        "gebied van zijn eerste voorkomen draagt."
+    )
 
 
 def _per_gebied_en_check(gebieden: Sequence[GebiedsSamenvatting]) -> pd.DataFrame:

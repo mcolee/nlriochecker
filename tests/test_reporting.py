@@ -370,6 +370,21 @@ def test_afkap_is_configureerbaar_en_wordt_gemeld(tmp_path: Path) -> None:
     assert "2 bevindingen niet getoond" in tekst
 
 
+def test_de_afkapmelding_wijst_niet_naar_een_uitgezette_csv(tmp_path: Path) -> None:
+    """Juist de weggelaten bevindingen mogen niet naar een ontbrekend bestand wijzen."""
+    config = _fixtureconfig()
+    config.rapport.max_bevindingen_per_check = 1
+    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
+
+    markdown_path, csv_path = write_check_report(run, tmp_path, met_csv=False)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert csv_path is None
+    assert "2 bevindingen niet getoond" in tekst
+    assert "bevindingen.csv" not in tekst
+    assert "de CSV is met `--uitvoer` uitgezet" in tekst
+
+
 def test_rapport_opent_met_de_rode_draad(tmp_path: Path) -> None:
     """De synthese hoort voor de tabellen te staan, niet erachter."""
     run = _checkrun("net003_tegen_de_richting.ttl")

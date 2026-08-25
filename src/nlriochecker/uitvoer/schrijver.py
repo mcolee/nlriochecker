@@ -256,7 +256,14 @@ def _schrijf_totaal(
         # De titel noemt het gebied waar het rapport over gaat, net als het
         # bevindingenrapport per gebied; de dataset staat in de romp.
         f"# Totaal ({getal(len(runs), 'gebied', 'gebieden')})",
-        totaalsynthese(verzameld, beschikbaar, overgeslagen, eerste.dataset.source.name),
+        totaalsynthese(
+            verzameld,
+            beschikbaar,
+            overgeslagen,
+            eerste.dataset.source.name,
+            met_csv=met_csv,
+            met_json=met_json,
+        ),
         run_datum,
         markering=markering(eerste),
     )

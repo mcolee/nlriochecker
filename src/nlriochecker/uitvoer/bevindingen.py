@@ -159,7 +159,7 @@ def write_check_report(
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
         f"# {_titel(run)}",
-        _render_checks(run, meldingen, notities, onderdrukking),
+        _render_checks(run, meldingen, notities, onderdrukking, met_csv=met_csv),
         run_datum,
         markering=markering(run),
     )
@@ -257,6 +257,8 @@ def _render_checks(
     meldingen: list[Melding],
     notities: Sequence[str] = (),
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    *,
+    met_csv: bool = True,
 ) -> list[str]:
     """Stelt de romp van het bevindingenrapport samen; de kop komt uit `schrijf_markdown`.
 
@@ -264,6 +266,10 @@ def _render_checks(
     over gaat (de aantallen), dan of het voldoet (de managementsamenvatting en de rode
     draad), dan de verantwoording van wat er wel en niet bekeken is, en pas daarna het
     detail -- eerst de compliance van de GWSW-nulmeting, dan de eigen bevindingen.
+
+    `met_csv` zegt of de CSV ernaast geschreven wordt. Zonder haar mag het rapport er
+    niet naar verwijzen: dat zou de lezer naar een bestand sturen dat er niet is,
+    juist voor de bevindingen die het rapport zelf weglaat (issue #66).
     """
     lines = _omvang_section(run)
     lines += _samenvatting_section(run, meldingen)
@@ -275,9 +281,24 @@ def _render_checks(
     lines += ["", "## Detailrapportage", ""]
     nulmeting = _detail_nulmeting(run, meldingen)
     lines += nulmeting
-    lines += _detail_eigen(run, meldingen, genummerd=bool(nulmeting))
-    lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
+    lines += _detail_eigen(run, meldingen, genummerd=bool(nulmeting), met_csv=met_csv)
+    lines += ["", _archiefzin(met_csv)]
     return lines
+
+
+def _archiefzin(met_csv: bool) -> str:
+    """Waar de lezer de volledige lijst vindt; zonder CSV verwijst hij daar niet naar.
+
+    De andere twee vormen staan onder voorbehoud: dit rapport weet niet of ze gevraagd
+    zijn, en beweren dat ze er zijn zou dezelfde fout zijn als naar een uitgezette CSV
+    wijzen.
+    """
+    if met_csv:
+        return f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."
+    return (
+        f"De CSV is met `--uitvoer` uitgezet; alle bevindingen staan in `{FILE_CHECKS_JSON}` "
+        "en in de GeoPackage, voor zover die gevraagd zijn."
+    )
 
 
 def _omvang_section(run: CheckRun) -> list[str]:
@@ -648,7 +669,9 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     return [*regels, ""]
 
 
-def _detail_eigen(run: CheckRun, meldingen: list[Melding], *, genummerd: bool) -> list[str]:
+def _detail_eigen(
+    run: CheckRun, meldingen: list[Melding], *, genummerd: bool, met_csv: bool = True
+) -> list[str]:
     """Het detail van de eigen checks, eerst de foutchecks dan de waarschuwingschecks.
 
     `genummerd` is onwaar als er geen nulmetingblok boven staat -- zonder `--shacl` is
@@ -682,10 +705,15 @@ def _detail_eigen(run: CheckRun, meldingen: list[Melding], *, genummerd: bool) -
         regels += table(_findings_frame(getoond), f"Bevindingen ({len(eigen)})")
         weggelaten = len(eigen) - len(getoond)
         if weggelaten:
+            waar = (
+                f"de volledige lijst staat in `{FILE_CHECKS_CSV}`"
+                if met_csv
+                else f"de CSV is met `--uitvoer` uitgezet, de volledige lijst staat in "
+                f"`{FILE_CHECKS_JSON}` of de GeoPackage, voor zover die gevraagd zijn"
+            )
             regels += [
                 "",
-                f"_{getal(weggelaten, 'bevinding', 'bevindingen')} niet getoond; "
-                f"de volledige lijst staat in `{FILE_CHECKS_CSV}`._",
+                f"_{getal(weggelaten, 'bevinding', 'bevindingen')} niet getoond; {waar}._",
             ]
     return regels
 

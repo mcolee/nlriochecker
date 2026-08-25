@@ -458,6 +458,34 @@ def test_uitvoer_json_en_gpkg_laat_de_csv_weg_maar_niet_het_rapport(tmp_path: Pa
     assert len(list(uitvoer.glob("*.gpkg"))) == 1
 
 
+def test_rapport_verwijst_niet_naar_een_uitgezette_csv(tmp_path: Path) -> None:
+    """Een verwijzing naar een bestand dat er niet is, is een onwaarheid (issue #66)."""
+    uitvoer = tmp_path / "uitvoer"
+    argumenten = [
+        "toets",
+        "--geen-ontologie",
+        "--dataset",
+        str(TTL_DIR / "top001_losliggende_put.ttl"),
+        "--check",
+        "TOP-001",
+        "--geen-cache",
+        "--output",
+        str(uitvoer),
+    ]
+
+    zonder = CliRunner().invoke(main, [*argumenten, "--uitvoer", "json"])
+    assert zonder.exit_code == 0, zonder.output
+    rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert f"staan in `{FILE_CHECKS_CSV}`" not in rapport
+    assert "De CSV is met `--uitvoer` uitgezet" in rapport
+
+    met = CliRunner().invoke(main, argumenten)
+    assert met.exit_code == 0, met.output
+    rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`." in rapport
+    assert "uitgezet" not in rapport
+
+
 def test_de_oude_vlaggen_bestaan_niet_meer(tmp_path: Path) -> None:
     """Geen alias en geen overgangsperiode (issue #66)."""
     for vlag in ("--geen-gpkg", "--geen-json"):

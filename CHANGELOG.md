@@ -64,8 +64,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   Eén bevestigende, herhaalbare optie zegt welke bijproducten er naast het Markdown-rapport
   komen; standaard alle drie, en ook de CSV is nu uit te zetten. Het rapport wordt altijd
   geschreven: het draagt de markering en het voorbehoud. De twee oude vlaggen vervallen
-  zonder alias; wie ze opgeeft krijgt de gewone optiefout. `Toetsopdracht` krijgt `met_csv`
-  en `Uitvoer.csv` kan `None` zijn.
+  zonder alias; wie ze opgeeft krijgt de gewone optiefout. `Toetsopdracht` krijgt `met_csv`,
+  `Uitvoer.csv` kan `None` zijn en `write_check_report` geeft voortaan
+  `tuple[Path, Path | None]` terug. Het rapport en de totaalsynthese verwijzen alleen naar de
+  bijproducten die daadwerkelijk geschreven zijn.
 
 - **`schrijf_uitvoer` neemt `stroom=` in plaats van `meldingen=`** (issue #65). Wie de vier
   uitvoervormen zelf aanstuurt gaf een `list[Melding]` mee; dat is nu een `Meldingenstroom`
