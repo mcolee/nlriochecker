@@ -95,6 +95,21 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   gewoon per object. CSV, JSON en de meldingentabel van de GeoPackage houden elke rij
   met haar vlag: dat zijn archieven en een publiek contract, en alleen de mensgerichte
   views vouwen samen.
+- **Wat `bekeken` telde staat erbij** (issue #77): elke `CheckOutcome` draagt
+  `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut-instanties`, de enum
+  `checks.base.Scope` -- en `populatie`, de gedeclareerde rollen van de check als
+  opsomming (of "de hele export" zonder rollen). `run_checks` leidt de scope af uit
+  dezelfde beslissing die de check zijn dataset gaf (`over_volledige_populatie`) plus de
+  klassevlag `Check.telt_instanties`, die staat op de twee checks waarvan `examined()`
+  kenmerkinstanties telt in plaats van objecten (ATTR-014, BTR-006); die vlag wint, want
+  "volledige export" zegt niets over een noemer in instanties. Zonder dat label mengt één
+  kolom 95, 45.803 en 459.108, en deelt `percentage_populatie` in de GeoPackage door een
+  getal waarvan de eenheid onbekend is. Het staat in de checktabel (kolommen Bekeken scope
+  en Populatie), in de detailregel en de generieke systemische regel per check
+  (`_bekeken_regel`), in `overzicht_checks` en in het optionele enveloppeveld `checks` van
+  de JSON -- niet in de meldingen-CSV en niet in `totaal/bevindingen.json`. De rollen
+  zeggen waar de check over gáát; dat is niet exact de verzameling die `examined` telt.
+  Zie BO-58.
 - De runbrede markering boven een rapport wordt samengesteld in
   `uitvoer/voorbehoud.py`, en nergens anders. Er kan meer dan een voorbehoud tegelijk
   gelden -- een `--cfk`-deelset op een run met `--geen-ontologie` -- en

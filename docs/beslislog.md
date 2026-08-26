@@ -2988,3 +2988,85 @@ QGIS-projecten die erop wezen moeten opnieuw gekoppeld worden. De drempel `stels
 `gemengd_zonder_overstort_buffer_m` -- een projectconfig met de oude naam wordt geweigerd
 (`extra="forbid"`). RVZ-006 levert op dezelfde data meer meldingen dan voorheen; een vergelijking met
 een meetmoment van vóór deze wijziging telt appels en peren, en `vergelijk` zegt dat niet.
+
+### BO-58 `bekeken` draagt een scopelabel met drie waarden en de getelde populatie
+
+**Wat.** Elke `CheckOutcome` draagt naast `examined` twee duidingen (issue #77):
+
+- `bekeken_scope` (`checks.base.Scope`), met **precies drie** waarden:
+  `analyseset`, `volledige_export` en `attribuut-instanties`;
+- `populatie`, de gedeclareerde rollen van de check als leesbare opsomming, of
+  `de hele export` als een check er geen declareert.
+
+Ze staan in de checktabel van het Markdown-rapport (kolommen Bekeken scope en
+Populatie), in de detailregel en de generieke systemische regel onder elke check, in
+`overzicht_checks` van de GeoPackage (`bekeken_scope`, `populatie`) en in het optionele
+enveloppeveld `checks` van `bevindingen.json`. **Niet** in de meldingen-CSV: bekeken
+hoort bij de check en niet bij de rij, dezelfde scheiding als bij de CFK-set (BO-7).
+`totaal/bevindingen.json` draagt het veld evenmin -- `bekeken` is per gebied gemeten.
+
+**De taxonomie.** Het getal varieert langs twee onafhankelijke assen. De eerste is de
+dataset die `run_checks` de check geeft: de analyseset (kern plus contextschil) of de
+volledige export, afhankelijk van `Check.volledig_bereik` en
+`[studiegebied] volledige_dataset_checks`. De tweede is wat `examined()` op die dataset
+telt: objecten van een rol, of instanties van een kenmerk. De tweede as wint, want telt
+een check geen objecten dan zegt "volledige export" niets over zijn noemer: ATTR-014
+heeft `volledig_bereik` én telt instanties, en heet daarom `attribuut-instanties`.
+
+Welke checks instanties tellen is niet uit de code af te leiden en staat daarom als
+`Check.telt_instanties` op de klasse, bewaakt door
+`test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd`. Het zijn er twee: **ATTR-014**
+(elke kenmerkinstantie met een property-restrictie) en **BTR-006** (elke hoogtewaarde:
+twee BOB's per streng, deksel en maaiveld per knoop).
+
+`analyseset` betekent niet "minder gezien": zonder studiegebied valt de analyseset samen
+met de volledige export. Het onderscheid zegt dat deze check met de afbakening meebeweegt
+en `volledige_export` niet.
+
+**Wat `populatie` niet is.** De rollen zeggen waar de check over gáát, niet exact welke
+verzameling `examined` telt. ATTR-018 declareert ook `leidingen`, omdat zijn toelichting
+die telt, terwijl `examined` alleen vrijvervalstrengen plus putten telt. Een machinale
+koppeling tussen `examined()` en de rollen bestaat niet; de declaratie is de beste
+beschikbare duiding en de rest staat in de regel "Toetst ..." eronder.
+
+**Waarom.** Eén kolom `bekeken` mengde 95, 45.803 en 459.108 zonder dat er iets bij stond,
+en `percentage_populatie` in de GeoPackage deelt door precies dat ongelabelde getal --
+de percentages waren daardoor onderling onvergelijkbaar. Het is nadrukkelijk een
+labelprobleem en geen rekenfout: HGT-011 (bekeken 79 op Koekangerveld) en RVZ-002
+(bekeken 0) tellen verschillende rollen -- `netwerkknopen` tegenover `overstortputten`
+-- en géén van beide telt de klasse `Overstortdrempel`, want dat is een `Wand`-onderdeel
+en geen knoop. De getallen gelijktrekken zou de fout zijn.
+
+**Meting (`scripts/analyse_scope_per_check.py`, `36d2a2f`).** Alle 99 checks, twee runs
+op `dewoldenhoogeveen_orox.ttl` met `configs/dewoldenhoogeveen.toml`:
+
+| scope | aantal checks | voorbeeld | bekeken (gemeentebreed) | bekeken (Koekangerveld) |
+|---|---:|---|---:|---:|
+| `analyseset` | 95 | HGT-011 (`netwerkknopen`) | 22.363 | 79 |
+| `volledige_export` | 2 | ADM-002 (`leidingen, netwerkknopen`) | 45.803 | 45.803 |
+| `attribuut-instanties` | 2 | ATTR-014 (`de hele export`) | 459.108 | 459.108 |
+
+De andere twee: ATTR-015 (`volledige_export`, 29.087 gedateerde objecten) en BTR-006
+(`attribuut-instanties`, 57.569 hoogtewaarden gemeentebreed, 161 op Koekangerveld).
+ATTR-018 op Koekangerveld leest nu als "36 bevindingen op 119 bekeken (analyseset:
+leidingen, putten, vrijvervalrioolleidingen)". Let op het verschil met de 39 putten uit
+`scripts/analyse_begindatum.py`: dat script telt de **kern**, terwijl `bekeken` de
+analyseset telt -- kern plus contextschil, hier 78 putten plus 41 vrijvervalstrengen. Het
+jaartalgat zelf is geen bug (3 van 39 Koekangerveldse putten dragen een `Begindatum`,
+gemeentebreed 11.695 van 20.758, `aspect-zonder-datum` overal 0); deze duiding maakt het
+alleen leesbaar.
+
+**Alternatieven.** Twee waarden in plaats van drie en de instantietellers onder
+`volledige_export` scharen (verworpen: dan staat 459.108 als "objecten" naast 45.803).
+De scope uit `examined()` afleiden in plaats van hem te declareren (verworpen: er is niets
+in de code dat objecten van instanties onderscheidt; een heuristiek zou stil verkeerd
+kunnen labelen). Het veld `scope` noemen (verworpen: `Melding.scope` draagt in hetzelfde
+JSON-bestand al een andere betekenis -- `binnen_studiegebied` of `geen_studiegebied`).
+De noemers gelijktrekken (verworpen: het is een labelprobleem, zie hierboven). Het label
+ook in de meldingen-CSV zetten (verworpen: zie BO-7).
+
+**Contractbreuk.** Geen. `checks` is een optioneel, additief enveloppeveld en
+`schema_versie` blijft daarom `1.1`, conform de versioneringsregel in
+`docs/json-schema.md`. `overzicht_checks` krijgt er twee kolommen bij; bestaande
+kolommen blijven ongewijzigd, en een lezer die op naam selecteert merkt er niets van.
+De checktabel in het Markdown-rapport is twee kolommen breder.

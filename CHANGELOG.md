@@ -13,6 +13,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **`bekeken` zegt per check waarover het geteld is** (issue #77, BO-58). Elke uitslag
+  draagt `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut-instanties` --
+  en `populatie`, de gedeclareerde rollen van de check. Ze staan in de checktabel van het
+  rapport (kolommen Bekeken scope en Populatie), in de detailregel per check, in
+  `overzicht_checks` van de GeoPackage en in het optionele enveloppeveld `checks` van
+  `bevindingen.json` (`schema_versie` blijft `1.1`: optioneel en additief); niet in de
+  meldingen-CSV. Zonder label mengde één kolom 95, 45.803 en 459.108 objecten
+  respectievelijk kenmerkinstanties, en waren de percentages die erop delen
+  onvergelijkbaar. Meting: `scripts/analyse_scope_per_check.py`.
 - **Elke check declareert zijn GWSW-rollen en -kenmerken** (issue #64). `Check` krijgt
   `rollen` (namen uit `selectie._ROLLEN`: de populatie die de check langsloopt) en
   `kenmerken` (GWSW-kenmerknamen, of een `config:<pad>`-verwijzing voor ATTR-013, of `*`
@@ -27,6 +36,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De afbakening tot een studiegebied houdt de checkdeclaratie vast** (issue #77).
+  `CheckRun.beperk_tot_studiegebied` bouwde elke uitslag opnieuw op met een opsomming die
+  `rollen` en `kenmerken` oversloeg, zodat elk gebiedsrapport "Toetst de hele export" zei
+  in plaats van de klassen en kenmerken van de check.
 - **Systemische bevindingen staan generiek in het rapport en in de popup** (issue #76).
   Een systemische bevinding is dezelfde structurele kwestie op (vrijwel) elk object; per
   object opgesomd verdringt zij de gebreken die dat object van zijn buren onderscheiden.
