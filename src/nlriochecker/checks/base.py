@@ -223,15 +223,24 @@ class CheckOutcome:
 
     @property
     def populatie(self) -> str:
-        """De populatie waar deze check over gaat, in woorden (issue #77).
+        """De populatie die deze check declareert, in woorden (issue #77).
 
-        De gedeclareerde rollen (`Check.rollen`); zonder rollen dezelfde formulering
-        die de regel "Toetst ..." in het rapport gebruikt. Let op wat het niet is: de
-        rollen zeggen waar de check over gaat, niet exact welke verzameling
-        `examined` telt. ATTR-018 declareert ook `leidingen` omdat zijn toelichting
-        die telt, terwijl `examined` alleen vrijvervalstrengen plus putten telt.
+        Waar de check over *gaat*, en nadrukkelijk niet de noemer van `examined`: de
+        declaratie is de vereniging van wat `run()`, `examined()` en `notes()`
+        aanraken, en dus structureel een bovengrens. ATTR-018 declareert ook
+        `leidingen` omdat zijn toelichting die telt, terwijl `examined` alleen
+        vrijvervalstrengen plus putten telt. Wie het aantal wil, leest `examined`.
+
+        De rollen gaan voor; declareert een check er geen, dan zeggen zijn kenmerken
+        waar hij over gaat (RVZ-011 leest de drempelkenmerken, ATTR-014 alle
+        kenmerken). Declareert hij geen van beide -- ADM-007 -- dan is er niets te
+        noemen en blijft het leeg. Bewust géén terugval op "de hele export": die
+        formulering hoort bij de regel "Toetst ...", waar zij betekent dat de check
+        niet tot een rol beperkt is, en zou achter een telling als de noemer lezen.
         """
-        return ", ".join(self.rollen) if self.rollen else "de hele export"
+        if self.rollen:
+            return ", ".join(self.rollen)
+        return ", ".join("alle kenmerken" if k == "*" else k for k in self.kenmerken)
 
 
 @dataclass(frozen=True)

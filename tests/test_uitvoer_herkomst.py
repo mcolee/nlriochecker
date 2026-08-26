@@ -716,11 +716,12 @@ def test_json_zonder_checks_draagt_het_veld_niet(tmp_path: Path) -> None:
 
 
 def test_json_labelt_per_check_waarover_bekeken_geteld_is(toets: CheckRun, tmp_path: Path) -> None:
-    """De noemer van elke check draagt haar scope en haar populatie (issue #77).
+    """Elke check draagt de scope van zijn noemer en zijn declaratie (issue #77).
 
     Zonder label mengt `bekeken` een rol op de analyseset, dezelfde rol op de
     volledige export en kenmerkinstanties, en zijn de percentages die erop delen
-    onderling onvergelijkbaar.
+    onderling onvergelijkbaar. `populatie` is de declaratie en geen noemer: zonder
+    rollen zijn dat de kenmerken (RVZ-011), en zonder beide is het leeg (ADM-007).
     """
     uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_geopackage=False)
 
@@ -732,6 +733,12 @@ def test_json_labelt_per_check_waarover_bekeken_geteld_is(toets: CheckRun, tmp_p
     assert len(per_check) == len(toets.outcomes)
     assert per_check["ADM-002"]["bekeken_scope"] == "volledige_export"
     assert per_check["ATTR-014"]["bekeken_scope"] == "attribuut-instanties"
+    assert per_check["ATTR-014"]["populatie"] == "alle kenmerken"
+    assert per_check["RVZ-011"]["populatie"] == (
+        "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau"
+    )
+    assert per_check["ADM-007"]["populatie"] == ""
+    assert all(rij["populatie"] != "de hele export" for rij in document["checks"])
     assert per_check["TOP-001"] == {
         "check_id": "TOP-001",
         "bekeken": next(o.examined for o in toets.outcomes if o.check_id == "TOP-001"),
@@ -748,5 +755,6 @@ def test_de_csv_krijgt_de_checkscope_niet(toets: CheckRun, tmp_path: Path) -> No
     kolommen = list(pd.read_csv(uitvoer.csv, sep=";", encoding="utf-8").columns)
 
     assert "bekeken_scope" not in kolommen
+    assert "Gaat over" not in kolommen
     assert "Populatie" not in kolommen
     assert "Bekeken" not in kolommen

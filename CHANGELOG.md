@@ -15,8 +15,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 - **`bekeken` zegt per check waarover het geteld is** (issue #77, BO-58). Elke uitslag
   draagt `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut-instanties` --
-  en `populatie`, de gedeclareerde rollen van de check. Ze staan in de checktabel van het
-  rapport (kolommen Bekeken scope en Populatie), in de detailregel per check, in
+  en `populatie`, de populatie die de check declareert (zijn rollen, anders zijn
+  kenmerken) -- waar hij over gaat, niet de noemer van het getal, en daarom overal achter
+  "gaat over". Ze staan in de checktabel van het
+  rapport (kolommen Bekeken scope en Gaat over, met een voetnoot eronder), in de detailregel per check, in
   `overzicht_checks` van de GeoPackage en in het optionele enveloppeveld `checks` van
   `bevindingen.json` (`schema_versie` blijft `1.1`: optioneel en additief); niet in de
   meldingen-CSV. Zonder label mengde één kolom 95, 45.803 en 459.108 objecten

@@ -2995,11 +2995,11 @@ een meetmoment van vóór deze wijziging telt appels en peren, en `vergelijk` ze
 
 - `bekeken_scope` (`checks.base.Scope`), met **precies drie** waarden:
   `analyseset`, `volledige_export` en `attribuut-instanties`;
-- `populatie`, de gedeclareerde rollen van de check als leesbare opsomming, of
-  `de hele export` als een check er geen declareert.
+- `populatie`, de populatie die de check **declareert** -- zijn rollen als leesbare
+  opsomming; zonder rollen zijn kenmerken (`alle kenmerken` voor `*`); zonder beide leeg.
 
 Ze staan in de checktabel van het Markdown-rapport (kolommen Bekeken scope en
-Populatie), in de detailregel en de generieke systemische regel onder elke check, in
+Gaat over, met een voetnoot eronder), in de detailregel en de generieke systemische regel onder elke check, in
 `overzicht_checks` van de GeoPackage (`bekeken_scope`, `populatie`) en in het optionele
 enveloppeveld `checks` van `bevindingen.json`. **Niet** in de meldingen-CSV: bekeken
 hoort bij de check en niet bij de rij, dezelfde scheiding als bij de CFK-set (BO-7).
@@ -3023,11 +3023,28 @@ twee BOB's per streng, deksel en maaiveld per knoop).
 met de volledige export. Het onderscheid zegt dat deze check met de afbakening meebeweegt
 en `volledige_export` niet.
 
-**Wat `populatie` niet is.** De rollen zeggen waar de check over gáát, niet exact welke
-verzameling `examined` telt. ATTR-018 declareert ook `leidingen`, omdat zijn toelichting
-die telt, terwijl `examined` alleen vrijvervalstrengen plus putten telt. Een machinale
-koppeling tussen `examined()` en de rollen bestaat niet; de declaratie is de beste
-beschikbare duiding en de rest staat in de regel "Toetst ..." eronder.
+**`populatie` is geen noemer, en wordt nergens als noemer gepresenteerd.** De declaratie
+is de vereniging van wat `run()`, `examined()` en `notes()` aanraken -- dat is wat de
+AST-sweep van issue #64 verzamelt -- en dus structureel een bovengrens op wat `examined`
+telt. ATTR-018 declareert ook `leidingen`, omdat zijn toelichting die telt, terwijl
+`examined` alleen vrijvervalstrengen plus putten telt. Een machinale koppeling tussen
+`examined()` en de rollen bestaat niet.
+
+Daarom staat de populatie in elke uitvoervorm los van het getal, achter **"gaat over"**:
+`119 bekeken (analyseset; gaat over: leidingen, putten, vrijvervalrioolleidingen)`. De
+kolom in de checktabel heet **Gaat over** en niet Populatie, en onder de tabel staat een
+voetnoot die het herhaalt. Een eerdere opzet zette de populatie achter een dubbele punt
+direct achter de telling; dat leest als de noemer en is precies het misverstand dat dit
+besluit wegneemt.
+
+Om diezelfde reden **geen terugval op "de hele export"** als een check geen rollen
+declareert. Die formulering hoort bij de regel "Toetst ...", waar zij zegt dat de check
+niet tot een rol beperkt is; achter een telling zou zij beweren dat de hele export de
+noemer was. RVZ-011 (telt de drempels die aan een put hangen) en ADM-007 (telt de putten
+van de geconfigureerde puttypen) zijn precies de gevallen waar dat misging. RVZ-011 valt
+nu terug op zijn kenmerken (`Drempelbreedte, Drempelniveau, Maaiveldhoogte,
+Putdekselniveau`), ATTR-014 op `alle kenmerken`, en ADM-007 -- die geen van beide
+declareert -- krijgt niets: dan zwijgt de uitvoer erover in plaats van iets te beweren.
 
 **Waarom.** Eén kolom `bekeken` mengde 95, 45.803 en 459.108 zonder dat er iets bij stond,
 en `percentage_populatie` in de GeoPackage deelt door precies dat ongelabelde getal --
@@ -3044,12 +3061,12 @@ op `dewoldenhoogeveen_orox.ttl` met `configs/dewoldenhoogeveen.toml`:
 |---|---:|---|---:|---:|
 | `analyseset` | 95 | HGT-011 (`netwerkknopen`) | 22.363 | 79 |
 | `volledige_export` | 2 | ADM-002 (`leidingen, netwerkknopen`) | 45.803 | 45.803 |
-| `attribuut-instanties` | 2 | ATTR-014 (`de hele export`) | 459.108 | 459.108 |
+| `attribuut-instanties` | 2 | ATTR-014 (`alle kenmerken`) | 459.108 | 459.108 |
 
 De andere twee: ATTR-015 (`volledige_export`, 29.087 gedateerde objecten) en BTR-006
 (`attribuut-instanties`, 57.569 hoogtewaarden gemeentebreed, 161 op Koekangerveld).
-ATTR-018 op Koekangerveld leest nu als "36 bevindingen op 119 bekeken (analyseset:
-leidingen, putten, vrijvervalrioolleidingen)". Let op het verschil met de 39 putten uit
+ATTR-018 op Koekangerveld leest nu als "36 bevindingen op 119 bekeken (analyseset; gaat
+over: leidingen, putten, vrijvervalrioolleidingen)". Let op het verschil met de 39 putten uit
 `scripts/analyse_begindatum.py`: dat script telt de **kern**, terwijl `bekeken` de
 analyseset telt -- kern plus contextschil, hier 78 putten plus 41 vrijvervalstrengen. Het
 jaartalgat zelf is geen bug (3 van 39 Koekangerveldse putten dragen een `Begindatum`,
@@ -3063,7 +3080,12 @@ in de code dat objecten van instanties onderscheidt; een heuristiek zou stil ver
 kunnen labelen). Het veld `scope` noemen (verworpen: `Melding.scope` draagt in hetzelfde
 JSON-bestand al een andere betekenis -- `binnen_studiegebied` of `geen_studiegebied`).
 De noemers gelijktrekken (verworpen: het is een labelprobleem, zie hierboven). Het label
-ook in de meldingen-CSV zetten (verworpen: zie BO-7).
+ook in de meldingen-CSV zetten (verworpen: zie BO-7). De populatie weglaten nu zij geen
+noemer is (verworpen: zonder haar zegt een rij alleen nog "43 bekeken (analyseset)" en is
+niet te zien waar de check over gaat; achter "gaat over" is zij precies wat zij is). Voor
+een check zonder rollen én zonder kenmerken iets verzinnen -- "alle objecten", "de hele
+export" (verworpen: dat is de fout die dit besluit wegneemt; zwijgen is hier eerlijk, en de
+regel "Toetst ..." eronder zegt al dat de check niet tot een rol beperkt is).
 
 **Contractbreuk.** Geen. `checks` is een optioneel, additief enveloppeveld en
 `schema_versie` blijft daarom `1.1`, conform de versioneringsregel in

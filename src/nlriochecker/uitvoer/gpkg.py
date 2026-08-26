@@ -1251,10 +1251,12 @@ OVERZICHT_KOLOMMEN = [
     _Kolom("aantal_meldingen", "integer"),
     _Kolom("bekeken", "integer"),
     _Kolom("percentage_populatie", "real"),
-    # Waarover `bekeken` geteld is, en om welke populatie het gaat (issue #77). Zonder
-    # die twee mengt de kolom `bekeken` drie noemers -- een rol op de analyseset,
-    # dezelfde rol op de volledige export, en kenmerkinstanties -- en deelt
-    # `percentage_populatie` door een getal waarvan de lezer de eenheid niet kent.
+    # Waarover `bekeken` geteld is (issue #77). Zonder die kolom mengt `bekeken` drie
+    # noemers -- een rol op de analyseset, dezelfde rol op de volledige export, en
+    # kenmerkinstanties -- en deelt `percentage_populatie` door een getal waarvan de
+    # lezer de eenheid niet kent. `populatie` staat daar los van: dat is de populatie
+    # die de check declareert (waar hij over gaat), en niet de noemer van `bekeken` --
+    # de declaratie is een bovengrens, zie `CheckOutcome.populatie`.
     _Kolom("bekeken_scope", "text"),
     _Kolom("populatie", "text"),
     _Kolom("systemisch", "integer"),

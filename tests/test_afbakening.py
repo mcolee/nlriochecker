@@ -290,23 +290,31 @@ def test_de_uitslag_zegt_waarover_bekeken_geteld_is() -> None:
     assert scope["ATTR-014"] is Scope.ATTRIBUUT_INSTANTIES
 
 
-def test_de_uitslag_noemt_de_getelde_populatie() -> None:
-    """Naast het scopelabel de rollen waar de check over gaat (issue #77).
+def test_de_uitslag_noemt_de_gedeclareerde_populatie() -> None:
+    """Naast het scopelabel: waar de check over gaat (issue #77).
 
-    ATTR-014 declareert geen rol -- hij gaat over de kenmerken van de hele export --
-    en valt daarom terug op dezelfde formulering die de regel "Toetst ..." gebruikt.
+    Geen noemer maar een declaratie. Zonder rollen zeggen de kenmerken waar de check
+    over gaat (RVZ-011 leest de drempelkenmerken, ATTR-014 alle kenmerken); declareert
+    hij geen van beide, dan valt er niets te noemen en blijft het leeg. Nadrukkelijk
+    geen terugval op "de hele export": achter een telling zou dat als de noemer lezen,
+    terwijl ADM-007 alleen de putten van de geconfigureerde puttypen telt.
     """
     dataset, area, config = _opzet()
     analyseset = bouw_analyseset(dataset, area, config)
 
     run = run_checks(
         CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
-        ["ATTR-014", "TOP-001"],
+        ["ADM-007", "ATTR-014", "RVZ-011", "TOP-001"],
     )
     populatie = {outcome.check_id: outcome.populatie for outcome in run.outcomes}
 
     assert populatie["TOP-001"] == "leidingen, netwerkknopen, vrijvervalrioolleidingen"
-    assert populatie["ATTR-014"] == "de hele export"
+    assert populatie["ATTR-014"] == "alle kenmerken"
+    assert populatie["RVZ-011"] == (
+        "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau"
+    )
+    assert populatie["ADM-007"] == ""
+    assert "de hele export" not in set(populatie.values())
 
 
 def test_de_afbakening_houdt_de_declaratie_van_de_check_vast() -> None:

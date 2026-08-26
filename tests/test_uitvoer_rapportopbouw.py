@@ -448,7 +448,7 @@ class TestSystemischGeneriek:
         )
         tekst = markdown.read_text(encoding="utf-8")
 
-        assert "Systemisch: 1 bevinding op 0 bekeken (analyseset:" in tekst
+        assert "Systemisch: 1 bevinding op 0 bekeken (analyseset;" in tekst
 
     def test_de_csv_en_de_json_houden_de_systemische_rijen(self, tmp_path: Path) -> None:
         """Publiek contract: alleen de mensgerichte views vouwen samen.
@@ -484,31 +484,68 @@ class TestBekekenScope:
     kolom die overal hetzelfde telt.
     """
 
-    def test_de_checktabel_noemt_scope_en_populatie(self, tmp_path: Path) -> None:
+    def test_de_checktabel_scheidt_scope_van_de_populatie(self, tmp_path: Path) -> None:
+        """De populatie staat onder "Gaat over" en niet naast Bekeken als noemer."""
         tekst = _rapport(_run("top013_parallel.ttl", "TOP-013"), tmp_path)
         kop = next(regel for regel in tekst.splitlines() if regel.startswith("| Check "))
         rij = next(regel for regel in tekst.splitlines() if regel.startswith("| TOP-013 "))
 
         assert "| Bekeken scope " in kop
-        assert "| Populatie " in kop
+        assert "| Gaat over " in kop
+        assert "| Populatie " not in kop
         assert "analyseset" in rij
         assert "leidingen, netwerkknopen, vrijvervalrioolleidingen" in rij
 
-    def test_de_detailregel_noemt_scope_en_populatie(self, tmp_path: Path) -> None:
+    def test_onder_de_checktabel_staat_wat_gaat_over_wel_en_niet_zegt(self, tmp_path: Path) -> None:
+        """De declaratie is een bovengrens; het aantal staat in Bekeken."""
+        tekst = _rapport(_run("top013_parallel.ttl", "TOP-013"), tmp_path)
+
+        assert "niet noodzakelijk precies de verzameling die geteld is" in tekst
+        assert "het aantal staat in Bekeken" in tekst
+
+    def test_de_detailregel_zet_de_populatie_achter_gaat_over(self, tmp_path: Path) -> None:
         """De regel zei "bekeken objecten", ook waar een check instanties telt."""
         tekst = _rapport(_run("top013_parallel.ttl", "TOP-013"), tmp_path)
 
-        assert "bekeken (analyseset: leidingen, netwerkknopen, vrijvervalrioolleidingen)" in tekst
+        assert (
+            "bekeken (analyseset; gaat over: leidingen, netwerkknopen, "
+            "vrijvervalrioolleidingen)" in tekst
+        )
         assert "bekeken objecten" not in tekst
 
     def test_een_check_over_de_volledige_export_zegt_dat(self, tmp_path: Path) -> None:
         """ADM-002 zoekt dubbele identificaties en draait daarom op de hele export."""
         tekst = _rapport(_run("top013_parallel.ttl", "ADM-002"), tmp_path)
 
-        assert "bekeken (volledige_export: leidingen, netwerkknopen)" in tekst
+        assert "bekeken (volledige_export; gaat over: leidingen, netwerkknopen)" in tekst
 
     def test_een_check_die_kenmerkinstanties_telt_zegt_dat(self, tmp_path: Path) -> None:
         """ATTR-014 telt geen objecten maar instanties van een kenmerk."""
         tekst = _rapport(_run("top013_parallel.ttl", "ATTR-014"), tmp_path)
 
-        assert "bekeken (attribuut-instanties: de hele export)" in tekst
+        assert "bekeken (attribuut-instanties; gaat over: alle kenmerken)" in tekst
+
+    def test_een_check_zonder_rollen_noemt_zijn_kenmerken(self, tmp_path: Path) -> None:
+        """RVZ-011 telt de drempels aan een put; "de hele export" loog over de noemer.
+
+        De regel "Toetst de hele export op ..." blijft er wel staan: daar betekent die
+        formulering dat de check niet tot een rol beperkt is, en zij staat niet achter
+        een telling.
+        """
+        tekst = _rapport(_run("top013_parallel.ttl", "RVZ-011"), tmp_path)
+        regel = next(regel for regel in tekst.splitlines() if "bekeken (" in regel)
+
+        assert (
+            "bekeken (analyseset; gaat over: Drempelbreedte, Drempelniveau, "
+            "Maaiveldhoogte, Putdekselniveau)" in regel
+        )
+        assert "de hele export" not in regel
+        assert "_Toetst de hele export op Drempelbreedte" in tekst
+
+    def test_een_check_die_niets_declareert_zwijgt_erover(self, tmp_path: Path) -> None:
+        """ADM-007 telt de putten van de geconfigureerde puttypen en declareert niets."""
+        tekst = _rapport(_run("top013_parallel.ttl", "ADM-007"), tmp_path)
+        regel = next(regel for regel in tekst.splitlines() if "bekeken (" in regel)
+
+        assert regel.endswith("bekeken (analyseset).")
+        assert "gaat over" not in regel

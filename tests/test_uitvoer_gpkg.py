@@ -175,9 +175,12 @@ def test_overzicht_checks_labelt_waarover_bekeken_geteld_is(tmp_path: Path) -> N
     """`percentage_populatie` deelt door `bekeken`; zonder label is dat onvergelijkbaar.
 
     ADM-002 telt de volledige export, TOP-013 de analyseset (hier gelijk, want er is
-    geen studiegebied) en ATTR-014 kenmerkinstanties. Zie issue #77.
+    geen studiegebied) en ATTR-014 kenmerkinstanties. `populatie` staat daarnaast en is
+    de declaratie van de check, geen noemer: RVZ-011 noemt zijn kenmerken en ADM-007,
+    die niets declareert, blijft leeg -- "de hele export" naast `percentage_populatie`
+    zou juist het misverstand terugbrengen. Zie issue #77 en BO-58.
     """
-    run = _run("top013_parallel.ttl", "ADM-002", "ATTR-014", "TOP-013")
+    run = _run("top013_parallel.ttl", "ADM-002", "ADM-007", "ATTR-014", "RVZ-011", "TOP-013")
     pad = _schrijf(run, tmp_path)
 
     rijen = dict(
@@ -189,7 +192,12 @@ def test_overzicht_checks_labelt_waarover_bekeken_geteld_is(tmp_path: Path) -> N
 
     assert rijen["TOP-013"] == ("analyseset", "leidingen, netwerkknopen, vrijvervalrioolleidingen")
     assert rijen["ADM-002"] == ("volledige_export", "leidingen, netwerkknopen")
-    assert rijen["ATTR-014"] == ("attribuut-instanties", "de hele export")
+    assert rijen["ATTR-014"] == ("attribuut-instanties", "alle kenmerken")
+    assert rijen["RVZ-011"] == (
+        "analyseset",
+        "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau",
+    )
+    assert rijen["ADM-007"] == ("analyseset", "")
 
 
 def test_runmetadata_maakt_het_bestand_herleidbaar(tmp_path: Path) -> None:

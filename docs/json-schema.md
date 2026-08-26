@@ -165,7 +165,7 @@ onderling niet te vergelijken. Zie BO-58 in [docs/beslislog.md](beslislog.md).
 | `check_id` | string | Check-ID uit het checkregister; hetzelfde ID als op de meldingen. |
 | `bekeken` | integer | Hoeveel deze check bekeken heeft. Wat de eenheid is, zegt `bekeken_scope`. |
 | `bekeken_scope` | string | Waarover geteld is: `analyseset`, `volledige_export` of `attribuut-instanties`. |
-| `populatie` | string | De populatie waar de check over gaat: zijn gedeclareerde rollen, komma-gescheiden, of `de hele export` als hij er geen declareert. |
+| `populatie` | string | De populatie die de check *declareert* — waar hij over gaat, **niet** de noemer van `bekeken`. Zijn rollen komma-gescheiden; declareert hij er geen, dan zijn kenmerken (`alle kenmerken` voor `*`); declareert hij geen van beide, dan een lege string. |
 
 De drie waarden van `bekeken_scope`:
 
@@ -180,16 +180,20 @@ De drie waarden van `bekeken_scope`:
   hoogtewaarde. Op De Wolden staat 459.108 tegenover 45.803 objecten; die twee getallen
   naast elkaar leggen heeft geen betekenis.
 
-Let op wat `populatie` niet is: de rollen zeggen waar de check over gáát, niet exact
-welke verzameling `bekeken` telt. ATTR-018 declareert ook `leidingen` omdat zijn
-toelichting die telt, terwijl `bekeken` alleen vrijvervalstrengen plus putten telt.
+**`populatie` is geen noemer.** Het is de declaratie van de check: de vereniging van wat
+zijn code aanraakt, en daarmee structureel een bovengrens op wat `bekeken` telt. ATTR-018
+declareert ook `leidingen` omdat zijn toelichting die telt, terwijl `bekeken` alleen
+vrijvervalstrengen plus putten telt. Reken er dus niet mee; het aantal staat in `bekeken`
+en de eenheid ervan in `bekeken_scope`. Een check die niets declareert (ADM-007) krijgt
+een lege string -- geen omschrijving van de hele export, want dat zou wél als noemer lezen.
 
 `totaal/bevindingen.json` draagt het veld niet: `bekeken` is per gebied gemeten, een som
 zou objecten op een gebiedsgrens dubbel tellen en het eerste gebied nemen zou een dekking
 beweren die niemand gemeten heeft. De meldingen-CSV draagt het ook niet -- bekeken hoort
 bij de check en niet bij de rij, dezelfde scheiding als bij `cfk_set`. In de GeoPackage
 staan dezelfde twee waarden in `overzicht_checks` (`bekeken_scope`, `populatie`), en in
-het Markdown-rapport in de kolommen Bekeken scope en Populatie van de checktabel.
+het Markdown-rapport in de kolommen Bekeken scope en Gaat over van de checktabel, met een
+voetnoot eronder die dezelfde waarschuwing draagt.
 
 Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering` en
 `onderdrukt`.

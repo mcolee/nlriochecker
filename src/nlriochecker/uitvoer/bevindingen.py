@@ -597,6 +597,12 @@ def _verantwoording(
 
     lines += _zonder_locatie(meldingen, met_csv=met_csv)
     lines += table(_check_summary(run, _per_check(meldingen)), "Samenvatting per check")
+    lines += [
+        "",
+        "_Bekeken scope zegt waarover Bekeken geteld is. Gaat over noemt de populatie die "
+        "de check zelf declareert (rollen en kenmerken); dat is niet noodzakelijk precies "
+        "de verzameling die geteld is -- het aantal staat in Bekeken._",
+    ]
 
     skeletten = [outcome for outcome in run.outcomes if outcome.skeleton]
     if skeletten:
@@ -787,14 +793,22 @@ def _detail_eigen(
 
 
 def _bekeken_regel(outcome) -> str:
-    """Wat `bekeken` van deze check telde: het aantal, de scope en de populatie.
+    """Wat `bekeken` van deze check telde: het aantal en de scope, plus waar hij over gaat.
 
     Eén formulering voor de detailregel en voor de generieke systemische regel
     eronder. Het kale getal mengt drie noemers -- een rol op de analyseset, dezelfde
     rol op de volledige export, en kenmerkinstanties -- en "bekeken objecten" was voor
     de derde soort gewoon onwaar (issue #77).
+
+    De scope hoort bij het getal; de gedeclareerde populatie staat er los van, achter
+    "gaat over". Zij is een bovengrens en geen noemer (zie `CheckOutcome.populatie`),
+    en direct achter een telling zou zij als de noemer lezen. Een check die niets
+    declareert (ADM-007) krijgt de toevoeging niet.
     """
-    return f"{outcome.examined} bekeken ({outcome.bekeken_scope.value}: {outcome.populatie})"
+    kern = f"{outcome.examined} bekeken ({outcome.bekeken_scope.value}"
+    if not outcome.populatie:
+        return f"{kern})"
+    return f"{kern}; gaat over: {outcome.populatie})"
 
 
 def _volledige_lijst(met_csv: bool) -> str:
@@ -1071,8 +1085,9 @@ def _bronnen_section(run: CheckRun) -> list[str]:
 def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.DataFrame:
     """Een regel per check met de aantallen uit de meldingenstroom.
 
-    `Bekeken scope` en `Populatie` staan naast `Bekeken` omdat dat getal anders drie
-    onvergelijkbare noemers in een kolom mengt (issue #77).
+    `Bekeken scope` staat naast `Bekeken` omdat dat getal anders drie onvergelijkbare
+    noemers in een kolom mengt (issue #77). `Gaat over` is geen noemer maar de
+    gedeclareerde populatie van de check; de voetnoot onder de tabel zegt dat erbij.
     """
     return pd.DataFrame(
         [
@@ -1083,7 +1098,7 @@ def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.Dat
                 "Dimensie": outcome.dimension.value,
                 "Bekeken": outcome.examined,
                 "Bekeken scope": outcome.bekeken_scope.value,
-                "Populatie": outcome.populatie,
+                "Gaat over": outcome.populatie,
                 "Bevindingen": len(per_check.get(outcome.check_id, [])),
                 "Typering onbetrouwbaar": sum(
                     1
@@ -1101,7 +1116,7 @@ def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.Dat
             "Dimensie",
             "Bekeken",
             "Bekeken scope",
-            "Populatie",
+            "Gaat over",
             "Bevindingen",
             "Typering onbetrouwbaar",
             "Skelet",
