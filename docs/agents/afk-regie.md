@@ -16,6 +16,14 @@ de bron van de punten die hier zijn aangescherpt.
 - **Werk op `dev`, nooit op `main`.** Commit na elke groene stap.
 - Lees vooraf één keer: `CLAUDE.md`, `docs/architectuur.md` (het deel dat het issue raakt) en
   `docs/agents/analyse-harness.md` (voor de metingen en de dataset-API).
+- **Auto-mode blokkeert een paar schrijfacties.** In een unattended run weigert de
+  auto-mode-classifier `gh repo create` en `gh issue create` ("Blocked by classifier"), en soms
+  de eerste agent-dispatch (die lukt bij herhaling). Op 26-08 kostte dat drie geweigerde calls
+  plus een auteur-tussenkomst. Verwacht het: stage de body/args in een scratchbestand en laat de
+  auteur de call als `! gh issue create …` draaien, of doe het buiten de regie om. Een nieuwe
+  publieke repo pushen struikelt bovendien over GH007 (privé-e-mail): zet eerst
+  `git config user.email <id>+mcolee@users.noreply.github.com` en `git commit --amend --reset-author`
+  (dat herschrijft de SHA, dus verifieer de historie opnieuw).
 - **Volg `CLAUDE.md` strikt.** Bij twijfel wint `CLAUDE.md` boven deze brief.
 - **Gebruik de superpowers-skills expliciet.** Fable stuurt via `superpowers:executing-plans`
   en `superpowers:subagent-driven-development`; elke implementer draait
