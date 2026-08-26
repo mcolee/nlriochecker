@@ -24,13 +24,13 @@ Draaien: `uv run python scripts/analyse_systemisch_minimum.py`
 from pathlib import Path
 
 import geopandas as gpd
+from gwsw_orox_helpers.cache import laad_met_cache
+from gwsw_orox_helpers.dataset import markeer_vulwaarden
 from shapely import unary_union
 
 from nlriochecker.afbakening import bouw_analyseset
-from nlriochecker.cache import laad_met_cache
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.dataset import markeer_vulwaarden
 from nlriochecker.studiegebied import StudyArea
 from nlriochecker.uitvoer.melding import _is_systemisch
 

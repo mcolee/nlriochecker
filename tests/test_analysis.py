@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
+from gwsw_orox_helpers.errors import DatasetError
 
 from nlriochecker.analysis import analyze, analyze_report
-from nlriochecker.dataset import load_dataset
-from nlriochecker.errors import DatasetError
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.shaclrapport import lees_shacl_rapport
 
@@ -49,7 +49,7 @@ def test_typeringspoort_met_dataset(mini_mdsplan_shacl: Path, tmp_path: Path) ->
     bron += "\n:PutB rdf:type gwsw:Overstortput .\ngwsw:Overstortput rdfs:subClassOf gwsw:Put .\n"
     pad = tmp_path / "met_overstortput.ttl"
     pad.write_text(bron, encoding="utf-8")
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
 
     poort = analyze_report(lees_shacl_rapport(mini_mdsplan_shacl), dataset).typing_gate
 
@@ -92,7 +92,7 @@ def test_typeringspoort_noemt_een_verbindingsklasse_onbeoordeelbaar(
     onbeoordeelbaar opzij -- de andere klassen worden gewoon gewogen.
     """
     rapport = meting_met_verbindingsklasse(mini_mdsplan_shacl, tmp_path / "verbinding.csv")
-    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"))
+    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"), [])
 
     poort = analyze_report(lees_shacl_rapport(rapport), dataset).typing_gate
 
@@ -137,7 +137,7 @@ def test_typeringspoort_noemt_een_stelselklasse_zonder_objecten_onbeoordeelbaar(
     `[]` op terug. Zonder deze tak scoort de poort er nul te globale objecten voor
     zonder een woord, terwijl de dataset de stelsels wel bevat.
     """
-    dataset = load_dataset(_met_stelsel(tmp_path / "met_stelsel.ttl", "Vuilwaterstelsel"))
+    dataset = load_dataset(_met_stelsel(tmp_path / "met_stelsel.ttl", "Vuilwaterstelsel"), [])
 
     poort = analyze_report(lees_shacl_rapport(mini_mdsplan_shacl), dataset).typing_gate
 
@@ -157,7 +157,7 @@ def test_een_klasse_die_niet_voorkomt_is_geen_onbeoordeelbare_klasse(
     kijken, dan zou elke te globale klasse die in deze dataset niet voorkomt als
     onbeoordeelbaar in het rapport komen, en dat leest als een gat dat er niet is.
     """
-    dataset = load_dataset(_met_stelsel(tmp_path / "zonder_stelsel.ttl"))
+    dataset = load_dataset(_met_stelsel(tmp_path / "zonder_stelsel.ttl"), [])
 
     poort = analyze_report(lees_shacl_rapport(mini_mdsplan_shacl), dataset).typing_gate
 

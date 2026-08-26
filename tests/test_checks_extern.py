@@ -15,12 +15,12 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import LineString, box
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
-from nlriochecker.dataset import load_dataset
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
@@ -70,7 +70,7 @@ def uitkomst(
     bestand: Path = SCENARIO,
 ) -> CheckOutcome:
     """Draait een enkele check op de scenariofixture."""
-    dataset = load_dataset(bestand)
+    dataset = load_dataset(bestand, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
     return run_checks(context, [check_id]).outcomes[0]
 
@@ -162,7 +162,7 @@ def test_nodata_cellen_worden_gemeld(config: CheckConfig, bronnen: ExternalData)
 def test_typeringspoort_haalt_objecten_uit_de_uitslag(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     verdacht = next(uri for uri, node in dataset.nodes.items() if node.label == "C")
     context = CheckContext(
         dataset=dataset,
@@ -206,7 +206,7 @@ def test_de_twee_kruisingschecks_delen_een_populatie(
     besluit en geen onmogelijkheid -- dan zou de check die het eerst draait de lijst van
     de ander bepalen, zonder uitzondering en met de verkeerde uitslag.
     """
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
     ext002 = REGISTRY["EXT-002"]()
     ext003 = REGISTRY["EXT-003"]()
@@ -239,7 +239,7 @@ def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
     die van streng 6. Een assertie op zijn eigen label zou dat dus missen; deze kijkt
     daarom ook in de meldingsteksten.
     """
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     resultaat = run_checks(CheckContext(dataset=dataset, config=config))
     betrokken = [
         (outcome.check_id, finding.message)
@@ -426,7 +426,7 @@ def test_ext001_wijst_het_geraakte_pand_aan(config: CheckConfig, bronnen: Extern
 def test_ext001_registreert_de_treffer_met_geometrie(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-001"])
@@ -441,7 +441,7 @@ def test_ext001_registreert_de_treffer_met_geometrie(
 
 def test_ext001_bewaart_de_afstand_per_melding(config: CheckConfig, bronnen: ExternalData) -> None:
     """`Melding` draagt de afstand niet; de laag haalt hem uit het register."""
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-001"])
@@ -482,7 +482,7 @@ def test_ext002_registreert_zijn_treffer(config: CheckConfig, bronnen: ExternalD
     een geregistreerde zinker of duiker -- een vlak in de laag `vlakken`, en deelt een
     waterdeel dat beide checks raken één sleutel met EXT-003.
     """
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-002"])
@@ -568,7 +568,7 @@ def test_een_streng_meldt_elk_doorkruist_waterdeel(
     streng: die beperking was in BO-17 nog geaccepteerd en is met BO-43 vervallen. Met
     één kandidaat-waterdeel per streng zou het verschil onzichtbaar blijven.
     """
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-003"])
@@ -594,7 +594,7 @@ def test_ext002_geeft_elke_doorkruising_een_eigen_melding_id(
     streng 9 dezelfde ingredienten en het volgnummer-vangnet sloeg aan -- een ID die van
     de verwerkingsvolgorde afhangt. Het doorkruiste waterdeel is nu het tweede object.
     """
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     with caplog.at_level(logging.WARNING, logger="nlriochecker.uitvoer.melding"):

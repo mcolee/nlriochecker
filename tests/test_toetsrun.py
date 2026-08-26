@@ -75,9 +75,9 @@ def toets(tmp_path: Path, bestand: str, **velden) -> Toetsuitslag:
     """Draait een toets op een fixture, met de uitvoer in `tmp_path`.
 
     De fixtures declareren hun eigen klassenhierarchie en hebben dus geen
-    ontologiebestand nodig; `voer_toets_uit` wil die keuze wel expliciet horen, dus
-    staat `geen_ontologie` standaard aan. Een test die een ontologie meegeeft
-    overschrijft hem.
+    ontologiebestand nodig; zonder vlag zou de lader de gebundelde GWSW-ontologie
+    parsen en die inline hierarchie overrulen. Daarom staat `geen_ontologie` hier
+    standaard aan. Een test die een ontologie meegeeft overschrijft hem.
     """
     velden.setdefault("geen_ontologie", True)
     opdracht = Toetsopdracht(
@@ -581,46 +581,49 @@ class TestNulmetingInDeMeldingen:
         assert len(gelezen) == 1
 
 
-class TestOntologiepoort:
-    """`toets` weigert een run zonder klassenhierarchie, tenzij erom gevraagd wordt."""
+class TestOntologiekeuze:
+    """Welke klassenhierarchie een run krijgt: de gebundelde, een eigen, of geen."""
 
-    def test_zonder_ontologie_weigert_de_run(self, tmp_path: Path) -> None:
-        """De melding zegt wat er misgaat en wat de gebruiker kan doen.
+    def test_zonder_vlag_draait_de_run_op_de_gebundelde_ontologie(self, tmp_path: Path) -> None:
+        """De standaardweg sinds de leeslaag haar eigen ontologie meelevert.
 
-        Zonder ontologie typeert de OroX-export niets op wortelniveau en draaien de
-        checks over een onvolledige selectie, zonder dat het rapport dat zei. Stilte
-        leest als "alles gecontroleerd", dus dit is een fout en geen stille overslag.
+        Tot die verhuizing weigerde `voer_toets_uit` een run zonder `--ontologie`:
+        zonder klassenhierarchie draaien de checks over een onvolledige selectie en
+        draagt hun uitkomst geen oordeel. Die weigering is nu overbodig -- geen vlag
+        betekent de gebundelde GWSW-ontologie 1.6 -- en dit is de vervangende belofte:
+        de run loopt door en het rapport noemt de ontologie waarop hij draaide.
         """
-        with pytest.raises(OpdrachtError) as fout:
-            voer_toets_uit(
-                Toetsopdracht(
-                    dataset_pad=TTL_DIR / "schoon.ttl",
-                    uitvoermap=tmp_path / "uitvoer",
-                    cachemap=tmp_path / "cache",
-                )
+        uitslag = voer_toets_uit(
+            Toetsopdracht(
+                dataset_pad=TTL_DIR / "schoon.ttl",
+                uitvoermap=tmp_path / "uitvoer",
+                check_ids=("TOP-001",),
+                met_geopackage=False,
+                cachemap=tmp_path / "cache",
             )
+        )
 
-        boodschap = str(fout.value)
-        assert "--ontologie" in boodschap and "--geen-ontologie" in boodschap
-        assert "onvolledige selectie" in boodschap
+        assert [pad.name for pad in uitslag.dataset.ontologies] == ["Ontologie_GWSW_Totaal.ttl"]
+        assert uitslag.dataset.klassenhierarchie_bekend is True
+        markdown = uitslag.uitvoer.per_gebied[""].markdown.read_text(encoding="utf-8")
+        assert "Ontologie_GWSW_Totaal.ttl" in markdown
+        assert GEEN_KLASSENHIERARCHIE not in markdown
 
-    def test_de_weigering_komt_voor_het_laden(self, tmp_path: Path) -> None:
-        """Laden kost op De Wolden en Hoogeveen ruim drie minuten; deze weigering is gratis.
+    def test_een_eigen_pad_gaat_voor_op_de_ontsnappingsvlag(self, tmp_path: Path) -> None:
+        """Wie een pad noemt wil precies die hierarchie, ook naast `--geen-ontologie`.
 
-        Aangetoond met een dataset die niet te parsen is: kwam de poort na het laden,
-        dan stond hier de foutmelding van de parser.
+        De drie toestanden van `_ontologiekeuze` zijn niet uitwisselbaar en de
+        voorrangsregel is de enige plek waar twee vlaggen elkaar kunnen tegenspreken.
         """
-        stuk = tmp_path / "stuk.ttl"
-        stuk.write_text("dit is <geen turtle", encoding="utf-8")
+        uitslag = toets(
+            tmp_path,
+            "schoon.ttl",
+            check_ids=("TOP-001",),
+            ontologieen=(TTL_DIR / "schoon.ttl",),
+            geen_ontologie=True,
+        )
 
-        with pytest.raises(OpdrachtError, match="--geen-ontologie"):
-            voer_toets_uit(
-                Toetsopdracht(
-                    dataset_pad=stuk,
-                    uitvoermap=tmp_path / "uitvoer",
-                    cachemap=tmp_path / "cache",
-                )
-            )
+        assert [pad.name for pad in uitslag.dataset.ontologies] == ["schoon.ttl"]
 
     def test_met_ontologie_loopt_de_run_gewoon_door(self, tmp_path: Path) -> None:
         """De vlag is niet nodig zodra er een ontologie meekomt."""

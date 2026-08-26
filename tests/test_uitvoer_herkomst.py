@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker import __version__
 from nlriochecker.analysis import MetingAnalysis, analyze
@@ -29,7 +30,6 @@ from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import assess_coverage
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.reporting import (
     FILE_COMPARISON_CSV,
@@ -106,9 +106,6 @@ MAG_ZELF_SCHRIJVEN = {
     # heen. Hij draagt zijn herkomst in het veld `gereedschap` van `gwsw_run`, en
     # `test_geopackage_runtabel_noemt_het_gereedschap` bewaakt dat.
     "nlriochecker/uitvoer/gpkg.py",
-    # Schrijft de datasetcache, geen uitvoer voor een lezer. De cachesleutel draagt
-    # de broncode van de lader, dus een cache van een andere versie wordt genegeerd.
-    "nlriochecker/cache.py",
 }
 
 MARKDOWN_BESTANDEN = {
@@ -137,7 +134,7 @@ def toets() -> CheckRun:
     """Een toetsrun met ten minste een bevinding, zodat de CSV rijen krijgt."""
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl")
+    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl", [])
     return run_checks(CheckContext(dataset=dataset, config=config))
 
 

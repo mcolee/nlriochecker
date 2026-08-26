@@ -13,9 +13,10 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.bevindingen import _omvang_section, meldingen_json
 from nlriochecker.uitvoer.melding import (
     BRON_DATASET,
@@ -98,7 +99,7 @@ def _run(tmp_path: Path, weglaten: set[str]) -> CheckRun:
     """Een run over een fixture met alle klassen behalve de weggelaten."""
     pad = tmp_path / "klassen.ttl"
     pad.write_text(_maak_ttl(ALLE_KLASSEN - weglaten), encoding="utf-8")
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     config = load_check_config()
     return CheckRun(
         dataset=dataset,
@@ -251,7 +252,7 @@ class TestKoppelingsherstel:
     def _run(self) -> CheckRun:
         config = load_check_config()
         config.drempels.rd_y_min = 0.0
-        dataset = load_dataset(TTL_DIR / "dataset_fantoomkoppeling.ttl")
+        dataset = load_dataset(TTL_DIR / "dataset_fantoomkoppeling.ttl", [])
         return run_checks(CheckContext(dataset=dataset, config=config), ["TOP-001"])
 
     def test_herstelde_koppelingen_geven_een_systemische_waarschuwing(self) -> None:

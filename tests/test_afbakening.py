@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from nlriochecker.afbakening import (
     _component,
     bouw_analyseset,
@@ -16,7 +18,6 @@ from nlriochecker.afbakening import (
 )
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, Scope, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.studiegebied import load_study_area
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -31,7 +32,7 @@ def _labels(dataset, uris) -> set[str]:
 
 def _opzet():
     """De fixture, het gebied en de config."""
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -92,7 +93,7 @@ def test_de_schil_haalt_de_route_door_het_persnet_erbij() -> None:
     buiten de contextbuffer van 50 m, zodat het alleen via de mechanische kanten mee
     kan komen. De tweede helft is de controle: zonder schil slaat NET-001 wel aan.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_persnet.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_persnet.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -119,7 +120,7 @@ def test_de_buffer_haalt_ongekoppelde_buren_erbij() -> None:
     context_buffer_m = 60 (H ligt 5 meter buiten het gebied) hoort hij erbij, met
     context_buffer_m = 0 juist niet.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_buffer_los_object.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_buffer_los_object.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -143,7 +144,7 @@ def test_streng_via_compartiment_zonder_geometrie_houdt_haar_netwerkverband() ->
     `resolve_network_node` gaf op de uitgedunde dataset dan None terug in plaats
     van put A -- de streng zou ten onrechte als niet aangesloten tellen.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_compartiment_zonder_geometrie.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_compartiment_zonder_geometrie.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -172,7 +173,7 @@ def test_evenwijdige_strengen_vallen_geen_van_beide_buiten_de_schil() -> None:
     stilzwijgend buiten de analyseset, terwijl allebei in dezelfde component zitten
     als de kern (put A).
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_parallelle_strengen.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_parallelle_strengen.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -189,7 +190,7 @@ def test_streng_met_los_uiteinde_telt_mee_maar_verdwijnt_niet_ongemerkt() -> Non
     checks/netwerk.py, die hem in `unconnected` zet), maar het aantal moet
     zichtbaar blijven in plaats van stilzwijgend te verdwijnen.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_los_uiteinde.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_los_uiteinde.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0

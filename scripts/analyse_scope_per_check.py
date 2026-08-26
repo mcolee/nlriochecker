@@ -16,7 +16,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from nlriochecker.cache import laad_met_cache
+from gwsw_orox_helpers.cache import laad_met_cache
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.meting import Meetbereik
 from nlriochecker.studiegebied import Studiegebieden, load_studiegebieden

@@ -57,7 +57,13 @@ jobs:
       # is: tests/test_gwsw_vocabulaire.py sloeg hier eerst 140 van zijn 142 gevallen
       # over en draait nu op een na volledig mee. Die ene is de drifttest, die de
       # ontologie zelf nodig heeft.
-      NLRIOCHECKER_MIN_GESLAAGD: "1200"
+      #
+      # Gemeten 2026-08-26 met `uv run python scripts/runnerpoort.py` (de conditie van
+      # deze runner) na de verhuizing van de leeslaag naar gwsw-orox-helpers: 1695
+      # geslaagd, 21 overgeslagen. De negen verhuisde testbestanden vielen weg en de
+      # ontologie en de vocabulaire-index komen nu als package-resource mee, dus de
+      # index-overslagen zijn er ook af. 1670 houdt daar een marge van 25 onder.
+      NLRIOCHECKER_MIN_GESLAAGD: "1670"
       # Overslagen worden niet geteld maar op reden geclassificeerd (BO-48). Een telgrens
       # (`NLRIOCHECKER_MAX_OVERGESLAGEN`, 50 → 57 → 65) telde ook de bedoelde, datagebonden
       # overslagen mee -- de ontologie, het Juinen-voorbeeld en de SHACL-rapporten staan

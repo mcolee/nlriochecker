@@ -20,6 +20,7 @@ import inspect
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import selectie
@@ -32,7 +33,6 @@ from nlriochecker.checks.selectie import (
     putten,
     vrijvervalrioolleidingen,
 )
-from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -40,7 +40,7 @@ TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 @pytest.fixture(scope="module")
 def rollenset() -> GwswDataset:
     """De fixture met precies een object per rol."""
-    return load_dataset(TTL_DIR / "selectie_rollen.ttl")
+    return load_dataset(TTL_DIR / "selectie_rollen.ttl", [])
 
 
 def context_van(dataset: GwswDataset) -> CheckContext:

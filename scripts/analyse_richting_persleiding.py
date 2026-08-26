@@ -32,7 +32,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from nlriochecker.cache import laad_met_cache
+from gwsw_orox_helpers.cache import laad_met_cache
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun
 from nlriochecker.checks.selectie import mechanischeleidingen

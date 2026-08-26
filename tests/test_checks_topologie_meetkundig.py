@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import Point
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, Finding, run_checks
-from nlriochecker.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -47,7 +47,7 @@ def fixtureconfig() -> CheckConfig:
 
 def bevindingen(pad: Path, check_id: str, config: CheckConfig | None = None) -> list[Finding]:
     """Draait een enkele check op een fixture."""
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=config or fixtureconfig())
     return run_checks(context, [check_id]).outcomes[0].findings
 
@@ -119,7 +119,7 @@ def test_top009_buiten_het_standaard_rd_bereik() -> None:
 
 
 def test_top009_meldt_ook_wat_er_niet_getoetst_is() -> None:
-    dataset = load_dataset(TTL_DIR / "top009_buiten_rd.ttl")
+    dataset = load_dataset(TTL_DIR / "top009_buiten_rd.ttl", [])
     context = CheckContext(dataset=dataset, config=fixtureconfig())
     outcome = run_checks(context, ["TOP-009"]).outcomes[0]
 
@@ -157,7 +157,7 @@ def test_top019_draait_niet_zonder_functieloze_klassen() -> None:
     config = fixtureconfig()
     config.klassen.functieloze_knoop = []
 
-    dataset = load_dataset(TTL_DIR / "top019_pseudoknoop.ttl")
+    dataset = load_dataset(TTL_DIR / "top019_pseudoknoop.ttl", [])
     context = CheckContext(dataset=dataset, config=config)
     outcome = run_checks(context, ["TOP-019"]).outcomes[0]
 
@@ -199,7 +199,7 @@ def test_paarmeldingen_dragen_het_tweede_object() -> None:
 
 def _dataset_en_bevindingen(bestand: str, check_id: str):
     """De dataset plus de bevindingen van een check erop."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=fixtureconfig())
     return dataset, run_checks(context, [check_id]).outcomes[0].findings
 

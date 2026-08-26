@@ -21,7 +21,7 @@ Twee vragen worden hier streng gescheiden gehouden:
 Een klasse die wel bestaat maar nul instanties heeft, verandert op deze dataset
 niets -- en dat is precies de vraag die dit script beantwoordt.
 
-**Waarom een eigen parser en niet `nlriochecker.dataset.load_dataset`.** De export
+**Waarom een eigen parser en niet `gwsw_orox_helpers.dataset.load_dataset`.** De export
 is 112 MB; rdflib heeft er ruim drie minuten en circa 3 GB voor nodig. De export is
 regelgeoriënteerd en volstrekt regelmatig (elk subject op een eigen regel, elk
 predicaat op een ingesprongen regel), dus een gerichte scan volstaat en kost acht
@@ -701,8 +701,8 @@ def _controleer_parser(
     de hele meting draagt. Geeft het gescande uittreksel terug zodat de beller die
     dekking kan afdrukken zodra ook de volledige scan klaar is.
     """
-    _kop("CONTROLE -- regelscan tegen nlriochecker.dataset.load_dataset")
-    from nlriochecker.dataset import load_dataset
+    _kop("CONTROLE -- regelscan tegen gwsw_orox_helpers.dataset.load_dataset")
+    from gwsw_orox_helpers.dataset import load_dataset
 
     with tempfile.TemporaryDirectory(prefix="issue32-") as tijdelijk:
         pad = _uittreksel(EXPORT, vensters, Path(tijdelijk))

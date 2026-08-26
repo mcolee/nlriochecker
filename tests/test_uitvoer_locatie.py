@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from nlriochecker.checks import Dimension, Finding, Severity
-from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.locatie import foutlocatie
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -18,7 +19,7 @@ TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
 def _dataset():
     """De schone fixture: put A op (1000, 2000), put B op (1050, 2000), streng 1 ertussen."""
-    return load_dataset(TTL_DIR / "schoon.ttl")
+    return load_dataset(TTL_DIR / "schoon.ttl", [])
 
 
 def _bevinding(uri: str, **kenmerken) -> Finding:
@@ -87,7 +88,7 @@ def test_onverwachte_geometrie_levert_toch_een_punt() -> None:
     struikelt, verdwijnt de melding waar hij het hardst nodig is. De fixture
     top016_ongeldige_geometrie.ttl bevat een object met een vlakgeometrie.
     """
-    dataset = load_dataset(TTL_DIR / "top016_ongeldige_geometrie.ttl")
+    dataset = load_dataset(TTL_DIR / "top016_ongeldige_geometrie.ttl", [])
     uri, conduit = next(
         (uri, conduit)
         for uri, conduit in dataset.conduits.items()

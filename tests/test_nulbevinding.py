@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
-from nlriochecker.dataset import GwswDataset, load_dataset
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 
@@ -19,7 +19,7 @@ DREMPEL = 0.80
 @pytest.fixture
 def joinset() -> GwswDataset:
     """De dataset waarop de focusnodes van de join-fixtures uitkomen."""
-    return load_dataset(TTL_DIR / "nulmeting_join.ttl")
+    return load_dataset(TTL_DIR / "nulmeting_join.ttl", [])
 
 
 @pytest.fixture

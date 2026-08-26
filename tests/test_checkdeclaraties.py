@@ -18,11 +18,11 @@ ontologietest lost ze op.
 from __future__ import annotations
 
 import pytest
+from gwsw_orox_helpers.dataset import Conduit, Node
 
 import nlriochecker.checks  # noqa: F401  (vult de registry)
 from checkdeclaratie_analyse import DERIVED_PROPS, analyseer_alle_checks
 from nlriochecker.checks.base import REGISTRY, Check, Dimension, Severity, SkeletonCheck, register
-from nlriochecker.dataset import Conduit, Node
 
 # De eigenschappen van `Node`/`Conduit` die geen GWSW-kenmerk lezen maar de geometrie: de
 # z-waarde uit de GML-lijn. Ze horen daarom niet in `DERIVED_PROPS`.

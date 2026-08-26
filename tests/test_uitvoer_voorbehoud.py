@@ -15,10 +15,10 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik
 from nlriochecker.uitvoer.samenvatting import NIET_GEMETEN, REGEL_EIGEN_CHECKS, VINKJE
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
@@ -39,7 +39,7 @@ def toets() -> CheckRun:
     """Een gewone toetsrun op een fixture die haar eigen klassenhierarchie draagt."""
     return run_checks(
         CheckContext(
-            dataset=load_dataset(TTL_DIR / "top001_losliggende_put.ttl"),
+            dataset=load_dataset(TTL_DIR / "top001_losliggende_put.ttl", []),
             config=load_check_config(),
         )
     )

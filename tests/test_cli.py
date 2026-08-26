@@ -943,8 +943,8 @@ def test_toets_met_ontologie_gebruikt_de_klassenhierarchie(tmp_path: Path) -> No
     ontologie de *enige* bron van de hierarchie is. Dat de bare dataset toch twee
     knooppunten en een streng oplevert -- in plaats van nul -- bewijst dat de
     hierarchie uit `--ontologie` daadwerkelijk gebruikt is, niet enkel geaccepteerd.
-    Zou de doorgifte breken, dan weigert `_eis_ontologie` de run (geen ontologie,
-    geen `--geen-ontologie`) en valt de exitcode op 1.
+    Zou de doorgifte breken, dan valt de run terug op de gebundelde ontologie en
+    noemt het rapport die in plaats van `schoon.ttl`.
     """
     bron = (TTL_DIR / "schoon.ttl").read_text(encoding="utf-8").splitlines()
     kaal = tmp_path / "kaal.ttl"
@@ -978,24 +978,33 @@ def test_toets_met_ontologie_gebruikt_de_klassenhierarchie(tmp_path: Path) -> No
     assert "geen ontologie geladen" not in rapport
 
 
-def test_toets_zonder_ontologie_faalt(tmp_path: Path) -> None:
-    """De standaardweg: geen --ontologie en geen --geen-ontologie is een fout.
+def test_toets_zonder_ontologie_draait_op_de_gebundelde(tmp_path: Path) -> None:
+    """De standaardweg over de opdrachtregel: geen vlag is geen fout meer.
 
-    Click mag hem niet zelf afvangen met `required=True`: dan verdwijnt de
-    ontsnappingsvlag en krijgt de gebruiker clicks eigen melding in plaats van een
-    die uitlegt wat er misgaat.
+    Tot de leeslaag haar eigen ontologie meebracht was dit een weigering met
+    exitcode 1 -- `--ontologie` was verplicht en `--geen-ontologie` de enige
+    ontsnapping. Nu levert dezelfde aanroep een geslaagde run op de gebundelde
+    GWSW-ontologie, en het rapport noemt haar bij naam in plaats van een
+    voorbehoud te dragen.
     """
+    uitvoer = tmp_path / "uitvoer"
+
     resultaat = CliRunner().invoke(
         main,
         [
             "toets",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
+            "--check",
+            "TOP-001",
             "--output",
-            str(tmp_path / "uitvoer"),
+            str(uitvoer),
+            "--uitvoer",
+            "csv",
         ],
     )
 
-    assert resultaat.exit_code == 1
-    assert "--geen-ontologie" in resultaat.output
-    assert not (tmp_path / "uitvoer").exists()
+    assert resultaat.exit_code == 0, resultaat.output
+    rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert "Klassenhierarchie uit `Ontologie_GWSW_Totaal.ttl`." in rapport
+    assert "geen ontologie geladen" not in rapport

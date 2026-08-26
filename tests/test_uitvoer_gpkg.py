@@ -16,13 +16,13 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import box
 
 from gpkghelper import schrijf_vlakken
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, Severity, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik
@@ -60,7 +60,7 @@ def _config() -> CheckConfig:
 
 def _run(bestand: str, *check_ids: str) -> CheckRun:
     """Draait checks op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=_config())
     return run_checks(context, list(check_ids) or None)
 
@@ -305,7 +305,7 @@ def test_zonder_analyseset_blijven_de_kolommen_leeg(tmp_path: Path) -> None:
 
 
 def test_de_analyseset_omvang_staat_in_de_runmetadata(tmp_path: Path) -> None:
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = _config()
     analyseset = bouw_analyseset(dataset, area, config)
@@ -658,7 +658,7 @@ def _ext_bronnen() -> ExternalData:
 
 def _ext_run() -> CheckRun:
     """Een run met de EXT-checks op de scenariofixture."""
-    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl")
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl", [])
     context = CheckContext(dataset=dataset, config=_config(), bronnen=_ext_bronnen())
     return run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
 
@@ -786,7 +786,7 @@ def _bronnen_met_pand(
 
 def _run_met_bronnen(bronnen: ExternalData, *check_ids: str) -> CheckRun:
     """Draait checks op de EXT-scenariofixture met eigen bronnen."""
-    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl")
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl", [])
     context = CheckContext(dataset=dataset, config=_config(), bronnen=bronnen)
     return run_checks(context, list(check_ids))
 
@@ -966,7 +966,7 @@ class TestStatusEnPopup:
         )
 
         met = _schrijf(_run("schoon.ttl"), tmp_path / "met")
-        zonder = load_dataset(kaal)
+        zonder = load_dataset(kaal, [])
         assert zonder.klassenhierarchie_bekend is False
         pad = _schrijf(
             run_checks(CheckContext(dataset=zonder, config=_config())), tmp_path / "zonder"
@@ -1054,7 +1054,7 @@ class TestStatusEnPopup:
             Path(__file__).parent / "fixtures" / "gis" / "buurt_noord.gpkg"
         )
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -1265,7 +1265,7 @@ def _run_onderdrukt(klassen: Sequence[str], checks: Sequence[str] = ()) -> Check
     config = _config()
     config.rapport.onderdruk_klassen = list(klassen)
     config.rapport.onderdruk_checks = list(checks)
-    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl")
+    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
     return replace(run, nulbevindingen=(_nulbevinding_op_de_persleiding(),))
 

@@ -6,12 +6,12 @@ from pathlib import Path
 
 import networkx as nx
 import pytest
+from gwsw_orox_helpers.dataset import GWSW, load_dataset
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.netwerk import KringloopInNetwerk
 from nlriochecker.checks.verbanden import _netwerk, deelstelsel_ids, verbonden_knopen
-from nlriochecker.dataset import GWSW, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 NET_IDS = ["NET-001", "NET-002", "NET-004", "NET-007"]
@@ -19,7 +19,7 @@ NET_IDS = ["NET-001", "NET-002", "NET-004", "NET-007"]
 
 def _outcome(bestand: str, check_id: str, config: CheckConfig | None = None) -> CheckOutcome:
     """Draait een enkele check op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=config or load_check_config())
     return run_checks(context, [check_id]).outcomes[0]
 
@@ -53,7 +53,7 @@ def test_net001_accepteert_een_overnamepunt_op_de_orientatie(tmp_path: Path) -> 
     lijst hierboven ook groen zijn als de klasse nooit werd opgezocht.
     """
     bestand = "net001_overnamepunt.ttl"
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
 
     # De klasse wordt op de orientatie van put B gevonden, niet op put B zelf.
     knoop = dataset.nodes["http://example.org/toets#PutB"]
@@ -83,7 +83,7 @@ def test_losse_overnamepuntorientatie_verdwijnt_uit_de_netwerkanalyse() -> None:
     netwerkanalyse valt: geen herleidbare put aan beide zijden. Alleen de notitie
     van de check telt haar nog.
     """
-    dataset = load_dataset(TTL_DIR / "net001_overnamepunt.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_overnamepunt.ttl", [])
     assert "http://example.org/toets#LosOvp_ori" not in dataset.nodes
 
     outcome = _outcome("net001_overnamepunt.ttl", "NET-001")
@@ -141,7 +141,7 @@ def test_net004_noemt_dezelfde_streng_ongeacht_de_invoervolgorde(bestand: str) -
     """Twee parallelle strengen op de kring: de melding hangt aan een streng die echt op
     de kant kring[0] -> kring[1] ligt, en aan dezelfde streng ongeacht de volgorde waarin
     de export ze declareert. Anders verschuift de melding-ID tussen twee exports."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     bevindingen = run_checks(context, ["NET-004"]).outcomes[0].findings
 
@@ -260,7 +260,7 @@ def test_drukriolering_bereikt_het_gemaal_door_het_hulpstuk(tmp_path: Path) -> N
     """
     bestand = "net001_drukriolering_gemaal.ttl"
     config = _testconfig(tmp_path, "druk_gemaal", _DRUKRIOLERING_KLASSEN)
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
 
     assert (
         dataset.resolve_network_node("http://example.org/toets#T1", config.klassen.netwerkknopen)
@@ -373,7 +373,7 @@ def test_notitie_meldt_strengen_die_tegen_de_bob_in_lopen(tmp_path: Path) -> Non
     pad = tmp_path / "bob.ttl"
     pad.write_text(bron, encoding="utf-8")
 
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     outcome = run_checks(context, ["NET-001"]).outcomes[0]
 
@@ -428,7 +428,7 @@ def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> Non
 
 def _labels_op(pad: Path, check_id: str, config: CheckConfig | None) -> list[str]:
     """Draait een check op een pad buiten de fixturemap."""
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=config or load_check_config())
     outcome = run_checks(context, [check_id]).outcomes[0]
     return sorted(finding.object_label for finding in outcome.findings)
@@ -456,7 +456,7 @@ def test_orientatie_aspecten_zijn_geen_knoop_in_de_netwerkgraaf() -> None:
     Deze test legt dat vast, zodat een latere wijziging in `_read_nodes()` niet
     stilzwijgend aspecten de graaf in laat lopen.
     """
-    dataset = load_dataset(TTL_DIR / "net001_bouwwerk_eindknoop.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_bouwwerk_eindknoop.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
 
     graaf = _netwerk(context).graph
@@ -473,7 +473,7 @@ def test_deelstelsel_ids_delen_een_id_binnen_hetzelfde_netwerkdeel() -> None:
 
     De fixture heeft twee losse delen: A-B-G rond het gemaal, en C-D daarbuiten.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
 
     ids = deelstelsel_ids(context)
@@ -489,7 +489,7 @@ def test_net001_draagt_het_deelstelsel_id_van_zijn_streng() -> None:
 
     Zonder ID op de bevinding is dat verband alleen uit de kaart af te leiden.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     ids = deelstelsel_ids(context)
     verwacht = next(cluster for uri, cluster in ids.items() if dataset.nodes[uri].label == "C")

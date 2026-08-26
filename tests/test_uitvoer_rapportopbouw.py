@@ -14,11 +14,11 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
+from gwsw_orox_helpers.dataset import load_dataset
 
 from helpers_melding import melding as _basismelding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 from nlriochecker.studiegebied import load_studiegebieden
@@ -45,7 +45,7 @@ def _config() -> CheckConfig:
 
 def _run(bestand: str, *check_ids: str) -> CheckRun:
     """Een run zonder studiegebied."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=_config())
     return run_checks(context, list(check_ids) or None)
 
@@ -53,7 +53,7 @@ def _run(bestand: str, *check_ids: str) -> CheckRun:
 def _met_nulmeting(bestand: str = "nulmeting_join.ttl") -> CheckRun:
     """Een gemeten run: de join-fixture met haar twee CFK-rapporten."""
     config = _config()
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     nulmeting = laad_nulmeting(
         [SHACL_DIR / "join_mdsplan.csv", SHACL_DIR / "join_mdsproj.csv"], CFKS, CFKS
     )
@@ -84,7 +84,7 @@ class TestTitel:
         """De lezer moet aan de titel zien waar het rapport over gaat."""
         gebieden = load_studiegebieden(GIS_DIR / "buurt_noord.gpkg")
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -97,7 +97,7 @@ class TestTitel:
     def test_de_totaalsynthese_heet_totaal(self, tmp_path: Path) -> None:
         gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -137,7 +137,7 @@ class TestAantallen:
         """De schil zit in de dataset van de run maar wordt niet gerapporteerd."""
         gebieden = load_studiegebieden(GIS_DIR / "buurt_noord.gpkg")
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -152,7 +152,7 @@ class TestAantallen:
     def test_het_rapport_noemt_de_schil_als_voetnoot(self, tmp_path: Path) -> None:
         gebieden = load_studiegebieden(GIS_DIR / "buurt_noord.gpkg")
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -267,7 +267,7 @@ class TestVerantwoordingBlijft:
     def test_de_verantwoording_noemt_nog_alles_wat_ze_noemde(self, tmp_path: Path) -> None:
         gebieden = load_studiegebieden(GIS_DIR / "buurt_noord.gpkg")
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -294,7 +294,7 @@ class TestOnderdrukking:
     def _run_onderdrukt(klassen: Sequence[str]) -> CheckRun:
         config = _config()
         config.rapport.onderdruk_klassen = list(klassen)
-        dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl")
+        dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl", [])
         run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
         return replace(
             run,
@@ -460,7 +460,7 @@ class TestSystemischGeneriek:
         config = _config()
         config.rapport.systemisch_drempel = 0.1
         config.rapport.systemisch_minimum_bekeken = 1
-        dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+        dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
         run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
 
         uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)

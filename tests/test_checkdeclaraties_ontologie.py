@@ -45,13 +45,15 @@ import json
 from functools import cache
 from pathlib import Path
 
+from gwsw_orox_helpers.bronnen import vocabulaire_index_pad
+
 import nlriochecker.checks  # noqa: F401  (vult de registry)
 from checkdeclaratie_analyse import _veld_naar_rol
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks.base import REGISTRY
 
 WORTEL = Path(__file__).resolve().parents[1]
-INDEXBESTAND = WORTEL / "data" / "gwsw-vocabulaire-index.json"
+INDEXBESTAND = vocabulaire_index_pad()
 CONFIGS = {
     "checks.toml": None,
     "dewoldenhoogeveen.toml": WORTEL / "configs" / "dewoldenhoogeveen.toml",

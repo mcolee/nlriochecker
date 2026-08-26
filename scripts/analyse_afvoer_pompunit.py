@@ -21,9 +21,9 @@ Draaien: `uv run python scripts/analyse_afvoer_pompunit.py`
 from pathlib import Path
 
 import geopandas as gpd
+from gwsw_orox_helpers.cache import laad_met_cache
 from shapely import unary_union
 
-from nlriochecker.cache import laad_met_cache
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext
 from nlriochecker.checks.selectie import mechanischeleidingen

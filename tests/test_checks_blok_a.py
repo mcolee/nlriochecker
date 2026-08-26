@@ -13,11 +13,11 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
 
 from nlriochecker.checkconfig import CheckConfig, VerhangStap, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
 from nlriochecker.plausibiliteit import load_plausibility
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -33,7 +33,7 @@ def fixtureconfig() -> CheckConfig:
 def context_voor(bestand: str, config: CheckConfig) -> CheckContext:
     """Laadt een fixture zoals `toetsrun` dat doet: met de vulwaarde-leesregel erop."""
     dataset = markeer_vulwaarden(
-        load_dataset(TTL_DIR / bestand),
+        load_dataset(TTL_DIR / bestand, []),
         config.vulwaarden.hoogte_kenmerken,
         config.vulwaarden.hoogte_band_m,
     )
@@ -276,7 +276,7 @@ def test_attr013_noemt_twee_kenmerken_elk_met_hun_eigen_waarde() -> None:
     tegenhanger -- dus die situatie wordt hier op de geladen dataset nagebootst.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl")
+    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl", [])
     put = next(node for node in ruw.nodes.values() if node.label == "C")
     nodes = dict(ruw.nodes)
     nodes[put.uri] = replace(
@@ -332,7 +332,7 @@ def test_attr013_telt_de_vulwaarden_buiten_haar_populatie() -> None:
     nagebootst: streng 1 en put A krijgen een klasse buiten de populatie.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl")
+    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl", [])
     streng = next(conduit for conduit in ruw.conduits.values() if conduit.label == "1")
     put = next(node for node in ruw.nodes.values() if node.label == "A")
     conduits = dict(ruw.conduits)
@@ -467,7 +467,7 @@ def test_attr016_verantwoordt_de_ronde_putten_zonder_maat() -> None:
     hier van zijn lengte ontdaan, zodat de verantwoordingsregel zichtbaar wordt.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr016_ronde_put_ongelijk.ttl")
+    ruw = load_dataset(TTL_DIR / "attr016_ronde_put_ongelijk.ttl", [])
     put = next(node for node in ruw.nodes.values() if node.label == "A")
     nodes = dict(ruw.nodes)
     nodes[put.uri] = replace(put, aspects=tuple(a for a in put.aspects if a.kind != "LengtePut"))
@@ -515,7 +515,7 @@ def test_attr017_verantwoordt_de_ongetoetste_leidingen() -> None:
     in de toelichting te staan; de PE-30-streng blijft de enige bevinding.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr017_wandruwheid_pe_betonwaarde.ttl")
+    ruw = load_dataset(TTL_DIR / "attr017_wandruwheid_pe_betonwaarde.ttl", [])
     conduits = dict(ruw.conduits)
     streng3 = next(c for c in ruw.conduits.values() if c.label == "3")
     conduits[streng3.uri] = replace(
@@ -699,7 +699,7 @@ def test_rvz006_meldt_per_gemengde_streng() -> None:
     outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
 
     assert labels(outcome) == ["1", "2"]
-    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl", [])
     assert all(bevinding.object_uri in dataset.conduits for bevinding in outcome.findings)
 
 
@@ -709,7 +709,7 @@ def test_rvz006_draagt_hetzelfde_deelstelsel_id_als_de_net_checks() -> None:
     Alleen met een gedeeld ID is in rapport en GIS te zien dat het om hetzelfde
     stuk net gaat; anders lijken twee gemengde strengen twee losse gebreken.
     """
-    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl", [])
     context = CheckContext(dataset=dataset, config=fixtureconfig())
     ids = deelstelsel_ids(context)
 
@@ -787,7 +787,7 @@ def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
     en de onbetrouwbare objecten; die zijn alle drie gebiedsonafhankelijk, dus mag
     hij over gebieden heen gedeeld worden.
     """
-    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    dataset = load_dataset(TTL_DIR / "schoon.ttl", [])
     config = load_check_config()
     gedeeld = CheckContext(
         dataset=dataset, config=config, volledige_dataset=dataset
@@ -812,7 +812,7 @@ def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
 
 def test_de_run_draagt_het_trefferregister_van_zijn_context() -> None:
     """De GeoPackage-schrijver joint de meldingen later op dit register."""
-    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    dataset = load_dataset(TTL_DIR / "schoon.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
 
     run = run_checks(context, ["TOP-001"])

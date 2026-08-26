@@ -58,9 +58,10 @@ _voeg_systeem_pyqgis_toe()
 
 qgis_core = pytest.importorskip("qgis.core", reason="PyQGIS is hier niet geinstalleerd")
 
+from gwsw_orox_helpers.dataset import load_dataset  # noqa: E402
+
 from nlriochecker.checkconfig import load_check_config  # noqa: E402
 from nlriochecker.checks import CheckContext, run_checks  # noqa: E402
-from nlriochecker.dataset import load_dataset  # noqa: E402
 from nlriochecker.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
 from nlriochecker.uitvoer.melding import bouw_meldingen  # noqa: E402
 
@@ -86,7 +87,7 @@ def geschreven_gpkg(tmp_path_factory) -> Path:
     """Een GeoPackage van de mechanische fixture, met alle vier de lagen."""
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl")
+    dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config))
     map_ = tmp_path_factory.mktemp("qgis")
     return schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), map_, RUNDATUM)

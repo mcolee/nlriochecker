@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, Finding, run_checks
-from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -26,7 +26,7 @@ TOP_IDS = [
 
 def _bevindingen(pad: Path, check_id: str, config: CheckConfig | None = None) -> list[Finding]:
     """Draait een enkele check op een fixture."""
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=config or load_check_config())
     return run_checks(context, [check_id]).outcomes[0].findings
 
@@ -160,7 +160,7 @@ def test_top023_meldt_een_t_stuk_met_vier_richtingen() -> None:
 
 def test_hulpstukchecks_verantwoorden_de_klassen_zonder_aantal() -> None:
     """Afsluitstuk A1 draagt geen functie met een aantal: buiten de toets, wel geteld."""
-    dataset = load_dataset(TTL_DIR / "top022_hulpstuk_te_weinig.ttl")
+    dataset = load_dataset(TTL_DIR / "top022_hulpstuk_te_weinig.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     outcome = run_checks(context, ["TOP-022"]).outcomes[0]
 

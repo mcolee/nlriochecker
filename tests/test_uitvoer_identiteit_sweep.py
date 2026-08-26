@@ -13,10 +13,10 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
-from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
 WORTEL = Path(__file__).resolve().parent.parent
@@ -37,7 +37,9 @@ def test_geen_enkele_fixture_levert_een_botsende_melding_id(caplog) -> None:
     botsingen: list[tuple[str, str]] = []
     with caplog.at_level(logging.WARNING, logger="nlriochecker.uitvoer.melding"):
         for pad in sorted(TTL_DIR.glob("*.ttl")):
-            dataset = load_dataset(pad)
+            # De sweep loopt over elke fixture, en `codering_cp850.ttl` is met opzet
+            # geen UTF-8; zonder terugvalcodering valt hij hier om.
+            dataset = load_dataset(pad, [], fallback_encoding=FALLBACK_ENCODING)
             run = run_checks(CheckContext(dataset=dataset, config=config))
             for melding in bouw_meldingen(run, RUNDATUM):
                 if "-" in melding.melding_id[16:]:

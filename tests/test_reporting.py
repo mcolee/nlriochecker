@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
@@ -17,7 +18,6 @@ from nlriochecker.checks import CheckContext, run_checks
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import assess_coverage
-from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import PipelineError, StudyAreaError
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.reporting import (
@@ -75,7 +75,7 @@ def test_samenvatting_noemt_een_onbeoordeelbare_verbindingsklasse(
     """
     hyd, mdsplan, mdsproj = shacl_drieluik
     aangepast = meting_met_verbindingsklasse(mdsplan, tmp_path / "verbinding.csv")
-    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"))
+    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"), [])
     meting = laad_nulmeting([hyd, aangepast, mdsproj], VEREIST)
 
     markdown_path, _ = write_reports(analyze(meting, dataset), tmp_path / "uitvoer")
@@ -135,7 +135,7 @@ def test_uitvoer_overschrijft_nooit_de_invoer(shacl_drieluik: list[Path], tmp_pa
 
 
 def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
-    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context, ["TOP-001"])
     assert len(run.findings) == 1
@@ -166,7 +166,7 @@ def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
 
 
 def test_checkrapport_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     gebied = load_study_area(
         Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
     )
@@ -202,7 +202,7 @@ def test_checkrapport_noemt_ook_een_via_config_aangewezen_check(tmp_path: Path) 
     """De opsomming moet ADM-002 (klasse-attribuut) en een via de config aangewezen
     check allebei noemen, gesorteerd, in plaats van alleen "ADM-002" hard te coderen.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     gebied = load_study_area(
         Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
     )
@@ -227,7 +227,7 @@ def test_checkrapport_noemt_ook_een_via_config_aangewezen_check(tmp_path: Path) 
 
 def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path: Path) -> None:
     """Zonder studiegebied is er geen analyseset en dus geen regel erover."""
-    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context, ["TOP-001"])
 
@@ -239,7 +239,7 @@ def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path:
 
 def test_checkrapport_meldt_strengen_zonder_netwerkverband(tmp_path: Path) -> None:
     """Wat de afbakening niet kon meewegen, hoort net zo goed in het rapport."""
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     gebied = load_study_area(
         Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
     )
@@ -268,7 +268,7 @@ def test_studiegebied_zonder_enig_object_faalt_hard() -> None:
     is een verkeerde laagkeuze of een verkeerd gebied, en dat hoort te knallen in
     plaats van als schone data te lezen.
     """
-    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context, ["TOP-001"])
 
@@ -288,7 +288,7 @@ def _fixtureconfig():
 
 def _checkrun(bestand: str, *check_ids: str, config=None):
     """Draait checks op een TTL-fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=config or _fixtureconfig())
     return run_checks(context, list(check_ids) or None)
 

@@ -14,11 +14,11 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import Point, box, mapping
 
 from gpkghelper import schrijf_buurten, schrijf_vlakken
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import load_external_data
 from nlriochecker.meting import Meetbereik
@@ -64,7 +64,7 @@ def _draai(
     """Draait de toetsloop op een fixture, met of zonder studiegebiedbestand."""
     gebieden = load_studiegebieden(GIS_DIR / bestand) if bestand is not None else None
     return toets_gebieden(
-        load_dataset(TTL_DIR / ttl),
+        load_dataset(TTL_DIR / ttl, []),
         gebieden,
         _config(),
         onbetrouwbaar=frozenset(),
@@ -187,7 +187,7 @@ def _schrijf(
     """Draait de toetsloop en schrijft de uitvoer weg."""
     gebieden = load_studiegebieden(GIS_DIR / bestand)
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / ttl),
+        load_dataset(TTL_DIR / ttl, []),
         gebieden,
         config or _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -339,7 +339,7 @@ def test_synthese_vermeldt_een_selectie(tmp_path: Path) -> None:
     gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
     keuze = gebieden.selecteer(["Noord"])
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         keuze,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -364,7 +364,7 @@ def test_een_leeg_gebied_sloopt_de_run_niet(tmp_path: Path) -> None:
     gebieden = load_studiegebieden(_met_leeg_gebied(tmp_path / "b.gpkg"))
 
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         gebieden,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -380,7 +380,7 @@ def test_een_leeg_gebied_wordt_luid_gemeld(tmp_path: Path) -> None:
     """Nul bevindingen op een leeg gebied leest anders als 'hier is alles in orde'."""
     gebieden = load_studiegebieden(_met_leeg_gebied(tmp_path / "b.gpkg"))
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         gebieden,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -400,7 +400,7 @@ def test_een_leeg_enkel_gebied_blijft_een_harde_fout(tmp_path: Path) -> None:
 
     with pytest.raises(StudyAreaError, match="geen GWSW-objecten"):
         toets_gebieden(
-            load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+            load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
             load_studiegebieden(bestand),
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -429,7 +429,7 @@ def test_overgeslagen_geometrieen_staan_in_het_rapport(tmp_path: Path) -> None:
     )
     gebieden = load_studiegebieden(pad)
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         gebieden,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -484,7 +484,7 @@ def test_treffers_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
     gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
 
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_dataset(TTL_DIR / "ext_scenario.ttl", []),
         gebieden,
         config,
         bronnen=bronnen,
@@ -537,7 +537,7 @@ def test_grenspand_staat_in_beide_gebieden(tmp_path: Path) -> None:
         tmp_path / "bron", [({"lokaal_id": "p-grens"}, box(1055, 1999, 1065, 2001))]
     )
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_dataset(TTL_DIR / "ext_scenario.ttl", []),
         load_studiegebieden(GIS_DIR / "buurten_twee.gpkg"),
         _config(),
         bronnen=bronnen,
@@ -567,7 +567,7 @@ def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: 
     config.studiegebied.volledige_dataset_checks = ["EXT-001"]
 
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_dataset(TTL_DIR / "ext_scenario.ttl", []),
         load_studiegebieden(GIS_DIR / "buurten_twee.gpkg"),
         config,
         bronnen=bronnen,
@@ -616,7 +616,7 @@ class TestNulmetingPerGebied:
         """In `totaal/` staat hij een keer, want daar wordt op melding-ID ontdubbeld."""
         gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),

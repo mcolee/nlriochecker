@@ -24,12 +24,12 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
+from gwsw_orox_helpers.cache import laad_met_cache
+from gwsw_orox_helpers.dataset import markeer_vulwaarden
 
 from nlriochecker.afbakening import bouw_analyseset, bouw_gedeelde_index
-from nlriochecker.cache import laad_met_cache
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import markeer_vulwaarden
 from nlriochecker.studiegebied import StudyArea
 
 CHECKS = ["NET-001", "NET-002", "RVZ-006"]

@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset, markeer_vulwaarden
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
-from nlriochecker.dataset import load_dataset, markeer_vulwaarden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
 
 def _outcome(bestand: str) -> CheckOutcome:
     """Draait NET-009 op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     return run_checks(context, ["NET-009"]).outcomes[0]
 
@@ -64,7 +65,7 @@ def test_bob_vulwaarde_valt_buiten_beeld_en_wordt_gemeld() -> None:
     de toelichting meldt hoeveel strengen om die reden buiten de BOB-toets vielen.
     """
     dataset = markeer_vulwaarden(
-        load_dataset(TTL_DIR / "net009_bob_vulwaarde.ttl"),
+        load_dataset(TTL_DIR / "net009_bob_vulwaarde.ttl", []),
         ["BobBeginpuntLeiding", "BobEindpuntLeiding"],
         0.01,
     )

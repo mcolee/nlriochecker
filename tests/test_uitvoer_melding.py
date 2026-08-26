@@ -7,9 +7,10 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import load_study_area
 from nlriochecker.uitvoer.identiteit import melding_id
@@ -37,7 +38,7 @@ def _config() -> CheckConfig:
 
 def _run(bestand: str, *check_ids: str) -> CheckRun:
     """Draait checks op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=_config())
     return run_checks(context, list(check_ids) or None)
 
@@ -181,7 +182,7 @@ def test_check_boven_de_drempel_heet_systemisch() -> None:
     BO-59 staat hier op 1: drie bekeken strengen halen de productiewaarde nooit, en
     dan valt er geen ratio te tonen.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     config = _config()
     config.rapport.systemisch_drempel = 0.1
     config.rapport.systemisch_minimum_bekeken = 1
@@ -202,7 +203,7 @@ def test_een_te_kleine_populatie_is_nooit_systemisch() -> None:
     over de export als geheel; zo'n check hoort gewoon per object gemeld te worden.
     Pas vanaf `systemisch_minimum_bekeken` telt de ratio mee.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     config = _config()
     config.rapport.systemisch_drempel = 0.1
     run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
@@ -222,7 +223,7 @@ def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
     "systemisch" iets anders betekenen naargelang er een gebied is opgegeven -- en
     daar hangen zowel de kaartstijl als de tellingen op de featurelagen aan.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     config = _config()
     config.rapport.systemisch_drempel = 0.1
     config.rapport.systemisch_minimum_bekeken = 1
@@ -261,7 +262,7 @@ def _nulbevinding(**overschrijf: object) -> Nulbevinding:
 
 def _run_met_nulbevindingen(bestand: str, *bevindingen: Nulbevinding) -> CheckRun:
     """Een run zonder eigen checkbevindingen, met alleen nulmetingbevindingen."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=_config())
     run = run_checks(context, [])
     return replace(run, nulbevindingen=tuple(bevindingen))
@@ -364,7 +365,7 @@ def _run_onderdrukt(
     config = _config()
     config.rapport.onderdruk_klassen = list(klassen)
     config.rapport.onderdruk_checks = list(checks)
-    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl")
+    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
     return replace(run, nulbevindingen=tuple(bevindingen))
 

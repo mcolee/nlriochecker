@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
-from nlriochecker.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -17,7 +17,7 @@ NIEUWE_NET_IDS = ["NET-003", "NET-005", "NET-006", "NET-008"]
 
 def uitkomst(pad: Path, check_id: str, config: CheckConfig | None = None) -> CheckOutcome:
     """Draait een enkele check op een fixture en geeft de volledige uitkomst."""
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=config or load_check_config())
     return run_checks(context, [check_id]).outcomes[0]
 

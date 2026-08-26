@@ -15,10 +15,10 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
+from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import bouw_nulbevindingen
 from nlriochecker.uitvoer.bevindingen import FILE_CHECKS_CSV, FILE_CHECKS_JSON
@@ -39,7 +39,7 @@ def _run(check_ids: list[str] | None = None) -> CheckRun:
     """
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "nulmeting_join.ttl")
+    dataset = load_dataset(TTL_DIR / "nulmeting_join.ttl", [])
     nulmeting = laad_nulmeting(
         [SHACL_DIR / "join_mdsplan.csv", SHACL_DIR / "join_mdsproj.csv"], CFKS, CFKS
     )

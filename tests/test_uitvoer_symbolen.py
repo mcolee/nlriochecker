@@ -11,8 +11,8 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
-from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.objectkaart import STATUSSEN
 from nlriochecker.uitvoer.stijlen.symbolen import (
     LIJNSYMBOLEN,
@@ -282,7 +282,7 @@ def test_een_type_met_een_afwijkende_schrijfwijze_valt_niet_in_het_vangnet(
 
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl")
+    dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config))
     pad = schrijf_geopackage(
         run, bouw_meldingen(run, date(2026, 8, 19)), tmp_path, date(2026, 8, 19)

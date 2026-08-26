@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from helpers_melding import melding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
 from nlriochecker.uitvoer.synthese import rode_draad
 
@@ -25,7 +26,7 @@ def _config() -> CheckConfig:
 
 def _run(bestand: str, config: CheckConfig | None = None) -> CheckRun:
     """Draait alle checks op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=config or _config())
     return run_checks(context)
 

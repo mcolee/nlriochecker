@@ -11,13 +11,14 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from nlriochecker.cache import laad_met_cache
+from gwsw_orox_helpers.cache import laad_met_cache
+from gwsw_orox_helpers.dataset import load_dataset
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, NulVoortgang, Voortgang
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
-from nlriochecker.voortgang import NUL_VOORTGANG, NulVoortgang, Voortgang
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
@@ -91,7 +92,7 @@ def test_laadfase_zet_een_stap_per_bestand() -> None:
     """rdflib geeft geen tussenstand binnen een bestand; dit is wat er wel te melden is."""
     opnemer = Opnemer()
 
-    load_dataset(TTL_DIR / "schoon.ttl", voortgang=opnemer)
+    load_dataset(TTL_DIR / "schoon.ttl", [], voortgang=opnemer)
 
     assert opnemer.fasen() == [("TTL laden", 1)]
     assert opnemer.labels("TTL laden") == ["schoon.ttl"]
@@ -111,7 +112,7 @@ def test_shaclfase_zet_een_stap_per_rapport(shacl_drieluik: list[Path]) -> None:
 def test_checksfase_zet_een_stap_per_check() -> None:
     """De gebruiker ziet welke check loopt, niet alleen dat er iets loopt."""
     opnemer = Opnemer()
-    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    dataset = load_dataset(TTL_DIR / "schoon.ttl", [])
 
     run = run_checks(CheckContext(dataset=dataset, config=load_check_config()), voortgang=opnemer)
 
@@ -125,7 +126,7 @@ def test_geopackagefase_zet_een_stap_per_laag(tmp_path: Path) -> None:
     opnemer = Opnemer()
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl")
+    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config))
 
     schrijf_uitvoer(run, tmp_path, RUNDATUM, voortgang=opnemer)
@@ -172,7 +173,7 @@ def test_geen_voortgang_verandert_de_uitvoerbestanden_niet(tmp_path: Path) -> No
     """
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl")
+    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl", [])
     context = CheckContext(dataset=dataset, config=config)
 
     zonder = schrijf_uitvoer(run_checks(context), tmp_path / "a", RUNDATUM)
@@ -189,7 +190,7 @@ def test_geen_voortgang_verandert_de_uitvoerbestanden_niet(tmp_path: Path) -> No
 def test_checksfase_kan_de_gebiedsnaam_dragen() -> None:
     """Met meerdere gebieden moet zichtbaar zijn welk gebied loopt."""
     opnemer = Opnemer()
-    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    dataset = load_dataset(TTL_DIR / "schoon.ttl", [])
 
     run_checks(
         CheckContext(dataset=dataset, config=load_check_config()),

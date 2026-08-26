@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 
 import pytest
-
-from nlriochecker.dataset import GwswDataset, load_dataset
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
 # Een schone kloon heeft `data/` niet: die map staat buiten versiebeheer omdat de
 # OroX-export en de GIS-bronnen gigabytes beslaan. De tests die erop leunen slaan
@@ -42,27 +42,26 @@ TTL_DIR = FIXTURE_DIR / "ttl"
 SHACL_DIR = FIXTURE_DIR / "shacl"
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
-ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
-# De deelmodellen Mds en Hyd zijn filters op het totaalmodel; alleen de
-# totaal-ontologie kent alle Knooppunt- en Verbinding-klassen.
-ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
 
 
 @pytest.fixture(scope="session")
-def ontologie() -> list[Path]:
-    """De GWSW-totaalontologie, voor de klassenhierarchie."""
-    if not ONTOLOGIE_TTL.exists():
-        pytest.skip("de GWSW-ontologie staat niet in data/")
-    return [ONTOLOGIE_TTL]
+def ontologie() -> Path:
+    """De GWSW-totaalontologie, voor de klassenhierarchie; altijd aanwezig.
+
+    Zij reist als package-resource mee met `gwsw-orox-helpers`; de deelmodellen Mds en
+    Hyd zijn filters op dit totaalmodel en kennen niet alle Knooppunt- en
+    Verbinding-klassen.
+    """
+    return gebundelde_ontologie()
 
 
 @pytest.fixture(scope="session")
-def juinen(ontologie: list[Path]) -> GwswDataset:
+def juinen(ontologie: Path) -> GwswDataset:
     """Het meegeleverde Juinen-voorbeeld als schone referentiedataset."""
     if not VOORBEELD_TTL.exists():
         pytest.skip("het OroX-voorbeeldbestand staat niet in data/")
-    return load_dataset(VOORBEELD_TTL, ontologie)
+    return load_dataset(VOORBEELD_TTL, [ontologie])
 
 
 @pytest.fixture

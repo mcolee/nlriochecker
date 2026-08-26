@@ -4,17 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext
 from nlriochecker.checks.verbanden import afvoerpad_van_streng, afvoerpaden
-from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
 
 def _context(bestand: str) -> CheckContext:
     """Bouwt een context op een netwerkfixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     return CheckContext(dataset=dataset, config=load_check_config())
 
 

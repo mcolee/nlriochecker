@@ -37,13 +37,13 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
+from gwsw_orox_helpers.cache import laad_met_cache
+from gwsw_orox_helpers.dataset import markeer_vulwaarden
 from shapely import unary_union
 
 from nlriochecker.afbakening import bouw_analyseset
-from nlriochecker.cache import laad_met_cache
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import markeer_vulwaarden
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.nulbevinding import bouw_nulbevindingen
 from nlriochecker.studiegebied import StudyArea

@@ -10,6 +10,8 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
+from gwsw_orox_helpers.dataset import load_dataset
 
 from gpkghelper import schrijf_buurten, schrijf_buurtenraster
 from nlriochecker.afbakening import bouw_analyseset
@@ -18,7 +20,6 @@ from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, run_checks
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import Verdict, assess_coverage
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.reporting import write_check_report, write_reports
 from nlriochecker.studiegebied import load_studiegebieden, load_study_area
@@ -34,7 +35,8 @@ GIS_DIR = DATA_DIR / "gis_koekangerveld"
 OROX_DEWOLDENHOOGEVEEN = OROX_DIR / "dewoldenhoogeveen_orox.ttl"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
 ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Mds.ttl"
-ONTOLOGIE_TOTAAL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
+# De totaal-ontologie reist mee met gwsw-orox-helpers; het deelmodel Mds niet.
+ONTOLOGIE_TOTAAL = gebundelde_ontologie()
 STUDIEGEBIED = GIS_DIR / "cbs_buurt_koekangerveld_studiegebied.gpkg"
 
 SHACL_PADEN = sorted(SHACL_DIR.glob("*.csv"))

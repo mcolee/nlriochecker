@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset, markeer_vulwaarden
+
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.dataset import load_dataset, markeer_vulwaarden
 from nlriochecker.karakteristiek import bepaal_karakteristiek
 from nlriochecker.reporting import write_check_report
 
@@ -22,7 +23,7 @@ FIXTURE = TTL_DIR / "karakteristiek_datums.ttl"
 
 def _karakteristiek(config: CheckConfig | None = None):
     """De karakteristieken van de fixture."""
-    return bepaal_karakteristiek(load_dataset(FIXTURE), config or load_check_config())
+    return bepaal_karakteristiek(load_dataset(FIXTURE, []), config or load_check_config())
 
 
 def _vulling(karakteristiek, kenmerk: str):
@@ -51,7 +52,7 @@ def test_alles_op_1_januari_geldt_als_jaarprecisie(tmp_path: Path) -> None:
     kopie = tmp_path / "jaarprecisie.ttl"
     kopie.write_text(tekst, encoding="utf-8")
 
-    karakteristiek = bepaal_karakteristiek(load_dataset(kopie), load_check_config())
+    karakteristiek = bepaal_karakteristiek(load_dataset(kopie, []), load_check_config())
 
     begindatum = next(item for item in karakteristiek.datums if item.kenmerk == "Begindatum")
     assert begindatum.jaarprecisie
@@ -103,7 +104,7 @@ def test_kenmerken_zonder_waarden_komen_niet_in_de_tabel() -> None:
 
 def test_de_sectie_staat_in_het_bevindingenrapport(tmp_path: Path) -> None:
     """Het rapport hoort te vermelden op welke precisie de datums staan."""
-    context = CheckContext(dataset=load_dataset(FIXTURE), config=load_check_config())
+    context = CheckContext(dataset=load_dataset(FIXTURE, []), config=load_check_config())
     run = run_checks(context, ["ATTR-007"])
 
     markdown_path, _ = write_check_report(run, tmp_path)
@@ -125,7 +126,7 @@ def test_de_weggezette_vulwaarden_staan_onder_de_inwinningstabel(tmp_path: Path)
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
     dataset = markeer_vulwaarden(
-        load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl"),
+        load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl", []),
         config.vulwaarden.hoogte_kenmerken,
         config.vulwaarden.hoogte_band_m,
     )

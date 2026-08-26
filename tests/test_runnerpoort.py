@@ -45,10 +45,9 @@ def test_de_pytest_regel_is_die_van_de_ci() -> None:
 
 
 def test_alleen_de_getrackte_databestanden_gaan_mee() -> None:
-    """De runner heeft van data/ alleen wat git kent: de checkregisters en de vocabulaire-index."""
+    """De runner heeft van data/ alleen wat git kent: de checkregisters."""
     namen = {pad.name for pad in RUNNERPOORT.getrackte_databestanden()}
 
-    assert "gwsw-vocabulaire-index.json" in namen
     assert "checkregister-gwsw-nulmeting-v0_9.md" in namen
     assert not any(naam.endswith(".ttl") or naam.endswith(".gpkg") for naam in namen)
     assert all(pad.parts[0] == "data" for pad in RUNNERPOORT.getrackte_databestanden())
