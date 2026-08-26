@@ -16,7 +16,7 @@ from gwsw_orox_helpers.dataset import load_dataset
 from gpkghelper import schrijf_buurten, schrijf_buurtenraster
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
-from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, run_checks
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import Verdict, assess_coverage
@@ -32,6 +32,11 @@ OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
 ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
 GIS_DIR = DATA_DIR / "gis_koekangerveld"
 
+# Elke `load_dataset` hieronder draagt `fallback_encoding=FALLBACK_ENCODING`, net als de
+# pijplijn zelf: de echte export is geen UTF-8 (vijf CP850-bytes in straatnamen, zie
+# `test_checks_op_dewoldenhoogeveen_met_typeringspoort`). De lader heeft sinds
+# gwsw-orox-helpers geen terugvalcodering meer als default -- welke codering een afwijkend
+# bestand draagt, weet alleen de afnemer -- dus zonder dit argument valt de run om.
 OROX_DEWOLDENHOOGEVEEN = OROX_DIR / "dewoldenhoogeveen_orox.ttl"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
 ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Mds.ttl"
@@ -126,7 +131,7 @@ def test_samenvatting_schrijven(meting, tmp_path: Path) -> None:
     reason="het OroX-voorbeeld of de ontologie staat niet in data/",
 )
 def test_alle_checks_draaien_op_het_voorbeeld(tmp_path: Path) -> None:
-    dataset = load_dataset(VOORBEELD_TTL, [ONTOLOGIE_TTL])
+    dataset = load_dataset(VOORBEELD_TTL, [ONTOLOGIE_TTL], fallback_encoding=FALLBACK_ENCODING)
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context)
     markdown_path, csv_path = write_check_report(run, tmp_path)
@@ -142,7 +147,9 @@ def test_alle_checks_draaien_op_het_voorbeeld(tmp_path: Path) -> None:
     reason="de De Wolden en Hoogeveen-OroX staat niet in data/",
 )
 def test_checks_op_dewoldenhoogeveen_met_typeringspoort(meting, tmp_path: Path) -> None:
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     analyse = analyze(meting, dataset)
 
     onbetrouwbaar = set()
@@ -177,7 +184,9 @@ def test_attr014_op_dewoldenhoogeveen_meldt_alleen_wibonthema() -> None:
     te breed staat. De aantallen (23.440 objecten, 18.363 met de vulwaarde 0) komen
     rechtstreeks uit de audit in het issue.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(dataset=dataset, config=load_check_config())
     outcome = run_checks(context, ["ATTR-014"]).outcomes[0]
 
@@ -205,7 +214,9 @@ def test_attr017_op_dewoldenhoogeveen_meldt_de_pe_leidingen() -> None:
     duizenden, dan is de schaallezing misgegaan. De 49 Polypropyleen-leidingen en de
     1.362 zonder materiaal blijven ongetoetst en staan in de toelichting.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(dataset=dataset, config=load_check_config())
     outcome = run_checks(context, ["ATTR-017"]).outcomes[0]
 
@@ -223,7 +234,9 @@ def test_attr017_op_dewoldenhoogeveen_meldt_de_pe_leidingen() -> None:
 )
 def test_studiegebied_koekangerveld(tmp_path: Path) -> None:
     """De afbakening moet aanzienlijk minder bevindingen opleveren, en dat melden."""
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(dataset=dataset, config=load_check_config())
     volledig = run_checks(context)
 
@@ -295,7 +308,9 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     overgrote deel van de objecten hoort daarom de status *buiten studiegebied* te
     krijgen en geen uitslag.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
@@ -328,7 +343,9 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
 )
 def test_afbakening_op_koekangerveld_verandert_de_bevindingen_niet() -> None:
     """De contextschil mag de uitkomst op de kern niet veranderen, alleen sneller maken."""
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     config = load_check_config()
     area = load_study_area(STUDIEGEBIED)
     ids = ["NET-001", "NET-002", "NET-004", "TOP-001", "TOP-005"]
@@ -361,7 +378,9 @@ def test_twee_buurten_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     de oostelijke helft, elk als eigen feature. Per helft moeten de meldingen
     gelijk zijn aan die van een losse run op alleen die helft.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     config = load_check_config()
     ids = ["NET-001", "TOP-001", "TOP-005"]
     west, oost = _helften(load_study_area(STUDIEGEBIED).geometry)
@@ -409,7 +428,9 @@ def test_schaal_tachtig_buurten(tmp_path: Path) -> None:
     Dat is de meting waarop het uitstel van de lokaal/contextueel-optimalisatie
     wacht (zie de beslislog).
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     bestand = schrijf_buurtenraster(
         tmp_path / "tachtig.gpkg", 80, load_study_area(STUDIEGEBIED).geometry.bounds
     )
@@ -466,7 +487,9 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     from nlriochecker.uitvoer.gpkg import schrijf_geopackage
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
