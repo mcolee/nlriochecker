@@ -342,7 +342,7 @@ def test_pompunit_zonder_persnet_is_geen_afvoereindpunt(tmp_path: Path) -> None:
 def _zonder_persnet(config: CheckConfig) -> CheckConfig:
     """Dezelfde config met het persnet uitgezet, voor de controlehelften.
 
-    Bewust niet als TOML: `KlassenConfig._pompunit_heeft_een_uitweg` weigert sinds BO-55
+    Bewust niet als TOML: `ClassRoots._pompunit_heeft_een_uitweg` weigert sinds BO-55
     een geschreven config die `mechanisch` leeg laat terwijl `Pompunit` geen eindpunt is
     -- dat is de valse-positieventoestand van BO-33. Die poort bewaakt wat iemand als
     projectconfig opschrijft; hier wordt de lijst na de validatie leeggemaakt om te tonen

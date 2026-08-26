@@ -203,12 +203,12 @@ def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
 
 
 def checks_json(run: CheckRun) -> list[dict[str, object]]:
-    """De noemer van elke check als JSON-klare rijen, gesorteerd op check-ID.
+    """Wat elke check bekeken heeft, als JSON-klare rijen, gesorteerd op check-ID.
 
     Wat `bekeken` telde staat niet in de meldingen: het hoort bij de check en niet bij
     de rij, dezelfde scheiding waarom de CFK-set niet in de CSV staat. Zonder scope en
-    populatie is het een kaal getal waarvan een afnemer de noemer niet kent, en dan
-    zijn ook de percentages die erop delen onvergelijkbaar (issue #77).
+    populatie is `bekeken` een kaal getal waarvan een afnemer niet weet waarover het
+    geteld is, en dan zijn ook de percentages die erop delen onvergelijkbaar (issue #77).
     """
     return [
         {

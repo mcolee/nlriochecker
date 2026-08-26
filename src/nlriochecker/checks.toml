@@ -18,8 +18,12 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
-# Mechanisch riool wordt zelf niet getoetst (zie het checkregister): geen enkele check
-# meldt over een mechanische streng, want ze selecteren op `vrijvervalleiding`. Deze lijst
+# Mechanisch riool wordt zelf niet getoetst (zie het checkregister): geen enkele
+# NET-check toetst het mechanische riool inhoudelijk, want zij selecteren op
+# `vrijvervalleiding`. De checks op de bredere rol `streng` (`[klassen] streng =
+# ["Leiding"]`) zien het wél -- ADM-002/003/010/011 en TOP-001 onder meer, en in de
+# praktijk melden vooral TOP-010 en TOP-011 erop; wat zij erop melden houdt
+# `[rapport] onderdruk_klassen` desgewenst uit de uitvoer. Deze lijst
 # heeft sinds issue #72 twee lezers, en de tweede stuurt wel degelijk uitkomsten.
 #  - `uitvoer/gpkg.py` (via `selectie.mechanischeleidingen`) bepaalt de kaartkleur: een
 #    mechanische streng blijft in de laag `strengen` maar krijgt status `grijs` zolang er
@@ -27,8 +31,8 @@ streng = ["Leiding"]
 #    issue #74 bepaalt dezelfde lijst daar ook de richtingspijl: een mechanische streng
 #    krijgt `richting_bob = onbekend` (grijze pijl), ook als zij wel een BOB-verval draagt.
 #    Dat verval blijft in `bob_verval_m` staan; alleen de pijl vervalt.
-#  - `checks/verbanden._bouw_netwerk` legt deze leidingen als ONGERICHTE kanten in de
-#    bereikbaarheidsgraaf, doorlopend via hulpstukken. Daarmee bepaalt deze lijst mee of
+#  - `checks/verbanden._bouw_bereikbaarheid` legt deze leidingen als ONGERICHTE kanten in
+#    de bereikbaarheidsgraaf, doorlopend via hulpstukken. Daarmee bepaalt deze lijst mee of
 #    NET-001 en NET-002 een vrijvervalstreng als afgevoerd zien: een streng die op een
 #    pompput eindigt bereikt het gemaal erachter via het persnet. Leeg laten schakelt dat
 #    uit en meldt de hele drukriolering weer als onbereikbaar. Zie BO-54.
@@ -64,7 +68,7 @@ loze_leiding = ["LozeLeiding"]
 # LET OP -- deze lijst en `mechanisch` hierboven hangen samen: `Pompunit` mag hier
 # alleen ontbreken zolang `mechanisch` klassen noemt. Zonder persnet is een streng
 # die op een pompput eindigt nergens meer heen, en meldt NET-001 haar vals als
-# onbereikbaar. `KlassenConfig` weigert die combinatie (BO-55).
+# onbereikbaar. `ClassRoots` weigert die combinatie (BO-55).
 afvoer_eindpunt = ["Overnamepunt", "Gemaal"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie

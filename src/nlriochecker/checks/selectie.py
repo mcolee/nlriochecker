@@ -164,9 +164,10 @@ def hulpstukken(context: CheckContext) -> list[Node]:
 def leidingen(context: CheckContext) -> list[Conduit]:
     """Alle leidingen: `gwsw:Leiding` en haar subklassen.
 
-    Dus inclusief pers-, druk- en vacuumleidingen. Niet te verwarren met de streng:
-    `gwsw:Streng` bestaat niet en `gwsw:Rioolstreng` is de NEN 3300-aanduiding voor
-    de riolering tussen twee putmiddelpunten.
+    Dus inclusief het mechanische riool (zie `mechanischeleidingen`) en de loze
+    leidingen. Niet te verwarren met de streng: `gwsw:Streng` bestaat niet en
+    `gwsw:Rioolstreng` is de NEN 3300-aanduiding voor de riolering tussen twee
+    putmiddelpunten.
     """
     return _verbindingen(context, "sel:leidingen", context.config.klassen.streng)
 
@@ -213,12 +214,26 @@ def infiltratieleidingen(context: CheckContext) -> list[Conduit]:
 
 
 def mechanischeleidingen(context: CheckContext) -> list[Conduit]:
-    """De leidingen van het mechanische stelsel: pers-, druk- en vacuumleiding.
+    """De leidingen van het mechanische stelsel.
 
-    Een *rol*: de ontologie kent de drie klassen los van elkaar. Deze selectie doet
-    niet mee aan de checks -- mechanisch riool valt buiten het checkregister -- maar
-    de GIS-uitvoer heeft haar nodig om die leidingen uit de strengenlaag te houden,
-    waar "geen melding" ten onrechte als "getoetst en in orde" zou lezen.
+    Een *rol*: de ontologie kent de klassen los van elkaar en `[klassen] mechanisch`
+    noemt ze via twee wortels. `MechanischeRioolleiding` dekt Drukleiding,
+    Luchtpersleiding en Vacuumleiding; `MechanischeTransportleiding` dekt Persleiding,
+    Leidingsegment en Spoelleiding -- zes klassen samen (issue #56).
+
+    Getoetst wordt het mechanische riool niet: het valt buiten het checkregister, en
+    geen enkele check leest zijn kenmerken. Maar de selectie stuurt wel degelijk
+    uitkomsten, op drie plekken:
+
+    * `checks/verbanden._bouw_bereikbaarheid` legt deze leidingen als ongerichte kanten
+      in de bereikbaarheidsgraaf, en beslist daarmee mee over NET-001 en NET-002 (en over
+      de lozingspunten die NET-008 telt): een streng die op een pompput eindigt bereikt
+      het gemaal erachter via het persnet. Zie BO-54.
+    * `afbakening._componentstructuur` laat de contextschil er sinds issue #73 doorheen
+      lopen, want anders valt dat gemaal bij een gebiedsrun buiten de schil (BO-56).
+    * `uitvoer/gpkg.py` houdt deze leidingen uit de beoordeelde kleuring -- ze krijgen
+      status `grijs` zolang er niets op staat, want "geen melding" zou daar ten onrechte
+      als "getoetst en in orde" lezen -- en laat hun richtingspijl weg (issue #74).
     """
     return _verbindingen(context, "sel:mechanischeleidingen", context.config.klassen.mechanisch)
 

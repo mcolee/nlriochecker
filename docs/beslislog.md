@@ -1862,7 +1862,7 @@ meetbare criterium uit deze BO is daarmee ook het besliscriterium. RVZ-006 (issu
 op deze ongewijzigde lijst voort.
 
 **Hoe is vastgesteld dat er niets verschoof.** Niet met een gerichte run: `afvoer_eindpunt`
-gaat behalve in NET-001 ook op in `KlassenConfig.netwerkknopen`, en die rol draagt de hele
+gaat behalve in NET-001 ook op in `ClassRoots.netwerkknopen`, en die rol draagt de hele
 netwerkgraaf. Daarom een volle `toets` op De Wolden (`--dataset dewolden_orox.ttl
 --ontologie Ontologie_GWSW_Totaal.ttl`, zonder `--shacl`, `--bronnen` en `--studiegebied`),
 vóór en na. Uitkomst: 35.370 meldingen over 48 checks, geen enkele check beweegt, en de
@@ -2865,13 +2865,13 @@ RVZ-006-boodschappen wijzigen alleen van tekst.
 
 **Voorwaarde, en die wordt afgedwongen.** Dit besluit klopt alleen zolang de route achter de
 pompput traceerbaar is, en dat is precies zolang `[klassen] mechanisch` klassen noemt:
-`_met_mechanische_connectiviteit` legt de kanten alleen dan, en `_componentstructuur` neemt de
+`_bouw_bereikbaarheid` legt de kanten alleen dan, en `_componentstructuur` neemt de
 route alleen dan in de contextschil op (BO-56). `load_check_config` valideert een projectbestand
 **op zichzelf** en legt het niet over `checks.toml` heen, dus een projectconfig die deze nieuwe
 `afvoer_eindpunt` overneemt maar `mechanisch` weglaat, krijgt een lege lijst en belandt stil in
 de +645-toestand van BO-33. De nul-bewaking vangt dat niet: een gedeclareerde rol zonder
 klassen valt juist uit de rollentelling weg (BO-52), dus er komt geen `SIG-nulklasse`. Daarom
-weigert `KlassenConfig._pompunit_heeft_een_uitweg` de combinatie "`afvoer_eindpunt` niet leeg,
+weigert `ClassRoots._pompunit_heeft_een_uitweg` de combinatie "`afvoer_eindpunt` niet leeg,
 zonder `Pompunit`" met "`mechanisch` leeg", met een foutmelding die beide sleutels en dit
 BO-nummer noemt. Een lege `afvoer_eindpunt` valt er bewust buiten: dan is er in het geheel geen
 afvoereindpunt, een eigen en meteen zichtbare toestand waar de minimale testconfigs op leunen.
@@ -2891,7 +2891,7 @@ lozingspunt". Vastgelegd in `tests/test_checkconfig.py::test_afvoereindpunt_is_o
 
 **Wat.** `_componentstructuur` in `afbakening.py` legt naast de vrijvervalleidingen ook de
 mechanische leidingen (`[klassen] mechanisch`) als kanten in de componentgraaf, met dezelfde
-terugval op de rauwe koppeling als `_met_mechanische_connectiviteit` (BO-54). De contextschil
+terugval op de rauwe koppeling als `_bouw_bereikbaarheid` (BO-54). De contextschil
 van een studiegebied is daardoor de samenhangende component over vrijverval **én** persnet.
 
 **Waarom.** BO-12 eist gelijkwaardigheid: de meldingen van een gebied zijn gelijk aan die van

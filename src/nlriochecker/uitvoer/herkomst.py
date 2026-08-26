@@ -161,8 +161,8 @@ def schrijf_json(
     het staat er alleen als de projectconfiguratie iets onderdrukt, zodat een run zonder
     lijsten byte-voor-byte blijft zoals hij was en `SCHEMA_VERSIE` niet omhoog hoeft.
 
-    `checks` draagt per check de noemer van zijn uitslag: hoeveel er bekeken is, waarover
-    dat geteld is en om welke populatie het gaat (issue #77). Hij komt kant-en-klaar
+    `checks` draagt per check wat hij bekeken heeft: hoeveel, waarover dat geteld is en
+    welke populatie hij declareert (issue #77). Hij komt kant-en-klaar
     binnen via `bevindingen.checks_json`; ook hier interpreteert deze functie niets.
     Optioneel en additief om dezelfde reden als `onderdrukt`, en om die reden ook niet
     hernummerd; de totaalsynthese over meerdere gebieden laat hem weg, want `bekeken` is

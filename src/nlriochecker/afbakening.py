@@ -292,7 +292,7 @@ def _componentstructuur(
     strengen apart in `unconnected` en houdt ze buiten de graaf -- maar mag niet
     stilzwijgend gebeuren; het aantal gaat terug naar de aanroeper. Een mechanische
     leiding valt daar juist terug op de rauwe koppeling, precies zoals
-    `_met_mechanische_connectiviteit` dat doet: het persnet komt samen op hulpstukken
+    `_bouw_bereikbaarheid` dat doet: het persnet komt samen op hulpstukken
     die nergens naartoe klimmen, en zonder die terugval hakt elke T de route in stukken.
     Zulke leidingen tellen niet mee in `zonder_netwerkverband`; dat getal gaat over de
     vrijvervalstrengen die het rapport noemt.

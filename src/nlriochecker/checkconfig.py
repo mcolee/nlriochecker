@@ -84,9 +84,9 @@ class ClassRoots(BaseModel):
         """Zonder persnet mag `Pompunit` niet uit `afvoer_eindpunt` verdwijnen (BO-55).
 
         Een pompput is een overdrachtspunt naar de drukriolering: de streng die erop
-        eindigt voert af langs het persnet naar het gemaal erachter. `checks/verbanden.
-        _met_mechanische_connectiviteit` legt die route alleen als `mechanisch` klassen
-        noemt, en `afbakening._componentstructuur` neemt hem alleen dan in de
+        eindigt voert af langs het persnet naar het gemaal erachter.
+        `checks/verbanden._bouw_bereikbaarheid` legt die route alleen als `mechanisch`
+        klassen noemt, en `afbakening._componentstructuur` neemt hem alleen dan in de
         contextschil op. Is die lijst leeg terwijl `Pompunit` geen eindpunt meer is, dan
         meldt NET-001 elke vrijvervalstreng die op een pompput uitkomt als
         onbereikbaar -- op De Wolden en Hoogeveen 645 valse bevindingen. Precies daarom

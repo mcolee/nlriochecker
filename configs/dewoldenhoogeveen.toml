@@ -44,7 +44,10 @@ vrijvervalleiding = ["VrijvervalRioolleiding"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
-# Mechanisch riool wordt zelf niet getoetst (zie het checkregister), maar deze lijst
+# Geen enkele NET-check toetst het mechanische riool inhoudelijk (zie het checkregister);
+# de checks op de bredere rol `streng` zien het wel -- ADM-002/003/010/011 en TOP-001
+# onder meer, en in de praktijk melden vooral TOP-010 en TOP-011 erop -- en
+# `[rapport] onderdruk_klassen` verderop houdt dat uit de uitvoer. Deze lijst
 # stuurt wel twee dingen: de grijze laag in de GIS-uitvoer (een leeg kaartbeeld daar zou
 # anders als "geen gebreken" lezen) en, sinds issue #72, de ongerichte connectiviteit in
 # de bereikbaarheidsgraaf van NET-001 en NET-002 (BO-54). De twee ontologische wortels in
@@ -76,7 +79,7 @@ loze_leiding = ["LozeLeiding"]
 # LET OP -- deze lijst en `mechanisch` hierboven hangen samen: `Pompunit` mag hier
 # alleen ontbreken zolang `mechanisch` klassen noemt. Zonder persnet is een streng
 # die op een pompput eindigt nergens meer heen, en meldt NET-001 haar vals als
-# onbereikbaar. `KlassenConfig` weigert die combinatie (BO-55).
+# onbereikbaar. `ClassRoots` weigert die combinatie (BO-55).
 afvoer_eindpunt = ["Overnamepunt", "Gemaal"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
