@@ -559,7 +559,7 @@ def compare_command(
     "cache_dir",
     default=None,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Waar de geparseerde dataset bewaard wordt; standaard ~/.cache/nlriochecker.",
+    help="Waar de geparseerde dataset bewaard wordt; standaard ~/.cache/gwsw-orox-helpers.",
 )
 @_output_option("Map waarin het bevindingenrapport wordt geschreven.")
 def check_command(
