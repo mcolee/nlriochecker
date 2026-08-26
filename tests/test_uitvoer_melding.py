@@ -177,11 +177,14 @@ def test_check_boven_de_drempel_heet_systemisch() -> None:
     """De drempel is configureerbaar; hier verlaagd om het gedrag te tonen.
 
     NET-001 slaat op de fixture op 1 van de 3 strengen aan. Met de standaarddrempel
-    van 80% is dat geen systemische melding, met 10% wel.
+    van 80% is dat geen systemische melding, met 10% wel. De minimumpopulatie van
+    BO-59 staat hier op 1: drie bekeken strengen halen de productiewaarde nooit, en
+    dan valt er geen ratio te tonen.
     """
     dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
     config = _config()
     config.rapport.systemisch_drempel = 0.1
+    config.rapport.systemisch_minimum_bekeken = 1
     context = CheckContext(dataset=dataset, config=config)
     run = run_checks(context, ["NET-001"])
 
@@ -189,6 +192,26 @@ def test_check_boven_de_drempel_heet_systemisch() -> None:
 
     assert meldingen
     assert all(melding.systemisch for melding in meldingen)
+
+
+def test_een_te_kleine_populatie_is_nooit_systemisch() -> None:
+    """Onder de minimumpopulatie zegt de ratio niets (BO-59).
+
+    NET-001 slaat op deze fixture op 1 van de 3 strengen aan. Met de drempel op 10%
+    haalt die ratio de grens ruim, maar drie bekeken objecten dragen geen uitspraak
+    over de export als geheel; zo'n check hoort gewoon per object gemeld te worden.
+    Pas vanaf `systemisch_minimum_bekeken` telt de ratio mee.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    config = _config()
+    config.rapport.systemisch_drempel = 0.1
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+    assert run.outcomes[0].examined < config.rapport.systemisch_minimum_bekeken
+
+    assert all(not melding.systemisch for melding in bouw_meldingen(run, RUNDATUM))
+
+    config.rapport.systemisch_minimum_bekeken = 1
+    assert all(melding.systemisch for melding in bouw_meldingen(run, RUNDATUM))
 
 
 def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
@@ -202,6 +225,7 @@ def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
     dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
     config = _config()
     config.rapport.systemisch_drempel = 0.1
+    config.rapport.systemisch_minimum_bekeken = 1
     run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
     assert all(melding.systemisch for melding in bouw_meldingen(run, RUNDATUM))
 

@@ -60,6 +60,8 @@ from nlriochecker.uitvoer.melding import (
     categorie_van,
 )
 from nlriochecker.uitvoer.objectkaart import (
+    STATUS_ORANJE,
+    STATUS_ROOD,
     Objectkop,
     bepaal_status,
     popup_html,
@@ -1056,15 +1058,21 @@ def _gemengd_rij(
 ) -> tuple[object, ...]:
     """De attribuutvelden van een gemengd-deelstelselvlak, in kolomvolgorde.
 
-    De status is die van de meldingen erop -- er staat er per definitie minstens één,
-    anders was er geen vlak -- dus grijs komt hier niet voor en `geanalyseerd` staat
-    vast op waar.
+    De status komt hier niet uit `bepaal_status` en de popup laat niets weg: een rij in
+    deze laag bestaat alleen omdat RVZ-006 op dit deelstelsel aansloeg, dus zij is per
+    constructie een gebrek. `bepaal_status` en `popup_html` filteren systemische
+    meldingen weg -- terecht op een put of een streng, waar zij naast andere gebreken
+    staan, maar hier zou het vlak dan groen worden en "geen eigen gebrek" te lezen geven
+    terwijl het alleen bestaat door de meldingen die het weglaat. Dat gebeurde op
+    Koekangerveld: 26 van de 26 gemengde strengen gemeld, dus systemisch. Zie BO-59.
+
+    Grijs komt hier niet voor -- er staat per definitie minstens één melding op.
     """
     strenglengte = sum(conduit.line.length for conduit in conduits if conduit.line is not None)
     kop = Objectkop(
         label=cluster,
         objecttype=SOORT_GEMENGD_DEELSTELSEL,
-        status=bepaal_status(meldingen, geanalyseerd=True),
+        status=STATUS_ROOD if any(m.ernst == "F" for m in meldingen) else STATUS_ORANJE,
         feiten=(
             f"{len(knopen)} knopen, {len(conduits)} strengen, {strenglengte:.0f} m",
             f"{len(meldingen)} gemengde strengen gemeld",
@@ -1077,7 +1085,7 @@ def _gemengd_rij(
         len(conduits),
         strenglengte,
         len(meldingen),
-        popup_html(kop, meldingen),
+        popup_html(kop, meldingen, toon_systemisch=True),
     )
 
 

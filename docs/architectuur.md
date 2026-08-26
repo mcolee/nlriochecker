@@ -92,7 +92,10 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   samenvat -- en `objectkaart.popup_html` laat ze weg en telt ze in een afsluitende
   regel. De scheiding gaat per melding (`Melding.systemisch`, zelf gedeclareerd of uit
   de populatieratio), dus een check waarvan maar een deel systemisch is toont de rest
-  gewoon per object. CSV, JSON en de meldingentabel van de GeoPackage houden elke rij
+  gewoon per object. De populatieratio geldt pas vanaf `[rapport]
+  systemisch_minimum_bekeken` bekeken objecten (standaard 100): daaronder is zij geen
+  uitspraak over de export maar een breuk van kleine getallen, en zou een echt gebrek
+  in een klein gebied juist uit de mensgerichte views verdwijnen (BO-59). CSV, JSON en de meldingentabel van de GeoPackage houden elke rij
   met haar vlag: dat zijn archieven en een publiek contract, en alleen de mensgerichte
   views vouwen samen.
 - **Wat `bekeken` telde staat erbij** (issue #77): elke `CheckOutcome` draagt
@@ -199,7 +202,10 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   laag na afbakening of onderdrukking niet meer kan tonen dan de uitslag; de geometrie
   komt uit `run.context`, de graaf waarop de check draaide. Kolommen: `cluster_id` (het
   deelstelsel-ID dat RVZ-006, NET-001 en NET-002 delen), `n_knopen`, `n_strengen`,
-  `strenglengte_m`, `n_meldingen` (één per gemengde streng) en `popup_html`; `gwsw_run`
+  `strenglengte_m`, `n_meldingen` (één per gemengde streng) en `popup_html`. Die popup is
+  de enige die systemische meldingen wél toont en zijn status niet uit `bepaal_status`
+  haalt: een rij in deze laag bestaat alleen omdat RVZ-006 aansloeg en is per constructie
+  een gebrek (BO-59). `gwsw_run`
   telt de laag in `n_gemengd_zonder_overstort`, net zoals `n_vlakken` de laag `vlakken`
   telt. Twee dingen kunnen de laag kleiner maken dan het aantal gemelde deelstelsels, en
   ze worden verschillend behandeld. Een `cluster_id` die de graaf van de run niet kent is

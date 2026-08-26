@@ -45,9 +45,16 @@ VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 
 
 def _config() -> CheckConfig:
-    """De standaardconfig, met het RD-bereik verruimd tot de fixturecoordinaten."""
+    """De standaardconfig, met het RD-bereik verruimd tot de fixturecoordinaten.
+
+    De minimumpopulatie van BO-59 staat op 1. De fixtures tellen een handvol objecten
+    en halen de productiewaarde van 100 nooit; zonder deze verlaging vouwt niets samen
+    en is het gedrag rond systemische meldingen (status, popup, vlakkenlaag) hier niet
+    te tonen.
+    """
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
+    config.rapport.systemisch_minimum_bekeken = 1
     return config
 
 
@@ -1175,6 +1182,27 @@ def test_gemengd_zonder_overstort_draagt_een_leesbaar_vlak(tmp_path: Path) -> No
     assert not vorm.is_empty
     # Twee strengen van 50 m met 10 m buffer: een lint van ruim 100 x 20 m.
     assert vorm.bounds == pytest.approx((990.0, 1990.0, 1110.0, 2010.0), abs=0.5)
+
+
+def test_gemengd_vlak_zwijgt_niet_over_systemisch_genoemde_meldingen(tmp_path: Path) -> None:
+    """Een vlak in deze laag is per constructie een gebrek (BO-59).
+
+    Zou het zijn status en zijn popup uit de systemisch-gefilterde meldingen afleiden,
+    dan kreeg het "geen eigen gebrek" te lezen zodra RVZ-006 op een klein gebied de
+    populatieratio haalt -- terwijl de rij alleen bestaat omdat die check aansloeg.
+    De fixture meldt op beide gemengde strengen (2 van 2), dus de vlag staat aan.
+    """
+    run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+    meldingen = bouw_meldingen(run, RUNDATUM)
+    rvz = [melding for melding in meldingen if melding.check_id == "RVZ-006"]
+    assert rvz and all(melding.systemisch for melding in rvz)
+
+    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+
+    ((popup,),) = _rijen(pad, "select popup_html from gemengd_zonder_overstort")
+    assert "RVZ-006" in popup
+    assert "s-rood" in popup
+    assert "geen eigen gebrek" not in popup
 
 
 def test_gemengd_zonder_overstort_blijft_leeg_zonder_bevinding(tmp_path: Path) -> None:

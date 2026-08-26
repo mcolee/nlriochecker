@@ -422,6 +422,11 @@ max_bevindingen_per_check = 0
 # Boven dit aandeel van de bekeken populatie heet een meldingtype systemisch: het
 # zegt dan meer over de export als geheel dan over de losse objecten.
 systemisch_drempel = 0.80
+# En vanaf hoeveel bekeken objecten dat aandeel iets mag betekenen. Onder dit aantal is
+# de ratio geen uitspraak over de export maar een breuk van kleine getallen: 26 van de 26
+# gemengde strengen in een buurt is geen structureel verschijnsel, en de vlag zou dat
+# gebrek van de kaart en uit de popup halen. Zie BO-59.
+systemisch_minimum_bekeken = 100
 # Versie van het checkregister waaraan deze run getoetst is.
 register_versie = "v0.9"
 # Meldingen die de uitvoer niet halen (issue #65): het mechanische riool, dezelfde twee

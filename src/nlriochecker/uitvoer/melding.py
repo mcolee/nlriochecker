@@ -505,9 +505,15 @@ def _is_systemisch(outcome: CheckOutcome, config: CheckConfig) -> bool:
     dataset. Zonder die correctie zou een tot een buurt afgebakende run de vlag
     nooit meer laten aanslaan en zou "systemisch" iets anders betekenen naargelang
     er een studiegebied is opgegeven.
+
+    Onder `systemisch_minimum_bekeken` bekeken objecten geldt de ratio niet: op een
+    handvol objecten is 26 van de 26 geen uitspraak over de export maar een breuk van
+    kleine getallen, en de vlag zou een echt gebrek van de kaart en uit de popup halen.
+    Een check die zichzelf systemisch noemt (`Finding.systemisch`) staat hier los van
+    en blijft ongemoeid. Zie BO-59.
     """
     gevonden = len(outcome.findings) + outcome.weggelaten
-    if not outcome.examined or not gevonden:
+    if outcome.examined < config.rapport.systemisch_minimum_bekeken or not gevonden:
         return False
     return gevonden / outcome.examined > config.rapport.systemisch_drempel
 

@@ -475,6 +475,10 @@ class ReportOptions(BaseModel):
     max_bevindingen_per_check: int = Field(default=0, ge=0)
     # Boven welk aandeel van de bekeken populatie een meldingtype systemisch heet.
     systemisch_drempel: float = Field(default=0.80, gt=0.0, le=1.0)
+    # En vanaf hoeveel bekeken objecten dat aandeel iets mag betekenen. Onder dit
+    # aantal is een ratio geen uitspraak over de export maar een toevallige breuk van
+    # kleine getallen; zie BO-59.
+    systemisch_minimum_bekeken: int = Field(default=100, ge=1)
     # Versie van het checkregister, voor de metadata in de GIS-uitvoer.
     register_versie: str = "v0.9"
     # Issue #65: meldingen die de uitvoer niet haalt. Wortelklassen (subklassen via de

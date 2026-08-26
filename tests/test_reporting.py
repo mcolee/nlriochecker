@@ -444,7 +444,11 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     """
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    # Drie bekeken strengen halen de minimumpopulatie van BO-59 nooit; die staat hier
+    # op 1, want deze test toont juist de generieke regel van een systemische check.
+    config = _fixtureconfig()
+    config.rapport.systemisch_minimum_bekeken = 1
+    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
     # Alleen de checkmeldingen; de datasetsignalen (bron "dataset", issue #22) staan
     # los van wat deze test over het volgen van de meegegeven stroom aantoont.
     volledig = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
@@ -474,7 +478,11 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
 
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    # Drie bekeken strengen halen de minimumpopulatie van BO-59 nooit; die staat hier
+    # op 1, want deze test toont juist de generieke regel van een systemische check.
+    config = _fixtureconfig()
+    config.rapport.systemisch_minimum_bekeken = 1
+    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
     # Alleen de checkmeldingen: de datasetsignalen hebben zelf geen plek op de kaart en
     # zouden de telling die deze test afdwingt vertroebelen.
     meldingen = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]

@@ -459,6 +459,7 @@ class TestSystemischGeneriek:
         """
         config = _config()
         config.rapport.systemisch_drempel = 0.1
+        config.rapport.systemisch_minimum_bekeken = 1
         dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
         run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
 

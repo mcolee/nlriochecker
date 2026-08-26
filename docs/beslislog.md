@@ -3104,3 +3104,59 @@ regel "Toetst ..." eronder zegt al dat de check niet tot een rol beperkt is).
 `docs/json-schema.md`. `overzicht_checks` krijgt er twee kolommen bij; bestaande
 kolommen blijven ongewijzigd, en een lezer die op naam selecteert merkt er niets van.
 De checktabel in het Markdown-rapport is twee kolommen breder.
+
+### BO-59 De systemisch-vlag geldt pas vanaf 100 bekeken objecten
+
+**Besluit.** `melding._is_systemisch` toetst de populatieratio (`bevindingen / bekeken >
+systemisch_drempel`) alleen nog boven een minimumpopulatie: `[rapport]
+systemisch_minimum_bekeken`, standaard **100** bekeken objecten. Daaronder is een uitslag
+nooit systemisch, hoe hoog de ratio ook is. De vlag die een check zelf zet
+(`Finding.systemisch`, ATTR-014/ATTR-015) staat hier los van en verandert niet; de
+nulmeting heeft haar eigen bepaling per (vorm, objecttype) en blijft ook ongemoeid.
+
+**Waarom een minimum.** De vlag is een uitspraak over de export als geheel: "dit gebrek
+onderscheidt dit object niet van zijn buren, dus zet het niet even zwaar op de kaart". Die
+uitspraak leunt op een populatie die groot genoeg is om er iets over te zeggen. Op een klein
+gebied is zij onwaar en schadelijk. Issue #75 maakte `examined` van RVZ-006 de gemengde
+strengen; op Koekangerveld zijn dat er 26 en slaat de check op alle 26 aan (ratio 1,00). De
+vouwing van issue #76 haalde die meldingen daarna uit de kaartpopup en uit de tabel per
+object, en het `gemengd_zonder_overstort`-vlak kreeg via `bepaal_status` de status *groen*,
+met de tekst "geen eigen gebrek" -- terwijl elk vlak in die laag per constructie een
+gebrek is. Een echt gebrek in een klein gebied verdween zo uit precies de views waarvoor het
+bedoeld was. Hetzelfde geldt voor elke gebiedsrun: hoe kleiner het gebied, hoe eerder een
+check "systemisch" heet.
+
+**Waarom 100.** Een ronde ondergrens, ruim boven het bereik waarin de breuk toevallig hoog
+uitvalt en ruim onder de populaties waar de vlag voor bedoeld is. Gemeten op De Wolden en
+Hoogeveen (`configs/dewoldenhoogeveen.toml`, door de echte pijplijn) zijn er precies twee
+uitslagen boven de ratiodrempel: RVZ-002 en RVZ-003, allebei 245 van 245 -- die blijven dus
+systemisch, zoals bedoeld, want dat *is* een structureel verschijnsel over de hele export.
+ATTR-014 blijft systemisch omdat de check dat zelf declareert. Aan de andere kant valt
+RVZ-006 op Koekangerveld (26 van 26) er nu buiten en staat weer gewoon op de kaart. Er is
+geen uitslag met een populatie tussen 26 en 245 die boven de drempel uitkomt, dus elke
+waarde in dat bereik levert vandaag dezelfde uitkomst; 100 is de ronde waarde in het midden
+en houdt marge naar beide kanten.
+
+**Wat de auteur kan bijstellen.** `systemisch_minimum_bekeken` staat in `[rapport]` van
+`src/nlriochecker/checks.toml` en `configs/dewoldenhoogeveen.toml`, naast
+`systemisch_drempel`. Op 1 zetten geeft het gedrag van vóór dit besluit terug (de
+fixturetests doen dat, want fixtures tellen een handvol objecten). Hoger zetten maakt de
+vlag zeldzamer; hij mag niet op 0, want een ratio over nul bekeken objecten bestaat niet.
+
+**Alternatieven.** De ratio afhankelijk maken van de gebiedsgrootte (verworpen: dan
+betekent "systemisch" opnieuw iets anders naargelang er een studiegebied is, precies wat de
+correctie in BO-28 wegnam). Alleen de vlakkenlaag repareren en de vlag laten staan
+(verworpen: dat is de helft -- de gemelde strengen zelf lezen dan nog steeds "geen eigen
+gebrek" in hun popup; die kant is los daarvan wél gerepareerd, zie hieronder). RVZ-006
+uitzonderen (verworpen: het is geen eigenschap van die check maar van kleine populaties,
+en de volgende check met een smalle populatie loopt er weer in).
+
+**Tweede helft: het vlak leidt zijn status niet meer af uit gefilterde meldingen.**
+`gpkg._gemengd_rij` gaf de meldingen van het deelstelsel aan `bepaal_status` en
+`popup_html`, die allebei systemische meldingen wegfilteren. Een rij in de laag
+`gemengd_zonder_overstort` bestaat echter alleen omdat RVZ-006 op dat deelstelsel aansloeg;
+er is daar geen "geen eigen gebrek"-toestand. De rij bepaalt haar status daarom nu uit de
+ernst van haar eigen meldingen en toont ze in de popup, ook als zij systemisch heten. Dat is
+geen uitzondering op BO-29: die regel gaat over objecten waarvan de systemische meldingen
+één van vele soorten zijn, terwijl dit vlak niets anders draagt dan de bevinding die hem
+liet bestaan.

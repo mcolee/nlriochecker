@@ -38,6 +38,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De systemisch-vlag geldt pas vanaf 100 bekeken objecten** (eindreview #72–#77,
+  BO-59). Nieuwe drempel `[rapport] systemisch_minimum_bekeken` (standaard 100): onder
+  dat aantal bekeken objecten is een uitslag nooit systemisch, hoe hoog de ratio ook is.
+  Op een klein gebied haalde de ratio anders de grens op een handvol objecten — RVZ-006
+  slaat op Koekangerveld op alle 26 gemengde strengen aan — en verdween een echt gebrek
+  uit de kaartpopup en uit de tabel per object. Op De Wolden en Hoogeveen blijven RVZ-002
+  en RVZ-003 (245 van 245) systemisch en blijft ATTR-014 dat op eigen declaratie; alleen
+  de kleine populaties vallen eruit. Daarbij leidt het vlak in
+  `gemengd_zonder_overstort` zijn status en popup niet langer af uit de
+  systemisch-gefilterde meldingen: zo'n vlak bestaat alleen omdat RVZ-006 aansloeg en is
+  per constructie een gebrek, dus "geen eigen gebrek" hoort er niet te staan.
 - **Alleen de bereikbaarheidschecks gaan nog over het persnet** (eindreview #72–#77,
   BO-54). De bereikbaarheidsgraaf (vrijverval plus mechanisch riool als ongerichte
   kanten) was een veld op `_Netwerk` en werd dus door `_bouw_netwerk` altijd meegebouwd;

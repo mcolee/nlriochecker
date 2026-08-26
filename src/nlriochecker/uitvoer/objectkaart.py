@@ -106,7 +106,9 @@ def bepaal_status(meldingen: Sequence[Melding], *, geanalyseerd: bool) -> str:
     return STATUS_GROEN if geanalyseerd else STATUS_GRIJS
 
 
-def popup_html(kop: Objectkop, meldingen: Sequence[Melding]) -> str:
+def popup_html(
+    kop: Objectkop, meldingen: Sequence[Melding], *, toon_systemisch: bool = False
+) -> str:
     """Bouwt de popup-inhoud van een object als HTML-fragment.
 
     Systemische meldingen staan er niet bij (issue #76). Zij zijn dezelfde structurele
@@ -116,15 +118,20 @@ def popup_html(kop: Objectkop, meldingen: Sequence[Melding]) -> str:
     afsluitende regel; stilzwijgend weglaten zou lezen als "hier is niets gevonden".
     De losse rijen blijven in de meldingentabel, de CSV en de JSON staan.
 
+    Met `toon_systemisch` staan ze er wél bij, zonder afsluitende regel. Dat is voor een
+    laag waarvan een rij per constructie een gebrek is -- `gemengd_zonder_overstort`,
+    waar elk vlak alleen bestaat omdat RVZ-006 op dat deelstelsel aansloeg. Daar is er
+    geen "andere objecten van dit type" om zich van te onderscheiden. Zie BO-59.
+
     Wat overblijft staat op prioriteit, dan check-ID, dan melding-ID: de zwaarste
     eerst, zodat de cap van vijf niet de melding wegsnijdt die de status bepaalde.
 
     Alles wat uit de brondata komt wordt geescaped: een label met een `<` mag de popup
     niet breken.
     """
-    systemisch = sum(1 for melding in meldingen if melding.systemisch)
+    systemisch = 0 if toon_systemisch else sum(1 for melding in meldingen if melding.systemisch)
     gesorteerd = sorted(
-        (melding for melding in meldingen if not melding.systemisch),
+        (melding for melding in meldingen if toon_systemisch or not melding.systemisch),
         key=lambda m: (m.prioriteit, m.check_id, m.melding_id),
     )
     getoond = gesorteerd[:MAX_MELDINGEN_IN_POPUP]
