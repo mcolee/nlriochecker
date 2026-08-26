@@ -58,7 +58,7 @@ def _lijn(conduit: Conduit) -> LineString:
     Dezelfde belofte als `_punt`: `lined` bevat alleen strengen waarvan
     `endpoints(conduit.line)` iets opleverde, dus met een geometrie. Dat filter laat
     strikt genomen ook een andere lijnvormige geometrie dan `LineString` door (zie
-    `coords_of` in `dataset.py`); de cast is een runtime-noop en de gebruikte
+    `coords_of` in `gwsw_orox_helpers.dataset`); de cast is een runtime-noop en de gebruikte
     bewerkingen -- afstand, kruising, snijpunt -- gelden voor elke shapely-geometrie.
     """
     return cast(LineString, conduit.line)

@@ -37,6 +37,7 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from gwsw_orox_helpers.cache import laad_met_cache
 from gwsw_orox_helpers.dataset import markeer_vulwaarden
 from shapely import unary_union
@@ -50,7 +51,7 @@ from nlriochecker.studiegebied import StudyArea
 
 CHECK = "RVZ-006"
 DATASET = Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl")
-ONTOLOGIE = Path("data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl")
+ONTOLOGIE = gebundelde_ontologie()
 KOEKANGERVELD = Path("data/gis_koekangerveld/cbs_buurt_koekangerveld_studiegebied.gpkg")
 SHACL = Path("data/shacl_nulmeting")
 RAPPORTEN = {

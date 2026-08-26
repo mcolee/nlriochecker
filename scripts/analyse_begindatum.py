@@ -9,6 +9,7 @@ Draaien: `uv run python scripts/analyse_begindatum.py`
 from pathlib import Path
 
 import geopandas as gpd
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from gwsw_orox_helpers.cache import laad_met_cache
 from shapely import unary_union
 
@@ -37,7 +38,7 @@ def classificeer(nodes: list) -> dict:
 def main() -> None:
     dataset, _ = laad_met_cache(
         Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl"),
-        [Path("data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl")],
+        [gebundelde_ontologie()],
     )
     config = load_check_config(Path("configs/dewoldenhoogeveen.toml"))
     context = CheckContext(dataset=dataset, config=config)

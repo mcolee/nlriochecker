@@ -7,21 +7,28 @@ want de code kan schuiven.
 
 ## Dataset-, config- en registry-API
 
+De leeslaag (dataset, graaf, geometrie, ontologie, cache, voortgang) leeft sinds 0.4 in de
+package `gwsw-orox-helpers`; de mechaniek hieronder blijft gelden, alleen de importregels
+wijzen naar `gwsw_orox_helpers`. De GWSW-ontologie reist als package-resource mee en wordt
+niet meer uit `data/` gelezen.
+
 Voor een scratch-script tegen de echte data — dit recept, verbatim, zodat je de
 signaturen niet elke sessie opnieuw hoeft op te zoeken:
 
 ```python
 from pathlib import Path
 
-from nlriochecker.cache import laad_met_cache
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
+from gwsw_orox_helpers.cache import laad_met_cache
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, run_checks
 
 # Cachetreffer = geen parse: seconden i.p.v. de koude ~0,5 min. De cache staat in
-# standaard_cachemap() (~/.cache/nlriochecker); laad_met_cache geeft (dataset, cache).
+# standaard_cachemap() (~/.cache/gwsw-orox-helpers); laad_met_cache geeft (dataset, cache).
 dataset, _ = laad_met_cache(
     Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl"),
-    [Path("data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl")],
+    [gebundelde_ontologie()],
 )
 config = load_check_config(Path("configs/dewoldenhoogeveen.toml"))
 context = CheckContext(dataset=dataset, config=config)
@@ -103,7 +110,9 @@ Bewerk de generator en regenereer; anders valt de bijbehorende drifttest:
 |---|---|
 | `tests/fixtures/ttl/*.ttl` | `scripts/maak_ttl_fixtures.py` |
 | `docs/dekkingsmatrix.md` | `scripts/dekkingsmatrix.py` |
-| `data/gwsw-vocabulaire-index.json` | `scripts/maak_gwsw_index.py` |
+
+De vocabulaire-index staat niet meer in deze repo: zij reist mee met `gwsw-orox-helpers`
+en wordt daar geregenereerd.
 
 Check dit **vóór** je een fixture aanraakt: met de hand bewerken lijkt lokaal te werken maar
 is een valse start — de drifttest en de review sturen je terug naar de generator (kostte in

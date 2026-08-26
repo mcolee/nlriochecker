@@ -66,7 +66,7 @@ jobs:
       NLRIOCHECKER_MIN_GESLAAGD: "1670"
       # Overslagen worden niet geteld maar op reden geclassificeerd (BO-48). Een telgrens
       # (`NLRIOCHECKER_MAX_OVERGESLAGEN`, 50 → 57 → 65) telde ook de bedoelde, datagebonden
-      # overslagen mee -- de ontologie, het Juinen-voorbeeld en de SHACL-rapporten staan
+      # overslagen mee -- het Juinen-voorbeeld, de OroX-export en de SHACL-rapporten staan
       # niet op deze runner -- en klapte op 24-08 en 25-08 op legitieme testgroei. Met deze
       # vlag is elke test-overslag waarvan de reden geen `data/` en geen `BO-` noemt een
       # harde fout: een fixture die niet meekomt, een generator die niet gedraaid is, een

@@ -25,7 +25,7 @@ DEFAULT_CHECK_CONFIG_NAME = "checks.toml"
 # inspecteert (KLASSE_MAAIVELDHOOGTE, KLASSE_PUTDEKSELNIVEAU, KLASSE_BOB_BEGIN en
 # KLASSE_BOB_EIND). Een andere naam in `[vulwaarden] hoogte_kenmerken` -- een tikfout,
 # of een kenmerk dat de pijplijn niet inleest -- zou stil niets doen terwijl ATTR-013
-# meldt dat de regel is toegepast; `checkconfig.VulwaardeOptions` weigert hem daarom.
+# meldt dat de regel is toegepast; `VulwaardeOptions` hieronder weigert hem daarom.
 # De lijst hoort bij de afnemer: `gwsw_orox_helpers.markeer_vulwaarden` neemt de
 # kenmerken als parameter en kent deze keuze niet.
 VULWAARDE_KENMERKEN: frozenset[str] = frozenset(

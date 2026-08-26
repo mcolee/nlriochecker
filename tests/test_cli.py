@@ -1001,6 +1001,9 @@ def test_toets_zonder_ontologie_draait_op_de_gebundelde(tmp_path: Path) -> None:
             str(uitvoer),
             "--uitvoer",
             "csv",
+            # Geen cache: anders laat deze test een sleutel achter in
+            # ~/.cache/gwsw-orox-helpers, buiten tmp_path.
+            "--geen-cache",
         ],
     )
 

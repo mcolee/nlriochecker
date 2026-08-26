@@ -3,8 +3,14 @@
 Naslag bij het bouwen. `CLAUDE.md` draagt de harde regels en de werkwijze; dit bestand
 draagt de geverifieerde feiten over de invoerbestanden en de engine/uitvoer-interna die je
 alleen nodig hebt als je het betreffende deel aanraakt. De harde regels zelf (GWSW is
-leidend, `toets` eist `--ontologie`, één uitvoerschrijver, drempels configureerbaar) staan
-in `CLAUDE.md`, niet hier — lees die eerst.
+leidend, de drie ontologietoestanden van `toets`, één uitvoerschrijver, drempels
+configureerbaar) staan in `CLAUDE.md`, niet hier — lees die eerst.
+
+**De leeslaag leeft sinds 0.4 in `gwsw-orox-helpers`** (`gwsw_orox_helpers.dataset`,
+`.graaf`, `.geometry`, `.ontologie`, `.cache`, `.voortgang`, `.bronnen`): het inlezen van
+de OroX-TTL, de klassenhierarchie, de netwerkgraaf, de geometrie, de cache en het
+voortgangsprotocol. De mechaniek die hieronder beschreven staat blijft onverkort gelden —
+alleen het bestand waarin zij staat is verhuisd.
 
 ## Feiten over de invoerbestanden (geverifieerd)
 
@@ -22,7 +28,7 @@ in `CLAUDE.md`, niet hier — lees die eerst.
 - De koppeling wijst naar de ORIENTATIE, niet naar het object, en kan naar een compartiment of hulpstuk wijzen; loop via hasPart omhoog tot een put. De BrutIS-export van De Wolden en Hoogeveen koppelt elk leidingeinde op een hulpstuk aan `<hulpstuk>_put`, een URI zonder type of aspect (1122 hulpstukken, 3024 koppelingen over 2165 strengen; nagemeten). De lader herstelt dat op naamstam -- alleen als het doel onbekend is én de stam een knoop met een Hulpstukorientatie is -- telt het in `GwswDataset.koppelingsherstel` en het rapport meldt het als datasetsignaal `SIG-hulpstukkoppeling` (issue #60). Let op wat het herstel NIET doet: het herstelde eind wijst naar het hulpstuk zelf, en dat is geen netwerkknoop en klimt via hasPart niet naar een put, dus `resolve_network_node` geeft er nog steeds `None` voor. Alleen TOP-022/TOP-023 zien die einden; de netwerkgraaf en de andere checks veranderden er geen bevinding door.
 - De netwerkgraaf uit `checks/verbanden.py` bestaat sinds issue #72 uit twee lagen. `_Netwerk.graph` is het zuivere vrijverval, gericht van BeginpuntLeiding naar EindpuntLeiding; daarop draaien kringlopen (NET-004), stelseltypen (NET-005/006) en de afvoerpadanalyse (`afvoerpaden`). `_bereikbaarheid(context)` is diezelfde graaf plus het mechanische riool (`selectie.mechanischeleidingen`) als ONGERICHTE kanten -- een persleiding is pompgestuurd, dus haar administratieve richting telt niet mee, alleen haar connectiviteit. Alleen de bereikbaarheidsvraag leest die tweede laag: `_bereikbaar_vanaf` (NET-001/002), `_eindpunten` en `_eindpuntnotities`. Die laag wordt LUI gebouwd, in een eigen `context.cached`, en is met opzet geen veld op `_Netwerk`: wie hem opvraagt leest de rol `mechanischeleidingen` en moet die declareren, en zo blijft die declaratie beperkt tot NET-001, NET-002 en NET-008 in plaats van tot elke check die de graaf aanraakt. Waar `resolve_network_node` geen netwerkknoop oplevert valt de mechanische kant terug op de rauwe `Conduit.start_node`/`end_node`, zodat een hulpstuk een doorgeefknoop wordt in plaats van een breuk: het persnet komt samen op T-stukken, en die klimmen via hasPart niet naar een put. Op De Wolden en Hoogeveen hebben 1914 van de 3720 mechanische leidingen (51%) geen twee oplosbare knopen. De notities eromheen tellen bewust alleen vrijvervalknopen: `_richtingsverlies` neemt de samenhangende delen van de bereikbaarheidsgraaf (het gemaal kan buiten het vrijvervaldeel liggen) maar telt binnen zo'n deel alleen de knopen die ook in `graph` staan, want een hulpstuk of een knoop die uitsluitend aan het persnet hangt wordt door geen enkele NET-check beoordeeld. Zie BO-53 en BO-54.
 - Klassen als Lozingspunt, Overnamepunt en UitlaatPunt zijn Knooppunt-subklassen en staan dus op de orientatie. Overnamepunt bestaat alleen in de totaal-ontologie, niet in de deelmodellen.
-- Welke ontologie je laadt bepaalt de uitkomst; gebruik data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl. Zonder ontologie valt de lader terug op herkenning via geometrie en meldt het verschil. (De harde eis dat `toets` `--ontologie` krijgt, staat in `CLAUDE.md`.)
+- Welke ontologie je laadt bepaalt de uitkomst; zonder eigen `--ontologie` is dat de gebundelde totaalontologie uit `gwsw-orox-helpers` (`bronnen.gebundelde_ontologie()`). Zonder ontologie valt de lader terug op herkenning via geometrie en meldt het verschil. (De drie toestanden van `toets` -- eigen pad, gebundeld, `--geen-ontologie` -- staan als harde regel in `CLAUDE.md`.)
 
 ### Studiegebied (data/gis_koekangerveld/, data/gis_dewoldenhoogeveen/)
 - GeoPackage of GeoJSON, gelezen met stdlib sqlite3 plus shapely; geen extra afhankelijkheid. Moet in EPSG:28992 staan, net als de GWSW-coordinaten; herprojecteren doen we niet.
@@ -242,9 +248,14 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   hoe dat pad afgeleid wordt en `GWSW_QGIS_SITE_PACKAGES` om het te overschrijven.
 
 ## Cache en voortgang
-- De geparseerde dataset wordt gecachet (`~/.cache/nlriochecker`, `--geen-cache` om hem
-  over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py`,
-  `geometry.py`, `ontologie.py` of `graaf.py` wijzigt, krijgt vanzelf een nieuwe cache.
+
+Deze laag leeft sinds 0.4 in `gwsw-orox-helpers` (`gwsw_orox_helpers.cache` en
+`.voortgang`); de mechaniek hieronder blijft gelden.
+
+- De geparseerde dataset wordt gecachet (`~/.cache/gwsw-orox-helpers`, `--geen-cache` om
+  hem over te slaan). De sleutel bevat de broncode van de lader; wie `dataset.py`,
+  `geometry.py`, `ontologie.py` of `graaf.py` in die package wijzigt, krijgt vanzelf een
+  nieuwe cache.
   De cachemap groeit per sleutel (op De Wolden en Hoogeveen circa 120 MB, waarvan de
   graafpickle 91 MB); oude sleutels worden niet automatisch opgeruimd.
 - Voortgang bij de zware stappen loopt via het protocol in `voortgang.py`, met

@@ -18,7 +18,7 @@ MINIMUM_ENV = "NLRIOCHECKER_MIN_GESLAAGD"
 # wil vangen is stille overslag: een fixture die niet meekomt, een generator die niet
 # gedraaid is, een tool die op de runner ontbreekt. Een telgrens op "overgeslagen"
 # (`NLRIOCHECKER_MAX_OVERGESLAGEN`, tot 2026-08-25) ving dat, maar telde ook de bedoelde,
-# datagebonden overslagen mee -- de ontologie, het Juinen-voorbeeld en de SHACL-rapporten
+# datagebonden overslagen mee -- het Juinen-voorbeeld, de OroX-export en de SHACL-rapporten
 # staan niet op de runner -- en klapte daardoor twee keer op legitieme testgroei. Daarom
 # classificeert de poort nu op *reden*: een overslag is verwacht als zijn reden zegt waar
 # hij vandaan komt. Al het andere is met deze vlag gezet een harde fout, zonder getal om

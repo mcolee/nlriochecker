@@ -17,7 +17,6 @@
 # Gebruik:
 #   uv run nlriochecker toets \
 #     --dataset data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl \
-#     --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
 #     --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv \
 #     --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_MdsPlan.csv \
 #     --shacl data/shacl_nulmeting/gwsw_shacl_report_MdsProj.csv \
@@ -25,7 +24,9 @@
 #     --bronnen data/gis_dewoldenhoogeveen \
 #     --output uitvoer/dewoldenhoogeveen
 #
-# Op 2026-08-19 kostte die run 6:00 en 5,9 GB piekgeheugen.
+# Zonder `--ontologie` draait die run op de GWSW-ontologie die met gwsw-orox-helpers
+# meekomt; dat is de bedoelde weg. Op 2026-08-19 kostte de run 6:00 en 5,9 GB
+# piekgeheugen.
 
 #
 # Klassenwortels bepalen welke objecten als put, vrijvervalleiding of netwerk-

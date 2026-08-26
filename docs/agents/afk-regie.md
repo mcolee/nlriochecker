@@ -51,8 +51,8 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    > - Maak de BO('s) die het issue noemt aan in `docs/beslislog.md`; het volgende nummer is
    >   `grep -n '^### BO-' docs/beslislog.md | tail -1` + 1 (chronologisch onderaan).
    > - Regenereer elke generator die je raakt (`scripts/maak_ttl_fixtures.py`,
-   >   `scripts/dekkingsmatrix.py`, `scripts/maak_gwsw_index.py`) en werk de checkdeclaratie
-   >   (`rollen`/`kenmerken`) bij als de check anders selecteert/leest.
+   >   `scripts/dekkingsmatrix.py`) en werk de checkdeclaratie (`rollen`/`kenmerken`) bij
+   >   als de check anders selecteert/leest.
    > - Voeg een regel toe onder `## [Unreleased]` in `CHANGELOG.md`.
    > - Draai de **volledige mechanische poort op de voorgrond** en plak de uitvoer:
    >   `uv run ruff check`, `uv run ruff format --check`, `uv run mypy`,

@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from gwsw_orox_helpers.cache import laad_met_cache
 from gwsw_orox_helpers.dataset import markeer_vulwaarden
 
@@ -61,7 +62,7 @@ def buurten() -> list[StudyArea]:
 def main() -> None:
     dataset, _ = laad_met_cache(
         Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl"),
-        [Path("data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl")],
+        [gebundelde_ontologie()],
     )
     configpad = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("configs/dewoldenhoogeveen.toml")
     config = load_check_config(configpad)

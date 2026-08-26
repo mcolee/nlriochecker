@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 """Draait de poort in de conditie van de CI-runner, vóór je pusht.
 
-De runner heeft van `data/` alleen wat git kent (de checkregisters en de
-vocabulaire-index), geen PyQGIS, en de grensvariabelen uit
-`.github/workflows/toets.yml`. Een test die hier slaagt maar daar overslaat -- of andersom
--- zie je pas na de push, en dan als rode run. Dit script bootst die conditie na: het zet
-`data/` tijdelijk opzij, zet alleen de getrackte bestanden terug, zet PyQGIS uit en draait
-dezelfde pytest-regel met dezelfde omgeving als de workflow. Beide leest het uit de
-workflow zelf, zodat er maar een waarheid is (BO-48).
+De runner heeft van `data/` alleen wat git kent (de twee checkregisters), geen PyQGIS, en
+de grensvariabelen uit `.github/workflows/toets.yml`. Een test die hier slaagt maar daar
+overslaat -- of andersom -- zie je pas na de push, en dan als rode run. Dit script bootst
+die conditie na: het zet `data/` tijdelijk opzij, zet alleen de getrackte bestanden terug,
+zet PyQGIS uit en draait dezelfde pytest-regel met dezelfde omgeving als de workflow.
+Beide leest het uit de workflow zelf, zodat er maar een waarheid is (BO-48).
 
 Gebruik:  uv run python scripts/runnerpoort.py
 De exitcode is die van pytest.

@@ -16,6 +16,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from gwsw_orox_helpers.cache import laad_met_cache
 
 from nlriochecker.checkconfig import load_check_config
@@ -25,7 +26,7 @@ from nlriochecker.toetsloop import toets_gebieden
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 TTL = Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl")
-ONTOLOGIE = [Path("data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl")]
+ONTOLOGIE = [gebundelde_ontologie()]
 CONFIG = Path("configs/dewoldenhoogeveen.toml")
 GEBIED = Path("data/gis_koekangerveld/cbs_buurt_koekangerveld_studiegebied.gpkg")
 

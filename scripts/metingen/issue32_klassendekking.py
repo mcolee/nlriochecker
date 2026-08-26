@@ -53,10 +53,11 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from rdflib import OWL, RDF, RDFS, Graph, URIRef
 
 WORTEL = Path(__file__).resolve().parents[2]
-ONTOLOGIE = WORTEL / "data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl"
+ONTOLOGIE = gebundelde_ontologie()
 EXPORT = WORTEL / "data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl"
 # De twee bestanden waarin `[klassen]` staat. De huidige lijsten worden hieruit
 # gelezen en niet overgeschreven uit het issue: anders zou de meting stil verouderen
@@ -164,7 +165,7 @@ class Ontologie:
 
         Bewust niet `bestaat` genoemd, en bewust niet afgeleid uit `kinderen`/`ouders`.
         "Komt deze naam in een `subClassOf`-tripel voor" is een derde definitie van
-        bestaan naast die van `scripts/maak_gwsw_index.py` en die van de
+        bestaan naast die van de indexgenerator in `gwsw-orox-helpers` en die van de
         vocabulairetest, en juist bij dit onderwerp mag een kolom niet meer beweren dan
         ze meet. Een collectielid is geen klasse maar bestaat wel degelijk: `gwsw:Muil`
         draagt `a gwsw:VormLeidingColl` en `gwsw:Metselwerk` draagt
@@ -762,7 +763,7 @@ def _controleer_parser(
 
 def main() -> None:
     """Draait de hele meting en drukt het verslag af."""
-    print(f"Ontologie : {ONTOLOGIE.relative_to(WORTEL)}")
+    print(f"Ontologie : {ONTOLOGIE.name} (gebundeld met gwsw-orox-helpers)")
     print(f"Export    : {EXPORT.relative_to(WORTEL)}")
     print(f"Config    : {' + '.join(str(pad.relative_to(WORTEL)) for pad in CONFIGS)}")
     klassen = _huidige_klassen()

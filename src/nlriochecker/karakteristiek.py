@@ -97,9 +97,9 @@ def bepaal_karakteristiek(dataset: GwswDataset, config: CheckConfig) -> DataChar
 def _vulwaarden(dataset: GwswDataset) -> int:
     """Telt de hoogtewaarden die de vulwaarde-leesregel heeft weggezet.
 
-    Precies de vier kenmerken die `_inwinningsvulling` telt: `markeer_vulwaarden`
-    werkt op geen andere velden. Elk van deze waarden is uit de noemers van die
-    tabel verdwenen.
+    Precies de vier kenmerken die `_inwinningsvulling` telt:
+    `gwsw_orox_helpers.dataset.markeer_vulwaarden` werkt op geen andere velden. Elk van
+    deze waarden is uit de noemers van die tabel verdwenen.
     """
     return sum(len(node.vulwaarden) for node in dataset.nodes.values()) + sum(
         len(conduit.vulwaarden) for conduit in dataset.conduits.values()

@@ -22,7 +22,6 @@ De eigen checks uit het checkregister op de OroX-dataset draaien:
 ```bash
 nlriochecker toets \
   --dataset data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl \
-  --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
   --shacl data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv \
   --output uitvoer
 ```
@@ -31,13 +30,17 @@ Verder: `nlriochecker dekking` toetst de nulmeting tegen het checkregister, en
 `nlriochecker vergelijk --eerder ... --later ...` zet twee meetmomenten naast elkaar voor
 de trend. Elk subcommando kent `--help`.
 
-### `toets` eist de ontologie
+### `toets` en de ontologie
 
-`toets` weigert te draaien zonder `--ontologie`. De andere subcommando's niet:
-`analyseer --dataset` zonder `--ontologie` draait door en berekent de typeringsscore
-met een afsluiting die op de kale wortelklassen blijft steken, zonder voorbehoud. De
-poort staat dus bij `toets` en niet bij het pakket als geheel. De OroX-export typeert niet op
-wortelniveau -- er staat `Inspectieput` in en geen `Put` -- en draagt zelf geen enkele
+De GWSW-ontologie hoef je niet aan te wijzen: zij reist mee met de leeslaagpackage
+[gwsw-orox-helpers](https://github.com/mcolee/gwsw-orox-helpers), en zonder `--ontologie`
+laadt `toets` die gebundelde versie. Met `--ontologie <pad>` (meermaals toegestaan) kies je
+een eigen ontologie; dat gaat dan voor. Die terugval geldt alleen voor `toets`:
+`analyseer --dataset` zonder `--ontologie` berekent de typeringsscore met een afsluiting
+die op de kale wortelklassen blijft steken, zonder voorbehoud.
+
+Wat er bij `toets` niet gebeurt, is doorlopen zónder klassenhierarchie. De OroX-export
+typeert niet op wortelniveau -- er staat `Inspectieput` in en geen `Put` -- en draagt geen
 `rdfs:subClassOf`. Zonder de klassenhierarchie leveren `putten()` en `leidingen()` dus
 een lege verzameling. De checks draaien dan over een onvolledige selectie en hun
 uitkomst draagt geen oordeel, terwijl het rapport dat nergens zei.
@@ -125,7 +128,6 @@ dan een feature, dan rapporteert `toets` per feature:
 ```bash
 nlriochecker toets \
   --dataset data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl \
-  --ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl \
   --studiegebied data/gis_koekangerveld/buurten.gpkg \
   --output uitvoer
 ```
@@ -332,8 +334,8 @@ geschreven paden op stdout schoon blijven voor wie de uitvoer doorpipet; buiten 
 terminal valt hij terug op een enkele regel per fase.
 
 Wie de package als library gebruikt, geeft een eigen implementatie van het protocol in
-`nlriochecker.voortgang` mee. Zonder argument gebeurt er niets: voortgang is weergave en
-raakt de uitkomst van een run nergens.
+`gwsw_orox_helpers.voortgang` mee. Zonder argument gebeurt er niets: voortgang is weergave
+en raakt de uitkomst van een run nergens.
 
 ## Ontwikkelen
 
@@ -360,10 +362,11 @@ dev-groep en wordt per run met `--with` opgelost. Beide poorten dwingen een onde
 95% af (`--cov-fail-under`). Gemeten: 97% mét `data/` en 96% in de CI-conditie zonder
 `data/` -- beide ruim boven de grens.
 
-Zet je een nieuwe GWSW-ontologie in `data/gwsw_ontologieen/`, draai dan
-`uv run python scripts/maak_gwsw_index.py`. Dat schrijft de getrackte afgeleide
-`data/gwsw-vocabulaire-index.json` opnieuw, waartegen de GWSW-vocabulairetest valideert;
-werk in dezelfde stap de GWSW-versie in [CLAUDE.md](CLAUDE.md) bij.
+Het inlezen van de OroX-TTL zelf staat niet in deze repository: de leeslaag (dataset,
+graaf, geometrie, ontologie, cache, voortgang) is de package
+[gwsw-orox-helpers](https://github.com/mcolee/gwsw-orox-helpers) (MIT), die ook de
+GWSW-ontologie en de vocabulaire-index meelevert. Een nieuwe GWSW-versie is dus een release
+daar, gevolgd door `uv lock` hier.
 
 Wat er per versie veranderde staat in [CHANGELOG.md](CHANGELOG.md); zet nieuwe
 wijzigingen onder `## [Unreleased]`.

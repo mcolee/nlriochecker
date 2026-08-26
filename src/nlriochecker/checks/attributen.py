@@ -1207,9 +1207,9 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
 class HoogteOpVulwaarde(Check):
     """ATTR-013: een hoogtekenmerk dat een vulwaarde draagt in plaats van een meting.
 
-    De leesregel zelf staat in `dataset.markeer_vulwaarden` (toegepast in `toetsrun`);
-    deze check meldt per object een keer wat die regel heeft weggezet, zodat het in de
-    uitvoer staat en niet alleen in de toelichting van de hoogtechecks.
+    De leesregel zelf staat in `gwsw_orox_helpers.dataset.markeer_vulwaarden` (toegepast
+    in `toetsrun`); deze check meldt per object een keer wat die regel heeft weggezet,
+    zodat het in de uitvoer staat en niet alleen in de toelichting van de hoogtechecks.
     """
 
     id = "ATTR-013"
