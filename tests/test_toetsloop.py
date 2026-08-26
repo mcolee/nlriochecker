@@ -273,7 +273,7 @@ def test_de_json_per_gebied_labelt_bekeken_en_de_totaal_json_niet(tmp_path: Path
     assert {rij["bekeken_scope"] for rij in gebied["checks"]} <= {
         "analyseset",
         "volledige_export",
-        "attribuut-instanties",
+        "attribuut_instanties",
     }
     assert "checks" not in totaal
 

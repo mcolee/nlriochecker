@@ -99,7 +99,7 @@ in `CLAUDE.md`, niet hier — lees die eerst.
   met haar vlag: dat zijn archieven en een publiek contract, en alleen de mensgerichte
   views vouwen samen.
 - **Wat `bekeken` telde staat erbij** (issue #77): elke `CheckOutcome` draagt
-  `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut-instanties`, de enum
+  `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut_instanties`, de enum
   `checks.base.Scope` -- en `populatie`, de gedeclareerde rollen van de check (zonder
   rollen: zijn kenmerken; zonder beide: leeg). `run_checks` leidt de scope af uit
   dezelfde beslissing die de check zijn dataset gaf (`over_volledige_populatie`) plus de

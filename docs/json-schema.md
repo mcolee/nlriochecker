@@ -164,7 +164,7 @@ onderling niet te vergelijken. Zie BO-58 in [docs/beslislog.md](beslislog.md).
 |---|---|---|
 | `check_id` | string | Check-ID uit het checkregister; hetzelfde ID als op de meldingen. |
 | `bekeken` | integer | Hoeveel deze check bekeken heeft. Wat de eenheid is, zegt `bekeken_scope`. |
-| `bekeken_scope` | string | Waarover geteld is: `analyseset`, `volledige_export` of `attribuut-instanties`. |
+| `bekeken_scope` | string | Waarover geteld is: `analyseset`, `volledige_export` of `attribuut_instanties`. |
 | `populatie` | string | De populatie die de check *declareert* — waar hij over gaat, **niet** de noemer van `bekeken`. Zijn rollen komma-gescheiden; declareert hij er geen, dan zijn kenmerken (`alle kenmerken` voor `*`); declareert hij geen van beide, dan een lege string. |
 
 De drie waarden van `bekeken_scope`:
@@ -175,7 +175,7 @@ De drie waarden van `bekeken_scope`:
 - **`volledige_export`** — de check gaat over de hele populatie (`Check.volledig_bereik`
   of `[studiegebied] volledige_dataset_checks`) en telt daarom altijd de volledige
   export, ook met een studiegebied. ADM-002 (dubbele identificaties) is er een.
-- **`attribuut-instanties`** — het getal telt geen objecten maar instanties van een
+- **`attribuut_instanties`** — het getal telt geen objecten maar instanties van een
   kenmerk: ATTR-014 elke kenmerkinstantie met een property-restrictie, BTR-006 elke
   hoogtewaarde. Op De Wolden staat 459.108 tegenover 45.803 objecten; die twee getallen
   naast elkaar leggen heeft geen betekenis.

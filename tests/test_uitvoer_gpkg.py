@@ -199,7 +199,7 @@ def test_overzicht_checks_labelt_waarover_bekeken_geteld_is(tmp_path: Path) -> N
 
     assert rijen["TOP-013"] == ("analyseset", "leidingen, netwerkknopen, vrijvervalrioolleidingen")
     assert rijen["ADM-002"] == ("volledige_export", "leidingen, netwerkknopen")
-    assert rijen["ATTR-014"] == ("attribuut-instanties", "alle kenmerken")
+    assert rijen["ATTR-014"] == ("attribuut_instanties", "alle kenmerken")
     assert rijen["RVZ-011"] == (
         "analyseset",
         "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau",

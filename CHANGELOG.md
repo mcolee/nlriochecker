@@ -14,7 +14,7 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 ### Toegevoegd
 
 - **`bekeken` zegt per check waarover het geteld is** (issue #77, BO-58). Elke uitslag
-  draagt `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut-instanties` --
+  draagt `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut_instanties` --
   en `populatie`, de populatie die de check declareert (zijn rollen, anders zijn
   kenmerken) -- waar hij over gaat, niet de noemer van het getal, en daarom overal achter
   "gaat over". Ze staan in de checktabel van het

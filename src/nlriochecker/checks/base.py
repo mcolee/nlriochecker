@@ -66,7 +66,7 @@ class Scope(StrEnum):
 
     ANALYSESET = "analyseset"
     VOLLEDIGE_EXPORT = "volledige_export"
-    ATTRIBUUT_INSTANTIES = "attribuut-instanties"
+    ATTRIBUUT_INSTANTIES = "attribuut_instanties"
 
 
 @dataclass(frozen=True)
@@ -561,7 +561,7 @@ def _scope(check: Check, over_volledige_populatie: bool) -> Scope:
 
     Twee onafhankelijke assen, en de instantieteller wint: telt een check geen
     objecten, dan zegt "volledige export" niets over zijn noemer. ATTR-014 heeft
-    `volledig_bereik` én telt instanties, en heet daarom `attribuut-instanties`.
+    `volledig_bereik` én telt instanties, en heet daarom `attribuut_instanties`.
     """
     if check.telt_instanties:
         return Scope.ATTRIBUUT_INSTANTIES

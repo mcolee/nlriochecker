@@ -3006,7 +3006,7 @@ een meetmoment van vóór deze wijziging telt appels en peren, en `vergelijk` ze
 **Wat.** Elke `CheckOutcome` draagt naast `examined` twee duidingen (issue #77):
 
 - `bekeken_scope` (`checks.base.Scope`), met **precies drie** waarden:
-  `analyseset`, `volledige_export` en `attribuut-instanties`;
+  `analyseset`, `volledige_export` en `attribuut_instanties`;
 - `populatie`, de populatie die de check **declareert** -- zijn rollen als leesbare
   opsomming; zonder rollen zijn kenmerken (`alle kenmerken` voor `*`); zonder beide leeg.
 
@@ -3023,7 +3023,17 @@ volledige export, afhankelijk van `Check.volledig_bereik` en
 `[studiegebied] volledige_dataset_checks`. De tweede is wat `examined()` op die dataset
 telt: objecten van een rol, of instanties van een kenmerk. De tweede as wint, want telt
 een check geen objecten dan zegt "volledige export" niets over zijn noemer: ATTR-014
-heeft `volledig_bereik` én telt instanties, en heet daarom `attribuut-instanties`.
+heeft `volledig_bereik` én telt instanties, en heet daarom `attribuut_instanties`.
+
+**Onderstreping in plaats van een koppelteken.** Issue #77 schreef die derde waarde
+letterlijk als `attribuut-instanties`. De uitgebrachte waarde is
+`attribuut_instanties`, met een onderstreping: zij staat in hetzelfde veld als
+`volledige_export`, en één van de drie waarden een ander scheidingsteken geven maakt
+elke afnemer die op de string vergelijkt afhankelijk van welke waarde hij toevallig
+tegenkomt. Het koppelteken had geen andere grond dan de schrijfwijze in het issue. De
+correctie is bij de eindreview van #72--#77 gemaakt, vóór de eerste uitgave waarin het
+veld voorkomt, dus er is geen afnemer die de oude spelling gezien heeft en de
+JSON-schemaversie hoeft er niet voor omhoog.
 
 Welke checks instanties tellen is niet uit de code af te leiden en staat daarom als
 `Check.telt_instanties` op de klasse, bewaakt door
@@ -3073,10 +3083,10 @@ op `dewoldenhoogeveen_orox.ttl` met `configs/dewoldenhoogeveen.toml`:
 |---|---:|---|---:|---:|
 | `analyseset` | 95 | HGT-011 (`netwerkknopen`) | 22.363 | 79 |
 | `volledige_export` | 2 | ADM-002 (`leidingen, netwerkknopen`) | 45.803 | 45.803 |
-| `attribuut-instanties` | 2 | ATTR-014 (`alle kenmerken`) | 459.108 | 459.108 |
+| `attribuut_instanties` | 2 | ATTR-014 (`alle kenmerken`) | 459.108 | 459.108 |
 
 De andere twee: ATTR-015 (`volledige_export`, 29.087 gedateerde objecten) en BTR-006
-(`attribuut-instanties`, 57.569 hoogtewaarden gemeentebreed, 161 op Koekangerveld).
+(`attribuut_instanties`, 57.569 hoogtewaarden gemeentebreed, 161 op Koekangerveld).
 ATTR-018 op Koekangerveld leest nu als "36 bevindingen op 119 bekeken (analyseset; gaat
 over: leidingen, putten, vrijvervalrioolleidingen)". Let op het verschil met de 39 putten uit
 `scripts/analyse_begindatum.py`: dat script telt de **kern**, terwijl `bekeken` de

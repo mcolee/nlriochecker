@@ -732,7 +732,7 @@ def test_json_labelt_per_check_waarover_bekeken_geteld_is(toets: CheckRun, tmp_p
     assert [rij["check_id"] for rij in document["checks"]] == sorted(per_check)
     assert len(per_check) == len(toets.outcomes)
     assert per_check["ADM-002"]["bekeken_scope"] == "volledige_export"
-    assert per_check["ATTR-014"]["bekeken_scope"] == "attribuut-instanties"
+    assert per_check["ATTR-014"]["bekeken_scope"] == "attribuut_instanties"
     assert per_check["ATTR-014"]["populatie"] == "alle kenmerken"
     assert per_check["RVZ-011"]["populatie"] == (
         "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau"

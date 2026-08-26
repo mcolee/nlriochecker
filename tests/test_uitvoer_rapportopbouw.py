@@ -524,7 +524,7 @@ class TestBekekenScope:
         """ATTR-014 telt geen objecten maar instanties van een kenmerk."""
         tekst = _rapport(_run("top013_parallel.ttl", "ATTR-014"), tmp_path)
 
-        assert "bekeken (attribuut-instanties; gaat over: alle kenmerken)" in tekst
+        assert "bekeken (attribuut_instanties; gaat over: alle kenmerken)" in tekst
 
     def test_een_check_zonder_rollen_noemt_zijn_kenmerken(self, tmp_path: Path) -> None:
         """RVZ-011 telt de drempels aan een put; "de hele export" loog over de noemer.
