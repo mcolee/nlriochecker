@@ -610,3 +610,24 @@ def test_buurten_beperken_de_trekking_tot_hun_vlak(tmp_path: Path) -> None:
         steekproef.schrijf_steekproef(
             bron, doel, 10, "seed", 1000.0, buurten=(buurten, ["Koekange"])
         )
+
+
+def test_alleen_checks_beperkt_steekproef_en_dekking(tmp_path: Path) -> None:
+    """`--check` laat alleen de genoemde checks over, ook in de dekkingstabel."""
+    bron = _run_met_drie_checks(tmp_path)
+    doel = tmp_path / "steekproef.gpkg"
+
+    steekproef.schrijf_steekproef(
+        bron, doel, 10, "seed", 1000.0, alleen_checks=["ADM-002", "NET-003"]
+    )
+
+    verbinding = sqlite3.connect(doel)
+    ids = {r[0] for r in verbinding.execute(f"select check_id from {steekproef.LAAG_LOCATIES}")}
+    dekking = {r[0] for r in verbinding.execute(f"select check_id from {steekproef.TABEL_DEKKING}")}
+    (checks,) = verbinding.execute(f"select checks from {steekproef.TABEL_RUN}").fetchone()
+    verbinding.close()
+    assert ids == dekking == {"ADM-002", "NET-003"}
+    assert checks == "ADM-002, NET-003"
+
+    with pytest.raises(ValueError, match="onbekende check"):
+        steekproef.schrijf_steekproef(bron, doel, 10, "seed", 1000.0, alleen_checks=["XYZ-1"])

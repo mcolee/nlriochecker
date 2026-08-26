@@ -595,6 +595,7 @@ def schrijf_steekproef(
     celgrootte: float,
     buurten: tuple[Path, list[str]] | None = None,
     per_bestand: int | None = None,
+    alleen_checks: list[str] | None = None,
 ) -> dict[str, int]:
     """Trekt de steekproef uit `bron` en schrijft haar naar `doel`.
 
@@ -606,6 +607,8 @@ def schrijf_steekproef(
     meldingen met een foutlocatie in die buurten mee. `per_bestand` splitst de uitvoer
     in genummerde bestanden van ten hoogste zoveel rijen, in registervolgorde en met
     elke check heel in één bestand; de dekkingstabel staat volledig in elk bestand.
+    `alleen_checks` beperkt de steekproef én de dekkingstabel tot die check-ID's; een
+    onbekend ID is een fout.
 
     `doel` mag de bron niet zijn: die wordt gewist voordat er gelezen wordt, en dan
     is een run van minuten weg door een typefout. Dezelfde voorwaarde als
@@ -622,6 +625,13 @@ def schrijf_steekproef(
     try:
         checks = lees_checks(lezen)
         alle = lees_meldingen(lezen)
+        if alleen_checks:
+            bekend = {str(check["check_id"]) for check in checks}
+            onbekend = sorted(set(alleen_checks) - bekend)
+            if onbekend:
+                raise ValueError(f"onbekende check(s) {', '.join(onbekend)} in overzicht_checks.")
+            checks = [check for check in checks if str(check["check_id"]) in alleen_checks]
+            alle = {k: v for k, v in alle.items() if k in alleen_checks}
         per_check = (
             {check_id: binnen(meldingen, gebied) for check_id, meldingen in alle.items()}
             if gebied is not None
@@ -725,6 +735,7 @@ def schrijf_steekproef(
                 seed,
                 celgrootte,
                 buurten[1] if buurten else [],
+                alleen_checks or [],
                 f"{volgnummer} van {len(doelen)}",
             )
             verbinding.commit()
@@ -815,6 +826,7 @@ def _schrijf_herkomst(
     seed: str,
     celgrootte: float,
     buurten: list[str],
+    alleen_checks: list[str],
     bestand: str,
 ) -> None:
     """Schrijft de herkomst van dit bestand: gereedschap, bron en trekkingsinstellingen.
@@ -830,13 +842,14 @@ def _schrijf_herkomst(
         ("seed", "text"),
         ("celgrootte_m", "real"),
         ("buurten", "text"),
+        ("checks", "text"),
         ("bestand", "text"),
     ]
     _maak_tabel(verbinding, TABEL_RUN, kolommen, "Herkomst van deze steekproef en haar trekking.")
     verbinding.execute(
         f'insert into "{TABEL_RUN}" '
         "(gereedschap, bron_geopackage, gemaakt_op, aantal_per_check, seed, celgrootte_m, "
-        "buurten, bestand) values (?, ?, ?, ?, ?, ?, ?, ?)",
+        "buurten, checks, bestand) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             gereedschap(),
             str(bron),
@@ -845,6 +858,7 @@ def _schrijf_herkomst(
             seed,
             celgrootte,
             ", ".join(buurten),
+            ", ".join(alleen_checks),
             bestand,
         ),
     )
@@ -885,6 +899,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Splits in genummerde bestanden van ten hoogste zoveel rijen (check blijft heel).",
     )
+    ontleder.add_argument(
+        "--check",
+        action="append",
+        default=[],
+        help="Beperk tot dit check-ID; herhaalbaar. Standaard alle eigen checks.",
+    )
     argumenten = ontleder.parse_args(argv)
 
     bron: Path = argumenten.bron
@@ -918,6 +938,7 @@ def main(argv: list[str] | None = None) -> int:
             argumenten.cel,
             buurten,
             argumenten.per_bestand,
+            argumenten.check or None,
         )
     except ValueError as fout:
         print(f"Fout: {fout}", file=sys.stderr)

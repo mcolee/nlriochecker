@@ -16,8 +16,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 - **`scripts/steekproef.py` trekt op buurt en splitst in kleine bestanden.** Nieuwe opties
   `--buurten <CBS-gpkg> --buurt <naam>...` (alleen meldingen met een foutlocatie in die
   buurten; de dekkingstabel telt `in_gebied` en meldt "geen bevindingen in de gekozen
-  buurten (N erbuiten)") en `--per-bestand N` (genummerde bestanden in registervolgorde,
-  elke check heel in één bestand, de dekkingstabel volledig in elk). Elke rij draagt nu
+  buurten (N erbuiten)"), `--per-bestand N` (genummerde bestanden in registervolgorde,
+  elke check heel in één bestand, de dekkingstabel volledig in elk) en `--check ID`
+  (herhaalbaar; beperkt steekproef en dekkingstabel tot die checks). Elke rij draagt nu
   ook alle kolommen van de put/streng uit de run (`obj_`-voorvoegsel bij een naamclash) en
   één lege kolom `feedback` in plaats van `oordeel` + `opmerking`. Voorbereiding op de
   checkaudit (#68–#70).

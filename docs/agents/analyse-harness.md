@@ -60,8 +60,10 @@ context = CheckContext(dataset=dataset, config=config)
   is de volle run (mét `--bronnen`) na de fixgolf van #72–#77; `steekproef_dorpen/` is de
   handmatige steekproef daarop voor de checkaudit (#68–#70): 3 per check in Koekangerveld,
   Verspreide huizen Koekange, Veeningen, Fluitenberg kern en Schutlanden-Oost/-West, 14
-  bestanden van ≤10 rijen met een kolom `feedback` van de auteur — lees die feedback vóór
-  je een auditverslag schrijft. Het commando staat in de docstring van `scripts/steekproef.py`.
+  bestanden van ≤10 rijen met een kolom `feedback` van de auteur, plus `steekproef_extra_01/02`
+  (Zuidwolde kern en Ruinerwold-Buiten, alleen de zeven checks die in de dorpen leeg
+  bleven: TOP-004/013/020, ATTR-006/016, HGT-004, NET-008) — lees die feedback vóór je een
+  auditverslag schrijft. Het commando staat in de docstring van `scripts/steekproef.py`.
 - **Een vergelijkbare gemeentebrede run heeft dezelfde vlaggen als de baseline nodig**, en
   `volledig_24082026/` draaide mét `--bronnen data/gis_dewoldenhoogeveen` (de EXT-checks).
   Zonder die vlag ontbreken de EXT-bevindingen en klopt de totaaltelling niet; op 26-08
