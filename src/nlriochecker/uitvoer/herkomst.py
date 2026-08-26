@@ -119,6 +119,7 @@ def schrijf_json(
     gebied: str | None = None,
     gebieden: list[str] | None = None,
     onderdrukking: Onderdrukking | None = None,
+    checks: list[dict[str, object]] | None = None,
 ) -> Path:
     """Schrijft de meldingenstroom als JSON, met een envelop die de run beschrijft.
 
@@ -159,6 +160,14 @@ def schrijf_json(
     hoeveel meldingen erdoor wegvielen (BO-49). Ook dit veld is optioneel en additief --
     het staat er alleen als de projectconfiguratie iets onderdrukt, zodat een run zonder
     lijsten byte-voor-byte blijft zoals hij was en `SCHEMA_VERSIE` niet omhoog hoeft.
+
+    `checks` draagt per check de noemer van zijn uitslag: hoeveel er bekeken is, waarover
+    dat geteld is en om welke populatie het gaat (issue #77). Hij komt kant-en-klaar
+    binnen via `bevindingen.checks_json`; ook hier interpreteert deze functie niets.
+    Optioneel en additief om dezelfde reden als `onderdrukt`, en om die reden ook niet
+    hernummerd; de totaalsynthese over meerdere gebieden laat hem weg, want `bekeken` is
+    daar per gebied gemeten en een som of een eerste gebied zou een dekking beweren die
+    niemand gemeten heeft.
     """
     document: dict[str, object] = {
         "schema_versie": SCHEMA_VERSIE,
@@ -184,6 +193,8 @@ def schrijf_json(
         }
     if markering:
         document["markering"] = markering
+    if checks is not None:
+        document["checks"] = checks
     document |= {
         "aantal_meldingen": len(meldingen),
         "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),

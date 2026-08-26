@@ -437,8 +437,8 @@ class TestSystemischGeneriek:
         """Een zelf gedeclareerde systemische bevinding kan op een lege populatie staan.
 
         De populatieratio slaat dan niet aan (delen door nul), maar de check mag zijn
-        eigen bevinding nog steeds systemisch noemen. De regel hoort dan "0 bekeken
-        objecten" te melden en geen aandeel te suggereren dat niet gemeten is.
+        eigen bevinding nog steeds systemisch noemen. De regel hoort dan nul bekeken te
+        melden en geen aandeel te suggereren dat niet gemeten is.
         """
         run = _run("top013_parallel.ttl", "TOP-013")
         leeg = replace(run, outcomes=tuple(replace(o, examined=0) for o in run.outcomes))
@@ -448,7 +448,7 @@ class TestSystemischGeneriek:
         )
         tekst = markdown.read_text(encoding="utf-8")
 
-        assert "Systemisch: 1 bevinding op 0 bekeken objecten" in tekst
+        assert "Systemisch: 1 bevinding op 0 bekeken (analyseset:" in tekst
 
     def test_de_csv_en_de_json_houden_de_systemische_rijen(self, tmp_path: Path) -> None:
         """Publiek contract: alleen de mensgerichte views vouwen samen.
@@ -474,3 +474,41 @@ class TestSystemischGeneriek:
         assert [r for r in rijen if r["check_id"] == "NET-001" and r["systemisch"]]
         assert "**Bevindingen (1)**" not in tekst
         assert "Systemisch: 1 bevinding op" in tekst
+
+
+class TestBekekenScope:
+    """Het rapport zegt per check waarover `bekeken` geteld is (issue #77).
+
+    Het kale getal mengt drie noemers: een rol op de analyseset, dezelfde rol op de
+    volledige export, en kenmerkinstanties. Zonder label leest de checktabel als een
+    kolom die overal hetzelfde telt.
+    """
+
+    def test_de_checktabel_noemt_scope_en_populatie(self, tmp_path: Path) -> None:
+        tekst = _rapport(_run("top013_parallel.ttl", "TOP-013"), tmp_path)
+        kop = next(regel for regel in tekst.splitlines() if regel.startswith("| Check "))
+        rij = next(regel for regel in tekst.splitlines() if regel.startswith("| TOP-013 "))
+
+        assert "| Bekeken scope " in kop
+        assert "| Populatie " in kop
+        assert "analyseset" in rij
+        assert "leidingen, netwerkknopen, vrijvervalrioolleidingen" in rij
+
+    def test_de_detailregel_noemt_scope_en_populatie(self, tmp_path: Path) -> None:
+        """De regel zei "bekeken objecten", ook waar een check instanties telt."""
+        tekst = _rapport(_run("top013_parallel.ttl", "TOP-013"), tmp_path)
+
+        assert "bekeken (analyseset: leidingen, netwerkknopen, vrijvervalrioolleidingen)" in tekst
+        assert "bekeken objecten" not in tekst
+
+    def test_een_check_over_de_volledige_export_zegt_dat(self, tmp_path: Path) -> None:
+        """ADM-002 zoekt dubbele identificaties en draait daarom op de hele export."""
+        tekst = _rapport(_run("top013_parallel.ttl", "ADM-002"), tmp_path)
+
+        assert "bekeken (volledige_export: leidingen, netwerkknopen)" in tekst
+
+    def test_een_check_die_kenmerkinstanties_telt_zegt_dat(self, tmp_path: Path) -> None:
+        """ATTR-014 telt geen objecten maar instanties van een kenmerk."""
+        tekst = _rapport(_run("top013_parallel.ttl", "ATTR-014"), tmp_path)
+
+        assert "bekeken (attribuut-instanties: de hele export)" in tekst

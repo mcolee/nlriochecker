@@ -202,6 +202,25 @@ def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
     return rijen
 
 
+def checks_json(run: CheckRun) -> list[dict[str, object]]:
+    """De noemer van elke check als JSON-klare rijen, gesorteerd op check-ID.
+
+    Wat `bekeken` telde staat niet in de meldingen: het hoort bij de check en niet bij
+    de rij, dezelfde scheiding waarom de CFK-set niet in de CSV staat. Zonder scope en
+    populatie is het een kaal getal waarvan een afnemer de noemer niet kent, en dan
+    zijn ook de percentages die erop delen onvergelijkbaar (issue #77).
+    """
+    return [
+        {
+            "check_id": outcome.check_id,
+            "bekeken": outcome.examined,
+            "bekeken_scope": outcome.bekeken_scope.value,
+            "populatie": outcome.populatie,
+        }
+        for outcome in sorted(run.outcomes, key=lambda outcome: outcome.check_id)
+    ]
+
+
 def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
     """Zet de meldingen in de archieftabel."""
     rows = [
@@ -736,7 +755,7 @@ def _detail_eigen(
         regels += [
             f"Ernst {outcome.severity.value}, dimensie {outcome.dimension.value}. "
             f"{getal(len(eigen), 'bevinding', 'bevindingen')} op "
-            f"{outcome.examined} bekeken objecten."
+            f"{_bekeken_regel(outcome)}."
             f"{markering}",
         ]
         regels += ["", f"_{_toetst_regel(outcome, run.config)}_"]
@@ -762,9 +781,20 @@ def _detail_eigen(
                 ]
         if systemisch:
             regels += _systemische_regel(
-                len(systemisch), outcome.examined, alle=not per_object, met_csv=met_csv
+                len(systemisch), outcome, alle=not per_object, met_csv=met_csv
             )
     return regels
+
+
+def _bekeken_regel(outcome) -> str:
+    """Wat `bekeken` van deze check telde: het aantal, de scope en de populatie.
+
+    Eén formulering voor de detailregel en voor de generieke systemische regel
+    eronder. Het kale getal mengt drie noemers -- een rol op de analyseset, dezelfde
+    rol op de volledige export, en kenmerkinstanties -- en "bekeken objecten" was voor
+    de derde soort gewoon onwaar (issue #77).
+    """
+    return f"{outcome.examined} bekeken ({outcome.bekeken_scope.value}: {outcome.populatie})"
 
 
 def _volledige_lijst(met_csv: bool) -> str:
@@ -781,7 +811,7 @@ def _volledige_lijst(met_csv: bool) -> str:
     )
 
 
-def _systemische_regel(aantal: int, examined: int, *, alle: bool, met_csv: bool) -> list[str]:
+def _systemische_regel(aantal: int, outcome, *, alle: bool, met_csv: bool) -> list[str]:
     """De generieke regel voor systemische bevindingen (issue #76).
 
     Check, aantal en bekeken populatie, in de vorm die het nulmetingblok per SHACL-vorm
@@ -797,9 +827,10 @@ def _systemische_regel(aantal: int, examined: int, *, alle: bool, met_csv: bool)
     aanhef = "Systemisch" if alle else "Daarnaast systemisch"
     return [
         "",
-        f"_{aanhef}: {getal(aantal, 'bevinding', 'bevindingen')} op {examined} bekeken "
-        f"objecten -- dezelfde kwestie op vrijwel elk object, dus dit rapport toont "
-        f"{vorm(aantal, 'haar', 'ze')} niet per object; {_volledige_lijst(met_csv)}._",
+        f"_{aanhef}: {getal(aantal, 'bevinding', 'bevindingen')} op "
+        f"{_bekeken_regel(outcome)} -- dezelfde kwestie op vrijwel elk object, dus dit "
+        f"rapport toont {vorm(aantal, 'haar', 'ze')} niet per object; "
+        f"{_volledige_lijst(met_csv)}._",
     ]
 
 
@@ -1038,7 +1069,11 @@ def _bronnen_section(run: CheckRun) -> list[str]:
 
 
 def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.DataFrame:
-    """Een regel per check met de aantallen uit de meldingenstroom."""
+    """Een regel per check met de aantallen uit de meldingenstroom.
+
+    `Bekeken scope` en `Populatie` staan naast `Bekeken` omdat dat getal anders drie
+    onvergelijkbare noemers in een kolom mengt (issue #77).
+    """
     return pd.DataFrame(
         [
             {
@@ -1047,6 +1082,8 @@ def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.Dat
                 "Ernst": outcome.severity.value,
                 "Dimensie": outcome.dimension.value,
                 "Bekeken": outcome.examined,
+                "Bekeken scope": outcome.bekeken_scope.value,
+                "Populatie": outcome.populatie,
                 "Bevindingen": len(per_check.get(outcome.check_id, [])),
                 "Typering onbetrouwbaar": sum(
                     1
@@ -1063,6 +1100,8 @@ def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.Dat
             "Ernst",
             "Dimensie",
             "Bekeken",
+            "Bekeken scope",
+            "Populatie",
             "Bevindingen",
             "Typering onbetrouwbaar",
             "Skelet",

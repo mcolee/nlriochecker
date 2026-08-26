@@ -559,6 +559,14 @@ def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> Non
         onderdrukking=Onderdrukking(
             klassen=("Leiding",), checks=("TOP-001",), per_check={"TOP-001": 1}, per_klasse={}
         ),
+        checks=[
+            {
+                "check_id": "TOP-001",
+                "bekeken": 3,
+                "bekeken_scope": "analyseset",
+                "populatie": "netwerkknopen",
+            }
+        ],
     )
     document = json.loads(pad.read_text(encoding="utf-8"))
     doc = (Path(__file__).resolve().parents[1] / "docs" / "json-schema.md").read_text(
@@ -566,6 +574,7 @@ def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> Non
     )
 
     ontbreekt = [veld for veld in document if f"`{veld}`" not in doc]
+    ontbreekt += [veld for veld in document["checks"][0] if f"`{veld}`" not in doc]
 
     assert ontbreekt == []
 
@@ -697,3 +706,47 @@ def test_json_met_onderdrukking_draagt_de_lijsten_en_de_telling(tmp_path: Path) 
 
     assert document["onderdrukt"] == {"klassen": ["Leiding"], "checks": ["TOP-001"], "meldingen": 1}
     assert document["schema_versie"] == "1.1"
+
+
+def test_json_zonder_checks_draagt_het_veld_niet(tmp_path: Path) -> None:
+    """Optioneel en additief, net als `onderdrukt`: geen checks, geen veld (issue #77)."""
+    document = _envelop(tmp_path / "b.json")
+
+    assert "checks" not in document
+
+
+def test_json_labelt_per_check_waarover_bekeken_geteld_is(toets: CheckRun, tmp_path: Path) -> None:
+    """De noemer van elke check draagt haar scope en haar populatie (issue #77).
+
+    Zonder label mengt `bekeken` een rol op de analyseset, dezelfde rol op de
+    volledige export en kenmerkinstanties, en zijn de percentages die erop delen
+    onderling onvergelijkbaar.
+    """
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_geopackage=False)
+
+    assert uitvoer.json is not None
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    per_check = {rij["check_id"]: rij for rij in document["checks"]}
+
+    assert [rij["check_id"] for rij in document["checks"]] == sorted(per_check)
+    assert len(per_check) == len(toets.outcomes)
+    assert per_check["ADM-002"]["bekeken_scope"] == "volledige_export"
+    assert per_check["ATTR-014"]["bekeken_scope"] == "attribuut-instanties"
+    assert per_check["TOP-001"] == {
+        "check_id": "TOP-001",
+        "bekeken": next(o.examined for o in toets.outcomes if o.check_id == "TOP-001"),
+        "bekeken_scope": "analyseset",
+        "populatie": "leidingen, netwerkknopen, vrijvervalrioolleidingen",
+    }
+
+
+def test_de_csv_krijgt_de_checkscope_niet(toets: CheckRun, tmp_path: Path) -> None:
+    """Bekeken hoort bij de check, niet bij de rij -- dezelfde scheiding als de CFK-set."""
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_geopackage=False)
+
+    assert uitvoer.csv is not None
+    kolommen = list(pd.read_csv(uitvoer.csv, sep=";", encoding="utf-8").columns)
+
+    assert "bekeken_scope" not in kolommen
+    assert "Populatie" not in kolommen
+    assert "Bekeken" not in kolommen

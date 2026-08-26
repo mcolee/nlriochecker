@@ -1251,6 +1251,12 @@ OVERZICHT_KOLOMMEN = [
     _Kolom("aantal_meldingen", "integer"),
     _Kolom("bekeken", "integer"),
     _Kolom("percentage_populatie", "real"),
+    # Waarover `bekeken` geteld is, en om welke populatie het gaat (issue #77). Zonder
+    # die twee mengt de kolom `bekeken` drie noemers -- een rol op de analyseset,
+    # dezelfde rol op de volledige export, en kenmerkinstanties -- en deelt
+    # `percentage_populatie` door een getal waarvan de lezer de eenheid niet kent.
+    _Kolom("bekeken_scope", "text"),
+    _Kolom("populatie", "text"),
     _Kolom("systemisch", "integer"),
     _Kolom("aantal_gebieden", "integer"),
     _Kolom("skelet", "text"),
@@ -1455,6 +1461,8 @@ def _schrijf_overzicht(
             round(100 * len(per_check.get(outcome.check_id, [])) / outcome.examined, 2)
             if outcome.examined
             else None,
+            outcome.bekeken_scope.value,
+            outcome.populatie,
             int(outcome.check_id in systemisch),
             len({gebied for gebied in gebieden.get(outcome.check_id, set()) if gebied}),
             outcome.skeleton,
@@ -1467,8 +1475,8 @@ def _schrijf_overzicht(
             check_id,
             # Een SHACL-vorm draagt geen titel zoals een eigen check. De kolommen die
             # alleen een `CheckOutcome` kent -- de omschrijving, hoeveel objecten
-            # bekeken zijn, het skelet -- blijven daarom leeg; een gevulde waarde zou
-            # een dekking beweren die niemand gemeten heeft.
+            # bekeken zijn en waarover, het skelet -- blijven daarom leeg; een gevulde
+            # waarde zou een dekking beweren die niemand gemeten heeft.
             "",
             BRON_NULMETING,
             # De zwaarste ernst binnen de vorm, dezelfde regel als in het rapport
@@ -1484,6 +1492,8 @@ def _schrijf_overzicht(
             len(groep),
             None,
             None,
+            "",
+            "",
             int(check_id in systemisch),
             len({melding.gebied for melding in groep if melding.gebied}),
             "",

@@ -140,6 +140,9 @@ class SystematischAfgerondeHoogtewaarden(Check):
     dimension = Dimension.PRECISION
     rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "Maaiveldhoogte", "Putdekselniveau")
+    # `examined()` telt hoogtewaarden en geen objecten: een streng draagt er twee (beide
+    # BOB's) en een knoop hooguit twee (deksel en maaiveld). Zie issue #77.
+    telt_instanties = True
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meet per kenmerksoort welk deel van de waarden op het raster valt.

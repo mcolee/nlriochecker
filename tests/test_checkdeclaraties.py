@@ -103,3 +103,16 @@ def test_register_weigert_check_zonder_declaratie() -> None:
     with pytest.raises(ValueError, match="rollen"):
         register(ZonderDeclaratie)
     assert "TST-000" not in REGISTRY
+
+
+def test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd() -> None:
+    """Wie `examined()` op instanties zet, zegt dat erbij (issue #77).
+
+    De scope-taxonomie van BO-58 is met de hand gedeclareerd: er is geen manier om uit
+    `examined()` af te leiden of het getal objecten of kenmerkinstanties telt. Deze
+    lijst is daarom de plek waar dat besluit staat; komt er een derde teller bij zonder
+    vlag, dan noemt het rapport zijn getal "bekeken objecten" terwijl het dat niet is.
+    """
+    gemarkeerd = {cid for cid in CHECK_IDS if REGISTRY[cid].telt_instanties}
+
+    assert gemarkeerd == {"ATTR-014", "BTR-006"}

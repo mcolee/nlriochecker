@@ -259,6 +259,25 @@ def test_totaal_json_noemt_alle_gebieden(tmp_path: Path) -> None:
     assert document["gebieden"] == ["Noord", "Zuid"]
 
 
+def test_de_json_per_gebied_labelt_bekeken_en_de_totaal_json_niet(tmp_path: Path) -> None:
+    """`bekeken` is per gebied gemeten; over gebieden heen is er geen noemer (issue #77).
+
+    Een som zou objecten op een gebiedsgrens dubbel tellen en het eerste gebied nemen
+    zou een dekking beweren die niemand gemeten heeft.
+    """
+    _schrijf("buurten_twee.gpkg", tmp_path)
+
+    gebied = json.loads((tmp_path / "noord" / "bevindingen.json").read_text(encoding="utf-8"))
+    totaal = json.loads((tmp_path / "totaal" / "bevindingen.json").read_text(encoding="utf-8"))
+
+    assert {rij["bekeken_scope"] for rij in gebied["checks"]} <= {
+        "analyseset",
+        "volledige_export",
+        "attribuut-instanties",
+    }
+    assert "checks" not in totaal
+
+
 def test_json_van_een_enkel_gebied_draagt_geen_gebiedsveld(tmp_path: Path) -> None:
     """Een run op een enkelvoudig bestand blijft precies wat hij was."""
     _schrijf("buurt_noord.gpkg", tmp_path)

@@ -29,6 +29,7 @@ from nlriochecker.toetsloop import GebiedsRun
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
     FILE_CHECKS_JSON,
+    checks_json,
     meldingen_json,
     meldingen_tabel,
     write_check_report,
@@ -140,6 +141,7 @@ def schrijf_uitvoer(
             markering=markering(run),
             gebied=gebied,
             onderdrukking=stroom.onderdrukking,
+            checks=checks_json(run),
         )
         if met_json
         else None

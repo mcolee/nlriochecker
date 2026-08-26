@@ -1372,6 +1372,10 @@ class PropertyTegenOntologie(Check):
     dimension = Dimension.CONSISTENCY
     id_sleutels = ("kenmerk",)
     volledig_bereik = True
+    # `examined()` telt kenmerkinstanties, geen objecten: op De Wolden 459.108 tegenover
+    # 45.803 objecten. Zonder deze vlag zou het rapport dat getal "bekeken objecten"
+    # noemen (issue #77).
+    telt_instanties = True
     rollen = ()
     kenmerken = ("*",)
 

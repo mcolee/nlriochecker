@@ -171,6 +171,27 @@ def test_overzicht_checks_toont_ook_de_checks_zonder_bevinding(tmp_path: Path) -
     assert aantal == len(run.outcomes)
 
 
+def test_overzicht_checks_labelt_waarover_bekeken_geteld_is(tmp_path: Path) -> None:
+    """`percentage_populatie` deelt door `bekeken`; zonder label is dat onvergelijkbaar.
+
+    ADM-002 telt de volledige export, TOP-013 de analyseset (hier gelijk, want er is
+    geen studiegebied) en ATTR-014 kenmerkinstanties. Zie issue #77.
+    """
+    run = _run("top013_parallel.ttl", "ADM-002", "ATTR-014", "TOP-013")
+    pad = _schrijf(run, tmp_path)
+
+    rijen = dict(
+        (check_id, (scope, populatie))
+        for check_id, scope, populatie in _rijen(
+            pad, "select check_id, bekeken_scope, populatie from overzicht_checks"
+        )
+    )
+
+    assert rijen["TOP-013"] == ("analyseset", "leidingen, netwerkknopen, vrijvervalrioolleidingen")
+    assert rijen["ADM-002"] == ("volledige_export", "leidingen, netwerkknopen")
+    assert rijen["ATTR-014"] == ("attribuut-instanties", "de hele export")
+
+
 def test_runmetadata_maakt_het_bestand_herleidbaar(tmp_path: Path) -> None:
     run = _run("schoon.ttl")
     pad = _schrijf(run, tmp_path)

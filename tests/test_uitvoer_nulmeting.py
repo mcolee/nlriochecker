@@ -146,13 +146,27 @@ def test_een_nulmetingrij_telt_zijn_vorm_en_laat_de_checkkolommen_leeg(tmp_path:
     try:
         (rij,) = verbinding.execute(
             "select omschrijving, ernst, categorie, dimensie, aantal_meldingen, bekeken, "
-            "percentage_populatie, systemisch, aantal_gebieden, skelet, cfk "
-            "from overzicht_checks where check_id = 'NULMETING-Put_HoogtePut_card'"
+            "percentage_populatie, bekeken_scope, populatie, systemisch, aantal_gebieden, "
+            "skelet, cfk from overzicht_checks where check_id = 'NULMETING-Put_HoogtePut_card'"
         ).fetchall()
     finally:
         verbinding.close()
 
-    assert rij == ("", "F", "NULMETING", "Compliance", 4, None, None, 1, 0, "", "MdsPlan, MdsProj")
+    assert rij == (
+        "",
+        "F",
+        "NULMETING",
+        "Compliance",
+        4,
+        None,
+        None,
+        "",
+        "",
+        1,
+        0,
+        "",
+        "MdsPlan, MdsProj",
+    )
 
 
 def test_de_puttenlaag_telt_de_nulmeldingen_in_haar_eigen_kolom(tmp_path: Path) -> None:

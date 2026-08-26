@@ -49,6 +49,26 @@ class Dimension(StrEnum):
     COMPLIANCE = "Compliance"
 
 
+class Scope(StrEnum):
+    """Waarover `CheckOutcome.examined` geteld is (issue #77).
+
+    Het kale getal "bekeken" mengt drie noemers die niets met elkaar te maken hebben:
+    een rol op de analyseset (kern plus contextschil), diezelfde rol op de volledige
+    export, en de instanties van een kenmerk. Wie de drie zonder label naast elkaar
+    zet, vergelijkt 95 met 45.803 en met 459.108, en `percentage_populatie` deelt door
+    een noemer waarvan niemand weet wat hij telt. Zie BO-58.
+
+    `ANALYSESET` is de scope die `run_checks` een gewone check meegeeft. Zonder
+    studiegebied valt die samen met de volledige export; het onderscheid met
+    `VOLLEDIGE_EXPORT` zegt dus niet dat er minder gezien is, maar dat deze check
+    meebeweegt met de afbakening en de andere niet.
+    """
+
+    ANALYSESET = "analyseset"
+    VOLLEDIGE_EXPORT = "volledige_export"
+    ATTRIBUUT_INSTANTIES = "attribuut-instanties"
+
+
 @dataclass(frozen=True)
 class Finding:
     """Een enkele bevinding van een check op een object."""
@@ -192,11 +212,26 @@ class CheckOutcome:
     # bouwt er de toelichtingsregel "Toetst <klassen> op <kenmerken>" mee op.
     rollen: tuple[str, ...] = ()
     kenmerken: tuple[str, ...] = ()
+    # Issue #77: waarover `examined` geteld is. `run_checks` leidt hem af uit dezelfde
+    # beslissing die de check zijn dataset gaf, dus hij kan er niet van afwijken.
+    bekeken_scope: Scope = Scope.ANALYSESET
 
     @property
     def unreliable_count(self) -> int:
         """Het aantal bevindingen waarvan de typering onbetrouwbaar is."""
         return sum(1 for finding in self.findings if not finding.typing_reliable)
+
+    @property
+    def populatie(self) -> str:
+        """De populatie waar deze check over gaat, in woorden (issue #77).
+
+        De gedeclareerde rollen (`Check.rollen`); zonder rollen dezelfde formulering
+        die de regel "Toetst ..." in het rapport gebruikt. Let op wat het niet is: de
+        rollen zeggen waar de check over gaat, niet exact welke verzameling
+        `examined` telt. ATTR-018 declareert ook `leidingen` omdat zijn toelichting
+        die telt, terwijl `examined` alleen vrijvervalstrengen plus putten telt.
+        """
+        return ", ".join(self.rollen) if self.rollen else "de hele export"
 
 
 @dataclass(frozen=True)
@@ -351,22 +386,18 @@ class CheckRun:
                 return True
             return False
 
+        # `replace` in plaats van elk veld opsommen -- ook hier, en om dezelfde reden
+        # als bij de run hieronder: de opsomming vergat `rollen` en `kenmerken`, zodat
+        # elk gebiedsrapport "Toetst de hele export" zei, en het scopelabel van issue
+        # #77 zou er langs diezelfde weg uitvallen.
         outcomes = []
         for outcome in self.outcomes:
             binnen_gebied = [f for f in outcome.findings if hoort_erbij(f)]
             outcomes.append(
-                CheckOutcome(
-                    check_id=outcome.check_id,
-                    title=outcome.title,
-                    severity=outcome.severity,
-                    dimension=outcome.dimension,
-                    examined=outcome.examined,
+                replace(
+                    outcome,
                     findings=binnen_gebied,
-                    id_sleutels=outcome.id_sleutels,
-                    volledig_bereik=outcome.volledig_bereik,
-                    notes=outcome.notes,
                     weggelaten=len(outcome.findings) - len(binnen_gebied),
-                    skeleton=outcome.skeleton,
                 )
             )
         # `replace` in plaats van elk veld opsommen: die opsomming vergat bij elke
@@ -417,6 +448,11 @@ class Check(ABC):
     # in `config.studiegebied.volledige_dataset_checks`; `run_checks` telt beide
     # bronnen mee.
     volledig_bereik: ClassVar[bool] = False
+    # Checks waarvan `examined()` kenmerkinstanties telt in plaats van objecten
+    # (ATTR-014 telt elke instantie van elk kenmerk, BTR-006 elke hoogtewaarde). Hun
+    # noemer is van een andere soort dan die van de andere checks; `run_checks` zet
+    # daarom de scope van hun uitslag op `Scope.ATTRIBUUT_INSTANTIES`. Zie BO-58.
+    telt_instanties: ClassVar[bool] = False
     # Issue #64: de GWSW-populatie en -kenmerken die deze check declareert. `rollen` zijn
     # namen uit `selectie._ROLLEN` -- de populatie die de check langsloopt. `kenmerken`
     # zijn GWSW-kenmerknamen zoals de code ze aan `aspect`/`number`/`reference`/`date`
@@ -511,6 +547,18 @@ def register(check: type[Check]) -> type[Check]:
     return check
 
 
+def _scope(check: Check, over_volledige_populatie: bool) -> Scope:
+    """Waarover `examined()` van deze check geteld heeft (issue #77).
+
+    Twee onafhankelijke assen, en de instantieteller wint: telt een check geen
+    objecten, dan zegt "volledige export" niets over zijn noemer. ATTR-014 heeft
+    `volledig_bereik` én telt instanties, en heet daarom `attribuut-instanties`.
+    """
+    if check.telt_instanties:
+        return Scope.ATTRIBUUT_INSTANTIES
+    return Scope.VOLLEDIGE_EXPORT if over_volledige_populatie else Scope.ANALYSESET
+
+
 def run_checks(
     context: CheckContext,
     check_ids: list[str] | None = None,
@@ -568,6 +616,7 @@ def run_checks(
                     skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
                     rollen=check.rollen,
                     kenmerken=check.kenmerken,
+                    bekeken_scope=_scope(check, over_volledige_populatie),
                 )
             )
             voortgang.stap(label=check.id)

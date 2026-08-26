@@ -53,6 +53,14 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
   "cfk_set": ["Hyd"],
   "volledig": false,
   "typeringspoort_toegepast": true,
+  "checks": [
+    {
+      "check_id": "TOP-009",
+      "bekeken": 42,
+      "bekeken_scope": "analyseset",
+      "populatie": "leidingen, netwerkknopen, vrijvervalrioolleidingen"
+    }
+  ],
   "aantal_meldingen": 1,
   "meldingen": [
     {
@@ -101,6 +109,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
 | `onderdrukt` | object | *Optioneel.* Wat `[rapport]` in de projectconfiguratie uit de stroom hield: `klassen` (array van string, de wortelklassen), `checks` (array van string, de check-ID's) en `meldingen` (integer, hoeveel meldingen wegvielen). Het veld ontbreekt als beide lijsten leeg zijn. In `totaal/bevindingen.json` is `meldingen` de som over de gebieden, niet ontdubbeld -- net als de kolom Meldingen in de synthese. De CSV draagt de lijsten niet: de keuze hoort bij de run, niet bij de melding. |
 | `markering` | string | *Optioneel.* De runbrede voorbehouden van deze run als een tekst voor een lezer, dezelfde die boven het Markdown-rapport staat en in de kolom `markering` van `gwsw_run`. Twee voorbehouden worden twee alinea's, gescheiden door een lege regel. Het veld ontbreekt als er niets voor te behouden valt. |
+| `checks` | array van object | *Optioneel.* Een rij per uitgevoerde check met de noemer van zijn uitslag, gesorteerd op `check_id`. Zie [Over `checks`](#over-checks). Ontbreekt in `totaal/bevindingen.json`. |
 | `aantal_meldingen` | integer | Het aantal elementen in `meldingen`. Redundant, maar zo kan een afnemer een afgekapt bestand herkennen. |
 | `meldingen` | array van object | De meldingen, gesorteerd op `melding_id`. |
 
@@ -143,6 +152,47 @@ het totaal, waarin elke weggevallen melding een keer telt.
 
 Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering`:
 wie het niet kent leest het bestand zoals voorheen.
+
+### Over `checks`
+
+Elke rij beschrijft één uitgevoerde check en zegt waar zijn getal "bekeken" over gaat.
+Zonder die duiding is `bekeken` een kaal getal met drie onvergelijkbare noemers, en dan
+zijn ook de percentages die erop delen (`percentage_populatie` in de GeoPackage)
+onderling niet te vergelijken. Zie BO-58 in [docs/beslislog.md](beslislog.md).
+
+| Veld | Type | Betekenis |
+|---|---|---|
+| `check_id` | string | Check-ID uit het checkregister; hetzelfde ID als op de meldingen. |
+| `bekeken` | integer | Hoeveel deze check bekeken heeft. Wat de eenheid is, zegt `bekeken_scope`. |
+| `bekeken_scope` | string | Waarover geteld is: `analyseset`, `volledige_export` of `attribuut-instanties`. |
+| `populatie` | string | De populatie waar de check over gaat: zijn gedeclareerde rollen, komma-gescheiden, of `de hele export` als hij er geen declareert. |
+
+De drie waarden van `bekeken_scope`:
+
+- **`analyseset`** — geteld over de dataset die de check meekreeg: met een studiegebied
+  de kern plus de contextschil, zonder studiegebied de volledige export. Dit is de
+  gewone waarde; ze zegt dat het getal met de afbakening meebeweegt.
+- **`volledige_export`** — de check gaat over de hele populatie (`Check.volledig_bereik`
+  of `[studiegebied] volledige_dataset_checks`) en telt daarom altijd de volledige
+  export, ook met een studiegebied. ADM-002 (dubbele identificaties) is er een.
+- **`attribuut-instanties`** — het getal telt geen objecten maar instanties van een
+  kenmerk: ATTR-014 elke kenmerkinstantie met een property-restrictie, BTR-006 elke
+  hoogtewaarde. Op De Wolden staat 459.108 tegenover 45.803 objecten; die twee getallen
+  naast elkaar leggen heeft geen betekenis.
+
+Let op wat `populatie` niet is: de rollen zeggen waar de check over gáát, niet exact
+welke verzameling `bekeken` telt. ATTR-018 declareert ook `leidingen` omdat zijn
+toelichting die telt, terwijl `bekeken` alleen vrijvervalstrengen plus putten telt.
+
+`totaal/bevindingen.json` draagt het veld niet: `bekeken` is per gebied gemeten, een som
+zou objecten op een gebiedsgrens dubbel tellen en het eerste gebied nemen zou een dekking
+beweren die niemand gemeten heeft. De meldingen-CSV draagt het ook niet -- bekeken hoort
+bij de check en niet bij de rij, dezelfde scheiding als bij `cfk_set`. In de GeoPackage
+staan dezelfde twee waarden in `overzicht_checks` (`bekeken_scope`, `populatie`), en in
+het Markdown-rapport in de kolommen Bekeken scope en Populatie van de checktabel.
+
+Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering` en
+`onderdrukt`.
 
 ### Over `gebied` en `gebieden`
 
@@ -354,7 +404,7 @@ Het tweede nummer telt op bij een achterwaarts verenigbare *wijziging* die een b
 afnemer merkt -- niet bij een puur optioneel, additief veld. Zo'n veld laat een afnemer die
 het niet kent het bestand lezen zoals voorheen; het valt daarom onder de lijst hieronder en
 verhoogt de versie niet. Het nummer staat op `1.1`: die stap van `1.0` viel samen met het
-veld `cfk`, maar de latere velden `gebied`, `gebieden`, `markering` en `onderdrukt` -- alle optioneel en
+veld `cfk`, maar de latere velden `gebied`, `gebieden`, `markering`, `onderdrukt` en `checks` -- alle optioneel en
 additief -- kwamen er binnen `1.1` bij, zonder verhoging. Pin daarom op het **hoofdnummer**
 (`schema_versie.split(".")[0] == "1"`), niet op de volledige string: `1.1` duidt niet één
 vaste enveloppevorm aan.

@@ -15,7 +15,7 @@ from nlriochecker.afbakening import (
     objecten_in_gebied,
 )
 from nlriochecker.checkconfig import load_check_config
-from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.checks import CheckContext, Scope, run_checks
 from nlriochecker.dataset import load_dataset
 from nlriochecker.studiegebied import load_study_area
 
@@ -262,6 +262,72 @@ def test_de_run_onthoudt_de_omvang_van_kern_en_schil() -> None:
     )
 
     assert run.analyseset is analyseset
+
+
+def test_de_uitslag_zegt_waarover_bekeken_geteld_is() -> None:
+    """`bekeken` mengt drie noemers; het label zegt per check welke (issue #77).
+
+    TOP-001 draait op de analyseset, ADM-002 op de volledige export, en ATTR-014
+    telt geen objecten maar kenmerkinstanties. Zonder label zijn hun getallen -- en
+    dus ook de percentages die erop delen -- onderling onvergelijkbaar.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    run = run_checks(
+        CheckContext(
+            dataset=analyseset.dataset,
+            config=config,
+            volledige_dataset=dataset,
+            analyseset=analyseset,
+        ),
+        ["ADM-002", "ATTR-014", "TOP-001"],
+    )
+    scope = {outcome.check_id: outcome.bekeken_scope for outcome in run.outcomes}
+
+    assert scope["TOP-001"] is Scope.ANALYSESET
+    assert scope["ADM-002"] is Scope.VOLLEDIGE_EXPORT
+    assert scope["ATTR-014"] is Scope.ATTRIBUUT_INSTANTIES
+
+
+def test_de_uitslag_noemt_de_getelde_populatie() -> None:
+    """Naast het scopelabel de rollen waar de check over gaat (issue #77).
+
+    ATTR-014 declareert geen rol -- hij gaat over de kenmerken van de hele export --
+    en valt daarom terug op dezelfde formulering die de regel "Toetst ..." gebruikt.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    run = run_checks(
+        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
+        ["ATTR-014", "TOP-001"],
+    )
+    populatie = {outcome.check_id: outcome.populatie for outcome in run.outcomes}
+
+    assert populatie["TOP-001"] == "leidingen, netwerkknopen, vrijvervalrioolleidingen"
+    assert populatie["ATTR-014"] == "de hele export"
+
+
+def test_de_afbakening_houdt_de_declaratie_van_de_check_vast() -> None:
+    """Afbakenen tot de kern raakt de bevindingen, niet de herkomst van de uitslag.
+
+    De opsomming in `beperk_tot_studiegebied` vergat `rollen` en `kenmerken`, zodat
+    elk gebiedsrapport "Toetst de hele export" zei. Het scopelabel van issue #77 zou
+    langs dezelfde weg wegvallen.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    run = run_checks(
+        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
+        ["TOP-001"],
+    )
+    beperkt = run.beperk_tot_studiegebied(area)
+
+    assert beperkt.outcomes[0].rollen == run.outcomes[0].rollen
+    assert beperkt.outcomes[0].kenmerken == run.outcomes[0].kenmerken
+    assert beperkt.outcomes[0].bekeken_scope is Scope.ANALYSESET
 
 
 def _uri_van(dataset, label: str) -> str:
