@@ -50,6 +50,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 - Leeslaag (dataset, graaf, geometrie, ontologie, cache, voortgang) afgesplitst naar de
   package gwsw-orox-helpers 0.1.0 (MIT); `--ontologie` is optioneel geworden en valt terug
   op de gebundelde GWSW-ontologie 1.6.
+- **De standaardcachemap is verhuisd** van `~/.cache/nlriochecker` naar
+  `~/.cache/gwsw-orox-helpers`, met de leeslaag mee. De oude map blijft als wees achter en
+  ruim je zelf op; de eerste run na deze overgang vindt geen cache en parseert koud.
 - **De systemisch-vlag geldt pas vanaf 100 bekeken objecten** (eindreview #72–#77,
   BO-59). Nieuwe drempel `[rapport] systemisch_minimum_bekeken` (standaard 100): onder
   dat aantal bekeken objecten is een uitslag nooit systemisch, hoe hoog de ratio ook is.

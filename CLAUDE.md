@@ -90,8 +90,9 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   de afwijking als BO-nummer in `docs/beslislog.md` -- niet als commentaar in een
   configbestand.
   Voordat je beweert dat een klasse of property niet bestaat, grep je de gebundelde
-  ontologie (`uv run python -c "from gwsw_orox_helpers.bronnen import gebundelde_ontologie;
-  print(gebundelde_ontologie())"` geeft het pad). Let op inconsistent hoofdlettergebruik:
+  ontologie. Haar pad geeft dit commando:
+  `uv run python -c "from gwsw_orox_helpers.bronnen import gebundelde_ontologie as g; print(g())"`
+  Let op inconsistent hoofdlettergebruik:
   een regex als `[A-Za-z]*Stelsel` mist `Vuilwaterstelsel` met kleine s. Scheid twee vragen
   die makkelijk door elkaar lopen: "bestaat de klasse in de ontologie" en "komen er
   instanties voor in deze dataset" hebben verschillende antwoorden en vragen om

@@ -9,6 +9,8 @@ import pytest
 from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
+from nlriochecker.checkconfig import FALLBACK_ENCODING
+
 # Een schone kloon heeft `data/` niet: die map staat buiten versiebeheer omdat de
 # OroX-export en de GIS-bronnen gigabytes beslaan. De tests die erop leunen slaan
 # dan over, en de run blijft groen terwijl er nauwelijks iets getoetst is. Zet deze
@@ -61,7 +63,7 @@ def juinen(ontologie: Path) -> GwswDataset:
     """Het meegeleverde Juinen-voorbeeld als schone referentiedataset."""
     if not VOORBEELD_TTL.exists():
         pytest.skip("het OroX-voorbeeldbestand staat niet in data/")
-    return load_dataset(VOORBEELD_TTL, [ontologie])
+    return load_dataset(VOORBEELD_TTL, [ontologie], fallback_encoding=FALLBACK_ENCODING)
 
 
 @pytest.fixture
