@@ -50,6 +50,10 @@ en PyPI kent geen enkele `gwsw*`-package. Deze package is de eerste in zijn nich
 - De vocabulaire-index-generator (`maak_gwsw_index.py`) en de bijbehorende
   index-drifttests. De "leidende GWSW-versie"-regel verhuist van nlriochecker-CLAUDE.md
   naar de package-repo; een GWSW-upgrade wordt: package-release + `uv lock` in afnemers.
+  De package biedt de index (en de ontologie) als resource aan via
+  `importlib.resources`: de drifttests die in nlriochecker blijven
+  (`test_checkdeclaraties_ontologie.py`, `test_gwsw_vocabulaire.py`) lezen hem daaruit
+  in plaats van uit `data/`.
 - De dataset-/graaf-/geometrie-/ontologie-/cachetests, met een **gesplitste
   fixturegenerator**: de package krijgt een eigen kleine generator + fixtures;
   nlriochecker houdt `maak_ttl_fixtures.py` met de defect-fixtures voor de checktests.
