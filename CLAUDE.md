@@ -248,6 +248,8 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   die je nooit met de hand bewerkt, en het drempelrecept over vijf gekoppelde plekken. Lees
   het vóór je zelf een telling of een scratch-script tegen de dataset schrijft -- het
   bespaart de ~1,5-min/3-GB herlaadronde op een verkeerde gok.
+- **`docs/agents/afk-regie.md`** is het sjabloon voor een onbewaakte regiesessie die een reeks
+  issues met Opus-subagents afwerkt (lus per issue, één poort, review-timing, slotrun).
 - Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
   `gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
   niemand een openstaand punt in twee toestanden aantreft.

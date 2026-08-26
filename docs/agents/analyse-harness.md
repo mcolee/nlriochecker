@@ -57,6 +57,11 @@ context = CheckContext(dataset=dataset, config=config)
   `issue63/` zijn de nametingen per issue — `issue62/` is de recentste. **Tel eerst daarop**
   (`bevindingen.json`) voordat je een nieuwe run van ~6 minuten start; noem in je verslag
   welke run je gebruikte, want de baseline dateert van vóór #60–#63.
+- **Een vergelijkbare gemeentebrede run heeft dezelfde vlaggen als de baseline nodig**, en
+  `volledig_24082026/` draaide mét `--bronnen data/gis_dewoldenhoogeveen` (de EXT-checks).
+  Zonder die vlag ontbreken de EXT-bevindingen en klopt de totaaltelling niet; op 26-08
+  kostte dat een tweede run van ~6 minuten. Kijk vóór je start of het baseline-rapport
+  (`.md`) de sectie **Externe bronnen** draagt: dan draaide hij met `--bronnen`.
 - **Een meetscript dat een getal in een issue of BO onderbouwt, bewaar je** — in het
   scratchpad volstaat niet. Zet het onder `scripts/` of naast het verslag in `docs/`, met de
   commit-hash van de dataset-lader erin. Op 24-08 bleef een 234-telling alleen als inline

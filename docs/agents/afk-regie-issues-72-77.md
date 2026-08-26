@@ -1,5 +1,8 @@
 # AFK-regie: issues #72–#77 fixen met Opus-agents
 
+> **Uitgevoerd op 26-08 (alle zes gesloten).** Voor een volgende reeks gebruik je het sjabloon
+> `afk-regie.md`; dat scherpt punt 4, 5, 7 en 8 aan op basis van de meting van deze run.
+
 Geef dit aan een **verse (gecleared) Fable-sessie** in `/home/martin/nlriochecker`. Fable is
 de regisseur; het echte werk doen **Opus-subagents**. De auteur is er niet bij — **unattended**.
 
