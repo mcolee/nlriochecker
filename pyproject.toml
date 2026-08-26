@@ -15,6 +15,9 @@ dependencies = [
     # `Result.stderr` niet, waar tests/test_cli.py op steunt.
     "click>=8.2",
     "geopandas>=1.1.4",
+    # De leeslaag (dataset, graaf, geometrie, ontologie, cache, voortgang) plus de
+    # gebundelde GWSW-ontologie 1.6; afgesplitst als eigen MIT-package.
+    "gwsw-orox-helpers>=0.1.0",
     "networkx>=3.3",
     "pandas>=2.2",
     "pydantic>=2.7",
@@ -35,6 +38,9 @@ dev = [
     "pytest>=8.2",
     "ruff>=0.6",
 ]
+
+[tool.uv.sources]
+gwsw-orox-helpers = { git = "https://github.com/mcolee/gwsw-orox-helpers", tag = "v0.1.0" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nlriochecker"]

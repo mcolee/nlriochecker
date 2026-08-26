@@ -31,6 +31,8 @@ from datetime import date
 from importlib import resources
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import Conduit, Node
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
 from shapely.geometry import MultiPolygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
@@ -47,7 +49,6 @@ from nlriochecker.checks.verbanden import (
     afvoerpaden,
     deelstelsel_ids,
 )
-from nlriochecker.dataset import Conduit, Node
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
@@ -70,7 +71,6 @@ from nlriochecker.uitvoer.omvang import stelseltypen
 from nlriochecker.uitvoer.stijlen.symbolen import bouw_qml
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.uitvoer.voorbehoud import markering
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 # De GWSW-coordinaten staan in Rijksdriehoek; herprojecteren doen we niet.
 RD_NEW = 28992

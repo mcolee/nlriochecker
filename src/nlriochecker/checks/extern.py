@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
 
@@ -33,7 +34,6 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import lozingspunten, netwerkknopen, vrijvervalrioolleidingen
 from nlriochecker.checks.treffers import Treffer, bouw_sleutel
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.dataset import Conduit, Node
 from nlriochecker.externedata import VectorLayer
 from nlriochecker.taal import getal, met_lidwoord
 

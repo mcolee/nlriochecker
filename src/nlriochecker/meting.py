@@ -7,10 +7,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
+
 from nlriochecker.errors import NulmetingError, OpdrachtError
 from nlriochecker.shaclrapport import ShaclReport, lees_shacl_rapport
 from nlriochecker.taal import vorm
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 @dataclass(frozen=True)

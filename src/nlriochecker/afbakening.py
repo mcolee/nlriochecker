@@ -14,11 +14,11 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 import networkx as nx
+from gwsw_orox_helpers.dataset import GwswDataset
 from shapely import STRtree
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checkconfig import CheckConfig
-from nlriochecker.dataset import GwswDataset
 from nlriochecker.studiegebied import StudyArea
 
 

@@ -8,14 +8,15 @@ from pathlib import Path
 from typing import Any
 
 import click
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
+from gwsw_orox_helpers.errors import DatasetError
 
 from nlriochecker import __version__
 from nlriochecker.analysis import MetingAnalysis, analyze
-from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import CoverageConfig, load_coverage_config
 from nlriochecker.coverage import assess_coverage, verify_register
-from nlriochecker.dataset import GwswDataset, load_dataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.meting import kies_cfk, laad_nulmeting
 from nlriochecker.register import Register, default_register_path, load_register
@@ -302,7 +303,11 @@ def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths,
     project = load_check_config(project_config_path)
     gekozen = kies_cfk(cfk_keuze, project.nulmeting.vereiste_cfk)
     nulmeting = laad_nulmeting(list(shacl_paths), gekozen, project.nulmeting.vereiste_cfk)
-    dataset = load_dataset(dataset_path, list(ontology_paths)) if dataset_path is not None else None
+    dataset = (
+        load_dataset(dataset_path, list(ontology_paths), fallback_encoding=FALLBACK_ENCODING)
+        if dataset_path is not None
+        else None
+    )
     return project, nulmeting, analyze(nulmeting, dataset), dataset
 
 
@@ -352,7 +357,7 @@ def analyze_command(
         # mankeert.
         coverage = assess_coverage(analyse, config, register)
         markdown_path, csv_path = write_reports(analyse, output_dir, coverage)
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     _echo_meting(analyse, dataset)
@@ -393,7 +398,7 @@ def coverage_command(
         verify_register(config, register, eisen=True)
         result = assess_coverage(analyse, config, register)
         markdown_path, csv_path = write_coverage_report(result, output_dir)
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     click.echo(
@@ -459,7 +464,7 @@ def compare_command(
         later = analyze(laad_nulmeting(list(later_paths), gekozen, volledig))
         comparison = compare_metingen(eerder, later, load_coverage_config(config_path))
         markdown_path, csv_path, objects_path = write_comparison_reports(comparison, output_dir)
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     click.echo(f"Dataset {comparison.dataset_file}")
@@ -493,7 +498,7 @@ def compare_command(
     "ontology_paths",
     multiple=True,
     type=RAPPORT_TYPE,
-    help="GWSW-ontologie (TTL) voor de klassenhierarchie; meermaals toegestaan.",
+    help="GWSW-ontologie (TTL); standaard de gebundelde versie 1.6; meermaals toegestaan.",
 )
 @click.option(
     "--geen-ontologie",
@@ -598,7 +603,7 @@ def check_command(
     )
     try:
         uitslag = voer_toets_uit(opdracht, voortgang=_BalkVoortgang())
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     for regel in uitslag.regels():

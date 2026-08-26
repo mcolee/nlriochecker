@@ -17,10 +17,23 @@ from pydantic import (
     model_validator,
 )
 
-from nlriochecker.dataset import VULWAARDE_KENMERKEN
 from nlriochecker.errors import ConfigError
 
 DEFAULT_CHECK_CONFIG_NAME = "checks.toml"
+
+# De kenmerken waarop `markeer_vulwaarden` werkt: precies de vier velden die zij
+# inspecteert (KLASSE_MAAIVELDHOOGTE, KLASSE_PUTDEKSELNIVEAU, KLASSE_BOB_BEGIN en
+# KLASSE_BOB_EIND). Een andere naam in `[vulwaarden] hoogte_kenmerken` -- een tikfout,
+# of een kenmerk dat de pijplijn niet inleest -- zou stil niets doen terwijl ATTR-013
+# meldt dat de regel is toegepast; `checkconfig.VulwaardeOptions` weigert hem daarom.
+# De lijst hoort bij de afnemer: `gwsw_orox_helpers.markeer_vulwaarden` neemt de
+# kenmerken als parameter en kent deze keuze niet.
+VULWAARDE_KENMERKEN: frozenset[str] = frozenset(
+    {"Maaiveldhoogte", "Putdekselniveau", "BobBeginpuntLeiding", "BobEindpuntLeiding"}
+)
+
+# De Wolden-export: cp850-vervuiling in de aanlevering; zie de spec van gwsw-orox-helpers.
+FALLBACK_ENCODING = "cp850"
 
 
 class ClassRoots(BaseModel):

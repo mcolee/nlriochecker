@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pandas as pd
+from gwsw_orox_helpers.dataset import GwswDataset
 
-from nlriochecker.dataset import GwswDataset
 from nlriochecker.meting import Nulmeting
 from nlriochecker.shaclrapport import ShaclReport
 

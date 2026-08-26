@@ -15,8 +15,9 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 
+from gwsw_orox_helpers.dataset import GwswDataset, Inwinning
+
 from nlriochecker.checkconfig import CheckConfig
-from nlriochecker.dataset import GwswDataset, Inwinning
 
 JAARGRENS = (1, 1)
 

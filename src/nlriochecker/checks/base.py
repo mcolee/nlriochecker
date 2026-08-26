@@ -8,19 +8,19 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
 
+from gwsw_orox_helpers.dataset import GwswDataset
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
 from shapely.geometry import Point
 
 from nlriochecker.afbakening import Analyseset, objecten_in_gebied
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks.treffers import Trefferregister
-from nlriochecker.dataset import GwswDataset
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import ExternalData
 from nlriochecker.karakteristiek import DataCharacteristics, bepaal_karakteristiek
 from nlriochecker.meting import Meetbereik
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import StudyArea
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 if TYPE_CHECKING:  # pragma: no cover
     # Alleen als type. `nulbevinding` leest `uitvoer.identiteit`, en die module

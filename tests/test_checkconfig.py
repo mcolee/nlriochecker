@@ -6,9 +6,16 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import (
+    KLASSE_BOB_BEGIN,
+    KLASSE_BOB_EIND,
+    KLASSE_MAAIVELDHOOGTE,
+    KLASSE_PUTDEKSELNIVEAU,
+)
 from pydantic import BaseModel
 
 from nlriochecker.checkconfig import (
+    VULWAARDE_KENMERKEN,
     CheckThresholds,
     ExternalSources,
     ReportOptions,
@@ -492,3 +499,22 @@ def test_vulwaarden_uit_de_standaardconfig() -> None:
         "Putdekselniveau",
     ]
     assert config.vulwaarden.hoogte_band_m == 0.01
+
+
+def test_ondersteunde_kenmerken_volgen_de_vier_geladen_klassen() -> None:
+    """`VULWAARDE_KENMERKEN` is precies wat `markeer_vulwaarden` inspecteert.
+
+    De lijst hoort bij de afnemer sinds de leeslaag naar gwsw-orox-helpers verhuisde:
+    `markeer_vulwaarden` neemt de kenmerken als parameter en kent deze keuze niet meer.
+    De config weigert elke andere naam; loopt deze lijst uit de pas met de klassen die
+    de lader in de vier hoogtevelden zet, dan zou ze een geldig kenmerk weigeren of een
+    inert kenmerk toelaten.
+    """
+    klassen = (
+        KLASSE_MAAIVELDHOOGTE,
+        KLASSE_PUTDEKSELNIVEAU,
+        KLASSE_BOB_BEGIN,
+        KLASSE_BOB_EIND,
+    )
+
+    assert VULWAARDE_KENMERKEN == {str(klasse).rsplit("/", 1)[-1] for klasse in klassen}

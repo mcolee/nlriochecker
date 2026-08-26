@@ -20,13 +20,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import pandas as pd
+from gwsw_orox_helpers.dataset import GwswDataset
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
 from nlriochecker.checks.base import REGISTRY
 from nlriochecker.checks.selectie import klassen_van_rol
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.dataset import GwswDataset
 from nlriochecker.taal import getal, vorm
 
 KOLOMMEN = ["Objecttype", "Stelsel", "Aantal", "Lengte (m)"]

@@ -38,9 +38,9 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
+from gwsw_orox_helpers.dataset import GWSW, GwswDataset, aspect_holders_of, part_holders_of
 from rdflib import URIRef
 
-from nlriochecker.dataset import GWSW, GwswDataset, aspect_holders_of, part_holders_of
 from nlriochecker.meting import Nulmeting
 from nlriochecker.uitvoer.identiteit import kort
 

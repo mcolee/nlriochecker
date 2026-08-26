@@ -26,8 +26,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
+
 from nlriochecker.checks.base import CheckContext
-from nlriochecker.dataset import Conduit, GwswDataset, Node
 
 
 # `Object` is het objecttype van de verzameling waarin gezocht wordt: een knoop of

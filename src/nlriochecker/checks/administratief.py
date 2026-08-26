@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date
 
+from gwsw_orox_helpers.dataset import HAS_CONNECTION, Conduit, Node, part_holders_of, parts_of
 from rdflib import URIRef
 
 from nlriochecker.checks.base import (
@@ -26,7 +27,6 @@ from nlriochecker.checks.base import (
 )
 from nlriochecker.checks.selectie import leidingen, lozeleidingen, netwerkknopen
 from nlriochecker.checks.verbanden import aansluitingen
-from nlriochecker.dataset import HAS_CONNECTION, Conduit, Node, part_holders_of, parts_of
 from nlriochecker.taal import getal, vorm
 
 

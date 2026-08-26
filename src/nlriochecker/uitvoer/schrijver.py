@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
+
 from nlriochecker.checkconfig import ReportOptions
 from nlriochecker.checks import CheckRun
 from nlriochecker.studiegebied import MAP_TOTAAL
@@ -45,7 +47,6 @@ from nlriochecker.uitvoer.melding import (
 from nlriochecker.uitvoer.synthese import GebiedsSamenvatting, totaalsynthese
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.uitvoer.voorbehoud import markering
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 # De naam van het bestand met de synthese over alle gebieden. De mapnaam ernaast
 # (`MAP_TOTAAL`) staat in `studiegebied.py`, want daar wordt hij als gebiedsnaam

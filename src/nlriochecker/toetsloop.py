@@ -26,17 +26,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from gwsw_orox_helpers.dataset import GwswDataset
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
+
 from nlriochecker.afbakening import GedeeldeIndex, bouw_analyseset, bouw_gedeelde_index
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.checks.treffers import Trefferregister
-from nlriochecker.dataset import GwswDataset
 from nlriochecker.externedata import ExternalData
 from nlriochecker.meting import Meetbereik
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import Studiegebieden, StudyArea, mapnaam
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 @dataclass(frozen=True)

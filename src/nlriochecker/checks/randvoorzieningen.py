@@ -22,6 +22,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar
 
+from gwsw_orox_helpers.dataset import Conduit, Node, part_holders_of
+
 from nlriochecker import taal
 from nlriochecker.checks.base import (
     Check,
@@ -44,7 +46,6 @@ from nlriochecker.checks.verbanden import (
     deelstelsel_ids,
     netwerkdelen,
 )
-from nlriochecker.dataset import Conduit, Node, part_holders_of
 
 
 @dataclass(frozen=True)

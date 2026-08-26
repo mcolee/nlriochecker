@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import cast
 
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import nearest_points
@@ -38,7 +39,6 @@ from nlriochecker.checks.selectie import (
     vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.dataset import Conduit, GwswDataset, Node
 from nlriochecker.taal import getal, vorm
 
 

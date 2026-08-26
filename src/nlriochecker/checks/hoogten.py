@@ -15,6 +15,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from gwsw_orox_helpers.dataset import Conduit, Node
+
 from nlriochecker.checkconfig import VerhangStap
 from nlriochecker.checks.base import (
     Check,
@@ -32,7 +34,6 @@ from nlriochecker.checks.selectie import (
     vuilwaterleidingen,
 )
 from nlriochecker.checks.verbanden import aansluitingen, verbonden_knopen
-from nlriochecker.dataset import Conduit, Node
 
 
 @dataclass(frozen=True)

@@ -17,11 +17,11 @@ from collections import deque
 from dataclasses import dataclass, field
 
 import networkx as nx
+from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely.geometry import LineString
 
 from nlriochecker.checks.base import CheckContext
 from nlriochecker.checks.selectie import mechanischeleidingen, vrijvervalrioolleidingen
-from nlriochecker.dataset import Conduit, Node
 
 
 def verbonden_knopen(context: CheckContext, conduit: Conduit) -> tuple[str | None, str | None]:

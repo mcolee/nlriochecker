@@ -12,11 +12,11 @@ De uitvoer draagt hem als `X`/`Y` in de CSV, als `foutlocatie` in de JSON en als
 
 from __future__ import annotations
 
+from gwsw_orox_helpers.dataset import GwswDataset
 from shapely.geometry import LinearRing, LineString, Point
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checks import Finding
-from nlriochecker.dataset import GwswDataset
 
 # Onder deze detailsleutel geeft een check zelf de plek van het probleem op, als
 # een (x, y)-paar in Rijksdriehoek.

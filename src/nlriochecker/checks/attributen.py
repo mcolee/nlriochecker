@@ -13,6 +13,7 @@ from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date
 
+from gwsw_orox_helpers.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
 from rdflib import RDF, URIRef
 
 from nlriochecker import taal
@@ -31,7 +32,6 @@ from nlriochecker.checks.selectie import (
     vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
-from nlriochecker.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
 from nlriochecker.plausibiliteit import (
     MaterialDiameter,
     MaterialRoughness,

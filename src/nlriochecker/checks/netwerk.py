@@ -6,6 +6,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
 import networkx as nx
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset, part_holders_of
 
 from nlriochecker.checks.base import (
     Check,
@@ -27,7 +28,6 @@ from nlriochecker.checks.verbanden import (
     deelstelsel_ids,
     verbonden_knopen,
 )
-from nlriochecker.dataset import Conduit, GwswDataset, part_holders_of
 from nlriochecker.taal import getal, vorm
 
 
