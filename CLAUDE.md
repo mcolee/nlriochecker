@@ -222,7 +222,9 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   overslagbewaking). Kies daarbovenop de review
   naar het **risico** van de wijziging, niet naar de omvang:
   - **Docs/config** (geen `src/**.py`, bv. deze regel): geen poort en geen review, alleen
-    de drifttests die de wijziging raakt (bv. `test_indexversie_staat_in_claude_md`).
+    de drifttests die de wijziging raakt (bv.
+    `test_de_dekkingsondergrens_is_overal_hetzelfde_getal`, die deze CLAUDE.md aan de
+    dekkingsgrens van de CI en de uitgavepoort bindt).
   - **Klein** (code buiten de kritieke paden, geen nieuwe feature): `/code-review` --
     `low` bij een triviale one-liner, anders `medium`.
   - **Substantieel** (een nieuwe check/feature, óf de wijziging raakt een kritiek pad:
