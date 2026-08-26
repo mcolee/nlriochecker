@@ -38,6 +38,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Alleen de bereikbaarheidschecks gaan nog over het persnet** (eindreview #72–#77,
+  BO-54). De bereikbaarheidsgraaf (vrijverval plus mechanisch riool als ongerichte
+  kanten) was een veld op `_Netwerk` en werd dus door `_bouw_netwerk` altijd meegebouwd;
+  de AST-sweep van BO-51 zag de rol `mechanischeleidingen` daardoor vanuit alle negen
+  NET-checks, en sinds issue #77 stond dat als "gaat over: mechanischeleidingen" in het
+  rapport, in `overzicht_checks.populatie` en in de JSON — ook bij NET-004, dat het
+  persnet juist niet mág zien. De laag wordt nu lui gebouwd
+  (`verbanden._bereikbaarheid`), en alleen NET-001, NET-002 en NET-008 declareren de rol.
+  De uitkomsten veranderen niet: NET-001 8467 en NET-002 3031 op De Wolden en Hoogeveen,
+  gelijk aan vóór deze wijziging.
 - **De afbakening tot een studiegebied houdt de checkdeclaratie vast** (issue #77).
   `CheckRun.beperk_tot_studiegebied` bouwde elke uitslag opnieuw op met een opsomming die
   `rollen` en `kenmerken` oversloeg, zodat elk gebiedsrapport "Toetst de hele export" zei

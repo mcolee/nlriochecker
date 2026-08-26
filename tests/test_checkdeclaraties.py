@@ -105,6 +105,22 @@ def test_register_weigert_check_zonder_declaratie() -> None:
     assert "TST-000" not in REGISTRY
 
 
+def test_alleen_de_bereikbaarheidschecks_gaan_over_het_persnet() -> None:
+    """Alleen wie de bereikbaarheidsgraaf leest declareert `mechanischeleidingen`.
+
+    Het mechanische riool wordt inhoudelijk niet getoetst; het draagt alleen
+    connectiviteit voor de vraag of vrijverval ergens uitkomt (BO-54). Die vraag stellen
+    NET-001, NET-002 en NET-008 (die zijn lozingspunten uit dezelfde laag haalt); de
+    overige NET-checks draaien op het zuivere vrijverval. NET-004 (kringlopen) is daar
+    het scherpste geval: elke ongerichte persleidingkant zou er een kringloop van twee
+    knopen zijn, dus die check mág het persnet niet zien -- en hoort het dan ook niet te
+    declareren.
+    """
+    met_persnet = {cid for cid in CHECK_IDS if "mechanischeleidingen" in REGISTRY[cid].rollen}
+
+    assert met_persnet == {"NET-001", "NET-002", "NET-008"}
+
+
 def test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd() -> None:
     """Wie `examined()` op instanties zet, zegt dat erbij (issue #77).
 

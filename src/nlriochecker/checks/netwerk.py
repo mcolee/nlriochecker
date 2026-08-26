@@ -20,6 +20,7 @@ from nlriochecker.checks.selectie import (
     overstortputten,
 )
 from nlriochecker.checks.verbanden import (
+    _bereikbaarheid,
     _eindpunten,
     _Netwerk,
     _netwerk,
@@ -30,7 +31,7 @@ from nlriochecker.dataset import Conduit, GwswDataset, part_holders_of
 from nlriochecker.taal import getal, vorm
 
 
-def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
+def _bereikbaar_vanaf(context: CheckContext, endpoints: set[str]) -> set[str]:
     """De knopen die stroomafwaarts een van deze eindpunten bereiken.
 
     Over de bereikbaarheidsgraaf, dus inclusief het mechanische riool als ongerichte
@@ -45,7 +46,7 @@ def _bereikbaar_vanaf(netwerk: _Netwerk, endpoints: set[str]) -> set[str]:
     if not endpoints:
         return set()
 
-    omgekeerd = netwerk.bereikbaarheid.reverse(copy=False)
+    omgekeerd = _bereikbaarheid(context).reverse(copy=False)
     bereikt = {uri for uri in endpoints if uri in omgekeerd}
     stapel = list(bereikt)
     while stapel:
@@ -84,7 +85,7 @@ def _eindknoop_notitie(
         return []
 
     endpoints = _eindpuntset(context, rollen)
-    bereikt = _bereikbaar_vanaf(netwerk, endpoints)
+    bereikt = _bereikbaar_vanaf(context, endpoints)
     doodlopend = [uri for uri in sinks if uri not in bereikt]
     if not doodlopend:
         return []
@@ -127,15 +128,12 @@ def _richtingsverlies(
     beoordeeld (mechanisch riool valt buiten het checkregister), en zou hier als
     ongemelde last verschijnen in een getal dat de lezer op de bevindingen betrekt.
     """
-    if not rollen:
-        return 0, 0
-
     endpoints = _eindpuntset(context, rollen)
-    bereikt = _bereikbaar_vanaf(netwerk, endpoints)
+    bereikt = _bereikbaar_vanaf(context, endpoints)
     vrijverval = set(netwerk.graph)
 
     zonder = met = 0
-    for deel in nx.weakly_connected_components(netwerk.bereikbaarheid):
+    for deel in nx.weakly_connected_components(_bereikbaarheid(context)):
         onbereikt = len((deel & vrijverval) - bereikt)
         if deel & endpoints:
             met += onbereikt
@@ -156,8 +154,13 @@ def _bob_tegen_de_richting(netwerk: _Netwerk) -> tuple[int, int]:
     return tegendraads, meetbaar
 
 
-def _netwerk_notities(context: CheckContext, rollen: Sequence[str] = ()) -> list[str]:
-    """Beschrijft welke objecten niet in de netwerkanalyse konden meedoen."""
+def _netwerk_notities(context: CheckContext) -> list[str]:
+    """Beschrijft welke objecten niet in de netwerkanalyse konden meedoen.
+
+    Alleen wat op het zuivere vrijverval te zien is; wat de bereikbaarheidsgraaf nodig
+    heeft staat in `_eindpuntnotities`, zodat een check die geen eindpunt zoekt het
+    persnet niet aanraakt en het dus ook niet hoeft te declareren.
+    """
     netwerk = _netwerk(context)
     notities = []
     if netwerk.unconnected:
@@ -173,8 +176,29 @@ def _netwerk_notities(context: CheckContext, rollen: Sequence[str] = ()) -> list
             "van-naar-richting."
         )
 
-    if rollen:
-        notities.extend(_eindknoop_notitie(context, netwerk, rollen))
+    tegendraads, meetbaar = _bob_tegen_de_richting(netwerk)
+    if meetbaar and tegendraads:
+        notities.append(
+            f"De analyse neemt aan dat de administratieve begin-naar-eindrichting de "
+            f"afvoerrichting is. Bij {tegendraads} van de {meetbaar} strengen met bekende "
+            f"BOB's stijgt de bodem juist in die richting "
+            f"({100 * tegendraads / meetbaar:.0f}%). NET-003 toetst dat later expliciet; "
+            "tot die tijd verdienen de bereikbaarheidsuitkomsten een slag om de arm."
+        )
+
+    return notities
+
+
+def _eindpuntnotities(context: CheckContext, rollen: Sequence[str]) -> list[str]:
+    """De notities die op de bereikbaarheidsgraaf leunen: waar komt het water uit?
+
+    Alleen voor de checks die werkelijk een eindpunt zoeken (NET-001, NET-002,
+    NET-008). Die lezen daarmee het persnet -- dat is de rol `mechanischeleidingen`
+    in hun declaratie -- terwijl de overige NET-checks op het zuivere vrijverval
+    blijven. Zie BO-54.
+    """
+    netwerk = _netwerk(context)
+    notities = list(_eindknoop_notitie(context, netwerk, rollen))
 
     zonder, in_deel_met_eindpunt = _richtingsverlies(context, netwerk, rollen)
     if in_deel_met_eindpunt:
@@ -189,17 +213,7 @@ def _netwerk_notities(context: CheckContext, rollen: Sequence[str] = ()) -> list
             f"{zonder} knopen liggen in een netwerkdeel zonder enig eindpunt van dit soort."
         )
 
-    tegendraads, meetbaar = _bob_tegen_de_richting(netwerk)
-    if meetbaar and tegendraads:
-        notities.append(
-            f"De analyse neemt aan dat de administratieve begin-naar-eindrichting de "
-            f"afvoerrichting is. Bij {tegendraads} van de {meetbaar} strengen met bekende "
-            f"BOB's stijgt de bodem juist in die richting "
-            f"({100 * tegendraads / meetbaar:.0f}%). NET-003 toetst dat later expliciet; "
-            "tot die tijd verdienen de bereikbaarheidsuitkomsten een slag om de arm."
-        )
-
-    if rollen and not _eindpuntset(context, rollen):
+    if not _eindpuntset(context, rollen):
         namen = [naam for rol in rollen for naam in getattr(context.config.klassen, rol)]
         klassen = ", ".join(namen) or "geen geconfigureerd"
         notities.append(
@@ -255,7 +269,7 @@ class _ZonderAfvoerpad(Check):
         endpoints: set[str] = set()
         for rol in self.eindpuntrollen:
             endpoints |= _eindpunten(context, rol)
-        bereikt = _bereikbaar_vanaf(netwerk, endpoints)
+        bereikt = _bereikbaar_vanaf(context, endpoints)
         dataset = context.dataset
         wortels = context.config.klassen.netwerkknopen
         clusters = deelstelsel_ids(context)
@@ -285,7 +299,7 @@ class _ZonderAfvoerpad(Check):
         afgebakend is. Hier geteld zou de duiding het aantal deelstelsels van het
         hele werkbereik van de check melden bij de bevindingen van een enkele buurt.
         """
-        return _netwerk_notities(context, self.eindpuntrollen)
+        return _netwerk_notities(context) + _eindpuntnotities(context, self.eindpuntrollen)
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""
@@ -337,7 +351,7 @@ class KringloopInNetwerk(Check):
     title = "Cirkels (kringlopen) in het vrijvervalnetwerk"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -422,12 +436,7 @@ class ItStelselZonderDrempel(Check):
     title = "IT-stelsel zonder drempel"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
-    rollen = (
-        "infiltratieleidingen",
-        "mechanischeleidingen",
-        "overstortputten",
-        "vrijvervalrioolleidingen",
-    )
+    rollen = ("infiltratieleidingen", "overstortputten", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -532,7 +541,7 @@ class OrientatieTegenAfvoerrichting(Check):
     title = "Strengorientatie tegen de afvoerrichting in"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -708,7 +717,7 @@ class RichtingssignalenSprekenElkaarTegen(Check):
     title = "Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -787,7 +796,7 @@ class StelseltypeWijktAfVanBuren(Check):
     title = "Stelseltype streng wijkt af van boven- en benedenstroomse buren"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -873,7 +882,7 @@ class KoppelingTussenStelseltypen(Check):
     title = "Koppelingen tussen verschillende stelseltypen"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -970,7 +979,7 @@ class VeelLozingspuntenInDeelstelsel(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt wat er buiten de graaf viel."""
-        return _netwerk_notities(context, ("lozings_eindpunt",))
+        return _netwerk_notities(context) + _eindpuntnotities(context, ("lozings_eindpunt",))
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen in de graaf."""

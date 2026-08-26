@@ -160,15 +160,13 @@ class _Netwerk:
     EindpuntLeiding. Dat is de richting die het GWSW-model als afvoerrichting
     bedoelt; NET-003 toetst later of de geometrie daarmee overeenkomt.
 
-    `bereikbaarheid` is diezelfde graaf plus het mechanische riool als ongerichte
-    connectiviteit; alleen de bereikbaarheidsvraag ("komt dit water ergens uit?")
-    leest die. `graph` blijft het zuivere vrijverval, want kringlopen (NET-004),
-    stelseltypen (NET-005/006) en de afvoerpadanalyse zijn vrijverval-begrippen en
-    zouden op de ongerichte kanten onzin opleveren. Zie BO-54.
+    `graph` is het zuivere vrijverval. Het mechanische riool zit in een tweede laag
+    die `_bereikbaarheid` los opbouwt, want kringlopen (NET-004), stelseltypen
+    (NET-005/006) en de afvoerpadanalyse zijn vrijverval-begrippen en zouden op
+    ongerichte persleidingkanten onzin opleveren. Zie BO-54.
     """
 
     graph: nx.DiGraph
-    bereikbaarheid: nx.DiGraph
     conduits: list[Conduit]
     unconnected: list[Conduit]
     reversed_count: int = 0
@@ -208,7 +206,6 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
 
     return _Netwerk(
         graph=graph,
-        bereikbaarheid=_met_mechanische_connectiviteit(context, graph),
         conduits=aangesloten,
         unconnected=los,
         reversed_count=omgedraaid,
@@ -219,7 +216,19 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     )
 
 
-def _met_mechanische_connectiviteit(context: CheckContext, vrijverval: nx.DiGraph) -> nx.DiGraph:
+def _bereikbaarheid(context: CheckContext) -> nx.DiGraph:
+    """De bereikbaarheidsgraaf; die wordt per context een keer gebouwd.
+
+    Bewust een eigen gecachte laag naast `_netwerk` en niet een tweede veld erin: wie
+    hem opvraagt leest daarmee de rol `mechanischeleidingen`, en dat is precies wat een
+    check hoort te declareren. Zat de laag in `_bouw_netwerk`, dan zou elke check die
+    de graaf aanraakt het persnet declareren -- ook NET-004, dat er per se buiten moet
+    blijven. Zie BO-54.
+    """
+    return context.cached("bereikbaarheid", lambda: _bouw_bereikbaarheid(context))
+
+
+def _bouw_bereikbaarheid(context: CheckContext) -> nx.DiGraph:
     """De vrijvervalgraaf plus het mechanische riool als ongerichte kanten (BO-54).
 
     Ongericht, want een persleiding is pompgestuurd en haar administratieve
@@ -233,7 +242,7 @@ def _met_mechanische_connectiviteit(context: CheckContext, vrijverval: nx.DiGrap
     het persnet in losse stukken en blijft het gemaal erachter onbereikbaar. Met de
     terugval is het hulpstuk een doorgeefknoop.
     """
-    graaf: nx.DiGraph = vrijverval.copy()
+    graaf: nx.DiGraph = _netwerk(context).graph.copy()
     for conduit in mechanischeleidingen(context):
         begin, eind = verbonden_knopen(context, conduit)
         begin = begin or conduit.start_node
@@ -259,13 +268,13 @@ def _eindpunten(context: CheckContext, rol: str) -> set[str]:
     vrijvervalgraaf niet voor. Die graaf is een deelverzameling van deze, dus voor de
     lezers die met vrijvervalknopen werken verandert er niets.
     """
-    netwerk = _netwerk(context)
+    graaf = _bereikbaarheid(context)
     dataset = context.dataset
     return {
         uri
         for wortel in getattr(context.config.klassen, rol)
         for uri in dataset.of_class(wortel)
-        if uri in netwerk.bereikbaarheid
+        if uri in graaf
     }
 
 

@@ -2764,10 +2764,10 @@ géén gemaal, alleen een lozingspunt. Alleen NET-001 is verruimd, niet symmetri
 
 ### BO-54 Het mechanische riool telt als ongerichte connectiviteit, doorlopend via hulpstukken
 
-**Wat.** `checks/verbanden._bouw_netwerk` levert sinds issue #72 naast de gerichte
-vrijvervalgraaf (`_Netwerk.graph`) een tweede laag: `_Netwerk.bereikbaarheid`, dezelfde graaf plus
-de mechanische leidingen (rol `mechanischeleidingen`, `[klassen] mechanisch`) als kanten in beide
-richtingen. Alleen de bereikbaarheidsvraag leest die laag -- `_bereikbaar_vanaf` (NET-001/NET-002),
+**Wat.** `checks/verbanden.py` kent sinds issue #72 naast de gerichte vrijvervalgraaf
+(`_Netwerk.graph`) een tweede laag: `_bereikbaarheid(context)`, dezelfde graaf plus de mechanische
+leidingen (rol `mechanischeleidingen`, `[klassen] mechanisch`) als kanten in beide richtingen.
+Alleen de bereikbaarheidsvraag leest die laag -- `_bereikbaar_vanaf` (NET-001/NET-002),
 `_eindpunten` en de notities eromheen. Kringlopen (NET-004), stelseltypen (NET-005/006) en de
 afvoerpadanalyse (`afvoerpaden`, `afvoerpad_van_streng`) blijven op het zuivere vrijverval: dat
 zijn vrijverval-begrippen, en ongerichte kanten zouden er onzin van maken -- elke persleiding zou
@@ -2789,13 +2789,25 @@ de ADM-checks, en globaal wijzigen is een te groot risico-oppervlak.
 Hoogeveen zijn hulpstukken; er is er geen enkele die dat niet is. De terugval raakt dus precies de
 hulpstukken en niets anders.
 
-**Gevolg voor de declaraties.** `_bouw_netwerk` leest hierdoor de rol `mechanischeleidingen`, en
-de AST-sweep van BO-51 ziet dat vanuit elke NET-check die de graaf bouwt. NET-001 t/m NET-009
-declareren die rol daarom nu. Dat trekt de opmerking in BO-52 in dat "`mechanische leiding`
-verdwijnt omdat geen check die rol declareert": de rol staat weer in de rollentelling en in de
-`SIG-nulklasse`-bewaking, met de negen NET-checks als leunende checks. Voor een dataset zonder
-mechanisch riool levert dat een nul-signaal op; dat is de bedoelde betekenis van die bewaking
-(een populatie waar checks op leunen komt niet voor), niet een gebrek in de aanlevering.
+**Gevolg voor de declaraties.** Wie de laag opvraagt leest daarmee de rol
+`mechanischeleidingen`, en de AST-sweep van BO-51 ziet dat. Dat zijn NET-001, NET-002 en NET-008;
+die drie declareren de rol. De overige NET-checks blijven op het zuivere vrijverval en declareren
+hem niet.
+
+Dat de laag lui is (een eigen `context.cached("bereikbaarheid", ...)` in plaats van een veld op
+`_Netwerk`) is precies daarvoor: bouwde `_bouw_netwerk` hem eager op, dan las elke check die de
+graaf aanraakt het persnet en moest hij het declareren -- ook NET-004, dat er per se buiten moet
+blijven. Tot de eindreview van #72--#77 stond het zo, en toen beweerden alle negen NET-checks in
+rapport, `overzicht_checks.populatie` en JSON dat zij over mechanische leidingen gingen. Onwaar, en
+in tegenspraak met deze BO zelf; de luie laag herstelt dat zonder de AST-sweep te omzeilen. De
+uitkomsten van de checks veranderen er niet van: NET-001 blijft op 8467, NET-002 op 3031 (De Wolden
+en Hoogeveen, na #73).
+
+Dit trekt de opmerking in BO-52 in dat "`mechanische leiding` verdwijnt omdat geen check die rol
+declareert": de rol staat weer in de rollentelling en in de `SIG-nulklasse`-bewaking, nu met drie
+leunende checks. Voor een dataset zonder mechanisch riool levert dat een nul-signaal op; dat is de
+bedoelde betekenis van die bewaking (een populatie waar checks op leunen komt niet voor), niet een
+gebrek in de aanlevering.
 
 **Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`, door de echte pijplijn met
 `markeer_vulwaarden` vóór de checks).** NET-001 gaat van **9062** naar **7978** bevindingen op
