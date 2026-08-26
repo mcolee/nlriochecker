@@ -56,7 +56,12 @@ context = CheckContext(dataset=dataset, config=config)
   0.3.0-baseline (162.046 meldingen, met `steekproef_checks.gpkg`) en `issue58/` t/m
   `issue63/` zijn de nametingen per issue — `issue62/` is de recentste. **Tel eerst daarop**
   (`bevindingen.json`) voordat je een nieuwe run van ~6 minuten start; noem in je verslag
-  welke run je gebruikte, want de baseline dateert van vóór #60–#63.
+  welke run je gebruikte, want de baseline dateert van vóór #60–#63. `26082026_godspeed/`
+  is de volle run (mét `--bronnen`) na de fixgolf van #72–#77; `steekproef_dorpen/` is de
+  handmatige steekproef daarop voor de checkaudit (#68–#70): 3 per check in Koekangerveld,
+  Verspreide huizen Koekange, Veeningen, Fluitenberg kern en Schutlanden-Oost/-West, 14
+  bestanden van ≤10 rijen met een kolom `feedback` van de auteur — lees die feedback vóór
+  je een auditverslag schrijft. Het commando staat in de docstring van `scripts/steekproef.py`.
 - **Een vergelijkbare gemeentebrede run heeft dezelfde vlaggen als de baseline nodig**, en
   `volledig_24082026/` draaide mét `--bronnen data/gis_dewoldenhoogeveen` (de EXT-checks).
   Zonder die vlag ontbreken de EXT-bevindingen en klopt de totaaltelling niet; op 26-08
