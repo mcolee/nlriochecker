@@ -20,7 +20,10 @@ de bron van de punten die hier zijn aangescherpt.
   auto-mode-classifier `gh repo create` en `gh issue create` ("Blocked by classifier"), en soms
   de eerste agent-dispatch (die lukt bij herhaling). Op 26-08 kostte dat drie geweigerde calls
   plus een auteur-tussenkomst. Verwacht het: stage de body/args in een scratchbestand en laat de
-  auteur de call als `! gh issue create …` draaien, of doe het buiten de regie om. Een nieuwe
+  auteur de call als `! gh issue create …` draaien, of doe het buiten de regie om. Probeer na
+  een classifier-blokkade geen variant van dezelfde schrijfactie (op 26-08 hielp een tweede,
+  kleinere `gh repo create` niet): meld het één keer aan de auteur en wacht op het startsein.
+  Een nieuwe
   publieke repo pushen struikelt bovendien over GH007 (privé-e-mail): zet eerst
   `git config user.email <id>+mcolee@users.noreply.github.com` en `git commit --amend --reset-author`
   (dat herschrijft de SHA, dus verifieer de historie opnieuw).
