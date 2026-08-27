@@ -13,6 +13,12 @@ het bereik, objectsoort), de overlap tussen checks die op dezelfde grootheid rek
 (HGT-004/013/018 op de buiskruin, HGT-005/006 tegen NET-003/009 voor PRE-1) en de
 diepteverdeling van HGT-003, de meting achter de diepteligging-drempel.
 
+Deel C (NET, RVZ, BTR en EXT): welke populatie NET-001 en NET-002 elk melden (het
+verschil dat de steekproef niet zag), de deelverzameling NET-003 in NET-009 achter
+PRE-1, de stelseltypecombinaties van NET-006, de gelijke populatie van RVZ-002 en
+RVZ-003 achter S2, de gelijke uitslag van EXT-002 en EXT-003 achter PRE-4, en de
+klassen achter de lozingspunten van EXT-007 (de scope-bug).
+
 Bewaard omdat een meetscript dat een getal in een verslag onderbouwt navolgbaar hoort te
 zijn (`docs/agents/analyse-harness.md`).
 
@@ -45,9 +51,12 @@ from nlriochecker.checks.hoogten import _verhang as _hgt_verhang
 from nlriochecker.checks.selectie import (
     functieloze_knopen,
     hulpstukken,
+    infiltratieleidingen,
     leidingen,
     lozeleidingen,
+    lozingspunten,
     mechanischeleidingen,
+    overstortputten,
     vrijvervalrioolleidingen,
     vuilwaterleidingen,
 )
@@ -327,6 +336,120 @@ def deel_b(context: CheckContext, meldingen: list[dict]) -> None:
     print(
         f"-- HGT-007: {len(per['HGT-007'])} meldingen op {toetsbaar} werkelijk getoetste strengen"
     )
+
+    deel_c(context, meldingen)
+
+
+def _clusters(meldingen: list[dict]) -> int:
+    """Het aantal verschillende deelstelsels waarop een check meldt."""
+    return len({melding["cluster_id"] for melding in meldingen if melding["cluster_id"]})
+
+
+def deel_c(context: CheckContext, meldingen: list[dict]) -> None:
+    """De uitsplitsingen achter de NET-, RVZ-, BTR- en EXT-secties van het verslag."""
+    dataset = context.dataset
+    klassen = context.config.klassen
+    per = _per_check(meldingen)
+
+    def stelseltype(uri: str) -> str:
+        """Het stelseltype van de gemelde streng, of waarom er geen is."""
+        conduit = dataset.conduits.get(uri)
+        if conduit is None:
+            return "(geen streng)"
+        return klassen.stelseltype(conduit.types, dataset.closure) or "(geen stelseltype)"
+
+    # 1. NET-001 en NET-002 melden op verschillende populaties en met verschillende
+    # eindpunten; de steekproef vroeg wat het verschil is.
+    for check_id in ("NET-001", "NET-002"):
+        soorten = collections.Counter(stelseltype(m["object_uri"]) for m in per[check_id])
+        print(
+            f"-- {check_id}: {len(per[check_id])} meldingen in {_clusters(per[check_id])} "
+            f"deelstelsels; stelseltypen {soorten.most_common()}"
+        )
+    print(
+        f"-- NET-001 n NET-002: {len(_objecten(per['NET-001']) & _objecten(per['NET-002']))} "
+        "objecten gedeeld"
+    )
+
+    # 2. Het richtingscluster van PRE-1: is NET-003 een deelverzameling van NET-009?
+    net003, net009 = _objecten(per["NET-003"]), _objecten(per["NET-009"])
+    print(
+        f"-- NET-003 n NET-009: {len(net003 & net009)} van de {len(net003)} NET-003-objecten "
+        f"({len(net009)} bij NET-009); alleen NET-009: {len(net009 - net003)}"
+    )
+    _tel("NET-009 geometrie", per["NET-009"], r"De lijn is (omgekeerd getekend|in de van-naar)")
+    _tel("NET-009 bob", per["NET-009"], r"De BOB (stijgt|daalt|ligt vlak|ontbreekt)")
+
+    # 3. De stelseltype-checks: wat melden ze precies?
+    _tel(
+        "NET-005",
+        per["NET-005"],
+        r"stelseltype '(\w+)' terwijl alle \d+ buurstrengen van type (.*?) zijn",
+    )
+    _tel("NET-006", per["NET-006"], r"Hier komen (\d+) stelseltypen samen")
+    _tel("RVZ-005", per["RVZ-005"], r"uitsluitend aan strengen van type (.*?)\.")
+    _tel("RVZ-010", per["RVZ-010"], r"ligt uitsluitend stelseltype (.*?);")
+
+    # 3b. NET-006 op de combinatie van soorten, zonder de strenglabels ertussen.
+    combinaties: collections.Counter[tuple[str, ...]] = collections.Counter()
+    for melding in per["NET-006"]:
+        treffer = re.search(r"stelseltypen samen \((.*)\)\.$", melding["boodschap"])
+        if treffer is not None:
+            combinaties[
+                tuple(sorted(deel.split(":")[0].strip() for deel in treffer.group(1).split("; ")))
+            ] += 1
+    print(f"-- NET-006 combinaties: {combinaties.most_common(12)}")
+
+    # 4. NET-007 en RVZ-006: hoeveel van de populatie melden ze, en op hoeveel stelsels?
+    infiltratie = len(infiltratieleidingen(context))
+    print(
+        f"-- NET-007: {len(per['NET-007'])} meldingen op {infiltratie} infiltratieleidingen; "
+        f"{len(overstortputten(context))} overstortputten in de dataset"
+    )
+    print(
+        f"-- RVZ-006: {len(per['RVZ-006'])} meldingen in {_clusters(per['RVZ-006'])} deelstelsels"
+    )
+
+    # 5. RVZ-002 en RVZ-003 (S2): dezelfde putten, dezelfde basis?
+    print(
+        f"-- RVZ-002 n RVZ-003: {len(_objecten(per['RVZ-002']) & _objecten(per['RVZ-003']))} van "
+        f"elk {len(_objecten(per['RVZ-002']))} resp. {len(_objecten(per['RVZ-003']))} objecten"
+    )
+
+    # 6. EXT-001: welke relatie, en op welk objectsoort?
+    _tel("EXT-001", per["EXT-001"], r"Dit object (ligt volledig binnen|kruist|ligt [\d.]+ m van)")
+    knoop = sum(1 for m in per["EXT-001"] if m["object_uri"] in dataset.nodes)
+    print(f"-- EXT-001: {knoop} putten, {len(per['EXT-001']) - knoop} strengen")
+
+    # 7. EXT-002 en EXT-003 (PRE-4): dezelfde doorkruisingen?
+    print(
+        f"-- EXT-002 n EXT-003: {len(_objecten(per['EXT-002']) & _objecten(per['EXT-003']))} van "
+        f"elk {len(_objecten(per['EXT-002']))} resp. {len(_objecten(per['EXT-003']))} objecten"
+    )
+
+    # 8. EXT-007 (scope-bug): welke lozingspuntklassen melden en welke bestaan er?
+    gemeld = collections.Counter(
+        dataset.beheerobjecttype(m["object_uri"]) or "(zonder type)" for m in per["EXT-007"]
+    )
+    populatie = collections.Counter(
+        dataset.beheerobjecttype(node.uri) or "(zonder type)" for node in lozingspunten(context)
+    )
+    print(f"-- EXT-007 gemeld: {gemeld.most_common()}; populatie: {populatie.most_common()}")
+    for naam in (
+        "Lozingspunt",
+        "LozingspuntBodem",
+        "LozingspuntOppervlaktewater",
+        "UitlaatPunt",
+        "Uitlaatconstructie",
+        "Uitlaat",
+        "Lozingsput",
+        "Overnamepunt",
+    ):
+        direct = sum(1 for _ in dataset.graph.subjects(RDF.type, URIRef(GWSW + naam)))
+        print(
+            f"-- klasse {naam}: {direct} directe instanties, "
+            f"{len(dataset.of_class(naam))} incl. subklassen"
+        )
 
 
 if __name__ == "__main__":
