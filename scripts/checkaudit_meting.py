@@ -1,10 +1,17 @@
 """Uitsplitsingen achter de checkaudit van augustus 2026 (docs/checks-audit-2026-08.md).
 
-De aantallen F/W en `bekeken` in dat verslag komen rechtstreeks uit `bevindingen.json`.
-Dit script levert de uitsplitsingen die daar niet in staan en die het verslag wel citeert:
-per melding de populatie van beide betrokken objecten, het aandeel `c*`-duplicaatlabels,
-waar de niet-gesnapte strengeinden van TOP-002/003 aan hangen, en het effect van PRE-3 op
-de scope van TOP-006/010/011.
+De aantallen F/W en `bekeken` in dat verslag komen rechtstreeks uit `bevindingen.json`,
+en wat een check niet kon toetsen staat als toelichting in `bevindingen.md`. Dit script
+levert de uitsplitsingen die in geen van beide staan en die het verslag wel citeert.
+
+Deel A (TOP en ADM): per melding de populatie van beide betrokken objecten, het aandeel
+`c*`-duplicaatlabels, waar de niet-gesnapte strengeinden van TOP-002/003 aan hangen, en
+het effect van PRE-3 op de scope van TOP-006/010/011.
+
+Deel B (ATTR en HGT): per check de uitsplitsing van de meldingstekst (materiaal, kant van
+het bereik, objectsoort), de overlap tussen checks die op dezelfde grootheid rekenen
+(HGT-004/013/018 op de buiskruin, HGT-005/006 tegen NET-003/009 voor PRE-1) en de
+diepteverdeling van HGT-003, de meting achter de diepteligging-drempel.
 
 Bewaard omdat een meetscript dat een getal in een verslag onderbouwt navolgbaar hoort te
 zijn (`docs/agents/analyse-harness.md`).
@@ -22,14 +29,19 @@ from __future__ import annotations
 
 import collections
 import json
+import re
 import sys
 from pathlib import Path
 
 from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from gwsw_orox_helpers.cache import laad_met_cache
+from gwsw_orox_helpers.dataset import GWSW
+from rdflib import RDF, URIRef
 
 from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import CheckContext
+from nlriochecker.checks.hoogten import _staffeldrempel
+from nlriochecker.checks.hoogten import _verhang as _hgt_verhang
 from nlriochecker.checks.selectie import (
     functieloze_knopen,
     hulpstukken,
@@ -37,6 +49,7 @@ from nlriochecker.checks.selectie import (
     lozeleidingen,
     mechanischeleidingen,
     vrijvervalrioolleidingen,
+    vuilwaterleidingen,
 )
 from nlriochecker.checks.verbanden import verbonden_knopen
 
@@ -152,6 +165,167 @@ def main(uitvoermap: Path) -> None:
     print(
         f"-- TOP-019: {len(functieloos)} functieloze knopen ({soorten.most_common()}); "
         f"{treffers} van de {2 * len(alle)} strengeinden komt erop uit"
+    )
+
+    deel_b(context, meldingen)
+
+
+def _per_check(meldingen: list[dict]) -> dict[str, list[dict]]:
+    """De meldingen gegroepeerd op check-ID."""
+    per: dict[str, list[dict]] = collections.defaultdict(list)
+    for melding in meldingen:
+        per[melding["check_id"]].append(melding)
+    return per
+
+
+def _tel(naam: str, meldingen: list[dict], patroon: str) -> None:
+    """Telt de vangstgroepen van een regex over de meldingsteksten van een check."""
+    teller: collections.Counter[tuple[str, ...]] = collections.Counter()
+    ongevangen = 0
+    for melding in meldingen:
+        treffer = re.search(patroon, melding["boodschap"])
+        if treffer is None:
+            ongevangen += 1
+        else:
+            teller[treffer.groups()] += 1
+    staart = f"; {ongevangen} zonder treffer" if ongevangen else ""
+    print(f"-- {naam}: {len(meldingen)} meldingen{staart}")
+    for groepen, aantal in teller.most_common(12):
+        print(f"   {groepen}: {aantal}")
+
+
+def _zijden(meldingen: list[dict]) -> set[tuple[str, str]]:
+    """Per melding het paar (object, zijde); twee einden van dezelfde streng zijn twee gevallen."""
+    gevonden = set()
+    for melding in meldingen:
+        treffer = re.search(r"aan het (beginpunt|eindpunt)", melding["boodschap"])
+        gevonden.add((melding["object_uri"], treffer.group(1) if treffer else ""))
+    return gevonden
+
+
+def _objecten(meldingen: list[dict]) -> set[str]:
+    """De URI's waarop een check heeft gemeld."""
+    return {melding["object_uri"] for melding in meldingen}
+
+
+def deel_b(context: CheckContext, meldingen: list[dict]) -> None:
+    """De uitsplitsingen achter de ATTR- en HGT-secties van het verslag."""
+    dataset = context.dataset
+    per = _per_check(meldingen)
+
+    # 1. Wat de meldingstekst per check uitsplitst.
+    _tel("ATTR-001", per["ATTR-001"], r"ligt (onder|boven) het bereik .* materiaal (\w+)")
+    _tel("ATTR-003", per["ATTR-003"], r"Materiaal (\w+) met begindatum (\d{4})")
+    _tel("ATTR-008", per["ATTR-008"], r"ligt (onder|boven) de grens van (\S+) m")
+    _tel("ATTR-016", per["ATTR-016"], r"breedte \S+ mm en lengte (0|\S+) mm")
+    _tel("ATTR-018", per["ATTR-018"], r"Deze (put|streng)")
+    _tel("HGT-003", per["HGT-003"], r"ligt (boven het AHN-maaiveld|[\d.]+ m onder)")
+    _tel("HGT-004", per["HGT-004"], r"ligt (boven het \w+|onder de bodem)")
+    _tel("HGT-013", per["HGT-013"], r"ligt (onder|boven) de grens")
+    _tel("HGT-018", per["HGT-018"], r"aan het (beginpunt|eindpunt)")
+    _tel("ATTR-002", per["ATTR-002"], r"gangbare ondergrens van (\S+) mm voor (.*?)\.")
+
+    # 1b. ATTR-002: hoeveel meldingen komen alleen door de 250 mm van gemengd/hemelwater?
+    boven_200 = sum(
+        1
+        for melding in per["ATTR-002"]
+        if (
+            t := re.search(r"Profielmaat (\S+) mm .* ondergrens van (\S+) mm", melding["boodschap"])
+        )
+        and float(t.group(2)) > 200
+        and float(t.group(1)) >= 200
+    )
+    print(
+        f"-- ATTR-002: {boven_200} meldingen zouden bij een enkele ondergrens van 200 mm wegvallen"
+    )
+
+    # 1c. De omvang van het tegenverhang: waar ligt de grens tussen licht en fors?
+    for check_id in ("HGT-005", "HGT-006"):
+        stijgingen = sorted(
+            float(t.group(1))
+            for melding in per[check_id]
+            if (t := re.search(r"stijgt ([\d.]+) m", melding["boodschap"])) is not None
+        )
+        if stijgingen:
+            deel = len(stijgingen)
+            boven = {f">{g:g} m": sum(1 for s in stijgingen if s > g) for g in (0.1, 0.2, 0.5)}
+            print(
+                f"-- {check_id} stijging: min {stijgingen[0]:.3f}, mediaan "
+                f"{stijgingen[deel // 2]:.3f}, p90 {stijgingen[9 * deel // 10]:.3f}, "
+                f"max {stijgingen[-1]:.3f}, {boven}"
+            )
+
+    # 2. ATTR-013 meldt op twee objectsoorten tegelijk; de kenmerken staan in de tekst.
+    knoop = sum(1 for m in per["ATTR-013"] if m["object_uri"] in dataset.nodes)
+    streng = sum(1 for m in per["ATTR-013"] if m["object_uri"] in dataset.conduits)
+    kenmerken: collections.Counter[str] = collections.Counter()
+    for melding in per["ATTR-013"]:
+        for kenmerk in re.findall(r"(Bob\w+|Maaiveldhoogte|Putdekselniveau)", melding["boodschap"]):
+            kenmerken[kenmerk] += 1
+    print(f"-- ATTR-013: {knoop} knopen, {streng} strengen; kenmerken {kenmerken.most_common()}")
+
+    # 3. De kanttekening van HGT-001/002: hoogte tegen hoogtemodel in plaats van tegen meting.
+    for check_id in ("HGT-001", "HGT-002"):
+        eigen = per[check_id]
+        uit_model = sum(1 for m in eigen if "Let op:" in m["boodschap"])
+        print(f"-- {check_id}: {len(eigen)} meldingen, {uit_model} met de hoogtemodel-kanttekening")
+
+    # 4. De diepteverdeling achter HGT-003: waar zou een diepteligging-drempel liggen?
+    diepten = sorted(
+        float(treffer.group(1))
+        for melding in per["HGT-003"]
+        if (treffer := re.search(r"ligt ([\d.]+) m onder", melding["boodschap"])) is not None
+    )
+    if diepten:
+        deel = len(diepten)
+        kwantielen = {f"p{pct}": diepten[min(deel - 1, pct * deel // 100)] for pct in (50, 90, 99)}
+        boven = [4.0, 5.0, 6.0]
+        tellingen = {f">{grens:g} m": sum(1 for d in diepten if d > grens) for grens in boven}
+        print(
+            f"-- HGT-003 diepte onder AHN: {deel} meldingen, min {diepten[0]:.2f}, "
+            f"max {diepten[-1]:.2f}, {kwantielen}, {tellingen}"
+        )
+
+    # 5. Overlap tussen de checks die op dezelfde grootheid rekenen.
+    paren = (
+        ("HGT-004", "HGT-018", "buiskruin ligt per definitie boven de BOB"),
+        ("HGT-013", "HGT-018", "negatieve gronddekking is kruin boven maaiveld"),
+        ("ATTR-001", "ATTR-002", "twee ondergrenzen op dezelfde profielmaat"),
+        ("HGT-005", "NET-003", "PRE-1: zit het richtingsdeel al in de NET-checks?"),
+        ("HGT-006", "NET-003", "PRE-1"),
+        ("HGT-006", "NET-009", "PRE-1"),
+        ("HGT-005", "NET-009", "PRE-1"),
+        ("HGT-014", "HGT-006", "tegenverhang verklaart een afwijkend maaiveldverloop"),
+        ("HGT-013", "HGT-003", "te veel gronddekking is dezelfde diepteligging"),
+    )
+    for links, rechts, waarom in paren:
+        gedeeld = _objecten(per[links]) & _objecten(per[rechts])
+        print(
+            f"-- {links} n {rechts}: {len(gedeeld)} objecten gedeeld "
+            f"({len(_objecten(per[links]))} resp. {len(_objecten(per[rechts]))}) -- {waarom}"
+        )
+    op_zijde = _zijden(per["HGT-004"]) & _zijden(per["HGT-018"])
+    print(f"-- HGT-004 n HGT-018 op (object, zijde): {len(op_zijde)} van de {len(per['HGT-004'])}")
+
+    # 6. De buiskruin-methode: kent deze export een wanddikte om mee te rekenen?
+    for kenmerk in ("Wanddikte", "HoogtePut", "Putdekselniveau", "Overstortdrempel"):
+        aantal = sum(1 for _ in dataset.graph.subjects(RDF.type, URIRef(GWSW + kenmerk)))
+        print(f"-- instanties van {kenmerk}: {aantal}")
+
+    # 7. De echte noemer van HGT-007: `bekeken` telt alle vrijvervalstrengen, maar de
+    # check toetst alleen de vuilwaterrol met verval naar beneden en een staffeldrempel.
+    vuilwater = {conduit.uri for conduit in vuilwaterleidingen(context)}
+    staffel = context.config.verhang_staffel
+    toetsbaar = 0
+    for conduit in vrijvervalrioolleidingen(context):
+        if conduit.uri not in vuilwater:
+            continue
+        verhang = _hgt_verhang(conduit)
+        if verhang is None or verhang < 0 or _staffeldrempel(staffel, conduit.breedte_mm) is None:
+            continue
+        toetsbaar += 1
+    print(
+        f"-- HGT-007: {len(per['HGT-007'])} meldingen op {toetsbaar} werkelijk getoetste strengen"
     )
 
 
