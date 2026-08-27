@@ -6,7 +6,7 @@ Gebruik de `gh` CLI voor alle bewerkingen.
 ## Conventies
 
 - **Issue aanmaken**: `gh issue create --title "..." --body "..."`. Gebruik een heredoc voor een meerregelige body.
-- **Issue lezen**: `gh issue view <nummer> --json title,body,labels,comments --jq '{title, body, labels: [.labels[].name], comments: [.comments[].body]}'`. Let op: de kale `gh issue view <nummer>` en `--comments` breken op gh 2.45 met *"Projects (classic) is being deprecated … repository.issue.projectCards"* -- de `--json`-vorm omzeilt dat. Filter met de ingebouwde `--jq`; de losse `jq`-CLI is op deze machine niet geïnstalleerd.
+- **Issue lezen**: `gh issue view <nummer> --comments` werkt weer sinds gh 2.98 (de projectCards-deprecation die dit op gh 2.45 brak, is verholpen). Voor een script blijft de `--json`-vorm handig: `gh issue view <nummer> --json title,body,labels,comments --jq '{title, body, labels: [.labels[].name], comments: [.comments[].body]}'`. Filteren kan met `--jq` of met de losse `jq`-CLI (staat nu geïnstalleerd).
 - **Issues lijsten**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`, met de passende `--label`- en `--state`-filters.
 - **Reageren op een issue**: `gh issue comment <nummer> --body "..."`
 - **Labels toevoegen of verwijderen**: `gh issue edit <nummer> --add-label "..."` / `--remove-label "..."`
@@ -51,7 +51,7 @@ Maak een GitHub-issue aan.
 
 ## Als een skill zegt "haal het bijbehorende ticket op"
 
-Draai `gh issue view <nummer> --json title,body,labels,comments` (niet `--comments`: dat breekt op de projectCards-deprecation, zie boven).
+Draai `gh issue view <nummer> --comments` (of de `--json`-vorm hierboven voor scripting); sinds gh 2.98 werkt `--comments` weer, zie boven.
 
 ## Wayfinder-operaties
 
