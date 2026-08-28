@@ -169,9 +169,11 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
         de tabel opvalt.
 
         Daarboven staat sinds issue #86 hoeveel strengen niet tegen hun materiaal maar
-        tegen hun constructietype getoetst zijn, met de grens van die uitzondering
-        erbij: `Drain` en `Duiker` hangen rechtstreeks onder `Leiding` en komen deze
-        check dus in het geheel niet tegen.
+        tegen hun constructietype getoetst zijn, en welke constructietypen uit de tabel
+        in *deze* configuratie buiten de getoetste populatie vallen. Dat laatste wordt
+        afgeleid en niet opgeschreven: bij de standaardconfiguratie zijn dat `Drain` en
+        `Duiker` (zij hangen rechtstreeks onder `Leiding`), maar een project dat
+        `[klassen] vrijvervalleiding` verbreedt haalt ze erin.
         """
         tabel = context.plausibiliteit
         strengen = vrijvervalrioolleidingen(context)
@@ -192,13 +194,19 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
                 1 for conduit in strengen if _constructietyperegel(context, conduit) is not None
             )
             namen = ", ".join(regel.klasse for regel in uitzonderingen)
+            buiten = _buiten_de_rol(context, uitzonderingen)
+            staart = (
+                f" {', '.join(buiten)} {taal.vorm(len(buiten), 'valt', 'vallen')} in deze "
+                f"configuratie buiten de getoetste populatie en "
+                f"{taal.vorm(len(buiten), 'komt', 'komen')} deze check dus niet tegen."
+                if buiten
+                else ""
+            )
             regels.append(
                 f"{met_eigen_bereik} van de {totaal} strengen zijn tegen het bereik van hun "
                 f"constructietype getoetst in plaats van tegen dat van hun materiaal "
-                f"({namen}); een drainageleiding is naar haar functie dunner dan een riool. "
-                "`Drain` en `Duiker` hangen in de GWSW-ontologie rechtstreeks onder "
-                "`Leiding` en vallen daarmee buiten deze check, die alleen "
-                "vrijvervalrioolleidingen toetst."
+                f"({namen}); een drainageleiding is naar haar functie dunner dan een "
+                f"riool.{staart}"
             )
         zonder_maat = [conduit for conduit in strengen if _grootste_maat(conduit) is None]
         if zonder_maat:
@@ -1507,6 +1515,28 @@ def _diameterregel(context: CheckContext, conduit: Conduit) -> Diameterregel | N
     if regel is not None:
         return regel
     return context.plausibiliteit.diameter(conduit.materiaal)
+
+
+def _buiten_de_rol(
+    context: CheckContext, uitzonderingen: Sequence[ConstructionTypeDiameter]
+) -> list[str]:
+    """De constructietypen uit de tabel die buiten de populatie van ATTR-001 vallen.
+
+    Afgeleid uit `[klassen] vrijvervalleiding` plus de klassenhierarchie, en niet als
+    vaste zin opgeschreven. Bij de standaardconfiguratie zijn dit `Drain` en `Duiker` --
+    zij hangen in de GWSW-ontologie rechtstreeks onder `Leiding` -- maar een project dat
+    die rol verbreedt haalt ze erin, en dan zou een vaste zin onwaar zijn. Zonder
+    klassenhierarchie blijft elke afsluiting bij zichzelf steken; de uitkomst is dan
+    nog steeds waar, want dan selecteert de rol ook alleen haar eigen wortels.
+    """
+    return [
+        regel.klasse
+        for regel in uitzonderingen
+        if not any(
+            context.dataset.closure(regel.klasse) & context.dataset.closure(wortel)
+            for wortel in context.config.klassen.vrijvervalleiding
+        )
+    ]
 
 
 def _diameteranker(context: CheckContext, conduit: Conduit) -> object | None:

@@ -4079,8 +4079,8 @@ leidingmateriaal. Draagt een streng een constructietype dat in de nieuwe tabel
 `[[constructietype_diameter]]` van `plausibiliteit.toml` staat, dan gaat dat bereik voor
 het materiaalbereik. Drie klassen staan er: `Drain`, `DIT_riool` en `DT_riool`, alle drie
 op 50-4000 mm. De boodschap noemt welk van de twee bereiken gold ("... dat bij
-constructietype DT_riool hoort") en de bevinding draagt dan het detailveld
-`constructietype`.
+constructietype DT_riool hoort"); de details van de bevinding veranderen niet, want een
+veld erbij is een wijziging van het uitvoercontract en de boodschap draagt het al.
 
 **De research, en wat zij wel en niet oplevert.** Het issue vraagt eerst om de gangbare
 diameterrange voor drainageleidingen.
@@ -4143,5 +4143,25 @@ dat is 1.216 leidingen nieuw in beeld en levert juist méér bevindingen -- het 
 van wat het issue vraagt, en het raakt elke andere check op die rol niet). De uitzondering
 aan het BRUTIS-constructietype ophangen in plaats van aan de GWSW-klasse (verworpen: OroX/
 GWSW is leidend en die twee divergeren aantoonbaar, zie #79 §4). De drainageklassen
-helemaal overslaan in plaats van ze een eigen bereik te geven (verworpen: dan staat er
-nergens wat een drainagemaat is, en een Ø10-registratie zou stil doorgaan).
+helemaal overslaan in plaats van ze een eigen bereik te geven (verworpen, maar zwakker dan
+het eerst leek -- zie hieronder).
+
+**Wat deze regel wél en niet toevoegt, eerlijk geteld.** De bedoelde werking is
+*onderdrukking*: de valse meldingen op een gangbare drainagemaat (Ø65 tegen de
+PVC-ondergrens van 100 mm) verdwijnen, en dat is precies wat het issue vraagt. De
+toegevoegde *detectie* is vrijwel nul, en dat hoort hier te staan. De nulmetingvorm
+`BreedteLeiding_val` toetst het GWSW-waardebereik 63-4000 mm en vuurt aantoonbaar ook op
+een drain: `data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv` regel 7506 meldt
+`Zu1D0096-Zu1D0094-1` (`type=Drain`) met breedte 60 als Warning. Het vuurvenster van deze
+regel (< 50 of > 4000 mm) ligt dus strikt bínnen dat nulmetingsvenster (< 63 of > 4000 mm);
+met een nulmeting erbij meldt ATTR-001 op een drainageleiding niets wat daar niet al staat.
+De regel is alleen het enige bezwaar in een `toets` zonder `--shacl` -- dan is er geen
+nulmeting als vangnet.
+
+De twee grenzen zijn daarbij niet symmetrisch, en dat is bedoeld. De bovengrens is exact de
+GWSW-grens (4000 mm), dus daarboven melden regel en nulmeting hetzelfde. De ondergrens van
+50 mm ligt 13 mm *onder* de GWSW-ondergrens van 63: een drain van 55 mm levert hier geen
+ATTR-001-bevinding op, maar wel een `BreedteLeiding_val`-melding uit de nulmeting. Dat gat
+is de prijs van de keuze om de ondergrens de handelsmaatreeks te laten volgen in plaats van
+het registratiebereik -- de tabel zegt wat een drainagemaat ís, en of zo'n maat in GWSW
+geregistreerd mag worden is een andere vraag met een eigen melding.

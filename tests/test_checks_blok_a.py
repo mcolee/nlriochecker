@@ -208,6 +208,15 @@ def test_attr001_constructietype_gaat_voor_het_materiaal() -> None:
     telling = [note for note in outcome.notes if "constructietype getoetst" in note]
     assert len(telling) == 1, outcome.notes
     assert "2 van de 3 strengen" in telling[0]
+    # `Drain` staat wel in de tabel maar hangt onder `Leiding`; de zin daarover wordt uit
+    # de configuratie afgeleid en noemt dus precies die klasse en niet DIT_riool/DT_riool.
+    assert "Drain valt in deze configuratie buiten de getoetste populatie" in telling[0]
+
+    # De kolom Buiten bereik telt per streng tegen haar eigen anker: alle drie de PVC-
+    # strengen staan in de rij, maar DT (Ø65, drainagebereik) telt er niet in mee.
+    verdeling = [note for note in outcome.notes if "| Materiaal |" in note]
+    assert len(verdeling) == 1, outcome.notes
+    assert "| PVC | 3 | 2 | 45 | 65 |" in verdeling[0]
 
 
 def test_attr002_ondergrens_per_stelseltype() -> None:
