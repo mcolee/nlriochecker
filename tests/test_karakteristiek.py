@@ -13,7 +13,7 @@ from pathlib import Path
 from gwsw_orox_helpers.dataset import load_dataset, markeer_vulwaarden
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.checks import CheckContext, Severity, run_checks
 from nlriochecker.karakteristiek import bepaal_karakteristiek
 from nlriochecker.reporting import write_check_report
 
@@ -114,6 +114,45 @@ def test_de_sectie_staat_in_het_bevindingenrapport(tmp_path: Path) -> None:
     assert "| Begindatum | 4 | 3 (75.0%) | dag |" in tekst
     assert "| maaiveldhoogte | 5 | 2 | 1 (50.0%) |" in tekst
     assert "expliciet dat de inwinning niet te achterhalen is" in tekst
+
+
+def test_het_aandeel_putten_zonder_aanlegjaar_opent_de_sectie(tmp_path: Path) -> None:
+    """Het ontbrekende aanlegjaar is een aanleveringsgebrek en hoort in de kop (issue #91).
+
+    De fixture heeft vier putten waarvan er een geen begindatum draagt: 25%. Teller en
+    noemer komen uit wat er al is -- de ATTR-018-meldingen van deze uitvoer en de
+    putpopulatie -- en niet uit een tweede telling naast de check.
+    """
+    context = CheckContext(
+        dataset=load_dataset(TTL_DIR / "attr018_zonder_begindatum.ttl", []),
+        config=load_check_config(),
+    )
+    run = run_checks(context, ["ATTR-018"])
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "**25.0% van de putten draagt geen aanlegjaar** (1 van de 4)" in tekst
+    assert "aanleveringssignaal" in tekst
+    # De regel opent de sectie; de tabellen komen erna.
+    assert tekst.index("**Datakarakteristieken**") < tekst.index("van de putten draagt geen")
+    assert tekst.index("van de putten draagt geen") < tekst.index("| Datumkenmerk |")
+
+
+def test_zonder_ontbrekend_aanlegjaar_blijft_de_regel_weg(tmp_path: Path) -> None:
+    """Nul meldingen is geen karakteristiek; "0% van de putten" zou ruis zijn."""
+    context = CheckContext(
+        dataset=load_dataset(TTL_DIR / "attr_schoon.ttl", []), config=load_check_config()
+    )
+    run = run_checks(context, ["ATTR-018"])
+
+    assert run.count(Severity.ERROR) == 0
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "**Datakarakteristieken**" in tekst
+    assert "van de putten draagt geen aanlegjaar" not in tekst
 
 
 def test_de_weggezette_vulwaarden_staan_onder_de_inwinningstabel(tmp_path: Path) -> None:

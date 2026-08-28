@@ -93,6 +93,15 @@ alleen het bestand waarin zij staat is verhuisd.
   nulmeting per SHACL-vorm, dan de eigen checks, elk met de fouten voorop. De
   aantallen komen uit `uitvoer/omvang.py`, de samenvatting uit
   `uitvoer/samenvatting.py`. Zie BO-31.
+- De datakarakteristieken in de verantwoording openen sinds issue #91 met het aandeel
+  putten zonder aanlegjaar ("44% van de putten draagt geen aanlegjaar"). Teller en noemer
+  komen uit wat er al is: de ATTR-018-meldingen van díé uitvoer -- dus na afbakening en na
+  de onderdrukking uit `[rapport]` -- en `uitvoer/omvang.putten_in_beeld`, de rol `putten`
+  van de context waarop de checks draaiden, met een studiegebied tot de kern afgebakend.
+  Geen tweede teller naast de check, en geen drempel: meldt ATTR-018 niets of staat er geen
+  put in beeld, dan blijft de regel weg -- "0% van de putten" is geen karakteristiek. De
+  meldingen per object blijven volledig bestaan, ook op putniveau; alleen de kop zegt wat
+  ze samen betekenen. De check zelf (`checks/attributen.py`) verandert er niet door.
 - Systemische bevindingen staan in het rapport en in de popup **generiek**, niet per
   object (issue #76): `_detail_eigen` vervangt hun rijen door een regel met check,
   aantal en bekeken populatie -- dezelfde vorm waarin het nulmetingblok per SHACL-vorm

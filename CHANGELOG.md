@@ -55,6 +55,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De datakarakteristieken openen met het aandeel putten zonder aanlegjaar** (issue #91,
+  checkaudit 27-08). ATTR-018 is met 9.274 meldingen verreweg de grootste post, en 9.063
+  daarvan staan op putten -- 44% van alle putten. Dat is één gebrek in de aanlevering en
+  geen 9.063 losse correcties, dus de kop van het bevindingenrapport benoemt het nu als
+  eerste regel van de datakarakteristieken: "44% van de putten draagt geen aanlegjaar
+  (9.063 van de 20.758) -- een aanleveringssignaal". Teller en noemer komen uit wat er al
+  is (de ATTR-018-meldingen van díé uitvoer en de rol `putten` uit `uitvoer/omvang.py`,
+  met een studiegebied tot de kern afgebakend); er is geen tweede teller en geen drempel.
+  Meldt ATTR-018 niets of staat er geen put in beeld, dan blijft de regel weg in plaats van
+  "0%" te melden. **De meldingen per object blijven volledig bestaan**, ook op putniveau,
+  en aan de check zelf verandert niets.
 - **Ook de checktitel van HGT-008 laat "indicatie verwisselde BOB's" weg** (issue #84,
   blok E review). De meldingstekst was die gok al kwijt, de titel nog niet -- en die voedt
   de checkkop in het rapport, de kolom Omschrijving in de CSV en `overzicht_checks` in de

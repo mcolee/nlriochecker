@@ -37,6 +37,7 @@ from nlriochecker.uitvoer.omvang import (
     klassentelling,
     koppelingsherstel,
     omvangtabel,
+    putten_in_beeld,
     zonder_geometrie,
 )
 from nlriochecker.uitvoer.samenvatting import (
@@ -55,6 +56,12 @@ FILE_CHECKS_JSON = "bevindingen.json"
 
 # Zoveel deelstelsel-ID's noemt de clusterduiding er hooguit bij naam.
 MAX_CLUSTERS_IN_DUIDING = 5
+
+# De check waarvan het aandeel bij de datakarakteristieken komt te staan (issue #91).
+# Eén ID en geen configuratie: dit is geen instelbare drempel maar de vaststelling dat
+# een ontbrekend aanlegjaar op tienduizenden putten één gebrek in de aanlevering is en
+# geen tienduizenden losse gebreken. De meldingen per object blijven volledig staan.
+CHECK_AANLEGJAAR = "ATTR-018"
 
 # De kolommen van het archief. De eerste negen stonden er al en houden hun naam en
 # plaats; hernoemen zou bestaande verwerking breken zonder dat er iets tegenover
@@ -566,7 +573,7 @@ def _verantwoording(
         lines += [""]
 
     lines += _bronnen_section(run)
-    lines += _karakteristiek_section(run)
+    lines += _karakteristiek_section(run, meldingen)
 
     if run.dataset.ontologies:
         namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)
@@ -955,27 +962,73 @@ def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
     return sorted(ids)
 
 
-def _karakteristiek_section(run: CheckRun) -> list[str]:
+def _karakteristiek_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     """Beschrijft eigenschappen van de dataset die de bevindingen kleuren.
 
     Geen bevindingen: datums die allemaal op 1 januari vallen en registraties die
     expliciet "niet achterhaald" zeggen, zijn niet per object te herstellen. Ze
     bepalen wel hoe de rest van dit rapport gelezen moet worden, en ze staan hier
     daarom als samenvattende regel in plaats van als duizenden meldingen.
+
+    Het ontbrekende aanlegjaar staat vooraan (issue #91): dat is wél per object gemeld,
+    maar het aandeel zegt iets anders dan de losse meldingen -- de kop hoort het te
+    benoemen, ook als er verder geen enkele karakteristiek is.
     """
+    aanlegjaar = _aanlegjaar_regel(run, meldingen)
+    tabellen = _karakteristiek_tabellen(run)
+    if not aanlegjaar and not tabellen:
+        return []
+    return ["**Datakarakteristieken**", "", *aanlegjaar, *tabellen]
+
+
+def _aanlegjaar_regel(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+    """Het aandeel putten zonder aanlegjaar, als eerste regel van de datakarakteristieken.
+
+    Teller en noemer komen uit wat er al is: de ATTR-018-meldingen van *deze* uitvoer --
+    dus na afbakening en na de onderdrukking uit `[rapport]` -- en de putpopulatie uit
+    `uitvoer.omvang`. Een eigen doorloop over de dataset zou een tweede waarheid naast
+    de check opleveren.
+
+    Meldt ATTR-018 niets, of staat er geen put in beeld, dan blijft de regel weg. "0%
+    van de putten zonder aanlegjaar" is geen karakteristiek van de aanlevering maar ruis
+    in een sectie die juist zegt waaronder de rest gelezen moet worden. Dat de teller
+    dan nul is dekt beide gevallen, en houdt de deling veilig.
+    """
+    in_beeld = putten_in_beeld(run)
+    zonder = sum(
+        1
+        for melding in meldingen
+        if melding.check_id == CHECK_AANLEGJAAR and melding.object_uri in in_beeld
+    )
+    if not zonder:
+        return []
+    hier = " in dit gebied" if run.study_area is not None else ""
+    return [
+        f"**{100 * zonder / len(in_beeld):.1f}% van de putten{hier} draagt geen aanlegjaar** "
+        f"({zonder} van de {len(in_beeld)}) — een aanleveringssignaal: het aanlegjaar "
+        "ontbreekt stelselmatig, en dat is één gebrek in de aanlevering. "
+        f"{CHECK_AANLEGJAAR} meldt elk geval afzonderlijk in dit rapport, in de CSV en op de "
+        "kaart, zodat de putten aanwijsbaar blijven; herstellen gaat via de aanlevering en "
+        "niet put voor put.",
+        "",
+    ]
+
+
+def _karakteristiek_tabellen(run: CheckRun) -> list[str]:
+    """De tellingen van `karakteristiek.py`: datumprecisie en inwinningsvulling."""
     karakteristiek = run.karakteristiek
     if karakteristiek is None or (not karakteristiek.datums and not karakteristiek.inwinning):
         return []
 
-    lines = ["**Datakarakteristieken**", ""]
+    lines: list[str] = []
     if run.study_area is not None:
         # De cijfers zijn over de hele dataset geteld, terwijl de bevindingen erboven
         # tot het studiegebied zijn afgebakend. Zonder deze regel leest de tabel als
         # een beschrijving van de afbakening.
         lines += [
-            f"> Geteld over de **volledige dataset**, niet over {run.study_area.name}: het "
-            "gaat om eigenschappen van de aangeleverde export, en die veranderen niet met "
-            "de afbakening van de rapportage.",
+            f"> De tabellen hieronder tellen over de **volledige dataset**, niet over "
+            f"{run.study_area.name}: het gaat om eigenschappen van de aangeleverde export, "
+            "en die veranderen niet met de afbakening van de rapportage.",
             "",
         ]
 

@@ -25,7 +25,7 @@ from gwsw_orox_helpers.dataset import GwswDataset
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
 from nlriochecker.checks.base import REGISTRY
-from nlriochecker.checks.selectie import klassen_van_rol
+from nlriochecker.checks.selectie import klassen_van_rol, putten
 from nlriochecker.checks.verbanden import verbonden_knopen
 from nlriochecker.taal import getal, vorm
 
@@ -141,6 +141,24 @@ def zonder_geometrie(run: CheckRun) -> int:
 def _leeg(geometrie: object) -> bool:
     """Of een geometrie ontbreekt of leeg is."""
     return geometrie is None or geometrie.is_empty  # type: ignore[attr-defined]
+
+
+def putten_in_beeld(run: CheckRun) -> frozenset[str]:
+    """De putten waar dit rapport over gaat: de rol `putten`, afgebakend tot de kern.
+
+    De noemer van het aanlegjaar-aandeel in de rapportkop (issue #91). Het is dezelfde
+    selectie waarop ATTR-018 draaide -- `selectie.putten` op de context van de run, dus
+    uit haar cache -- want een eigen doorloop over de dataset zou op een dag een ander
+    getal geven dan de check die de teller levert.
+
+    Met een studiegebied blijft alleen de kern over. De meldingen in dit rapport zijn
+    daartoe afgebakend, en een noemer over de volledige export zou het aandeel in een
+    kleine buurt naar nul drukken -- anders dan de klassentelling hierboven, die niet
+    tegen een teller wordt afgezet.
+    """
+    binnen = run.objecten_binnen()
+    uris = {node.uri for node in putten(run.context)}
+    return frozenset(uris if binnen is None else uris & binnen)
 
 
 @dataclass(frozen=True)
