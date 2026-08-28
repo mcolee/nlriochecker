@@ -1380,9 +1380,16 @@ class PseudoKnoop(Check):
 
         aansluitend: dict[str, list[Conduit]] = {}
         for conduit in _topologie(context).all_conduits:
-            for uri in verbonden_knopen(context, conduit):
-                if uri in functieloos:
-                    aansluitend.setdefault(uri, []).append(conduit)
+            begin, eind = verbonden_knopen(context, conduit)
+            # Terugval op de rauwe koppeling, net als `_bouw_hulpstuktelling`: een
+            # hulpstuk is geen netwerkknoop en `resolve_network_node` geeft er dus None
+            # voor, terwijl het wel een functieloze knoop kan zijn (T-stuk,
+            # ontstoppingsstuk). Zonder terugval blijft deze index per constructie leeg.
+            # Ontdubbeld op knoop, net als in `_bouw_aansluitingen`: een streng met beide
+            # einden op dezelfde knoop is een streng en geen paar.
+            gevonden = (begin or conduit.start_node, eind or conduit.end_node)
+            for uri in dict.fromkeys(uri for uri in gevonden if uri in functieloos):
+                aansluitend.setdefault(uri, []).append(conduit)
 
         for uri, strengen in aansluitend.items():
             if len(strengen) != 2:

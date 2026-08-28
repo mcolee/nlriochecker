@@ -55,6 +55,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **TOP-019 herleidt een strengeinde nu ook via een hulpstuk** (issue #88). De check zocht
+  zijn functieloze knopen op `verbonden_knopen()`, en dat herleidt elk strengeinde naar de rol
+  `netwerkknopen` -- een `Hulpstuk` zit daar niet in. Twee van de vier geconfigureerde
+  functieloze klassen (`Ontstoppingsstuk`, `Verbindingsstuk`) zíjn een hulpstuk en de andere
+  twee (`LozePut`, `BlindePut`) hebben in De Wolden en Hoogeveen nul instanties, dus de index
+  bleef per constructie leeg: 0 van de 46.880 strengeinden kwam op een functieloze knoop uit
+  en de nul in het rapport las als "geen pseudo-knopen gevonden" terwijl er niets gemeten was.
+  De herleiding valt nu terug op de rauwe `start_node`/`end_node` waar `resolve_network_node`
+  niets oplevert -- hetzelfde patroon dat `_bouw_hulpstuktelling` voor TOP-022/TOP-023 al
+  gebruikt. Twee strengen die door een T-stuk gescheiden worden en in diameter, materiaal én
+  stelseltype gelijk zijn, melden voortaan. Een streng met beide einden op dezelfde knoop
+  telt daarbij als één streng en niet als een paar (zoals in `_bouw_aansluitingen`), anders
+  zou zij met zichzelf vergeleken worden en altijd melden. De configuratie
+  (`[klassen] functieloze_knoop`) en de kenmerkvergelijking blijven ongewijzigd; het effect op
+  De Wolden en Hoogeveen is nog niet gemeten en hoort bij de blokregie.
 - **TOP-002 en TOP-003: een hulpstuk met een telbare GWSW-functie is een geldig strengeinde**
   (issue #89, BO-72). Een `Hulpstuk` valt in het GWSW onder `Constructieonderdeel` en niet
   onder `Put`, dus een streng die op een T-stuk eindigt had daar geometrisch "geen put" --

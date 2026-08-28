@@ -73,6 +73,7 @@ def labels(gevonden: list[Finding]) -> list[str]:
         ("top017_zelfkruisend.ttl", "TOP-017", ["1"]),
         ("top018_spike.ttl", "TOP-018", ["1"]),
         ("top019_pseudoknoop.ttl", "TOP-019", ["B"]),
+        ("top019_pseudoknoop_hulpstuk.ttl", "TOP-019", ["T1"]),
         ("top020_omgekeerd_getekend.ttl", "TOP-020", ["1"]),
         ("top021_put_op_streng.ttl", "TOP-021", ["C"]),
     ],
@@ -166,6 +167,32 @@ def test_top018_meldt_de_scherpste_hoek() -> None:
     # keerpunt en een bij het punt waar de lijn de eerdere richting weer oppakt.
     assert bevinding.details["spikes"] == 2
     assert "graden" in bevinding.message
+
+
+def test_top019_herleidt_ook_via_een_hulpstuk() -> None:
+    """Issue #88: een T-stuk is geen netwerkknoop, maar wel een functieloze knoop.
+
+    `verbonden_knopen()` herleidt elk strengeinde naar de rol `netwerkknopen`, en een
+    hulpstuk zit daar niet in; zonder terugval op de rauwe koppeling bleef de index per
+    constructie leeg en meldde de check nul. T2 staat ernaast om te tonen dat de
+    kenmerkvergelijking onverkort geldt: ongelijke diameter is geen pseudo-knoop.
+    """
+    gevonden = bevindingen(TTL_DIR / "top019_pseudoknoop_hulpstuk.ttl", "TOP-019")
+
+    assert labels(gevonden) == ["T1"]
+    assert gevonden[0].details["strengen"] == ["1", "2"]
+
+
+def test_top019_telt_een_streng_op_zichzelf_niet_als_twee() -> None:
+    """Een streng met beide einden op dezelfde knoop is een streng, geen pseudo-knoop.
+
+    Dezelfde grens als in `_bouw_hulpstuktelling` en `_bouw_aansluitingen`: zonder
+    ontdubbeling staat streng 5 twee keer in de lijst van T3 en zou de check hem met
+    zichzelf vergelijken -- altijd gelijk, dus altijd een melding.
+    """
+    gevonden = bevindingen(TTL_DIR / "top019_pseudoknoop_hulpstuk.ttl", "TOP-019")
+
+    assert "T3" not in labels(gevonden)
 
 
 def test_top019_draait_niet_zonder_functieloze_klassen() -> None:

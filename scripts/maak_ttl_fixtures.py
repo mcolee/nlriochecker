@@ -561,6 +561,64 @@ FIXTURES["top019_pseudoknoop.ttl"] = (
     ),
 )
 
+# TOP-019 (issue #88): dezelfde pseudo-knoop, maar dan op een hulpstuk. Een T-stuk is
+# geen netwerkknoop, dus de herleiding moet op de rauwe koppeling terugvallen. T1 draagt
+# het defect; T2 staat ernaast met twee strengen van ongelijke diameter, en T3 draagt een
+# enkele streng die op zichzelf terugkeert -- die telt als een streng en niet als twee.
+FIXTURES["top019_pseudoknoop_hulpstuk.ttl"] = (
+    "T-stuk T1 scheidt twee strengen met dezelfde diameter, hetzelfde materiaal en "
+    "hetzelfde stelseltype; bij T2 verschilt de diameter en bij T3 komt een enkele "
+    "streng met beide einden op het hulpstuk uit (issue #88)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + hulpstuk("T1", "T1", 1025.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "T1",
+        kenmerken=maat("L1", 300, 300),
+    )
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "T1",
+        "PutB",
+        kenmerken=maat("L2", 300, 300),
+    )
+    + put("PutC", "C", 1000.0, 2100.0)
+    + hulpstuk("T2", "T2", 1025.0, 2100.0)
+    + put("PutD", "D", 1050.0, 2100.0)
+    + leiding(
+        "L3",
+        "3",
+        [(1000.0, 2100.0), (1025.0, 2100.0)],
+        "PutC",
+        "T2",
+        kenmerken=maat("L3", 300, 300),
+    )
+    + leiding(
+        "L4",
+        "4",
+        [(1025.0, 2100.0), (1050.0, 2100.0)],
+        "T2",
+        "PutD",
+        kenmerken=maat("L4", 400, 400),
+    )
+    + hulpstuk("T3", "T3", 1025.0, 2200.0)
+    + leiding(
+        "L5",
+        "5",
+        [(1025.0, 2200.0), (1050.0, 2225.0), (1025.0, 2200.0)],
+        "T3",
+        "T3",
+        kenmerken=maat("L5", 300, 300),
+    ),
+)
+
 # TOP-020: de lijn is tegen de administratieve richting in getekend.
 FIXTURES["top020_omgekeerd_getekend.ttl"] = (
     "streng 1 is van B naar A getekend terwijl de administratie A naar B zegt",
