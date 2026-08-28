@@ -114,7 +114,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid | geimplementeerd met test | infiltratieleidingen, overstortputten, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | W | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | W | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 
 ## RVZ
 

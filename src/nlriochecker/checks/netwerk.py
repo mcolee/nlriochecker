@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import deque
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
@@ -565,15 +564,12 @@ _RICHTING_ONBEKEND = "onbekend"
 
 @dataclass(frozen=True)
 class _Richtingsdiagnose:
-    """De richtingssignalen van een streng, elk ten opzichte van de administratie.
+    """De drie richtingssignalen van een streng, elk ten opzichte van de administratie.
 
     `geometrie` en `bob` zeggen of dat signaal met de administratieve van-naar-richting
     meeloopt (`mee`), er tegenin (`tegen`), niet te bepalen is (`onbekend`) of -- alleen
-    de BOB -- vlak ligt (`vlak`). `waarheid` is de harde referentie uit de ongerichte
-    graaf: is er vanuit de streng een lozingspunt bereikbaar, dan loopt de afvoer die
-    kant op en zegt `waarheid` of dat met de van-naar-richting meeloopt (`mee`), er
-    tegenin gaat (`tegen`) of niet vast te leggen is (`onbekend`). De administratie is de
-    tekstuele referentie: van `begin_label` naar `eind_label`.
+    de BOB -- vlak ligt (`vlak`). De administratie zelf is de referentie: van
+    `begin_label` naar `eind_label`.
     """
 
     conduit: Conduit
@@ -582,7 +578,6 @@ class _Richtingsdiagnose:
     geometrie: str
     bob: str
     bob_verval: float | None
-    waarheid: str
 
 
 def _knooplabel(context: CheckContext, uri: str | None) -> str:
@@ -614,61 +609,14 @@ def _bob_richting(conduit: Conduit, drempel: float) -> str:
     return _RICHTING_VLAK
 
 
-def _lozingspunt_afstanden(context: CheckContext) -> dict[str, int]:
-    """Per knoop de ongerichte afstand tot het dichtstbijzijnde lozingspunt.
-
-    De harde waarheid van NET-009: waar het water werkelijk uitkomt, los van hoe de
-    richting geregistreerd staat. Daarom een ongerichte doorloop -- een verkeerd
-    gerichte administratie mag de afvoerrichting niet mee bepalen. Een keer per context.
-    """
-    return context.cached("net009:lozingsafstand", lambda: _bouw_lozingspunt_afstanden(context))
-
-
-def _bouw_lozingspunt_afstanden(context: CheckContext) -> dict[str, int]:
-    """Multi-source breedte-eerst vanaf alle lozingspunten over de ongerichte graaf.
-
-    Over de bereikbaarheidsgraaf (BO-54: het persnet telt als ongerichte connectiviteit),
-    zodat een streng die via een pompput en het persnet op een lozingspunt uitkomt óók
-    zijn afvoerrichting vastgelegd krijgt. Een enkele O(knopen + kanten)-doorloop.
-    """
-    lozingen = _eindpunten(context, "lozings_eindpunt")
-    ongericht = _bereikbaarheid(context).to_undirected(as_view=True)
-    afstand = {uri: 0 for uri in lozingen if uri in ongericht}
-    rij: deque[str] = deque(sorted(afstand))
-    while rij:
-        knoop = rij.popleft()
-        for buur in ongericht[knoop]:
-            if buur not in afstand:
-                afstand[buur] = afstand[knoop] + 1
-                rij.append(buur)
-    return afstand
-
-
-def _waarheid_richting(context: CheckContext, conduit: Conduit, afstanden: dict[str, int]) -> str:
-    """De afvoerrichting uit een bereikbaar lozingspunt, ten opzichte van de administratie.
-
-    Ligt de administratieve beginput dichter bij een lozingspunt dan de eindput, dan
-    hoort het water van eind naar begin te lopen en staat de administratie omgekeerd
-    (`tegen`); ligt de eindput dichterbij, dan loopt de afvoer mee. Bereikt geen van
-    beide een lozingspunt, of liggen ze even ver, dan legt de waarheid niets vast.
-    """
-    begin, eind = verbonden_knopen(context, conduit)
-    begin_afstand = afstanden.get(begin) if begin is not None else None
-    eind_afstand = afstanden.get(eind) if eind is not None else None
-    if begin_afstand is None or eind_afstand is None or begin_afstand == eind_afstand:
-        return _RICHTING_ONBEKEND
-    return _RICHTING_MEE if begin_afstand > eind_afstand else _RICHTING_TEGEN
-
-
 def _richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
     """De richtingssignalen per streng in de graaf; een keer per context."""
     return context.cached("net009", lambda: _bouw_richtingsdiagnoses(context))
 
 
 def _bouw_richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
-    """Bepaalt per aangesloten vrijvervalstreng haar richtingssignalen en de harde waarheid."""
+    """Bepaalt per aangesloten vrijvervalstreng haar drie richtingssignalen."""
     drempel = context.config.drempels.tegenverhang_licht_m
-    afstanden = _lozingspunt_afstanden(context)
     return [
         _Richtingsdiagnose(
             conduit=conduit,
@@ -677,44 +625,25 @@ def _bouw_richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
             geometrie=_geometrie_richting(context, conduit),
             bob=_bob_richting(conduit, drempel),
             bob_verval=conduit.bob_verval,
-            waarheid=_waarheid_richting(context, conduit, afstanden),
         )
         for conduit in _netwerk(context).conduits
     ]
 
 
 def _tegenspraak(diagnose: _Richtingsdiagnose) -> bool:
-    """Geeft aan of administratie, geometrie en BOB niet alle drie dezelfde kant op wijzen.
+    """Geeft aan of een van de signalen tegen de administratie in wijst.
 
-    De referentie is de harde waarheid uit een bereikbaar lozingspunt (`waarheid`); is er
-    geen lozingspunt bereikbaar, dan valt de referentie terug op de administratie zelf.
-    Er is tegenspraak zodra een stellig signaal -- de administratie (altijd 'mee'), de
-    geometrie of de BOB -- de andere kant op wijst dan die referentie. Een vlak of
-    onbekend signaal doet geen uitspraak en telt daarom niet als tegenspraak. Loopt de
-    waarheid tegen de administratie in, dan is de administratie zelf het foute signaal --
-    ook als geometrie en BOB haar keurig volgen.
+    De administratie is de referentie (altijd 'mee'), dus er is tegenspraak zodra de
+    geometrie of de BOB de andere kant op wijst. Twee tegen-signalen die het onderling
+    eens zijn spreken de administratie nog steeds tegen -- de streng lijkt dan omgekeerd
+    geregistreerd.
     """
-    referentie = diagnose.waarheid if diagnose.waarheid != _RICHTING_ONBEKEND else _RICHTING_MEE
-    signalen = (_RICHTING_MEE, diagnose.geometrie, diagnose.bob)
-    return any(
-        signaal in (_RICHTING_MEE, _RICHTING_TEGEN) and signaal != referentie
-        for signaal in signalen
-    )
+    return _RICHTING_TEGEN in (diagnose.geometrie, diagnose.bob)
 
 
 def _geen_signaal(diagnose: _Richtingsdiagnose) -> bool:
     """Geeft aan of noch de geometrie noch de BOB iets over de richting zegt."""
     return diagnose.geometrie == _RICHTING_ONBEKEND and diagnose.bob == _RICHTING_ONBEKEND
-
-
-def _niet_beoordeeld(diagnose: _Richtingsdiagnose) -> bool:
-    """Geen enkel richtingssignaal: geometrie noch BOB, en geen bereikbaar lozingspunt.
-
-    Een bereikbaar lozingspunt maakt de administratie toetsbaar (zij is dan zelf een
-    signaal tegen de harde waarheid), dus een streng met alleen een waarheid telt wél
-    als beoordeeld.
-    """
-    return _geen_signaal(diagnose) and diagnose.waarheid == _RICHTING_ONBEKEND
 
 
 def _geometrie_zin(richting: str) -> str:
@@ -737,58 +666,40 @@ def _bob_zin(richting: str, verval: float | None) -> str:
     return "De BOB ontbreekt."
 
 
-def _waarheid_zin(richting: str) -> str:
-    """De regel over de harde waarheid uit een bereikbaar lozingspunt."""
-    if richting == _RICHTING_TEGEN:
-        return (
-            " Naar het dichtstbijzijnde bereikbare lozingspunt loopt de afvoer juist van "
-            "eind naar begin; de administratie wijst de verkeerde kant op."
-        )
-    if richting == _RICHTING_MEE:
-        return (
-            " Naar het dichtstbijzijnde bereikbare lozingspunt loopt de afvoer in de "
-            "van-naar-richting; de administratie klopt en een ander signaal is fout."
-        )
-    return ""
-
-
 @register
 class RichtingssignalenSprekenElkaarTegen(Check):
-    """NET-009: de integrale richtingscheck. Administratie, geometrie en BOB moeten
-    dezelfde kant op wijzen als de afvoer werkelijk loopt."""
+    """NET-009: administratie, geometrie en BOB wijzen niet dezelfde kant op."""
 
     id = "NET-009"
     title = "Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
-    rollen = ("lozingspunten", "mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke streng waarvan de richtingssignalen niet één kant op wijzen.
+        """Meldt elke streng waarvan de drie richtingssignalen elkaar tegenspreken.
 
-        De integrale richtingscheck (issue #80): zijn administratie, tekenrichting én
-        BOB het eens, dan is de streng goed. In elk ander geval een W. Is er vanuit de
-        streng een lozingspunt bereikbaar, dan legt een ongerichte graaf de werkelijke
-        afvoerrichting vast en is dát de referentie -- ook de administratie zelf kan er
-        dan tegen in blijken te staan. De melding noemt alle waarden, zodat de beheerder
-        ziet welke fout is. NET-003 (BOB tegen) en TOP-020 (tekenrichting tegen) gingen
-        hierin op en vervielen als aparte checks.
+        De integrale richtingscheck (issue #80): de administratieve van-naar-richting is
+        de referentie, en zodra de geometrie of de BOB de andere kant op wijst is er een
+        W. Wijzen administratie, tekenrichting én BOB dezelfde kant op, dan is de streng
+        goed. De melding noemt alle drie de waarden, zodat de beheerder zelf ziet welke
+        fout is. NET-003 (BOB tegen) en TOP-020 (tekenrichting tegen) gingen hierin op en
+        vervielen als aparte checks.
+
+        De ongerichte-graaf "harde waarheid" uit een bereikbaar lozingspunt is bewust
+        weggelaten (BO-76): op De Wolden gaf zij 2.822 vals-alarmen op strengen die intern
+        kloppen -- de topologisch dichtstbijzijnde uitstroom is vaak niet de werkelijke,
+        en drie eensgezinde signalen wegen zwaarder dan die heuristiek.
         """
         for diagnose in _richtingsdiagnoses(context):
             if not _tegenspraak(diagnose):
                 continue
-            intern = _RICHTING_TEGEN in (diagnose.geometrie, diagnose.bob)
-            lead = (
-                "De richtingssignalen spreken elkaar tegen."
-                if intern
-                else "De registratie is intern consistent, maar wijst de verkeerde kant op."
-            )
             boodschap = (
-                f"{lead} Administratief loopt de streng van {diagnose.begin_label!r} naar "
-                f"{diagnose.eind_label!r}. {_geometrie_zin(diagnose.geometrie)} "
+                "De richtingssignalen spreken elkaar tegen. Administratief loopt de "
+                f"streng van {diagnose.begin_label!r} naar {diagnose.eind_label!r}. "
+                f"{_geometrie_zin(diagnose.geometrie)} "
                 f"{_bob_zin(diagnose.bob, diagnose.bob_verval)}"
-                f"{_waarheid_zin(diagnose.waarheid)}"
             )
             yield self.finding(
                 context,
@@ -797,7 +708,6 @@ class RichtingssignalenSprekenElkaarTegen(Check):
                 boodschap,
                 geometrie=diagnose.geometrie,
                 bob=diagnose.bob,
-                waarheid=diagnose.waarheid,
                 bob_verval_m=round(diagnose.bob_verval, 3)
                 if diagnose.bob_verval is not None
                 else None,
@@ -806,30 +716,17 @@ class RichtingssignalenSprekenElkaarTegen(Check):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt de harde waarheid, de vlakke strengen en de BOB's die als vulwaarde wegvielen."""
+        """Meldt de vlakke strengen ('geen uitspraak') en de BOB's die als vulwaarde wegvielen."""
         diagnoses = _richtingsdiagnoses(context)
         notities = _netwerk_notities(context)
 
-        met_waarheid = sum(1 for d in diagnoses if d.waarheid != _RICHTING_ONBEKEND)
-        if met_waarheid:
-            omgekeerd = sum(1 for d in diagnoses if d.waarheid == _RICHTING_TEGEN)
-            notities.append(
-                f"Voor {getal(met_waarheid, 'streng', 'strengen')} is via een ongerichte graaf "
-                f"een bereikbaar lozingspunt gevonden en de afvoerrichting daaruit vastgelegd; "
-                f"bij {omgekeerd} daarvan wijst de administratie de verkeerde kant op."
-            )
-
-        vlak = sum(
-            1
-            for d in diagnoses
-            if not _tegenspraak(d) and d.bob == _RICHTING_VLAK and d.waarheid == _RICHTING_ONBEKEND
-        )
+        vlak = sum(1 for d in diagnoses if not _tegenspraak(d) and d.bob == _RICHTING_VLAK)
         if vlak:
             drempel = context.config.drempels.tegenverhang_licht_m
             notities.append(
                 f"{getal(vlak, 'streng', 'strengen')} {vorm(vlak, 'ligt', 'liggen')} vlak "
-                f"(|verval| ≤ {drempel} m) zonder bereikbaar lozingspunt: de BOB zegt niets over "
-                f"de richting, dus deze toets doet daar geen uitspraak over."
+                f"(|verval| ≤ {drempel} m): de BOB zegt niets over de richting, dus deze toets "
+                f"doet daar geen uitspraak over."
             )
 
         vulwaarde = sum(1 for d in diagnoses if d.conduit.vulwaarden)
@@ -840,19 +737,19 @@ class RichtingssignalenSprekenElkaarTegen(Check):
                 "hun richting kon niet op de BOB getoetst worden."
             )
 
-        niet_beoordeeld = sum(1 for d in diagnoses if _niet_beoordeeld(d))
-        if niet_beoordeeld:
+        geen_signaal = sum(1 for d in diagnoses if _geen_signaal(d))
+        if geen_signaal:
             notities.append(
-                f"{getal(niet_beoordeeld, 'streng', 'strengen')} "
-                f"{vorm(niet_beoordeeld, 'draagt', 'dragen')} geen bruikbare tekenrichting, geen "
-                "BOB en geen bereikbaar lozingspunt, dus met geen enkel richtingssignaal te "
-                "toetsen; deze strengen zijn niet beoordeeld."
+                f"{getal(geen_signaal, 'streng', 'strengen')} "
+                f"{vorm(geen_signaal, 'draagt', 'dragen')} geen bruikbare tekenrichting en geen "
+                "BOB, dus met geen enkel richtingssignaal te toetsen; deze strengen zijn niet "
+                "beoordeeld."
             )
         return notities
 
     def examined(self, context: CheckContext) -> int:
         """De strengen met minstens een richtingssignaal; de rest kon niet beoordeeld worden."""
-        return sum(1 for d in _richtingsdiagnoses(context) if not _niet_beoordeeld(d))
+        return sum(1 for d in _richtingsdiagnoses(context) if not _geen_signaal(d))
 
 
 @register

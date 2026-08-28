@@ -4172,16 +4172,12 @@ geregistreerd mag worden is een andere vraag met een eigen melding.
 streng -- en droegen samen 85% van de deel C-meldingen (audit 27-08, PRE-1). Per issue #80
 is de afvoerrichting één integrale check geworden:
 
-* **NET-009 is dé richtingscheck.** De beslisregel van de auteur: zijn de administratieve
-  van-naar-richting, de tekenrichting van de lijn én de BOB-richting alle drie gelijk, dan
-  is de streng goed; in elk ander geval een **W** (was F). Is er vanuit de streng een
-  lozingspunt bereikbaar, dan legt een **ongerichte** doorloop over de
-  bereikbaarheidsgraaf (BO-54) de werkelijke afvoerrichting vast -- de kant van het
-  dichtstbijzijnde lozingspunt -- en dát is de referentie waartegen de drie signalen
-  gelegd worden. Zo kan óók de administratie zelf het foute signaal blijken: staat zij
-  omgekeerd terwijl geometrie en BOB haar keurig volgen, dan wijst de harde waarheid dat
-  aan. Ongericht, want een verkeerd geregistreerde richting mag de afvoerrichting niet mee
-  bepalen; alleen de topologie tot aan de uitstroom telt.
+* **NET-009 is dé richtingscheck.** De administratieve van-naar-richting is de referentie;
+  zodra de tekenrichting van de lijn óf de BOB de andere kant op wijst is er een **W**
+  (was F). Wijzen administratie, tekenrichting én BOB dezelfde kant op, dan is de streng
+  goed. De melding noemt alle drie de waarden. De ongerichte-graaf "harde waarheid" uit een
+  bereikbaar lozingspunt is geprobeerd maar weer weggelaten -- zie het aparte kopje
+  hieronder.
 * **NET-003 (BOB stijgt in de van-naar-richting) vervalt** en gaat op in NET-009: de
   BOB-tegen-richting is daar een deelgeval. Gemeten staan alle 3.651 NET-003-objecten óók
   in de 3.656 van NET-009 (audit 27-08), dus er gaat geen signaal verloren.
@@ -4206,26 +4202,26 @@ vroeger een F gaf; het F-niveau blijft bestaan als de aparte, disjuncte HGT-006-
 fors tegenverhang. Een streng met stijgende BOB krijgt dus een W van NET-009 (de richting)
 en, als de stijging boven 0,10 m ligt, daarnaast een F van HGT-006 (de forse hoogtefout).
 
-**Firing-regel, precies.** De referentie is de harde waarheid als een lozingspunt
-bereikbaar is, anders de administratie zelf (terugval, zoals voorheen). Er is tegenspraak
-zodra een *stellig* signaal -- administratie (altijd mee), geometrie of BOB -- de andere
-kant op wijst dan de referentie. Een vlak of onbekend signaal doet geen uitspraak en telt
-niet als tegenspraak. Zonder bereikbaar lozingspunt valt dit terug op het oude gedrag
-(melden zodra geometrie of BOB tegen de administratie in gaat), dus de bekende 3.656
-NET-009-meldingen blijven; de harde waarheid voegt de gevallen toe waar de administratie
-zelf omgekeerd staat terwijl haar signalen intern kloppen. De toelichting telt voortaan
-hoeveel strengen een harde waarheid kregen en bij hoeveel de administratie de verkeerde
-kant op wijst.
+**Firing-regel, precies.** De administratie is de referentie (altijd "mee"). Er is
+tegenspraak zodra de geometrie óf de BOB stellig de andere kant op wijst ("tegen"). Een
+vlak of onbekend signaal doet geen uitspraak en telt niet als tegenspraak. Dat is exact het
+oude NET-009-gedrag; de audit mat dat NET-003 (3.651) er een strikte deelverzameling van is
+en TOP-020 (6) eveneens, dus NET-009 = 3.656 meldingen, nu als W in plaats van F.
 
-**Aanname, ter correctie voorgelegd.** De issue-body merkt op dat het samenspel
-("alle andere gevallen W", met HGT-006 als eigen F ernaast) fout kan zijn en vraagt dan om
-een comment. Het is uitgevoerd zoals hierboven; de nieuwe NET-009-telling en de HGT-006-
-verschuiving worden op #80 gerapporteerd na de hermeting.
-
-**Interpretatie van de "harde waarheid".** Issue #80 noemt "een lozingspunt" (de rol
-`lozings_eindpunt`). Letterlijk gevolgd: een vuilwaterstreng die op een gemaal uitkomt en
-geen lozingspunt bereikt, valt terug op de administratie en gedraagt zich als voorheen
-(geen regressie). Het verbreden naar alle uitstroompunten (ook `afvoer_eindpunt`: gemaal,
-overnamepunt) zou meer strengen een harde waarheid geven; dat is een keuze voor de auteur
-en staat als optie open. Zie [#80](https://github.com/mcolee/nlriochecker/issues/80) en de
-checkaudit (`docs/checks-audit-2026-08.md`, PRE-1).
+**De harde waarheid: geprobeerd en verworpen.** Issue #80 vroeg om een ongerichte graaf die
+vanaf een bereikbaar lozingspunt de werkelijke afvoerrichting vastlegt, als referentie
+waartegen de drie signalen gelegd worden -- zodat ook een administratie die zelf omgekeerd
+staat, terwijl geometrie en BOB haar volgen, aangewezen wordt. Die versie is gebouwd en op
+De Wolden gemeten (hermeting 28-08). Uitkomst: NET-009 sprong van 3.656 naar **6.478**, en
+alle 2.822 extra meldingen zaten op strengen die *intern kloppen* (administratie, geometrie
+én BOB dezelfde kant op) -- onder meer strengen met een **dalende BOB**, die dus fysiek die
+kant op afvoeren. Oorzaak: het persnet maakt de ongerichte graaf één groot samenhangend
+geheel (BO-54), waardoor het *topologisch dichtstbijzijnde* lozingspunt vaak niet de
+werkelijke uitstroom van die streng is; de heuristiek keert dan een correct geregistreerde
+streng om. Drie eensgezinde signalen wegen zwaarder dan die gok, en de issue-hoofdregel
+zegt zelf "zijn alle drie gelijk, dan is het goed". Besluit auteur (28-08, in antwoord op de
+voorgelegde tweesprong): **de harde waarheid helemaal weglaten.** NET-009 leest de drie
+signalen zoals hierboven; er is geen lozingspunt-machinerie in de check. De alternatieven
+(waarheid als beslissende referentie; waarheid alleen als duiding in de melding) zijn
+verworpen. Zie [#80](https://github.com/mcolee/nlriochecker/issues/80) en de checkaudit
+(`docs/checks-audit-2026-08.md`, PRE-1).

@@ -10,13 +10,14 @@ het effect van PRE-3 op de scope van TOP-006/010/011.
 
 Deel B (ATTR en HGT): per check de uitsplitsing van de meldingstekst (materiaal, kant van
 het bereik, objectsoort), de overlap tussen checks die op dezelfde grootheid rekenen
-(HGT-004/013/018 op de buiskruin, HGT-005/006 tegen NET-003/009 voor PRE-1) en de
+(HGT-004/013/018 op de buiskruin, HGT-006 tegen NET-009 voor PRE-1) en de
 diepteverdeling van HGT-003, de meting achter de diepteligging-drempel.
 
 Deel C (NET, RVZ, BTR en EXT): welke populatie NET-001 en NET-002 elk melden (het
-verschil dat de steekproef niet zag), de deelverzameling NET-003 in NET-009 achter
-PRE-1, de stelseltypecombinaties van NET-006, de gelijke populatie van RVZ-002 en
-RVZ-003 achter S2, en de klassen achter de lozingspunten van EXT-007 (de scope-bug).
+verschil dat de steekproef niet zag), de richtingsmeting van NET-009 (NET-003 en
+TOP-020 zijn er per #80 in opgegaan), de stelseltypecombinaties van NET-006, de gelijke
+populatie van RVZ-002 en RVZ-003 achter S2, en de klassen achter de lozingspunten van
+EXT-007 (de scope-bug).
 De uitsplitsing achter PRE-4 -- de gelijke uitslag van EXT-002 en EXT-003, 281 van 281
 strengen -- staat in BO-66; EXT-002 bestaat sinds issue #83 niet meer.
 
@@ -259,7 +260,7 @@ def deel_b(context: CheckContext, meldingen: list[dict]) -> None:
     )
 
     # 1c. De omvang van het tegenverhang: waar ligt de grens tussen licht en fors?
-    for check_id in ("HGT-005", "HGT-006"):
+    for check_id in ("HGT-006",):
         stijgingen = sorted(
             float(t.group(1))
             for melding in per[check_id]
@@ -310,10 +311,7 @@ def deel_b(context: CheckContext, meldingen: list[dict]) -> None:
         ("HGT-004", "HGT-018", "buiskruin ligt per definitie boven de BOB"),
         ("HGT-013", "HGT-018", "negatieve gronddekking is kruin boven maaiveld"),
         ("ATTR-001", "ATTR-002", "twee ondergrenzen op dezelfde profielmaat"),
-        ("HGT-005", "NET-003", "PRE-1: zit het richtingsdeel al in de NET-checks?"),
-        ("HGT-006", "NET-003", "PRE-1"),
-        ("HGT-006", "NET-009", "PRE-1"),
-        ("HGT-005", "NET-009", "PRE-1"),
+        ("HGT-006", "NET-009", "PRE-1: zit het richtingsdeel al in de NET-checks?"),
         ("HGT-014", "HGT-006", "tegenverhang verklaart een afwijkend maaiveldverloop"),
         ("HGT-013", "HGT-003", "te veel gronddekking is dezelfde diepteligging"),
     )
@@ -381,12 +379,9 @@ def deel_c(context: CheckContext, meldingen: list[dict]) -> None:
         "objecten gedeeld"
     )
 
-    # 2. Het richtingscluster van PRE-1: is NET-003 een deelverzameling van NET-009?
-    net003, net009 = _objecten(per["NET-003"]), _objecten(per["NET-009"])
-    print(
-        f"-- NET-003 n NET-009: {len(net003 & net009)} van de {len(net003)} NET-003-objecten "
-        f"({len(net009)} bij NET-009); alleen NET-009: {len(net009 - net003)}"
-    )
+    # 2. Het richtingscluster: NET-003 en TOP-020 zijn per #80 in NET-009 opgegaan en
+    # vervallen (BO-76), dus alleen NET-009 zelf valt nog te meten.
+    print(f"-- NET-009: {len(_objecten(per['NET-009']))} objecten (NET-003/TOP-020 vervallen)")
     _tel("NET-009 geometrie", per["NET-009"], r"De lijn is (omgekeerd getekend|in de van-naar)")
     _tel("NET-009 bob", per["NET-009"], r"De BOB (stijgt|daalt|ligt vlak|ontbreekt)")
 
