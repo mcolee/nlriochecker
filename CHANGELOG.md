@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **De nulmeting spreekt Nederlands** (issue #101, BO-74). Elke overtreding uit de GWSW
+  SHACL-nulmeting draagt een vaste, beschrijvende zin bij haar SHACL-vorm -- "Put zonder
+  (of met meer dan één) geregistreerde puthoogte" in plaats van "Subject Put, path
+  hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1)". De 43 teksten zijn
+  door de auteur vastgesteld en staan als package-resource in
+  `src/nlriochecker/nulmeting_teksten.toml`; grenzen (`{min}`, `{max}`, `{n}`) komen uit
+  de meldingsrij zelf, nooit uit de code of de configuratie. Het Markdown-rapport (ook de
+  nieuwe kolom Omschrijving in de tabel per SHACL-vorm) en de GeoPackage-popup tonen
+  alleen de zin; de drie archieven dragen beide teksten. Een vorm zonder tekst valt terug
+  op de technische boodschap en het rapport telt hoeveel meldingen dat waren.
 - **Nieuwe Harde regel (Techniek): functionaliteit mag `gwsw-orox-helpers` niet breken**
   (`CLAUDE.md`) — alleen de publieke API, geen patches op internals; leeslaagwijzigingen
   lopen via een release van die package (besluit auteur 28-08).
@@ -55,6 +65,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`schema_versie` van `bevindingen.json` gaat van `1.1` naar `1.2`** (issue #101,
+  BO-74). Elke melding draagt het nieuwe veld `boodschap_technisch`, en bij een
+  nulmetingmelding is `boodschap` voortaan de Nederlandse zin in plaats van de
+  SHACL-tekst; die staat in het nieuwe veld. De CSV krijgt om dezelfde reden de kolom
+  `MeldingTechnisch` achteraan (vóór `Gereedschap`) en de meldingentabel van de
+  GeoPackage de kolom `boodschap_technisch` achteraan. Melding-ID's verschuiven niet: die
+  hangen aan de technische tekst. Deze ene versiestap dekt het hele blok, dus ook de
+  GeoPackage-herindeling van issue #98 hieronder.
 - **De GeoPackage draagt nog drie objectlagen: `putten`, `strengen` en `vlakken`**
   (issue #98, BO-73; besluit auteur 28-08). De vierde laag `gemengd_zonder_overstort`
   vervalt: haar vlakken staan nu in `vlakken` met `soort = gemengd_deelstelsel`, naast de

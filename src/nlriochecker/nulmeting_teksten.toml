@@ -1,0 +1,71 @@
+# Mensleesbare teksten bij de SHACL-vormen van de GWSW-nulmeting (issue #101).
+#
+# Sleutel: de naam van de geschonden SHACL-vorm, exact zoals de kolom `Source` van een
+# rapport van de GWSW-server hem schrijft. Waarde: een vaste, beschrijvende Nederlandse
+# zin -- wat er aan de hand is, geen handelingsadvies. De GWSW-termen blijven staan:
+# "Overstortput" is de naam van het ding, en hem vervangen door een omschrijving maakt
+# de melding niet leesbaarder maar wel onnauwkeurig.
+#
+# Deze 43 teksten zijn door de auteur vastgesteld (issue #101, comment 28-08) en worden
+# niet zonder zijn besluit gewijzigd. Zie BO-74 in docs/beslislog.md.
+#
+# Sjabloonvelden: `{min}`, `{max}` en `{n}` worden per melding ingevuld uit de
+# meldingsrij zelf -- nooit uit een hier of elders vastgelegde grens. `{min}` en `{max}`
+# komen uit de grens die de kolom `Message` achteraan tussen haakjes noemt
+# (`... waarde wijkt af (min=63,max=4000)`), `{n}` uit het getal waarmee de kolom
+# `Value` opent. Is een veld uit de rij niet te halen, dan vervalt de haakjesgroep
+# eromheen en blijft de zin zonder ingevulde grens staan. De grens gaat alleen naar
+# deze zin: het meldingveld `drempel` blijft leeg, zoals docs/json-schema.md zegt.
+#
+# Een vorm zonder regel hieronder valt terug op de technische SHACL-tekst, en het
+# rapport telt hoeveel meldingen dat waren. Vul de tabel dus aan zodra een nieuwe vorm
+# opduikt -- de drifttest in tests/test_integration.py meet dat tegen de De
+# Wolden-rapporten.
+#
+# Literale TOML-strings ('...'), zodat de aanhalingstekens in de tekst geen
+# ontsnapping nodig hebben.
+
+[vormen]
+BeginpuntLeiding_Knooppunt_card = 'Streng waarvan het beginpunt niet aan precies één put/knooppunt is gekoppeld'
+EindpuntLeiding_Knooppunt_card = 'Streng waarvan het eindpunt niet aan precies één put/knooppunt is gekoppeld'
+Bouwwerk_MateriaalBouwwerk_card = 'Bouwwerk zonder (of met meer dan één) geregistreerd materiaal'
+Bouwwerk_VormBouwwerk_card = 'Bouwwerk zonder (of met meer dan één) geregistreerde vorm'
+BreedteBouwwerk_val = 'Bouwwerkbreedte buiten het aannemelijke bereik ({min}–{max} mm)'
+BreedteLeiding_val = 'Leidingbreedte/-diameter buiten het aannemelijke bereik ({min}–{max} mm)'
+BreedtePut_val = 'Putbreedte buiten het aannemelijke bereik ({min}–{max} mm)'
+CfkTypes_typ = 'Objecttype te globaal voor deze toetsing (bijv. "Put" waar "Inspectieput" hoort)'
+Drukriolering_Pompunit_card = 'Drukrioleringsstelsel zonder pompunit'
+Gemaal_CapaciteitGemaal_card = 'Gemaal zonder geregistreerde capaciteit'
+Gemaal_Pomp_card = 'Gemaal zonder geregistreerde pomp'
+GemengdStelsel_Lozingspunt_card = 'Gemengd stelsel zonder lozingspunt'
+Hemelwaterstelsel_Lozingspunt_card = 'Hemelwaterstelsel zonder lozingspunt'
+Hemelwaterstelsel_UitlaatPunt_card = 'Hemelwaterstelsel zonder uitlaatpunt'
+HoogteLeiding_val = 'Leidinghoogte buiten het aannemelijke bereik ({min}–{max} mm)'
+HoogteTovNAP_val = 'Hoogte t.o.v. NAP buiten het aannemelijke bereik ({min}–{max} m)'
+Knooppunt_Netwerk_conn = 'Put of ander knooppunt zonder enige verbinding in het netwerk'
+Kolk_Deksel_card = 'Kolk zonder (of met meer dan één) deksel'
+Leiding_MateriaalLeiding_card = 'Leiding zonder (of met meer dan één) geregistreerd materiaal'
+Leiding_VormLeiding_card = 'Leiding zonder (of met meer dan één) geregistreerde vorm'
+LengteBouwwerk_val = 'Bouwwerklengte buiten het aannemelijke bereik ({min}–{max} mm)'
+LengteLeiding_val = 'Strenglengte buiten het aannemelijke bereik ({min}–{max} m)'
+LengtePut_val = 'Putlengte buiten het aannemelijke bereik ({min}–{max} mm)'
+Maaiveldorientatie_Putorientatie_card = 'Maaiveldpunt dat niet aan precies één put is gekoppeld'
+MateriaalPut_ref = 'Putmateriaal met een waarde buiten de GWSW-materiaallijst'
+MechanischRioolstelsel_Lozingspunt_card = 'Mechanisch rioolstelsel zonder lozingspunt'
+Ontstoppingsstuk_Deksel_card = 'Ontstoppingsstuk zonder (of met meer dan één) deksel'
+Overstortput_Compartiment_card = 'Overstortput zonder compartiment'
+Overstortput_Overstortdrempel_card = 'Overstortput zonder overstortdrempel'
+Put_HoogtePut_card = 'Put zonder (of met meer dan één) geregistreerde puthoogte'
+Put_MateriaalPut_card = 'Put zonder (of met meer dan één) geregistreerd materiaal'
+Put_VormPut_card = 'Put zonder (of met meer dan één) geregistreerde vorm'
+Rioolput_BergendOppervlak_card = 'Rioolput zonder geregistreerd bergend oppervlak'
+Rioolput_Maaiveldschematisering_card = 'Rioolput zonder maaiveldschematisering'
+Stuwput_Compartiment_card = 'Stuwput met minder dan twee compartimenten'
+Stuwput_Stuwmuur_card = 'Stuwput zonder (of met meer dan één) stuwmuur'
+Uitlaatconstructie_UitlaatPunt_card = 'Uitlaatconstructie zonder (of met meer dan één) uitlaatpunt'
+Vacuumriolering_Vacuumpompstation_card = 'Vacuümriolering zonder vacuümpompstation'
+VrijvervalRioolstelsel_Aansluiting_card = 'Vrijvervalstelsel zonder enige aansluiting'
+VrijvervalRioolstelsel_Rioolput_card = 'Vrijvervalstelsel zonder enige rioolput'
+Vuilwaterstelsel_Lozingspunt_card = 'Vuilwaterstelsel zonder lozingspunt'
+Vuilwaterstelsel_VrijvervalRioolleiding_card = 'Vuilwaterstelsel zonder vrijvervalrioolleiding'
+Vuilwaterstelsel_Vuilwaterriool_card = 'Vuilwaterstelsel zonder vuilwaterriool'

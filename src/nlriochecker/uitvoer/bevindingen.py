@@ -21,6 +21,8 @@ from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.checks.extern import bronrollen_met_check
 from nlriochecker.checks.selectie import klassen_van_rol
 from nlriochecker.externedata import rol_van
+from nlriochecker.nulbevinding import CHECK_VOORVOEGSEL
+from nlriochecker.nulmeting_teksten import vertaald
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import (
@@ -96,6 +98,11 @@ CSV_KOLOMMEN = [
     "ObjectURI",
     "Object2URI",
     "CFK",
+    # De technische SHACL-tekst naast de leesbare zin in `Melding` (issue #101).
+    # Achteraan, net als `CFK`: bestaande kolommen houden hun plaats, zodat een lezer
+    # die op positie werkt niet omvalt. Leeg bij een eigen check en bij een
+    # datasetsignaal.
+    "MeldingTechnisch",
 ]
 
 # Veld → kolom(men): de afbeelding die `meldingen_tabel` hieronder rij voor rij
@@ -127,6 +134,7 @@ CSV_VELD_NAAR_KOLOM: dict[str, tuple[str, ...]] = {
     "run_datum": ("RunDatum",),
     "dataset": ("Dataset",),
     "cfk": ("CFK",),
+    "boodschap_technisch": ("MeldingTechnisch",),
 }
 
 
@@ -260,6 +268,7 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
             "ObjectURI": melding.object_uri,
             "Object2URI": melding.object2_uri,
             "CFK": ", ".join(melding.cfk),
+            "MeldingTechnisch": melding.boodschap_technisch,
         }
         for melding in meldingen
     ]
@@ -674,6 +683,12 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     een lezer hier nodig heeft is welke eis waar de mist in gaat, hoe vaak, en welke
     conformiteitsklassen hem stellen. De losse meldingen staan in `bevindingen.csv`
     en op de kaart.
+
+    De kolom Omschrijving draagt de leesbare zin bij de vorm (issue #101). Zij komt uit
+    de meldingen zelf en niet opnieuw uit de vertaaltabel: wat hier staat is dan per
+    constructie dezelfde tekst als in de CSV, de JSON en de popup. Dragen de meldingen
+    van een vorm meer dan een zin -- twee conformiteitsklassen met een andere grens --
+    dan staan ze er allebei.
     """
     uit_nulmeting = [melding for melding in meldingen if melding.bron == BRON_NULMETING]
     if not run.meetbereik.gemeten:
@@ -687,12 +702,13 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     for melding in uit_nulmeting:
         per_vorm[melding.check_id].append(melding)
 
-    rijen: list[tuple[str, str, int, int, str]] = []
+    rijen: list[tuple[str, str, str, int, int, str]] = []
     for check_id, groep in per_vorm.items():
         klassen = sorted({cfk for melding in groep for cfk in melding.cfk})
         rijen.append(
             (
                 check_id,
+                "; ".join(sorted({melding.boodschap for melding in groep})),
                 # De zwaarste ernst in de groep, niet die van de eerste melding: zouden
                 # twee CFK-rapporten het oneens zijn over de Severity van dezelfde vorm,
                 # dan hoort de tabel de zwaarste te noemen en niet de toevallig eerste.
@@ -702,11 +718,18 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
                 ", ".join(klassen),
             )
         )
-    kolommen = ["Vorm", "Ernst", "Overtredingen", "Systemisch", "Conformiteitsklassen"]
+    kolommen = [
+        "Vorm",
+        "Omschrijving",
+        "Ernst",
+        "Overtredingen",
+        "Systemisch",
+        "Conformiteitsklassen",
+    ]
     tabel = pd.DataFrame(
         # Fouten boven waarschuwingen, en binnen elk het zwaarste eerst; dat is de
         # volgorde waarin een lezer ze wil aflopen.
-        sorted(rijen, key=lambda rij: (rij[1] != "F", -rij[2], rij[0])),
+        sorted(rijen, key=lambda rij: (rij[2] != "F", -rij[3], rij[0])),
         columns=kolommen,
     )
     regels += table(tabel, f"Overtredingen per SHACL-vorm ({len(uit_nulmeting)})")
@@ -934,6 +957,7 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         "daarom geen plek op de kaart.",
         "",
     ]
+    regels += _onvertaald_section(uit_nulmeting)
     if run.nulbevindingen_weggelaten:
         buiten = getal(run.nulbevindingen_weggelaten, "overtreding viel", "overtredingen vielen")
         regels += [
@@ -943,6 +967,38 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
             "",
         ]
     return regels
+
+
+def _onvertaald_section(uit_nulmeting: list[Melding]) -> list[str]:
+    """Hoeveel meldingen op de technische SHACL-tekst terugvielen, en van welke vormen.
+
+    De vertaaltabel (issue #101) dekt de 43 vormen die de De Wolden-rapporten kennen.
+    Een GWSW-server die een nieuwe vorm oplevert, of een andere gemeente met andere
+    stelseltypen, levert een vorm zonder tekst; die melding blijft staan met haar
+    technische boodschap. Zwijgen zou lezen als "alles is leesbaar gemaakt", terwijl de
+    lezer dan zonder verklaring een regel SHACL-jargon voor zich krijgt.
+
+    De regel blijft weg zodra elke vorm vertaald is: "0 meldingen van 0 onvertaalde
+    vormen" is geen verantwoording maar ruis in een sectie die juist zegt wat er
+    ontbreekt.
+    """
+    telling: dict[str, int] = defaultdict(int)
+    for melding in uit_nulmeting:
+        vormnaam = melding.check_id.removeprefix(f"{CHECK_VOORVOEGSEL}-")
+        if not vertaald(vormnaam):
+            telling[vormnaam] += 1
+    if not telling:
+        return []
+
+    meldingen = sum(telling.values())
+    namen = ", ".join(f"`{vormnaam}`" for vormnaam in sorted(telling))
+    return [
+        f"> **{getal(meldingen, 'melding draagt', 'meldingen dragen')} de technische "
+        f"SHACL-tekst**: {getal(len(telling), 'vorm heeft', 'vormen hebben')} nog geen "
+        f"vastgestelde Nederlandse omschrijving ({namen}). De overtreding zelf telt "
+        "gewoon mee; alleen de zin erbij is nog die van de GWSW-server.",
+        "",
+    ]
 
 
 def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:

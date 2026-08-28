@@ -3988,3 +3988,86 @@ QGIS-projecten die erop wezen moeten de laag `vlakken` met een filter op `soort`
 Haar kolommen `cluster_id` en `n_meldingen` heten daar `id` en `aantal_meldingen`.
 `n_vlakken` in `gwsw_run` telt sinds deze wijziging ook de deelstelsels: een trendlijn over
 deze grens heen telt appels en peren, en `vergelijk` zegt dat niet.
+
+### BO-74 De nulmeting krijgt een vaste vertaaltabel van SHACL-vorm naar Nederlandse zin
+
+**Wat.** Elke overtreding uit de GWSW SHACL-nulmeting draagt naast de tekst van de server
+een vaste, beschrijvende Nederlandse zin: `Put_HoogtePut_card` wordt "Put zonder (of met
+meer dan één) geregistreerde puthoogte" in plaats van "Subject Put, path hasAspect, object
+HoogtePut - aantal voorkomens wijkt af (exact=1)". De 43 teksten -- precies de vormen die
+de drie De Wolden-rapporten kennen -- zijn door de auteur vastgesteld en ongewijzigd
+akkoord bevonden (issue #101, comment 28-08). Ze staan als package-resource in
+`src/nlriochecker/nulmeting_teksten.toml` en worden niet zonder besluit van de auteur
+gewijzigd.
+
+**Waar de zin landt.** De mensgerichte views tonen alleen de zin: het Markdown-rapport (ook
+de kolom Omschrijving in de tabel per SHACL-vorm) en de GeoPackage-popup. De drie archieven
+dragen beide teksten: de CSV in `Melding` plus de nieuwe kolom `MeldingTechnisch`, de JSON
+in `boodschap` plus het nieuwe veld `boodschap_technisch`, en de meldingentabel van de
+GeoPackage in `boodschap` plus de nieuwe kolom `boodschap_technisch`. De meldingentabel
+doet mee omdat zij een archief is naast de CSV en de JSON; alleen de popup is een
+mensgerichte view.
+
+**De tekstkeuze staat in `nulbevinding.py`.** Dat is de enige plek waar `Source`, `Message`
+en `Value` bijeen staan, en waar de vier uitvoervormen hun tekst uit dezelfde bron krijgen.
+De schrijvers in `uitvoer/` kiezen niets: zouden zij zelf de tabel raadplegen, dan kunnen
+rapport en CSV uit elkaar lopen, en dat is precies wat de eenschrijversregel verbiedt.
+
+**Grenzen komen uit de rij, nooit uit de code.** De sjabloonvelden `{min}`, `{max}` en
+`{n}` worden per melding ingevuld: `{min}` en `{max}` uit de grens die de kolom `Message`
+achteraan tussen haakjes noemt (`waarde wijkt af (min=63,max=4000)`), `{n}` uit het getal
+waarmee de kolom `Value` opent. Een conformiteitsklasse mag een andere grens stellen -- de
+ontdubbeling in `nulbevinding.py` houdt zulke meldingen daarom al uit elkaar op de
+boodschap -- en een in de tabel of in `checks.toml` opgeschreven getal zou dan de verkeerde
+noemen. Is een veld niet uit de rij te halen, dan vervalt de haakjesgroep eromheen en
+blijft de zin zonder ingevulde grens staan; er wordt niets verzonnen. Acht van de 43
+teksten dragen een sjabloonveld, alle acht `{min}`/`{max}` op een `_val`-vorm; `{n}` wordt
+door geen van de vastgestelde teksten gebruikt, omdat de auteur "nul of meer dan één" in
+één zin opvangt ("Put zonder (of met meer dan één) ...").
+
+Het meldingveld `drempel` blijft leeg bij een nulmetingmelding, zoals `docs/json-schema.md`
+al zei. Dat de zin dezelfde grens invult verandert daar niets aan: de grens staat als tekst
+in de zin en niet als waarde in een eigen veld, en een tweede uitlevering ervan zou een
+tweede contract zijn dat naast de brontekst moet blijven kloppen.
+
+**Het melding-ID hangt aan de technische tekst.** `boodschap` op `Nulbevinding` blijft de
+SHACL-tekst; hij is de ontdubbelsleutel en gaat mee in `melding_id`. Zou het ID aan de
+leesbare zin hangen, dan verschoof elke nulmeting-ID zodra de vertaaltabel bijgewerkt werd,
+en las een trendvergelijking dat als tienduizenden opgeloste plus tienduizenden nieuwe
+meldingen.
+
+**Vangnet en drift.** Een vorm zonder tekst valt terug op de technische boodschap -- de
+melding verdwijnt nooit -- en het Markdown-rapport telt in de verantwoording hoeveel
+meldingen dat waren en om welke vormen het ging. De regel blijft weg zodra alles vertaald
+is. Twee tests bewaken de tabel: `tests/test_nulmeting_teksten.py` telt de 43 en toetst het
+invullen en de terugval zonder invoerdata, en
+`tests/test_integration.py::test_elke_shacl_vorm_heeft_een_leesbare_zin` houdt de tabel
+tegen de echte rapporten in `data/shacl_nulmeting/` -- in beide richtingen, dus ook een
+tekst voor een vorm die niet meer voorkomt valt op. Die rapporten staan niet onder
+versiebeheer (te groot), dus die test slaat over waar `data/` leeg is; de telling van 43
+staat daarom óók in de eerste test, die overal draait.
+
+**Waarom.** Het rapport is voor de beheerder die met de bevindingen aan de slag moet. De
+SHACL-tekst beschrijft de geschonden vorm correct en is voor die lezer onbruikbaar; op De
+Wolden staat hij op 105.963 van de meldingen, dus het is niet een randgeval maar het
+grootste deel van het rapport. Een tabel is de goedkoopste vorm die klopt: de zin is per
+vorm hetzelfde, hij hoeft niet uit de tekst afgeleid te worden, en de auteur kan hem
+vaststellen zonder dat er code aan te pas komt.
+
+**Alternatieven.** De zin uit de SHACL-tekst afleiden met regels ("Subject X, path hasPart,
+object Y" → "X zonder Y") (verworpen: dat leest de brontekst een tweede keer en levert
+Nederlands dat per vorm net niet klopt -- "Stuwput zonder Compartiment" waar "Stuwput met
+minder dan twee compartimenten" hoort). De technische tekst helemaal vervangen (verworpen:
+de melding is dan niet meer naar het SHACL-rapport te herleiden, en het melding-ID zou aan
+een tekst hangen die wij zelf schrijven). De zin ook in de meldingentabel weglaten en alleen
+in de popup zetten (verworpen: de drie archieven horen dezelfde gegevens te dragen). De
+tabel in `checks.toml` zetten (verworpen: dat is de projectconfiguratie met drempels die een
+project mag overschrijven, en deze teksten zijn juist vast).
+
+**Contractbreuk.** `schema_versie` van `bevindingen.json` gaat van `1.1` naar `1.2`. Een
+afnemer die `boodschap` van een nulmetingmelding las krijgt daar voortaan de Nederlandse
+zin; de oude tekst staat in `boodschap_technisch`. De CSV krijgt de kolom
+`MeldingTechnisch` achteraan (vóór `Gereedschap`) en de meldingentabel van de GeoPackage de
+kolom `boodschap_technisch` achteraan. Melding-ID's verschuiven niet. Dezelfde
+versiestap dekt de GeoPackage-herindeling van issue #98 (BO-73): het contract kent één
+nummer per blok wijzigingen, geen nummer per issue.

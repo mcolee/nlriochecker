@@ -25,6 +25,12 @@ Drie dingen gebeuren hier, en nergens anders:
    instanties van dat type in de dataset. Zonder objecttype of zonder instanties is
    er geen noemer en valt de vlag naar de veilige kant: een melding ten onrechte
    systemisch noemen haalt hem van de kaart.
+4. **De tekstkeuze.** De leesbare zin bij de vorm komt uit de vertaaltabel
+   (`nulmeting_teksten.py`, issue #101). Hier en niet in de schrijvers: `Source`,
+   `Message` en `Value` staan alleen op deze plek bij elkaar, en de vier uitvoervormen
+   horen dezelfde zin te dragen. `boodschap` blijft de technische SHACL-tekst -- hij is
+   de ontdubbelsleutel en gaat mee in de melding-ID, dus een leesbaardere formulering
+   erin zou elke melding-ID van de nulmeting laten verschuiven.
 
 De teller van die vlag telt over de volledige export, vóór afbakening tot een
 studiegebied -- dezelfde keuze als bij de eigen checks (`melding._is_systemisch`), en
@@ -42,6 +48,7 @@ from gwsw_orox_helpers.dataset import GWSW, GwswDataset, aspect_holders_of, part
 from rdflib import URIRef
 
 from nlriochecker.meting import Nulmeting
+from nlriochecker.nulmeting_teksten import leesbaar
 from nlriochecker.uitvoer.identiteit import kort
 
 logger = logging.getLogger(__name__)
@@ -88,6 +95,10 @@ class Nulbevinding:
     # betekenis als op een checkbevinding: de melding blijft staan, maar is niet
     # betrouwbaar te duiden.
     typering_betrouwbaar: bool = True
+    # De leesbare zin bij deze vorm (issue #101), naast de technische `boodschap`. Leeg
+    # als er geen tekstkeuze gemaakt is -- een met de hand gebouwde bevinding in een
+    # test; de melding valt dan terug op `boodschap`, net als een onvertaalde vorm.
+    leesbaar: str = ""
 
 
 def bouw_nulbevindingen(
@@ -138,6 +149,7 @@ def bouw_nulbevindingen(
                 ),
                 herleid=bool(uri),
                 typering_betrouwbaar=uri not in onbetrouwbaar,
+                leesbaar=leesbaar(vorm, boodschap, waarde),
             )
         )
     return bevindingen

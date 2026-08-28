@@ -65,6 +65,22 @@ alleen het bestand waarin zij staat is verhuisd.
   wordt via `hasPart`, `hasAspect` en als laatste `hasConnection` omhooggelopen tot een
   put of streng; komt hij nergens op uit, dan blijft de melding staan zonder object en
   met een leeg gebied, en het rapport telt die gevallen. Zie BO-28.
+- **De nulmetingmelding draagt twee teksten** (issue #101, BO-74): `boodschap` is de
+  vastgestelde Nederlandse zin bij de SHACL-vorm, `boodschap_technisch` de tekst van de
+  GWSW-server. De keuze valt in `nulbevinding.py` -- de enige plek waar `Source`,
+  `Message` en `Value` bijeen staan -- en leest de vertaaltabel
+  `nulmeting_teksten.toml`, een package-resource met de 43 vormen die de De
+  Wolden-rapporten kennen. De sjabloonvelden `{min}`, `{max}` en `{n}` komen uit de
+  meldingsrij zelf (`{min}`/`{max}` uit de grens achter de boodschap, `{n}` uit het
+  getal waarmee `Value` opent); is een veld niet te vullen, dan vervalt de haakjesgroep
+  eromheen. Een vorm zonder tekst valt terug op de technische boodschap en het rapport
+  telt hoeveel meldingen dat waren. Wat waar landt: de mensgerichte views (het
+  Markdown-rapport, de tabel per SHACL-vorm en de GeoPackage-popup) tonen alleen de zin,
+  de drie archieven (CSV `MeldingTechnisch`, JSON `boodschap_technisch`, de kolom
+  `boodschap_technisch` van de meldingentabel) dragen beide. Het melding-ID hangt aan de
+  **technische** tekst, want die is ook de ontdubbelsleutel: zou het aan de zin hangen,
+  dan verschoof elke nulmeting-ID zodra de tabel bijgewerkt werd. `drempel` blijft leeg,
+  ook al vult de zin dezelfde grens in.
 - Een derde bron in dezelfde stroom is het datasetsignaal (`bron = "dataset"`, categorie
   `SIG`): `_alle_meldingen` (binnen `bouw_meldingenstroom`) leest
   `uitvoer/omvang.klassen_op_nul` en maakt één systemische

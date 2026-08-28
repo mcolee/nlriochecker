@@ -47,7 +47,13 @@ VELD_GEREEDSCHAP = "gereedschap"
 # De versie van het JSON-contract, los van het versienummer van deze package. Een
 # afnemer pint hierop, niet op de packageversie: de checks mogen veranderen zonder
 # dat het formaat dat doet. Zie `docs/json-schema.md` voor de versioneringsregel.
-SCHEMA_VERSIE = "1.1"
+#
+# 1.2 (issue #101): elke melding draagt `boodschap_technisch`, en bij een
+# nulmetingmelding is `boodschap` voortaan de leesbare Nederlandse zin in plaats van de
+# SHACL-tekst. Dat merkt een bestaande afnemer, dus het telt als wijziging en niet als
+# optionele toevoeging -- vandaar de stap, terwijl `markering`, `onderdrukt` en `checks`
+# binnen `1.1` bijkwamen.
+SCHEMA_VERSIE = "1.2"
 
 
 def gereedschap() -> str:

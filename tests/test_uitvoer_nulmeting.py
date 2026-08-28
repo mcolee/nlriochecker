@@ -20,7 +20,8 @@ from gwsw_orox_helpers.dataset import load_dataset
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.meting import Meetbereik, laad_nulmeting
-from nlriochecker.nulbevinding import bouw_nulbevindingen
+from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
+from nlriochecker.nulmeting_teksten import leesbaar
 from nlriochecker.uitvoer.bevindingen import FILE_CHECKS_CSV, FILE_CHECKS_JSON
 from nlriochecker.uitvoer.melding import bouw_meldingen
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
@@ -233,3 +234,124 @@ def test_een_gemeten_run_zonder_overtredingen_zegt_dat_met_zoveel_woorden(
 
     assert "**GWSW-nulmeting**" in tekst
     assert "0 overtredingen uit de SHACL-nulmeting" in tekst
+
+
+# De technische SHACL-teksten van de join-fixtures, met de zin die de vertaaltabel
+# ervoor in de plaats zet (issue #101). De tweede draagt een grens uit de meldingsrij.
+SHACL_PUTHOOGTE = (
+    "Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1)"
+)
+ZIN_PUTHOOGTE = "Put zonder (of met meer dan één) geregistreerde puthoogte"
+SHACL_LENGTE = "Kenmerk LengteLeiding - waarde wijkt af (min=1,max=75)"
+ZIN_LENGTE = "Strenglengte buiten het aannemelijke bereik (1–75 m)"
+
+
+def test_het_rapport_toont_alleen_de_leesbare_zin(tmp_path: Path) -> None:
+    """De mensleesbare uitvoer draagt de zin, niet het SHACL-jargon (issue #101).
+
+    De grens in de tweede zin komt uit de meldingsrij zelf (`min=1,max=75` in de
+    boodschap), niet uit een in de code of de config vastgelegde waarde.
+    """
+    uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM, met_geopackage=False)
+
+    tekst = uitvoer.markdown.read_text(encoding="utf-8")
+
+    assert ZIN_PUTHOOGTE in tekst
+    assert ZIN_LENGTE in tekst
+    assert SHACL_PUTHOOGTE not in tekst
+    assert SHACL_LENGTE not in tekst
+
+
+def test_de_csv_draagt_de_zin_en_de_brontekst(tmp_path: Path) -> None:
+    """Een archief houdt beide: de zin om te lezen, de brontekst om op te herleiden."""
+    uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM, met_geopackage=False)
+
+    tabel = pd.read_csv(uitvoer.csv, sep=";", keep_default_na=False)
+    put_a = tabel[(tabel["Check"] == "NULMETING-Put_HoogtePut_card") & (tabel["Label"] == "A")]
+    eigen = tabel[tabel["Bron"] == "register"]
+
+    assert list(put_a["Melding"]) == [ZIN_PUTHOOGTE]
+    assert list(put_a["MeldingTechnisch"]) == [SHACL_PUTHOOGTE]
+    # Een eigen check schrijft zijn boodschap zelf; er is geen tweede formulering.
+    assert set(eigen["MeldingTechnisch"]) <= {""}
+
+
+def test_de_json_draagt_de_zin_en_de_brontekst(tmp_path: Path) -> None:
+    """Hetzelfde paar als in de CSV, want het is dezelfde meldingenstroom."""
+    uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM, met_geopackage=False)
+
+    assert uitvoer.json is not None
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    puthoogte = [
+        melding
+        for melding in document["meldingen"]
+        if melding["check_id"] == "NULMETING-Put_HoogtePut_card"
+    ]
+
+    assert puthoogte
+    assert all(melding["boodschap"] == ZIN_PUTHOOGTE for melding in puthoogte)
+    assert all(melding["boodschap_technisch"] == SHACL_PUTHOOGTE for melding in puthoogte)
+    assert all(melding["drempel"] == "" for melding in puthoogte)
+
+
+def test_de_geopackage_draagt_de_zin_in_de_popup_en_beide_in_de_meldingentabel(
+    tmp_path: Path,
+) -> None:
+    """De popup is mensleesbare uitvoer; de meldingentabel is een archief."""
+    uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM)
+
+    assert uitvoer.geopackage is not None
+    verbinding = sqlite3.connect(f"file:{uitvoer.geopackage}?mode=ro", uri=True)
+    try:
+        rijen = verbinding.execute(
+            "select boodschap, boodschap_technisch from meldingen "
+            "where check_id = 'NULMETING-Put_HoogtePut_card'"
+        ).fetchall()
+        popups = "".join(
+            rij[0] for rij in verbinding.execute("select popup_html from strengen") if rij[0]
+        )
+    finally:
+        verbinding.close()
+
+    assert rijen and all(rij == (ZIN_PUTHOOGTE, SHACL_PUTHOOGTE) for rij in rijen)
+    assert "Streng waarvan het beginpunt niet aan precies één put/knooppunt is gekoppeld" in popups
+    assert "aantal voorkomens wijkt af" not in popups
+
+
+def test_een_onvertaalde_vorm_valt_terug_en_wordt_geteld(tmp_path: Path) -> None:
+    """Het vangnet: de melding blijft staan, en het rapport zegt dat de zin ontbreekt."""
+    run = _run()
+    shacl = "Subject Iets, path hasPart, object Anders - aantal voorkomens wijkt af (min=1)"
+    onbekend = Nulbevinding(
+        check_id="NULMETING-Iets_Anders_card",
+        vorm="Iets_Anders_card",
+        focus_node="PutA",
+        ernst="W",
+        object_uri="http://example.org/toets#PutA",
+        object_label="A",
+        objecttype="Inspectieput",
+        boodschap=shacl,
+        waarde="te weinig voorkomens",
+        cfk=("MdsPlan",),
+        systemisch=False,
+        herleid=True,
+        leesbaar=leesbaar("Iets_Anders_card", shacl, "te weinig voorkomens"),
+    )
+    run = replace(run, nulbevindingen=(*run.nulbevindingen, onbekend))
+
+    uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)
+    tekst = uitvoer.markdown.read_text(encoding="utf-8")
+    tabel = pd.read_csv(uitvoer.csv, sep=";", keep_default_na=False)
+    rij = tabel[tabel["Check"] == "NULMETING-Iets_Anders_card"]
+
+    assert list(rij["Melding"]) == list(rij["MeldingTechnisch"]) == [onbekend.boodschap]
+    assert "1 melding draagt de technische SHACL-tekst" in tekst
+    assert "1 vorm heeft nog geen vastgestelde Nederlandse omschrijving" in tekst
+    assert "`Iets_Anders_card`" in tekst
+
+
+def test_zonder_onvertaalde_vorm_zwijgt_het_rapport_erover(tmp_path: Path) -> None:
+    """Nul onvertaalde vormen is geen verantwoording maar ruis; de regel blijft dan weg."""
+    uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM, met_geopackage=False)
+
+    assert "technische SHACL-tekst" not in uitvoer.markdown.read_text(encoding="utf-8")

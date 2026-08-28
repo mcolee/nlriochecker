@@ -1330,6 +1330,11 @@ MELDING_KOLOMMEN = [
     # Achteraan, net als de kolom `CFK` in de CSV: bestaande kolommen houden hun
     # plaats, zodat een lezer die op positie werkt niet omvalt.
     _Kolom("cfk", "text"),
+    # De technische SHACL-tekst naast de leesbare zin in `boodschap` (issue #101). De
+    # meldingentabel is een archief, net als de CSV en de JSON, en die drie horen
+    # dezelfde gegevens te dragen; alleen de popup toont uitsluitend de zin. Leeg bij
+    # een eigen check en bij een datasetsignaal.
+    _Kolom("boodschap_technisch", "text"),
 ]
 
 # Veld → kolom(men): de afbeelding die `_melding_rij` hieronder maakt, hier expliciet
@@ -1362,6 +1367,7 @@ MELDING_VELD_NAAR_KOLOM: dict[str, tuple[str, ...]] = {
     "object2_uri": ("gwsw_uri_2",),
     "foutlocatie": ("x", "y"),
     "cfk": ("cfk",),
+    "boodschap_technisch": ("boodschap_technisch",),
     # Het tweede object staat in de tabel als `feature_id_2` en `gwsw_uri_2`; zijn
     # label heeft hier nooit een kolom gehad. Expliciet leeg, zodat de drifttest dit
     # als bekende weglating leest -- een nieuw veld zonder vermelding valt er wél op.
@@ -1423,6 +1429,7 @@ def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
         melding.foutlocatie.x if melding.foutlocatie is not None else None,
         melding.foutlocatie.y if melding.foutlocatie is not None else None,
         ", ".join(melding.cfk),
+        melding.boodschap_technisch,
     )
 
 

@@ -22,6 +22,7 @@ from nlriochecker.checks.extern import bronrollen_met_check
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import Verdict, assess_coverage
 from nlriochecker.meting import Meetbereik, laad_nulmeting
+from nlriochecker.nulmeting_teksten import vertaald, vormteksten
 from nlriochecker.reporting import write_check_report, write_reports
 from nlriochecker.studiegebied import load_studiegebieden, load_study_area
 from nlriochecker.toetsloop import toets_gebieden
@@ -47,6 +48,10 @@ STUDIEGEBIED = GIS_DIR / "cbs_buurt_koekangerveld_studiegebied.gpkg"
 
 SHACL_PADEN = sorted(SHACL_DIR.glob("*.csv"))
 RUNDATUM = date(2026, 8, 18)
+
+# Zoveel unieke SHACL-vormen (kolom `Source`) dragen de drie rapporten samen; gemeten
+# 28-08-2026. De vertaaltabel van issue #101 dekt er precies evenveel.
+VORMEN_DE_WOLDEN = 43
 
 pytestmark = pytest.mark.integratie
 
@@ -97,6 +102,25 @@ def test_bekende_kerncijfers(meting) -> None:
     assert analyse.per_cfk["MdsProj"].total_count == 53480
     # De ernst komt nu uit de nulmeting zelf; het waarschuwingsaantal is gelijk.
     assert {analyse.per_cfk[cfk].warning_count for cfk in meting.cfks} == {18946}
+
+
+def test_elke_shacl_vorm_heeft_een_leesbare_zin(meting) -> None:
+    """De drifttest van issue #101: 43 vormen in de rapporten, 43 vastgestelde teksten.
+
+    De vertaaltabel is met de hand vastgesteld en kan dus achterlopen op wat de
+    GWSW-server oplevert. Een vorm zonder tekst valt in de uitvoer terug op de
+    technische SHACL-boodschap -- geen verlies, maar wel het jargon dat #101 juist
+    wegneemt. Deze test vangt het zodra het gebeurt.
+
+    Andersom telt ook: staat er een tekst voor een vorm die de rapporten niet kennen,
+    dan is de tabel gaan drijven ten opzichte van de meting. Dat is geen fout in de
+    uitvoer, maar het is wel het moment om te kijken of de naam nog klopt.
+    """
+    vormen = {vorm for cfk in meting.cfks for vorm in meting.report(cfk).findings["Source"]}
+
+    assert len(vormen) == VORMEN_DE_WOLDEN
+    assert sorted(vorm for vorm in vormen if not vertaald(vorm)) == []
+    assert sorted(set(vormteksten()) - vormen) == []
 
 
 def test_te_globale_klassen_per_cfk(meting) -> None:

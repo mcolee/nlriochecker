@@ -46,7 +46,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 
 ```json
 {
-  "schema_versie": "1.1",
+  "schema_versie": "1.2",
   "gereedschap": "nlriochecker 0.2.0",
   "run_datum": "2026-08-18",
   "dataset": "hgt004_bob_boven_deksel.ttl",
@@ -88,7 +88,8 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
       "foutlocatie": [1025.0, 2000.0],
       "run_datum": "2026-08-18",
       "dataset": "hgt004_bob_boven_deksel.ttl",
-      "cfk": []
+      "cfk": [],
+      "boodschap_technisch": ""
     }
   ]
 }
@@ -297,14 +298,28 @@ Wat je van zo'n melding moet weten:
   `foutlocatie` en een leeg `gebied`, want hij is aan geen enkel studiegebied toe
   te wijzen. Bij een run over meerdere gebieden staat hij daarom in de JSON van elk
   gebied.
-- **`drempel` is altijd leeg.** De SHACL-rapporten noemen de drempel binnen de
-  boodschap (`waarde wijkt af (min=1,max=75)`) en niet in een eigen kolom; hem eruit
-  peuteren zou een tweede lezing van dezelfde tekst zijn.
-- **`melding_id` hangt aan de boodschap.** De onderscheidende sleutels zijn de
-  focusnode en de boodschap: twee eindpunten van dezelfde streng herleiden naar
-  diezelfde streng, dus de object-URI onderscheidt ze niet. Herformuleert de
+- **`boodschap` is de leesbare zin, `boodschap_technisch` de SHACL-tekst.** Sinds
+  `1.2` (issue #101) draagt elke nulmetingmelding een vaste Nederlandse omschrijving
+  bij haar SHACL-vorm: *"Put zonder (of met meer dan één) geregistreerde puthoogte"*
+  in plaats van *"Subject Put, path hasAspect, object HoogtePut - aantal voorkomens
+  wijkt af (exact=1)"*. De tabel met die teksten reist als package-resource mee
+  (`nulmeting_teksten.toml`); zij dekt de 43 vormen die de De Wolden-rapporten kennen.
+  Een vorm zonder tekst valt terug op de technische boodschap -- dan zijn de twee
+  velden gelijk -- en het Markdown-rapport telt hoeveel meldingen dat waren. De
+  grenzen in zo'n zin (`(63–4000 mm)`) komen uit de meldingsrij zelf en niet uit een
+  vastgelegde waarde, dus een conformiteitsklasse met een andere grens levert een
+  andere zin.
+- **`drempel` is altijd leeg**, ook sinds `1.2`. De SHACL-rapporten noemen de drempel
+  binnen de boodschap (`waarde wijkt af (min=1,max=75)`) en niet in een eigen kolom;
+  hem als eigen veld uitleveren zou een tweede contract zijn dat naast de brontekst
+  moet blijven kloppen. Dat de leesbare zin diezelfde grens invult verandert daar
+  niets aan: die grens staat als tekst in `boodschap`, niet als waarde in `drempel`.
+- **`melding_id` hangt aan de technische boodschap.** De onderscheidende sleutels zijn
+  de focusnode en `boodschap_technisch`: twee eindpunten van dezelfde streng herleiden
+  naar diezelfde streng, dus de object-URI onderscheidt ze niet. Herformuleert de
   GWSW-server een boodschap, dan verschuiven de ID's van die vorm eenmalig en leest
-  een trendvergelijking ze als opgelost plus nieuw.
+  een trendvergelijking ze als opgelost plus nieuw. Een gewijzigde *leesbare* zin doet
+  dat niet: de vertaaltabel raakt geen enkel melding-ID.
 - **`systemisch`** wordt per (vorm, objecttype) bepaald, met als noemer het aantal
   instanties van dat type in de dataset. Zonder objecttype in het rapport of zonder
   instanties van dat type is er geen noemer en is de melding niet systemisch.
@@ -369,7 +384,7 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 | `object2_uri` | string | Het tweede betrokken object, bij checks die een paar beoordelen (een kruising, een koppeling). Leeg als de check maar één object aanwijst. |
 | `object2_id` | string | Het URI-fragment van `object2_uri`. |
 | `object2_label` | string | Leesbare aanduiding van het tweede object. |
-| `boodschap` | string | De bevinding in woorden, zoals ook in het Markdown-rapport en de CSV. |
+| `boodschap` | string | De bevinding in woorden, zoals ook in het Markdown-rapport en de CSV. Bij een melding uit de nulmeting is dit sinds `1.2` de vastgestelde Nederlandse zin bij de SHACL-vorm, niet meer de tekst van de GWSW-server; die staat in `boodschap_technisch`. |
 | `waarde` | string | De aangetroffen waarde, als de check er een noemt. Tekst, niet getal: de eenheid en de opmaak horen bij de boodschap. |
 | `drempel` | string | De drempel waartegen `waarde` is afgezet, als die er is. |
 | `typering_betrouwbaar` | boolean | Onwaar als de nulmeting dit object te globaal getypeerd noemt. De melding blijft staan, maar is niet betrouwbaar te duiden. |
@@ -382,6 +397,7 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 | `run_datum` | string | Gelijk aan het enveloppeveld. |
 | `dataset` | string | Gelijk aan het enveloppeveld. |
 | `cfk` | array van string | De conformiteitsklassen die deze overtreding noemen, gesorteerd. Leeg (`[]`) bij een melding uit de eigen check-engine: die toetst niet tegen een conformiteitsklasse. Zie [Meldingen uit de nulmeting](#meldingen-uit-de-nulmeting). |
+| `boodschap_technisch` | string | De brontekst achter `boodschap`. Bij een melding uit de nulmeting de `Message`-kolom van het SHACL-rapport (`Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1)`); leeg bij een eigen check en bij een datasetsignaal, want die schrijven hun boodschap zelf en er is geen tweede formulering. Kwam er in `1.2` bij (issue #101). |
 
 ### Waarom `run_datum` en `dataset` dubbel staan
 
@@ -410,11 +426,20 @@ dat doet.
 Het tweede nummer telt op bij een achterwaarts verenigbare *wijziging* die een bestaande
 afnemer merkt -- niet bij een puur optioneel, additief veld. Zo'n veld laat een afnemer die
 het niet kent het bestand lezen zoals voorheen; het valt daarom onder de lijst hieronder en
-verhoogt de versie niet. Het nummer staat op `1.1`: die stap van `1.0` viel samen met het
+verhoogt de versie niet. De stap van `1.0` naar `1.1` viel samen met het
 veld `cfk`, maar de latere velden `gebied`, `gebieden`, `markering`, `onderdrukt` en `checks` -- alle optioneel en
 additief -- kwamen er binnen `1.1` bij, zonder verhoging. Pin daarom op het **hoofdnummer**
-(`schema_versie.split(".")[0] == "1"`), niet op de volledige string: `1.1` duidt niet één
-vaste enveloppevorm aan.
+(`schema_versie.split(".")[0] == "1"`), niet op de volledige string: één tweede nummer
+duidt niet één vaste enveloppevorm aan.
+
+Het nummer staat op `1.2`. Die stap is er voor issue #101: elke melding draagt sindsdien
+`boodschap_technisch`, en bij een nulmetingmelding is `boodschap` de leesbare zin geworden
+in plaats van de SHACL-tekst. Dat laatste is een gewijzigde `boodschap`-tekst en dus
+toegestaan binnen het hoofdnummer, maar een bestaande afnemer merkt het -- vandaar de
+verhoging, waar `markering` en `onderdrukt` er als optionele toevoeging binnen `1.1` bij
+mochten. Dezelfde stap dekt de GeoPackage-herindeling van issue #98: die laat de JSON
+ongemoeid op de verwijzingen na, en het contract kent één nummer per blok wijzigingen, geen
+nummer per issue.
 
 **Binnen een hoofdversie mag:**
 

@@ -92,6 +92,13 @@ class Melding:
     # meerdere CFK-rapporten en levert een melding op; tellingen per CFK tellen hem
     # bij elke genoemde klasse mee.
     cfk: tuple[str, ...] = ()
+    # De technische brontekst achter `boodschap` (issue #101). Bij een nulmetingmelding
+    # is `boodschap` de leesbare zin uit de vertaaltabel en draagt dit veld de
+    # SHACL-tekst van de GWSW-server; bij een eigen check of een datasetsignaal is het
+    # leeg, want die schrijven hun boodschap zelf en er is geen tweede formulering.
+    # Alleen de archieven (CSV, JSON, meldingentabel) dragen beide; de mensgerichte
+    # views -- rapport en popup -- tonen alleen de zin.
+    boodschap_technisch: str = ""
 
 
 @dataclass(frozen=True)
@@ -377,7 +384,9 @@ def _nulmeldingen(
     De onderscheidende sleutels zijn de focusnode en de boodschap. De object-URI
     volstaat niet: twee eindpunten van dezelfde streng herleiden naar diezelfde
     streng. De boodschap zit erin omdat hij ook de ontdubbelsleutel is; herformuleert
-    de GWSW-server hem, dan verschuiven de melding-ID's van die vorm eenmalig.
+    de GWSW-server hem, dan verschuiven de melding-ID's van die vorm eenmalig. Dat is
+    de *technische* boodschap en niet de leesbare zin (issue #101): zou de ID aan de
+    zin hangen, dan verschoof elke nulmeting-ID zodra de vertaaltabel bijgewerkt werd.
 
     Een bevinding die nergens op uitkwam draagt geen gebied: hij is aan geen enkel
     studiegebied toe te wijzen. Hem het gebied van de run geven zou beweren dat hij
@@ -408,7 +417,11 @@ def _nulmeldingen(
                 object2_uri="",
                 object2_id="",
                 object2_label="",
-                boodschap=bevinding.boodschap,
+                # De leesbare zin voorop; de SHACL-tekst blijft er als eigen veld naast
+                # staan (issue #101). De terugval op `boodschap` dekt een vorm zonder
+                # vertaling en een met de hand gebouwde bevinding.
+                boodschap=bevinding.leesbaar or bevinding.boodschap,
+                boodschap_technisch=bevinding.boodschap,
                 waarde=bevinding.waarde,
                 drempel="",
                 typering_betrouwbaar=bevinding.typering_betrouwbaar,
