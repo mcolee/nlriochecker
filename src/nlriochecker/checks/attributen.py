@@ -286,13 +286,21 @@ class MateriaalPastNietBijBegindatum(_StrengCheck):
                 yield self._bevinding(context, conduit, jaar, regel.tot_jaar, "na", regel)
 
     def _bevinding(self, context, conduit, jaar: int, grens: int, kant: str, regel) -> Finding:
-        """Bouwt de bevinding met de grens en de toelichting erbij."""
+        """Bouwt de bevinding met de grens en de toelichting erbij.
+
+        De boodschap vraagt om een controle en stelt niets vast (issue #84): de
+        tijdvakken zijn ervaringsregels -- alleen het asbestverbod van 1993 is hard --
+        en een gerenoveerd riool zonder `DatumMaatregel` geeft dezelfde uitslag. Voor
+        een te vroege begindatum is de vraag of het materiaal er toen *al* was, voor een
+        te late of het er toen *nog* was.
+        """
+        toen = "al" if kant == "voor" else "nog"
         return self.finding(
             context,
             conduit.uri,
             conduit.label,
-            f"Materiaal {conduit.materiaal} met begindatum {jaar}, {kant} {grens}. "
-            f"{regel.toelichting}".strip(),
+            f"Te controleren of materiaal {conduit.materiaal} in {jaar} {toen} werd "
+            f"toegepast: dat is {kant} {grens}. {regel.toelichting}".strip(),
             materiaal=conduit.materiaal,
             begindatum_jaar=jaar,
             grensjaar=grens,

@@ -123,7 +123,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |
 | --- | --- | --- | --- | --- | --- | --- |
-| RVZ-001 | Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk; geometrisch-topologische variant, de administratieve koppeling dekt… | F | Consistentie | geimplementeerd met test | bergbezinkvoorzieningen, overstortputten · — | — |
+| RVZ-001 | Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk; geometrisch-topologische variant, de administratieve koppeling dekt… | F | Consistentie | geimplementeerd met test | bergbezinkvoorzieningen, lozeleidingen, overstortputten · — | — |
 | RVZ-002 | Overstort zonder geregistreerde drempelhoogte (Drempelniveau), ook als het drempelonderdeel zelf ontbreekt; overlapt bewust met de nulmetingvorm Over… | W | Compleetheid | geimplementeerd met test | overstortputten · Drempelbreedte, Drempelniveau | — |
 | RVZ-003 | Overstort zonder geregistreerde drempelbreedte (Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt | W | Compleetheid | geimplementeerd met test | overstortputten · Drempelbreedte, Drempelniveau | — |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit | geimplementeerd met test | oppervlaktewaterobjecten, overstortputten · — | — |

@@ -422,8 +422,7 @@ class ExtreemVerhang(_StrengCheck):
                 context,
                 conduit.uri,
                 conduit.label,
-                f"Verhang 1:{1 / verhang:.0f}, steiler dan 1:{een_op:g}; mogelijk zijn de "
-                "BOB's verwisseld.",
+                f"Verhang 1:{1 / verhang:.0f}, steiler dan 1:{een_op:g}.",
                 verhang=round(verhang, 5),
                 een_op=een_op,
             )

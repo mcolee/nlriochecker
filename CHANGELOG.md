@@ -55,6 +55,22 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Drie meldingsteksten beweren niet langer meer dan de check meet** (issue #84, PRE-5).
+  **HGT-008** laat "mogelijk zijn de BOB's verwisseld" weg: dat was een gok bovenop de
+  meting, en een extreem verhang kan net zo goed een lengte- of een BOB-fout zijn of een
+  echte val. **ATTR-003** vraagt om een controle in plaats van iets vast te stellen ("Te
+  controleren of materiaal PVC in 1954 al werd toegepast: dat is voor 1958."): op één na
+  (het asbestverbod van 1993) zijn de tijdvakken ervaringsregels, en een gerenoveerd riool
+  zonder `DatumMaatregel` geeft dezelfde uitslag. **RVZ-001** zegt "geen actieve
+  aangesloten streng (loze leidingen niet meegerekend)" én doet dat nu ook: de check
+  filtert de rol `lozeleidingen` (`LozeLeiding` = buiten gebruik, dezelfde grens die
+  ADM-010 hanteert) uit de aansluitingen, want een randvoorziening die alleen aan een
+  leiding buiten gebruik hangt is feitelijk niet aangesloten. Het filter zit in RVZ-001 en
+  niet in de gedeelde index van `verbanden.aansluitingen`, dus geen andere check verandert;
+  RVZ-001 declareert de rol `lozeleidingen` erbij. Conditie, ernst en drempels blijven bij
+  alle drie ongewijzigd; alleen RVZ-001 kan meer meldingen geven (op De Wolden en
+  Hoogeveen nog niet gemeten -- de hermeting hoort bij de blokregie). Nieuwe fixture
+  `rvz001_overstort_aan_loze_leiding.ttl`.
 - **TOP-019 herleidt een strengeinde nu ook via een hulpstuk** (issue #88). De check zocht
   zijn functieloze knopen op `verbonden_knopen()`, en dat herleidt elk strengeinde naar de rol
   `netwerkknopen` -- een `Hulpstuk` zit daar niet in. Twee van de vier geconfigureerde

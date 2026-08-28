@@ -1793,6 +1793,17 @@ FIXTURES["rvz001_losse_overstort.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55)),
 )
 
+# RVZ-001 (issue #84): overstortput O hangt aan precies een streng, en die is loos
+# (`LozeLeiding` = "leiding is buiten gebruik"). Sinds #84 telt een loze leiding niet
+# meer als aansluiting, dus de put is net zo goed niet aangesloten als hierboven.
+FIXTURES["rvz001_overstort_aan_loze_leiding.ttl"] = (
+    "overstortput O hangt uitsluitend aan de loze leiding X1",
+    LOZE_KLASSE
+    + hoogteput("PutA", "A", A)
+    + put("PutO", "O", B[0], B[1], klasse="Overstortput")
+    + leiding("X1", "X1", [A, B], "PutA", "PutO", klasse="LozeLeiding"),
+)
+
 FIXTURES["rvz004_overstort_zonder_water.ttl"] = (
     "overstortput O ligt 500 m van de enige sloot",
     hoogteput("PutA", "A", A)

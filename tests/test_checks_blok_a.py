@@ -103,6 +103,8 @@ DEFECTEN = [
     ("hgt017_z_wijkt_af.ttl", "HGT-017", ["1", "1"]),
     ("hgt018_buiskruin_boven_maaiveld.ttl", "HGT-018", ["1"]),
     ("rvz001_losse_overstort.ttl", "RVZ-001", ["O"]),
+    # Issue #84: de enige aangesloten streng is loos; die telt niet als aansluiting.
+    ("rvz001_overstort_aan_loze_leiding.ttl", "RVZ-001", ["O"]),
     ("rvz002_drempel_zonder_niveau.ttl", "RVZ-002", ["O"]),
     ("rvz002_overstort_zonder_drempel.ttl", "RVZ-002", ["O"]),
     ("rvz003_drempel_zonder_breedte.ttl", "RVZ-003", ["O"]),

@@ -36,6 +36,7 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import (
     bergbezinkleidingen,
     bergbezinkvoorzieningen,
+    lozeleidingen,
     oppervlaktewaterobjecten,
     overstortleidingen,
     overstortputten,
@@ -236,25 +237,32 @@ class RandvoorzieningNietAangesloten(Check):
     title = "Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("bergbezinkvoorzieningen", "overstortputten")
+    rollen = ("bergbezinkvoorzieningen", "lozeleidingen", "overstortputten")
     kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Zoekt overstortputten en BBB's zonder enige aangesloten streng.
+        """Zoekt overstortputten en BBB's zonder enige actief aangesloten streng.
 
         Dit is de geometrisch-topologische variant: er wordt gekeken of er
         werkelijk een streng op uitkomt. De administratieve koppeling dekt de
         nulmeting al.
+
+        Een loze leiding telt niet mee (issue #84): `LozeLeiding` is in het GWSW een
+        leiding buiten gebruik, dus een randvoorziening die alleen daaraan hangt is
+        feitelijk niet aangesloten. Dezelfde grens als ADM-010 hanteert -- de rol
+        `lozeleidingen` -- zodat er niet twee begrippen van "loos" naast elkaar staan.
         """
         index = aansluitingen(context)
+        loos = {conduit.uri for conduit in lozeleidingen(context)}
         for node in (*overstortputten(context), *bergbezinkvoorzieningen(context)):
-            if index.strengen(node.uri):
+            if any(conduit.uri not in loos for conduit in index.strengen(node.uri)):
                 continue
             yield self.finding(
                 context,
                 node.uri,
                 node.label,
-                "Deze randvoorziening heeft geen enkele aangesloten streng.",
+                "Deze randvoorziening heeft geen actieve aangesloten streng (loze "
+                "leidingen niet meegerekend).",
                 soort=_soortnaam(context, node),
             )
 
