@@ -134,9 +134,50 @@ def test_het_aandeel_putten_zonder_aanlegjaar_opent_de_sectie(tmp_path: Path) ->
 
     assert "**25.0% van de putten draagt geen aanlegjaar** (1 van de 4)" in tekst
     assert "aanleveringssignaal" in tekst
+    assert "de volledige lijst staat in `bevindingen.csv`" in tekst
     # De regel opent de sectie; de tabellen komen erna.
     assert tekst.index("**Datakarakteristieken**") < tekst.index("van de putten draagt geen")
     assert tekst.index("van de putten draagt geen") < tekst.index("| Datumkenmerk |")
+
+    # Zonder CSV mag de regel er niet naar verwijzen (issue #66): dan staat er een
+    # bestand genoemd dat `--uitvoer` heeft uitgezet.
+    zonder_csv, _ = write_check_report(run, tmp_path, met_csv=False)
+    regel = next(
+        r
+        for r in zonder_csv.read_text(encoding="utf-8").splitlines()
+        if "van de putten draagt geen aanlegjaar" in r
+    )
+    assert "`bevindingen.csv`" not in regel
+    assert "`bevindingen.json`" in regel
+
+
+def test_de_kopregel_belooft_geen_plek_die_de_vouwing_wegneemt(tmp_path: Path) -> None:
+    """Boven de systemisch-drempel toont het rapport ATTR-018 niet meer per object.
+
+    `_detail_eigen` vervangt de tabel dan door één generieke regel (issue #76) en de
+    popup laat de meldingen weg terwijl `status` ze negeert (BO-59); een afgekapte tabel
+    (`max_bevindingen_per_check`) doet hetzelfde met een deel. Een kopregel die "in dit
+    rapport en op de kaart" belooft, is daar onwaar. Zij verwijst daarom alleen naar het
+    archief, en dat is de enige belofte die in elke toestand klopt.
+    """
+    config = load_check_config()
+    config.rapport.systemisch_minimum_bekeken = 0
+    config.rapport.systemisch_drempel = 0.1
+    context = CheckContext(
+        dataset=load_dataset(TTL_DIR / "attr018_zonder_begindatum.ttl", []), config=config
+    )
+    run = run_checks(context, ["ATTR-018"])
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    # De vouwing is werkelijk opgetreden: het detail toont de bevindingen niet per object.
+    assert "dus dit rapport toont ze niet per object" in tekst
+
+    regel = next(r for r in tekst.splitlines() if "van de putten draagt geen aanlegjaar" in r)
+    assert "op de kaart" not in regel
+    assert "in dit rapport" not in regel
+    assert "`bevindingen.csv`" in regel
 
 
 def test_zonder_ontbrekend_aanlegjaar_blijft_de_regel_weg(tmp_path: Path) -> None:

@@ -582,7 +582,7 @@ def _verantwoording(
         lines += [""]
 
     lines += _bronnen_section(run)
-    lines += _karakteristiek_section(run, meldingen)
+    lines += _karakteristiek_section(run, meldingen, met_csv=met_csv)
 
     if run.dataset.ontologies:
         namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)
@@ -1018,7 +1018,7 @@ def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
     return sorted(ids)
 
 
-def _karakteristiek_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+def _karakteristiek_section(run: CheckRun, meldingen: list[Melding], *, met_csv: bool) -> list[str]:
     """Beschrijft eigenschappen van de dataset die de bevindingen kleuren.
 
     Geen bevindingen: datums die allemaal op 1 januari vallen en registraties die
@@ -1030,14 +1030,14 @@ def _karakteristiek_section(run: CheckRun, meldingen: list[Melding]) -> list[str
     maar het aandeel zegt iets anders dan de losse meldingen -- de kop hoort het te
     benoemen, ook als er verder geen enkele karakteristiek is.
     """
-    aanlegjaar = _aanlegjaar_regel(run, meldingen)
+    aanlegjaar = _aanlegjaar_regel(run, meldingen, met_csv=met_csv)
     tabellen = _karakteristiek_tabellen(run)
     if not aanlegjaar and not tabellen:
         return []
     return ["**Datakarakteristieken**", "", *aanlegjaar, *tabellen]
 
 
-def _aanlegjaar_regel(run: CheckRun, meldingen: list[Melding]) -> list[str]:
+def _aanlegjaar_regel(run: CheckRun, meldingen: list[Melding], *, met_csv: bool) -> list[str]:
     """Het aandeel putten zonder aanlegjaar, als eerste regel van de datakarakteristieken.
 
     Teller en noemer komen uit wat er al is: de ATTR-018-meldingen van *deze* uitvoer --
@@ -1049,6 +1049,15 @@ def _aanlegjaar_regel(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     van de putten zonder aanlegjaar" is geen karakteristiek van de aanlevering maar ruis
     in een sectie die juist zegt waaronder de rest gelezen moet worden. Dat de teller
     dan nul is dekt beide gevallen, en houdt de deling veilig.
+
+    De regel wijst naar het **archief** en niet naar dit rapport of de kaart. Dat er per
+    put een melding is blijft waar in elke toestand, maar waar die te zien is niet: komt
+    ATTR-018 boven de systemisch-drempel, dan vouwt `_detail_eigen` de tabel tot een
+    generieke regel (issue #76) en laat `objectkaart.popup_html` de meldingen weg
+    (BO-59), en `max_bevindingen_per_check` kapt de tabel sowieso af. `_volledige_lijst`
+    is de ene plek die weet waar de volledige lijst wél staat, inclusief het geval waarin
+    `--uitvoer` de CSV uitzette (issue #66); die tweede plek hier zelf formuleren zou op
+    een dag naar een bestand wijzen dat er niet is.
     """
     in_beeld = putten_in_beeld(run)
     zonder = sum(
@@ -1063,9 +1072,9 @@ def _aanlegjaar_regel(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         f"**{100 * zonder / len(in_beeld):.1f}% van de putten{hier} draagt geen aanlegjaar** "
         f"({zonder} van de {len(in_beeld)}) — een aanleveringssignaal: het aanlegjaar "
         "ontbreekt stelselmatig, en dat is één gebrek in de aanlevering. "
-        f"{CHECK_AANLEGJAAR} meldt elk geval afzonderlijk in dit rapport, in de CSV en op de "
-        "kaart, zodat de putten aanwijsbaar blijven; herstellen gaat via de aanlevering en "
-        "niet put voor put.",
+        f"{CHECK_AANLEGJAAR} meldt elk geval afzonderlijk, zodat de putten aanwijsbaar "
+        f"blijven: {_volledige_lijst(met_csv)}. Herstellen gaat via de aanlevering en niet "
+        "put voor put.",
         "",
     ]
 

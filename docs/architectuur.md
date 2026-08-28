@@ -110,14 +110,19 @@ alleen het bestand waarin zij staat is verhuisd.
   aantallen komen uit `uitvoer/omvang.py`, de samenvatting uit
   `uitvoer/samenvatting.py`. Zie BO-31.
 - De datakarakteristieken in de verantwoording openen sinds issue #91 met het aandeel
-  putten zonder aanlegjaar ("44% van de putten draagt geen aanlegjaar"). Teller en noemer
+  putten zonder aanlegjaar ("43.7% van de putten draagt geen aanlegjaar (9063 van de
+  20758)"). Teller en noemer
   komen uit wat er al is: de ATTR-018-meldingen van díé uitvoer -- dus na afbakening en na
   de onderdrukking uit `[rapport]` -- en `uitvoer/omvang.putten_in_beeld`, de rol `putten`
   van de context waarop de checks draaiden, met een studiegebied tot de kern afgebakend.
   Geen tweede teller naast de check, en geen drempel: meldt ATTR-018 niets of staat er geen
   put in beeld, dan blijft de regel weg -- "0% van de putten" is geen karakteristiek. De
   meldingen per object blijven volledig bestaan, ook op putniveau; alleen de kop zegt wat
-  ze samen betekenen. De check zelf (`checks/attributen.py`) verandert er niet door.
+  ze samen betekenen. De check zelf (`checks/attributen.py`) verandert er niet door. Voor
+  de losse gevallen wijst de regel naar het archief (`_volledige_lijst`, dus ook als
+  `--uitvoer` de CSV uitzette) en niet naar dit rapport of de kaart: boven de
+  systemisch-drempel vouwt `_detail_eigen` ze tot één regel en laat de popup ze weg, en
+  `max_bevindingen_per_check` kapt de tabel sowieso af.
 - Systemische bevindingen staan in het rapport en in de popup **generiek**, niet per
   object (issue #76): `_detail_eigen` vervangt hun rijen door een regel met check,
   aantal en bekeken populatie -- dezelfde vorm waarin het nulmetingblok per SHACL-vorm
