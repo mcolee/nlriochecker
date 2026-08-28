@@ -13,6 +13,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Nieuwe Harde regel (Techniek): functionaliteit mag `gwsw-orox-helpers` niet breken**
+  (`CLAUDE.md`) — alleen de publieke API, geen patches op internals; leeslaagwijzigingen
+  lopen via een release van die package (besluit auteur 28-08).
 - **Checkaudit 2026-08 besloten: de Besluit-kolom is gevuld voor alle 99 checks**
   (`docs/checks-audit-2026-08.md`), op basis van het beantwoorde beslisdocument van de
   auteur (28-08). De vervolgissues staan als #80 t/m #97; drie punten zijn aangehouden

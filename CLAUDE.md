@@ -146,6 +146,12 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - Ernstniveaus: F = fout, W = waarschuwing. Elke check heeft een dimensietag (Consistentie, Compleetheid, Plausibiliteit, Actualiteit, Traceerbaarheid, Precisie, Nauwkeurigheid, Compliance; de enum `Dimension` is de bron). In de SHACL-rapporten komt de ernst uit de kolom Severity: Violation = F, Warning = W.
 
 ### Techniek
+- **Functionaliteit hier mag `gwsw-orox-helpers` niet breken.** Deze repo gebruikt de
+  leeslaag uitsluitend via haar publieke API: geen monkeypatches of overrides op
+  internals, geen afhankelijkheid van privégedrag, en geen wijziging hier die een
+  bestaande aanroep van die package een andere betekenis geeft. Is er echt een
+  leeslaagwijziging nodig, dan loopt die via een release van die package plus een
+  `uv lock` hier — nooit via een omweg in deze repo.
 - **`toets` draait nooit zonder klassenhierarchie, tenzij je dat expliciet vraagt.** De
   export draagt nul `rdfs:subClassOf` en typeert niets op wortelniveau (`Inspectieput`
   wel, `Put` niet), dus zonder hierarchie draaien de checks over een onvolledige selectie
