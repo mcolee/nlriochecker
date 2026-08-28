@@ -121,8 +121,16 @@ alleen het bestand waarin zij staat is verhuisd.
   `totaal/bevindingen.json`. **`populatie` is geen noemer**: de declaratie is de vereniging
   van wat `run()`, `examined()` en `notes()` aanraken en dus een bovengrens, en zij staat
   daarom achter "gaat over" en niet achter het getal. Er is bewust geen terugval op "de
-  hele export" -- die formulering hoort bij de regel "Toetst ...", waar zij zegt dat de
-  check niet tot een rol beperkt is. Zie BO-58.
+  hele export" -- die formulering hoort bij de regel "Toetst ...". Ook daar geldt zij
+  sinds issue #96 niet meer voor elke rolloze check: `Check.populatie_omschrijving`
+  (klassevariabele, overgenomen op `CheckOutcome`) laat zo'n check zijn deelpopulatie
+  zelf in woorden noemen, en `_toetst_regel` in `uitvoer/bevindingen.py` zet die tekst op
+  de plaats van de klassen. Zet het veld op een check zonder rollen die zijn objecten via
+  engine-navigatie haalt (RVZ-011 loopt de overstortdrempel-index) of via de
+  projectconfiguratie (ADM-007 leest `[[puttyperegels]]`); laat het leeg bij een check
+  mét rollen -- daar komen de klassen uit de rollen en is de zin dode tekst -- en bij
+  ATTR-014, die werkelijk de hele export op alle kenmerken langsloopt. Aan het veld
+  `populatie` ("gaat over") verandert dit niets. Zie BO-58.
 - De runbrede markering boven een rapport wordt samengesteld in
   `uitvoer/voorbehoud.py`, en nergens anders. Er kan meer dan een voorbehoud tegelijk
   gelden -- een `--cfk`-deelset op een run met `--geen-ontologie` -- en

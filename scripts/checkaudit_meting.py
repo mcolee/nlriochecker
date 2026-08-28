@@ -23,6 +23,12 @@ strengen -- staat in BO-66; EXT-002 bestaat sinds issue #83 niet meer.
 Bewaard omdat een meetscript dat een getal in een verslag onderbouwt navolgbaar hoort te
 zijn (`docs/agents/analyse-harness.md`).
 
+De patronen die de meldingsteksten uitsplitsen horen bij de teksten van *ná* blok E van
+de checkaudit: ATTR-003 is in issue #84 herschreven ("Te controleren of materiaal ... werd
+toegepast") en ATTR-016 splitste in issue #92 in twee varianten. De bewaarde run van 27-08
+draagt nog de oude teksten, dus daarop geven juist die twee patronen geen treffer; draai
+het script op een verse run.
+
 Gemeten op:
     run      uitvoer/audit_27082026/ (2026-08-27)
     commit   6311502 (63115026ddfffc5b67af7b47eafd08b6d025eb8f)
@@ -225,8 +231,12 @@ def deel_b(context: CheckContext, meldingen: list[dict]) -> None:
 
     # 1. Wat de meldingstekst per check uitsplitst.
     _tel("ATTR-001", per["ATTR-001"], r"ligt (onder|boven) het bereik .* materiaal (\w+)")
-    _tel("ATTR-003", per["ATTR-003"], r"Materiaal (\w+) met begindatum (\d{4})")
-    _tel("ATTR-016", per["ATTR-016"], r"breedte \S+ mm en lengte (0|\S+) mm")
+    _tel("ATTR-003", per["ATTR-003"], r"materiaal (\w+) in (\d{4}) (?:al|nog) werd toegepast")
+    # ATTR-016 kreeg in issue #92 twee teksten binnen dezelfde conditie: een maat van 0 mm
+    # (niet geregistreerd) tegenover twee echte maar ongelijke maten. Ze sluiten elkaar
+    # uit, dus de niet-treffers van de ene regel zijn precies de meldingen van de andere.
+    _tel("ATTR-016 niet geregistreerd", per["ATTR-016"], r"maar (breedte|lengte) 0 mm")
+    _tel("ATTR-016 ongelijke maten", per["ATTR-016"], r"breedte (\S+) mm en lengte (\S+) mm")
     _tel("ATTR-018", per["ATTR-018"], r"Deze (put|streng)")
     _tel("HGT-003", per["HGT-003"], r"ligt (boven het AHN-maaiveld|[\d.]+ m onder)")
     _tel("HGT-004", per["HGT-004"], r"ligt (boven het \w+|onder de bodem)")

@@ -400,10 +400,16 @@ class OnvoldoendeVerhang(_StrengCheck):
 
 @register
 class ExtreemVerhang(_StrengCheck):
-    """HGT-008: een verval dat te steil is om te kloppen."""
+    """HGT-008: een verval dat te steil is om te kloppen.
+
+    Titel en boodschap noemen alleen het gemeten verhang en de drempel. De duiding
+    "indicatie verwisselde BOB's" is er in issue #84 uitgehaald -- zo steil dalen kan
+    net zo goed een lengtefout, een enkele foute BOB of een echte val zijn -- en de
+    registerregel draagt die oude formulering als annotatie.
+    """
 
     id = "HGT-008"
-    title = "Extreem verhang (steiler dan bijv. 1:50), indicatie verwisselde BOB's"
+    title = "Extreem verhang (steiler dan bijv. 1:50)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
     rollen = ("vrijvervalrioolleidingen",)

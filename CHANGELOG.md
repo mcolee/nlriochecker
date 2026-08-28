@@ -55,6 +55,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Ook de checktitel van HGT-008 laat "indicatie verwisselde BOB's" weg** (issue #84,
+  blok E review). De meldingstekst was die gok al kwijt, de titel nog niet -- en die voedt
+  de checkkop in het rapport, de kolom Omschrijving in de CSV en `overzicht_checks` in de
+  GeoPackage. De registerregel draagt de v0.9-formulering nu als annotatie en
+  `docs/dekkingsmatrix.md` is opnieuw gegenereerd; conditie, ernst en drempel blijven.
 - **Drie herkomstregels zeggen weer wat de check werkelijk doet** (issue #96, checkaudit
   27-08). **EXT-003** declareerde het kenmerk `VormLeiding` zonder het te lezen: de
   AST-sweep van issue #64 las `kruising.vorm` -- de geometrie van het waterdeel -- als de

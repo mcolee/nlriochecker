@@ -3077,6 +3077,19 @@ nu terug op zijn kenmerken (`Drempelbreedte, Drempelniveau, Maaiveldhoogte,
 Putdekselniveau`), ATTR-014 op `alle kenmerken`, en ADM-007 -- die geen van beide
 declareert -- krijgt niets: dan zwijgt de uitvoer erover in plaats van iets te beweren.
 
+**Nagekomen 2026-08-28 (issue #96): "de hele export" is ook uit de regel "Toetst ..."
+verdwenen waar zij niet klopte.** Aan het veld `populatie` verandert niets -- de terugval
+hierboven blijft weg -- maar de zin "die formulering hoort bij de regel 'Toetst ...'" gold
+voor élke rolloze check, en dat was voor RVZ-011 en ADM-007 precies dezelfde overdrijving
+een regel lager: beide bekeken een smalle deelpopulatie. Zij noemen die nu zelf via
+`Check.populatie_omschrijving` (klassevariabele, overgenomen op `CheckOutcome`), en
+`_toetst_regel` zet die tekst op de plaats van de klassen: "de overstortdrempels die aan
+een put hangen" respectievelijk "de putten van de geconfigureerde puttypen
+(`[[puttyperegels]]`)". "De hele export" blijft over voor ATTR-014, die werkelijk niet tot
+een populatie beperkt is. Het veld is leeg bij elke check mét rollen;
+`test_alleen_een_check_zonder_rol_omschrijft_zijn_populatie` houdt die lijst op ADM-007 en
+RVZ-011.
+
 **Waarom.** Eén kolom `bekeken` mengde 95, 45.803 en 459.108 zonder dat er iets bij stond,
 en `percentage_populatie` in de GeoPackage deelt door precies dat ongelabelde getal --
 de percentages waren daardoor onderling onvergelijkbaar. Het is nadrukkelijk een
