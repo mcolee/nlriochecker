@@ -79,6 +79,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **NET-009 wordt de integrale richtingscheck en de forsgrens verschuift** (issue #80,
+  BO-76). NET-009 meldt voortaan elke streng waarvan de administratieve van-naar-richting,
+  de tekenrichting en de BOB niet één kant op wijzen, en is daarmee een **W** (was F). Is
+  er vanuit de streng een lozingspunt bereikbaar, dan legt een ongerichte graaf de
+  werkelijke afvoerrichting vast en is dát de referentie: ook een administratie die zelf
+  omgekeerd staat terwijl haar signalen intern kloppen, wordt zo aangewezen. De melding
+  noemt alle signalen plus de harde waarheid; de toelichting telt hoeveel strengen een
+  waarheid kregen en bij hoeveel de administratie de verkeerde kant op wijst. HGT-006 (fors
+  tegenverhang) blijft F, maar de drempel `tegenverhang_fors_m` gaat van 0,05 naar 0,10 m:
+  onder tien centimeter is tegenverhang in vlak Nederland inwinnauwkeurigheid.
+
 - **`schema_versie` van `bevindingen.json` gaat van `1.1` naar `1.2`** (issue #101,
   BO-74). Elke melding draagt het nieuwe veld `boodschap_technisch`, en bij een
   nulmetingmelding is `boodschap` voortaan de Nederlandse zin in plaats van de
@@ -564,6 +575,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `ext_watergang_buffer_m` is voortaan alleen de zoekstraal. Zie BO-43.
 
 ### Verwijderd
+
+- **NET-003, TOP-020 en HGT-005 vervallen: opgegaan in NET-009** (issue #80, BO-76). De
+  drie losse richtingssignalen -- een stijgende BOB (NET-003), een omgekeerd getekende lijn
+  (TOP-020) en licht tegenverhang (HGT-005) -- zijn deelgevallen van de integrale
+  richtingscheck NET-009 en verdwijnen als aparte checks. Gemeten op De Wolden staan alle
+  3.651 NET-003- en 1.284 van de 1.285 HGT-005-objecten óók in NET-009, dus er gaat geen
+  signaal verloren. De ID's worden niet hergebruikt en staan in de tabel Vervallen checks
+  van het register.
 
 - **EXT-002 vervalt: de kale watergangkruising draagt geen handelingsperspectief**
   (issue #83, BO-66). De check meldde elke vrijvervalstreng die een BGT-waterdeel écht
