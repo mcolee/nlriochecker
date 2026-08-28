@@ -149,6 +149,6 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |
 | --- | --- | --- | --- | --- | --- | --- |
 | EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · — | — |
-| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie… | W | Compleetheid | geimplementeerd met test | vrijvervalrioolleidingen · VormLeiding | — |
+| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie… | W | Compleetheid | geimplementeerd met test | vrijvervalrioolleidingen · — | — |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · — | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |
 | EXT-007 | Lozingspunt zonder watergang binnen X m; alleen de klassen die op oppervlaktewater lozen (`[klassen] waterlozingspunt`); scopeafwijking in BO-67 | W | Plausibiliteit | geimplementeerd met test | lozingspunten, waterlozingspunten · — | — |

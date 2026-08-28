@@ -444,10 +444,16 @@ class _Kruising:
     criterium (BO-43). Een dataclass in plaats van een tuple: hij werd op positie
     uitgepakt, en een veld erbij of een andere volgorde zou daar pas tijdens het
     draaien opvallen.
+
+    Dat veld heet `waterdeel` en niet `vorm`: op een `Conduit` is `vorm` de
+    profielvorm, dus de AST-sweep van issue #64 las `kruising.vorm` als een lezing
+    van `VormLeiding` en EXT-003 declareerde een kenmerk dat hij niet leest. De
+    naam is het herstel; een uitzondering in de sweep zou dezelfde val voor de
+    volgende dataclass laten liggen (issue #96).
     """
 
     conduit: Conduit
-    vorm: BaseGeometry
+    waterdeel: BaseGeometry
     rij: dict[str, object]
     laag: VectorLayer
     buffer: float
@@ -651,7 +657,7 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
     rollen = ("vrijvervalrioolleidingen",)
-    kenmerken = ("VormLeiding",)
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt doorkruisingen waarvan de streng geen kruisingsconstructie is."""
@@ -663,7 +669,9 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
             if any(dataset.is_a(conduit.uri, wortel) for wortel in wortels):
                 continue
             soort = str(kruising.rij.get("type") or "waterdeel")
-            sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], kruising.rij, kruising.vorm)
+            sleutel, terugval = bouw_sleutel(
+                VOORVOEGSEL["bgt_water"], kruising.rij, kruising.waterdeel
+            )
             if terugval:
                 context.treffers.meld_zonder_id(self.id, kruising.laag.source.name)
             context.treffers.registreer(
@@ -672,7 +680,7 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
                     bron="bgt_water",
                     label=soort,
                     bronbestand=kruising.laag.source.name,
-                    geometrie=kruising.vorm,
+                    geometrie=kruising.waterdeel,
                     attributen=dict(kruising.rij),
                 ),
                 check_id=self.id,

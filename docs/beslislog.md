@@ -1902,10 +1902,19 @@ objecten -- 13 `rdf:type gwsw:Infiltratiestelsel` (naast 57 `Vuilwaterstelsel`, 
 `GemengdStelsel`, 48 `Hemelwaterstelsel` en 4 `Drainagestelsel`), en die dertien dragen samen
 687 `hasPart`-leden, waaronder **alle** 340 `Infiltratieriool`-instanties en geen enkel
 infiltratieriool daarbuiten. De graafafleiding en de `hasPart`-boom wijzen hier dus dezelfde
-strengen aan. Dat NET-007 op alle 340 uitkomt heeft trouwens een derde oorzaak:
+strengen aan. Dat NET-007 destijds op alle 340 uitkwam had trouwens een derde oorzaak:
 `[klassen] drempel = ["Overstortdrempel"]`, en die klasse heeft in De Wolden nul instanties en
-in de ontologie geen subklassen, dus de drempelverzameling is leeg en elk infiltratieriool
-wordt onvoorwaardelijk gemeld. Dat is een bevinding op zichzelf en ligt buiten deze BO.
+in de ontologie geen subklassen, dus de drempelverzameling was leeg en elk infiltratieriool
+werd onvoorwaardelijk gemeld. Dat is een bevinding op zichzelf en ligt buiten deze BO.
+
+**Nagekomen 2026-08-28 (issue #96): dat aantal van 340 is achterhaald.** Issue #42 heeft de
+overstortput zelf (`Overstortput`, `Stuwput`) als overstortvoorziening laten meetellen, zodat
+de drempelverzameling niet meer leeg is. NET-007 meldt op De Wolden en Hoogeveen sindsdien
+**156 van de 340** infiltratieriolen; de overige 184 liggen in een deel met een overstortput.
+`Overstortdrempel` telt er nog altijd nul instanties (datasetsignaal `SIG-nulklasse`). Gemeten
+in de checkaudit van 27-08 (`docs/checks-audit-2026-08.md`, rij NET-007). Aan het besluit
+hierboven verandert dit niets: de populatie is nog steeds dezelfde 340 infiltratieriolen en
+beide lezingen wijzen ze allebei aan -- alleen het aantal bevindingen is veranderd.
 
 De reden om te wachten is dus een engine-feit en geen datavraag: **de engine leest de
 stelselboom nergens.** Overgaan betekent NET-007 zijn graafanalyse laten inruilen voor een

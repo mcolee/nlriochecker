@@ -237,6 +237,10 @@ class PuttypePastNietBijLeiding(Check):
     dimension = Dimension.CONSISTENCY
     rollen = ()
     kenmerken = ()
+    # De populatie komt rechtstreeks uit `[[puttyperegels]]` via `dataset.of_class`, niet
+    # uit een rol; zonder deze zin zei het rapport "Toetst de hele export" over een check
+    # die op De Wolden en Hoogeveen 273 putten bekeek (issue #96).
+    populatie_omschrijving = "de putten van de geconfigureerde puttypen (`[[puttyperegels]]`)"
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de netwerkfunctie van elk puttype tegen de regels uit de config.

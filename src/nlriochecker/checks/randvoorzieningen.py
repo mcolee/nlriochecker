@@ -779,6 +779,10 @@ class OnvoldoendeWaking(Check):
     dimension = Dimension.PLAUSIBILITY
     rollen = ()
     kenmerken = ("Drempelbreedte", "Drempelniveau", "Maaiveldhoogte", "Putdekselniveau")
+    # De populatie komt uit `drempels_per_put()` en niet uit een rol; zonder deze zin
+    # zei het rapport "Toetst de hele export" over een check die alleen de drempels aan
+    # een put bekijkt -- op De Wolden en Hoogeveen nul stuks (issue #96).
+    populatie_omschrijving = "de overstortdrempels die aan een put hangen"
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Berekent de waking per drempel en toetst die op het minimum."""

@@ -55,6 +55,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Drie herkomstregels zeggen weer wat de check werkelijk doet** (issue #96, checkaudit
+  27-08). **EXT-003** declareerde het kenmerk `VormLeiding` zonder het te lezen: de
+  AST-sweep van issue #64 las `kruising.vorm` -- de geometrie van het waterdeel -- als de
+  profielvorm van een streng. Dat veld heet nu `waterdeel`, en de declaratie is
+  `kenmerken = ()`; de rapport- en dekkingsmatrixregel noemt dus geen kenmerk meer.
+  **RVZ-011 en ADM-007** zeiden "Toetst de hele export" terwijl ze een smalle
+  deelpopulatie bekeken; beide noemen die nu zelf (`Check.populatie_omschrijving`, ook op
+  `CheckOutcome`): "de overstortdrempels die aan een put hangen" respectievelijk "de
+  putten van de geconfigureerde puttypen (`[[puttyperegels]]`)". "De hele export" blijft
+  staan waar ze klopt (ATTR-014). **Conditie, ernst en drempels wijzigen bij geen van de
+  drie**, dus geen enkele bevinding beweegt. **BO-34** draagt een datumnotitie: NET-007
+  meldt sinds issue #42 156 van de 340 infiltratieriolen, niet alle 340.
 - **NET-001 en NET-002 noemen het stelseltype van de streng en het eindpunt dat ze zoeken**
   (issue #93). De twee checks delen nul objecten -- `vuilwater`/`gemengd` tegenover
   `hemelwater`, en elk een ander eindpunt -- maar zeiden allebei alleen "Geen afvoerpad

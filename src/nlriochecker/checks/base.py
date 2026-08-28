@@ -213,6 +213,10 @@ class CheckOutcome:
     # bouwt er de toelichtingsregel "Toetst <klassen> op <kenmerken>" mee op.
     rollen: tuple[str, ...] = ()
     kenmerken: tuple[str, ...] = ()
+    # Issue #96: de deelpopulatie in woorden van een check zonder rollen, overgenomen
+    # uit de checkklasse. De uitvoerlaag zet hem in de regel "Toetst ..." waar anders
+    # "de hele export" zou staan.
+    populatie_omschrijving: str = ""
     # Issue #77: waarover `examined` geteld is. `run_checks` leidt hem af uit dezelfde
     # beslissing die de check zijn dataset gaf, dus hij kan er niet van afwijken.
     bekeken_scope: Scope = Scope.ANALYSESET
@@ -474,6 +478,14 @@ class Check(ABC):
     # ontologie.
     rollen: ClassVar[tuple[str, ...]]
     kenmerken: ClassVar[tuple[str, ...]]
+    # Issue #96: de deelpopulatie in woorden, voor een check die zijn objecten niet via
+    # een rol haalt maar via engine-navigatie (RVZ-011 loopt de overstortdrempel-index)
+    # of via de projectconfiguratie (ADM-007 leest `[[puttyperegels]]`). De regel
+    # "Toetst ..." valt zonder rollen terug op "de hele export", en dat zegt van een
+    # check die juist een smalle deelpopulatie bekeek het omgekeerde. Leeg bij elke
+    # check met een rol -- daar komen de klassen uit de rollen -- en leeg bij ATTR-014,
+    # die werkelijk de hele export op alle kenmerken langsloopt.
+    populatie_omschrijving: ClassVar[str] = ""
 
     @abstractmethod
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -626,6 +638,7 @@ def run_checks(
                     skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
                     rollen=check.rollen,
                     kenmerken=check.kenmerken,
+                    populatie_omschrijving=check.populatie_omschrijving,
                     bekeken_scope=_scope(check, over_volledige_populatie),
                 )
             )

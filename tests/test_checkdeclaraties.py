@@ -121,6 +121,20 @@ def test_alleen_de_bereikbaarheidschecks_gaan_over_het_persnet() -> None:
     assert met_persnet == {"NET-001", "NET-002", "NET-008"}
 
 
+def test_alleen_een_check_zonder_rol_omschrijft_zijn_populatie() -> None:
+    """Wie geen rol declareert, zegt zelf welke deelpopulatie hij bekeek (issue #96).
+
+    `populatie_omschrijving` vult de regel "Toetst ..." waar anders "de hele export"
+    zou staan, en die terugval treedt alleen op zonder rollen. Op een check mét rollen
+    is de zin dus dode tekst; deze test houdt hem daar weg. ATTR-014 heeft ook geen
+    rollen en staat er met opzet niet bij: die gaat werkelijk over de hele export.
+    """
+    met_omschrijving = {cid for cid in CHECK_IDS if REGISTRY[cid].populatie_omschrijving}
+
+    assert met_omschrijving == {"ADM-007", "RVZ-011"}
+    assert all(not REGISTRY[cid].rollen for cid in met_omschrijving)
+
+
 def test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd() -> None:
     """Wie `examined()` op instanties zet, zegt dat erbij (issue #77).
 

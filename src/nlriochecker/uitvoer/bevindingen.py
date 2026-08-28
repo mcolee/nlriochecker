@@ -728,9 +728,14 @@ def _kenmerk_labels(outcome, config) -> list[str]:
 
 
 def _toetst_regel(outcome, config) -> str:
-    """De regel "Toetst <klassen> op <kenmerken>" onder een eigen check (issue #64)."""
+    """De regel "Toetst <klassen> op <kenmerken>" onder een eigen check (issue #64).
+
+    Zonder rollen noemt de check zelf de deelpopulatie die hij bekeek
+    (`populatie_omschrijving`, issue #96); "de hele export" blijft over voor de check
+    die werkelijk niet tot een populatie beperkt is.
+    """
     klassen = sorted({k for rol in outcome.rollen for k in klassen_van_rol(rol, config.klassen)})
-    klassen_txt = ", ".join(klassen) if klassen else "de hele export"
+    klassen_txt = ", ".join(klassen) or outcome.populatie_omschrijving or "de hele export"
     kenmerken = _kenmerk_labels(outcome, config)
     if not kenmerken:
         return f"Toetst {klassen_txt} (structuur en geometrie, geen kenmerk)."

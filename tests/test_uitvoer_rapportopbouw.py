@@ -556,9 +556,9 @@ class TestBekekenScope:
     def test_een_check_zonder_rollen_noemt_zijn_kenmerken(self, tmp_path: Path) -> None:
         """RVZ-011 telt de drempels aan een put; "de hele export" loog over de noemer.
 
-        De regel "Toetst de hele export op ..." blijft er wel staan: daar betekent die
-        formulering dat de check niet tot een rol beperkt is, en zij staat niet achter
-        een telling.
+        De regel "Toetst ..." noemt sinds issue #96 dezelfde deelpopulatie: de check
+        haalt zijn putten uit de overstortdrempel-index en niet uit een rol, dus "de
+        hele export" zei daar het omgekeerde van wat hij bekeek.
         """
         tekst = _rapport(_run("top013_parallel.ttl", "RVZ-011"), tmp_path)
         regel = next(regel for regel in tekst.splitlines() if "bekeken (" in regel)
@@ -568,7 +568,8 @@ class TestBekekenScope:
             "Maaiveldhoogte, Putdekselniveau)" in regel
         )
         assert "de hele export" not in regel
-        assert "_Toetst de hele export op Drempelbreedte" in tekst
+        assert "_Toetst de overstortdrempels die aan een put hangen op Drempelbreedte" in tekst
+        assert "de hele export" not in tekst
 
     def test_een_check_die_niets_declareert_zwijgt_erover(self, tmp_path: Path) -> None:
         """ADM-007 telt de putten van de geconfigureerde puttypen en declareert niets."""
@@ -577,3 +578,18 @@ class TestBekekenScope:
 
         assert regel.endswith("bekeken (analyseset).")
         assert "gaat over" not in regel
+
+    def test_een_check_zonder_rol_noemt_zijn_deelpopulatie(self, tmp_path: Path) -> None:
+        """ADM-007 gaat over de putten uit `[[puttyperegels]]`, niet over de hele export.
+
+        Hij declareert rol noch kenmerk, dus de regel "Toetst ..." had geen enkele bron
+        en viel terug op "de hele export" -- misleidend bij een paar honderd bekeken
+        putten (issue #96).
+        """
+        tekst = _rapport(_run("top013_parallel.ttl", "ADM-007"), tmp_path)
+
+        assert (
+            "_Toetst de putten van de geconfigureerde puttypen (`[[puttyperegels]]`) "
+            "(structuur en geometrie, geen kenmerk)._" in tekst
+        )
+        assert "de hele export" not in tekst
