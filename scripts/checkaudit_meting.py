@@ -16,8 +16,9 @@ diepteverdeling van HGT-003, de meting achter de diepteligging-drempel.
 Deel C (NET, RVZ, BTR en EXT): welke populatie NET-001 en NET-002 elk melden (het
 verschil dat de steekproef niet zag), de deelverzameling NET-003 in NET-009 achter
 PRE-1, de stelseltypecombinaties van NET-006, de gelijke populatie van RVZ-002 en
-RVZ-003 achter S2, de gelijke uitslag van EXT-002 en EXT-003 achter PRE-4, en de
-klassen achter de lozingspunten van EXT-007 (de scope-bug).
+RVZ-003 achter S2, en de klassen achter de lozingspunten van EXT-007 (de scope-bug).
+De uitsplitsing achter PRE-4 -- de gelijke uitslag van EXT-002 en EXT-003, 281 van 281
+strengen -- staat in BO-66; EXT-002 bestaat sinds issue #83 niet meer.
 
 Bewaard omdat een meetscript dat een getal in een verslag onderbouwt navolgbaar hoort te
 zijn (`docs/agents/analyse-harness.md`).
@@ -420,13 +421,7 @@ def deel_c(context: CheckContext, meldingen: list[dict]) -> None:
     knoop = sum(1 for m in per["EXT-001"] if m["object_uri"] in dataset.nodes)
     print(f"-- EXT-001: {knoop} putten, {len(per['EXT-001']) - knoop} strengen")
 
-    # 7. EXT-002 en EXT-003 (PRE-4): dezelfde doorkruisingen?
-    print(
-        f"-- EXT-002 n EXT-003: {len(_objecten(per['EXT-002']) & _objecten(per['EXT-003']))} van "
-        f"elk {len(_objecten(per['EXT-002']))} resp. {len(_objecten(per['EXT-003']))} objecten"
-    )
-
-    # 8. EXT-007 (scope-bug): welke lozingspuntklassen melden en welke bestaan er?
+    # 7. EXT-007 (scope-bug): welke lozingspuntklassen melden en welke bestaan er?
     gemeld = collections.Counter(
         dataset.beheerobjecttype(m["object_uri"]) or "(zonder type)" for m in per["EXT-007"]
     )

@@ -681,7 +681,7 @@ def _reden_niet_beoordeeld(
 # De EXT-checks die een extern vlak aanwijzen. Alleen hun meldingen worden op het
 # trefferregister gejoind; een andere check met een `object2_uri` (een SHACL-paar) wijst
 # geen extern object aan en hoort niet in deze laag.
-VLAK_CHECKS = ("EXT-001", "EXT-002", "EXT-003")
+VLAK_CHECKS = ("EXT-001", "EXT-003")
 
 # De soort van een vlak volgt op één plek uit `Treffer.bron`: de rol waarmee de check hem
 # registreerde. Panden komen uit twee bronnen (BGT en BAG) maar zijn dezelfde soort.
@@ -747,10 +747,11 @@ def _schrijf_treffers(
     """Schrijft de laag `vlakken`: de externe objecten waarnaar de EXT-meldingen verwijzen.
 
     Eén laag voor pand, bouwwerk en water (issue #67); de soort staat in de kolom `soort`
-    en volgt uit `Treffer.bron`. Een waterdeel dat zowel EXT-002 als EXT-003 raakt krijgt
-    één rij met beide check-ID's; een waterdeel dat alleen EXT-002 ziet -- een echte
-    doorkruising door een geregistreerde zinker -- krijgt sindsdien ook een vlak, omdat
-    EXT-002 zijn treffer nu registreert.
+    en volgt uit `Treffer.bron`. Zouden twee checks naar hetzelfde vlak wijzen, dan is dat
+    één rij met beide check-ID's. De watervlakken komen sinds issue #83 uitsluitend van
+    EXT-003, dat zijn doorkruiste waterdeel zelf registreert; een doorkruising door een
+    als zinker geregistreerde streng is geen bevinding en krijgt dus ook geen vlak meer --
+    dat vlak hing aan het vervallen EXT-002 (BO-66).
 
     Strikte aansluiting: de rijen komen uit de meldingen van déze uitvoer, gejoind op
     het trefferregister van de run (`checks/treffers.py`). Deze schrijver bevraagt
@@ -798,8 +799,8 @@ def _schrijf_treffers(
 def _groepeer_op_treffer(meldingen: list[Melding], *check_ids: str) -> dict[str, list[Melding]]:
     """De meldingen van de gegeven checks, gegroepeerd op het externe object dat ze aanwijzen.
 
-    Twee checks kunnen naar hetzelfde vlak wijzen (EXT-002 en EXT-003 naar één waterdeel);
-    ze belanden dan in dezelfde groep en de rij draagt beide check-ID's.
+    Wijzen twee checks naar hetzelfde vlak, dan belanden ze in dezelfde groep en draagt
+    de rij beide check-ID's.
     """
     gekozen = set(check_ids)
     per_treffer: dict[str, list[Melding]] = defaultdict(list)

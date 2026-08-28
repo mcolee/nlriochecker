@@ -334,6 +334,25 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Verwijderd
 
+- **EXT-002 vervalt: de kale watergangkruising draagt geen handelingsperspectief**
+  (issue #83, BO-66). De check meldde elke vrijvervalstreng die een BGT-waterdeel écht
+  doorkruist, zonder te vragen of dat een gebrek is. Dat is het niet -- een kruising
+  gebeurt overal en er valt niets aan te herstellen. Het gebrek is dat zo'n kruising niet
+  als zinker geregistreerd staat, en dat meldt EXT-003, die ongewijzigd blijft en nu de
+  enige watergangmelding is. Op De Wolden en Hoogeveen gaven de twee exact dezelfde
+  uitslag (281 van 281 strengen, 319 doorkruisingen; audit 27-08), want de export bevat
+  geen enkele als zinker geregistreerde streng: de 319 EXT-002-waarschuwingen verdwijnen
+  en EXT-003 blijft op 319. Het register zet EXT-002 in de tabel *Vervallen checks* (niet
+  *Geschrapte checks*: de nulmeting dekt hem niet, dus ook geen sentinel in
+  `dekking.toml`); het ID wordt niet hergebruikt. De regel "Waterschapsdata is niet
+  aangeleverd; alleen de BGT-waterdelen zijn gebruikt" verhuist mee naar de toelichting van
+  EXT-003, zodat het rapport blijft zeggen op welke waterbron getoetst is. Gevolg voor de
+  GeoPackage: de watervlakken in de laag `vlakken` komen nu uitsluitend van EXT-003, dat
+  zijn doorkruiste waterdeel zelf registreert -- `check_ids` leest daar voortaan altijd
+  `EXT-003`, de structuur van de laag verandert niet. Wat wél vervalt is het vlak dat
+  alleen EXT-002 aanwees (de treffer die #67 hem gaf, zie hierboven onder Gewijzigd): een
+  doorkruising door een geregistreerde zinker is geen bevinding meer en krijgt dus ook geen
+  vlak. Op De Wolden en Hoogeveen kost dat nul vlakken, want er is geen enkele zinker.
 - **BTR-002, BTR-005, EXT-005 en EXT-006 vervallen voor nu** (issue #95, BO-62 t/m BO-65).
   Alle vier kunnen op deze aanlevering structureel geen uitslag geven, en de bron die ze
   nodig hebben komt er niet. BTR-002 vraagt de inwinningswijze op de kritieke

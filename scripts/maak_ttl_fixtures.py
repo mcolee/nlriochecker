@@ -1978,17 +1978,18 @@ FIXTURES["ext_scenario.ttl"] = (
     + put("PutL2", "L2", 1072.0, 2008.0, klasse="Lozingsput")
     # Streng 1 loopt door pand-1 heen: EXT-001.
     + hoogteleiding("L1", "1", [EXT_A, EXT_B], "PutA", "PutB", bob=(11.00, 9.50))
-    # Streng 2 kruist water-1 en is geen duiker: EXT-002 en EXT-003.
+    # Streng 2 kruist water-1 en is geen zinker: EXT-003.
     + hoogteleiding("L2", "2", [EXT_B, EXT_C], "PutB", "PutC", bob=(9.50, 6.30))
-    # Streng 3 is een zinker die water-2 kruist: wel EXT-002, geen EXT-003. Een zinker
-    # is in de ontologie een VrijvervalRioolleiding en zit dus in de populatie.
+    # Streng 3 is een zinker die water-2 kruist: een echte doorkruising die EXT-003
+    # bewust niet meldt. Een zinker is in de ontologie een VrijvervalRioolleiding en
+    # zit dus in de populatie.
     + hoogteleiding("L3", "3", [EXT_E, EXT_F], "PutE", "PutF", bob=(9.60, 9.55)).replace(
         "gwsw:GemengdRiool", "gwsw:Zinker"
     )
     # Streng 6 is een duiker die water-2 kruist, net als streng 3, maar drie meter
     # noordelijker en op een eigen route: een duiker is geen rioolleiding (subklasse
     # van Leiding, niet van VrijvervalRioolleiding) en valt buiten de populatie van
-    # EXT-002 en EXT-003; geen van beide meldt hem. Hij verbindt oppervlaktewater en
+    # EXT-003, dat hem dus niet meldt. Hij verbindt oppervlaktewater en
     # heeft dus geen rioolputten aan zijn uiteinden. Boven op streng 3 leverde hij
     # TOP-006 een samenvalmelding op; die check draait op alle leidingen.
     + leiding("L6", "6", [EXT_G, EXT_H], None, None, klasse="Duiker")

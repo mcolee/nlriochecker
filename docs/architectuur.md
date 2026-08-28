@@ -186,15 +186,17 @@ alleen het bestand waarin zij staat is verhuisd.
   `bgt_water` → `water`). `subtype` draagt voor water het BGT-`type` (waterloop, greppel;
   uit `Treffer.label`) en voor pand en bouwwerk het BGT-type uit `Treffer.attributen`;
   `relatie` en `afstand_min_m` gelden alleen voor pand en bouwwerk (EXT-001) en blijven
-  leeg bij water. `check_ids` somt de checks op die naar het vlak wijzen: een waterdeel
-  dat zowel EXT-002 als EXT-003 raakt draagt beide. De vroegere `buffer_m` vervalt --
+  leeg bij water. `check_ids` somt de checks op die naar het vlak wijzen; sinds EXT-002
+  vervallen is (BO-66) draagt een watervlak altijd alleen EXT-003. De vroegere `buffer_m` vervalt --
   dat is runmetadata en staat in `gwsw_run` (`n_vlakken` telt de laag). De schrijver
   bevraagt zelf nooit een externe bron -- dan zouden laag en uitslag uit elkaar kunnen
   lopen. Eén beperking erft mee en blijft staan: EXT-001 meldt alleen het sterkste
-  bouwwerk (BO-17). EXT-002 registreert sinds issue #67 zijn treffer (het doorkruiste
-  waterdeel), zodat ook een kruising door een geregistreerde zinker een vlak krijgt; de
-  watergangcheck geeft elke echte doorkruising per streng terug (de `break` na het eerste
-  waterdeel is met BO-43 vervallen). Zie ook BO-18.
+  bouwwerk (BO-17). De watervlakken komen sinds issue #83 uitsluitend van EXT-003, dat
+  het doorkruiste waterdeel zelf als treffer registreert (issue #67); een doorkruising
+  door een als zinker geregistreerde streng is geen bevinding meer en krijgt dus ook geen
+  vlak -- dat vlak hing aan het vervallen EXT-002 (BO-66). De watergangcheck geeft elke
+  echte doorkruising per streng terug (de `break` na het eerste waterdeel is met BO-43
+  vervallen). Zie ook BO-18.
 - Aangeleverde externe bronnen worden bij het laden getoetst op dekking van
   `bronnen.studiegebied` (vectorlagen plus de grootste EXT-zoekafstand, het raster
   zonder marge). Een tekort boven `[bronnen] dekking_tolerantie_m` (standaard 0) is een

@@ -218,9 +218,9 @@ studiegebiedbestand dat de run meekreeg.
 
 De meeste checks laten deze twee leeg. Ze zijn gevuld bij een melding die twee objecten
 tegen elkaar afzet: de TOP-checks (twee GWSW-objecten, dus twee dataset-URI's) en sinds
-deze versie EXT-001, EXT-002 en EXT-003, die een extern object aanwijzen -- bij EXT-002
-en EXT-003 het doorkruiste BGT-waterdeel. Dat is een achterwaarts verenigbare
-toevoeging: de velden bestonden al.
+deze versie EXT-001 en EXT-003, die een extern object aanwijzen -- bij EXT-003 het
+doorkruiste BGT-waterdeel. Dat is een achterwaarts verenigbare toevoeging: de velden
+bestonden al.
 
 De URI's van externe objecten volgen een vaste conventie:
 
@@ -239,10 +239,11 @@ Zo'n sleutel is stabiel over runs op hetzelfde bestand, maar verandert zodra de
 geometrie in de bron wijzigt.
 
 Let op bij het vergelijken van meetmomenten: `melding_id` is een hash over onder meer
-`object2_uri`. Doordat EXT-001, EXT-002 en EXT-003 dat veld sinds deze versie vullen,
+`object2_uri`. Doordat EXT-001 en EXT-003 dat veld sinds deze versie vullen,
 hebben hun meldingen een ander ID dan in de vorige versie, en verschijnen ze in een
 diff eenmalig als opgelost plus nieuw. Een `geo:`-sleutel verschuift bovendien mee
-zodra de geometrie in de bron wijzigt.
+zodra de geometrie in de bron wijzigt. De meldingen van EXT-002 verdwijnen in deze
+versie helemaal: die check is vervallen (BO-66).
 
 Sinds deze versie verschuiven er nog drie dingen, alle drie zonder dat `schema_versie`
 verandert -- de vorm van het contract blijft gelijk, alleen de meldingen die het draagt
@@ -268,10 +269,10 @@ draagt dezelfde sleutel in haar kolom `id` (issue #67). De kolom `soort` (`pand`
 en `waterdelen_zonder_zinker` stonden; `check_ids` somt de checks op die naar het vlak
 wijzen.
 
-EXT-002 registreert sinds issue #67 ook zijn treffer. Een waterdeel dat wél doorkruist
-wordt maar door een geregistreerde zinker levert dus zowel een EXT-002-melding met
-`object2_uri` als een rij in `vlakken` (met `check_ids = "EXT-002"`); raken beide checks
-hetzelfde waterdeel, dan is het één rij met `check_ids = "EXT-002, EXT-003"`.
+Een watervlak draagt sinds issue #83 altijd `check_ids = "EXT-003"`: EXT-002 is vervallen
+(BO-66) en EXT-003 registreert zijn doorkruiste waterdeel zelf. Een doorkruising door een
+als zinker geregistreerde streng is geen bevinding en levert dus ook geen rij in `vlakken`
+meer; tot #83 deed zij dat wel, via EXT-002.
 
 ### Meldingen uit de nulmeting
 

@@ -29,7 +29,7 @@ GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
 SCENARIO = TTL_DIR / "ext_scenario.ttl"
 GRENS = TTL_DIR / "hgt001_grens.ttl"
 
-EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-007"]
+EXT_IDS = ["EXT-001", "EXT-003", "EXT-007"]
 AHN_IDS = ["HGT-001", "HGT-002", "HGT-003"]
 
 pytestmark = pytest.mark.skipif(
@@ -105,7 +105,6 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
     [
         ("EXT-001", ["1", "4", "P", "Q"]),
         # Streng 9 doorkruist twee greppels (water-5 en water-7) en meldt dus twee keer.
-        ("EXT-002", ["2", "3", "9", "9"]),
         ("EXT-003", ["2", "9", "9"]),
         ("EXT-007", ["L1"]),
         ("HGT-001", ["B", "E"]),
@@ -189,44 +188,32 @@ def test_ext001_benoemt_de_relatie_met_het_bouwwerk(
 
 
 def test_ext003_zwijgt_over_een_zinker(config: CheckConfig, bronnen: ExternalData) -> None:
-    # Streng 3 is een zinker en kruist water-2; EXT-002 meldt hem wel, EXT-003 niet.
-    assert "3" in labels(uitkomst("EXT-002", config, bronnen))
-    assert "3" not in labels(uitkomst("EXT-003", config, bronnen))
+    """Streng 3 is een zinker die water-2 echt doorkruist: geteld, niet gemeld.
 
-
-def test_de_twee_kruisingschecks_delen_een_populatie(
-    config: CheckConfig, bronnen: ExternalData
-) -> None:
-    """De gedeelde kruisingenlijst mag alleen bestaan zolang de populatie gedeeld is.
-
-    EXT-002 en EXT-003 lezen dezelfde cache-ingang `ext:watergangkruisingen`. Kreeg een
-    van de twee een eigen, bredere populatie -- BO-25 verwierp dat, maar dat is een
-    besluit en geen onmogelijkheid -- dan zou de check die het eerst draait de lijst van
-    de ander bepalen, zonder uitzondering en met de verkeerde uitslag.
+    Sinds EXT-002 vervallen is (issue #83) is er geen check meer die hem wel meldt; dat
+    de doorkruising gezien is blijkt nog uit de telling in de toelichting -- vier
+    doorkruisingen op drie gemelde strengen.
     """
-    dataset = load_dataset(SCENARIO, [])
-    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
-    ext002 = REGISTRY["EXT-002"]()
-    ext003 = REGISTRY["EXT-003"]()
+    outcome = uitkomst("EXT-003", config, bronnen)
 
-    assert ext002.selectie(context).toetsbaar == ext003.selectie(context).toetsbaar
-    assert ext002.laag(context) is ext003.laag(context)
+    assert "3" not in labels(outcome)
+    assert any("4 doorkruisingen" in note for note in outcome.notes), outcome.notes
 
 
-def test_een_duiker_valt_buiten_beide_kruisingschecks(
+def test_een_duiker_valt_buiten_de_kruisingscheck(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
     """Streng 6 is een Duiker: in de ontologie een Leiding, geen VrijvervalRioolleiding.
 
-    Hij kruist water-2 net als streng 3, maar zit in geen van beide populaties. De
-    toelichting van beide checks zegt dat hij niet bekeken is.
+    Hij kruist water-2 net als streng 3, maar zit niet in de populatie. De toelichting
+    van de check zegt dat hij niet bekeken is.
     """
-    for check_id in ("EXT-002", "EXT-003"):
-        outcome = uitkomst(check_id, config, bronnen)
-        assert "6" not in labels(outcome)
-        assert any(
-            "niet bekeken: 1 streng van de klasse Duiker" in note for note in outcome.notes
-        ), outcome.notes
+    outcome = uitkomst("EXT-003", config, bronnen)
+
+    assert "6" not in labels(outcome)
+    assert any("niet bekeken: 1 streng van de klasse Duiker" in note for note in outcome.notes), (
+        outcome.notes
+    )
 
 
 def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
@@ -257,14 +244,14 @@ def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: Extern
 
 
 def test_ontbrekende_laag_laat_de_check_overslaan(config: CheckConfig) -> None:
-    # Zonder BGT-bestand is er geen waterlaag; EXT-002 hoort dat te melden in plaats
+    # Zonder BGT-bestand is er geen waterlaag; EXT-003 hoort dat te melden in plaats
     # van elke streng als kruisingsvrij te bestempelen.
     basis = load_check_config().bronnen
     zonder_bgt = basis.model_copy(
         update={"map": ".", "bgt": None, "studiegebied": "studiegebied.gpkg", "ahn_dtm": "ahn.tif"}
     )
     bronnen = load_external_data(zonder_bgt, GIS_DIR)
-    outcome = uitkomst("EXT-002", config, bronnen)
+    outcome = uitkomst("EXT-003", config, bronnen)
 
     assert outcome.findings == []
     assert outcome.examined == 0
@@ -463,17 +450,17 @@ def test_ext003_wijst_het_geraakte_waterdeel_aan(
     }
 
 
-def test_ext002_registreert_zijn_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
-    """Sinds issue #67 registreert EXT-002 elk doorkruist waterdeel als treffer.
+def test_ext003_registreert_zijn_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
+    """EXT-003 registreert elk gemeld waterdeel als treffer.
 
-    Zo krijgt ook een waterdeel dat alleen deze check ziet -- een echte doorkruising door
-    een geregistreerde zinker of duiker -- een vlak in de laag `vlakken`, en deelt een
-    waterdeel dat beide checks raken één sleutel met EXT-003.
+    Dit is de enige weg waarlangs de laag `vlakken` nog aan watervlakken komt: EXT-002
+    droeg die registratie sinds issue #67 ook, en is met issue #83 vervallen. Valt deze
+    registratie weg, dan loopt de laag stil leeg terwijl de meldingen blijven staan.
     """
     dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
-    run = run_checks(context, ["EXT-002"])
+    run = run_checks(context, ["EXT-003"])
 
     assert run.findings
     # Elke melding wijst een geregistreerde treffer aan, allemaal waterdelen.
@@ -494,21 +481,21 @@ def test_kruisingscheck_telt_wat_binnen_de_zoekstraal_afviel(
     Ze vielen wel binnen de zoekstraal; de toelichting hoort ze te tellen, anders
     leest stilte als "alles is een doorkruising of ligt ver van het water".
     """
-    for check_id in ("EXT-002", "EXT-003"):
-        outcome = uitkomst(check_id, config, bronnen)
-        notitie = next(note for note in outcome.notes if "doorkruis" in note.lower())
-        assert "7 paren" in notitie
-        assert "4 doorkruisingen" in notitie
-        assert "1 raakt het waterdeel niet" in notitie
-        assert "1 eindigt erin (lozingspunt)" in notitie
-        assert "1 loopt over de rand" in notitie
+    outcome = uitkomst("EXT-003", config, bronnen)
+    notitie = next(note for note in outcome.notes if "doorkruis" in note.lower())
+
+    assert "7 paren" in notitie
+    assert "4 doorkruisingen" in notitie
+    assert "1 raakt het waterdeel niet" in notitie
+    assert "1 eindigt erin (lozingspunt)" in notitie
+    assert "1 loopt over de rand" in notitie
 
 
-def test_ext002_meldt_doorkruising_en_houdt_buffer_m(
+def test_ext003_meldt_doorkruising_en_houdt_buffer_m(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
     bevinding = next(
-        f for f in uitkomst("EXT-002", config, bronnen).findings if f.object_label == "9"
+        f for f in uitkomst("EXT-003", config, bronnen).findings if f.object_label == "9"
     )
 
     assert bevinding.message.startswith("Doorkruist een BGT-waterdeel")
@@ -573,20 +560,20 @@ def test_een_streng_meldt_elk_doorkruist_waterdeel(
     }
 
 
-def test_ext002_geeft_elke_doorkruising_een_eigen_melding_id(
+def test_ext003_geeft_elke_doorkruising_een_eigen_melding_id(
     config: CheckConfig, bronnen: ExternalData, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Twee doorkruisingen van één streng mogen niet op dezelfde melding-ID uitkomen.
 
-    EXT-002 droeg geen tweede object; `melding_id` kreeg dan voor beide bevindingen op
-    streng 9 dezelfde ingredienten en het volgnummer-vangnet sloeg aan -- een ID die van
-    de verwerkingsvolgorde afhangt. Het doorkruiste waterdeel is nu het tweede object.
+    Zonder tweede object krijgt `melding_id` voor beide bevindingen op streng 9 dezelfde
+    ingredienten en slaat het volgnummer-vangnet aan -- een ID die van de
+    verwerkingsvolgorde afhangt. Het doorkruiste waterdeel is dat tweede object.
     """
     dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     with caplog.at_level(logging.WARNING, logger="nlriochecker.uitvoer.melding"):
-        run = run_checks(context, ["EXT-002"])
+        run = run_checks(context, ["EXT-003"])
         meldingen = bouw_meldingen(run, date.today())
 
     negens = [melding for melding in meldingen if melding.object_label == "9"]

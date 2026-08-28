@@ -156,8 +156,8 @@ class CheckContext:
         elk voorvoegsel heeft een eigenaar. `hgt:` en `rvz:` zijn van hun eigen
         checkmodule; `sel:` en `aansluitingen:` zijn juist gedeeld en horen bij
         `checks/selectie.py` respectievelijk `checks/verbanden.py`, die als enige
-        die sleutels vullen; `ext:` is van `checks/extern.py`, waar EXT-002 en EXT-003
-        hun kruisingenlijst onder delen.
+        die sleutels vullen; `ext:` is van `checks/extern.py`, waar EXT-003 zijn
+        kruisingenlijst onder bewaart.
         """
         if sleutel not in self._cache:
             self._cache[sleutel] = bouw()

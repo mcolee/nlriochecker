@@ -436,9 +436,9 @@ class _Kruising:
     De geometrie van het waterdeel gaat mee omdat EXT-003 er de treffer voor de
     GIS-uitvoer mee registreert; de detectie verandert er niet door. `buffer` is de
     zoekstraal waarbinnen het waterdeel als kandidaat gevonden is, niet het
-    criterium (BO-43). Een dataclass in plaats van een tuple: beide checks pakten
-    hem uit op positie, en een veld erbij of een andere volgorde zou daar pas
-    tijdens het draaien opvallen.
+    criterium (BO-43). Een dataclass in plaats van een tuple: hij werd op positie
+    uitgepakt, en een veld erbij of een andere volgorde zou daar pas tijdens het
+    draaien opvallen.
     """
 
     conduit: Conduit
@@ -534,7 +534,13 @@ def _zoek_kruisingen(
 
 
 class _WatergangKruising(_ExterneCheck):
-    """Gedeelde basis voor de twee kruisingschecks op BGT-waterdelen.
+    """Basis voor de kruisingscheck op BGT-waterdelen.
+
+    Tot issue #83 hingen EXT-002 en EXT-003 hier allebei onder; EXT-002 is vervallen
+    (BO-66) en EXT-003 is de enige die overblijft. De basis blijft staan omdat zij de
+    populatie, de kruisingstoets en de telling van wat buiten de populatie valt bij
+    elkaar houdt -- de uitzondering op een geregistreerde zinker is wat EXT-003 er
+    zelf bovenop legt.
 
     De populatie is die van `klassen.vrijvervalleiding`. Een duiker is in de
     GWSW-ontologie een `Leiding` die oppervlaktewater verbindt, geen rioolleiding;
@@ -552,15 +558,16 @@ class _WatergangKruising(_ExterneCheck):
     def kruisingstoets(self, context: CheckContext) -> _Kruisingen:
         """De doorkruisingen en de afvaltellingen, een keer per context berekend.
 
-        De lijst wordt door EXT-002 en EXT-003 gedeeld. Dat mag omdat de drie
+        De cache-ingang staat op de context en niet op de check, omdat de drie
         ingredienten van deze basisklasse zijn en niet van de aanroepende check: de
-        populatie (`objecten()` levert voor beide `vrijvervalrioolleidingen(context)`,
-        door dezelfde `selectie()` gefilterd), de laag `bgt_water` en de zoekstraal.
-        De twee deden dus tweemaal dezelfde ruimtelijke toets.
+        populatie (`objecten()` levert `vrijvervalrioolleidingen(context)`, door
+        `selectie()` gefilterd), de laag `bgt_water` en de zoekstraal. Toen EXT-002 er
+        nog onder hing deelden de twee checks hem, zodat de ruimtelijke toets niet
+        tweemaal draaide.
 
         De bouwer is daarom een vrije functie: hij krijgt die drie mee en kent geen
-        `self`, zodat de gedeelde ingang niet stilzwijgend van de eerste aanroeper kan
-        gaan afhangen. Wie hier ooit een derde subklasse met een eigen populatie onder
+        `self`, zodat de ingang niet stilzwijgend van de eerste aanroeper kan gaan
+        afhangen. Wie hier ooit een tweede subklasse met een eigen populatie onder
         hangt (BO-25 verwierp dat voor EXT-003), moet haar dus een eigen sleutel geven.
         """
         toetsbaar = self.selectie(context).toetsbaar
@@ -611,7 +618,7 @@ class _WatergangKruising(_ExterneCheck):
                 f"{raakt_niet}, {lozingspunt} "
                 f"en {getal(toets.tangentieel, 'loopt over de rand', 'lopen over de rand')}. "
                 "Doorkruisingen door een streng die als kruisingsconstructie "
-                "geregistreerd staat tellen hier mee; alleen EXT-003 laat die buiten de "
+                "geregistreerd staat tellen in die telling mee, maar blijven buiten de "
                 "bevindingen."
             )
         for klasse, aantal in self.buiten_populatie(context).items():
@@ -621,70 +628,6 @@ class _WatergangKruising(_ExterneCheck):
                 "kruising van zo'n streng met een watergang is geen bevinding."
             )
         return notities
-
-
-@register
-class KruisingMetWatergang(_WatergangKruising):
-    """EXT-002: een streng die een watergang kruist."""
-
-    id = "EXT-002"
-    title = "Kruising met watergang (waterschaps- of BGT-data)"
-    severity = Severity.WARNING
-    dimension = Dimension.PLAUSIBILITY
-    rollen = ("vrijvervalrioolleidingen",)
-    kenmerken = ("VormLeiding",)
-
-    def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke streng die een BGT-waterdeel echt doorkruist.
-
-        Het register laat BGT als watergangbron toe; waterschapsdata is niet
-        aangeleverd en valt in deze fase buiten scope.
-        """
-        for kruising in self.kruisingen(context):
-            soort = str(kruising.rij.get("type") or "waterdeel")
-            # Het waterdeel gaat als tweede object mee, anders krijgen twee
-            # doorkruisingen van dezelfde streng dezelfde melding-ID en valt de tweede
-            # terug op een volgnummer dat van de verwerkingsvolgorde afhangt.
-            sleutel, terugval = bouw_sleutel(VOORVOEGSEL["bgt_water"], kruising.rij, kruising.vorm)
-            if terugval:
-                context.treffers.meld_zonder_id(self.id, kruising.laag.source.name)
-            # De treffer wordt onder dezelfde sleutel als EXT-003 geregistreerd, zodat de
-            # laag `vlakken` een waterdeel dat beide checks raken één rij met beide
-            # check-ID's geeft en een waterdeel dat alleen deze check ziet (een echte
-            # doorkruising door een geregistreerde zinker) toch een vlak krijgt (issue #67).
-            context.treffers.registreer(
-                Treffer(
-                    sleutel=sleutel,
-                    bron="bgt_water",
-                    label=soort,
-                    bronbestand=kruising.laag.source.name,
-                    geometrie=kruising.vorm,
-                    attributen=dict(kruising.rij),
-                ),
-                check_id=self.id,
-                object_uri=kruising.conduit.uri,
-            )
-            yield self.finding(
-                context,
-                kruising.conduit.uri,
-                kruising.conduit.label,
-                f"Doorkruist een BGT-waterdeel van het type {soort!r} "
-                f"(zoekstraal {kruising.buffer:g} m).",
-                watertype=str(soort),
-                bron=kruising.laag.source.name,
-                buffer_m=kruising.buffer,
-                object2_uri=sleutel,
-                object2_label=str(soort),
-            )
-
-    def notes(self, context: CheckContext) -> list[str]:
-        """Meldt dat de waterschapsbron ontbreekt."""
-        return [
-            *super().notes(context),
-            "Waterschapsdata is niet aangeleverd; alleen de BGT-waterdelen zijn gebruikt. "
-            "Het register staat die bron expliciet toe.",
-            *_notitie_zonder_id(context, self.id),
-        ]
 
 
 @register
@@ -742,18 +685,29 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt welke klassen als kruisingsconstructie gelden."""
+        """Meldt welke klassen als kruisingsconstructie gelden en welke waterbron gebruikt is.
+
+        De regel over de waterschapsbron stond tot issue #83 bij EXT-002; die check is
+        vervallen en dit is nu de enige watergangmelding, dus zonder deze zin zou het
+        rapport niet meer zeggen dat er alleen op BGT-waterdelen getoetst is.
+        """
         wortels = context.config.klassen.kruisingsleiding
+        bron = (
+            "Waterschapsdata is niet aangeleverd; alleen de BGT-waterdelen zijn gebruikt. "
+            "Het register staat die bron expliciet toe."
+        )
         if not wortels:
             return [
                 *super().notes(context),
                 "Er zijn geen kruisingsconstructieklassen geconfigureerd "
                 "(`klassen.kruisingsleiding`); elke kruising telt daardoor mee.",
+                bron,
                 *_notitie_zonder_id(context, self.id),
             ]
         return [
             *super().notes(context),
             f"Als kruisingsconstructie gelden: {', '.join(wortels)}.",
+            bron,
             *_notitie_zonder_id(context, self.id),
         ]
 

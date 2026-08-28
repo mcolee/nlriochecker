@@ -33,6 +33,7 @@ from nlriochecker.uitvoer.gpkg import (
     RD_NEW,
     REDEN_MECHANISCH,
     REDEN_ONDERDRUKT,
+    VLAK_CHECKS,
     schrijf_geopackage,
 )
 from nlriochecker.uitvoer.melding import bouw_meldingen, bouw_meldingenstroom
@@ -657,10 +658,14 @@ def _ext_bronnen() -> ExternalData:
 
 
 def _ext_run() -> CheckRun:
-    """Een run met de EXT-checks op de scenariofixture."""
+    """Een run met precies de checks die een vlak kunnen aanwijzen.
+
+    De lijst komt uit `VLAK_CHECKS` en niet uit een tweede opsomming: valt er een check
+    weg of komt er een bij, dan draait deze run mee in plaats van stil achter te blijven.
+    """
     dataset = load_dataset(TTL_DIR / "ext_scenario.ttl", [])
     context = CheckContext(dataset=dataset, config=_config(), bronnen=_ext_bronnen())
-    return run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
+    return run_checks(context, list(VLAK_CHECKS))
 
 
 def _laagrijen(pad: Path, laag: str) -> list[dict]:
@@ -681,16 +686,12 @@ def _laagrijen(pad: Path, laag: str) -> list[dict]:
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
 def test_vlakkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) -> None:
-    """De kerntest: niets erbij, niets eraf. Eén laag voor EXT-001, EXT-002 en EXT-003."""
+    """De kerntest: niets erbij, niets eraf. Eén laag voor alle checks uit VLAK_CHECKS."""
     run = _ext_run()
     meldingen = bouw_meldingen(run, RUNDATUM)
     pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
 
-    verwacht = {
-        m.object2_uri
-        for m in meldingen
-        if m.check_id in ("EXT-001", "EXT-002", "EXT-003") and m.object2_uri
-    }
+    verwacht = {m.object2_uri for m in meldingen if m.check_id in VLAK_CHECKS and m.object2_uri}
 
     assert {rij["id"] for rij in _laagrijen(pad, "vlakken")} == verwacht
 
@@ -722,12 +723,13 @@ def test_pandvlak_wordt_ontdubbeld_met_de_sterkste_relatie(tmp_path: Path) -> No
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_watervlak_draagt_beide_checks_en_ook_de_ext002_zinker(tmp_path: Path) -> None:
-    """Water valt niet meer weg: EXT-002 registreert nu zijn treffer (issue #67).
+def test_watervlakken_blijven_bestaan_en_hangen_aan_ext003(tmp_path: Path) -> None:
+    """De vlakkenlaag mag niet leeglopen nu EXT-002 vervallen is (issue #83).
 
-    Water-1/5/7 worden door zowel EXT-002 als EXT-003 gemeld en dragen beide ID's;
-    water-2 wordt door streng 3 (een duiker) doorkruist -- EXT-003 slaat dat over, maar
-    EXT-002 niet -- en krijgt daardoor toch een vlak, met alleen EXT-002.
+    EXT-003 registreert het doorkruiste waterdeel zelf, dus elke doorkruising die hij
+    meldt houdt haar vlak: water-1 (streng 2) en water-5/7 (de twee greppels van streng
+    9). Wat wél verdwijnt is water-2, het waterdeel dat alleen EXT-002 zag -- een
+    doorkruising door de als zinker geregistreerde streng 3, die EXT-003 overslaat.
     """
     run = _ext_run()
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
@@ -736,12 +738,10 @@ def test_watervlak_draagt_beide_checks_en_ook_de_ext002_zinker(tmp_path: Path) -
 
     assert set(water) == {
         "bgt:waterdeel/water-1",
-        "bgt:waterdeel/water-2",
         "bgt:waterdeel/water-5",
         "bgt:waterdeel/water-7",
     }
-    assert water["bgt:waterdeel/water-1"]["check_ids"] == "EXT-002, EXT-003"
-    assert water["bgt:waterdeel/water-2"]["check_ids"] == "EXT-002"
+    assert {rij["check_ids"] for rij in water.values()} == {"EXT-003"}
     # Water draagt geen relatie of afstand -- die gelden alleen voor pand en bouwwerk.
     assert water["bgt:waterdeel/water-1"]["relatie"] == ""
     assert water["bgt:waterdeel/water-1"]["afstand_min_m"] is None
@@ -851,9 +851,9 @@ def test_runmetadata_telt_de_vlakkenlaag_mee(tmp_path: Path) -> None:
 
     (aantal,) = _rijen(pad, "select n_vlakken from gwsw_run")[0]
 
-    # Vijf vlakken: één pand, drie waterdelen die EXT-003 meldt (water-1/5/7) plus water-2
-    # dat alleen EXT-002 ziet, dat sinds issue #67 ook een treffer registreert.
-    assert aantal == 5
+    # Vier vlakken: één pand van EXT-001 plus de drie waterdelen die EXT-003 meldt
+    # (water-1/5/7). Water-2 hing aan het vervallen EXT-002 (issue #83).
+    assert aantal == 4
     assert aantal == len(_laagrijen(pad, "vlakken"))
 
 

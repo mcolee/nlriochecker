@@ -318,7 +318,7 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
-    ids = ["EXT-001", "EXT-002", "EXT-003", "EXT-007", "HGT-001", "HGT-002", "HGT-003"]
+    ids = ["EXT-001", "EXT-003", "EXT-007", "HGT-001", "HGT-002", "HGT-003"]
     run = run_checks(context, ids)
     per_check = {outcome.check_id: outcome for outcome in run.outcomes}
 
@@ -328,7 +328,7 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     assert per_check["EXT-001"].examined == 69
     assert per_check["HGT-001"].examined == 40
     for outcome in run.outcomes:
-        if outcome.check_id.startswith("HGT") or outcome.check_id in {"EXT-001", "EXT-002"}:
+        if outcome.check_id.startswith("HGT") or outcome.check_id in {"EXT-001", "EXT-003"}:
             assert any("Buiten studiegebied" in note for note in outcome.notes)
 
     # Geen enkele put wijkt 25 cm of meer van het AHN5 af, 7 wel 10 cm of meer (issue #63).
@@ -497,7 +497,7 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
-    run = run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
+    run = run_checks(context, ["EXT-001", "EXT-003"])
     meldingen = bouw_meldingen(run, RUNDATUM)
 
     pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
@@ -510,12 +510,10 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     finally:
         verbinding.close()
 
-    # Eén laag `vlakken` (issue #67): exact de verzameling treffers waar EXT-001, EXT-002
-    # en EXT-003 samen naar wijzen, niets erbij en niets eraf.
+    # Eén laag `vlakken` (issue #67): exact de verzameling treffers waar EXT-001 en
+    # EXT-003 samen naar wijzen, niets erbij en niets eraf.
     verwacht = {
-        m.object2_uri
-        for m in meldingen
-        if m.check_id in ("EXT-001", "EXT-002", "EXT-003") and m.object2_uri
+        m.object2_uri for m in meldingen if m.check_id in ("EXT-001", "EXT-003") and m.object2_uri
     }
     assert set(geschreven) == verwacht
     assert all(sleutel.startswith(("bgt:", "bag:")) for sleutel in geschreven)

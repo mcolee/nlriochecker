@@ -169,8 +169,7 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
 | EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit |
-| EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit |
-| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie van EXT-002 en EXT-003, het rapport meldt hoeveel dat er zijn | W | Compleetheid |
+| EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie van deze check, het rapport meldt hoeveel dat er zijn. Getoetst wordt op BGT-waterdelen; waterschapsdata is toegestaan maar niet aangeleverd | W | Compleetheid |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit |
 | EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit |
 
@@ -207,6 +206,7 @@ terug onder een nieuw ID.
 | BTR-005 | Toestands- of inspectiegegevens ouder dan drempel, gewogen naar risicoligging (spoor, dijk, wegfunctie) | v0.9 | Vervallen *voor nu*: twee bronnen ontbreken. De export bevat geen inspectie- of toestandsgegevens, en de weging naar risicoligging vraagt bronnen (spoor, dijk, wegfunctie) die niet zijn aangeleverd. Herleeft zodra er inspectiedata en een risicowegingsbron zijn; dan komt hij terug onder een nieuw ID. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-63. |
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | v0.9 | Vervallen *voor nu*: er is geen bruikbare putdeksellaag. De BGT-laag `put` telt in De Wolden en Hoogeveen 843 objecten (595 van ProRail) tegenover ruim 23.000 GWSW-putten, en een gemeentelijke deksellaag komt er niet. Herleeft zodra er een deksellaag is die het gebied dekt; dan komt hij terug onder een nieuw ID. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-64. |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | v0.9 | Vervallen *voor nu*, met EXT-005 mee: dezelfde ontbrekende deksellaag, van de andere kant bekeken. De twee staan of vallen met dezelfde bron. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-65. |
+| EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | v0.9 | Niet relevant voor deze opdracht: een kruising met een watergang is op zichzelf geen gebrek en draagt geen handelingsperspectief. De vraag die er wél een draagt -- moet deze streng een zinker zijn? -- stelt EXT-003, en die meldde op De Wolden en Hoogeveen exact dezelfde 281 strengen en dezelfde 319 doorkruisingen (audit 27-08), want de export bevat geen enkele als zinker geregistreerde streng. EXT-003 blijft en is nu de enige watergangmelding; de doorkruisingen die hij overslaat blijven in zijn toelichting geteld. Zie de checkaudit (`docs/checks-audit-2026-08.md`, PRE-4), [#83](https://github.com/mcolee/nlriochecker/issues/83) en BO-66. |
 
 ## Open punten
 
@@ -228,6 +228,18 @@ terug onder een nieuw ID.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-28): EXT-002 vervallen (zie de tabel Vervallen checks). De check
+meldde elke vrijvervalstreng die een BGT-waterdeel echt doorkruist, zonder te vragen of dat een
+gebrek is; het handelingsperspectief zit in EXT-003 ("moet dit een zinker zijn?"). Op De Wolden
+en Hoogeveen gaven de twee dezelfde uitslag -- 281 van 281 strengen, 319 doorkruisingen (audit
+27-08) -- omdat de export geen enkele als zinker geregistreerde streng bevat. EXT-003 blijft
+ongewijzigd en is nu de enige watergangmelding; hij telt in zijn toelichting nog steeds elke
+doorkruising, ook die van een geregistreerde zinker, en noemt daar voortaan ook dat alleen
+BGT-waterdelen gebruikt zijn (de regel die tot nu toe bij EXT-002 stond). Het ID EXT-002 wordt
+niet hergebruikt. Uit de checkaudit (PRE-4, `docs/checks-audit-2026-08.md`); het daar
+voorgestelde alternatief -- EXT-002 laten voortleven als GeoPackage-datalaag -- is door de
+auteur verworpen. Zie [#83](https://github.com/mcolee/nlriochecker/issues/83) en BO-66.
 
 Versie 0.9, addendum (2026-08-28): BTR-002, BTR-005, EXT-005 en EXT-006 vervallen *voor nu*
 (zie de tabel Vervallen checks). Alle vier vervallen om dezelfde soort reden: de bron die ze

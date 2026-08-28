@@ -3396,3 +3396,59 @@ er verdwijnt geen melding.
 **Alternatieven.** EXT-006 laten staan en alleen EXT-005 laten vervallen (verworpen: dan zou de
 helft van een spiegelpaar blijven draaien op een bron die er niet is, en zou het rapport
 suggereren dat de dekselvergelijking nog ergens gebeurt).
+
+### BO-66 EXT-002 vervalt: de kale watergangkruising draagt geen handelingsperspectief
+
+**Wat.** EXT-002 (W, Plausibiliteit, "Kruising met watergang (waterschaps- of BGT-data)")
+vervalt uit de engine en gaat in het register naar de tabel *Vervallen checks*, op de eerste
+grond die die tabel noemt: niet relevant voor deze opdracht. Het ID wordt niet hergebruikt.
+EXT-003 blijft ongewijzigd en is voortaan de enige watergangmelding.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, PRE-4). Een streng die een watergang kruist is op zichzelf
+geen gebrek -- dat gebeurt overal -- en er valt niets aan te herstellen. Het gebrek is dat zo'n
+kruising niet als zinker geregistreerd staat, en dat meldt EXT-003. De meting maakt dat hard:
+op De Wolden en Hoogeveen melden de twee exact dezelfde 281 strengen en dezelfde 319
+doorkruisingen (audit 27-08, gemeten met `scripts/checkaudit_meting.py`), omdat de export geen
+enkele als zinker geregistreerde streng bevat. Elke gemelde kruising kwam dus twee keer in de
+bevindingen, één keer zonder en één keer met handelingsperspectief. De steekproef vroeg om
+precies die samenvoeging: "Kunnen we dit niet combineren met de andere watergang check?"
+
+**Waarom geen sentinel, en geen datalaag.** Geen sentinel in `dekking.toml`: de nulmeting kent
+de BGT niet en dekt deze check niet, dus er kijkt na dit besluit niets meer naar de kale
+kruising -- en dat is de bedoeling. De audit stelde als alternatief voor EXT-002 te laten
+voortleven als GeoPackage-datalaag met alle doorkruisingen; de auteur heeft dat verworpen ("niet
+relevant"). Er komt dus geen vervangende laag en geen vervangende telling: wat er blijft is de
+telling in de toelichting van EXT-003, die elke doorkruising binnen de zoekstraal noemt,
+inclusief die van een geregistreerde zinker.
+
+**Wat er in de engine blijft staan.** De hele kruisingsdetectie: `_verhouding` met het
+doorkruisingscriterium van BO-43, `_zoek_kruisingen`, de gedeelde cache-ingang
+`ext:watergangkruisingen` en de basisklasse `_WatergangKruising` met haar populatie,
+`buiten_populatie()` (de duikertelling van BO-25) en haar afvaltellingen. EXT-003 hangt daar als
+enige nog onder; de basis is niet in de check gevouwen omdat zij de populatie, de toets en de
+tellingen bij elkaar houdt en dit besluit alleen over de melding gaat. Eén regel is van EXT-002
+naar EXT-003 verhuisd in plaats van weggevallen: "Waterschapsdata is niet aangeleverd; alleen de
+BGT-waterdelen zijn gebruikt." Zonder die verhuizing zou het rapport niet meer zeggen op welke
+waterbron getoetst is, terwijl het register die tweede bron expliciet toestaat.
+
+**Gevolg voor de laag `vlakken` in de GeoPackage.** De watervlakken blijven bestaan en komen nu
+uitsluitend van EXT-003, dat zijn doorkruiste waterdeel zelf als treffer registreert. `VLAK_CHECKS`
+in `uitvoer/gpkg.py` gaat van drie naar twee ID's; de structuur van de laag (kolommen, `soort`,
+`gwsw_run.n_vlakken`) verandert niet. Wat wél verdwijnt is het vlak dat alleen EXT-002 aanwees:
+een doorkruising door een als zinker geregistreerde streng kreeg sinds issue #67 een vlak met
+`check_ids = "EXT-002"`, en dat vlak hoort bij een melding die niet meer bestaat -- de laag toont
+per constructie exact de externe objecten waarnaar de meldingen van díé uitvoer verwijzen. Op De
+Wolden en Hoogeveen kost dat nul vlakken, want er is geen enkele zinker. `check_ids` op een
+watervlak leest voortaan altijd `EXT-003`.
+
+**Verwacht effect op De Wolden en Hoogeveen.** De 319 EXT-002-waarschuwingen (281 strengen)
+verdwijnen; EXT-003 blijft op 319 waarschuwingen en 281 strengen. Er gaat geen signaal verloren,
+alleen een dubbeling. De hermeting hoort bij blok B van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** EXT-002 laten voortleven als GeoPackage-datalaag (het PRE-4-voorstel uit de
+audit; verworpen door de auteur). EXT-003 laten vervallen en EXT-002 houden (verworpen: dan
+blijft juist de melding zonder handelingsperspectief over). De twee samenvoegen tot één check
+onder een nieuw ID (verworpen: EXT-003 is al precies die check, en een nieuw ID zou een
+trendvergelijking op check-ID breken zonder dat er iets aan de uitslag verandert). Het ID
+EXT-002 hergebruiken (verworpen: harde regel, vervallen ID's worden nooit hergebruikt).

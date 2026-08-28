@@ -247,7 +247,7 @@ EXT-checks verwijzen: `bouwwerken` (elk BGT-pand, BAG-pand of overig bouwwerk wa
 EXT-001 meldt, rood omlijnd) en `waterdelen_zonder_zinker` (elk BGT-waterdeel waarover
 EXT-003 meldt, blauw omlijnd). Beide lagen worden uitsluitend gevuld vanuit de
 meldingen van die uitvoer: wat erin staat is exact wat de check gemeld heeft, niet meer
-en niet minder. Kruisingen mét geregistreerde zinker of duiker (EXT-002) blijven er dus
+en niet minder. Kruisingen mét geregistreerde zinker of duiker blijven er dus
 buiten, en bij rapportage per gebied bevat elk gebied alleen zijn eigen treffers. De
 lagen bestaan altijd, ook leeg.
 
@@ -311,7 +311,7 @@ mankeert.
 
 De tolerantie geldt voor alle lagen tegelijk. Dekt een enkele laag het gebied echt niet,
 zet die laag dan uit in plaats van de tolerantie op te rekken: `bgt_waterlagen = []`
-schakelt EXT-002, EXT-003 en EXT-007 uit met een uitleg in het rapport, terwijl een
+schakelt EXT-003 en EXT-007 uit met een uitleg in het rapport, terwijl een
 tolerantie van kilometers de poort voor elke bron opheft.
 
 ### Projectconfiguraties
