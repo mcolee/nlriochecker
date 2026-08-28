@@ -108,7 +108,7 @@ def test_de_geopackage_meldingtabel_draagt_de_kolom_cfk(tmp_path: Path) -> None:
 
 def test_het_checkoverzicht_draagt_naast_het_register_ook_de_nulmeting(tmp_path: Path) -> None:
     """Een dashboard dat zich als de checklijst presenteert, mist anders de helft."""
-    run = _run(["ATTR-008"])
+    run = _run(["ATTR-009"])
     uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM)
 
     assert uitvoer.geopackage is not None

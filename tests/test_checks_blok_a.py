@@ -74,7 +74,6 @@ DEFECTEN = [
     # ATTR-018: alleen de vrijvervalstreng en de put zonder begindatum; persleiding 3
     # valt buiten de populatie.
     ("attr018_zonder_begindatum.ttl", "ATTR-018", ["1", "A"]),
-    ("attr008_lange_streng.ttl", "ATTR-008", ["1"]),
     ("attr009_lengte_wijkt_af.ttl", "ATTR-009", ["1"]),
     ("attr010_materiaal_put.ttl", "ATTR-010", ["1"]),
     ("attr012_metselwerk_rond.ttl", "ATTR-012", ["1"]),

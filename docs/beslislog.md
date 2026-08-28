@@ -3210,3 +3210,48 @@ notitie (verworpen: een melding zonder handelingsperspectief hoort niet in de be
 ongeacht haar gewicht; de telling in de verantwoording van ADM-010 dekt de informatiebehoefte
 al). Het ID hergebruiken voor een andere loze-leidingcheck (verworpen: harde regel, vervallen
 ID's worden nooit hergebruikt).
+
+### BO-61 ATTR-008 geschrapt: de nulmeting toetst exact hetzelfde lengtebereik
+
+**Wat.** ATTR-008 (W, Plausibiliteit, "Strenglengte korter dan X m of langer dan X m") vervalt
+uit de engine. Anders dan ADM-011 (BO-60) gaat hij niet naar de tabel *Vervallen checks* maar
+naar *Geschrapte checks*: de nulmeting dekt hem aantoonbaar, dus hij krijgt -- zoals voorwaarde
+3 van de schrapronde eist -- een sentinel in `src/nlriochecker/dekking.toml`, met
+`LengteLeiding_val` als bewijsvorm in alle drie de conformiteitsklassen. Dat is letterlijk
+dezelfde sentinel als die van ATTR-011. Het ID ATTR-008 wordt niet hergebruikt.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, ATTR-sectie en waarneming 4). De drempels van ATTR-008 zijn
+met issue #35 op de grenzen van het GWSW-datatype `Dt_LengteLeiding` gezet (1-75 m), omdat GWSW
+leidend is. Precies dat bereik toetst de SHACL-vorm `LengteLeiding_val`. Gemeten op De Wolden en
+Hoogeveen (audit 27-08): alle 443 ATTR-008-objecten staan óók in `LengteLeiding_val`. De
+overlap is niet gedeeltelijk maar volledig, en de vorm is bovendien breder -- zij telt er 932,
+want zij ziet ook drains, duikers en aansluitleidingen, en daar bovenop 1.955 meldingen op
+mechanisch riool die de projectconfiguratie onderdrukt. De check voegde dus niets toe: elk
+gemeld object werd twee keer gemeld, één keer door de nulmeting en één keer door ons.
+
+**Wat er blijft staan.** ATTR-009 (geometrische lengte tegen administratieve lengte) blijft
+ongewijzigd: die vergelijkt twee bronnen met elkaar in plaats van één waarde met een bereik, en
+de nulmeting kent de hartlijn niet. ATTR-005 verwees in zijn `notes()` naar ATTR-008 als de
+plek waar lengtewaarden getoetst worden; die zin noemt nu `LengteLeiding_val`. Ook de twee
+drempels `minimale_strenglengte_m` en `maximale_strenglengte_m` blijven in alle drie de
+configbestanden staan, met een regel erbij dat geen check ze meer leest. Ze weghalen is een
+losse beslissing en geen gevolg van deze: `CheckThresholds` staat op `extra="forbid"`, dus een
+bestaande projectconfiguratie die de sleutels draagt zou na verwijdering niet meer laden. Dat
+is een wijziging aan het configuratiecontract, en die hoort een eigen besluit te zijn -- niet
+een bijvangst van een schrapping. Zolang de sleutels er staan houdt
+`test_maximale_strenglengte_volgt_de_ontologie` hun waarde op de ontologiegrens.
+
+**Verwacht effect op De Wolden en Hoogeveen.** De 443 ATTR-008-waarschuwingen verdwijnen uit de
+bevindingen; de gevallen zelf blijven zichtbaar in het nulmetingblok van het rapport, onder de
+vorm `LengteLeiding_val`. Er gaat dus geen signaal verloren, alleen een dubbeling. De hermeting
+hoort bij blok A van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De drempels losmaken van het datatype en er een plausibiliteitsband van
+maken die stríkt binnen 1-75 m ligt, zodat de check wél iets toevoegt (verworpen door de
+auteur: dat is een projectkeuze zonder bron, terwijl GWSW hier een expliciet bereik declareert;
+een band die strenger is dan de ontologie zou strengen afkeuren die het model goedkeurt).
+ATTR-008 als *vervallen* boeken zoals ADM-011 (verworpen: dat zou zeggen dat er niets meer naar
+kijkt, en dat is aantoonbaar onwaar -- de nulmeting kijkt ernaar, en dan is de sentinel de
+manier om die dekking te blijven bewaken). Het ID hergebruiken voor een andere lengtecheck
+(verworpen: harde regel, vervallen ID's worden nooit hergebruikt).

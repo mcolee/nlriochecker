@@ -43,6 +43,7 @@ def _check(result: CoverageResult, check_id: str) -> CheckCoverage:
         ("ADM-001", Verdict.TOUCHED),
         ("ADM-004", Verdict.TOUCHED),
         ("ADM-005", Verdict.TOUCHED),
+        ("ATTR-008", Verdict.TOUCHED),
         ("ATTR-011", Verdict.TOUCHED),
     ],
 )

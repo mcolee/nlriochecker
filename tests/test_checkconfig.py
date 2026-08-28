@@ -48,12 +48,15 @@ def test_gemengd_zonder_overstort_buffer_heeft_een_default() -> None:
 
 
 def test_maximale_strenglengte_volgt_de_ontologie() -> None:
-    """De bovengrens van ATTR-008 is de GWSW-ontologiegrens, niet 200 m (issue #35).
+    """De strenglengtegrenzen zijn de GWSW-ontologiegrenzen, niet 200 m (issue #35).
 
     `Dt_LengteLeiding` declareert een bereik van 1-75 m. De oude drempel 200 keurde
     strengen goed die de SHACL-nulmeting in hetzelfde rapport afkeurde (op De Wolden en Hoogeveen
     431 vrijvervalstrengen); GWSW is leidend. De ondergrens 1 m valt al samen met de
-    ontologie.
+    ontologie. ATTR-008 las deze twee drempels tot issue #90; die check is geschrapt
+    omdat de vorm `LengteLeiding_val` hem volledig dekt (BO-61), dus vandaag leest geen
+    check ze. De sleutels blijven wel in de drie configbestanden staan, en dan hoort hun
+    waarde de ontologiegrens te blijven in plaats van stil terug te lopen.
     """
     drempels = load_check_config().drempels
     assert drempels.maximale_strenglengte_m == 75.0

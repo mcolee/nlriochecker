@@ -84,7 +84,6 @@ gebreken" leest.
 | ATTR-005 | Eenhedenfouten die binnen de GWSW-waardebereiken vallen (bijv. diameter 300 genoteerd in cm); fouten buiten bereik dekt de nulmeting | F | Nauwkeurigheid |
 | ATTR-006 | Strengdiameter groter dan afmeting van de aangesloten put | W | Plausibiliteit |
 | ATTR-007 | Begindatum in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit |
-| ATTR-008 | Strenglengte korter dan X m of langer dan X m | W | Plausibiliteit |
 | ATTR-009 | Geometrische lengte wijkt meer dan X% af van administratieve lengte | W | Consistentie |
 | ATTR-010 | Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past | W | Plausibiliteit |
 | ATTR-012 | Materiaal past niet bij profielvorm (bijv. metselwerk met rond profiel in plaats van ei- of muilprofiel) | W | Plausibiliteit |
@@ -190,6 +189,7 @@ Alle drie de voorwaarden worden machinaal gehandhaafd (2026-08-16). Voorwaarde 1
 | ADM-001 | Streng verwijst naar niet-bestaande begin- of eindput | Generieke melding gerefereerd object onbekend (CFK-onafhankelijk); verplichte aanwezigheid van de koppeling alleen via Hyd (hasConnection Knooppunt exact=1); Mds eist slechts max=1 |
 | ADM-004 | Verplichte GWSW-MdS-attributen niet gevuld | Mds via Top-laag van het MDSTOP-filter (someValuesFrom: materiaal, vorm, lengte, breedte, hoogte leiding) plus Mds-eigen min-eisen (putdekselniveau, maaiveldhoogte); Hyd aanvullend inclusief BOB's, afmetingen exact=1 en de put-vormen materiaal (MateriaalPut) en maaiveldschematisering (Maaiveldschematisering) — die twee hasAspect-eisen (exact=1) leveren uitsluitend in Hyd meldingen op (4142 resp. 20756 op De Wolden, nul in MdsPlan en MdsProj op hetzelfde RDF-bestand), dus de dekking van díé twee attributen rust op Hyd en niet op Mds (mechanisch na te lopen via [#41](https://github.com/mcolee/nlriochecker/issues/41)) |
 | ADM-005 | Attribuutwaarden buiten de GWSW-domeinlijsten | Beide CFK's: collectietoetsing hasReference |
+| ATTR-008 | Strenglengte korter dan X m of langer dan X m | Alle drie de CFK's: waardebereik LengteLeiding 1-75 m (vorm LengteLeiding_val, bevestigd in Mds-datatype Dt_LengteLeiding) — dezelfde dekking als ATTR-011. Gemeten op De Wolden en Hoogeveen (checkaudit 27-08): alle 443 ATTR-008-objecten staan ook in LengteLeiding_val, die er 932 telt en dus breder is (ook drains, duikers en aansluitleidingen) |
 | ATTR-011 | Absurde lengtewaarde boven harde bovengrens | Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype Dt_LengteLeiding) |
 
 ## Vervallen checks (niet relevant voor deze toepassing)
@@ -223,6 +223,18 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-28): ATTR-008 geschrapt (zie de tabel Geschrapte checks). De
+drempels van de check stonden op de grenzen van het GWSW-datatype `Dt_LengteLeiding` (1-75 m,
+issue #35), en precies dat bereik toetst de nulmetingvorm `LengteLeiding_val` in alle drie de
+conformiteitsklassen. Op De Wolden en Hoogeveen viel elk van de 443 ATTR-008-objecten ook
+onder die vorm; de vorm is bovendien breder, want zij ziet ook drains, duikers en
+aansluitleidingen. Dit is dezelfde dekking waarvoor ATTR-011 eerder geschrapt is, dus ATTR-008
+gaat naar de tabel Geschrapte checks (mét sentinel in `dekking.toml`), niet naar Vervallen
+checks. ATTR-009 (geometrische lengte tegen administratieve lengte) blijft ongewijzigd: die
+toetst iets anders. Het ID ATTR-008 wordt niet hergebruikt. Uit de checkaudit
+(`docs/checks-audit-2026-08.md`). Zie
+[#90](https://github.com/mcolee/nlriochecker/issues/90) en BO-61.
 
 Versie 0.9, addendum (2026-08-28): ADM-011 vervallen (zie de tabel Vervallen checks). De check
 meldde een loze keten zonder aansluiting op actief riool in de afvoerrichting als dode data,

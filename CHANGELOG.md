@@ -324,6 +324,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Verwijderd
 
+- **ATTR-008 geschrapt: de nulmeting toetst hetzelfde lengtebereik** (issue #90, BO-61). De
+  check meldde een administratieve strenglengte buiten 1-75 m, en die twee grenzen zijn met
+  issue #35 op het GWSW-datatype `Dt_LengteLeiding` gezet -- precies het bereik dat de
+  SHACL-vorm `LengteLeiding_val` in alle drie de conformiteitsklassen toetst. Op De Wolden en
+  Hoogeveen vielen alle 443 ATTR-008-objecten ook onder die vorm, die er zelfs 932 telt. De 443
+  waarschuwingen verdwijnen uit de bevindingen; de gevallen blijven zichtbaar in het
+  nulmetingblok van het rapport. Het register verhuist ATTR-008 naar de tabel *Geschrapte
+  checks* mét sentinel in `dekking.toml` (dezelfde als die van ATTR-011), niet naar *Vervallen
+  checks*; het ID wordt niet hergebruikt. ATTR-009 (geometrische lengte tegen administratieve
+  lengte) blijft ongewijzigd. De drempels `minimale_strenglengte_m` en
+  `maximale_strenglengte_m` blijven in de configuratie staan, maar geen check leest ze nog.
 - **ADM-011 vervalt** (issue #81, BO-60). De check meldde een keten van loze leidingen die
   in de administratieve afvoerrichting nergens op het actieve riool aansluit als dode data,
   maar dat is juist de gewenste eindtoestand: buiten gebruik gesteld en netjes losgekoppeld.

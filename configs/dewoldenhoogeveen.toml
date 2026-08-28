@@ -272,8 +272,9 @@ begindatum_minimum = 1870
 # de standaard (hoogste natuurlijke piek 4,5%, ruim onder 20%).
 begindatum_vulwaarde_aandeel = 0.20
 begindatum_vulwaarde_minimum_objecten = 30
-# ATTR-008: aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
-# `Dt_LengteLeiding` declareert 1-75 m; GWSW is leidend (issue #35).
+# Aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
+# `Dt_LengteLeiding` declareert 1-75 m; GWSW is leidend (issue #35). Geen check leest
+# ze meer: ATTR-008 is met issue #90 geschrapt (BO-61), de nulmeting dekt het bereik.
 minimale_strenglengte_m = 1.0
 maximale_strenglengte_m = 75.0
 # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.

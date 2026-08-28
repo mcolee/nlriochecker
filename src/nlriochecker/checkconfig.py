@@ -223,8 +223,10 @@ class CheckThresholds(BaseModel):
     # ATTR-015: onder zoveel gedateerde objecten zegt een aandeel niets; dan zwijgt
     # de detector.
     begindatum_vulwaarde_minimum_objecten: int = Field(default=30, ge=1)
-    # ATTR-008: aannemelijk bereik voor de strenglengte; de grenzen volgen het
-    # GWSW-datatype Dt_LengteLeiding (1-75 m). Zie checks.toml en issue #35.
+    # Aannemelijk bereik voor de strenglengte; de grenzen volgen het GWSW-datatype
+    # Dt_LengteLeiding (1-75 m). Zie checks.toml en issue #35. Geen check leest ze
+    # meer: ATTR-008 is met issue #90 geschrapt omdat de nulmetingvorm
+    # LengteLeiding_val exact dit bereik toetst (BO-61).
     minimale_strenglengte_m: float = Field(default=1.0, gt=0.0)
     maximale_strenglengte_m: float = Field(default=75.0, gt=0.0)
     # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.

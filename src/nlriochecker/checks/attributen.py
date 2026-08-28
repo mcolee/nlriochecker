@@ -461,7 +461,8 @@ class EenhedenfoutBinnenBereik(_StrengCheck):
         return [
             f"Alleen breedte en hoogte van leidingen zijn getoetst, en alleen onder "
             f"{drempel:g} mm. Eenhedenfouten in lengte- of hoogtewaarden vallen hier niet "
-            "onder; ATTR-008, ATTR-009 en de HGT-categorie kijken daarnaar."
+            "onder; ATTR-009, de HGT-categorie en de nulmetingvorm `LengteLeiding_val` "
+            "kijken daarnaar."
         ]
 
 
@@ -1000,47 +1001,6 @@ class BegindatumVulwaardejaar(Check):
             "gedateerde objecten draagt (signaalwaarde, geen norm). Het drukste jaar is "
             f"{jaar} met {aantal / totaal * 100:.1f}%."
         ]
-
-
-@register
-class StrenglengteBuitenBereik(_StrengCheck):
-    """ATTR-008: een strenglengte buiten het aannemelijke bereik."""
-
-    id = "ATTR-008"
-    title = "Strenglengte korter dan X m of langer dan X m"
-    severity = Severity.WARNING
-    dimension = Dimension.PLAUSIBILITY
-    rollen = ("vrijvervalrioolleidingen",)
-    kenmerken = ("LengteLeiding",)
-
-    def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst de administratieve lengte op het geconfigureerde bereik."""
-        drempels = context.config.drempels
-        minimum = drempels.minimale_strenglengte_m
-        maximum = drempels.maximale_strenglengte_m
-
-        for conduit in vrijvervalrioolleidingen(context):
-            lengte = conduit.lengte_m
-            if lengte is None or minimum <= lengte <= maximum:
-                continue
-            kant = "onder" if lengte < minimum else "boven"
-            grens = minimum if lengte < minimum else maximum
-            yield self.finding(
-                context,
-                conduit.uri,
-                conduit.label,
-                f"Administratieve lengte {lengte:g} m ligt {kant} de grens van {grens:g} m.",
-                lengte_m=lengte,
-                grens_m=grens,
-            )
-
-    def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen lengte hebben."""
-        strengen = vrijvervalrioolleidingen(context)
-        zonder = sum(1 for conduit in strengen if conduit.lengte_m is None)
-        if not zonder:
-            return []
-        return [f"{zonder} van de {len(strengen)} strengen hebben geen administratieve lengte."]
 
 
 @register

@@ -274,10 +274,12 @@ begindatum_minimum = 1870
 begindatum_vulwaarde_aandeel = 0.20
 # ATTR-015: onder zoveel gedateerde objecten zegt zo'n aandeel niets.
 begindatum_vulwaarde_minimum_objecten = 30
-# ATTR-008: aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
+# Aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
 # `Dt_LengteLeiding` declareert 1-75 m (owl:withRestrictions). GWSW is leidend, dus
 # beide grenzen volgen de ontologie -- niet langer de projectkeuze 200 m, die
-# strengen goedkeurde die de SHACL-nulmeting afkeurt (issue #35).
+# strengen goedkeurde die de SHACL-nulmeting afkeurt (issue #35). Geen check leest
+# deze twee drempels meer: ATTR-008 is met issue #90 geschrapt, want de
+# nulmetingvorm `LengteLeiding_val` toetst exact dit bereik (BO-61).
 minimale_strenglengte_m = 1.0
 maximale_strenglengte_m = 75.0
 # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.

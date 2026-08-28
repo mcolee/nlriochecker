@@ -986,20 +986,6 @@ FIXTURES["attr018_zonder_begindatum.ttl"] = (
     + nette_put("PutD", "D", *D, Begindatum="1985-01-01"),
 )
 
-FIXTURES["attr008_lange_streng.ttl"] = (
-    "streng 1 is administratief 500 m lang, boven de ontologiegrens van 75 m",
-    nette_put("PutA", "A", *A)
-    + nette_put("PutB", "B", (1500.0, 2000.0)[0], 2000.0)
-    + nette_leiding(
-        "L1",
-        "1",
-        [A, (1500.0, 2000.0)],
-        "PutA",
-        "PutB",
-        velden={"LengteLeiding": 500.0},
-    ),
-)
-
 FIXTURES["attr009_lengte_wijkt_af.ttl"] = (
     "streng 1 is 50 m getekend maar staat als 100 m geregistreerd",
     nette_put("PutA", "A", *A)

@@ -8,13 +8,13 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | ---: | ---: | ---: | ---: | ---: |
 | TOP | 23 | 23 | 0 | 0 | 0 |
 | ADM | 10 | 7 | 0 | 0 | 3 |
-| ATTR | 18 | 17 | 0 | 0 | 1 |
+| ATTR | 18 | 16 | 0 | 0 | 2 |
 | HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 9 | 9 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 6 | 6 | 0 | 0 | 0 |
 | EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **102** | **98** | **0** | **0** | **4** |
+| **totaal** | **102** | **97** | **0** | **0** | **5** |
 
 ## TOP
 
@@ -70,7 +70,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ATTR-005 | Eenhedenfouten die binnen de GWSW-waardebereiken vallen (bijv. diameter 300 genoteerd in cm); fouten buiten bereik dekt de nulmeting | F | Nauwkeurigheid | geimplementeerd met test | vrijvervalrioolleidingen · BreedteLeiding, HoogteLeiding | — |
 | ATTR-006 | Strengdiameter groter dan afmeting van de aangesloten put | W | Plausibiliteit | geimplementeerd met test | putten, vrijvervalrioolleidingen · BreedteBouwwerk, BreedteLeiding, BreedtePut, DiameterPut, HoogteLeiding, LengteBouwwerk, LengtePut | — |
 | ATTR-007 | Begindatum in de toekomst of voor 1870 (de nulmeting toetst alleen datatype, geen bereik) | W | Plausibiliteit | geimplementeerd met test | putten, vrijvervalrioolleidingen · Begindatum | — |
-| ATTR-008 | Strenglengte korter dan X m of langer dan X m | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · LengteLeiding | — |
+| ATTR-008 | Strenglengte korter dan X m of langer dan X m | — | — | geschrapt (gedekt door nulmeting) | — | Alle drie de CFK's: waardebereik LengteLeiding 1-75 m (vorm LengteLeiding_val, bevestigd in Mds-datatype Dt_LengteLeiding) — dezelfde dekking als ATT… |
 | ATTR-009 | Geometrische lengte wijkt meer dan X% af van administratieve lengte | W | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · LengteLeiding | — |
 | ATTR-010 | Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · MateriaalBouwwerk, MateriaalLeiding, MateriaalPut | — |
 | ATTR-011 | Absurde lengtewaarde boven harde bovengrens | — | — | geschrapt (gedekt door nulmeting) | — | Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype Dt_LengteLeiding) |
