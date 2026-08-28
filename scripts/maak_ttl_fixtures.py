@@ -578,6 +578,34 @@ FIXTURES["top021_put_op_streng.ttl"] = (
     + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB"),
 )
 
+# Issue #85: de Kikker-export splitst een put per compartiment en hangt aan elk deel het
+# putlabel plus een `c<n>`-postfix. Vier groepen naast elkaar, zodat alleen de eerste twee
+# samengevoegd mogen worden en de dedup zich niet tot elke gelijknamige put uitbreidt.
+FIXTURES["top005_compartimentduplicaat.ttl"] = (
+    "K0001  c2 ligt 0,10 m van K0001  c1 en is het compartimentduplicaat; M0003  c1 ligt "
+    "even dicht bij het postfixloze origineel M0003, dat de leiding juist niet draagt. "
+    "V0002  c2 ligt 0,50 m van V0002  c1 en blijft een eigen put; de twee putten DUB "
+    "dragen geen postfix en blijven een gewone dubbele put (issue #85)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("Comp1", "K0001  c1", 1100.0, 2000.0)
+    + put("Comp2", "K0001  c2", 1100.1, 2000.0)
+    + put("PutC", "C", 1150.0, 2000.0)
+    + put("Ver1", "V0002  c1", 1200.0, 2000.0)
+    + put("Ver2", "V0002  c2", 1200.5, 2000.0)
+    + put("PutD", "D", 1250.0, 2000.0)
+    + put("Dub1", "DUB", 1300.0, 2000.0)
+    + put("Dub2", "DUB", 1300.1, 2000.0)
+    + put("PutE", "E", 1350.0, 2000.0)
+    + put("Mof", "M0003", 1400.0, 2000.0)
+    + put("Mof1", "M0003  c1", 1400.1, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "Comp1")
+    + leiding("L3", "3", [(1150.0, 2000.0), (1200.0, 2000.0)], "PutC", "Ver1")
+    + leiding("L4", "4", [(1250.0, 2000.0), (1300.0, 2000.0)], "PutD", "Dub1")
+    + leiding("L5", "5", [(1350.0, 2000.0), (1400.1, 2000.0)], "PutE", "Mof1"),
+)
+
 # NET-003: de bodem stijgt in de administratieve richting.
 FIXTURES["net003_tegen_de_richting.ttl"] = (
     "streng 1 loopt administratief van A naar B terwijl de bodem stijgt",

@@ -3729,3 +3729,79 @@ configureerbare afgeleide (verworpen: de dataset draagt die nauwkeurigheid niet 
 zou een tweede drempel zijn die zich als een meting voordoet). De TOP-010-marge op −0,05 m zetten
 om de schampgevallen weg te nemen (verworpen: die schampgevallen bestaan niet -- de mediane overlap
 is 0,31 m -- dus het kost meldingen zonder dat iemand kan navertellen waarom juist die).
+
+### BO-71 Het compartimentduplicaat (`c<n>`-postfix) wordt vóór de topologiechecks samengevoegd
+
+**Wat.** Een knoop waarvan het label op een `c<n>`-postfix na gelijk is aan dat van een andere
+knoop, én die daar binnen `[drempels] dubbele_put_tolerantie_m` (0,30 m) van af ligt, is voor de
+topologiechecks hetzelfde fysieke object. `_bouw_topologie` in `checks/topologie.py` houdt er één
+van over; de rest valt uit de puttenindex. Beide eisen tellen: alleen op de naam matchen zou twee
+echte putten samenvoegen die toevallig zo heten, en alleen op de ligging matchen is precies wat
+TOP-005 al meldt. **Het origineel wint** -- de knoop wiens label géén postfix draagt; is die er
+niet, dan de laagste postfix, en bij gelijke stand de laagste URI, zodat de uitkomst niet van de
+leesvolgorde afhangt. Een knoop zónder postfix wordt nooit weggenomen: twee gelijknamige putten
+zonder postfix blijven een gewone dubbele put.
+
+**Waarom.** De Kikker/BrutIS-export schrijft een gecompartimenteerde put per compartiment uit, elk
+als een eigen `Inspectieput`/`Overstortput`/`Stuwput`/`Rioolgemaal`/`Pompunit` op precies dezelfde
+coördinaat, met het putlabel plus (met spaties uitgevuld) `c1`, `c2`, ... Dat is een
+exportartefact, geen tweede put in de grond. De putchecks zien er wél twee: de strengeinden snappen
+op de dichtstbijzijnde knoop en dat kan er maar één zijn, dus de andere heet losliggend (TOP-001),
+het paar heet een dubbele put (TOP-005) en soms ligt de overgebleven knoop naast een doorlopende
+streng (TOP-021). Het oordeel van de auteur bij de steekproef: *"Dit komt niet omdat er geen streng
+nabij ligt ... maar omdat hij niet is aangesloten."* Zie de checkaudit (#79 §3, **PRE-7**), het
+besluit van 28-08 en issue #85.
+
+**Wat de meting zegt** (28-08, tekstscan op `data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl`, geen
+toetsrun). 189 knoopslabels dragen een `c<n>`-postfix, in **98** groepen: 96 keer `c1`, 92 keer
+`c2`, 1 keer `c3`. De postfix staat er altijd met minstens één spatie ervoor; geen enkel
+strenglabel matcht het patroon. Binnen een groep is de onderlinge afstand **0,000 m** -- alle 92
+meetbare groepen vallen exact samen, dus de tolerantie van 0,30 m is hier ruim en niet krap. In
+slechts **3** van de 98 groepen bestaat er ook een knoop met het kale basislabel; in de overige 95
+is `c1` het oudste dat er is. Dezelfde regel over dezelfde export levert **94** samengevoegde
+knopen, en dat sluit aan bij de audit: 93 van de 102 TOP-001-meldingen en 92 van de 112
+TOP-005-meldingen dragen deze postfix.
+
+**Reikwijdte -- welke checks de samengevoegde populatie zien.** Precies de checks die de
+puttenindex `_Topologie.nodes` lezen, en dat zijn er zeven: **TOP-001** (losliggende put),
+**TOP-005** (dubbele put), **TOP-009** (RD-bereik), **TOP-014** (aansluitende strengen),
+**TOP-015** (multipart), **TOP-016** (ongeldige geometrie) en **TOP-021** (put naast een
+doorlopende streng). Alle zeven verantwoorden het in hun `notes()`; stilte zou lezen als "alles
+gecontroleerd". Omdat de STRtree op diezelfde lijst gebouwd wordt, snappen de strengeinden van een
+weggenomen duplicaat vanzelf op de knoop die overbleef -- TOP-002, TOP-003 en TOP-004 krijgen er
+dus geen nieuwe melding bij.
+
+Wat de dedup **niet** raakt, en met opzet: de netwerkgraaf in `checks/verbanden.py` en alles wat
+daarop leunt (`verbonden_knopen`, dus TOP-013/014-telling, TOP-019, alle NET-checks), de
+administratieve koppeling via `resolve_network_node` (TOP-004, TOP-012), de afbakening in
+`afbakening.py`, en de uitvoer: het duplicaat blijft gewoon een object in de laag `putten` van de
+GeoPackage. Dit is een analysestap vóór de topologiechecks, geen wijziging aan de dataset. De
+leeslaag `gwsw-orox-helpers` blijft ongemoeid -- een wijziging dáár is een release plus een
+`uv lock` (Harde regel), en de dedup is bovendien een projectinterpretatie en geen leesfeit.
+
+**Randgeval dat bewust conservatief uitpakt.** Ligt het origineel verder dan de tolerantie van zijn
+postfixdragers, dan wordt er in die groep niets samengevoegd -- ook niet als de postfixdragers
+onderling wél samenvallen. Dat kost hooguit een melding die blijft staan (de veilige kant); een
+clusterende variant zou code toevoegen voor een geval dat in deze export nul keer voorkomt.
+
+**Hoe het vastligt.** `_COMPARTIMENT_POSTFIX`, `_basislabel` en `_dedupliceer` in
+`checks/topologie.py`; de telling reist mee als `_Topologie.samengevoegd` en `_dedupnotitie` maakt
+er de toelichtingsregel van. De fixture `top005_compartimentduplicaat.ttl` zet vier groepen naast
+elkaar die alleen in het beslissende kenmerk verschillen: `K0001  c1`/`c2` op 0,10 m (samenvoegen),
+`M0003` met `M0003  c1` op 0,10 m waarbij de leiding aan de postfixdrager hangt (het origineel wint
+én de leiding snapt erop), `V0002  c1`/`c2` op 0,50 m (buiten de tolerantie, blijft staan) en twee
+putten `DUB` zonder postfix (blijft een dubbele put). De drempel is de bestaande
+`dubbele_put_tolerantie_m`; er komt geen nieuwe knop bij.
+
+**Verwacht effect op De Wolden en Hoogeveen.** TOP-001 **102 → ~9**, TOP-005 **112 → ~20**,
+TOP-021 **5 → ~3**. De hermeting hoort bij de blokregie, niet bij dit besluit.
+
+**Alternatieven.** De dedup in de leeslaag leggen (verworpen: Harde regel, en het is een
+interpretatie van één leverancier zijn export en geen leesfeit -- `gwsw-orox-helpers` moet de
+export teruggeven zoals hij is). Het patroon configureerbaar maken als regex (verworpen: niet
+gevraagd, en een verkeerd ingestelde regex zou stil echte putten samenvoegen; de tolerantie is de
+knop die er al is). Een eigen aan/uit-schakelaar (verworpen: op een export zonder dit artefact
+matcht de regel nul keer en kost zij niets). Samenvoegen op ligging alleen, zonder de naam
+(verworpen: dat is TOP-005 zelf uitzetten). De duplicaten ook uit de netwerkgraaf en de uitvoer
+halen (verworpen voor nu: dat raakt de NET-checks, de afbakening en de GIS-lagen, en het issue
+vraagt de kleinste ingreep die TOP-001/005/021 dedupliceert).

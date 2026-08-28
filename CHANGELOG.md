@@ -55,6 +55,24 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Het compartimentduplicaat (`c<n>`-postfix) wordt vóór de topologiechecks samengevoegd**
+  (issue #85, BO-71). De Kikker/BrutIS-export schrijft een gecompartimenteerde put per
+  compartiment uit: elk deel is een eigen put op dezelfde coördinaat, met het putlabel plus
+  `c1`, `c2`, ... De putchecks zagen er twee -- het strengeinde snapt op één ervan, dus de
+  ander heet losliggend (TOP-001) en het paar een dubbele put (TOP-005). Twee knopen gelden
+  nu als hetzelfde object wanneer hun labels op die postfix na gelijk zijn **én** ze binnen
+  `[drempels] dubbele_put_tolerantie_m` (0,30 m) samenvallen; het origineel wint (de knoop
+  zonder postfix, anders de laagste postfix). Een knoop zonder postfix wordt nooit
+  weggenomen, dus een gewone dubbele put blijft gemeld. De samenvoeging geldt voor de zeven
+  checks die de puttenindex lezen -- TOP-001, TOP-005, TOP-009, TOP-014, TOP-015, TOP-016 en
+  TOP-021 -- en alle zeven verantwoorden hem in hun toelichting; de strengeinden van een
+  weggenomen duplicaat snappen vanzelf op de knoop die overbleef, dus TOP-002/003/004 krijgen
+  er geen melding bij. Bewust ongemoeid: de netwerkgraaf, de administratieve koppeling, de
+  afbakening, de GIS-lagen en de leeslaag `gwsw-orox-helpers`. Gemeten op de export (tekstscan,
+  geen toetsrun): 189 zulke labels in 98 groepen (`c1` 96x, `c2` 92x, `c3` 1x), onderling op
+  0,000 m, waarvan er **94** samengevoegd worden. Verwacht effect op De Wolden en Hoogeveen:
+  TOP-001 **102 → ~9**, TOP-005 **112 → ~20**, TOP-021 **5 → ~3**. De hermeting hoort bij de
+  blokregie.
 - **TOP-006 meldt pas bij 2 cm samenval over 2 m; de TOP-010-marge blijft 0,0 m**
   (issue #100, BO-70). `overlap_tolerantie_m` gaat van 0,05 naar 0,02 m en
   `overlap_minimale_lengte_m` van 1,0 naar 2,0 m: twee buizen die binnen 5 cm van elkaar

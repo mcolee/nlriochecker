@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -78,6 +79,9 @@ class _Topologie:
     # Per streng-URI de uiteinden, een keer bepaald bij het bouwen; voorheen
     # rekende elke check ze opnieuw uit, met verse Point-objecten per aanroep.
     eindpunten: dict[str, tuple[Point, Point] | None] = field(default_factory=dict)
+    # Hoeveel knopen als `c<n>`-duplicaat zijn samengevoegd en dus niet in `nodes`
+    # staan; `_dedupnotitie` verantwoordt ze. Zie `_dedupliceer` en BO-71.
+    samengevoegd: int = 0
 
     def endpoints_of(self, conduit: Conduit) -> tuple[Point, Point] | None:
         """Het begin- en eindpunt van de strenggeometrie, uit de gedeelde tabel.
@@ -117,6 +121,7 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
     # De selectie ontdubbelt al, dus hier blijft alleen het filter over dat bij deze
     # structuur hoort en niet bij de rol: een knoop zonder punt kan niet in de index.
     knopen = [node for node in netwerkknopen(context) if node.point is not None]
+    knopen, samengevoegd = _dedupliceer(knopen, context.config.drempels.dubbele_put_tolerantie_m)
     tree = STRtree([node.point for node in knopen]) if knopen else None
 
     alle = leidingen(context)
@@ -131,7 +136,79 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
         lined=met_lijn,
         line_tree=STRtree([conduit.line for conduit in met_lijn]) if met_lijn else None,
         eindpunten=eindpunten,
+        samengevoegd=samengevoegd,
     )
+
+
+# Het achtervoegsel waarmee de Kikker-export een gecompartimenteerde put per deel
+# uitschrijft: het putlabel, met spaties uitgevuld, plus `c1`, `c2`, ... De export van De
+# Wolden en Hoogeveen draagt 189 zulke labels in 98 groepen (c1 96x, c2 92x, c3 1x); de
+# spatie ervoor staat er altijd, maar hij is hier optioneel omdat de uitvulling een
+# opmaakkeuze van de leverancier is en niet het patroon zelf.
+_COMPARTIMENT_POSTFIX = re.compile(r"^(?P<basis>.*\S)\s*c(?P<nummer>\d+)$")
+
+
+def _basislabel(label: str) -> tuple[str, int] | None:
+    """De putnaam en het compartimentnummer achter een `c<n>`-label, of None."""
+    treffer = _COMPARTIMENT_POSTFIX.match(label.strip())
+    if treffer is None:
+        return None
+    return treffer["basis"].strip(), int(treffer["nummer"])
+
+
+def _dedupliceer(knopen: list[Node], tolerantie: float) -> tuple[list[Node], int]:
+    """Voegt de compartimentduplicaten van dezelfde put samen; het origineel wint.
+
+    Twee knopen zijn hetzelfde fysieke object wanneer hun labels op een `c<n>`-postfix
+    na gelijk zijn **en** hun punten binnen de dubbele-put-tolerantie samenvallen. Beide
+    eisen tellen: alleen op de naam matchen zou twee echte putten samenvoegen die
+    toevallig zo heten, en alleen op de ligging matchen is precies wat TOP-005 al meldt.
+    Zie BO-71 en issue #85.
+
+    Het origineel wint: de knoop wiens label géén postfix draagt, en is die er niet --
+    in de export van De Wolden en Hoogeveen 95 van de 98 groepen -- de laagste
+    postfix. Een knoop zonder postfix wordt nooit weggenomen; twee gelijknamige putten
+    zonder postfix blijven dus gewoon een dubbele put.
+    """
+    per_basis: defaultdict[str, list[tuple[int, Node]]] = defaultdict(list)
+    zonder_postfix: defaultdict[str, list[Node]] = defaultdict(list)
+    for node in knopen:
+        label = (node.label or "").strip()
+        gevonden = _basislabel(label)
+        if gevonden is None:
+            zonder_postfix[label].append(node)
+        else:
+            per_basis[gevonden[0]].append((gevonden[1], node))
+
+    duplicaten: set[str] = set()
+    for basis, leden in per_basis.items():
+        genummerd = sorted(leden, key=lambda paar: (paar[0], paar[1].uri))
+        originelen = sorted(zonder_postfix.get(basis, []), key=lambda node: node.uri)
+        winnaar = originelen[0] if originelen else genummerd[0][1]
+        for _, node in genummerd:
+            if node.uri != winnaar.uri and _punt(node).distance(_punt(winnaar)) <= tolerantie:
+                duplicaten.add(node.uri)
+
+    if not duplicaten:
+        return knopen, 0
+    return [node for node in knopen if node.uri not in duplicaten], len(duplicaten)
+
+
+def _dedupnotitie(context: CheckContext) -> list[str]:
+    """Verantwoordt de knopen die als compartimentduplicaat zijn samengevoegd."""
+    aantal = _topologie(context).samengevoegd
+    if not aantal:
+        return []
+    tolerantie = context.config.drempels.dubbele_put_tolerantie_m
+    return [
+        f"{getal(aantal, 'knoop', 'knopen')} {vorm(aantal, 'is', 'zijn')} vóór deze toets "
+        "samengevoegd met een gelijknamige knoop: de labels verschillen alleen in een "
+        "`c<n>`-postfix -- waarmee de bronexport een gecompartimenteerde put per deel "
+        f"uitschrijft -- en de punten liggen binnen {tolerantie:g} m van elkaar "
+        "(`[drempels] dubbele_put_tolerantie_m`). Zij tellen hier niet als eigen knoop en "
+        "de leidingen die erop uitkomen snappen op de knoop die overbleef; een gebrek op "
+        "zo'n duplicaat wordt dus op het origineel gemeld. Zie BO-71."
+    ]
 
 
 def _snapping(context: CheckContext) -> dict[str, tuple[Node | None, ...]]:
@@ -326,6 +403,10 @@ class LosliggendePut(Check):
                     tolerantie_m=tolerantie,
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten met geometrie."""
         return len(_topologie(context).nodes)
@@ -496,6 +577,10 @@ class DubbelePut(Check):
                     tolerantie_m=tolerantie,
                     foutlocatie=_midden(node.point, ander.point),
                 )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten met geometrie."""
@@ -742,6 +827,7 @@ class BuitenRdBereik(Check):
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt welk deel van deze check niet uitgevoerd is."""
         return [
+            *_dedupnotitie(context),
             "Alleen het RD-bereik en het ontbreken van coordinaten zijn getoetst. Het "
             "beheergebied is niet getoetst: er is geen beheergebiedpolygoon aangeleverd. "
             "Het studiegebied Koekangerveld is daarvoor geen vervanging, want dat beslaat "
@@ -993,6 +1079,10 @@ class VeelAansluitendeStrengen(Check):
                 maximum=maximum,
             )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten."""
         return len(_topologie(context).nodes)
@@ -1037,6 +1127,10 @@ class MultipartGeometrie(Check):
                     "deel is ingelezen.",
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen plus strengen."""
         topologie = _topologie(context)
@@ -1071,14 +1165,15 @@ class OngeldigeGeometrie(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt de objecten waarvan de geometrie al bij het inlezen strandde."""
+        notities = _dedupnotitie(context)
         aantal = len(context.dataset.geometry_errors)
-        if not aantal:
-            return []
-        return [
-            f"{aantal} objecten hebben een GML-literaal die niet te lezen was; die konden "
-            "hier niet op geldigheid getoetst worden en staan in de lijst met "
-            "geometriefouten van de dataset."
-        ]
+        if aantal:
+            notities.append(
+                f"{aantal} objecten hebben een GML-literaal die niet te lezen was; die konden "
+                "hier niet op geldigheid getoetst worden en staan in de lijst met "
+                "geometriefouten van de dataset."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen plus strengen."""
@@ -1356,6 +1451,10 @@ class PutNaastDoorlopendeStreng(Check):
                     tolerantie_m=tolerantie,
                 )
                 break
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten met geometrie."""

@@ -136,6 +136,51 @@ def test_put_aan_alleen_een_persleiding_is_niet_losliggend() -> None:
     assert _labels(bevindingen) == ["LOS"]
 
 
+def _uitslag(bestand: str, check_id: str):
+    """Draait een enkele check op een fixture en geeft de hele uitslag terug."""
+    dataset = load_dataset(TTL_DIR / bestand, [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    return run_checks(context, [check_id]).outcomes[0]
+
+
+def test_compartimentduplicaat_valt_voor_de_topologiechecks_weg() -> None:
+    """Issue #85: `K0001  c2` en `M0003  c1` zijn samengevoegd, de rest blijft staan.
+
+    De twee groepen die overblijven tonen waar de dedup ophoudt: `V0002  c2` ligt 0,50 m
+    van zijn naamgenoot -- buiten de dubbele-put-tolerantie -- en de twee putten `DUB`
+    dragen geen postfix. Beide horen gewoon gemeld te worden.
+    """
+    losliggend = _bevindingen(TTL_DIR / "top005_compartimentduplicaat.ttl", "TOP-001")
+    dubbel = _bevindingen(TTL_DIR / "top005_compartimentduplicaat.ttl", "TOP-005")
+
+    assert _labels(losliggend) == ["DUB", "V0002  c2"]
+    assert _labels(dubbel) == ["DUB"]
+
+
+def test_het_postfixloze_origineel_wint_en_houdt_de_leiding() -> None:
+    """`M0003` blijft over, ook al hangt de leiding administratief aan `M0003  c1`.
+
+    De leiding eindigt op de plek van het duplicaat. Zou de dedup het origineel laten
+    vallen, dan bleef de melding staan met de andere knoop erin; zou zij de leiding niet
+    op de overgebleven knoop laten snappen, dan werd het origineel alsnog losliggend.
+    """
+    uitslag = _uitslag("top005_compartimentduplicaat.ttl", "TOP-001")
+
+    assert "M0003" not in _labels(uitslag.findings)
+    # Dertien knopen in de fixture, twee samengevoegd.
+    assert uitslag.examined == 11
+
+
+def test_de_samengevoegde_duplicaten_staan_in_de_toelichting() -> None:
+    uitslag = _uitslag("top005_compartimentduplicaat.ttl", "TOP-005")
+
+    assert any("2 knopen" in note and "c<n>" in note for note in uitslag.notes), uitslag.notes
+
+
+def test_zonder_duplicaten_zwijgt_de_toelichting() -> None:
+    assert _uitslag("top005_dubbele_put.ttl", "TOP-005").notes == []
+
+
 def test_top022_telt_richtingen_en_niet_strengen() -> None:
     """T3 heeft vier strengen maar drie richtingen (een dubbel gelegd) en zwijgt; T1 meldt."""
     pad = TTL_DIR / "top022_hulpstuk_te_weinig.ttl"
