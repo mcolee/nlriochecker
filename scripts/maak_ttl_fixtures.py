@@ -776,6 +776,45 @@ FIXTURES["net006_gemengd_naar_vuilwater.ttl"] = (
     ),
 )
 
+# NET-006 (issue #97, optie B): een doorgaand gemengd hoofdriool (L1 A->B->C L2) waarop een
+# vuilwatertak (L3 D->B) aansluit. Op knoop B stroomt gemengd zowel in als uit en vuilwater
+# in; de foutvorm (vuilwater benedenstrooms van gemengd) ontbreekt en alle strengen zijn
+# betrouwbaar gericht, dus NET-006 dempt de koppeling. De strikte regel (optie A) meldde deze
+# nog omdat gemengd niet puur uitstroomt.
+FIXTURES["net006_doorgaand_gemengd_hoofdriool.ttl"] = (
+    "geen; doorgaand gemengd hoofdriool met een aansluitende vuilwatertak op knoop B "
+    "(goede richting, issue #97)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + put("PutD", "D", 1025.0, 2025.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.5, 10.0),
+    )
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        bob=(10.0, 9.5),
+    )
+    + leiding(
+        "L3",
+        "3",
+        [(1025.0, 2025.0), (1025.0, 2000.0)],
+        "PutD",
+        "PutB",
+        klasse="Vuilwaterriool",
+        bob=(10.3, 10.0),
+    ),
+)
+
 # NET-008: drie lozingsputten in een deelstelsel van vier knopen.
 FIXTURES["net008_veel_lozingspunten.ttl"] = (
     "een deelstelsel van vier knopen heeft drie lozingsputten",

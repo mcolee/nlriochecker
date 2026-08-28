@@ -789,17 +789,24 @@ def _richting_op_knoop(knoop: str, begin: str | None, eind: str | None, betrouwb
     return "?"
 
 
-def _vuilwater_stroomt_in_gemengd(richtingen: dict[str, set[str]]) -> bool:
-    """Geeft aan of op deze knoop enkel vuilwater instroomt en gemengd uitstroomt.
+def _koppeling_is_goede_richting(richtingen: dict[str, set[str]]) -> bool:
+    """Geeft aan of deze gemengd+vuilwater-knoop de normale afvoerrichting heeft (issue #97).
 
-    Dat is de goede afvoerrichting (issue #97): gemengd benedenstrooms van vuilwater.
-    Alleen als het paar precies gemengd+vuilwater is, elk vuilwaterbeen betrouwbaar
-    instroomt en elk gemengd been betrouwbaar uitstroomt. Elke onbekende of omgekeerde
-    richting laat de melding staan.
+    Optie B (domein-getrouw): de enige koppelingsfout is vuilwater benedenstrooms van
+    gemengd -- gemengd stroomt de knoop ín en vuilwater stroomt eruit (de foutvorm). Elke
+    andere betrouwbaar gerichte gemengd+vuilwater-koppeling is normaal en wordt gedempt:
+    vuilwater dat in gemengd overgaat, én een doorgaand gemengd hoofdriool (gemengd zowel
+    in als uit) waarop een vuilwatertak aansluit. De strikte optie A dempte alleen het
+    eerste geval. Zodra een van beide typen een onbetrouwbare richting draagt (een '?' in
+    de set), of de foutvorm aanwezig is, blijft de melding staan.
     """
     if set(richtingen) != {_STELSEL_GEMENGD, _STELSEL_VUILWATER}:
         return False
-    return richtingen[_STELSEL_VUILWATER] == {"in"} and richtingen[_STELSEL_GEMENGD] == {"uit"}
+    alle_betrouwbaar = (
+        "?" not in richtingen[_STELSEL_GEMENGD] and "?" not in richtingen[_STELSEL_VUILWATER]
+    )
+    foutvorm = "in" in richtingen[_STELSEL_GEMENGD] and "uit" in richtingen[_STELSEL_VUILWATER]
+    return alle_betrouwbaar and not foutvorm
 
 
 def _betrouwbaar_gericht(diagnose: _Richtingsdiagnose) -> bool:
@@ -1029,10 +1036,12 @@ class KoppelingTussenStelseltypen(Check):
         hemelwater op een gemengd stelsel — maar ze horen bewust te zijn. De
         bevinding staat op de knoop, want daar zit de koppeling.
 
-        Eén paar is met een betrouwbare richting geen fout: vuilwater dat in een
-        gemengd riool overgaat (gemengd benedenstrooms van vuilwater). Die koppeling
-        wordt gedempt; de omgekeerde richting -- gemengd in een vuilwaterriool -- blijft
-        wél gemeld. Zie issue #97 en `_betrouwbare_richting` (de richtingsbron uit #80).
+        Het paar gemengd+vuilwater is met een betrouwbare richting alleen fout in één
+        vorm: vuilwater benedenstrooms van gemengd (gemengd stroomt in, vuilwater uit).
+        Elke andere betrouwbaar gerichte gemengd+vuilwater-koppeling -- vuilwater dat in
+        gemengd overgaat, of een doorgaand gemengd hoofdriool met een aansluitende
+        vuilwatertak -- wordt gedempt (optie B, issue #97). Zie `_koppeling_is_goede_richting`
+        en `_betrouwbare_richting` (de richtingsbron uit #80).
         """
         dataset = context.dataset
         knopen, _ = self._koppelingen(context)
@@ -1085,23 +1094,23 @@ class KoppelingTussenStelseltypen(Check):
         for uri, soorten in sorted(per_knoop.items()):
             if len(soorten) < 2:
                 continue
-            if _vuilwater_stroomt_in_gemengd(richtingen[uri]):
+            if _koppeling_is_goede_richting(richtingen[uri]):
                 gedempt += 1
                 continue
             knopen.append((uri, soorten))
         return knopen, gedempt
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt de gedempte vuilwater→gemengd-koppelingen en de typeloze strengen."""
+        """Meldt de gedempte gemengd+vuilwater-koppelingen en de typeloze strengen."""
         _, gedempt = self._koppelingen(context)
         notities = _stelseltype_notities(context)
         if gedempt:
             notities.insert(
                 0,
-                f"{getal(gedempt, 'koppeling', 'koppelingen')} waar vuilwater in een gemengd "
-                f"riool overgaat {vorm(gedempt, 'is', 'zijn')} niet gemeld: gemengd "
-                "benedenstrooms van vuilwater is de normale afvoerrichting (issue #97). De "
-                "omgekeerde richting blijft wel gemeld.",
+                f"{getal(gedempt, 'gemengd+vuilwater-koppeling', 'gemengd+vuilwater-koppelingen')} "
+                f"in de normale afvoerrichting {vorm(gedempt, 'is', 'zijn')} niet gemeld: alleen "
+                "vuilwater benedenstrooms van gemengd is een fout (issue #97). De foutvorm en "
+                "elke onbetrouwbaar gerichte koppeling blijven wel gemeld.",
             )
         return notities
 

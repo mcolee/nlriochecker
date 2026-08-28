@@ -81,6 +81,20 @@ def test_net006_dempt_vuilwater_dat_op_gemengd_uitkomt() -> None:
     assert any("vuilwater" in note and "gemengd" in note for note in outcome.notes)
 
 
+def test_net006_dempt_doorgaand_gemengd_hoofdriool_met_vuilwatertak() -> None:
+    """Een doorgaand gemengd hoofdriool met een vuilwatertak is geen fout (issue #97, optie B).
+
+    Op knoop B stroomt gemengd zowel in als uit (het hoofdriool loopt door) en sluit een
+    vuilwatertak aan die instroomt. De foutvorm -- vuilwater benedenstrooms van gemengd
+    (gemengd ín én vuilwater úit) -- is afwezig en alle strengen zijn betrouwbaar gericht,
+    dus NET-006 zwijgt. De strikte regel (optie A) meldde de knoop nog wél.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_doorgaand_gemengd_hoofdriool.ttl", "NET-006")
+
+    assert outcome.findings == []
+    assert any("vuilwater" in note and "gemengd" in note for note in outcome.notes)
+
+
 def test_net006_meldt_gemengd_dat_op_vuilwater_uitkomt() -> None:
     """De omgekeerde richting is wél een koppelingsfout (issue #97).
 

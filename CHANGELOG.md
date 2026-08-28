@@ -88,14 +88,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   een put sluit, hoort bij HGT-009. Beide worden gedempt en in de toelichting geteld. Een
   echte melding blijft een kring die op de betrouwbare richting overeind blijft en waarvan de
   BOB geen uitsluitsel geeft. Richtgetal De Wolden: 17 → 0 (hermeet).
-- **NET-006 dempt vuilwater dat op gemengd uitkomt** (issue #97). Gemengd benedenstrooms
-  van vuilwater is de normale afvoerrichting en geen koppelingsfout: op een knoop waar
-  precies gemengd en vuilwater samenkomen, elk vuilwaterbeen betrouwbaar instroomt en elk
-  gemengd been betrouwbaar uitstroomt, meldt NET-006 niets meer. De omgekeerde richting
-  (gemengd in een vuilwaterriool) en elke onbetrouwbare of onbekende richting blijven
-  gemeld. "Betrouwbaar" leunt op NET-009's per-streng oordeel (de richtingsbron uit #80,
-  BO-76): een streng waarvan geen enkel richtingssignaal de administratie tegenspreekt. De
-  toelichting telt de gedempte koppelingen. Richtgetal De Wolden: tot −213 (hermeet).
+- **NET-006 meldt alleen nog vuilwater benedenstrooms van gemengd** (issue #97, optie B).
+  Op een knoop waar precies gemengd en vuilwater samenkomen is er maar één koppelingsfout:
+  gemengd stroomt de knoop ín en vuilwater eruit (vuilwater benedenstrooms van gemengd).
+  Elke andere betrouwbaar gerichte gemengd+vuilwater-koppeling is normaal en wordt gedempt
+  -- zowel vuilwater dat in gemengd overgaat als een doorgaand gemengd hoofdriool (gemengd
+  in én uit) waarop een vuilwatertak aansluit. De foutvorm en elke onbetrouwbaar of onbekend
+  gerichte koppeling blijven gemeld. "Betrouwbaar" leunt op NET-009's per-streng oordeel (de
+  richtingsbron uit #80, BO-76): een streng waarvan geen enkel richtingssignaal de
+  administratie tegenspreekt. De toelichting telt de gedempte koppelingen. Hermeting De
+  Wolden + Hoogeveen: NET-006 van 410 (ongericht) via 393 (de eerdere strikte regel) naar
+  330 -- 80 koppelingen gedempt, ruim onder het −213-plafond.
 - **NET-009 wordt de integrale richtingscheck en de forsgrens verschuift** (issue #80,
   BO-76). NET-009 meldt elke streng waarvan de tekenrichting of de BOB de administratieve
   van-naar-richting tegenspreekt, en is daarmee een **W** (was F); NET-003 en TOP-020 gaan
