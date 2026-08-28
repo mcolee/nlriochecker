@@ -725,8 +725,7 @@ FIXTURES["net006_koppeling_stelseltypen.ttl"] = (
 # dalende BOB en meelopende geometrie, dus hun richting is betrouwbaar (NET-009 spreekt ze
 # niet tegen) en NET-006 dempt de koppelingsmelding.
 FIXTURES["net006_vuilwater_naar_gemengd.ttl"] = (
-    "geen; vuilwater komt op knoop B binnen en gaat als gemengd verder (goede richting, "
-    "issue #97)",
+    "geen; vuilwater komt op knoop B binnen en gaat als gemengd verder (goede richting, issue #97)",
     put("PutA", "A", 1000.0, 2000.0)
     + put("PutB", "B", 1025.0, 2000.0)
     + put("PutC", "C", 1050.0, 2000.0)
@@ -798,15 +797,9 @@ FIXTURES["net004_lus_door_richtingsfout.ttl"] = (
     put("PutC", "C", 2000.0, 3000.0)
     + put("PutD", "D", 2050.0, 3000.0)
     + put("PutE", "E", 2025.0, 3050.0)
-    + leiding(
-        "L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 9.5)
-    )
-    + leiding(
-        "L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(9.5, 9.0)
-    )
-    + leiding(
-        "L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(9.0, 9.5)
-    ),
+    + leiding("L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 9.5))
+    + leiding("L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(9.5, 9.0))
+    + leiding("L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(9.0, 9.5)),
 )
 
 # NET-004 (issue #102): een BOB-consistente ring die vlak ligt en nergens in een put omhoog
@@ -818,15 +811,9 @@ FIXTURES["net004_vermaasde_ring.ttl"] = (
     put("PutC", "C", 2000.0, 3000.0)
     + put("PutD", "D", 2050.0, 3000.0)
     + put("PutE", "E", 2025.0, 3050.0)
-    + leiding(
-        "L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 10.0)
-    )
-    + leiding(
-        "L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(10.0, 10.0)
-    )
-    + leiding(
-        "L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(10.0, 10.0)
-    ),
+    + leiding("L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 10.0))
+    + leiding("L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(10.0, 10.0))
+    + leiding("L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(10.0, 10.0)),
 )
 
 # NET-004 (issue #102): een BOB-consistente ring die per been keurig daalt maar alleen sluit
@@ -838,15 +825,9 @@ FIXTURES["net004_ring_met_putsprong.ttl"] = (
     put("PutC", "C", 2000.0, 3000.0)
     + put("PutD", "D", 2050.0, 3000.0)
     + put("PutE", "E", 2025.0, 3050.0)
-    + leiding(
-        "L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 9.6)
-    )
-    + leiding(
-        "L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(9.6, 9.2)
-    )
-    + leiding(
-        "L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(9.2, 8.8)
-    ),
+    + leiding("L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 9.6))
+    + leiding("L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(9.6, 9.2))
+    + leiding("L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(9.2, 8.8)),
 )
 
 
