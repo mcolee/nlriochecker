@@ -332,8 +332,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   over `[klassen] streng` en hield daarvan wat óók onder `[klassen] nabijheidsleiding` viel;
   de twee lijsten zijn los configureerbaar, dus versmalde een project `streng` tot de
   vrijvervalleiding, dan viel de duiker stilzwijgend uit de populatie en meldden de drie
-  checks er niets meer over. Met de standaardconfiguratie (`streng = ["Leiding"]`) verandert
-  er niets. Het meetscript `scripts/meet_v5_gevoeligheid.py` achter BO-70 gaf `_buren` sinds
+  checks er niets meer over. De verantwoordingsregel in de toelichting telt mee over de
+  vereniging van beide rollen, zodat "X van de N leidingen vallen daarbuiten" met N − X de
+  werkelijk getoetste populatie noemt. Met de standaardconfiguratie (`streng = ["Leiding"]`)
+  verandert er niets. Het meetscript `scripts/meet_v5_gevoeligheid.py` achter BO-70 gaf `_buren` sinds
   #82 een `_Topologie` in plaats van de nabijheidsindex -- de STRtree van pútpunten -- en
   leest nu `_nabijheid(context)`.
 - **Het rapport noemt alleen ontbrekende bronnen waar ook echt een check op leunt**

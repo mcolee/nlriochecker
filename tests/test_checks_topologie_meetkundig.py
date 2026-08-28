@@ -287,18 +287,24 @@ def test_de_populatie_is_de_eigen_rol_en_niet_haar_doorsnede_met_de_leidingen(
 
     Versmalt een project `streng` tot de vrijvervalleiding, dan valt de duiker uit de
     leidingenrol -- maar niet uit `nabijheidsleiding`. De populatie van TOP-006,
-    TOP-010 en TOP-011 is die rol zelf, dus het duikerpaar hoort te blijven melden.
+    TOP-010 en TOP-011 is die rol zelf, dus het duikerpaar hoort te blijven melden, en
+    de verantwoordingsregel hoort over diezelfde populatie te tellen: totaal min buiten
+    is de populatie, hier de zes vrijvervalleidingen plus de twee duikers.
     """
     config = fixtureconfig()
     config.klassen.streng = ["VrijvervalRioolleiding"]
 
-    gevonden = bevindingen(TTL_DIR / "top_nabijheid_scope.ttl", check_id, config)
+    dataset = load_dataset(TTL_DIR / "top_nabijheid_scope.ttl", [])
+    context = CheckContext(dataset=dataset, config=config)
+    outcome = run_checks(context, [check_id]).outcomes[0]
+    gevonden = outcome.findings
 
     assert len(gevonden) == 1, [
         (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
     ]
     bevinding = gevonden[0]
     assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
+    assert any("0 van de 8 leidingen" in note for note in outcome.notes), outcome.notes
 
 
 @pytest.mark.parametrize("check_id", ["TOP-006", "TOP-010", "TOP-011"])

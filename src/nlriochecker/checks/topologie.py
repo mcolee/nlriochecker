@@ -207,7 +207,8 @@ class _Nabijheid:
     # gevuld. TOP-010 gebruikt ze om een gedeeld uiteinde te herkennen.
     eindpunten: dict[str, tuple[Point, Point]]
     # Hoeveel leidingen buiten deze populatie vielen, en hoeveel er in totaal zijn;
-    # `notes()` verantwoordt de versmalling ermee.
+    # `notes()` verantwoordt de versmalling ermee. Invariant: `totaal - buiten` is de
+    # populatie, anders noemt die regel een ander getal dan er getoetst is.
     buiten: int
     totaal: int
 
@@ -225,10 +226,17 @@ def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
     configureerbaar, en een duiker zou bij een versmalde `streng` anders stil uit de
     populatie vallen. De leidingenrol wordt alleen geteld, voor de verantwoording in
     `notes()`: hoeveel leidingen er buiten de versmalde populatie vielen.
+
+    Dat tellen gaat over de vereniging van de twee rollen, zodat `totaal - buiten` de
+    populatie blijft. Zou `totaal` alleen de leidingenrol tellen, dan zou een project
+    dat `streng` versmalt een verantwoordingsregel krijgen die een kleiner getal noemt
+    dan er getoetst is. Onder de standaardconfiguratie (`streng = ["Leiding"]`) valt de
+    populatie binnen de leidingenrol en verandert er niets.
     """
     binnen = nabijheidsleidingen(context)
     in_populatie = {conduit.uri for conduit in binnen}
     alle = leidingen(context)
+    totaal = len({conduit.uri for conduit in alle} | in_populatie)
 
     conduits: list[Conduit] = []
     eindpunten: dict[str, tuple[Point, Point]] = {}
@@ -243,8 +251,8 @@ def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
         conduits=conduits,
         tree=STRtree([conduit.line for conduit in conduits]) if conduits else None,
         eindpunten=eindpunten,
-        buiten=sum(1 for conduit in alle if conduit.uri not in in_populatie),
-        totaal=len(alle),
+        buiten=totaal - len(in_populatie),
+        totaal=totaal,
     )
 
 
