@@ -242,6 +242,51 @@ def _bouw_snapping(context: CheckContext) -> dict[str, tuple[Node | None, ...]]:
     return snapping
 
 
+@dataclass(frozen=True)
+class _Eindhulpstukken:
+    """De hulpstukken die als geldig strengeinde tellen, met een index erop.
+
+    Een `Hulpstuk` is in het GWSW geen `Put` en dus geen netwerkknoop, dus een streng
+    die op een T-stuk eindigt heeft geometrisch geen put aan die zijde. TOP-002 en
+    TOP-003 lazen dat als een gebrek; op De Wolden en Hoogeveen ging het bij 45 van de
+    56 respectievelijk 107 van de 109 meldingen om precies dat. Zie BO-72 en issue #89.
+    """
+
+    nodes: list[Node]
+    tree: STRtree | None
+
+    def raakt(self, punt: Point, tolerantie: float) -> bool:
+        """Of een van deze hulpstukken binnen de tolerantie van dit punt ligt."""
+        if self.tree is None:
+            return False
+        for index in self.tree.query(punt, predicate="dwithin", distance=tolerantie):
+            if _punt(self.nodes[int(index)]).distance(punt) <= tolerantie:
+                return True
+        return False
+
+
+def _eindhulpstukken(context: CheckContext) -> _Eindhulpstukken:
+    """De index met de hulpstukken die als eind tellen; een keer per context."""
+    return context.cached("topologie:eindhulpstukken", lambda: _bouw_eindhulpstukken(context))
+
+
+def _bouw_eindhulpstukken(context: CheckContext) -> _Eindhulpstukken:
+    """Indexeert de hulpstukken met een telbare GWSW-functie en een puntgeometrie.
+
+    Precies de populatie die TOP-022 en TOP-023 toetsen (`_hulpstuktelling().telbaar`),
+    en met opzet dezelfde lijst: "telbare functie" is de grens die daar al ligt, en een
+    tweede klassenlijst zou stil van die grens weglopen. Een hulpstuk waarvan de klasse
+    wel een functie draagt maar geen aantal (`Afsluitstuk`, `Ontstoppingsstuk`) telt dus
+    niet als eind.
+    """
+    knopen = [
+        aansluiting.node
+        for aansluiting in _hulpstuktelling(context).telbaar
+        if aansluiting.node.point is not None
+    ]
+    return _Eindhulpstukken(knopen, STRtree([node.point for node in knopen]) if knopen else None)
+
+
 def _midden(links: Point, rechts: Point) -> tuple[float, float]:
     """Het punt precies tussen twee punten in."""
     return ((links.x + rechts.x) / 2, (links.y + rechts.y) / 2)
@@ -413,21 +458,35 @@ class LosliggendePut(Check):
 
 
 class _StrengPutAansluiting(Check):
-    """Gedeelde basis voor de checks op het aantal aangesloten putten per streng."""
+    """Gedeelde basis voor de checks op het aantal aangesloten eindobjecten per streng."""
 
     verwacht: int
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Telt per streng hoeveel uiteinden geometrisch op een put vallen."""
+        """Telt per streng hoeveel uiteinden op een geldig eindobject vallen.
+
+        Geldig is een put binnen de snapping-tolerantie, of -- sinds issue #89 -- een
+        hulpstuk met een telbare GWSW-functie op diezelfde afstand: een streng die
+        tussen twee T-stukken ligt is aangesloten, ook al is een `Hulpstuk` in het GWSW
+        geen `Put`. Mist zo'n hulpstuk zelf een leiding, dan is dat het gebrek dat
+        TOP-022 meldt; hier telt alleen of de streng ergens op uitkomt. Zie BO-72.
+        """
         topologie = _topologie(context)
         tolerantie = context.config.drempels.snapping_tolerantie_m
         snapping = _snapping(context)
+        eindhulpstukken = _eindhulpstukken(context)
 
         for conduit in topologie.conduits:
             treffers = snapping.get(conduit.uri)
-            if treffers is None:
+            uiteinden = topologie.endpoints_of(conduit)
+            if treffers is None or uiteinden is None:
                 continue
-            if sum(1 for node in treffers if node is not None) != self.verwacht:
+            geldig = sum(
+                1
+                for node, punt in zip(treffers, uiteinden, strict=True)
+                if node is not None or eindhulpstukken.raakt(punt, tolerantie)
+            )
+            if geldig != self.verwacht:
                 continue
             yield self.finding(
                 context,
@@ -440,6 +499,20 @@ class _StrengPutAansluiting(Check):
     def melding(self, tolerantie: float) -> str:
         """De tekst van de bevinding."""
         raise NotImplementedError
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt dat een hulpstuk met een telbare functie als eind meetelt."""
+        tolerantie = context.config.drempels.snapping_tolerantie_m
+        aantal = len(_eindhulpstukken(context).nodes)
+        return [
+            f"Een strengeinde dat binnen {tolerantie:g} m op een hulpstuk met een telbare "
+            "GWSW-functie valt (T-stuk, kruisstuk, mof) telt hier als geldig eind: de streng "
+            f"komt ergens op uit. {getal(aantal, 'hulpstuk', 'hulpstukken')} met geometrie "
+            f"{vorm(aantal, 'telt', 'tellen')} zo mee. Of zo'n hulpstuk zelf het juiste aantal "
+            "leidingen verbindt is een andere vraag, en die stelt TOP-022. Een hulpstuk waarvan "
+            "de klasse geen aantal voorschrijft -- een afsluitstuk of ontstoppingsstuk -- telt "
+            "niet als eind. Zie BO-72."
+        ]
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen met geometrie."""
@@ -455,13 +528,16 @@ class LosliggendeStreng(_StrengPutAansluiting):
     title = "Losliggende strengen (aan geen van beide zijden een put)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("hulpstukken", "leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
     kenmerken = ()
     verwacht = 0
 
     def melding(self, tolerantie: float) -> str:
         """De tekst van de bevinding."""
-        return f"Geen van beide strengeinden ligt binnen {tolerantie:g} m van een put."
+        return (
+            f"Geen van beide strengeinden ligt binnen {tolerantie:g} m van een put of van "
+            "een hulpstuk met een telbare GWSW-functie."
+        )
 
 
 @register
@@ -472,13 +548,16 @@ class StrengMetEenPut(_StrengPutAansluiting):
     title = "Streng met slechts aan een zijde een put"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("hulpstukken", "leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
     kenmerken = ()
     verwacht = 1
 
     def melding(self, tolerantie: float) -> str:
         """De tekst van de bevinding."""
-        return f"Slechts een van beide strengeinden ligt binnen {tolerantie:g} m van een put."
+        return (
+            f"Slechts een van beide strengeinden ligt binnen {tolerantie:g} m van een put "
+            "of van een hulpstuk met een telbare GWSW-functie."
+        )
 
 
 @register

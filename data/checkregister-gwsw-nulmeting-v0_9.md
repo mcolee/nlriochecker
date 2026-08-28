@@ -38,8 +38,8 @@ gebreken" leest.
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
 | TOP-001 | Losliggende putten (geen enkele streng aangesloten); geometrische variant, de administratieve koppeling dekt de nulmeting (verplichting exact=1 komt uitsluitend uit Hyd; Mds staat ontbreken toe) | F | Consistentie |
-| TOP-002 | Losliggende strengen (aan geen van beide zijden een put); geometrische variant, administratieve verplichting alleen via Hyd | F | Consistentie |
-| TOP-003 | Streng met slechts aan een zijde een put; geometrische variant, administratieve verplichting alleen via Hyd | F | Consistentie |
+| TOP-002 | Losliggende strengen (aan geen van beide zijden een put); geometrische variant, administratieve verplichting alleen via Hyd. Als geldig eind telt naast een put ook een hulpstuk met een telbare GWSW-functie (T-stuk, kruisstuk, mof): een streng die tussen twee T-stukken ligt komt ergens op uit. Mist zo'n hulpstuk zelf een leiding, dan meldt TOP-022 dat. v0.9 kende alleen de put als eindobject; afwijking in BO-72 (issue #89) | F | Consistentie |
+| TOP-003 | Streng met slechts aan een zijde een put; geometrische variant, administratieve verplichting alleen via Hyd. Zelfde afbakening van het eindobject als TOP-002: ook een hulpstuk met een telbare GWSW-functie telt mee (BO-72, issue #89) | F | Consistentie |
 | TOP-004 | Strengeindpunt niet gesnapt op putlocatie (afstand > tolerantie) | F | Consistentie |
 | TOP-005 | Dubbele putten: twee knopen binnen tolerantie (bijv. 0,30 m) | F | Compleetheid |
 | TOP-006 | Dubbel ingetekende of (deels) overlappende strengen. Beide leidingen van een paar moeten een `VrijvervalRioolleiding` of een `Duiker` zijn (`[klassen] nabijheidsleiding`); drains, mechanische leidingen en aansluitleidingen vallen erbuiten, want een vrijvervalriool dat daar dwars doorheen ligt is geen gebrek. v0.9 zei "strengen" zonder die afbakening; afwijking in BO-69 (issue #82) | F | Compleetheid |

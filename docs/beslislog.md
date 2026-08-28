@@ -3805,3 +3805,74 @@ matcht de regel nul keer en kost zij niets). Samenvoegen op ligging alleen, zond
 (verworpen: dat is TOP-005 zelf uitzetten). De duplicaten ook uit de netwerkgraaf en de uitvoer
 halen (verworpen voor nu: dat raakt de NET-checks, de afbakening en de GIS-lagen, en het issue
 vraagt de kleinste ingreep die TOP-001/005/021 dedupliceert).
+
+### BO-72 Een hulpstuk met een telbare GWSW-functie is voor TOP-002/003 een geldig strengeinde
+
+**Wat.** TOP-002 en TOP-003 tellen per vrijvervalstreng hoeveel uiteinden binnen
+`[drempels] snapping_tolerantie_m` (0,10 m) op een geldig eindobject vallen -- nul is TOP-002,
+precies één is TOP-003. Geldig is voortaan niet alleen een netwerkknoop (put, afvoer- en
+lozingseindpunt, bergbezinkvoorziening) maar ook een **hulpstuk met een telbare GWSW-functie**:
+de klasse draagt een `functie`-restrictie met een aantal leidingen erin
+(`VerbindenVanTweeLeidingen` 2, `VerbindenVanDrieLeidingen` 3, `VerbindenVanVierLeidingen` 4).
+Geverifieerd in de gebundelde ontologie: `Mof` draagt de eerste, `T_stuk` en `Y_stuk` de tweede,
+`Kruisstuk` de derde; alle vier hangen onder `Verbindingsstuk` → `Hulpstuk`. Een `Afsluitstuk`
+(`AfsluitenVanLeidingen`) en een `Ontstoppingsstuk` dragen wél een functie maar geen aantal en
+tellen dus **niet** als eind.
+
+**Waarom.** Een `Hulpstuk` valt in het GWSW onder `Constructieonderdeel` en niet onder `Put`, dus
+de rol `netwerkknopen` bevat het niet en een streng die op een T-stuk eindigt heeft daar
+geometrisch "geen put". Dat is wat de twee checks meldden, en het is niet wat zij bedoelen te
+meten: de vraag is of de streng ergens op uitkomt. Het oordeel van de auteur bij de steekproef is
+eenduidig -- *"Streng ligt tussen 2 T-stukken. Is voor deze analyse goed."*, *"Ligt tussen een
+t-stuk en inspectieput. Voor deze analyse is dat goed"* -- en de audit meet dat het geen
+uitzondering is: **45 van de 56** TOP-002-meldingen hebben beide einden aan een hulpstuk en
+**107 van de 109** TOP-003-meldingen één (checkaudit 27-08, §rode draad 2). Wat overblijft zijn
+de echte snapmissers: ~11 respectievelijk ~2.
+
+**Het gebrek verdwijnt niet.** Dat een T-stuk maar twee van zijn drie leidingen verbindt blijft
+zichtbaar via **TOP-022** (224 F op 1.054 telbare hulpstukken), vanaf de hulpstukkant en met het
+handelingsperspectief dat daarbij hoort ("ontbrekende leiding registreren, of het hulpstuk een
+klasse geven die bij het werkelijke aantal past"). TOP-002/003 gaan over de streng en TOP-022 over
+het hulpstuk; ze meldden tot nu toe dezelfde situatie twee keer vanaf twee kanten, en de
+strengkant was de minst bruikbare van de twee.
+
+**Waarom precies de telbare functie als grens.** Dat is de grens die `_bouw_hulpstuktelling` voor
+TOP-022/TOP-023 al hanteert (`_functie_met_aantal`, tabel `AANTAL_PER_FUNCTIE`), en de nieuwe index
+leest letterlijk diezelfde populatie (`_hulpstuktelling().telbaar`) in plaats van een tweede
+klassenlijst aan te leggen. Twee lijsten zouden stil uit elkaar lopen zodra er een klasse bijkomt.
+Bijkomend argument: een hulpstuk dat volgens de ontologie leidingen verbindt ís een knooppunt in
+het net; een afsluitstuk is dat niet, en een streng die daarop doodloopt hoort gemeld te worden.
+
+**Randgeval dat bewust blijft melden.** Een streng die op een `Afsluitstuk` of `Ontstoppingsstuk`
+eindigt houdt zijn TOP-002/003-melding (op De Wolden en Hoogeveen 58 respectievelijk 10 zulke
+hulpstukken, waarvan de audit niet meet hoeveel strengen erop uitkomen). Dat is de veilige kant:
+de ontologie zegt van die klassen niet dat zij leidingen verbinden, dus er is geen grond om ze als
+netwerkeind te lezen.
+
+**Hoe het vastligt.** `_Eindhulpstukken`, `_eindhulpstukken` en `_bouw_eindhulpstukken` in
+`checks/topologie.py`, gelezen door `_StrengPutAansluiting.run`; de index is een STRtree over de
+telbare hulpstukken met een punt en staat in dezelfde contextcache als de andere
+topologiestructuren. Beide checks declareren de rol `hulpstukken` erbij en verantwoorden de regel
+in hun `notes()` -- stilte zou lezen als "elk eind is aan een put getoetst". De meldingstekst noemt
+het hulpstuk nu ook expliciet. Fixture `top002_streng_op_hulpstuk.ttl`: streng 1 tussen put en
+T-stuk en streng 2 tussen twee T-stukken (beide goed), streng 3 met een afsluitstuk als tweede eind
+(TOP-003) en streng 4 los in het veld (TOP-002); dezelfde fixture toont dat TOP-022 de twee
+T-stukken onverkort meldt.
+
+**Verhouding tot BO-71.** De `c<n>`-deduplicatie van issue #85 werkt op de puttenindex
+`_Topologie.nodes`, en de snapping van TOP-002/003 leest diezelfde gededupliceerde lijst. De
+hulpstukindex staat daarnaast en raakt hem niet: een hulpstuk is geen netwerkknoop en komt in de
+dedup dus niet voor. De twee ingrepen werken op dezelfde strengeinden zonder elkaar te overlappen.
+
+**Verwacht effect op De Wolden en Hoogeveen.** TOP-002 **56 → ~11**, TOP-003 **109 → ~2**. TOP-022
+verandert niet. De hermeting hoort bij de blokregie, niet bij dit besluit.
+
+**Alternatieven.** Het hulpstuk aan de rol `netwerkknopen` toevoegen (verworpen: dat raakt elke
+check die die rol leest -- TOP-001 zou elk hulpstuk zonder streng als losliggende put melden, de
+netwerkgraaf zou van vorm veranderen, en het is bovendien in strijd met de GWSW-hiërarchie, waar
+een `Hulpstuk` geen `Put` is). Elk hulpstuk als eind laten tellen, ongeacht functie (verworpen: dan
+verdwijnt ook de melding op een streng die op een afsluitstuk doodloopt, en dat is een echt gebrek).
+De ernst van TOP-002/003 verlagen naar W in plaats van de populatie aan te passen (verworpen: het
+gebrek is niet minder ernstig, het was er domweg niet -- een streng tussen twee T-stukken is
+aangesloten). TOP-002/003 laten vervallen omdat TOP-022 hetzelfde meldt (verworpen: de ~11 en ~2
+echte snapmissers zijn precies wat deze twee checks moeten vinden, en die ziet TOP-022 niet).

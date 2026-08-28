@@ -181,6 +181,34 @@ def test_zonder_duplicaten_zwijgt_de_toelichting() -> None:
     assert _uitslag("top005_dubbele_put.ttl", "TOP-005").notes == []
 
 
+def test_streng_op_een_hulpstuk_met_telbare_functie_meldt_niet() -> None:
+    """Issue #89: een T-stuk is een geldig strengeinde, een afsluitstuk niet.
+
+    Streng '2' ligt tussen twee T-stukken en streng '1' tussen een put en een T-stuk;
+    allebei goed. Wat overblijft is de echte snapmisser: streng '4' ligt los in het veld
+    (TOP-002) en streng '3' heeft aan de andere zijde alleen een afsluitstuk, dat geen
+    functie met een aantal leidingen draagt en dus niet als eind telt (TOP-003).
+    """
+    pad = TTL_DIR / "top002_streng_op_hulpstuk.ttl"
+
+    assert _labels(_bevindingen(pad, "TOP-002")) == ["4"]
+    assert _labels(_bevindingen(pad, "TOP-003")) == ["3"]
+
+
+def test_het_hulpstukgebrek_blijft_bij_top022() -> None:
+    """Dezelfde T-stukken missen leidingen; TOP-022 draagt dat gebrek onverkort."""
+    bevindingen = _bevindingen(TTL_DIR / "top002_streng_op_hulpstuk.ttl", "TOP-022")
+
+    assert _labels(bevindingen) == ["T1", "T2"]
+
+
+def test_de_hulpstukregel_staat_in_de_toelichting() -> None:
+    """Stilte zou lezen als 'elk eind is aan een put getoetst'."""
+    uitslag = _uitslag("top002_streng_op_hulpstuk.ttl", "TOP-002")
+
+    assert any("hulpstuk" in note and "TOP-022" in note for note in uitslag.notes), uitslag.notes
+
+
 def test_top022_telt_richtingen_en_niet_strengen() -> None:
     """T3 heeft vier strengen maar drie richtingen (een dubbel gelegd) en zwijgt; T1 meldt."""
     pad = TTL_DIR / "top022_hulpstuk_te_weinig.ttl"

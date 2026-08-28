@@ -21,8 +21,8 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |
 | --- | --- | --- | --- | --- | --- | --- |
 | TOP-001 | Losliggende putten (geen enkele streng aangesloten); geometrische variant, de administratieve koppeling dekt de nulmeting (verplichting exact=1 komt… | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
-| TOP-002 | Losliggende strengen (aan geen van beide zijden een put); geometrische variant, administratieve verplichting alleen via Hyd | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
-| TOP-003 | Streng met slechts aan een zijde een put; geometrische variant, administratieve verplichting alleen via Hyd | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
+| TOP-002 | Losliggende strengen (aan geen van beide zijden een put); geometrische variant, administratieve verplichting alleen via Hyd. Als geldig eind telt naa… | F | Consistentie | geimplementeerd met test | hulpstukken, leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
+| TOP-003 | Streng met slechts aan een zijde een put; geometrische variant, administratieve verplichting alleen via Hyd. Zelfde afbakening van het eindobject als… | F | Consistentie | geimplementeerd met test | hulpstukken, leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-004 | Strengeindpunt niet gesnapt op putlocatie (afstand > tolerantie) | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-005 | Dubbele putten: twee knopen binnen tolerantie (bijv. 0,30 m) | F | Compleetheid | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-006 | Dubbel ingetekende of (deels) overlappende strengen. Beide leidingen van een paar moeten een `VrijvervalRioolleiding` of een `Duiker` zijn (`[klassen… | F | Compleetheid | geimplementeerd met test | leidingen, nabijheidsleidingen · — | — |

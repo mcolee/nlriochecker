@@ -2360,6 +2360,29 @@ FIXTURES["top023_hulpstuk_te_veel.ttl"] = (
 )
 
 
+# TOP-002/TOP-003 (issue #89): een strengeinde dat op een hulpstuk met een telbare
+# GWSW-functie valt is een geldig eind. Streng 1 loopt van put A naar T-stuk T1 en streng 2
+# tussen T1 en T2; geen van beide is een gebrek. Streng 3 eindigt op afsluitstuk A1 -- dat
+# draagt wel een functie maar geen aantal, dus het telt niet als eind -- en streng 4 ligt
+# los in het veld. Het hulpstukgebrek zelf blijft bij TOP-022: T1 verbindt er twee en T2
+# een, waar VerbindenVanDrieLeidingen er drie voorschrijft.
+FIXTURES["top002_streng_op_hulpstuk.ttl"] = (
+    "streng '4' ligt met beide einden los in het veld en streng '3' heeft aan een zijde "
+    "alleen een afsluitstuk; de strengen '1' en '2' eindigen op een T-stuk en zijn goed "
+    "(issue #89)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + hulpstuk("T2", "T2", 1100.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T1")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "T2")
+    + put("PutB", "B", 1000.0, 2100.0)
+    + hulpstuk("A1", "A1", 1050.0, 2100.0, klasse="Afsluitstuk")
+    + leiding("L3", "3", [(1000.0, 2100.0), (1050.0, 2100.0)], "PutB", "A1")
+    + leiding("L4", "4", [(1500.0, 2500.0), (1550.0, 2500.0)], None, None),
+)
+
+
 # Een streng waarvan de GML-literaal een lijn met precies een coordinaat bevat. GEOS
 # weigert die, en de lader hoort het object als onleesbaar te tellen in plaats van af
 # te breken. Er staat een gezonde streng naast, zodat zichtbaar is dat de rest

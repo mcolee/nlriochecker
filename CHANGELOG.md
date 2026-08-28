@@ -55,6 +55,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **TOP-002 en TOP-003: een hulpstuk met een telbare GWSW-functie is een geldig strengeinde**
+  (issue #89, BO-72). Een `Hulpstuk` valt in het GWSW onder `Constructieonderdeel` en niet
+  onder `Put`, dus een streng die op een T-stuk eindigt had daar geometrisch "geen put" --
+  45 van de 56 TOP-002-meldingen en 107 van de 109 TOP-003-meldingen kwamen daaruit voort,
+  terwijl het oordeel van de auteur bij de steekproef luidt: "Streng ligt tussen 2 T-stukken.
+  Is voor deze analyse goed." Als geldig eind telt nu naast een netwerkknoop ook een hulpstuk
+  waarvan de GWSW-klasse een functie mét aantal leidingen draagt (`Mof` 2, `T_stuk` en
+  `Y_stuk` 3, `Kruisstuk` 4) -- precies de populatie die TOP-022 en TOP-023 al toetsen, uit
+  dezelfde tabel, zodat er geen tweede klassenlijst ontstaat. Een `Afsluitstuk` of
+  `Ontstoppingsstuk` draagt wel een functie maar geen aantal en telt dus **niet** als eind: een
+  streng die daarop doodloopt blijft gemeld. Het gebrek "hulpstuk mist leidingen" blijft
+  onverkort zichtbaar via **TOP-022** (224 F op 1.054 telbare hulpstukken). Beide checks
+  declareren de rol `hulpstukken` erbij en verantwoorden de regel in hun toelichting. Verwacht
+  effect op De Wolden en Hoogeveen: TOP-002 **56 → ~11**, TOP-003 **109 → ~2**; TOP-022
+  verandert niet. De hermeting hoort bij de blokregie.
 - **Het compartimentduplicaat (`c<n>`-postfix) wordt vóór de topologiechecks samengevoegd**
   (issue #85, BO-71). De Kikker/BrutIS-export schrijft een gecompartimenteerde put per
   compartiment uit: elk deel is een eigen put op dezelfde coördinaat, met het putlabel plus
