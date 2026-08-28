@@ -411,14 +411,32 @@ class KringloopInNetwerk(Check):
     def _bouw_kringlopen(
         self, context: CheckContext
     ) -> tuple[list[tuple[str, str, int, list[str]]], int, int]:
-        """Zoekt de kringen op de betrouwbare richting en classificeert ze (issue #102)."""
+        """Zoekt de kringen op de betrouwbare richting en classificeert ze (issue #102).
+
+        De index `per_kant` is administratief georiënteerd (van BeginpuntLeiding naar
+        EindpuntLeiding), los van de config-keuze `netwerk.richting`: de betrouwbaarheid
+        uit NET-009 is per definitie ten opzichte van de administratie, dus de kring
+        hoort op die oriëntatie gezocht en geclassificeerd. `netwerk.strengen_per_kant`
+        wordt hier bewust NIET gebruikt -- die keert kanten om bij `richting = "bob"` en
+        zou dan tegen de administratieve betrouwbaarheid in wijzen.
+        """
         netwerk = _netwerk(context)
         dataset = context.dataset
         betrouwbaar = _betrouwbare_richting(context)
         drempel = context.config.drempels.bob_sprong_m
 
+        ruw: dict[tuple[str, str], list[Conduit]] = {}
+        for conduit in netwerk.conduits:
+            begin, eind = verbonden_knopen(context, conduit)
+            if begin is None or eind is None:
+                continue
+            ruw.setdefault((begin, eind), []).append(conduit)
+        per_kant = {
+            kant: sorted(strengen, key=lambda streng: streng.uri) for kant, strengen in ruw.items()
+        }
+
         reliable: nx.DiGraph = nx.DiGraph()
-        for (begin, eind), strengen in netwerk.strengen_per_kant.items():
+        for (begin, eind), strengen in per_kant.items():
             if any(betrouwbaar.get(streng.uri, False) for streng in strengen):
                 reliable.add_edge(begin, eind)
 
@@ -428,20 +446,20 @@ class KringloopInNetwerk(Check):
             if len(deel) < 2 and not self._heeft_zelflus(reliable, deel):
                 continue
             kring = self._voorbeeldkring(reliable.subgraph(deel))
-            soort = self._klasseer(netwerk, betrouwbaar, kring, drempel)
+            soort = self._klasseer(per_kant, betrouwbaar, kring, drempel)
             if soort == "vermaasd":
                 vermaasd += 1
             elif soort == "putsprong":
                 putsprong += 1
             else:
                 labels = [self._label(dataset, uri) for uri in kring]
-                uri, label = self._eerste_streng(netwerk, kring, dataset)
+                uri, label = self._eerste_streng(per_kant, kring, dataset)
                 te_melden.append((uri, label, len(deel), labels))
         return te_melden, vermaasd, putsprong
 
     def _klasseer(
         self,
-        netwerk: _Netwerk,
+        per_kant: dict[tuple[str, str], list[Conduit]],
         betrouwbaar: dict[str, bool],
         kring: list[str],
         drempel: float,
@@ -455,7 +473,7 @@ class KringloopInNetwerk(Check):
         """
         if len(kring) < 2:
             return "echte"
-        benen = self._benen(netwerk, betrouwbaar, kring)
+        benen = self._benen(per_kant, betrouwbaar, kring)
         bobben = [
             (been.bob_start, been.bob_end) if been is not None else (None, None) for been in benen
         ]
@@ -463,15 +481,21 @@ class KringloopInNetwerk(Check):
             return "echte"
         aantal = len(kring)
         for i in range(aantal):
-            _, boven = bobben[(i - 1) % aantal]
-            onder, _ = bobben[i]
-            assert boven is not None and onder is not None  # gedekt door de any-check hierboven
-            if onder - boven > drempel:
+            # In put kring[i] komt been (i-1) binnen (BOB aan het eind) en gaat been i
+            # verder (BOB aan het begin). Springt de afvoerende BOB boven de aanvoerende
+            # uit, dan klimt het water in de put -- een putsprong.
+            bob_aanvoer = bobben[(i - 1) % aantal][1]
+            bob_afvoer = bobben[i][0]
+            assert bob_aanvoer is not None and bob_afvoer is not None  # gedekt door de any-check
+            if bob_afvoer - bob_aanvoer > drempel:
                 return "putsprong"
         return "vermaasd"
 
     def _benen(
-        self, netwerk: _Netwerk, betrouwbaar: dict[str, bool], kring: list[str]
+        self,
+        per_kant: dict[tuple[str, str], list[Conduit]],
+        betrouwbaar: dict[str, bool],
+        kring: list[str],
     ) -> list[Conduit | None]:
         """De betrouwbare streng op elke opeenvolgende kant van de voorbeeldkring."""
         benen: list[Conduit | None] = []
@@ -479,9 +503,7 @@ class KringloopInNetwerk(Check):
         for i in range(aantal):
             kant = (kring[i], kring[(i + 1) % aantal])
             goede = [
-                streng
-                for streng in netwerk.strengen_per_kant.get(kant, ())
-                if betrouwbaar.get(streng.uri, False)
+                streng for streng in per_kant.get(kant, ()) if betrouwbaar.get(streng.uri, False)
             ]
             benen.append(goede[0] if goede else None)
         return benen
@@ -513,11 +535,14 @@ class KringloopInNetwerk(Check):
         return node.label if node is not None and node.label else uri
 
     def _eerste_streng(
-        self, netwerk: _Netwerk, kring: list[str], dataset: GwswDataset
+        self,
+        per_kant: dict[tuple[str, str], list[Conduit]],
+        kring: list[str],
+        dataset: GwswDataset,
     ) -> tuple[str, str]:
         """De streng waarop de melding wordt gehangen: de eerste op de kant kring[0] -> kring[1]."""
         if len(kring) > 1:
-            strengen = netwerk.strengen_per_kant.get((kring[0], kring[1]), ())
+            strengen = per_kant.get((kring[0], kring[1]), ())
             if strengen:
                 return strengen[0].uri, strengen[0].label
         return kring[0], self._label(dataset, kring[0])
