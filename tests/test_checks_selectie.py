@@ -57,6 +57,9 @@ ROLLENSET_AANTALLEN = {
     # overstort-, loze en valput); een gemaal of uitlaat zit er niet bij. Issue #64.
     "rioolputten": 5,
     "lozingspunten": 2,
+    # Alleen de uitlaatconstructie: de lozingsput hoort bij de bredere rol hierboven maar
+    # loost volgens het GWSW naar een ander rioolstelsel en niet op open water (BO-67).
+    "waterlozingspunten": 1,
     "overstortputten": 1,
     "bergbezinkvoorzieningen": 1,
     "valconstructies": 1,

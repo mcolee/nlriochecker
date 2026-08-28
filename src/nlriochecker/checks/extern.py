@@ -32,7 +32,12 @@ from nlriochecker.checks.base import (
     SkeletonCheck,
     register,
 )
-from nlriochecker.checks.selectie import lozingspunten, netwerkknopen, vrijvervalrioolleidingen
+from nlriochecker.checks.selectie import (
+    lozingspunten,
+    netwerkknopen,
+    vrijvervalrioolleidingen,
+    waterlozingspunten,
+)
 from nlriochecker.checks.treffers import Treffer, bouw_sleutel
 from nlriochecker.checks.verbanden import verbonden_knopen
 from nlriochecker.externedata import ROL_RASTER, ROL_STUDIEGEBIED, VectorLayer
@@ -733,20 +738,58 @@ class StrengOpParticulierTerrein(SkeletonCheck):
 
 @register
 class LozingspuntZonderWatergang(_ExterneCheck):
-    """EXT-007: een lozingspunt zonder watergang in de buurt."""
+    """EXT-007: een lozingspunt op oppervlaktewater zonder watergang in de buurt.
+
+    De populatie is sinds issue #94 de rol `waterlozingspunten` en niet meer de brede
+    rol `lozingspunten`: de vraag of er open water naast ligt hoort alleen bij de punten
+    die volgens het GWSW op oppervlaktewater lozen. Een `Lozingsput` loost "naar, of
+    ontvangt uit, een ander rioolstelsel" en hoort dus juist niet aan het water te
+    liggen; op De Wolden en Hoogeveen stond 32 van de 71 meldingen op zo'n put. Welke
+    klassen wel meetellen staat in `[klassen] waterlozingspunt`, afgeleid uit de
+    ontologie; zie BO-67.
+
+    `notes()` leest daarnaast de brede rol, om te melden hoeveel lozingspunten buiten
+    deze check vallen -- vandaar dat beide rollen gedeclareerd staan.
+    """
 
     id = "EXT-007"
     title = "Lozingspunt zonder watergang binnen X m"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("lozingspunten",)
+    rollen = ("lozingspunten", "waterlozingspunten")
     kenmerken = ()
     rol = "bgt_water"
-    soort = "lozingspunten"
+    soort = "lozingspunten op oppervlaktewater"
 
     def objecten(self, context: CheckContext) -> list:
-        """De knopen die als lozings- of uitstroompunt gelden."""
-        return lozingspunten(context)
+        """De knopen die volgens het GWSW op oppervlaktewater lozen."""
+        return waterlozingspunten(context)
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt welke klassen meetellen en hoeveel lozingspunten erbuiten vallen."""
+        klassen = context.config.klassen.waterlozingspunt
+        if klassen:
+            scope = (
+                "Alleen de klassen die volgens de GWSW-ontologie op oppervlaktewater lozen "
+                f"tellen mee (`[klassen] waterlozingspunt`): {', '.join(klassen)}."
+            )
+        else:
+            scope = (
+                "Er zijn geen lozingsklassen geconfigureerd (`[klassen] waterlozingspunt`); "
+                "deze check heeft niets kunnen toetsen."
+            )
+        notities = [*super().notes(context), scope]
+        binnen = {node.uri for node in self.objecten(context)}
+        buiten = sum(1 for node in lozingspunten(context) if node.uri not in binnen)
+        if buiten:
+            notities.append(
+                f"Buiten deze check: {getal(buiten, 'lozingspunt', 'lozingspunten')} uit de "
+                "bredere rol `lozingspunten`, die NET-001, NET-002 en NET-008 als "
+                "netwerkeindpunt gebruiken. Een `Lozingsput` bijvoorbeeld loost volgens het "
+                "GWSW naar een ander rioolstelsel; dat er geen open water naast ligt is daar "
+                "geen bevinding."
+            )
+        return notities
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt lozingspunten zonder BGT-waterdeel binnen de afstand."""

@@ -1973,9 +1973,18 @@ FIXTURES["ext_scenario.ttl"] = (
     # is 0,12 m, dus hij komt in HGT-001 terecht (vanaf 0,10 m, issue #63).
     + hoogteput("PutE", "E", EXT_E, mv=10.12, dek=None, mv_wijze="AHN2")
     + hoogteput("PutF", "F", EXT_F, mv=12.00, dek=12.00)
-    # Lozingsput ver van het water; Lozingsput vlakbij water-1.
+    # Lozingsput ver van het water; Lozingsput vlakbij water-1. Geen van beide is sinds
+    # issue #94 een bevinding van EXT-007: een Lozingsput loost volgens het GWSW naar een
+    # ander rioolstelsel, dus daar hoort geen open water te liggen.
     + put("PutL1", "L1", 1005.0, 1990.0, klasse="Lozingsput")
     + put("PutL2", "L2", 1072.0, 2008.0, klasse="Lozingsput")
+    # Uitlaatpunt U1, ver van het water: dit is wel een EXT-007-bevinding. Het GWSW legt
+    # UitlaatPunt op de orientatie (een Aansluitpunt en dus een Knooppunt) en niet op het
+    # object; de twee subklasseregels staan hier omdat de gedeelde prelude ze niet kent.
+    + "# Het uitlaatpunt van issue #94: een bouwwerk met een UitlaatPunt-orientatie.\n"
+    + "gwsw:Aansluitpunt rdfs:subClassOf gwsw:Knooppunt .\n"
+    + "gwsw:UitlaatPunt rdfs:subClassOf gwsw:Aansluitpunt .\n"
+    + put("PuntU1", "U1", 1005.0, 1985.0, klasse="Bouwwerk", orientatie="UitlaatPunt")
     # Streng 1 loopt door pand-1 heen: EXT-001.
     + hoogteleiding("L1", "1", [EXT_A, EXT_B], "PutA", "PutB", bob=(11.00, 9.50))
     # Streng 2 kruist water-1 en is geen zinker: EXT-003.

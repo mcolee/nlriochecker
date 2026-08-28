@@ -61,6 +61,13 @@ class ClassRoots(BaseModel):
     # die alleen een uitlaat bereikt is niet in orde.
     afvoer_eindpunt: list[str] = Field(default_factory=list)
     lozings_eindpunt: list[str] = Field(default_factory=list)
+    # EXT-007: de lozingspunten die volgens de GWSW-ontologie op oppervlaktewater lozen.
+    # Enger dan `lozings_eindpunt`, en met opzet: die bredere lijst blijft het
+    # netwerkeindpunt van NET-001/002/008. De drie wortels komen uit de ontologie, niet uit
+    # een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`. Zie BO-67.
+    waterlozingspunt: list[str] = Field(
+        default_factory=lambda: ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlaktewater"]
+    )
     vuilwater: list[str] = Field(default_factory=list)
     hemelwater: list[str] = Field(default_factory=list)
     infiltratie: list[str] = Field(default_factory=list)

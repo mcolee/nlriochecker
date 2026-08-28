@@ -173,6 +173,14 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :PutL2_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1072.0 2008.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+# Het uitlaatpunt van issue #94: een bouwwerk met een UitlaatPunt-orientatie.
+gwsw:Aansluitpunt rdfs:subClassOf gwsw:Knooppunt .
+gwsw:UitlaatPunt rdfs:subClassOf gwsw:Aansluitpunt .
+:PuntU1 rdf:type gwsw:Bouwwerk ; rdfs:label "U1" ;
+    gwsw:hasAspect :PuntU1_ori .
+:PuntU1_ori rdf:type gwsw:UitlaatPunt ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1005.0 1985.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 :L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
     gwsw:hasAspect :L1_ori .
 :L1 gwsw:hasAspect [ rdf:type gwsw:BreedteLeiding ; gwsw:hasValue 300 ] ,

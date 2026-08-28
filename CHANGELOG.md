@@ -55,6 +55,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **EXT-007 toetst alleen nog de lozingspunten die op oppervlaktewater lozen** (issue #94,
+  BO-67). De populatie is de nieuwe rol `waterlozingspunten` (`[klassen]
+  waterlozingspunt`): `Uitlaatconstructie` (met `Nooduitlaat` en `Uitstroombak` eronder),
+  `UitlaatPunt` en `LozingspuntOppervlaktewater` — de drie klassen waarvan de
+  GWSW-ontologie zegt dat er water naast hoort te liggen. `Lozingsput` valt eruit: die
+  loost volgens het GWSW "naar, of ontvangt uit, een ánder rioolstelsel", en de wortel
+  `Lozingspunt` ook, want daaronder hangt `LozingspuntBodem`. Op De Wolden en Hoogeveen
+  stond 32 van de 71 meldingen op een lozingsput; verwacht effect **71 → 39**, bekeken
+  767 → 712. De brede rol `lozingspunten` verandert niet — NET-001, NET-002 en NET-008
+  hebben haar als netwerkeindpunt nodig. De toelichting van de check noemt voortaan welke
+  klassen meetellen en hoeveel lozingspunten erbuiten vielen. De klassenlijst staat in
+  beide configbestanden en als default in `ClassRoots`, niet in de code.
 - Leeslaag (dataset, graaf, geometrie, ontologie, cache, voortgang) afgesplitst naar de
   package gwsw-orox-helpers 0.1.0 (MIT); `--ontologie` is optioneel geworden en valt terug
   op de gebundelde GWSW-ontologie 1.6.

@@ -3452,3 +3452,67 @@ blijft juist de melding zonder handelingsperspectief over). De twee samenvoegen 
 onder een nieuw ID (verworpen: EXT-003 is al precies die check, en een nieuw ID zou een
 trendvergelijking op check-ID breken zonder dat er iets aan de uitslag verandert). Het ID
 EXT-002 hergebruiken (verworpen: harde regel, vervallen ID's worden nooit hergebruikt).
+
+### BO-67 EXT-007 toetst alleen de lozingspunten die op oppervlaktewater lozen
+
+**Wat.** De populatie van EXT-007 ("Lozingspunt zonder watergang binnen X m") is niet langer de
+brede rol `lozingspunten` maar de nieuwe, engere rol `waterlozingspunten`: precies de klassen
+waarvan de GWSW-ontologie zegt dat zij op oppervlaktewater lozen. De lijst staat als
+`[klassen] waterlozingspunt` in beide configbestanden en als default in `ClassRoots`, niet in de
+code van de check. De brede rol `lozingspunten` (`[klassen] lozings_eindpunt`) blijft ongewijzigd:
+NET-001, NET-002 en NET-008 hebben haar als netwerkeindpunt nodig, en daar telt elke uitweg uit
+het stelsel mee. ID, titel, ernst, dimensie en de drempel `ext_lozingspunt_water_afstand_m`
+blijven zoals ze waren.
+
+**De lijst, en het bewijs per klasse** (gebundelde ontologie uit `gwsw-orox-helpers`,
+`Ontologie_GWSW_Totaal.ttl`; elke regel nagezocht):
+
+| Klasse | In de lijst | Definitie in de ontologie |
+|---|---|---|
+| `Uitlaatconstructie` | ja | "De constructie waar uitstroming van water uit een leiding naar het oppervlaktewater mogelijk is." Een `Bouwwerk`; `Nooduitlaat` en `Uitstroombak` hangen eronder en komen via de subklasse-afsluiting mee |
+| `UitlaatPunt` | ja | "Het punt waar uitstroming van water uit een leiding naar het oppervlaktewater mogelijk is." Een `Aansluitpunt` en dus een `Knooppunt`: hij staat op de orientatie, niet op het object |
+| `LozingspuntOppervlaktewater` | ja | "Locatie van de lozing bevindt zich in het oppervlaktewater." Subklasse van `Lozingspunt` |
+| `Lozingsput` | **nee** | "Een put waarop een rioolleiding is aangesloten waarmee het afvalwater het rioolstelsel verlaat naar, of ontvangt uit, een **ander rioolstelsel**." Een `Rioolput`; daar hoort per definitie geen open water te liggen |
+| `Lozingspunt` (de wortel) | **nee** | "Een knooppunt in een stelsel waar het afvalwater het stelsel verlaat of binnenkomt" -- de ontologie splitst hem zelf in `LozingspuntOppervlaktewater` en `LozingspuntBodem`, dus de wortel zegt niet waarop geloosd wordt. Hem opnemen zou `LozingspuntBodem` ("locatie van de lozing bevindt zich in de bodem") meenemen |
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, EXT-007), met de opdracht GWSW-conform te blijven. De steekproef
+wees het aan: "je hebt uitlaten/uitstroompunten waarbij je hemelwater OF overstortwater op een
+oppervlaktewaterlichaam brengt. En je hebt locaties waar afvalwater, vaak uit mechanisch riool,
+wordt geloosd op een gemengd stelsel in een kern." De meting bevestigt de omvang: van de 71
+meldingen op De Wolden en Hoogeveen stonden er 32 op een `Lozingsput` (58% van de 55
+lozingsputten) tegenover 39 op een `Uitlaatconstructie` (5% van de 712). Bij een lozingsput is
+"geen watergang binnen 10 m" geen gebrek maar de verwachte toestand, en een melding zonder
+handelingsperspectief kost de andere 39 hun geloofwaardigheid.
+
+**Waarom een eigen rol en niet een filter in de check.** De klassenlijst hoort in de
+configuratie (harde regel: geen hardgecodeerde drempels of klassenlijsten), en zodra hij daar
+staat is een rolfunctie in `checks/selectie.py` de bestaande weg om hem te lezen -- met de
+cachesleutel, de rollentelling in het rapport, de nul-bewaking (`SIG-nulklasse`) en de
+dekkingsmatrix die daaraan vastzitten. EXT-007 declareert daarom `rollen = ("lozingspunten",
+"waterlozingspunten")`: de smalle rol is zijn populatie, de brede leest hij alleen in `notes()`,
+om te tellen hoeveel lozingspunten buiten de check vallen. Dat is precies wat de declaratie
+belooft -- de vereniging van wat `run()`, `examined()` en `notes()` aanraken, een bovengrens en
+geen noemer (BO-58).
+
+**Wat het rapport erover zegt.** Twee regels in de toelichting van EXT-007: welke klassen
+meetellen (met de configsleutel erbij) en hoeveel lozingspunten uit de bredere rol buiten de
+check vielen, met de reden. Stilte zou hier lezen als "alle lozingspunten zijn getoetst".
+
+**Verwacht effect op De Wolden en Hoogeveen.** 71 → 39 waarschuwingen; de bekeken populatie
+zakt van 767 naar 712. `UitlaatPunt` en `LozingspuntOppervlaktewater` hebben in deze aanlevering
+nul instanties -- dat is een gat in de aanlevering en geen reden om ze uit de lijst te laten
+(de klassen bestaan in de ontologie, en dat is wat de lijst uitdrukt). De rol als geheel staat
+niet op nul, dus er komt geen `SIG-nulklasse`-signaal bij. De hermeting hoort bij blok B van de
+auditregie, niet bij dit besluit.
+
+**Niet besloten, en dus niet gedaan.** De omgekeerde toets uit de audit -- een `Lozingsput` die
+wél in het water ligt is verdacht -- blijft buiten dit besluit. Zij vraagt een eigen check-ID en
+een eigen afweging.
+
+**Alternatieven.** Een filter in `run()` op `dataset.is_a` met een klassenlijst in de code
+(verworpen: hardgecodeerde klassenlijst, en de rollentelling en nul-bewaking zouden de smalle
+populatie niet zien). De rol `lozingspunten` zelf versmallen (verworpen: NET-001/002/008 melden
+dan elke vuilwaterstreng die op een lozingsput eindigt als onbereikbaar). `Lozingspunt` als
+wortel opnemen (verworpen: `LozingspuntBodem` hangt eronder). EXT-007 helemaal laten vervallen
+(verworpen: de 39 meldingen op uitlaatconstructies zijn wél een signaal).

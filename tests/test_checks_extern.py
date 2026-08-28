@@ -106,7 +106,9 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
         ("EXT-001", ["1", "4", "P", "Q"]),
         # Streng 9 doorkruist twee greppels (water-5 en water-7) en meldt dus twee keer.
         ("EXT-003", ["2", "9", "9"]),
-        ("EXT-007", ["L1"]),
+        # Alleen het uitlaatpunt: de twee lozingsputten vallen sinds issue #94 buiten
+        # de populatie van EXT-007 (BO-67).
+        ("EXT-007", ["U1"]),
         ("HGT-001", ["B", "E"]),
         ("HGT-002", ["C"]),
         ("HGT-003", ["1", "2"]),
@@ -144,8 +146,10 @@ def test_buiten_studiegebied_wordt_geteld_in_de_toelichting(
     outcome = uitkomst("HGT-001", config, bronnen)
 
     # Putten P en Q liggen binnen het fixturegebied; alleen D valt erbuiten.
-    # 18 putten: de tien van voorheen plus de acht van de grensgevallen (issue #59).
-    assert any("Buiten studiegebied: 1 van de 18 putten" in note for note in outcome.notes)
+    # 19 netwerkknopen: de tien van voorheen, de acht van de grensgevallen (issue #59)
+    # en het uitlaatpunt van issue #94 -- een UitlaatPunt is een lozingseindpunt en dus
+    # een netwerkknoop, ook al is het object een bouwwerk en geen put.
+    assert any("Buiten studiegebied: 1 van de 19 putten" in note for note in outcome.notes)
 
 
 def test_nodata_cellen_worden_gemeld(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -233,6 +237,37 @@ def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
         if finding.object_label == "6" or "'6'" in finding.message
     ]
     assert betrokken == []
+
+
+def test_ext007_zwijgt_over_een_lozingsput(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Lozingsput L1 ligt ver van elk waterdeel en is toch geen bevinding (issue #94).
+
+    Het GWSW definieert een `Lozingsput` als een put waarmee het afvalwater naar een
+    ander rioolstelsel gaat; daar hoort geen open water te liggen. Uitlaatpunt U1 ligt
+    even ver van het water en is wel een bevinding -- dat is het verschil dat deze
+    check sinds BO-67 maakt. U1 bewijst bovendien dat de klassen op de orientatie
+    meetellen: `UitlaatPunt` staat daar en niet op het object.
+    """
+    outcome = uitkomst("EXT-007", config, bronnen)
+
+    assert labels(outcome) == ["U1"]
+    assert any(
+        "waterlozingspunt" in note and "Uitlaatconstructie" in note for note in outcome.notes
+    )
+    assert any("Buiten deze check: 2 lozingspunten" in note for note in outcome.notes), (
+        outcome.notes
+    )
+
+
+def test_ext007_zonder_klassen_toetst_niets(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Een lege klassenlijst zet de check uit, en dat hoort in de toelichting te staan."""
+    config.klassen.waterlozingspunt = []
+
+    outcome = uitkomst("EXT-007", config, bronnen)
+
+    assert outcome.findings == []
+    assert outcome.examined == 0
+    assert any("geen lozingsklassen geconfigureerd" in note for note in outcome.notes)
 
 
 def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: ExternalData) -> None:

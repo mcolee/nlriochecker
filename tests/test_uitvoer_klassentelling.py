@@ -39,7 +39,12 @@ TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 ALLE_KLASSEN = {klasse for rol in _rollen(load_check_config()) for klasse in rol.klassen}
 
 # Klassen die het GWSW op de orientatie van een knoop legt (subklassen van Aansluitpunt).
-_ORIENTATIE_KLASSEN = {"Overnamepunt", "Lozingspunt", "UitlaatPunt"}
+_ORIENTATIE_KLASSEN = {
+    "Overnamepunt",
+    "Lozingspunt",
+    "LozingspuntOppervlaktewater",
+    "UitlaatPunt",
+}
 # Klassen die als streng in de graaf staan.
 _CONDUIT_KLASSEN = {
     "Leiding",
@@ -61,6 +66,7 @@ gwsw:Bouwwerkorientatie rdfs:subClassOf gwsw:Knooppunt .
 gwsw:Aansluitpunt rdfs:subClassOf gwsw:Knooppunt .
 gwsw:Overnamepunt rdfs:subClassOf gwsw:Aansluitpunt .
 gwsw:Lozingspunt rdfs:subClassOf gwsw:Aansluitpunt .
+gwsw:LozingspuntOppervlaktewater rdfs:subClassOf gwsw:Lozingspunt .
 gwsw:UitlaatPunt rdfs:subClassOf gwsw:Aansluitpunt .
 gwsw:Leidingorientatie rdfs:subClassOf gwsw:Verbinding .
 """
@@ -126,9 +132,18 @@ class TestKlassenOpNul:
         assert klassen_op_nul(_run(tmp_path, {"Lozingspunt"})) == []
 
     def test_een_hele_lege_rol_geeft_een_signaal_op_rolniveau(self, tmp_path: Path) -> None:
-        leeg = {"Lozingspunt", "UitlaatPunt", "Lozingsput", "Uitlaatconstructie"}
+        # `LozingspuntOppervlaktewater` hoort erbij: hij is een subklasse van
+        # `Lozingspunt` en houdt de rol dus in zijn eentje gevuld. Beide lozingsrollen
+        # vallen zo tegelijk leeg -- de smalle van EXT-007 (BO-67) is een deelverzameling.
+        leeg = {
+            "Lozingspunt",
+            "LozingspuntOppervlaktewater",
+            "UitlaatPunt",
+            "Lozingsput",
+            "Uitlaatconstructie",
+        }
         op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, leeg))}
-        assert op_nul == {"lozingspunten"}
+        assert op_nul == {"lozingspunten", "waterlozingspunten"}
 
     def test_een_lege_gedeclareerde_rol_geeft_een_signaal(self, tmp_path: Path) -> None:
         # Sinds #71 bewaakt de nul-signalering elke gedeclareerde rol, niet alleen de

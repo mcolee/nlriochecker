@@ -83,6 +83,17 @@ lozings_eindpunt = [
   "Lozingsput",
   "Uitlaatconstructie",
 ]
+# EXT-007: de lozingspunten waar volgens het GWSW oppervlaktewater naast hoort te liggen.
+# Enger dan lozings_eindpunt hierboven, en dat blijft zo: NET-001, NET-002 en NET-008
+# hebben die bredere lijst als netwerkeindpunt nodig. De drie wortels zijn geverifieerd in
+# de gebundelde ontologie: Uitlaatconstructie is "de constructie waar uitstroming van water
+# uit een leiding naar het oppervlaktewater mogelijk is" (met Nooduitlaat en Uitstroombak
+# eronder), UitlaatPunt is datzelfde als punt, en LozingspuntOppervlaktewater is de lozing
+# waarvan "de locatie zich in het oppervlaktewater bevindt". Twee klassen horen er
+# nadrukkelijk NIET bij: Lozingsput ("een put waarmee het afvalwater het rioolstelsel
+# verlaat naar, of ontvangt uit, een ander rioolstelsel") en de wortel Lozingspunt, want
+# daaronder hangt ook LozingspuntBodem ("de locatie bevindt zich in de bodem"). Zie BO-67.
+waterlozingspunt = ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlaktewater"]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]

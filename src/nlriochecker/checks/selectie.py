@@ -114,6 +114,26 @@ def lozingspunten(context: CheckContext) -> list[Node]:
     return _knopen(context, "sel:lozingspunten", context.config.klassen.lozings_eindpunt)
 
 
+def waterlozingspunten(context: CheckContext) -> list[Node]:
+    """De lozingspunten die volgens het GWSW op oppervlaktewater lozen.
+
+    Een *rol*: geen enkele klasse dekt hem. Enger dan `lozingspunten`, en met opzet.
+    EXT-007 vraagt of er open water naast een lozingspunt ligt, en die vraag hoort
+    alleen bij de punten die daar volgens de ontologie op lozen: `Uitlaatconstructie`
+    ("de constructie waar uitstroming van water uit een leiding naar het
+    oppervlaktewater mogelijk is"), `UitlaatPunt` (datzelfde als punt) en
+    `LozingspuntOppervlaktewater` ("de locatie van de lozing bevindt zich in het
+    oppervlaktewater"). `Lozingsput` valt erbuiten -- die loost "naar, of ontvangt uit,
+    een ander rioolstelsel" -- en de wortel `Lozingspunt` ook, want daaronder hangt naast
+    `LozingspuntOppervlaktewater` ook `LozingspuntBodem`.
+
+    De brede rol `lozingspunten` blijft ongemoeid: NET-001, NET-002 en NET-008 hebben
+    haar als netwerkeindpunt nodig, en daar telt elke uitweg uit het stelsel mee. Zie
+    issue #94 en BO-67.
+    """
+    return _knopen(context, "sel:waterlozingspunten", context.config.klassen.waterlozingspunt)
+
+
 def overstortputten(context: CheckContext) -> list[Node]:
     """De overstortputten: `gwsw:Overstortput`, en de stuwput die dezelfde rol speelt."""
     return _knopen(context, "sel:overstortputten", context.config.klassen.overstortput)
@@ -294,6 +314,7 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "putten": putten,
     "rioolputten": rioolputten,
     "lozingspunten": lozingspunten,
+    "waterlozingspunten": waterlozingspunten,
     "overstortputten": overstortputten,
     "bergbezinkvoorzieningen": bergbezinkvoorzieningen,
     "valconstructies": valconstructies,
@@ -320,6 +341,7 @@ _ROL_VELDEN: dict[str, str] = {
     "putten": "put",
     "rioolputten": "rioolput",
     "lozingspunten": "lozings_eindpunt",
+    "waterlozingspunten": "waterlozingspunt",
     "overstortputten": "overstortput",
     "bergbezinkvoorzieningen": "bergbezinkvoorziening",
     "valconstructies": "valconstructie",
