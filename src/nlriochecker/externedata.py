@@ -145,6 +145,22 @@ ROLLEN = {
     "bgt_bouwwerk": "bgt_overige_bouwwerklagen",
 }
 
+# De twee bronnen die geen vectorrol zijn maar wel in `missing` kunnen belanden. Ze
+# staan hier als naam, zodat de checks kunnen declareren dat ze erop leunen zonder de
+# tekst over te tikken.
+ROL_STUDIEGEBIED = "studiegebied"
+ROL_RASTER = "ahn_dtm"
+
+
+def rol_van(ontbrekend: str) -> str:
+    """De rol uit een regel van `ExternalData.missing`.
+
+    Elke regel begint met de rolnaam; wat er tussen haakjes achter staat is de uitleg
+    waarom er geen bruikbare laag is. Het rapport leest de rol terug om te bepalen of
+    er een check op leunt.
+    """
+    return ontbrekend.split(" ", 1)[0]
+
 
 def load_external_data(
     bronnen, wortel: Path | None = None, *, dekkingseis: Dekkingseis | None = None
@@ -234,7 +250,7 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
         tekorten += _tekortregel(rol, laag.source.name, omhullende, bereik, eis.marge_m, eis)
     if data.raster is not None:
         tekorten += _tekortregel(
-            "ahn_dtm", data.raster.source.name, data.raster.bounds, bereik, 0.0, eis
+            ROL_RASTER, data.raster.source.name, data.raster.bounds, bereik, 0.0, eis
         )
 
     if tekorten:
@@ -317,12 +333,12 @@ def _lees_studiegebied(
     from nlriochecker.studiegebied import load_study_area
 
     if bestand is None:
-        ontbrekend.append("studiegebied")
+        ontbrekend.append(ROL_STUDIEGEBIED)
         return None, None, ""
 
     pad = map_pad / bestand
     if not pad.exists():
-        ontbrekend.append(f"studiegebied ({pad})")
+        ontbrekend.append(f"{ROL_STUDIEGEBIED} ({pad})")
         return None, None, ""
 
     try:
@@ -509,11 +525,11 @@ def _lees_raster(
 ) -> RasterSampler | None:
     """Opent het hoogteraster en bewaakt het coordinaatstelsel."""
     if bestand is None:
-        ontbrekend.append("ahn_dtm")
+        ontbrekend.append(ROL_RASTER)
         return None
     pad = map_pad / bestand
     if not pad.exists():
-        ontbrekend.append(f"ahn_dtm ({pad})")
+        ontbrekend.append(f"{ROL_RASTER} ({pad})")
         return None
 
     import rasterio

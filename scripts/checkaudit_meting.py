@@ -225,7 +225,6 @@ def deel_b(context: CheckContext, meldingen: list[dict]) -> None:
     # 1. Wat de meldingstekst per check uitsplitst.
     _tel("ATTR-001", per["ATTR-001"], r"ligt (onder|boven) het bereik .* materiaal (\w+)")
     _tel("ATTR-003", per["ATTR-003"], r"Materiaal (\w+) met begindatum (\d{4})")
-    _tel("ATTR-008", per["ATTR-008"], r"ligt (onder|boven) de grens van (\S+) m")
     _tel("ATTR-016", per["ATTR-016"], r"breedte \S+ mm en lengte (0|\S+) mm")
     _tel("ATTR-018", per["ATTR-018"], r"Deze (put|streng)")
     _tel("HGT-003", per["HGT-003"], r"ligt (boven het AHN-maaiveld|[\d.]+ m onder)")

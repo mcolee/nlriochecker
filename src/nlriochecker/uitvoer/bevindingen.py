@@ -18,7 +18,9 @@ from pathlib import Path
 import pandas as pd
 
 from nlriochecker.checks import CheckRun, Severity
+from nlriochecker.checks.extern import bronrollen_met_check
 from nlriochecker.checks.selectie import klassen_van_rol
+from nlriochecker.externedata import rol_van
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import (
@@ -1070,10 +1072,16 @@ def _bronnen_section(run: CheckRun) -> list[str]:
     regels += table(lagen, "Ingelezen lagen")
     if bronnen.raster is not None:
         regels += ["", f"Hoogteraster: `{bronnen.raster.source.name}` ({bronnen.raster.crs})."]
-    if bronnen.missing:
+    # Alleen de bronnen waar werkelijk een check op leunt: sinds EXT-005 en EXT-006
+    # vervielen leest niets meer `bgt_putdeksel`, en `nwb_wegvak` had nooit een lezer.
+    # Hun ontbreken slaat geen check over, dus deze zin zou er onwaar over zijn (BO-64).
+    # De laag zelf blijft geladen en op dekking getoetst, en de terugkoppeling van
+    # `toets` op de opdrachtregel somt nog steeds alles op wat er niet was.
+    gemist = [regel for regel in bronnen.missing if rol_van(regel) in bronrollen_met_check()]
+    if gemist:
         regels += [
             "",
-            "> **Niet aangeleverd of leeg:** " + "; ".join(bronnen.missing) + ". De checks "
+            "> **Niet aangeleverd of leeg:** " + "; ".join(gemist) + ". De checks "
             "die deze bronnen nodig hebben zijn overgeslagen; nul bevindingen betekent daar "
             "niet dat het in orde is.",
         ]

@@ -18,6 +18,7 @@ from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
 from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, run_checks
+from nlriochecker.checks.extern import bronrollen_met_check
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import Verdict, assess_coverage
 from nlriochecker.meting import Meetbereik, laad_nulmeting
@@ -287,9 +288,12 @@ def test_externe_bronnen_van_koekangerveld() -> None:
         "nwb_wegvak": 13,
     }
     # De BGT-laag `put` bestaat wel maar is leeg, dus de rol blijft onvervuld. Geen
-    # check leest hem meer sinds EXT-005 en EXT-006 vervielen (issue #95).
+    # check leest hem meer sinds EXT-005 en EXT-006 vervielen (issue #95), en daarom
+    # noemt het rapport hem niet als overgeslagen bron -- `missing` blijft wel het
+    # volledige laadverslag, dat `toets` op de opdrachtregel toont (BO-64).
     assert bronnen.layer("bgt_putdeksel") is None
     assert any("bgt_putdeksel" in ontbreekt for ontbreekt in bronnen.missing)
+    assert "bgt_putdeksel" not in bronrollen_met_check()
     # Alles staat al in RD New; er is niets geherprojecteerd.
     assert all(laag.reprojected_from is None for laag in bronnen.layers.values())
     assert bronnen.raster is not None

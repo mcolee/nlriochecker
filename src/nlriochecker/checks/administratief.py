@@ -689,9 +689,13 @@ class _LozeLeidingen(Check):
         Elke tekst claimt uitdrukkelijk de administratieve afvoerrichting, want dat is
         wat het geval toetst. Een actieve streng die een ketenknoop wel raakt maar tegen
         de richting in of ernaast ligt, verandert het geval niet en staat alleen in het
-        detail `rakend`. `run` roept deze methode alleen aan voor een geval uit
-        `gevallen`, dus de laatste tak is `afvoer`; `losgekoppeld` heeft sinds BO-60
-        geen tekst meer, want dat geval wordt niet gemeld.
+        detail `rakend`.
+
+        De drie gevallen staan er alle drie met naam, en een onbekend geval is een fout
+        in plaats van de afvoertekst: `losgekoppeld` heeft sinds BO-60 geen tekst meer,
+        en wie dat geval ooit weer aan een `gevallen`-set toevoegt zou anders stil de
+        omkering van de waarheid melden -- "voert af op actief riool" op een keten die
+        juist nergens op aansluit.
         """
         boven = getal(keten.bovenstrooms, "actieve streng", "actieve strengen")
         omvang = f" Bovenstrooms {vorm(keten.bovenstrooms, 'ligt', 'liggen')} {boven}."
@@ -707,10 +711,12 @@ class _LozeLeidingen(Check):
                 f"({_labels(keten.inkomend)}) af op deze loze leiding, maar er gaat niets "
                 f"verder.{omvang}"
             )
-        return (
-            "In de administratieve afvoerrichting voert deze loze leiding af op actief "
-            f"riool ({_labels(keten.uitgaand)}), maar er komt niets binnen."
-        )
+        if keten.geval == GEVAL_AFVOER:
+            return (
+                "In de administratieve afvoerrichting voert deze loze leiding af op actief "
+                f"riool ({_labels(keten.uitgaand)}), maar er komt niets binnen."
+            )
+        raise ValueError(f"ADM-010 heeft geen meldingstekst voor het geval {keten.geval!r}")
 
     def notes(self, context: CheckContext) -> list[str]:
         """Telt de ketens en strengen per geval, zodat de lezer het geheel ziet."""

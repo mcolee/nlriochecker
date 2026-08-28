@@ -81,9 +81,10 @@ class Finding:
     message: str
     typing_reliable: bool
     details: dict[str, object] = field(default_factory=dict)
-    # De EXT-checks melden ook objecten die niet uit de GWSW-dataset komen (een
-    # BGT-putdeksel zonder put, een BAG-pand zonder riolering). Die hebben geen
-    # dataset-URI om op af te bakenen; hun eigen RD-coordinaat neemt die rol over.
+    # De weg voor een bevinding op een object dat niet uit de GWSW-dataset komt: dat
+    # heeft geen dataset-URI om op af te bakenen, dus zijn eigen RD-coordinaat neemt
+    # die rol over. Geen enkele check vult dit veld nog sinds EXT-006 verviel; de weg
+    # blijft bestaan voor de volgende check op een externe bron (BO-65).
     location: tuple[float, float] | None = None
     # Een bevinding die niet over een los object maar over de export als geheel gaat
     # (ATTR-014 meldt per kenmerk, over alle objecten samen). De meldingenlaag OR't

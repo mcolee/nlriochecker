@@ -279,6 +279,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Het rapport noemt alleen ontbrekende bronnen waar ook echt een check op leunt**
+  (blok A-review van de schrapronde, BO-64). De regel *Niet aangeleverd of leeg: … De
+  checks die deze bronnen nodig hebben zijn overgeslagen* somde elke rol op die niet
+  geladen was, ook `bgt_putdeksel` (waarvan EXT-005 en EXT-006 de enige lezers waren) en
+  `nwb_wegvak` (dat er nooit een had). Op de De Wolden-configuratie beweerde het rapport
+  daardoor dat er checks waren overgeslagen die niet meer bestaan. Welke bronnen een check
+  nodig heeft volgt nu uit de checks zelf (`checks/extern.bronrollen_met_check()`), zodat
+  de regel niet opnieuw kan gaan liegen als er een check bij komt of afvalt. De lagen zelf
+  worden onveranderd geladen en op dekking getoetst, en de terugkoppeling van `toets` op
+  de opdrachtregel somt nog steeds elke ontbrekende bron op.
 - **Leidingeinden op een hulpstuk krijgen hun knoop terug** (issue #60). De BrutIS-export
   koppelt elk leidingeinde dat op een hulpstuk uitkomt aan `<hulpstuk>_put`, een URI die
   nergens bestaat, waardoor de engine bij alle T-stukken nul leidingen zag. De lader

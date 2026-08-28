@@ -1851,6 +1851,24 @@ FIXTURES["adm010_loze_keten_afvoer.ttl"] = (
     + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutC", "PutD"),
 )
 
+# Dezelfde aanvoerketen, plus streng 9: die verlaat put B en raakt de keten dus wel,
+# maar sluit in de afvoerrichting niet aan (inkomend blijft 1, er gaat niets verder).
+# Het geval verandert er niet door; streng 9 staat alleen in het detail `rakend`.
+FIXTURES["adm010_loze_keten_rakend.ttl"] = (
+    "actieve streng 1 watert af op loze streng X1; actieve streng 9 verlaat dezelfde put B "
+    "maar sluit niet aan (issue #62)",
+    LOZE_KLASSE
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + put("PutE", "E", 1050.0, 2050.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding(
+        "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
+    )
+    + leiding("L9", "9", [(1050.0, 2000.0), (1050.0, 2050.0)], "PutB", "PutE"),
+)
+
 # Geen defect meer sinds #81: een loze keten zonder aansluiting op actief riool is de
 # gewenste eindtoestand. ADM-010 telt hem in zijn verantwoording en meldt hem niet.
 FIXTURES["adm010_loze_keten_losgekoppeld.ttl"] = (

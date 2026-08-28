@@ -17,6 +17,7 @@ from gwsw_orox_helpers.dataset import GWSW, Aspect, load_dataset, markeer_vulwaa
 
 from nlriochecker.checkconfig import CheckConfig, VerhangStap, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
+from nlriochecker.checks.administratief import LozeLeidingAanActiefRiool, _LozeKeten
 from nlriochecker.checks.verbanden import deelstelsel_ids
 from nlriochecker.plausibiliteit import load_plausibility
 
@@ -1014,6 +1015,26 @@ def test_adm010_benoemt_het_geval(bestand: str, geval: str) -> None:
     outcome = uitkomst(bestand, "ADM-010")
 
     assert [f.details["geval"] for f in outcome.findings] == [geval]
+
+
+def test_adm010_noemt_de_actieve_streng_die_de_keten_alleen_raakt() -> None:
+    """Streng 9 verlaat dezelfde put B, maar sluit in de afvoerrichting niet aan (issue #62)."""
+    outcome = uitkomst("adm010_loze_keten_rakend.ttl", "ADM-010")
+
+    assert labels(outcome) == ["X1"]
+    bevinding = outcome.findings[0]
+    assert bevinding.details["geval"] == "aanvoer"
+    assert bevinding.details["inkomend"] == "1"
+    assert bevinding.details["rakend"] == "9"
+
+
+def test_adm010_weigert_een_geval_zonder_meldingstekst() -> None:
+    """Wie `losgekoppeld` weer aan `gevallen` toevoegt krijgt een fout, geen afvoertekst."""
+    keten = _LozeKeten("loos-X1", (), (), (), (), 0)
+    assert keten.geval == "losgekoppeld"
+
+    with pytest.raises(ValueError, match="losgekoppeld"):
+        LozeLeidingAanActiefRiool._boodschap(keten)
 
 
 def test_adm010_telt_de_losgekoppelde_keten_wel_maar_meldt_hem_niet() -> None:

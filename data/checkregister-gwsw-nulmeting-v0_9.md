@@ -188,11 +188,16 @@ Alle drie de voorwaarden worden machinaal gehandhaafd (2026-08-16). Voorwaarde 1
 | ATTR-008 | Strenglengte korter dan X m of langer dan X m | Alle drie de CFK's: waardebereik LengteLeiding 1-75 m (vorm LengteLeiding_val, bevestigd in Mds-datatype Dt_LengteLeiding) — dezelfde dekking als ATTR-011. Gemeten op De Wolden en Hoogeveen (checkaudit 27-08): alle 443 ATTR-008-objecten staan ook in LengteLeiding_val, die er 932 telt en dus breder is (ook drains, duikers en aansluitleidingen) |
 | ATTR-011 | Absurde lengtewaarde boven harde bovengrens | Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype Dt_LengteLeiding) |
 
-## Vervallen checks (niet relevant voor deze toepassing)
+## Vervallen checks (niet relevant, of zonder bruikbare bron)
 
 Anders dan de geschrapte checks hierboven zijn deze niet door de nulmeting gedekt; er
-kijkt niets meer naar. Ze zijn vervallen omdat ze voor deze opdracht geen bruikbare
-uitkomst geven. De ID's worden niet hergebruikt.
+kijkt niets meer naar. Er zijn twee gronden om te vervallen, en de kolom Reden zegt per
+rij welke van de twee geldt. De eerste is inhoudelijk: de check geeft voor deze opdracht
+geen bruikbare uitkomst, en komt dus ook niet terug. De tweede is de bron: de vraag is op
+zichzelf zinvol, maar de gegevens die de check nodig heeft bestaan in deze aanlevering
+niet en er komen er ook geen -- die checks vervallen *voor nu* en herleven zodra de bron
+er wel is. De ID's worden in beide gevallen niet hergebruikt; een herleefde check komt
+terug onder een nieuw ID.
 
 | ID | Check | Vervallen in | Reden |
 |---|---|---|---|

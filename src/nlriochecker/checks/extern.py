@@ -23,6 +23,7 @@ from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checks.base import (
+    REGISTRY,
     Check,
     CheckContext,
     Dimension,
@@ -34,7 +35,7 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import lozingspunten, netwerkknopen, vrijvervalrioolleidingen
 from nlriochecker.checks.treffers import Treffer, bouw_sleutel
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.externedata import VectorLayer
+from nlriochecker.externedata import ROL_RASTER, ROL_STUDIEGEBIED, VectorLayer
 from nlriochecker.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
@@ -152,6 +153,17 @@ class _ExterneCheck(Check):
     rol: str = ""
     soort: str = "objecten"
 
+    @classmethod
+    def bronrollen(cls) -> frozenset[str]:
+        """De externe bronnen waar deze check op leunt.
+
+        Het bereik hoort er altijd bij: zonder begrenzingspolygoon geeft geen enkele
+        EXT-check een uitslag. `bronrollen_met_check()` telt deze verzamelingen op,
+        zodat het rapport het ontbreken van een bron alleen als overgeslagen check
+        presenteert waar dat waar is.
+        """
+        return frozenset({ROL_STUDIEGEBIED, *([cls.rol] if cls.rol else [])})
+
     def objecten(self, context: CheckContext) -> list:
         """De GWSW-objecten die deze check bekijkt."""
         raise NotImplementedError
@@ -211,6 +223,25 @@ class _ExterneCheck(Check):
             return 0
         return len(self.selectie(context).toetsbaar)
 
+
+def bronrollen_met_check() -> frozenset[str]:
+    """De externe bronnen waar een geregistreerde check op leunt.
+
+    Het rapport zegt van een ontbrekende bron dat de checks die hem nodig hebben zijn
+    overgeslagen; die zin mag alleen over deze bronnen gaan. `bgt_putdeksel` staat er
+    niet meer bij sinds EXT-005 en EXT-006 vervielen (BO-64, BO-65) en `nwb_wegvak`
+    stond er nooit bij: beide worden nog geladen en op dekking getoetst, maar hun
+    ontbreken slaat niets over. De opdrachtregel van `toets` somt wel alles op wat
+    niet geladen is.
+    """
+    return frozenset().union(
+        *(check.bronrollen() for check in REGISTRY.values() if issubclass(check, _ExterneCheck))
+    )
+
+
+# De pand- en bouwwerkrollen van EXT-001, in leesvolgorde. Een van de drie volstaat om
+# de check te laten draaien; `rol` noemt alleen de eerste.
+BOUWWERKROLLEN = ("bgt_pand", "bag_pand", "bgt_bouwwerk")
 
 RELATIE_BINNEN = "binnen"
 RELATIE_KRUIST = "kruist"
@@ -356,6 +387,11 @@ class KruisingMetBouwwerk(_ExterneCheck):
             return "kruist"
         return f"ligt {afstand:.2f} m van"
 
+    @classmethod
+    def bronrollen(cls) -> frozenset[str]:
+        """Alle drie de pand- en bouwwerkrollen, niet alleen `rol`."""
+        return frozenset({ROL_STUDIEGEBIED, *BOUWWERKROLLEN})
+
     def bouwwerklagen(self, context: CheckContext) -> list:
         """De pand- en bouwwerklagen die deze check gebruikt.
 
@@ -367,7 +403,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
             return []
         return [
             laag
-            for rol in ("bgt_pand", "bag_pand", "bgt_bouwwerk")
+            for rol in BOUWWERKROLLEN
             for laag in [context.bronnen.layer(rol)]
             if laag is not None
         ]
@@ -784,6 +820,11 @@ class _AhnCheck(_ExterneCheck):
     """Basis voor de hoogtechecks die het AHN als referentie gebruiken."""
 
     soort = "putten"
+
+    @classmethod
+    def bronrollen(cls) -> frozenset[str]:
+        """Deze checks leunen op het hoogteraster in plaats van op een vectorlaag."""
+        return frozenset({ROL_STUDIEGEBIED, ROL_RASTER})
 
     def objecten(self, context: CheckContext) -> list:
         """De putten van het netwerk."""

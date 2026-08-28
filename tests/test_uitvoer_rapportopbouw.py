@@ -19,6 +19,7 @@ from gwsw_orox_helpers.dataset import load_dataset
 from helpers_melding import melding as _basismelding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
+from nlriochecker.externedata import ExternalData
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.nulbevinding import Nulbevinding, bouw_nulbevindingen
 from nlriochecker.studiegebied import load_studiegebieden
@@ -280,6 +281,31 @@ class TestVerantwoordingBlijft:
         assert "typeringspoort" in tekst
         assert "Analyseset:" in tekst
         assert "Externe bronnen" in tekst
+
+
+class TestOntbrekendeBronnen:
+    """De banner mag alleen bronnen noemen waar een check op leunt (BO-64)."""
+
+    @staticmethod
+    def _met_missing(tmp_path: Path, *ontbreekt: str) -> str:
+        """Het rapport van een run met deze ontbrekende bronnen."""
+        run = replace(_run("schoon.ttl"), bronnen=ExternalData(missing=ontbreekt))
+        return _rapport(run, tmp_path)
+
+    def test_een_bron_met_een_check_staat_in_de_banner(self, tmp_path: Path) -> None:
+        tekst = self._met_missing(tmp_path, "bgt_water (geen laagnaam geconfigureerd)")
+
+        assert "Niet aangeleverd of leeg:** bgt_water (geen laagnaam geconfigureerd)." in tekst
+
+    def test_een_bron_zonder_check_haalt_de_banner_niet(self, tmp_path: Path) -> None:
+        """Geen check leest `bgt_putdeksel` sinds EXT-005 en EXT-006 vervielen."""
+        tekst = self._met_missing(
+            tmp_path, "bgt_putdeksel (lagen put bevatten geen features)", "nwb_wegvak"
+        )
+
+        assert "bgt_putdeksel" not in tekst
+        assert "nwb_wegvak" not in tekst
+        assert "Niet aangeleverd of leeg" not in tekst
 
 
 class TestOnderdrukking:
