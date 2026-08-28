@@ -215,10 +215,14 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   observatie in de rondeverslagen. Zie BO-38.
 - CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
 - Werk op `dev`, niet op `main`. Elke wijziging gaat naar `dev`; `main` draagt alleen
-  uitgebrachte, getagde versies. Pas als de auteur zegt dat het een nieuwe versie is,
-  merge je `dev` in `main` en draai je daar `scripts/uitgave.py` -- in die volgorde,
-  want het script eist `main` (`TAKVOORWAARDE`) en breekt af op elke andere tak. Zet
-  `dev` daarna weer gelijk aan `main`, anders mist hij de bumpcommit.
+  uitgebrachte, getagde versies. `main` is GitHub-beschermd: PR verplicht en
+  `enforce_admins`, dus een rechtstreekse push naar `main` wordt geweigerd, ook van de
+  eigenaar. Pas als de auteur zegt dat het een nieuwe versie is, draai je op `dev`
+  `scripts/uitgave.py` (het eist `dev`, `TAKVOORWAARDE`, en breekt af op elke andere tak):
+  dat bumpt, toetst, schuift het wijzigingslog en commit+tagt `Versie X.Y.Z` op `dev`.
+  Daarna land je die op `main` via een **merge-commit-PR** (geen squash/rebase, anders
+  hangt de tag naast `main`) en zet je `dev` weer gelijk aan `main`. De volledige flow
+  staat in `docs/versionering.md`.
 - Eén sessie = één issue, en het issue is de enige plek waar de voortgang staat. Eindig je
   een issue niet af, zet dan een comment met de echte toestand: wat gecommit is en wat de
   poort nog mist. Beweer nooit "klaar/gepusht" als het dat niet is, en laat geen half
