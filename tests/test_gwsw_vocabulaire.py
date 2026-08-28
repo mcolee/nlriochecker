@@ -214,6 +214,12 @@ def _termen_uit_plausibiliteit() -> list[Term]:
                 "MateriaalLeidingColl",
             )
         )
+    # De constructietype-uitzondering van issue #86 draagt geen domeinlijstwaarde maar een
+    # klassenaam, dus de standaardcollectie `owl:Class` -- net als de rollen uit [klassen].
+    termen += [
+        Term(regel.klasse, "plausibiliteit.toml [[constructietype_diameter]]")
+        for regel in tabellen.constructietype_diameter
+    ]
     for regel in tabellen.materiaal_wandruwheid:
         termen.append(
             Term(
@@ -440,6 +446,9 @@ BRONSENTINELS: tuple[tuple[str, str], ...] = (
     # `checks.toml` laat de lijst leeg; alleen de projectconfig levert hier een term.
     ("configs/dewoldenhoogeveen.toml [rapport]", "MechanischeRioolleiding"),
     ("plausibiliteit.toml [[materiaal_diameter]]", "Beton"),
+    # `Drain` staat ook in de symbolentabel; de sentinel toetst op de vindplaats, dus die
+    # andere bron houdt deze regel niet groen.
+    ("plausibiliteit.toml [[constructietype_diameter]]", "DT_riool"),
     ("plausibiliteit.toml [[materiaal_begindatum]]", "PVC"),
     ("plausibiliteit.toml [[materiaal_vorm]]", "PVC"),
     # Een naam die alleen aan de leidingkant staat: `PVC` en `PE` staan sinds issue #43

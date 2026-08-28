@@ -104,6 +104,15 @@ HULPSTUK_KLASSEN = (
 # hebben haar nodig. Ze hangt onder Leiding en niet onder VrijvervalRioolleiding.
 LOZE_KLASSE = "gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .\n\n"
 
+# De twee drainageklassen die wél onder VrijvervalRioolleiding hangen (geverifieerd in de
+# gebundelde ontologie: DIT-riool en DT-riool zijn rioolleidingen met doorlatende wanden).
+# `Drain` staat in de prelude en hangt rechtstreeks onder Leiding; alleen de
+# ATTR-001-fixture van issue #86 heeft deze twee nodig.
+DRAINAGE_KLASSEN = (
+    "gwsw:DIT_riool rdfs:subClassOf gwsw:VrijvervalRioolleiding .\n"
+    "gwsw:DT_riool rdfs:subClassOf gwsw:VrijvervalRioolleiding .\n\n"
+)
+
 
 def hulpstuk(naam: str, label: str, x: float, y: float, klasse: str = "T_stuk") -> str:
     """Een hulpstuk: als een put, maar met een Hulpstukorientatie als knooppunt."""
@@ -875,6 +884,45 @@ FIXTURES["attr001_diameter_bij_materiaal.ttl"] = (
         "PutA",
         "PutB",
         velden={"BreedteLeiding": 1000, "HoogteLeiding": 1000, "MateriaalLeiding_ref": "PVC"},
+    ),
+)
+
+FIXTURES["attr001_constructietype_drainage.ttl"] = (
+    "streng HW is een hemelwaterriool van PVC Ø65 en valt onder de PVC-ondergrens van "
+    "100 mm; DT is een DT-riool van dezelfde maat en hetzelfde materiaal en valt binnen "
+    "het drainagebereik dat vóór het materiaalbereik gaat; DIT is een DIT-riool van Ø45 "
+    "en valt onder dat drainagebereik (issue #86)",
+    DRAINAGE_KLASSEN
+    + nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_put("PutD", "D", *D)
+    + nette_leiding(
+        "DT",
+        "DT",
+        [A, B],
+        "PutA",
+        "PutB",
+        klasse="DT_riool",
+        velden={"BreedteLeiding": 65, "HoogteLeiding": 65, "MateriaalLeiding_ref": "PVC"},
+    )
+    + nette_leiding(
+        "HW",
+        "HW",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Hemelwaterriool",
+        velden={"BreedteLeiding": 65, "HoogteLeiding": 65, "MateriaalLeiding_ref": "PVC"},
+    )
+    + nette_leiding(
+        "DIT",
+        "DIT",
+        [C, D],
+        "PutC",
+        "PutD",
+        klasse="DIT_riool",
+        velden={"BreedteLeiding": 45, "HoogteLeiding": 45, "MateriaalLeiding_ref": "PVC"},
     ),
 )
 

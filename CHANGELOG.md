@@ -13,6 +13,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **ATTR-001 kent een uitzondering per constructietype** (issue #86, BO-75). De nieuwe
+  tabel `[[constructietype_diameter]]` in `plausibiliteit.toml` geeft een GWSW-klasse haar
+  eigen diameterbereik, en dat gaat vóór het bereik van het materiaal: de materiaaltabellen
+  zijn op vrijvervalriool geschreven en een drainageleiding is naar haar functie dunner --
+  een drain van Ø65 is gangbaar en geen gebrek. `Drain`, `DIT_riool` en `DT_riool` staan er
+  op 50-4000 mm. Research: de handelsmaatreeks voor drainagebuis loopt van 50 tot 200 mm
+  (80 mm het meest toegepast; RIONED noemt in Kostenkengetallen drainage 80 of 100 mm bij
+  rioolvervanging); een gangbare bovengrens die ook een DIT- of DT-riool dekt levert geen
+  bron, dus die volgt de GWSW-waardegrens van 4000 mm. Op De Wolden verandert de uitslag
+  niet: `Drain` en `Duiker` hangen rechtstreeks onder `Leiding` en vallen buiten de rol
+  waarop ATTR-001 draait, en van `DIT_riool`/`DT_riool` levert die export er nul. De
+  toelichting van de check telt voortaan hoeveel strengen tegen hun constructietype
+  getoetst zijn en zegt erbij welke klassen buiten de check vallen.
+
 - **De nulmeting spreekt Nederlands** (issue #101, BO-74). Elke overtreding uit de GWSW
   SHACL-nulmeting draagt een vaste, beschrijvende zin bij haar SHACL-vorm -- "Put zonder
   (of met meer dan één) geregistreerde puthoogte" in plaats van "Subject Put, path

@@ -4071,3 +4071,77 @@ zin; de oude tekst staat in `boodschap_technisch`. De CSV krijgt de kolom
 kolom `boodschap_technisch` achteraan. Melding-ID's verschuiven niet. Dezelfde
 versiestap dekt de GeoPackage-herindeling van issue #98 (BO-73): het contract kent één
 nummer per blok wijzigingen, geen nummer per issue.
+
+### BO-75 ATTR-001 krijgt een uitzondering per constructietype; de drainageleiding houdt de GWSW-waardegrens
+
+**Wat.** Het diameterbereik van ATTR-001 hangt sinds issue #86 niet uitsluitend aan het
+leidingmateriaal. Draagt een streng een constructietype dat in de nieuwe tabel
+`[[constructietype_diameter]]` van `plausibiliteit.toml` staat, dan gaat dat bereik voor
+het materiaalbereik. Drie klassen staan er: `Drain`, `DIT_riool` en `DT_riool`, alle drie
+op 50-4000 mm. De boodschap noemt welk van de twee bereiken gold ("... dat bij
+constructietype DT_riool hoort") en de bevinding draagt dan het detailveld
+`constructietype`.
+
+**De research, en wat zij wel en niet oplevert.** Het issue vraagt eerst om de gangbare
+diameterrange voor drainageleidingen.
+
+* *Ondergrens, gevonden.* De handelsmaatreeks voor drainagebuis loopt van 50 tot 200 mm
+  (50, 60, 80, 100, 125, 160, 200 -- leveranciersassortiment Pipelife/Wavin, nagezien via
+  `drainagebuizen.nl/drainage-afsluitkap/` en `irritech.nl/drainagebuis/`, augustus 2026),
+  met 80 mm als meest toegepaste maat en 250 mm als grootste bijzondere maat
+  (stalbeluchting). RIONED noemt in *Kostenkengetallen drainage* (`riool.net/drainage`) 80
+  of 100 mm voor een drainageleiding die bij rioolvervanging wordt aangelegd. Die
+  RIONED-zin komt uit het zoekresultaat van die pagina; `riool.net` gaf de fetcher zelf een
+  404, dus zij is niet uit de pagina zelf geciteerd. De laagste geleverde maat is 50 mm, en
+  dat is de ondergrens geworden.
+* *Bovengrens, niet gevonden.* Geen bron geeft een gangbare bovengrens die zowel een
+  drainagebuis als een DIT- of DT-riool dekt. Die laatste twee zijn volgens de ontologie
+  *rioolleidingen* met doorlatende wanden ("inzameling en transport van grondwater en
+  hemelwater") en dus op rioolmaat; een plafond van 250 mm zou daar vals alarm geven. De
+  bovengrens volgt daarom de GWSW-waardegrens: `Dt_BreedteLeiding` en `Dt_HoogteLeiding`
+  declareren beide 63-4000 mm (geverifieerd in de gebundelde ontologie). Daarboven keurt de
+  nulmeting de waarde zelf al af. De lacune staat hiermee in de tabel in plaats van dat er
+  een getal verzonnen is.
+
+Beide grenzen dragen `bron = "ervaringsregel"`: de reeks komt uit een fabrikantmaattabel,
+en dat is precies waarvoor die bak in `plausibiliteit.toml` bestaat (issue #20). GWSW blijft
+leidend voor de vraag wélke klassen bestaan; de externe bronnen leveren alleen het bereik.
+
+**Welke klassen "drain" zijn, is tegen de ontologie geverifieerd.** `Drain` ("een leiding
+met doorlatende wanden bestemd voor het op peil houden van het grondwater") hangt
+rechtstreeks onder `Leiding`, net als `Duiker` en `Aansluitleiding`. `DIT_riool`
+(altLabel "Drainage infiltratie transportriool") en `DT_riool` (altLabel "Drainage
+transportriool") hangen onder `VrijvervalRioolleiding`.
+
+**Gevolg dat je moet kennen: op De Wolden verandert er niets.** ATTR-001 draait op de rol
+`vrijvervalrioolleidingen`, en `Drain` valt daarbuiten -- de export telt 1.216 `Drain` en
+610 `Duiker`, en geen van beide heeft deze check ooit gezien. Van de twee klassen die er
+wél in vallen levert De Wolden er nul (`DIT_riool` 0, `DT_riool` 0; geteld in de TTL). De
+uitslag van ATTR-001 blijft dus 13 bevindingen. Dat is niet wat het issue verwachtte, en
+het klopt met wat de audit al vaststelde: het steekproefgeval `Ve1D0002-Ve1D0004-1` staat
+in de export als `Hemelwaterriool` en niet als `Drain`, dus het is een
+data-classificatiepunt en geen checkfout. De uitzondering repareert de check voor een
+drainageleiding die wél als zodanig geregistreerd is; zij kan een verkeerd geclassificeerde
+leiding niet herkennen en hoort dat ook niet te doen.
+
+`notes()` maakt dat zichtbaar in plaats van het te verzwijgen: het rapport telt hoeveel
+strengen tegen hun constructietype getoetst zijn (op De Wolden 0 van de 17.603) en zegt
+erbij dat `Drain` en `Duiker` buiten deze check vallen. Ook de kolom Buiten bereik van de
+verdelingstabel telt sindsdien tegen het bereik waarop een streng feitelijk getoetst is,
+zodat die kolom niet meer kan tellen dan de check meldt.
+
+**Waarom `Duiker` geen regel krijgt.** Geen bron voor een gangbaar duikerbereik, en een
+duiker valt net als een drain buiten de rol waarop ATTR-001 draait. Een regel zou dus een
+verzonnen drempel zijn zonder werking. `Drain` staat er wel, hoewel de klasse vandaag
+buiten de populatie valt: zij ís de klasse waar het issue over gaat, `[klassen]
+vrijvervalleiding` is projectconfiguratie die een project mag verbreden, en een tabel die
+de twee -riool-klassen wel noemt en de drain zelf niet zou de lezer op het verkeerde been
+zetten.
+
+**Alternatieven.** De rol van ATTR-001 verbreden zodat `Drain` er wél in valt (verworpen:
+dat is 1.216 leidingen nieuw in beeld en levert juist méér bevindingen -- het omgekeerde
+van wat het issue vraagt, en het raakt elke andere check op die rol niet). De uitzondering
+aan het BRUTIS-constructietype ophangen in plaats van aan de GWSW-klasse (verworpen: OroX/
+GWSW is leidend en die twee divergeren aantoonbaar, zie #79 §4). De drainageklassen
+helemaal overslaan in plaats van ze een eigen bereik te geven (verworpen: dan staat er
+nergens wat een drainagemaat is, en een Ø10-registratie zou stil doorgaan).

@@ -59,6 +59,10 @@ def ids_van(groep: str) -> list[str]:
 
 DEFECTEN = [
     ("attr001_diameter_bij_materiaal.ttl", "ATTR-001", ["1"]),
+    # Issue #86: het constructietype gaat voor het materiaal. DT (Ø65 PVC) valt binnen het
+    # drainagebereik en meldt niet meer; HW (hemelwaterriool, dezelfde maat en hetzelfde
+    # materiaal) wel, en DIT (Ø45) valt onder het drainagebereik zelf.
+    ("attr001_constructietype_drainage.ttl", "ATTR-001", ["DIT", "HW"]),
     ("attr002_kleine_diameter.ttl", "ATTR-002", ["1"]),
     # De ondergrens is nu stelselafhankelijk (issue #20): G (gemengd, Ø220) valt onder
     # 250 mm, V (vuilwater, Ø220) blijft boven 200 mm en is geen bevinding.
@@ -184,6 +188,26 @@ def test_attr001_bereikcorrecties_uit_issue20() -> None:
     tabel buiten hun bereik; onder de gecorrigeerde tabel passen ze er alle vier in.
     """
     assert labels(uitkomst("attr001_diameterbesluit.ttl", "ATTR-001")) == []
+
+
+def test_attr001_constructietype_gaat_voor_het_materiaal() -> None:
+    """Issue #86: een drainageleiding wordt tegen haar eigen bereik gehouden.
+
+    DT (Ø65 PVC) valt binnen het drainagebereik en is geen bevinding meer, terwijl het
+    hemelwaterriool HW van dezelfde maat en hetzelfde materiaal er wel een blijft: de
+    uitzondering hangt aan het constructietype en niet aan de maat. DIT (Ø45) laat zien
+    dat het drainagebereik zelf ook een ondergrens heeft.
+    """
+    outcome = uitkomst("attr001_constructietype_drainage.ttl", "ATTR-001")
+
+    assert labels(outcome) == ["DIT", "HW"]
+    per_label = {bevinding.object_label: bevinding for bevinding in outcome.findings}
+    assert "het bereik 50-4000 mm dat bij constructietype DIT_riool" in per_label["DIT"].message
+    assert "het bereik 100-800 mm dat bij materiaal PVC" in per_label["HW"].message
+
+    telling = [note for note in outcome.notes if "constructietype getoetst" in note]
+    assert len(telling) == 1, outcome.notes
+    assert "2 van de 3 strengen" in telling[0]
 
 
 def test_attr002_ondergrens_per_stelseltype() -> None:
