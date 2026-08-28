@@ -31,3 +31,4 @@ data/*
 # De tijdelijke opzij-map van scripts/runnerpoort.py: de echte data/ staat daar tijdens
 # de run en na een crash. Zonder deze regel wist `git clean -fd` hem.
 /data_runnerpoort_opzij/
+/manifesto.md
