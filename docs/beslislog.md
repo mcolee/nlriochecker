@@ -4254,3 +4254,35 @@ betrouwbare richting) en sluiten de overige 3 (Ho5G0680, Zu1V0012, Rw1G0314) via
 omhoog in een put (+0,35 / +2,7 / +0,43 m). Richtgetal 17 -> 0; hermeet.
 
 Zie [#102](https://github.com/mcolee/nlriochecker/issues/102) en BO-76.
+
+### BO-78 RVZ-003 gaat op in RVZ-002; het ID vervalt
+
+**Wat.** RVZ-002 (overstort zonder drempelniveau) en RVZ-003 (overstort zonder
+drempelbreedte) waren twee checks met dezelfde populatie (`overstortputten`), dezelfde
+ernst (W), dezelfde dimensie (Compleetheid) en dezelfde herstelhandeling (het
+drempelonderdeel met niveau én breedte registreren). Ze zijn samengevoegd tot één check:
+RVZ-002 meldt voortaan in **één melding per put** welke van {`Drempelniveau`,
+`Drempelbreedte`} ontbreekt. RVZ-003 vervalt; het ID wordt nooit hergebruikt
+(`tests/test_checks_registry.py::test_vervallen_ids_worden_nooit_hergebruikt`).
+
+**Waarom.** Op De Wolden + Hoogeveen meldden de twee checks exact dezelfde 245 putten
+(checkaudit 27-08): de export draagt geen enkel `Overstortdrempel`-object, dus beide maten
+ontbreken altijd samen. Twee ID's leverden zo 490 waarschuwingen voor 245 putten -- een
+dubbeltelling voor één gebrek. Eén check die de ontbrekende maten opsomt houdt de telling
+eerlijk (245) en verliest geen informatie: de tekst en het detailveld `ontbrekende_maten`
+noemen per put welke maat mist.
+
+**Waarom niet één maat weggooien.** Beide maten zijn een eigen registratiegebrek; een put
+kan de ene wél en de andere níét hebben (de fixtures `rvz002_drempel_zonder_niveau` en
+`rvz003_drempel_zonder_breedte` tonen precies dat). De check moet dus per maat kunnen
+melden, alleen niet als twee losse ID's.
+
+**De bewuste overlap met de nulmeting blijft (BO-26).** De SHACL-vorm
+`Overstortput_Overstortdrempel_card` toetst alleen of de put een drempel *heeft*, dekt de
+27 `Stuwput` niet, en `toets` moet ook zonder `--shacl` iets zien. De samengevoegde
+`notes()` benoemt dat.
+
+**Hermeting.** 245 meldingen in plaats van 490; inhoud gelijk.
+
+Zie [#87](https://github.com/mcolee/nlriochecker/issues/87), BO-26 en
+`docs/checks-audit-2026-08.md`.

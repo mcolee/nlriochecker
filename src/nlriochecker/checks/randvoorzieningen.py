@@ -7,9 +7,9 @@ docs/beslislog.md): overstorten staan er als `Overstortput` met een
 `Overstortleiding` eraan. Losse `Overstortdrempel`-onderdelen met `Drempelniveau`
 en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel
 kent. Deze module leest daarom beide vormen, en meldt in de toelichting welke ze in
-deze dataset heeft aangetroffen. RVZ-002 en RVZ-003 melden dat per overstortput: een
-put zonder geregistreerd drempelniveau of zonder geregistreerde drempelbreedte, ook
-als het drempelonderdeel zelf ontbreekt.
+deze dataset heeft aangetroffen. RVZ-002 meldt dat per overstortput: een put zonder
+geregistreerd drempelniveau en/of zonder geregistreerde drempelbreedte, ook als het
+drempelonderdeel zelf ontbreekt, en zegt in één melding welke van de twee maten mist.
 
 Een *externe* overstort loost op oppervlaktewater en heeft een overstortleiding naar
 buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put.
@@ -17,7 +17,6 @@ buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar
@@ -271,48 +270,77 @@ class RandvoorzieningNietAangesloten(Check):
         return len(overstortputten(context)) + len(bergbezinkvoorzieningen(context))
 
 
-class _OverstortZonderDrempelkenmerk(Check):
-    """Basis voor RVZ-002 en RVZ-003: een overstortput waarvan geen enkele drempel
-    het gevraagde kenmerk draagt -- ook als er helemaal geen drempelonderdeel is.
+def _ontbrekende_maten(groep: list[Drempel]) -> list[tuple[str, str]]:
+    """De drempelmaten die op geen enkele drempel van de put geregistreerd staan.
+
+    Elke maat als (omschrijving, GWSW-kenmerk). De volgorde ligt vast -- eerst niveau,
+    dan breedte -- zodat twee runs op dezelfde data dezelfde melding opleveren.
+    """
+    ontbreekt: list[tuple[str, str]] = []
+    if not any(drempel.niveau is not None for drempel in groep):
+        ontbreekt.append(("drempelniveau", "Drempelniveau"))
+    if not any(drempel.breedte is not None for drempel in groep):
+        ontbreekt.append(("drempelbreedte", "Drempelbreedte"))
+    return ontbreekt
+
+
+@register
+class OverstortZonderDrempelmaat(Check):
+    """RVZ-002: overstortput zonder geregistreerd drempelniveau en/of drempelbreedte.
+
+    De aparte breedtecheck RVZ-003 is hierin opgegaan (#87, BO-78): op De Wolden meldden
+    de twee checks exact dezelfde 245 putten, want de export draagt geen enkel
+    drempelobject en dan ontbreken beide maten altijd samen. RVZ-002 zegt nu in één
+    melding per put welke van {`Drempelniveau`, `Drempelbreedte`} ontbreekt -- ook als er
+    helemaal geen drempelonderdeel aan de put hangt.
 
     De nulmetingvorm `Overstortput_Overstortdrempel_card` meldt het ontbreken van het
     onderdeel zelf al; die overlap is bewust (BO-26): het register vraagt naar de
-    geregistreerde waarde, en `toets` moet ook zonder `--shacl` iets zien.
+    geregistreerde waarde, en `toets` moet ook zonder `--shacl` iets zien. De SHACL-vorm
+    dekt bovendien alleen de `Overstortput`, niet de `Stuwput`.
     """
 
-    kenmerk: ClassVar[str] = ""
-    omschrijving: ClassVar[str] = ""
-
-    @abstractmethod
-    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
-        """De waarde van het gevraagde kenmerk op deze drempel."""
+    id = "RVZ-002"
+    title = "Overstort zonder geregistreerde drempelhoogte of -breedte"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    rollen = ("overstortputten",)
+    kenmerken = ("Drempelbreedte", "Drempelniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke overstortput zonder geregistreerd kenmerk op een van haar drempels."""
+        """Meldt elke overstortput die een drempelniveau en/of -breedte mist."""
         per_put = drempels_per_put(context)
         for node in overstortputten(context):
             groep = per_put.get(node.uri, [])
-            if any(self._kenmerkwaarde(drempel) is not None for drempel in groep):
+            ontbrekend = _ontbrekende_maten(groep)
+            if not ontbrekend:
                 continue
-            # Het voltooid deelwoord achteraan: `drempelniveau` is onzijdig en
-            # `drempelbreedte` niet, dus "een geregistreerd {omschrijving}" klopt maar
-            # voor een van de twee checks.
-            if len(groep) == 1:
-                tekst = (
-                    "De enige overstortdrempel van deze put heeft geen "
-                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
-                )
-            elif groep:
-                tekst = (
-                    f"Geen van de {len(groep)} overstortdrempels van deze put heeft een "
-                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
-                )
-            else:
-                tekst = (
+            yield self.finding(
+                context,
+                node.uri,
+                node.label,
+                self._melding(groep, ontbrekend),
+                drempels=len(groep),
+                ontbrekende_maten=[kenmerk for _, kenmerk in ontbrekend],
+            )
+
+    def _melding(self, groep: list[Drempel], ontbrekend: list[tuple[str, str]]) -> str:
+        """De meldingstekst; de opsomming noemt elke ontbrekende maat één keer.
+
+        Bij één of geen drempel leest de zin met "geen X (en geen Y)"; bij meerdere
+        drempels met "een X (of een Y)", zodat "Geen van de N ... heeft een X" geen
+        dubbele ontkenning wordt.
+        """
+        if len(groep) <= 1:
+            geen = " en ".join(f"geen {oms} (`{kenmerk}`)" for oms, kenmerk in ontbrekend)
+            if not groep:
+                return (
                     "Deze overstortput heeft geen enkel `Overstortdrempel`-onderdeel, en dus "
-                    f"ook geen {self.omschrijving}."
+                    f"{geen}."
                 )
-            yield self.finding(context, node.uri, node.label, tekst, drempels=len(groep))
+            return f"De enige overstortdrempel van deze put heeft {geen} geregistreerd."
+        een = " of ".join(f"een {oms} (`{kenmerk}`)" for oms, kenmerk in ontbrekend)
+        return f"Geen van de {len(groep)} overstortdrempels van deze put heeft {een} geregistreerd."
 
     def notes(self, context: CheckContext) -> list[str]:
         """Zegt hoeveel putten geen drempel hebben en dat de nulmeting dat ook meldt."""
@@ -337,42 +365,6 @@ class _OverstortZonderDrempelkenmerk(Check):
     def examined(self, context: CheckContext) -> int:
         """Het aantal overstortputten."""
         return len(overstortputten(context))
-
-
-@register
-class OverstortZonderDrempelniveau(_OverstortZonderDrempelkenmerk):
-    """RVZ-002: overstortput zonder geregistreerd drempelniveau."""
-
-    id = "RVZ-002"
-    title = "Overstort zonder geregistreerde drempelhoogte"
-    severity = Severity.WARNING
-    dimension = Dimension.COMPLETENESS
-    rollen = ("overstortputten",)
-    kenmerken = ("Drempelbreedte", "Drempelniveau")
-    kenmerk = "Drempelniveau"
-    omschrijving = "drempelniveau"
-
-    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
-        """Het geregistreerde drempelniveau."""
-        return drempel.niveau
-
-
-@register
-class OverstortZonderDrempelbreedte(_OverstortZonderDrempelkenmerk):
-    """RVZ-003: overstortput zonder geregistreerde drempelbreedte."""
-
-    id = "RVZ-003"
-    title = "Overstort zonder geregistreerde drempelbreedte"
-    severity = Severity.WARNING
-    dimension = Dimension.COMPLETENESS
-    rollen = ("overstortputten",)
-    kenmerken = ("Drempelbreedte", "Drempelniveau")
-    kenmerk = "Drempelbreedte"
-    omschrijving = "drempelbreedte"
-
-    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
-        """De geregistreerde drempelbreedte."""
-        return drempel.breedte
 
 
 @register

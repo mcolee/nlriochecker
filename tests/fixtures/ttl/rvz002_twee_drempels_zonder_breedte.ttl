@@ -38,7 +38,7 @@ gwsw:Drain rdfs:subClassOf gwsw:Leiding .
 gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: overstortput O heeft geen enkel Overstortdrempel-onderdeel; RVZ-002 meldt beide ontbrekende maten in één melding
+# DEFECT: overstortput O heeft twee drempels, beide met een niveau maar zonder Drempelbreedte
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .
@@ -78,6 +78,14 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
     gwsw:hasAspect :PutO_dek_ori .
 :PutO_dek_ori rdf:type gwsw:Dekselorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Putdekselniveau ; gwsw:hasValue 10.0 ] .
+
+:PutO gwsw:hasPart :DrempelO .
+:DrempelO rdf:type gwsw:Overstortdrempel ; rdfs:label "DrempelO" .
+:DrempelO gwsw:hasAspect [ rdf:type gwsw:Drempelniveau ; gwsw:hasValue 9.0 ] .
+
+:PutO gwsw:hasPart :DrempelP .
+:DrempelP rdf:type gwsw:Overstortdrempel ; rdfs:label "DrempelP" .
+:DrempelP gwsw:hasAspect [ rdf:type gwsw:Drempelniveau ; gwsw:hasValue 9.5 ] .
 :PutU rdf:type gwsw:Inspectieput ; rdfs:label "U" ;
     gwsw:hasAspect :PutU_ori .
 :PutU gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,

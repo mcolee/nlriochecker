@@ -112,8 +112,9 @@ DEFECTEN = [
     ("rvz001_overstort_aan_loze_leiding.ttl", "RVZ-001", ["O"]),
     ("rvz002_drempel_zonder_niveau.ttl", "RVZ-002", ["O"]),
     ("rvz002_overstort_zonder_drempel.ttl", "RVZ-002", ["O"]),
-    ("rvz003_drempel_zonder_breedte.ttl", "RVZ-003", ["O"]),
-    ("rvz002_overstort_zonder_drempel.ttl", "RVZ-003", ["O"]),
+    # RVZ-003 is opgegaan in RVZ-002 (#87): een put met alleen niveau, dus zonder
+    # breedte, valt nu ook onder RVZ-002.
+    ("rvz003_drempel_zonder_breedte.ttl", "RVZ-002", ["O"]),
     ("rvz004_overstort_zonder_water.ttl", "RVZ-004", ["O"]),
     ("rvz005_overstort_op_hemelwater.ttl", "RVZ-005", ["O"]),
     # Sinds #75 per gemengde streng: het deelstelsel telt er twee.
@@ -640,14 +641,22 @@ def test_rvz004_zwijgt_zonder_oppervlaktewater() -> None:
     assert any("geen enkel `Oppervlaktewater`-object" in note for note in outcome.notes)
 
 
-def test_rvz002_zwijgt_bij_een_drempel_met_niveau() -> None:
-    assert labels(uitkomst("rvz003_drempel_zonder_breedte.ttl", "RVZ-002")) == []
+def test_rvz002_zwijgt_bij_een_volledige_drempel() -> None:
+    # Een drempel met zowel niveau als breedte laat RVZ-002 zwijgen; ontbreekt er
+    # een van de twee, dan meldt de check (zie de teksttest hieronder).
+    assert labels(uitkomst("rvz_schoon.ttl", "RVZ-002")) == []
 
 
 def test_rvz002_verantwoordt_de_putten_zonder_drempel() -> None:
     outcome = uitkomst("rvz002_overstort_zonder_drempel.ttl", "RVZ-002")
 
     assert outcome.examined == 1
+    # Eén melding per put, die beide ontbrekende maten opsomt (#87).
+    assert [bevinding.message for bevinding in outcome.findings] == [
+        "Deze overstortput heeft geen enkel `Overstortdrempel`-onderdeel, en dus geen "
+        "drempelniveau (`Drempelniveau`) en geen drempelbreedte (`Drempelbreedte`)."
+    ]
+    assert outcome.findings[0].details["ontbrekende_maten"] == ["Drempelniveau", "Drempelbreedte"]
     assert any("zonder enig `Overstortdrempel`-onderdeel" in note for note in outcome.notes), (
         outcome.notes
     )
@@ -655,36 +664,52 @@ def test_rvz002_verantwoordt_de_putten_zonder_drempel() -> None:
 
 
 @pytest.mark.parametrize(
-    ("bestand", "check_id", "boodschap"),
+    ("bestand", "boodschap", "ontbrekend"),
     [
         (
             "rvz002_drempel_zonder_niveau.ttl",
-            "RVZ-002",
             "De enige overstortdrempel van deze put heeft geen drempelniveau "
             "(`Drempelniveau`) geregistreerd.",
+            ["Drempelniveau"],
         ),
         (
             "rvz003_drempel_zonder_breedte.ttl",
-            "RVZ-003",
             "De enige overstortdrempel van deze put heeft geen drempelbreedte "
             "(`Drempelbreedte`) geregistreerd.",
+            ["Drempelbreedte"],
         ),
     ],
 )
-def test_overstort_met_drempel_zonder_waarde_meldt_lopend_nederlands(
-    bestand: str, check_id: str, boodschap: str
+def test_rvz002_meldt_welke_maat_ontbreekt(
+    bestand: str, boodschap: str, ontbrekend: list[str]
 ) -> None:
-    """De tak 'wel een drempel, geen waarde' had geen test op haar tekst.
+    """RVZ-002 zegt in één melding per put welke drempelmaat ontbreekt (#87).
 
-    Bij een enkele drempel liep de zin fout ("Geen van de 1 overstortdrempels"), en het
-    voltooid deelwoord stond ervoor, waar het bij de breedte niet klopte ("een
-    geregistreerd drempelbreedte"). De toelichting noemt nu het bereik zoals de andere
-    notities in deze module dat doen.
+    RVZ-003 is hierin opgegaan: een put met alleen niveau (dus zonder breedte) en een
+    put met alleen breedte (dus zonder niveau) leveren allebei precies één melding met
+    de juiste maat in de tekst en in de details.
     """
-    outcome = uitkomst(bestand, check_id)
+    outcome = uitkomst(bestand, "RVZ-002")
 
     assert [bevinding.message for bevinding in outcome.findings] == [boodschap]
+    assert outcome.findings[0].details["ontbrekende_maten"] == ontbrekend
     assert outcome.notes == ["Bekeken: 1 overstortput in deze dataset (Overstortput, Stuwput)."]
+
+
+def test_rvz002_meldt_over_meerdere_drempels_van_een_put() -> None:
+    """Een put met meer dan één drempel krijgt de 'een X of een Y'-formulering (#87).
+
+    De tak leest positief ("Geen van de N ... heeft een X") om een dubbele ontkenning te
+    vermijden; op De Wolden komt hij niet voor (nul drempelobjecten), dus alleen deze
+    fixture bewaakt hem.
+    """
+    outcome = uitkomst("rvz002_twee_drempels_zonder_breedte.ttl", "RVZ-002")
+
+    assert [bevinding.message for bevinding in outcome.findings] == [
+        "Geen van de 2 overstortdrempels van deze put heeft een drempelbreedte "
+        "(`Drempelbreedte`) geregistreerd."
+    ]
+    assert outcome.findings[0].details["ontbrekende_maten"] == ["Drempelbreedte"]
 
 
 def test_rvz011_meldt_de_waking() -> None:

@@ -481,6 +481,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **RVZ-002 zegt in één melding welke drempelmaat ontbreekt** (issue #87, BO-78). De check
+  meldt voortaan per overstortput welke van {`Drempelniveau`, `Drempelbreedte`} niet
+  geregistreerd is -- in de tekst en in het nieuwe detailveld `ontbrekende_maten` -- ook als
+  er helemaal geen `Overstortdrempel`-onderdeel aan de put hangt. RVZ-003 (de aparte
+  breedtecheck) is hierin opgegaan (zie Verwijderd): op De Wolden meldden de twee exact
+  dezelfde 245 putten, want de export draagt geen enkel drempelobject en dan ontbreken beide
+  maten samen. Hermeting: 245 meldingen in plaats van 490, inhoud gelijk.
+
 - **Eén GeoPackage-laag `vlakken` vervangt `bouwwerken` en `waterdelen_zonder_zinker`**
   (issue #67). De externe objecten waarnaar de EXT-meldingen verwijzen staan nu in één laag
   (MULTIPOLYGON) met de kolom `soort` (`pand`, `bouwwerk`, `water`); `subtype`, `relatie` en
@@ -591,6 +599,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `ext_watergang_buffer_m` is voortaan alleen de zoekstraal. Zie BO-43.
 
 ### Verwijderd
+
+- **RVZ-003 vervalt: opgegaan in RVZ-002** (issue #87, BO-78). De aparte check op de
+  ontbrekende `Drempelbreedte` had dezelfde populatie, ernst, dimensie en herstelhandeling
+  als RVZ-002 (`Drempelniveau`) en meldde op De Wolden exact dezelfde 245 putten. RVZ-002
+  noemt nu beide maten in één melding; twee ID's leverden alleen een dubbeltelling (490 voor
+  245 putten). Het ID RVZ-003 wordt niet hergebruikt en staat in de tabel Vervallen checks
+  van het register.
 
 - **NET-003, TOP-020 en HGT-005 vervallen: opgegaan in NET-009** (issue #80, BO-76). De
   drie losse richtingssignalen -- een stijgende BOB (NET-003), een omgekeerd getekende lijn

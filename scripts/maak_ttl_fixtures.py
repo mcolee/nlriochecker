@@ -1931,17 +1931,27 @@ FIXTURES["rvz002_drempel_zonder_niveau.ttl"] = (
     _overstortstelsel(drempel("PutO", "DrempelO", niveau=None, breedte=2000.0)),
 )
 
-# RVZ-003: de drempel draagt geen Drempelbreedte.
+# RVZ-002 (nam RVZ-003 op, #87): de drempel draagt geen Drempelbreedte.
 FIXTURES["rvz003_drempel_zonder_breedte.ttl"] = (
     "de drempel van overstortput O heeft wel een niveau maar geen Drempelbreedte",
     _overstortstelsel(drempel("PutO", "DrempelO", niveau=9.00, breedte=None)),
 )
 
-# RVZ-002 en RVZ-003: er is helemaal geen drempelonderdeel.
+# RVZ-002: er is helemaal geen drempelonderdeel, dus beide maten ontbreken.
 FIXTURES["rvz002_overstort_zonder_drempel.ttl"] = (
-    "overstortput O heeft geen enkel Overstortdrempel-onderdeel; RVZ-002 en RVZ-003 "
-    "gaan allebei af",
+    "overstortput O heeft geen enkel Overstortdrempel-onderdeel; RVZ-002 meldt beide "
+    "ontbrekende maten in één melding",
     _overstortstelsel(""),
+)
+
+# RVZ-002: twee drempels op één put, beide met niveau maar zonder breedte -- de
+# meervoudstak ("Geen van de N ...") die op De Wolden niet voorkomt.
+FIXTURES["rvz002_twee_drempels_zonder_breedte.ttl"] = (
+    "overstortput O heeft twee drempels, beide met een niveau maar zonder Drempelbreedte",
+    _overstortstelsel(
+        drempel("PutO", "DrempelO", niveau=9.00, breedte=None)
+        + drempel("PutO", "DrempelP", niveau=9.50, breedte=None)
+    ),
 )
 
 FIXTURES["rvz001_losse_overstort.ttl"] = (
