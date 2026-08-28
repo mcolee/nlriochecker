@@ -324,6 +324,23 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Verwijderd
 
+- **BTR-002, BTR-005, EXT-005 en EXT-006 vervallen voor nu** (issue #95, BO-62 t/m BO-65).
+  Alle vier kunnen op deze aanlevering structureel geen uitslag geven, en de bron die ze
+  nodig hebben komt er niet. BTR-002 vraagt de inwinningswijze op de kritieke
+  hoogtekenmerken (537 van de 46.880 BOB's dragen er een; de overwogen tussenstap op alleen
+  de maaiveldhoogte is door de auteur afgewezen). BTR-005 vraagt inspectiegegevens én een
+  risicowegingsbron, en geen van beide bestaat. EXT-005 en EXT-006 vragen een putdeksellaag:
+  de BGT-laag `put` telt 843 objecten (595 van ProRail) tegenover ruim 23.000 GWSW-putten, en
+  er komt geen gemeentelijke deksellaag. Er verdwijnt geen enkele melding -- alle vier stonden
+  op nul -- wel vier "bekeken 0"-regels uit het rapport. Het register zet ze in de tabel
+  *Vervallen checks* (niet *Geschrapte checks*: de nulmeting dekt ze niet, dus er is ook geen
+  sentinel in `dekking.toml`); de ID's worden niet hergebruikt. "Voor nu" betekent dat het
+  besluit aan de bron hangt: komt die er alsnog, dan keert de toets terug onder een nieuw ID.
+  De sleutels `bgt_putdeksellagen` en `ext_putdeksel_afstand_m` blijven in de drie
+  configbestanden staan met een regel dat geen check ze meer leest; de BGT-rol
+  `bgt_putdeksel` wordt nog wel geladen en op dekking getoetst. De voorbeeldsleutel in de
+  melding van de dekkingspoort noemt daarom `bgt_waterlagen` in plaats van
+  `bgt_putdeksellagen`.
 - **ATTR-008 geschrapt: de nulmeting toetst hetzelfde lengtebereik** (issue #90, BO-61). De
   check meldde een administratieve strenglengte buiten 1-75 m, en die twee grenzen zijn met
   issue #35 op het GWSW-datatype `Dt_LengteLeiding` gezet -- precies het bereik dat de

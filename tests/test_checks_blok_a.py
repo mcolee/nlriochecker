@@ -138,7 +138,7 @@ def test_defect_wordt_gevonden(bestand: str, check_id: str, verwacht: list[str])
 def test_elk_defect_heeft_een_eigen_fixture() -> None:
     # Bewaakt dat er geen check-ID stilzwijgend zonder fixture blijft. HGT-001 t/m
     # HGT-003 en de EXT-checks hebben externe bronnen nodig en staan in blok C;
-    # BTR-001 t/m BTR-005 zijn skeletten. ADM-003 heeft geen defectfixture maar wel
+    # BTR-001, BTR-003 en BTR-004 zijn skeletten. ADM-003 heeft geen defectfixture maar wel
     # een eigen test, want zonder projectpatroon is er geen defect te bouwen.
     gedekt = {check_id for _, check_id, _ in DEFECTEN} | {"ADM-003"}
     verwacht = {
@@ -677,7 +677,7 @@ def test_btr006_zwijgt_bij_te_weinig_waarnemingen() -> None:
     assert outcome.findings == []
 
 
-@pytest.mark.parametrize("check_id", ["BTR-001", "BTR-002", "BTR-003", "BTR-004", "BTR-005"])
+@pytest.mark.parametrize("check_id", ["BTR-001", "BTR-003", "BTR-004"])
 def test_btr_skeletten_melden_hun_markering(check_id: str) -> None:
     outcome = uitkomst("attr_schoon.ttl", check_id)
 

@@ -286,8 +286,8 @@ def test_externe_bronnen_van_koekangerveld() -> None:
         "bag_pand": 166,
         "nwb_wegvak": 13,
     }
-    # De BGT-laag `put` bestaat wel maar is leeg; EXT-005 en EXT-006 worden daarom
-    # overgeslagen in plaats van elke put als dekselloos te melden.
+    # De BGT-laag `put` bestaat wel maar is leeg, dus de rol blijft onvervuld. Geen
+    # check leest hem meer sinds EXT-005 en EXT-006 vervielen (issue #95).
     assert bronnen.layer("bgt_putdeksel") is None
     assert any("bgt_putdeksel" in ontbreekt for ontbreekt in bronnen.missing)
     # Alles staat al in RD New; er is niets geherprojecteerd.

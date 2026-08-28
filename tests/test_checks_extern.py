@@ -29,7 +29,7 @@ GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
 SCENARIO = TTL_DIR / "ext_scenario.ttl"
 GRENS = TTL_DIR / "hgt001_grens.ttl"
 
-EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-005", "EXT-006", "EXT-007"]
+EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-007"]
 AHN_IDS = ["HGT-001", "HGT-002", "HGT-003"]
 
 pytestmark = pytest.mark.skipif(
@@ -107,8 +107,6 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
         # Streng 9 doorkruist twee greppels (water-5 en water-7) en meldt dus twee keer.
         ("EXT-002", ["2", "3", "9", "9"]),
         ("EXT-003", ["2", "9", "9"]),
-        ("EXT-005", ["C", "E", "F", "L1", "L2", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y"]),
-        ("EXT-006", ["deksel-los"]),
         ("EXT-007", ["L1"]),
         ("HGT-001", ["B", "E"]),
         ("HGT-002", ["C"]),
@@ -259,28 +257,18 @@ def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: Extern
 
 
 def test_ontbrekende_laag_laat_de_check_overslaan(config: CheckConfig) -> None:
-    # Zonder BGT-bestand is er geen putdeksellaag; EXT-005 hoort dat te melden in
-    # plaats van elke put als dekselloos te bestempelen.
+    # Zonder BGT-bestand is er geen waterlaag; EXT-002 hoort dat te melden in plaats
+    # van elke streng als kruisingsvrij te bestempelen.
     basis = load_check_config().bronnen
     zonder_bgt = basis.model_copy(
         update={"map": ".", "bgt": None, "studiegebied": "studiegebied.gpkg", "ahn_dtm": "ahn.tif"}
     )
     bronnen = load_external_data(zonder_bgt, GIS_DIR)
-    outcome = uitkomst("EXT-005", config, bronnen)
+    outcome = uitkomst("EXT-002", config, bronnen)
 
     assert outcome.findings == []
     assert outcome.examined == 0
     assert any("laag niet aanwezig in aangeleverde data" in note for note in outcome.notes)
-
-
-def test_externe_bevindingen_dragen_een_eigen_locatie(
-    config: CheckConfig, bronnen: ExternalData
-) -> None:
-    # EXT-006 meldt objecten die niet uit de GWSW-dataset komen; zonder eigen
-    # coordinaat zou het bij de afbakening tot een studiegebied wegvallen.
-    for check_id in ("EXT-006",):
-        for bevinding in uitkomst(check_id, config, bronnen).findings:
-            assert bevinding.location is not None
 
 
 def test_hgt003_meldt_beide_richtingen(config: CheckConfig, bronnen: ExternalData) -> None:

@@ -12,9 +12,9 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | HGT | 18 | 18 | 0 | 0 | 0 |
 | NET | 9 | 9 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
-| BTR | 6 | 6 | 0 | 0 | 0 |
-| EXT | 7 | 7 | 0 | 0 | 0 |
-| **totaal** | **102** | **97** | **0** | **0** | **5** |
+| BTR | 4 | 4 | 0 | 0 | 0 |
+| EXT | 5 | 5 | 0 | 0 | 0 |
+| **totaal** | **98** | **93** | **0** | **0** | **5** |
 
 ## TOP
 
@@ -140,10 +140,8 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |
 | --- | --- | --- | --- | --- | --- | --- |
 | BTR-001 | Kritieke hoogtekenmerken (BOB, dekselniveau, drempelniveau) zonder inwinningsmetagegevens | W | Traceerbaarheid | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · — | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat 25.546 keer `WijzeVanInwinning` en geen en… |
-| BTR-002 | Kritieke kenmerken ingewonnen via schatting, plan of ontwerp in plaats van meting | W | Traceerbaarheid | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · — | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden en Hoogeveen wel op de kritieke hoogtekenme… |
 | BTR-003 | Inwinningsdatum BOB ouder dan drempel, afhankelijk van grondsoort (indicatie: zand 40 jaar, veen 10 jaar) | W | Actualiteit | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · — | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. Er is geen enkele `DatumInwinning` in de De Wolden en Hoogeveen-export, en er is… |
 | BTR-004 | Geregistreerde grondwaterstand boven maaiveld of meer dan 5 m onder maaiveld | W | Plausibiliteit | geimplementeerd met test | netwerkknopen · — | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat geen enkel `Grondwaterniveau`-kenmerk; er… |
-| BTR-005 | Toestands- of inspectiegegevens ouder dan drempel, gewogen naar risicoligging (spoor, dijk, wegfunctie) | W | Actualiteit | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · — | skelet: vereist inwinningsmetagegevens — Niet gebouwd in deze fase. De export bevat geen inspectie- of toestandsgegevens, en de weging naar risicolig… |
 | BTR-006 | Systematisch afgeronde hoogtewaarden: BOB's of dekselhoogten clusteren op ronde waarden (hele of halve decimeters), indicatie van geschatte in plaats… | W | Precisie | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding, Maaiveldhoogte, Putdekselniveau | — |
 
 ## EXT
@@ -154,6 +152,4 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · VormLeiding | — |
 | EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie… | W | Compleetheid | geimplementeerd met test | vrijvervalrioolleidingen · VormLeiding | — |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · — | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |
-| EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid | geimplementeerd met test | netwerkknopen · — | — |
-| EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid | geimplementeerd met test | netwerkknopen · — | — |
 | EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit | geimplementeerd met test | lozingspunten · — | — |

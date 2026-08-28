@@ -3255,3 +3255,144 @@ ATTR-008 als *vervallen* boeken zoals ADM-011 (verworpen: dat zou zeggen dat er 
 kijkt, en dat is aantoonbaar onwaar -- de nulmeting kijkt ernaar, en dan is de sentinel de
 manier om die dekking te blijven bewaken). Het ID hergebruiken voor een andere lengtecheck
 (verworpen: harde regel, vervallen ID's worden nooit hergebruikt).
+
+### BO-62 BTR-002 vervalt voor nu: de inwinningswijze staat niet op de BOB's
+
+**Wat.** BTR-002 (W, Traceerbaarheid, "Kritieke kenmerken ingewonnen via schatting, plan of
+ontwerp in plaats van meting") vervalt uit de engine en gaat in het register naar de tabel
+*Vervallen checks*, niet naar *Geschrapte checks*: de nulmeting toetst de inwinningswijze
+nergens, dus er kijkt na dit besluit niets meer naar. Het skelet en zijn `reden` verdwijnen
+mee. Het ID wordt niet hergebruikt.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, BTR-sectie). De check kan op deze aanlevering geen uitslag
+geven: de wijze staat op 537 van de 46.880 BOB's en op 10.050 van de 22.363 maaiveldhoogten,
+en zij hangt bovendien aan de puntgeometrie in plaats van aan het kenmerk. De audit bood één
+tussenstap aan -- de check alleen op de maaiveldhoogte bouwen, waar 6.455 van de 10.050
+gevulde waarden expliciet niet-gemeten zijn (`AHN2` of `NietAchterhaald`) -- en de auteur
+heeft die afgewezen: dat versmalt de check ten opzichte van het register, dat over álle
+kritieke kenmerken gaat.
+
+**Waarom "voor nu", en waarom geen sentinel.** Het besluit hangt aan de bron en niet aan het
+begrip. Levert een volgende export `WijzeVanInwinning` op de BOB's zelf, dan is deze toets
+weer zinvol; hij keert dan terug onder een nieuw ID, want vervallen ID's worden nooit
+hergebruikt. Een dekking-sentinel in `dekking.toml` hoort hier niet: die is het bewijs dat de
+nulmeting een geschrapte check dekt (voorwaarde 3 van de schrapronde), en dat is hier
+aantoonbaar niet zo. De vindplaats van het besluit is dit BO plus de registerregel.
+
+**Wat er blijft staan.** BTR-001 (dezelfde metagegevens, vanaf de kant van het ontbreken),
+BTR-003 en BTR-004 blijven skelet; BTR-006 blijft gebouwd. De kanttekening bij HGT-001 en
+HGT-002 leest de inwinningswijze gewoon door: `[inwinning] uit_hoogtemodel` en
+`[inwinning] onbekend` blijven ongewijzigd in de configuratie en worden door die twee checks
+gelezen. Er raakt dus geen configuratiesleutel wees.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel met de markering *vereist
+inwinningsmetagegevens* verdwijnt uit het rapport. Er verdwijnt geen enkele melding: de check
+stond op nul. De hermeting hoort bij blok A van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De tussenstap op alleen de maaiveldhoogte bouwen (verworpen door de auteur,
+zie hierboven). Het skelet laten staan omdat het zichtbaar maakt wat er ontbreekt (verworpen:
+dat argument geldt nog voor BTR-001, dat precies over het ontbreken van de metagegevens gaat;
+een tweede skelet op dezelfde lege bron voegt daar niets aan toe).
+
+### BO-63 BTR-005 vervalt voor nu: inspectiegegevens noch risicowegingsbron bestaan
+
+**Wat.** BTR-005 (W, Actualiteit, "Toestands- of inspectiegegevens ouder dan drempel, gewogen
+naar risicoligging") vervalt uit de engine en gaat in het register naar de tabel *Vervallen
+checks*. Het skelet en zijn `reden` verdwijnen mee. Het ID wordt niet hergebruikt.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, BTR-sectie), die BTR-005 de laagste prioriteit van de vijf
+skeletten gaf en hem als enige BTR-kandidaat om te laten vervallen aanwees. Hij vraagt twee
+dingen die er geen van beide zijn: inspectie- of toestandsgegevens in de GWSW-export, en een
+bron voor de risicoligging (spoor, dijk, wegfunctie). Die weging is bovendien geen
+GWSW-begrip; zij vraagt externe bronnen die buiten de EXT-scope van deze fase vallen. Er is
+ook geen drempel voor geconfigureerd, dus er raakt geen configuratiesleutel wees.
+
+**Waarom "voor nu", en waarom geen sentinel.** Zoals BO-62: het besluit hangt aan de twee
+ontbrekende bronnen. Komen er inspectiedata én een risicowegingsbron, dan keert de toets
+terug onder een nieuw ID. Een sentinel in `dekking.toml` hoort hier niet -- de nulmeting kent
+geen inspectiegegevens en dekt hem dus niet.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel verdwijnt uit het
+rapport; er verdwijnt geen melding, want de check stond op nul. `docs/nwb-voorstel.md` noemde
+BTR-005 als de sterkste kandidaat om de NWB-wegvakken aan op te hangen, met als aanbeveling
+"bouw hier nu niets mee"; dat spoor loopt niet meer via déze check. De NWB-laag zelf verandert
+niet: zij wordt geladen en door geen enkele check gelezen, precies zoals daarvoor.
+
+**Alternatieven.** Alleen de leeftijdshelft bouwen, zonder risicoweging (verworpen: er zijn
+ook geen inspectiedata, dus er valt geen leeftijd te meten -- dit is niet één ontbrekende
+bron maar twee). Het skelet laten staan (verworpen op dezelfde grond als BO-62).
+
+### BO-64 EXT-005 vervalt voor nu: er is geen bruikbare putdeksellaag
+
+**Wat.** EXT-005 (W, Compleetheid, "Put zonder BGT-putdeksel binnen X m") vervalt uit de
+engine en gaat in het register naar de tabel *Vervallen checks*. Het ID wordt niet
+hergebruikt. Anders dan bij BTR-002 en BTR-005 gaat het hier niet om een skelet maar om een
+volledig gebouwde check: de code verdwijnt, met haar tests.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, EXT-sectie). De aangeleverde BGT-laag `put` is geen
+putdekselbron: zij telt 843 objecten, waarvan 595 van ProRail en 72 van de twee gemeenten
+samen, tegenover ruim 23.000 GWSW-putten. Dat is spoorinfrastructuur. `configs/dewoldenhoogeveen.toml`
+zette de rol daarom al leeg (`bgt_putdeksellagen = []`), zodat de check netjes oversloeg met
+"laag niet aanwezig in aangeleverde data". De audit stelde als aanleveringsvraag of er een
+gemeentelijke deksellaag bestaat die het gebied wél dekt; het antwoord van de auteur is nee,
+en die komt er ook niet.
+
+**Waarom "voor nu", en waarom geen sentinel.** Het besluit hangt aan de bron. Komt er alsnog
+een deksellaag die het studiegebied dekt, dan is deze toets weer zinvol en keert hij terug
+onder een nieuw ID. Een sentinel in `dekking.toml` hoort hier niet: de nulmeting kent geen
+BGT en dekt deze check niet -- er kijkt na dit besluit niets meer naar, en dat is precies wat
+de tabel *Vervallen checks* zegt.
+
+**Wat er blijft staan, en waarom.** De bron-rol `bgt_putdeksel` blijft in
+`externedata.ROLLEN`, en de sleutels `bgt_putdeksellagen` en `ext_putdeksel_afstand_m` blijven
+in alle drie de configbestanden staan, elk met een regel dat geen check ze meer leest. Dezelfde
+redenering als in BO-61: `CheckThresholds` en `ExternalSources` staan op `extra="forbid"`, dus een
+bestaande projectconfiguratie die de sleutels draagt zou na verwijdering niet meer laden. Dat
+is een wijziging aan het configuratiecontract en hoort een eigen besluit te zijn, geen bijvangst
+van een schrapping. Twee gevolgen die je moet kennen zolang ze er staan: een aangeleverde
+`put`-laag wordt nog steeds geladen én op dekking getoetst, dus een te klein extract van een
+laag die niemand meer leest kan de harde dekkingspoort raken; en `ext_zoekafstand_max_m` telt
+`ext_putdeksel_afstand_m` (2,0 m) nog mee in de marge van diezelfde poort -- zonder gevolg,
+want `ext_lozingspunt_water_afstand_m` (10,0 m) is groter. De voorbeeldsleutel in de melding
+van de dekkingspoort noemt daarom niet langer `bgt_putdeksellagen` maar `bgt_waterlagen`, een
+laag die nog wel checks bedient.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel verdwijnt uit het
+rapport; er verdwijnt geen melding, want de check sloeg over. De hermeting hoort bij blok A van
+de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De check laten staan zodat de overslag zichtbaar blijft (verworpen: de
+overslag was luid en correct, maar zij herhaalt per run een aanleveringsvraag die inmiddels
+beantwoord is -- het antwoord staat nu hier in plaats van in elk rapport). De `put`-laag toch
+als deksellaag gebruiken (verworpen: 595 van de 843 objecten zijn ProRail; dat zou 23.000
+putten als dekselloos melden en dat is een uitspraak over de bron, niet over de beheerdata).
+
+### BO-65 EXT-006 vervalt voor nu, met EXT-005 mee
+
+**Wat.** EXT-006 (W, Compleetheid, "BGT-putdeksel zonder put in de beheerdata") vervalt uit de
+engine en gaat in het register naar de tabel *Vervallen checks*. Het ID wordt niet hergebruikt.
+Een eigen BO en niet een alinea in BO-64, omdat elk vervallen ID zijn eigen vindplaats hoort te
+hebben -- maar de grond is dezelfde en dit BO is er de spiegelzijde van.
+
+**Waarom.** Zoals BO-64: EXT-006 is dezelfde vraag van de andere kant (elk BGT-deksel zonder
+GWSW-put binnen 2,0 m), leest dezelfde rol `bgt_putdeksel`, en staat of valt dus met dezelfde
+ontbrekende bron. De auditregel zei het al met zoveel woorden: "de twee staan of vallen met
+dezelfde bron".
+
+**Wat er met hem verdwijnt.** EXT-006 was de enige check die een bevinding op een object buiten
+de GWSW-dataset legde: de bevinding hing aan het BGT-deksel en droeg zijn RD-coordinaat zelf
+(`Finding.location`), zodat zij bij de afbakening tot een studiegebied niet wegviel. Die weg
+blijft in de uitvoer bestaan (`uitvoer/locatie.foutlocatie` en de kolommen `x`/`y` van de
+meldingentabel) en wordt door `tests/test_uitvoer_locatie.py` bewaakt, maar er is nu geen check
+meer die hem vult. Dat is bewust: de mechaniek weghalen zou een tweede, veel bredere ingreep in
+de uitvoer zijn, en de eerstvolgende check op een externe bron heeft hem weer nodig.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel verdwijnt uit het rapport;
+er verdwijnt geen melding.
+
+**Alternatieven.** EXT-006 laten staan en alleen EXT-005 laten vervallen (verworpen: dan zou de
+helft van een spiegelpaar blijven draaien op een bron die er niet is, en zou het rapport
+suggereren dat de dekselvergelijking nog ergens gebeurt).

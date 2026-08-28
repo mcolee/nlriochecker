@@ -310,9 +310,9 @@ objecten die aan de oostkant 276 m voor de rand ophouden, wat aan die bron niets
 mankeert.
 
 De tolerantie geldt voor alle lagen tegelijk. Dekt een enkele laag het gebied echt niet,
-zet die laag dan uit in plaats van de tolerantie op te rekken: `bgt_putdeksellagen = []`
-schakelt EXT-005 en EXT-006 uit met een uitleg in het rapport, terwijl een tolerantie van
-kilometers de poort voor elke bron opheft.
+zet die laag dan uit in plaats van de tolerantie op te rekken: `bgt_waterlagen = []`
+schakelt EXT-002, EXT-003 en EXT-007 uit met een uitleg in het rapport, terwijl een
+tolerantie van kilometers de poort voor elke bron opheft.
 
 ### Projectconfiguraties
 

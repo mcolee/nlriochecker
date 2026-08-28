@@ -1,9 +1,10 @@
 """BTR-checks: betrouwbaarheid en metagegevens van de hoogtewaarden.
 
-BTR-001 t/m BTR-005 hangen aan inwinningsmetagegevens (wijze en datum van
-inwinning, grondwaterstand, inspectiedata) en staan hier als skelet: ze zijn in
-deze fase niet gebouwd, en zonder gevulde metagegevens zouden ze alleen
-ontbreken-meldingen opleveren. Zie het register, open punt 8.
+BTR-001, BTR-003 en BTR-004 hangen aan inwinningsmetagegevens (wijze en datum van
+inwinning, grondwaterstand) en staan hier als skelet: ze zijn in deze fase niet
+gebouwd, en zonder gevulde metagegevens zouden ze alleen ontbreken-meldingen
+opleveren. Zie het register, open punt 8. BTR-002 en BTR-005 zijn met issue #95
+vervallen voor nu (BO-62 en BO-63); hun ID's worden niet hergebruikt.
 
 BTR-006 is de uitzondering: die werkt op de waarden zelf en is wel gebouwd.
 """
@@ -59,26 +60,6 @@ class HoogteZonderInwinningsmetagegevens(_Metagegevensskelet):
 
 
 @register
-class InwinningNietGemeten(_Metagegevensskelet):
-    """BTR-002: kritieke kenmerken geschat of ontworpen in plaats van gemeten."""
-
-    id = "BTR-002"
-    title = "Kritieke kenmerken ingewonnen via schatting, plan of ontwerp in plaats van meting"
-    severity = Severity.WARNING
-    dimension = Dimension.TRACEABILITY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
-    kenmerken = ()
-    reden = (
-        "Niet gebouwd in deze fase. De inwinningswijze staat in De Wolden en Hoogeveen wel op de "
-        "kritieke hoogtekenmerken, maar op te weinig ervan om een uitslag op te baseren: "
-        "537 van de 46.880 BOB's en 10.050 van de 22.363 maaiveldhoogten. Van die laatste "
-        "zijn er 5.104 uit het AHN afgeleid en 1.351 met de waarde NietAchterhaald, dus "
-        "geschat noch gemeten. Deze check wordt zinvol zodra een export de wijze op de "
-        "BOB's zelf meelevert."
-    )
-
-
-@register
 class InwinningsdatumTeOud(_Metagegevensskelet):
     """BTR-003: BOB's die te lang geleden zijn ingewonnen."""
 
@@ -108,23 +89,6 @@ class GrondwaterstandBuitenBereik(_Metagegevensskelet):
     reden = (
         "Niet gebouwd in deze fase. De De Wolden en Hoogeveen-export bevat geen enkel "
         "`Grondwaterniveau`-kenmerk; er valt niets te toetsen."
-    )
-
-
-@register
-class ToestandsgegevensTeOud(_Metagegevensskelet):
-    """BTR-005: inspectiegegevens die te oud zijn voor de risicoligging."""
-
-    id = "BTR-005"
-    title = "Toestands- of inspectiegegevens ouder dan drempel, gewogen naar risicoligging"
-    severity = Severity.WARNING
-    dimension = Dimension.TIMELINESS
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
-    kenmerken = ()
-    reden = (
-        "Niet gebouwd in deze fase. De export bevat geen inspectie- of toestandsgegevens, "
-        "en de weging naar risicoligging (spoor, dijk, wegfunctie) vraagt bronnen die niet "
-        "aangeleverd zijn."
     )
 
 

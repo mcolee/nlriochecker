@@ -70,7 +70,11 @@ def test_melding_op_een_streng_krijgt_het_middelpunt() -> None:
 
 
 def test_extern_object_gebruikt_zijn_eigen_coordinaat() -> None:
-    """EXT-006 meldt objecten die niet in de GWSW-dataset staan."""
+    """Een melding op een object buiten de GWSW-dataset draagt zijn eigen coordinaat.
+
+    EXT-006 was tot issue #95 de enige check die zulke meldingen maakte (een BGT-deksel
+    zonder put); de weg blijft bestaan voor een volgende check op een externe bron.
+    """
     punt = foutlocatie(_bevinding("urn:bgt:deksel-1", location=(1111.0, 2222.0)), _dataset())
 
     assert (punt.x, punt.y) == (1111.0, 2222.0)

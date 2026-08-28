@@ -207,6 +207,10 @@ bgt_pandlagen = ["pand"]
 # telt elk type mee (waterloop, greppel/droge sloot, watervlakte, zee); daar wordt niet
 # op gefilterd. Zie BO-24 in de beslislog.
 bgt_waterlagen = ["waterdeel"]
+# Geen check leest deze rol meer: EXT-005 en EXT-006 zijn met issue #95 vervallen bij
+# gebrek aan een bruikbare deksellaag (BO-64 en BO-65). De sleutel blijft staan -- hem
+# weghalen raakt het configuratiecontract -- en de laag wordt nog wel geladen en op
+# dekking getoetst.
 bgt_putdeksellagen = ["put"]
 bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
 
@@ -371,6 +375,9 @@ afronding_minimum_waarnemingen = 30
 # afstanden als "X m" open; projectkeuze, geen externe bron.
 ext_pand_buffer_m = 1.0
 ext_watergang_buffer_m = 1.0
+# Geen check leest deze afstand meer: EXT-005 en EXT-006 zijn met issue #95 vervallen
+# (BO-64 en BO-65). De sleutel blijft staan -- hem weghalen raakt het
+# configuratiecontract -- en `ext_zoekafstand_max_m` telt hem nog mee.
 ext_putdeksel_afstand_m = 2.0
 ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0

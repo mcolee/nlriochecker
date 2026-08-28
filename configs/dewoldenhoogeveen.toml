@@ -206,7 +206,8 @@ bgt_pandlagen = ["pand"]
 bgt_waterlagen = ["waterdeel"]
 # De BGT-laag `put` telt hier 843 objecten, waarvan 595 van ProRail en 72 van de twee
 # gemeenten samen; tegenover ruim 23.000 GWSW-putten is dat geen putdekselbron maar
-# spoorinfrastructuur. EXT-005 en EXT-006 slaan daarom over.
+# spoorinfrastructuur. Precies daarom zijn EXT-005 en EXT-006 met issue #95 vervallen
+# (BO-64 en BO-65); geen check leest deze rol meer. De sleutel blijft leeg staan.
 bgt_putdeksellagen = []
 bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
 
@@ -362,6 +363,8 @@ afronding_minimum_waarnemingen = 30
 # afstanden als "X m" open; projectkeuze, geen externe bron.
 ext_pand_buffer_m = 1.0
 ext_watergang_buffer_m = 1.0
+# Geen check leest deze afstand meer: EXT-005 en EXT-006 zijn met issue #95 vervallen
+# (BO-64 en BO-65). De sleutel blijft staan; `ext_zoekafstand_max_m` telt hem nog mee.
 ext_putdeksel_afstand_m = 2.0
 ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0

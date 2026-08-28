@@ -296,6 +296,9 @@ class CheckThresholds(BaseModel):
     # EXT-checks: bufferafstanden tot de externe bronnen.
     ext_pand_buffer_m: float = Field(default=1.0, ge=0.0)
     ext_watergang_buffer_m: float = Field(default=1.0, ge=0.0)
+    # Geen check leest deze afstand meer: EXT-005 en EXT-006 zijn met issue #95
+    # vervallen (BO-64 en BO-65). De sleutel blijft staan, en `ext_zoekafstand_max_m`
+    # telt hem nog mee.
     ext_putdeksel_afstand_m: float = Field(default=2.0, gt=0.0)
     ext_lozingspunt_water_afstand_m: float = Field(default=10.0, gt=0.0)
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
@@ -473,6 +476,8 @@ class ExternalSources(BaseModel):
     # Welke BGT-lagen welke rol vervullen; per aangeleverde export in te vullen.
     bgt_pandlagen: list[str] = Field(default_factory=list)
     bgt_waterlagen: list[str] = Field(default_factory=list)
+    # Geen check leest deze rol meer sinds EXT-005 en EXT-006 met issue #95 vervielen
+    # (BO-64 en BO-65); de sleutel blijft staan en de laag wordt nog wel geladen.
     bgt_putdeksellagen: list[str] = Field(default_factory=list)
     bgt_overige_bouwwerklagen: list[str] = Field(default_factory=list)
 

@@ -160,10 +160,8 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
 | BTR-001 | Kritieke hoogtekenmerken (BOB, dekselniveau, drempelniveau) zonder inwinningsmetagegevens | W | Traceerbaarheid |
-| BTR-002 | Kritieke kenmerken ingewonnen via schatting, plan of ontwerp in plaats van meting | W | Traceerbaarheid |
 | BTR-003 | Inwinningsdatum BOB ouder dan drempel, afhankelijk van grondsoort (indicatie: zand 40 jaar, veen 10 jaar) | W | Actualiteit |
 | BTR-004 | Geregistreerde grondwaterstand boven maaiveld of meer dan 5 m onder maaiveld | W | Plausibiliteit |
-| BTR-005 | Toestands- of inspectiegegevens ouder dan drempel, gewogen naar risicoligging (spoor, dijk, wegfunctie) | W | Actualiteit |
 | BTR-006 | Systematisch afgeronde hoogtewaarden: BOB's of dekselhoogten clusteren op ronde waarden (hele of halve decimeters), indicatie van geschatte in plaats van gemeten waarden | W | Precisie |
 
 ## EXT: Externe bronnen (BGT, BAG, waterschap, BRK)
@@ -174,8 +172,6 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | W | Plausibiliteit |
 | EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie van EXT-002 en EXT-003, het rapport meldt hoeveel dat er zijn | W | Compleetheid |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit |
-| EXT-005 | Put zonder BGT-putdeksel binnen X m | W | Compleetheid |
-| EXT-006 | BGT-putdeksel zonder put in de beheerdata | W | Compleetheid |
 | EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit |
 
 ## Geschrapte checks (gedekt door GWSW-nulmeting)
@@ -202,6 +198,10 @@ uitkomst geven. De ID's worden niet hergebruikt.
 |---|---|---|---|
 | EXT-008 | BAG-verblijfsobject zonder riolering binnen X m (dekkingscheck) | v0.8 | Niet relevant voor deze opdracht: de vraag of elk pand op riolering is aangesloten hoort bij het rioleringsplan, niet bij een datakwaliteitstoets op de bestaande registratie. Bovendien zijn er panden aangeleverd en geen verblijfsobjecten, waardoor de check alleen een benadering kon geven. |
 | ADM-011 | Loze leiding in een keten zonder aansluiting op actief riool in de afvoerrichting | v0.9 | Meldde het gewenste eindbeeld als gebrek: een loze leiding is buiten gebruik gesteld, en dat zij geen verbinding meer heeft met het actieve net is precies goed. Er valt niets te herstellen. Het echte gebrek -- actief riool dat wel op een loze keten aansluit -- meldt ADM-010 (F) en dat blijft ongewijzigd. De ketenbouw blijft bestaan en telt de losgekoppelde ketens in de verantwoording van ADM-010. Zie de checkaudit (`docs/checks-audit-2026-08.md`, PRE-2), [#81](https://github.com/mcolee/nlriochecker/issues/81) en BO-60. |
+| BTR-002 | Kritieke kenmerken ingewonnen via schatting, plan of ontwerp in plaats van meting | v0.9 | Vervallen *voor nu*: de bron ontbreekt. De inwinningswijze staat op te weinig kritieke kenmerken om een uitslag te dragen (537 van de 46.880 BOB's). De overwogen tussenstap op alleen de maaiveldhoogte is door de auteur afgewezen, want die versmalt de check ten opzichte van dit register. Herleeft zodra een export de wijze op de BOB's zelf meelevert; dan komt hij terug onder een nieuw ID. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-62. |
+| BTR-005 | Toestands- of inspectiegegevens ouder dan drempel, gewogen naar risicoligging (spoor, dijk, wegfunctie) | v0.9 | Vervallen *voor nu*: twee bronnen ontbreken. De export bevat geen inspectie- of toestandsgegevens, en de weging naar risicoligging vraagt bronnen (spoor, dijk, wegfunctie) die niet zijn aangeleverd. Herleeft zodra er inspectiedata en een risicowegingsbron zijn; dan komt hij terug onder een nieuw ID. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-63. |
+| EXT-005 | Put zonder BGT-putdeksel binnen X m | v0.9 | Vervallen *voor nu*: er is geen bruikbare putdeksellaag. De BGT-laag `put` telt in De Wolden en Hoogeveen 843 objecten (595 van ProRail) tegenover ruim 23.000 GWSW-putten, en een gemeentelijke deksellaag komt er niet. Herleeft zodra er een deksellaag is die het gebied dekt; dan komt hij terug onder een nieuw ID. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-64. |
+| EXT-006 | BGT-putdeksel zonder put in de beheerdata | v0.9 | Vervallen *voor nu*, met EXT-005 mee: dezelfde ontbrekende deksellaag, van de andere kant bekeken. De twee staan of vallen met dezelfde bron. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-65. |
 
 ## Open punten
 
@@ -212,7 +212,7 @@ uitkomst geven. De ID's worden niet hergebruikt.
 5. RVZ-008 (lediging BBB) raakt de scopegrens: lediging loopt in de praktijk vaak via een gemaal. De check toetst alleen of er een ledigingsroute geregistreerd staat, niet het gemaal zelf. NB: de nulmeting dekt dit niet (Ledigingsvoorziening heeft in beide CFK's, Mds en Hyd, max=1 en geen min-eis); alleen als er wel een ledigingsvoorziening geregistreerd is, eist Hyd daarin minimaal een pomp.
 6. Afgehandeld (2026-08-19). Empirisch vastgesteld op de De Wolden-export en vastgelegd in de beslislog: overstorten staan er als `Overstortput` met een `Overstortleiding` eraan; losse `Overstortdrempel`-objecten met `Drempelniveau` en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel kent. `checks/randvoorzieningen.py` leest daarom beide vormen en meldt in de toelichting welke het in deze dataset heeft aangetroffen; de klassen staan in `[klassen]` van de projectconfiguratie (`overstortput`, `overstortleiding`, `drempel`). RVZ-004 t/m RVZ-011 zijn gebouwd en draaien. NB: dezelfde vraag speelt voor `Overnamepunt` en voor het IT-stelsel. Die twee zijn eerder ten onrechte als ontbrekende GWSW-begrippen opgeschreven; de ontologie kent ze wel (`Overnamepunt` als subklasse van `Aansluitpunt`, het IT-stelsel als `Infiltratiestelsel` met zijn subklasse `DrainageInfiltratieTransportStelsel`), maar de De Wolden-export levert nul `Overnamepunt`-instanties. Wat er wel en niet uit volgt staat in BO-33 en BO-34 van de beslislog; het spoor loopt via [#11](https://github.com/mcolee/nlriochecker/issues/11).
 7. Afgehandeld: schrapronde uitgevoerd en geactualiseerd naar toetsbasis Mds, zie tabel Geschrapte checks. Afwijkingen ten opzichte van de oorspronkelijke verwachting: ADM-002 en ADM-003 blijven staan (duplicaat-ID's smelten in RDF geruisloos samen respectievelijk geen patroontoetsing), ADM-008/009 blijven staan (in de nulmeting-beschrijving expliciet aangemerkt als externe validatie), ATTR-011 is juist wel geschrapt; RVZ-003 was dat ook maar is in v0.9 teruggehaald (issue #6). In het proces borgen dat beide nulmeting-rapporten (Mds en Hyd) beschikbaar zijn en dat de typeringsscore als voorwaarde geldt.
-8. Afgehandeld voor de inwinningswijze; open voor de rest. De eerste run op De Wolden (2026-08-16) laat zien dat BTR-001 t/m BTR-005 op deze export inderdaad vrijwel alleen ontbreken-meldingen opleveren: er is geen enkele `DatumInwinning` en geen `Grondwaterniveau`, en de wijze hangt aan de puntgeometrie in plaats van aan het kenmerk (zie de inleiding van BTR). Ze blijven skelet. Een voorgestelde uitbreiding BTR-008 (inwinningswijze past niet bij het kenmerk) is afgewezen, zie de BTR-inleiding. Twee andere kandidaten, placeholder-datums en expliciete onbekend-waarden, zijn afgewezen als check en opgenomen als datakarakteristieken in de kop van het bevindingenrapport: ze slaan op vrijwel de hele dataset aan en leveren per object geen handeling op, maar bepalen wel op welke precisie leeftijden gelden en hoe rooskleurig een compleetheidscijfer leest.
+8. Afgehandeld voor de inwinningswijze; open voor de rest. De eerste run op De Wolden (2026-08-16) laat zien dat BTR-001 t/m BTR-005 op deze export inderdaad vrijwel alleen ontbreken-meldingen opleveren: er is geen enkele `DatumInwinning` en geen `Grondwaterniveau`, en de wijze hangt aan de puntgeometrie in plaats van aan het kenmerk (zie de inleiding van BTR). BTR-001, BTR-003 en BTR-004 blijven skelet; BTR-002 en BTR-005 zijn met [#95](https://github.com/mcolee/nlriochecker/issues/95) vervallen voor nu, zie de tabel Vervallen checks. Een voorgestelde uitbreiding BTR-008 (inwinningswijze past niet bij het kenmerk) is afgewezen, zie de BTR-inleiding. Twee andere kandidaten, placeholder-datums en expliciete onbekend-waarden, zijn afgewezen als check en opgenomen als datakarakteristieken in de kop van het bevindingenrapport: ze slaan op vrijwel de hele dataset aan en leveren per object geen handeling op, maar bepalen wel op welke precisie leeftijden gelden en hoe rooskleurig een compleetheidscijfer leest.
 9. Uit het onderzoeksrapport zijn de geometrie- en hoogtechecks verwerkt (N2 t/m N5, N7, N17 t/m N22, als TOP-015 t/m TOP-021, ATTR-011/012, HGT-016 t/m HGT-018). N1 (BOB onder putbodem) was al gedekt door HGT-004. Het restant is verplaatst naar de issuetracker: [#9 Resterende checks uit het onderzoeksrapport](https://github.com/mcolee/nlriochecker/issues/9).
 10. Deels afgehandeld (2026-08-16). Wat een regressietoets per run kan bewaken, wordt nu bewaakt; zie de voorwaarden bij Geschrapte checks. Wat niet kan: de rapportkoppen van de GWSW-server bevatten geen CFK-versie of filternaam, dus of de meting nog op deelmodel v1.6 en de filters collectie_MDSTOP_v16 en collectie_HYDTOP5_v16 draait, is niet uit de rapporten af te leiden en blijft handwerk. Het restant wordt niet opgepakt (besloten 2026-08-19): er is geen Mds-nulmetingrapport beschikbaar, en daarmee valt het buiten scope. Beide onderdelen staan of vallen met die bron -- zonder rapport is er niets om aan te verifieren en niets om een dekkinganalyse op te draaien. Komt er alsnog een Mds-rapport, dan is dit punt weer te openen. Dat restant was: (a) verifieren aan een echt Mds-nulmetingrapport of de someValuesFrom-eisen uit de Top-laag (waaronder HoogteLeiding, hasValidity-codering 1t 3t) daadwerkelijk als melding verschijnen, wat de NB-noot bij ATTR-004 raakt; en (b) een hernieuwde dekkinganalyse op Mds, die extra schrapkandidaten zou kunnen opleveren. (c) blijft staan als vaststelling: geen enkele geschrapte check hoeft terug, want Mds eist meer dan MdsPlan en niet minder.
 
@@ -223,6 +223,19 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-28): BTR-002, BTR-005, EXT-005 en EXT-006 vervallen *voor nu*
+(zie de tabel Vervallen checks). Alle vier vervallen om dezelfde soort reden: de bron die ze
+nodig hebben bestaat niet in deze aanlevering, en er komt er ook geen. BTR-002 vraagt de
+inwinningswijze op de BOB's (537 van de 46.880), BTR-005 vraagt inspectiegegevens én een
+risicowegingsbron (geen van beide bestaat), en EXT-005/EXT-006 vragen een putdeksellaag -- de
+BGT-laag `put` telt 843 objecten waarvan 595 van ProRail, tegenover ruim 23.000 GWSW-putten.
+Ze gingen niet naar de tabel Geschrapte checks: de nulmeting dekt ze niet, er kijkt niets meer
+naar. "Voor nu" betekent dat het besluit aan de bron hangt en niet aan het begrip; komt de
+bron er alsnog, dan keert de check terug onder een nieuw ID, want de ID's BTR-002, BTR-005,
+EXT-005 en EXT-006 worden niet hergebruikt. Uit de checkaudit
+(`docs/checks-audit-2026-08.md`, BTR- en EXT-sectie). Zie
+[#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-62 t/m BO-65.
 
 Versie 0.9, addendum (2026-08-28): ATTR-008 geschrapt (zie de tabel Geschrapte checks). De
 drempels van de check stonden op de grenzen van het GWSW-datatype `Dt_LengteLeiding` (1-75 m,
