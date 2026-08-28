@@ -171,9 +171,10 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
         Daarboven staat sinds issue #86 hoeveel strengen niet tegen hun materiaal maar
         tegen hun constructietype getoetst zijn, en welke constructietypen uit de tabel
         in *deze* configuratie buiten de getoetste populatie vallen. Dat laatste wordt
-        afgeleid en niet opgeschreven: bij de standaardconfiguratie zijn dat `Drain` en
-        `Duiker` (zij hangen rechtstreeks onder `Leiding`), maar een project dat
-        `[klassen] vrijvervalleiding` verbreedt haalt ze erin.
+        afgeleid en niet opgeschreven: bij de standaardconfiguratie is dat `Drain` (zij
+        hangt rechtstreeks onder `Leiding`), maar een project dat `[klassen]
+        vrijvervalleiding` verbreedt haalt haar erin. `Duiker` valt daar ook buiten maar
+        komt hier nooit voorbij -- die staat bewust niet in de tabel.
         """
         tabel = context.plausibiliteit
         strengen = vrijvervalrioolleidingen(context)
@@ -1523,9 +1524,12 @@ def _buiten_de_rol(
     """De constructietypen uit de tabel die buiten de populatie van ATTR-001 vallen.
 
     Afgeleid uit `[klassen] vrijvervalleiding` plus de klassenhierarchie, en niet als
-    vaste zin opgeschreven. Bij de standaardconfiguratie zijn dit `Drain` en `Duiker` --
-    zij hangen in de GWSW-ontologie rechtstreeks onder `Leiding` -- maar een project dat
-    die rol verbreedt haalt ze erin, en dan zou een vaste zin onwaar zijn. Zonder
+    vaste zin opgeschreven. De uitkomst kan nooit meer zijn dan wat er in
+    `[[constructietype_diameter]]` staat: bij de standaardconfiguratie is dat `Drain` --
+    zij hangt in de GWSW-ontologie rechtstreeks onder `Leiding` -- maar een project dat
+    die rol verbreedt haalt haar erin, en dan zou een vaste zin onwaar zijn. `Duiker`
+    valt net zo goed buiten die rol maar staat bewust niet in de tabel, en komt hier dus
+    ook niet uit. Zonder
     klassenhierarchie blijft elke afsluiting bij zichzelf steken; de uitkomst is dan
     nog steeds waar, want dan selecteert de rol ook alleen haar eigen wortels.
     """
