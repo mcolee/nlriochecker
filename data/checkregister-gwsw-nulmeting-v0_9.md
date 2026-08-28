@@ -131,7 +131,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid |
 | NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit |
-| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | F | Consistentie |
+| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | W | Consistentie |
 
 ## RVZ: Randvoorzieningen (BBB's, overstorten, drempels)
 

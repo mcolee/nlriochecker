@@ -114,5 +114,29 @@ def test_streng_zonder_enig_signaal_wordt_niet_stil_overgeslagen() -> None:
 def test_net009_severity_en_dimensie() -> None:
     outcome = _outcome("net009_omgekeerd_getekend.ttl")
 
-    assert outcome.severity.value == "F"
+    # Sinds issue #80 de integrale richtingscheck: elke tegenspraak is een W.
+    assert outcome.severity.value == "W"
     assert outcome.dimension.value == "Consistentie"
+
+
+def test_lozingspunt_bevestigt_de_richting_geeft_geen_bevinding() -> None:
+    # Administratie, geometrie en BOB zeggen alle drie A->B, en het bereikbare
+    # lozingspunt bevestigt dat: alle drie gelijk aan de harde waarheid, dus niets.
+    outcome = _outcome("net009_lozingspunt_bevestigt.ttl")
+
+    assert outcome.findings == []
+
+
+def test_lozingspunt_legt_omgekeerde_administratie_bloot() -> None:
+    # Streng 1: administratie, tekenrichting en BOB zeggen alle drie A->B, maar het
+    # bereikbare lozingspunt ligt aan de A-kant. De ongerichte graaf legt de
+    # afvoerrichting op B->A, dus de administratie wijst de verkeerde kant op: W.
+    outcome = _outcome("net009_lozingspunt_tegenspraak.ttl")
+
+    per_label = {f.object_label: f for f in outcome.findings}
+    assert set(per_label) == {"1"}
+    bevinding = per_label["1"]
+    assert bevinding.details["waarheid"] == "tegen"
+    assert bevinding.details["geometrie"] == "mee"
+    assert bevinding.details["bob"] == "mee"
+    assert "lozingspunt" in bevinding.message

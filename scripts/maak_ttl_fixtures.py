@@ -829,6 +829,32 @@ FIXTURES["net009_geen_signaal.ttl"] = (
 )
 
 
+# NET-009: de harde waarheid uit een bereikbaar lozingspunt bevestigt de administratie.
+# LP ligt benedenstrooms van B; ongericht is B dichter bij LP dan A, dus de afvoer loopt
+# A->B->LP, gelijk aan de administratie. Alle drie de signalen kloppen: geen bevinding.
+FIXTURES["net009_lozingspunt_bevestigt.ttl"] = (
+    "geen; het bereikbare lozingspunt bevestigt de administratieve richting A->B->LP",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutL", "L", 1100.0, 2000.0, klasse="Lozingsput")
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", bob=(10.5, 10.0))
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutL", bob=(10.0, 9.5)),
+)
+
+# NET-009: een streng waarvan administratie, tekenrichting en BOB alle drie A->B zeggen,
+# terwijl het enige bereikbare lozingspunt aan de A-kant ligt. Ongericht is A dichter bij
+# LP dan B, dus de afvoer hoort B->A->LP te lopen: de administratie staat omgekeerd. L0
+# koppelt A netjes aan LP en is zelf schoon; alleen streng 1 wordt gemeld.
+FIXTURES["net009_lozingspunt_tegenspraak.ttl"] = (
+    "streng 1 zegt A->B, maar het bereikbare lozingspunt legt de afvoerrichting op B->A",
+    put("PutL", "L", 950.0, 2000.0, klasse="Lozingsput")
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding("L0", "0", [(1000.0, 2000.0), (950.0, 2000.0)], "PutA", "PutL", bob=(10.6, 10.5))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", bob=(10.5, 10.0)),
+)
+
+
 # ---------------------------------------------------------------------------
 # Blok A: ATTR, HGT, RVZ, ADM en BTR
 # ---------------------------------------------------------------------------
