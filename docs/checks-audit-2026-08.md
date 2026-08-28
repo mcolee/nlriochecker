@@ -110,9 +110,10 @@ Drie waarnemingen die breder gelden dan één check:
    **PRE-7** haalt dus het leeuwendeel van beide uitslagen weg, zonder dat aan de checks
    zelf iets verandert. Uitgevoerd via #85 (BO-71): de export draagt 189 zulke labels in 98
    groepen, onderling op 0,000 m, en de dedupstap in `_bouw_topologie` voegt er **94**
-   samen. De zeven checks die de puttenindex lezen (TOP-001/005/009/014/015/016/021)
-   verantwoorden dat in hun `notes()`; de netwerkgraaf, de administratieve koppeling en de
-   GIS-lagen blijven ongemoeid.
+   samen. Negen checks verantwoorden dat in hun `notes()`: de zeven die de puttenindex
+   aflopen (TOP-001/005/009/014/015/016/021) plus TOP-002 en TOP-003, die hem via de
+   snapping lezen. De netwerkgraaf, de administratieve koppeling en de GIS-lagen blijven
+   ongemoeid.
 2. **Het hulpstuk domineert de strengchecks.** 45 van de 56 TOP-002-meldingen en 107 van de
    109 TOP-003-meldingen hangen aan een T-stuk-eind. Dat komt doordat `Hulpstuk` in GWSW
    onder `Constructieonderdeel` valt en niet onder `Put`, en de rol `netwerkknopen` dus geen

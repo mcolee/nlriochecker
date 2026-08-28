@@ -195,19 +195,31 @@ def _dedupliceer(knopen: list[Node], tolerantie: float) -> tuple[list[Node], int
 
 
 def _dedupnotitie(context: CheckContext) -> list[str]:
-    """Verantwoordt de knopen die als compartimentduplicaat zijn samengevoegd."""
+    """Verantwoordt de knopen die als compartimentduplicaat zijn samengevoegd.
+
+    Zegt precies wat de samenvoeging doet en wat zij niet doet. Zij haalt de knoop uit
+    de populatie -- ze rekent niets van het duplicaat bij het origineel op, dus wat
+    alleen op het duplicaat staat wordt hier niet meer beoordeeld -- en het strengeinde
+    dat erop uitkwam snapt alleen op het origineel als dat binnen de snapping-tolerantie
+    ligt. Die tweede zin is er niet voor de sier: `dubbele_put_tolerantie_m` is ruimer
+    dan `snapping_tolerantie_m`, dus tussen die twee maten in kan een strengeinde zijn
+    aansluiting verliezen. Zie BO-71.
+    """
     aantal = _topologie(context).samengevoegd
     if not aantal:
         return []
-    tolerantie = context.config.drempels.dubbele_put_tolerantie_m
+    drempels = context.config.drempels
     return [
         f"{getal(aantal, 'knoop', 'knopen')} {vorm(aantal, 'is', 'zijn')} vóór deze toets "
         "samengevoegd met een gelijknamige knoop: de labels verschillen alleen in een "
         "`c<n>`-postfix -- waarmee de bronexport een gecompartimenteerde put per deel "
-        f"uitschrijft -- en de punten liggen binnen {tolerantie:g} m van elkaar "
-        "(`[drempels] dubbele_put_tolerantie_m`). Zij tellen hier niet als eigen knoop en "
-        "de leidingen die erop uitkomen snappen op de knoop die overbleef; een gebrek op "
-        "zo'n duplicaat wordt dus op het origineel gemeld. Zie BO-71."
+        f"uitschrijft -- en de punten liggen binnen {drempels.dubbele_put_tolerantie_m:g} m "
+        "van elkaar (`[drempels] dubbele_put_tolerantie_m`). Zij tellen hier niet als eigen "
+        "knoop, en wat alleen op zo'n duplicaat staat is hier dus niet getoetst. Een "
+        "strengeinde dat erop uitkwam snapt op de knoop die overbleef zolang die binnen "
+        f"{drempels.snapping_tolerantie_m:g} m ligt "
+        "(`[drempels] snapping_tolerantie_m`); ligt het duplicaat verder van het origineel "
+        "dan die maat, dan geldt dat eind hier als niet-aangesloten. Zie BO-71."
     ]
 
 
@@ -501,17 +513,25 @@ class _StrengPutAansluiting(Check):
         raise NotImplementedError
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Verantwoordt dat een hulpstuk met een telbare functie als eind meetelt."""
+        """Verantwoordt de samenvoeging en dat een hulpstuk als eind meetelt.
+
+        Deze twee checks lezen de puttenindex niet rechtstreeks, maar wel via de
+        snapping, en die draait op de STRtree over dezelfde -- ontdubbelde -- lijst. Valt
+        een duplicaat weg dat verder dan de snapping-tolerantie van het origineel lag,
+        dan verliest het strengeinde dat erop uitkwam zijn aansluiting en is het precies
+        deze check die dat meldt. Zie BO-71.
+        """
         tolerantie = context.config.drempels.snapping_tolerantie_m
         aantal = len(_eindhulpstukken(context).nodes)
         return [
+            *_dedupnotitie(context),
             f"Een strengeinde dat binnen {tolerantie:g} m op een hulpstuk met een telbare "
             "GWSW-functie valt (T-stuk, kruisstuk, mof) telt hier als geldig eind: de streng "
             f"komt ergens op uit. {getal(aantal, 'hulpstuk', 'hulpstukken')} met geometrie "
             f"{vorm(aantal, 'telt', 'tellen')} zo mee. Of zo'n hulpstuk zelf het juiste aantal "
             "leidingen verbindt is een andere vraag, en die stelt TOP-022. Een hulpstuk waarvan "
             "de klasse geen aantal voorschrijft -- een afsluitstuk of ontstoppingsstuk -- telt "
-            "niet als eind. Zie BO-72."
+            "niet als eind. Zie BO-72.",
         ]
 
     def examined(self, context: CheckContext) -> int:

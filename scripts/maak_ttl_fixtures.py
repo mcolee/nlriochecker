@@ -664,6 +664,24 @@ FIXTURES["top005_compartimentduplicaat.ttl"] = (
     + leiding("L5", "5", [(1350.0, 2000.0), (1400.1, 2000.0)], "PutE", "Mof1"),
 )
 
+# Issue #85, blokreview: de prijs van de samenvoeging, in het venster tussen de twee
+# toleranties in. `dubbele_put_tolerantie_m` (0,30 m) is drie keer zo ruim als
+# `snapping_tolerantie_m` (0,10 m), dus een duplicaat op 0,20 m wordt wel samengevoegd
+# maar vangt het strengeinde daarna niet meer op. Streng 6 eindigt op het duplicaat en
+# raakt zijn aansluiting kwijt; streng 7 hangt aan de winnaar en houdt de zijne. Vóór de
+# dedup meldt hier niets.
+FIXTURES["top003_dedup_buiten_snapping.ttl"] = (
+    "W0004  c2 ligt 0,20 m van W0004  c1: binnen de dubbele-put-tolerantie (samenvoegen) "
+    "maar buiten de snapping-tolerantie, zodat streng 6 -- die op het duplicaat eindigt -- "
+    "daarna nog maar aan een zijde een put heeft (issue #85, blokreview blok D)",
+    put("PutF", "F", 1450.0, 2000.0)
+    + put("Won1", "W0004  c1", 1500.0, 2000.0)
+    + put("Won2", "W0004  c2", 1500.2, 2000.0)
+    + put("PutG", "G", 1550.0, 2000.0)
+    + leiding("L6", "6", [(1450.0, 2000.0), (1500.2, 2000.0)], "PutF", "Won2")
+    + leiding("L7", "7", [(1500.0, 2000.0), (1550.0, 2000.0)], "Won1", "PutG"),
+)
+
 # NET-003: de bodem stijgt in de administratieve richting.
 FIXTURES["net003_tegen_de_richting.ttl"] = (
     "streng 1 loopt administratief van A naar B terwijl de bodem stijgt",

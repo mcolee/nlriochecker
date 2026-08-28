@@ -93,13 +93,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   nu als hetzelfde object wanneer hun labels op die postfix na gelijk zijn **én** ze binnen
   `[drempels] dubbele_put_tolerantie_m` (0,30 m) samenvallen; het origineel wint (de knoop
   zonder postfix, anders de laagste postfix). Een knoop zonder postfix wordt nooit
-  weggenomen, dus een gewone dubbele put blijft gemeld. De samenvoeging geldt voor de zeven
-  checks die de puttenindex lezen -- TOP-001, TOP-005, TOP-009, TOP-014, TOP-015, TOP-016 en
-  TOP-021 -- en alle zeven verantwoorden hem in hun toelichting; de strengeinden van een
-  weggenomen duplicaat snappen vanzelf op de knoop die overbleef, dus TOP-002/003/004 krijgen
-  er geen melding bij. Bewust ongemoeid: de netwerkgraaf, de administratieve koppeling, de
-  afbakening, de GIS-lagen en de leeslaag `gwsw-orox-helpers`. Gemeten op de export (tekstscan,
-  geen toetsrun): 189 zulke labels in 98 groepen (`c1` 96x, `c2` 92x, `c3` 1x), onderling op
+  weggenomen, dus een gewone dubbele put blijft gemeld. Negen checks dragen de toelichting
+  die de samenvoeging verantwoordt: de zeven die de puttenindex aflopen -- TOP-001, TOP-005,
+  TOP-009, TOP-014, TOP-015, TOP-016 en TOP-021 -- plus TOP-002 en TOP-003, die hem via de
+  snapping lezen. Twee dingen staan er met opzet bij, want ze zijn de prijs van de
+  samenvoeging: wat alleen op het duplicaat stond is daarna niet meer getoetst (het wordt
+  niet bij het origineel opgeteld), en omdat de dubbele-put-tolerantie ruimer is dan
+  `snapping_tolerantie_m` (0,10 m) kan een duplicaat dat verder dan die maat van het
+  origineel ligt zijn strengeinde de aansluiting kosten -- dan meldt TOP-002 of TOP-003 dat.
+  Op De Wolden en Hoogeveen gebeurt dat niet: alle groepen vallen op 0,000 m samen. Bewust
+  ongemoeid: de netwerkgraaf, de administratieve koppeling (dus ook TOP-004), de afbakening,
+  de GIS-lagen en de leeslaag `gwsw-orox-helpers`. Gemeten op de export (tekstscan, geen
+  toetsrun): 189 zulke labels in 98 groepen (`c1` 96x, `c2` 92x, `c3` 1x), onderling op
   0,000 m, waarvan er **94** samengevoegd worden. Verwacht effect op De Wolden en Hoogeveen:
   TOP-001 **102 → ~9**, TOP-005 **112 → ~20**, TOP-021 **5 → ~3**. De hermeting hoort bij de
   blokregie.

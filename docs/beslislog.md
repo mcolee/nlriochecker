@@ -3762,14 +3762,33 @@ is `c1` het oudste dat er is. Dezelfde regel over dezelfde export levert **94** 
 knopen, en dat sluit aan bij de audit: 93 van de 102 TOP-001-meldingen en 92 van de 112
 TOP-005-meldingen dragen deze postfix.
 
-**Reikwijdte -- welke checks de samengevoegde populatie zien.** Precies de checks die de
-puttenindex `_Topologie.nodes` lezen, en dat zijn er zeven: **TOP-001** (losliggende put),
+**Reikwijdte -- welke checks de samengevoegde populatie zien.** Rechtstreeks: de checks die de
+puttenindex `_Topologie.nodes` aflopen, en dat zijn er zeven -- **TOP-001** (losliggende put),
 **TOP-005** (dubbele put), **TOP-009** (RD-bereik), **TOP-014** (aansluitende strengen),
 **TOP-015** (multipart), **TOP-016** (ongeldige geometrie) en **TOP-021** (put naast een
-doorlopende streng). Alle zeven verantwoorden het in hun `notes()`; stilte zou lezen als "alles
-gecontroleerd". Omdat de STRtree op diezelfde lijst gebouwd wordt, snappen de strengeinden van een
-weggenomen duplicaat vanzelf op de knoop die overbleef -- TOP-002, TOP-003 en TOP-004 krijgen er
-dus geen nieuwe melding bij.
+doorlopende streng). Indirect, via de snapping die op de STRtree over diezelfde lijst draait:
+**TOP-002** en **TOP-003**. Alle negen verantwoorden het in hun `notes()`; stilte zou lezen als
+"alles gecontroleerd".
+
+**Wat de samenvoeging níét doet, en wat zij kán kosten.** Zij haalt de knoop uit de populatie en
+rekent niets van het duplicaat bij het origineel op. Een gebrek dat alléén op het duplicaat stond
+-- een multipart-geometrie (TOP-015), een ongeldige geometrie (TOP-016) -- wordt daarna dus
+nergens meer gemeld, en TOP-014 telt de strengen van beide knopen niet bij elkaar op (drie plus
+drie blijft twee keer drie). De toelichting zegt dat met zoveel woorden ("wat alleen op zo'n
+duplicaat staat is hier niet getoetst") en belooft nadrukkelijk niet dat het gebrek op het
+origineel opduikt.
+
+Het strengeinde dat op een weggenomen duplicaat uitkwam snapt op de knoop die overbleef, maar
+alleen als die binnen `snapping_tolerantie_m` (0,10 m) ligt -- en de samenvoeging zelf gebruikt de
+ruimere `dubbele_put_tolerantie_m` (0,30 m). **Tussen die twee maten in kan een strengeinde zijn
+aansluiting verliezen en levert de dedup dus een nieuwe TOP-002- of TOP-003-melding op.** Op De
+Wolden en Hoogeveen gebeurt dat niet: alle 98 groepen vallen op 0,000 m samen, ruim binnen de
+snapping-tolerantie. Maar de claim geldt alleen binnen die tolerantie, en daarom dragen TOP-002 en
+TOP-003 de toelichting en noemt die beide drempels. De fixture
+`top003_dedup_buiten_snapping.ttl` legt het venster vast (duplicaat op 0,20 m). Dat de twee
+toleranties aan elkaar gekoppeld zouden moeten worden -- één maat in plaats van twee -- is een
+open auteursvraag en bewust níét in dit besluit meegenomen. **TOP-004** blijft hoe dan ook buiten
+schot: die leest de administratieve koppeling via `resolve_network_node` en niet de puttenindex.
 
 Wat de dedup **niet** raakt, en met opzet: de netwerkgraaf in `checks/verbanden.py` en alles wat
 daarop leunt (`verbonden_knopen`, dus TOP-013/014-telling, TOP-019, alle NET-checks), de
@@ -3786,7 +3805,8 @@ clusterende variant zou code toevoegen voor een geval dat in deze export nul kee
 
 **Hoe het vastligt.** `_COMPARTIMENT_POSTFIX`, `_basislabel` en `_dedupliceer` in
 `checks/topologie.py`; de telling reist mee als `_Topologie.samengevoegd` en `_dedupnotitie` maakt
-er de toelichtingsregel van. De fixture `top005_compartimentduplicaat.ttl` zet vier groepen naast
+er de toelichtingsregel van, die de negen checks delen. De fixture
+`top005_compartimentduplicaat.ttl` zet vier groepen naast
 elkaar die alleen in het beslissende kenmerk verschillen: `K0001  c1`/`c2` op 0,10 m (samenvoegen),
 `M0003` met `M0003  c1` op 0,10 m waarbij de leiding aan de postfixdrager hangt (het origineel wint
 én de leiding snapt erop), `V0002  c1`/`c2` op 0,50 m (buiten de tolerantie, blijft staan) en twee

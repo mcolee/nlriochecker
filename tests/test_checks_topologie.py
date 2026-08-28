@@ -181,6 +181,62 @@ def test_zonder_duplicaten_zwijgt_de_toelichting() -> None:
     assert _uitslag("top005_dubbele_put.ttl", "TOP-005").notes == []
 
 
+def test_samenvoegen_kan_een_strengeinde_zijn_aansluiting_kosten() -> None:
+    """De prijs van de dedup, in het venster tussen de twee toleranties in.
+
+    `dubbele_put_tolerantie_m` (0,30 m) is drie keer zo ruim als `snapping_tolerantie_m`
+    (0,10 m). `W0004  c2` ligt op 0,20 m van de winnaar: wel samengevoegd, maar te ver om
+    het eind van streng '6' nog op te vangen. Die streng houdt dus nog maar een zijde en
+    dat is precies wat TOP-003 hoort te melden -- niet stil, want de toelichting van
+    TOP-002 en TOP-003 noemt de samenvoeging en beide toleranties.
+    """
+    pad = TTL_DIR / "top003_dedup_buiten_snapping.ttl"
+    een_put = _uitslag("top003_dedup_buiten_snapping.ttl", "TOP-003")
+
+    assert _labels(een_put.findings) == ["6"]
+    assert _bevindingen(pad, "TOP-002") == []
+    # De winnaar zelf blijft aangesloten en het duplicaat is geen dubbele put meer.
+    assert _bevindingen(pad, "TOP-001") == []
+    assert _bevindingen(pad, "TOP-005") == []
+    assert any("1 knoop" in note and "0,1" in note.replace(".", ",") for note in een_put.notes), (
+        een_put.notes
+    )
+
+
+def test_die_melding_komt_van_de_dedup_en_niet_van_de_geometrie(tmp_path: Path) -> None:
+    """Met een krappere dubbele-put-tolerantie voegt niets samen en zwijgt TOP-003.
+
+    Hetzelfde bestand, alleen de drempel verschilt: op 0,05 m valt `W0004  c2` buiten de
+    samenvoeging, blijft hij een eigen put en houdt streng '6' zijn twee zijden. Dat pint
+    de oorzaak van de melding hierboven op de dedup vast en niet op de fixture.
+    """
+    krap = tmp_path / "krap.toml"
+    krap.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
+        "[drempels]\ndubbele_put_tolerantie_m = 0.05\n",
+        encoding="utf-8",
+    )
+    pad = TTL_DIR / "top003_dedup_buiten_snapping.ttl"
+
+    assert _bevindingen(pad, "TOP-003", load_check_config(krap)) == []
+    assert _bevindingen(pad, "TOP-002", load_check_config(krap)) == []
+    assert _bevindingen(pad, "TOP-001", load_check_config(krap)) == []
+
+
+def test_de_toelichting_belooft_niet_dat_het_duplicaat_elders_gemeld_wordt() -> None:
+    """TOP-014/015/016 rekenen niets van het duplicaat bij het origineel op.
+
+    Een multipart-geometrie of een vijfde streng op het duplicaat verdwijnt met de knoop
+    uit de populatie; de toelichting hoort dat te zeggen en niet te beloven dat het
+    gebrek op het origineel opduikt.
+    """
+    notities = _uitslag("top005_compartimentduplicaat.ttl", "TOP-015").notes
+
+    assert any("niet getoetst" in note for note in notities), notities
+    assert not any("op het origineel gemeld" in note for note in notities), notities
+
+
 def test_streng_op_een_hulpstuk_met_telbare_functie_meldt_niet() -> None:
     """Issue #89: een T-stuk is een geldig strengeinde, een afsluitstuk niet.
 
