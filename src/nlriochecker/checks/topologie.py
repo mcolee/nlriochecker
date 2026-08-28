@@ -1458,46 +1458,9 @@ class PseudoKnoop(Check):
         return len(functieloze_knopen(context))
 
 
-@register
-class OmgekeerdeDigitalisatie(Check):
-    """TOP-020: de tekenrichting is tegengesteld aan de van-naar-richting."""
-
-    id = "TOP-020"
-    title = "Digitalisatierichting komt niet overeen met de administratieve van-naar-richting"
-    severity = Severity.WARNING
-    dimension = Dimension.CONSISTENCY
-    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
-    kenmerken = ()
-
-    def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Vergelijkt het eerste lijnpunt met de administratieve beginput.
-
-        Alleen strengen waarvan beide putten bekend zijn en waarvan de putten
-        duidelijk uit elkaar liggen doen mee; anders is er niets te vergelijken.
-        """
-        dataset = context.dataset
-
-        for conduit in _topologie(context).conduits:
-            uitslag = dataset.richting_van_geometrie(conduit, context.config.klassen.netwerkknopen)
-            if uitslag is None:
-                continue
-            omgekeerd, begin, eind = uitslag
-            if not omgekeerd:
-                continue
-            yield self.finding(
-                context,
-                conduit.uri,
-                conduit.label,
-                f"De lijn begint bij put {eind.label!r} en eindigt bij {begin.label!r}, "
-                "terwijl de administratie het omgekeerd zegt.",
-                administratief_begin=begin.label,
-                administratief_eind=eind.label,
-            )
-
-    def examined(self, context: CheckContext) -> int:
-        """Het aantal vrijvervalstrengen met geometrie."""
-        topologie = _topologie(context)
-        return sum(1 for conduit in topologie.conduits if topologie.endpoints_of(conduit))
+# TOP-020 (digitalisatierichting tegen de van-naar-richting) is per issue #80 opgegaan in
+# NET-009 en vervallen; het ID wordt niet hergebruikt. De omgekeerde tekenrichting is nu
+# een deelgeval van de integrale richtingscheck (`checks/netwerk.py`).
 
 
 @register

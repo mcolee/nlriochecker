@@ -325,9 +325,10 @@ ahn_afwijking_fout_m = 0.25
 # riool legitiem dieper (bergings- en transportriolen) en een landelijke maximumnorm
 # bestaat niet, dus 4,0 m = die ontwerpnorm plus marge. Zie BO-68.
 bob_maximale_diepte_m = 4.0
-# HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng. Het
-# checkregister noemt "onder drempel" en "boven drempel" zonder getal;
-# projectkeuze, geen externe bron.
+# tegenverhang_licht_m is de vlak-band van NET-009 (onder dit |verval| zegt de BOB niets
+# over de richting); tegenverhang_fors_m is de forsgrens van HGT-006. Beide in meter over
+# de streng. Het checkregister noemt "onder drempel" en "boven drempel" zonder getal;
+# projectkeuze, geen externe bron. HGT-005 (licht) verviel in NET-009 (issue #80).
 tegenverhang_licht_m = 0.01
 tegenverhang_fors_m = 0.10
 # HGT-007: het minimale afschot staat als diameterstaffel in [[verhang_staffel]]
@@ -401,7 +402,7 @@ gemengd_zonder_overstort_buffer_m = 10.0
 [netwerk]
 # Hoe de afvoerrichting van een vrijvervalstreng bepaald wordt.
 #   administratief - de van-naar-richting uit het GWSW-model (standaard; dat is wat
-#                    het register bedoelt, en NET-003 toetst of die richting klopt)
+#                    het register bedoelt, en NET-009 toetst of die richting klopt)
 #   bob            - afgeleid uit het bodemverloop, met terugval op de
 #                    administratieve richting bij ontbrekende of gelijke BOB's
 richting = "administratief"

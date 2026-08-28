@@ -183,7 +183,7 @@ def _netwerk_notities(context: CheckContext) -> list[str]:
             f"De analyse neemt aan dat de administratieve begin-naar-eindrichting de "
             f"afvoerrichting is. Bij {tegendraads} van de {meetbaar} strengen met bekende "
             f"BOB's stijgt de bodem juist in die richting "
-            f"({100 * tegendraads / meetbaar:.0f}%). NET-003 toetst dat later expliciet; "
+            f"({100 * tegendraads / meetbaar:.0f}%). NET-009 toetst de richting integraal; "
             "tot die tijd verdienen de bereikbaarheidsuitkomsten een slag om de arm."
         )
 
@@ -553,71 +553,9 @@ def _stelseltype(context: CheckContext, conduit: Conduit) -> str | None:
     return context.config.klassen.stelseltype(conduit.types, context.dataset.closure)
 
 
-@register
-class OrientatieTegenAfvoerrichting(Check):
-    """NET-003: de administratieve richting loopt tegen het bodemverval in."""
-
-    id = "NET-003"
-    title = "Strengorientatie tegen de afvoerrichting in"
-    severity = Severity.ERROR
-    dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
-    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
-
-    def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst of de bodem daalt van de administratieve begin- naar de eindput.
-
-        Vrijverval stroomt naar beneden. Stijgt de BOB in de van-naar-richting met
-        meer dan de drempel voor licht tegenverhang, dan wijst dat op een omgekeerd
-        geregistreerde streng. HGT-005 en HGT-006 melden hetzelfde verschijnsel als
-        hoogteprobleem; NET-003 leest het als richtingsprobleem, en het register
-        kent beide.
-        """
-        drempel = context.config.drempels.tegenverhang_licht_m
-
-        for conduit in _netwerk(context).conduits:
-            if conduit.bob_start is None or conduit.bob_end is None:
-                continue
-            stijging = conduit.bob_end - conduit.bob_start
-            if stijging <= drempel:
-                continue
-            yield self.finding(
-                context,
-                conduit.uri,
-                conduit.label,
-                f"De bodem stijgt {stijging:.3f} m van begin- naar eindpunt "
-                f"(BOB {conduit.bob_start:.3f} naar {conduit.bob_end:.3f} m NAP); "
-                "de streng lijkt omgekeerd geregistreerd.",
-                bob_begin=conduit.bob_start,
-                bob_eind=conduit.bob_end,
-                stijging_m=round(stijging, 3),
-                drempel_m=drempel,
-            )
-
-    def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen door ontbrekende BOB's buiten beeld bleven."""
-        netwerk = _netwerk(context)
-        zonder = sum(
-            1
-            for conduit in netwerk.conduits
-            if conduit.bob_start is None or conduit.bob_end is None
-        )
-        notities = _netwerk_notities(context)
-        if zonder:
-            notities.append(
-                f"{zonder} van de {len(netwerk.conduits)} strengen in de graaf missen een "
-                "BOB aan begin- of eindpunt; die konden niet op richting getoetst worden."
-            )
-        return notities
-
-    def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen in de graaf met beide BOB's."""
-        return sum(
-            1
-            for conduit in _netwerk(context).conduits
-            if conduit.bob_start is not None and conduit.bob_end is not None
-        )
-
+# NET-003 (strengorientatie tegen de afvoerrichting) is per issue #80 opgegaan in NET-009
+# en vervallen; het ID wordt niet hergebruikt. De BOB-tegen-richting is nu een deelgeval
+# van de integrale richtingscheck hieronder.
 
 _RICHTING_MEE = "mee"
 _RICHTING_TEGEN = "tegen"

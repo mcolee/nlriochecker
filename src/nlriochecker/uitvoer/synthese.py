@@ -53,7 +53,7 @@ class GebiedsSamenvatting:
 
 
 # De checks die samen op een verkeerd geregistreerde afvoerrichting wijzen.
-RICHTINGSCHECKS = ("NET-001", "NET-003", "NET-004", "HGT-005", "HGT-006")
+RICHTINGSCHECKS = ("NET-001", "NET-004", "NET-009", "HGT-006")
 
 # Meer dan dit aantal objecten bij naam noemen maakt de synthese onleesbaar; de
 # rest staat toch in de bevindingentabellen en in de CSV.

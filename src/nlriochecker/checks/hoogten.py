@@ -215,7 +215,11 @@ class BobBuitenDePut(_StrengCheck):
 
 
 class _Tegenverhang(_StrengCheck):
-    """Gedeelde basis voor de twee tegenverhangchecks."""
+    """Basis voor de tegenverhangcheck HGT-006.
+
+    De ondergrens/bovengrens-vorm bleef bestaan van toen HGT-005 (licht tegenverhang)
+    er nog naast stond; die is per issue #80 in NET-009 opgegaan en vervallen.
+    """
 
     ondergrens: str
     bovengrens: str | None
@@ -252,8 +256,8 @@ class _Tegenverhang(_StrengCheck):
             1 for conduit in strengen if conduit.bob_start is None or conduit.bob_end is None
         )
         notities = [
-            "De afvoerrichting is hier de administratieve van-naar-richting. NET-003 leest "
-            "hetzelfde verschijnsel als richtingsprobleem; het register kent beide."
+            "De afvoerrichting is hier de administratieve van-naar-richting. NET-009 leest "
+            "de richting integraal; een stijgende BOB is daar een deelgeval van."
         ]
         if zonder:
             notities.append(
@@ -263,18 +267,10 @@ class _Tegenverhang(_StrengCheck):
         return notities
 
 
-@register
-class TegenverhangLicht(_Tegenverhang):
-    """HGT-005: licht tegenverhang, onder de drempel voor fors."""
-
-    id = "HGT-005"
-    title = "Tegenverhang bij vrijverval: licht (onder drempel)"
-    severity = Severity.WARNING
-    dimension = Dimension.PLAUSIBILITY
-    rollen = ("vrijvervalrioolleidingen",)
-    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
-    ondergrens = "tegenverhang_licht_m"
-    bovengrens = "tegenverhang_fors_m"
+# HGT-005 (licht tegenverhang) is per issue #80 in de integrale richtingscheck NET-009
+# opgegaan en vervallen; het ID wordt niet hergebruikt. In vlak Nederland is een
+# centimeterstijging inwinnauwkeurigheid zonder handelingsperspectief, en NET-009 meldt
+# de richting al. HGT-006 (fors) blijft als F bestaan.
 
 
 @register
@@ -332,7 +328,7 @@ class OnvoldoendeVerhang(_StrengCheck):
         Het minimale afschot volgt de RIONED-staffel (`verhang_staffel`): kleine
         leidingen moeten steiler liggen dan grote. Alleen strengen met verval naar
         beneden doen mee. Loopt de bodem juist omhoog, dan is dat tegenverhang en
-        melden HGT-005 en HGT-006 dat; hier nog eens meetellen zou dezelfde streng
+        meldt HGT-006 dat (en NET-009 de richting); hier nog eens meetellen zou dezelfde streng
         dubbel laten opduiken.
         """
         staffel = context.config.verhang_staffel
@@ -381,7 +377,7 @@ class OnvoldoendeVerhang(_StrengCheck):
 
         notities = [
             "Alleen strengen met verval naar beneden zijn getoetst; tegenverhang meldt de "
-            "check niet, dat doen HGT-005 en HGT-006.",
+            "check niet, dat doet HGT-006.",
             "Het minimale afschot volgt de RIONED-staffel per diameter (config "
             "`verhang_staffel`); alleen de rol vuilwater (Vuilwaterriool en GemengdRiool) "
             "doet mee, hemelwater valt er bewust buiten.",

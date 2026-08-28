@@ -158,7 +158,7 @@ class _Netwerk:
 
     De richting is de administratieve van-naar-richting: van BeginpuntLeiding naar
     EindpuntLeiding. Dat is de richting die het GWSW-model als afvoerrichting
-    bedoelt; NET-003 toetst later of de geometrie daarmee overeenkomt.
+    bedoelt; NET-009 toetst of de geometrie en de BOB daarmee overeenkomen.
 
     `graph` is het zuivere vrijverval. Het mechanische riool zit in een tweede laag
     die `_bereikbaarheid` los opbouwt, want kringlopen (NET-004), stelseltypen

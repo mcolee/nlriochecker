@@ -1,4 +1,4 @@
-"""Tests voor NET-003, NET-005, NET-006 en NET-008 op kleine fixtures."""
+"""Tests voor NET-005, NET-006 en NET-008 op kleine fixtures."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
-NIEUWE_NET_IDS = ["NET-003", "NET-005", "NET-006", "NET-008"]
+NIEUWE_NET_IDS = ["NET-005", "NET-006", "NET-008"]
 
 
 def uitkomst(pad: Path, check_id: str, config: CheckConfig | None = None) -> CheckOutcome:
@@ -30,7 +30,6 @@ def labels(outcome: CheckOutcome) -> list[str]:
 @pytest.mark.parametrize(
     ("bestand", "check_id", "verwachte_labels"),
     [
-        ("net003_tegen_de_richting.ttl", "NET-003", ["1"]),
         ("net005_afwijkend_stelseltype.ttl", "NET-005", ["2"]),
         ("net006_koppeling_stelseltypen.ttl", "NET-006", ["B"]),
         ("net008_veel_lozingspunten.ttl", "NET-008", ["L1", "L2", "L3"]),
@@ -45,22 +44,6 @@ def test_defect_wordt_gevonden(bestand: str, check_id: str, verwachte_labels: li
 @pytest.mark.parametrize("check_id", NIEUWE_NET_IDS)
 def test_schone_fixture_geeft_geen_bevinding(check_id: str) -> None:
     assert uitkomst(TTL_DIR / "net_schoon.ttl", check_id).findings == []
-
-
-def test_net003_meldt_de_stijging() -> None:
-    bevinding = uitkomst(TTL_DIR / "net003_tegen_de_richting.ttl", "NET-003").findings[0]
-
-    assert bevinding.details["stijging_m"] == pytest.approx(0.5)
-    assert bevinding.details["bob_begin"] == pytest.approx(10.0)
-    assert bevinding.details["bob_eind"] == pytest.approx(10.5)
-
-
-def test_net003_meldt_hoeveel_strengen_geen_bob_hebben() -> None:
-    # In net_schoon.ttl staan geen BOB's; dat mag niet als "alles in orde" lezen.
-    outcome = uitkomst(TTL_DIR / "net_schoon.ttl", "NET-003")
-
-    assert outcome.examined == 0
-    assert any("missen een BOB" in note for note in outcome.notes)
 
 
 def test_net005_noemt_het_afwijkende_type_en_dat_van_de_buren() -> None:

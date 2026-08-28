@@ -628,13 +628,8 @@ FIXTURES["top019_pseudoknoop_hulpstuk.ttl"] = (
     ),
 )
 
-# TOP-020: de lijn is tegen de administratieve richting in getekend.
-FIXTURES["top020_omgekeerd_getekend.ttl"] = (
-    "streng 1 is van B naar A getekend terwijl de administratie A naar B zegt",
-    put("PutA", "A", 1000.0, 2000.0)
-    + put("PutB", "B", 1050.0, 2000.0)
-    + leiding("L1", "1", [(1050.0, 2000.0), (1000.0, 2000.0)], "PutA", "PutB"),
-)
+# TOP-020 verviel per issue #80 in NET-009; de fixture net009_omgekeerd_getekend dekt
+# de omgekeerde tekenrichting nu.
 
 # TOP-021: een put die naast een doorlopende streng ligt.
 FIXTURES["top021_put_op_streng.ttl"] = (
@@ -1431,12 +1426,8 @@ FIXTURES["hgt004_bob_boven_deksel.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(10.50, 8.55)),
 )
 
-FIXTURES["hgt005_tegenverhang_licht.ttl"] = (
-    "de bodem van streng 1 stijgt 0,02 m in de afvoerrichting",
-    hoogteput("PutA", "A", A)
-    + hoogteput("PutB", "B", B)
-    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.62)),
-)
+# HGT-005 verviel per issue #80 in NET-009; licht tegenverhang krijgt geen eigen fixture
+# meer.
 
 FIXTURES["hgt006_tegenverhang_fors.ttl"] = (
     "de bodem van streng 1 stijgt 0,30 m in de afvoerrichting",

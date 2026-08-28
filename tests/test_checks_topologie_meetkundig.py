@@ -27,7 +27,6 @@ MEETKUNDIGE_IDS = [
     "TOP-017",
     "TOP-018",
     "TOP-019",
-    "TOP-020",
     "TOP-021",
 ]
 
@@ -74,7 +73,6 @@ def labels(gevonden: list[Finding]) -> list[str]:
         ("top018_spike.ttl", "TOP-018", ["1"]),
         ("top019_pseudoknoop.ttl", "TOP-019", ["B"]),
         ("top019_pseudoknoop_hulpstuk.ttl", "TOP-019", ["T1"]),
-        ("top020_omgekeerd_getekend.ttl", "TOP-020", ["1"]),
         ("top021_put_op_streng.ttl", "TOP-021", ["C"]),
     ],
 )
@@ -205,13 +203,6 @@ def test_top019_draait_niet_zonder_functieloze_klassen() -> None:
 
     assert outcome.findings == []
     assert any("niet gedraaid" in note for note in outcome.notes)
-
-
-def test_top020_noemt_beide_putten() -> None:
-    bevinding = bevindingen(TTL_DIR / "top020_omgekeerd_getekend.ttl", "TOP-020")[0]
-
-    assert bevinding.details["administratief_begin"] == "A"
-    assert bevinding.details["administratief_eind"] == "B"
 
 
 def test_top021_meldt_de_streng_waarlangs_de_put_ligt() -> None:

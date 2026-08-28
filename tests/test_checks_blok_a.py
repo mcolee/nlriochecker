@@ -94,7 +94,6 @@ DEFECTEN = [
     # data, waardoor streng 1 (beton 30) en streng 3 (PE 4) wel bij hun materiaal passen.
     ("attr017_wandruwheid_pe_betonwaarde.ttl", "ATTR-017", ["2"]),
     ("hgt004_bob_boven_deksel.ttl", "HGT-004", ["1"]),
-    ("hgt005_tegenverhang_licht.ttl", "HGT-005", ["1"]),
     ("hgt006_tegenverhang_fors.ttl", "HGT-006", ["1"]),
     ("hgt007_te_weinig_verhang.ttl", "HGT-007", ["1"]),
     ("hgt008_extreem_verhang.ttl", "HGT-008", ["1"]),
@@ -148,11 +147,12 @@ def test_elk_defect_heeft_een_eigen_fixture() -> None:
     # Bewaakt dat er geen check-ID stilzwijgend zonder fixture blijft. HGT-001 t/m
     # HGT-003 en de EXT-checks hebben externe bronnen nodig en staan in blok C;
     # BTR-001, BTR-003 en BTR-004 zijn skeletten. ADM-003 heeft geen defectfixture maar wel
-    # een eigen test, want zonder projectpatroon is er geen defect te bouwen.
+    # een eigen test, want zonder projectpatroon is er geen defect te bouwen. HGT-005 verviel
+    # per issue #80 in NET-009 en telt dus niet meer mee.
     gedekt = {check_id for _, check_id, _ in DEFECTEN} | {"ADM-003"}
     verwacht = {
         *ids_van("ATTR"),
-        *[f"HGT-{nummer:03d}" for nummer in range(4, 19)],
+        *[f"HGT-{nummer:03d}" for nummer in range(4, 19) if nummer != 5],
         *ids_van("RVZ"),
         *ids_van("ADM"),
         "BTR-006",
@@ -612,12 +612,6 @@ def test_hgt004_meldt_dat_het_gwsw_geen_putbodemniveau_kent() -> None:
     outcome = uitkomst("hgt004_bob_boven_deksel.ttl", "HGT-004")
 
     assert any("Putbodemniveau" in note for note in outcome.notes)
-
-
-def test_hgt005_en_hgt006_sluiten_elkaar_uit() -> None:
-    # Licht tegenverhang mag niet ook als fors gelden, en omgekeerd.
-    assert uitkomst("hgt005_tegenverhang_licht.ttl", "HGT-006").findings == []
-    assert uitkomst("hgt006_tegenverhang_fors.ttl", "HGT-005").findings == []
 
 
 def test_hgt006_zwijgt_onder_de_forsgrens_van_tien_centimeter() -> None:

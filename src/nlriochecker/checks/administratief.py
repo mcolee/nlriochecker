@@ -530,7 +530,7 @@ def _bouw_loze_ketens(context: CheckContext) -> tuple[_LozeKeten, ...]:
     """Groepeert de loze leidingen tot ketens en bepaalt per keten de aansluitingen.
 
     De richting is de administratieve begin-naar-eindrichting, ongeacht `[netwerk]
-    richting`: dat is de bron die NET-003 toetst, en een verkeerd gerichte administratie
+    richting`: dat is de bron die NET-009 toetst, en een verkeerd gerichte administratie
     is daar een bevinding en niet hier. Een strengeinde wordt naar zijn netwerkknoop
     herleid met terugval op de rauwe URI, zodat ook een hulpstuk als knoop telt.
     """
@@ -740,7 +740,7 @@ class _LozeLeidingen(Check):
         return [
             f"{getal(totaal, 'loze leiding', 'loze leidingen')} in "
             f"{getal(len(ketens), 'keten', 'ketens')}: {delen}. De richting is de "
-            "administratieve begin-naar-eindrichting; of die klopt toetst NET-003."
+            "administratieve begin-naar-eindrichting; of die klopt toetst NET-009."
         ]
 
     def examined(self, context: CheckContext) -> int:

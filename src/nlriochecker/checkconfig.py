@@ -274,7 +274,9 @@ class CheckThresholds(BaseModel):
     # ontwerpnorm voor nieuw gebied (3,0 m, PvE Rotterdam) plus marge voor bestaand
     # gebied; een landelijke maximumnorm bestaat niet. Zie BO-68.
     bob_maximale_diepte_m: float = Field(default=4.0, gt=0.0)
-    # HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng.
+    # tegenverhang_licht_m is de vlak-band van NET-009: onder dit |verval| zegt de BOB
+    # niets over de richting. tegenverhang_fors_m is de forsgrens van HGT-006 (issue #80:
+    # van 0,05 naar 0,10 m). Beide in meter over de streng.
     tegenverhang_licht_m: float = Field(default=0.01, gt=0.0)
     tegenverhang_fors_m: float = Field(default=0.10, gt=0.0)
     # HGT-008: steiler dan een op zoveel is verdacht.
@@ -354,7 +356,7 @@ class NetworkOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # 'administratief' volgt de van-naar-richting uit het GWSW-model, zoals het
-    # register bedoelt; NET-003 toetst juist of die richting klopt. 'bob' leidt de
+    # register bedoelt; NET-009 toetst juist of die richting klopt. 'bob' leidt de
     # richting af uit het bodemverloop en valt terug op de administratieve richting
     # als een BOB ontbreekt of beide gelijk zijn.
     richting: Literal["administratief", "bob"] = "administratief"

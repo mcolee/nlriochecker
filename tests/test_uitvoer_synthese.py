@@ -46,7 +46,7 @@ def test_omgekeerde_registratie_wordt_als_gezamenlijke_oorzaak_benoemd() -> None
     """Stijgt de bodem bij veel strengen in de afvoerrichting, dan is dat een oorzaak.
 
     De fixture heeft een streng die administratief de verkeerde kant op staat; dat
-    verklaart tegelijk de NET-003-, NET-001- en HGT-006-bevinding.
+    verklaart tegelijk de NET-009-, NET-001- en HGT-006-bevinding.
     """
     tekst = _tekst("net003_tegen_de_richting.ttl")
 
@@ -68,7 +68,7 @@ def test_object_met_meldingen_uit_meerdere_checks_wordt_apart_benoemd() -> None:
     tekst = _tekst("net003_tegen_de_richting.ttl")
 
     assert "HGT-006" in tekst
-    assert "NET-003" in tekst
+    assert "NET-009" in tekst
 
 
 def test_gedeeld_deelstelsel_tussen_net_en_rvz_wordt_benoemd() -> None:

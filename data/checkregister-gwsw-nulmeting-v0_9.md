@@ -56,7 +56,6 @@ gebreken" leest.
 | TOP-017 | Niet-simple geometrie (ST_IsSimple: spikes, herhaalde structuren) | W | Consistentie |
 | TOP-018 | Opeenvolgende dubbele vertices of spikes (hoek nabij 0 graden) in strenggeometrie | W | Consistentie |
 | TOP-019 | Pseudo-knoop: twee strengen gescheiden door een functieloze knoop, met identieke attributen (diameter, materiaal, stelseltype); zouden een streng moeten zijn | W | Consistentie |
-| TOP-020 | Digitalisatierichting (begin- naar eindvertex) komt niet overeen met de administratieve van-naar-richting | W | Consistentie |
 | TOP-021 | Put valt niet samen met enig strengeindpunt maar ligt wel naast of op een doorlopende streng (verfijning van TOP-001) | W | Consistentie |
 | TOP-022 | Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft. Het verwachte aantal volgt uit de `functie`-restrictie op de klasse in de ontologie (`VerbindenVanTweeLeidingen` 2 voor `Mof`, `VerbindenVanDrieLeidingen` 3 voor `T_stuk` en `Y_stuk`, `VerbindenVanVierLeidingen` 4 voor `Kruisstuk`); geteld naar verschillende knopen aan de andere kant, zodat een dubbel gelegde richting een keer telt. Klassen zonder aantal in hun functie (`Afsluitstuk`, `Ontstoppingsstuk`, `Tubelure`, `Bochtstuk`, `Verloopstuk`, `Overgangsstuk`) vallen erbuiten en worden in de toelichting geteld. De nulmeting kent geen kardinaliteit op `hasConnection` van een hulpstuk (issue #60) | F | Consistentie |
 | TOP-023 | Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft; waarschijnlijk de verkeerde klasse gekozen (voor vier bestaat `Kruisstuk`). Zelfde telling als TOP-022 (issue #60) | W | Consistentie |
@@ -104,7 +103,6 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | HGT-002 | Dekselhoogte wijkt af van AHN: 25 cm of meer; zelfde kanttekening als HGT-001 | F | Nauwkeurigheid |
 | HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 4,0 m eronder; v0.9 zei "meer dan 3 m"; afwijking in BO-68) | F | Plausibiliteit |
 | HGT-004 | BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem | F | Consistentie |
-| HGT-005 | Tegenverhang bij vrijverval: licht (onder drempel) | W | Plausibiliteit |
 | HGT-006 | Tegenverhang bij vrijverval: fors (boven drempel) | F | Plausibiliteit |
 | HGT-007 | Verhang vuilwater of gemengd onder drempelwaarde | W | Plausibiliteit |
 | HGT-008 | Extreem verhang (steiler dan bijv. 1:50; v0.9 zei "…, indicatie verwisselde BOB's"; tekstherstel in #84) | W | Plausibiliteit |
@@ -125,7 +123,6 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 |---|---|---|---|
 | NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt, dus de configuratie moet de mechanische leidingklassen noemen zodat de route door het persnet traceerbaar is | F | Consistentie |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie |
-| NET-003 | Strengorientatie tegen de afvoerrichting in | F | Consistentie |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk | F | Consistentie |
 | NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie |
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit |
@@ -207,6 +204,9 @@ terug onder een nieuw ID.
 | EXT-005 | Put zonder BGT-putdeksel binnen X m | v0.9 | Vervallen *voor nu*: er is geen bruikbare putdeksellaag. De BGT-laag `put` telt in De Wolden en Hoogeveen 843 objecten (595 van ProRail) tegenover ruim 23.000 GWSW-putten, en een gemeentelijke deksellaag komt er niet. Herleeft zodra er een deksellaag is die het gebied dekt; dan komt hij terug onder een nieuw ID. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-64. |
 | EXT-006 | BGT-putdeksel zonder put in de beheerdata | v0.9 | Vervallen *voor nu*, met EXT-005 mee: dezelfde ontbrekende deksellaag, van de andere kant bekeken. De twee staan of vallen met dezelfde bron. Zie [#95](https://github.com/mcolee/nlriochecker/issues/95) en BO-65. |
 | EXT-002 | Kruising met watergang (waterschaps- of BGT-data) | v0.9 | Niet relevant voor deze opdracht: een kruising met een watergang is op zichzelf geen gebrek en draagt geen handelingsperspectief. De vraag die er wél een draagt -- moet deze streng een zinker zijn? -- stelt EXT-003, en die meldde op De Wolden en Hoogeveen exact dezelfde 281 strengen en dezelfde 319 doorkruisingen (audit 27-08), want de export bevat geen enkele als zinker geregistreerde streng. EXT-003 blijft en is nu de enige watergangmelding; de doorkruisingen die hij overslaat blijven in zijn toelichting geteld. Zie de checkaudit (`docs/checks-audit-2026-08.md`, PRE-4), [#83](https://github.com/mcolee/nlriochecker/issues/83) en BO-66. |
+| NET-003 | Strengorientatie tegen de afvoerrichting in | v0.9 | Opgegaan in de integrale richtingscheck NET-009. NET-003 meldde een BOB die in de van-naar-richting stijgt; gemeten op De Wolden en Hoogeveen (audit 27-08) staan alle 3.651 NET-003-objecten óók in de 3.656 van NET-009. De BOB-tegen-richting is nu een deelgeval van NET-009, dus er gaat geen signaal verloren. Zie de checkaudit (`docs/checks-audit-2026-08.md`, PRE-1), [#80](https://github.com/mcolee/nlriochecker/issues/80) en BO-73. |
+| TOP-020 | Digitalisatierichting (begin- naar eindvertex) komt niet overeen met de administratieve van-naar-richting | v0.9 | Opgegaan in de integrale richtingscheck NET-009. TOP-020 meldde het losse cosmetische signaal (tekenrichting tegen de administratie); NET-009 leest de tekenrichting samen met administratie, BOB en de harde afvoerrichting. Zie de checkaudit (`docs/checks-audit-2026-08.md`, PRE-1), [#80](https://github.com/mcolee/nlriochecker/issues/80) en BO-73. |
+| HGT-005 | Tegenverhang bij vrijverval: licht (onder drempel) | v0.9 | Opgegaan in NET-009. Licht tegenverhang (1 tot 5 cm) is in vlak Nederland inwinnauwkeurigheid zonder handelingsperspectief; gemeten staan 1.284 van de 1.285 HGT-005-objecten óók in NET-009 (audit 27-08). De richting meldt NET-009; HGT-006 (fors) blijft als F bestaan, met de forsgrens per #80 op 0,10 m. Zie de checkaudit (`docs/checks-audit-2026-08.md`, PRE-1), [#80](https://github.com/mcolee/nlriochecker/issues/80) en BO-73. |
 
 ## Open punten
 

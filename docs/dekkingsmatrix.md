@@ -6,15 +6,15 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | Categorie | Register | Met test | Zonder test | Ontbreekt | Geschrapt |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| TOP | 23 | 23 | 0 | 0 | 0 |
+| TOP | 22 | 22 | 0 | 0 | 0 |
 | ADM | 10 | 7 | 0 | 0 | 3 |
 | ATTR | 18 | 16 | 0 | 0 | 2 |
-| HGT | 18 | 18 | 0 | 0 | 0 |
-| NET | 9 | 9 | 0 | 0 | 0 |
+| HGT | 17 | 17 | 0 | 0 | 0 |
+| NET | 8 | 8 | 0 | 0 | 0 |
 | RVZ | 11 | 11 | 0 | 0 | 0 |
 | BTR | 4 | 4 | 0 | 0 | 0 |
 | EXT | 4 | 4 | 0 | 0 | 0 |
-| **totaal** | **97** | **92** | **0** | **0** | **5** |
+| **totaal** | **94** | **89** | **0** | **0** | **5** |
 
 ## TOP
 
@@ -39,7 +39,6 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | TOP-017 | Niet-simple geometrie (ST_IsSimple: spikes, herhaalde structuren) | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-018 | Opeenvolgende dubbele vertices of spikes (hoek nabij 0 graden) in strenggeometrie | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-019 | Pseudo-knoop: twee strengen gescheiden door een functieloze knoop, met identieke attributen (diameter, materiaal, stelseltype); zouden een streng moe… | W | Consistentie | geimplementeerd met test | functieloze_knopen, leidingen, netwerkknopen, vrijvervalrioolleidingen · BreedteLeiding, HoogteLeiding, MateriaalLeiding | — |
-| TOP-020 | Digitalisatierichting (begin- naar eindvertex) komt niet overeen met de administratieve van-naar-richting | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-021 | Put valt niet samen met enig strengeindpunt maar ligt wel naast of op een doorlopende streng (verfijning van TOP-001) | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-022 | Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft. Het verwachte aantal volgt uit de `functie`-restrictie op de klasse in de onto… | F | Consistentie | geimplementeerd met test | hulpstukken, leidingen · — | — |
 | TOP-023 | Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft; waarschijnlijk de verkeerde klasse gekozen (voor vier bestaat `Kruisstuk`). Zelf… | W | Consistentie | geimplementeerd met test | hulpstukken, leidingen · — | — |
@@ -90,7 +89,6 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | HGT-002 | Dekselhoogte wijkt af van AHN: 25 cm of meer; zelfde kanttekening als HGT-001 | F | Nauwkeurigheid | geimplementeerd met test | netwerkknopen · Maaiveldhoogte, Putdekselniveau | — |
 | HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 4,0 m eronder; v0.9 zei "meer dan 3 m"; afwijking in BO-68) | F | Plausibiliteit | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | HGT-004 | BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem | F | Consistentie | geimplementeerd met test | netwerkknopen, rioolputten, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding, HoogtePut, Maaiveldhoogte, Putdekselniveau | — |
-| HGT-005 | Tegenverhang bij vrijverval: licht (onder drempel) | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | HGT-006 | Tegenverhang bij vrijverval: fors (boven drempel) | F | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | HGT-007 | Verhang vuilwater of gemengd onder drempelwaarde | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen, vuilwaterleidingen · BobBeginpuntLeiding, BobEindpuntLeiding, BreedteLeiding, LengteLeiding | — |
 | HGT-008 | Extreem verhang (steiler dan bijv. 1:50; v0.9 zei "…, indicatie verwisselde BOB's"; tekstherstel in #84) | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding, LengteLeiding | — |
@@ -111,7 +109,6 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | --- | --- | --- | --- | --- | --- |
 | NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt,… | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-003 | Strengorientatie tegen de afvoerrichting in | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
