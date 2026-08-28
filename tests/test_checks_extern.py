@@ -324,12 +324,32 @@ def test_hgt003_meldt_pas_boven_de_diepte_drempel(
     assert diep.details["maximale_diepte_m"] == config.drempels.bob_maximale_diepte_m
 
 
+def test_hgt003_noemt_de_gehanteerde_diepte_in_de_toelichting(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """De titel noemt de drempel niet meer, dus de toelichting moet het doen.
+
+    Bij nul bevindingen zegt het rapport anders nergens welke grens gold, en leest een
+    gehalveerde telling als "de data is beter geworden" -- dezelfde reden waarom
+    HGT-001 en HGT-002 hun band noemen.
+    """
+    outcome = uitkomst("HGT-003", config, bronnen)
+    diepte = config.drempels.bob_maximale_diepte_m
+
+    assert any(
+        f"meer dan {diepte:g} m onder het AHN-maaiveld" in note and "boven het AHN-maaiveld" in note
+        for note in outcome.notes
+    ), outcome.notes
+
+
 def test_hgt003_noemt_de_drempel_niet_als_getal_in_zijn_titel() -> None:
     """De gehanteerde diepte staat in de config, niet in de titel.
 
     Hij luidde "meer dan 3 m eronder" en bleef dat toen de drempel op 4,0 m kwam
-    (BO-68). De titel voedt ook de dekkingsmatrix en het registeroverzicht, dus een
-    getal daarin leest als de gehanteerde grens.
+    (BO-68). De titel voedt de checkkop in het rapport, de kolom Omschrijving in de CSV
+    en `overzicht_checks` in de GeoPackage, dus een getal daarin leest als de
+    gehanteerde grens. De dekkingsmatrix rendert de registertitel en niet deze;
+    die regel is los geannoteerd.
     """
     assert REGISTRY["HGT-003"].title == (
         "BOB-sanity ten opzichte van AHN (boven maaiveld of onaannemelijk diep eronder)"

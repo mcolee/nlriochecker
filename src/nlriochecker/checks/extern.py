@@ -1099,6 +1099,24 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
                     maximale_diepte_m=diepte,
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Vult de bereiknotities aan met de gehanteerde diepte en de tweede tak.
+
+        De titel noemt de drempel sinds BO-68 niet meer als getal, want hij is
+        configureerbaar; zonder deze regel zegt het rapport nergens welke grens gold --
+        bij nul bevindingen al helemaal niet.
+        """
+        notities = super().notes(context)
+        if not self.bruikbaar(context):
+            return notities
+        diepte = context.config.drempels.bob_maximale_diepte_m
+        notities.append(
+            f"Gemeld vanaf een diepteligging van meer dan {diepte:g} m onder het "
+            "AHN-maaiveld (`drempels.bob_maximale_diepte_m`); een BOB boven het "
+            "AHN-maaiveld is altijd een bevinding en kent geen drempel."
+        )
+        return notities
+
     def _melding(self, bob: float, maaiveld: float, diepte: float, zijde: str, node) -> str | None:
         """De reden waarom deze BOB niet bij het AHN-maaiveld past, of None."""
         if bob > maaiveld:

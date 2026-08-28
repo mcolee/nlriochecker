@@ -102,7 +102,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 |---|---|---|---|
 | HGT-001 | Dekselhoogte wijkt af van AHN: 10 cm of meer (v0.9 zei "meer dan 5 cm"; afwijking in BO-44); is de gebruikte hoogte zelf uit een hoogtemodel ingewonnen, dan vergelijkt de check twee modellen en krijgt de bevinding een kanttekening (wijzen configureerbaar) | W | Nauwkeurigheid |
 | HGT-002 | Dekselhoogte wijkt af van AHN: 25 cm of meer; zelfde kanttekening als HGT-001 | F | Nauwkeurigheid |
-| HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 3 m eronder) | F | Plausibiliteit |
+| HGT-003 | BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 4,0 m eronder; v0.9 zei "meer dan 3 m"; afwijking in BO-68) | F | Plausibiliteit |
 | HGT-004 | BOB hoger dan dekselhoogte van de eigen put, of lager dan de putbodem | F | Consistentie |
 | HGT-005 | Tegenverhang bij vrijverval: licht (onder drempel) | W | Plausibiliteit |
 | HGT-006 | Tegenverhang bij vrijverval: fors (boven drempel) | F | Plausibiliteit |
@@ -171,7 +171,7 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 | EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit |
 | EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie van deze check, het rapport meldt hoeveel dat er zijn. Getoetst wordt op BGT-waterdelen; waterschapsdata is toegestaan maar niet aangeleverd | W | Compleetheid |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit |
-| EXT-007 | Lozingspunt zonder watergang binnen X m | W | Plausibiliteit |
+| EXT-007 | Lozingspunt zonder watergang binnen X m; alleen de klassen die op oppervlaktewater lozen (`[klassen] waterlozingspunt`); scopeafwijking in BO-67 | W | Plausibiliteit |
 
 ## Geschrapte checks (gedekt door GWSW-nulmeting)
 

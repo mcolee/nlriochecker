@@ -63,7 +63,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   meldingen "BOB boven het AHN-maaiveld" blijven staan, dus het totaal gaat van 1.090
   naar ~171. De titel van de check draagt de drempel niet meer als getal ("boven maaiveld
   of onaannemelijk diep eronder" in plaats van "meer dan 3 m eronder"), want de drempel
-  is configureerbaar.
+  is configureerbaar; in plaats daarvan noemt de toelichting van HGT-003 de gehanteerde
+  grens uit de config ("Gemeld vanaf een diepteligging van meer dan 4 m onder het
+  AHN-maaiveld"), zoals HGT-001 en HGT-002 hun band al noemden.
 - **EXT-007 toetst alleen nog de lozingspunten die op oppervlaktewater lozen** (issue #94,
   BO-67). De populatie is de nieuwe rol `waterlozingspunten` (`[klassen]
   waterlozingspunt`): `Uitlaatconstructie` (met `Nooduitlaat` en `Uitstroombak` eronder),

@@ -3553,11 +3553,21 @@ meldingen meer dan de 5 m-variant.
 **Waarom de titel neutraal wordt.** De titel luidde "BOB-sanity ten opzichte van AHN (boven
 maaiveld, meer dan 3 m eronder)" en droeg de drempel dus als getal, terwijl de drempel
 configureerbaar is (harde regel). Hij wordt "BOB-sanity ten opzichte van AHN (boven maaiveld of
-onaannemelijk diep eronder)". Dat is geen cosmetiek: de titel voedt ook het registeroverzicht en
-de dekkingsmatrix, dus een verouderd getal daar leest als de gehanteerde grens. Een drifttest
-(`test_hgt003_noemt_de_drempel_niet_als_getal_in_zijn_titel`) houdt hem vast. Het checkregister
-v0.9 zelf blijft ongewijzigd -- dat is een bronbestand met een eigen versienummer; deze afwijking
-ervan staat hier.
+onaannemelijk diep eronder)". Dat is geen cosmetiek: `Check.title` voedt de checkkop in het
+Markdown-rapport, de kolom Omschrijving in de CSV en de laag `overzicht_checks` in de
+GeoPackage, dus een verouderd getal daar leest als de gehanteerde grens. Een drifttest
+(`test_hgt003_noemt_de_drempel_niet_als_getal_in_zijn_titel`) houdt hem vast.
+
+**Correctie d.d. 2026-08-28** (blok B-review). Twee dingen stonden hierboven onjuist. (1) De
+dekkingsmatrix rendert niet `Check.title` maar de titel uit het checkregister
+(`scripts/dekkingsmatrix.py`, `entry.title`); een neutrale checktitel raakt die dus niet, en de
+matrix bleef "meer dan 3 m eronder" tonen. (2) Het register bleef daardoor ook niet ongewijzigd:
+de registerregel is nu geannoteerd volgens het huispatroon van HGT-001/BO-44 -- "meer dan 4,0 m
+eronder; v0.9 zei 'meer dan 3 m'; afwijking in BO-68" -- en de matrix is geregenereerd. Het
+versienummer van het register verandert daar niet van; de annotatie zegt juist dat dit een
+gedocumenteerde afwijking van v0.9 is. Daarbij is ook de omissie hersteld dat het rapport de
+gehanteerde grens nergens meer noemde: `notes()` van HGT-003 meldt hem voortaan uit de config,
+in dezelfde vorm als HGT-001/002 ("Gemeld vanaf ...").
 
 **Verwacht effect op De Wolden en Hoogeveen.** De dieptemeldingen gaan van 1.042 naar ~123; de 48
 bovenmaaiveld-meldingen blijven staan, dus het totaal van HGT-003 gaat van 1.090 naar ~171. De
