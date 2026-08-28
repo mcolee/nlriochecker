@@ -102,6 +102,45 @@ def test_net002_raakt_de_gemengde_strengen_niet() -> None:
     assert _labels("net001_geen_afvoerpad.ttl", "NET-002") == []
 
 
+def test_net001_noemt_het_stelseltype_van_de_streng() -> None:
+    """Het verschil met NET-002 hoort uit de melding zelf te lezen te zijn (issue #93).
+
+    NET-001 gaat over twee stelseltypen tegelijk (`Vuilwaterriool` plus `GemengdRiool`);
+    de melding noemt daarom het type van DEZE streng en niet de rol waarop de check
+    selecteert. Twee fixtures, twee typen -- anders zou een vaste tekst ook groen zijn.
+    """
+    gemengd = _outcome("net001_geen_afvoerpad.ttl", "NET-001").findings[0]
+    vuilwater = _outcome("net001_pompunit_zonder_persnet.ttl", "NET-001").findings[0]
+
+    assert gemengd.message == (
+        "Streng van stelseltype 'gemengd' zonder afvoerpad naar een gemaal, "
+        "overnamepunt of lozingspunt."
+    )
+    assert gemengd.details["stelseltype"] == "gemengd"
+    assert vuilwater.message.startswith(
+        "Streng van stelseltype 'vuilwater' zonder afvoerpad naar een gemaal, "
+        "overnamepunt of lozingspunt."
+    )
+    assert vuilwater.details["stelseltype"] == "vuilwater"
+
+
+def test_net002_noemt_hemelwater_en_zoekt_alleen_een_lozingspunt() -> None:
+    """Dezelfde verheldering voor NET-002, met het eindpunt dat de check echt zoekt.
+
+    NET-002 leest alleen de rol `lozings_eindpunt`; `Overnamepunt` staat in
+    `afvoer_eindpunt` en is voor deze check nooit een bestemming geweest. De tekst
+    noemde hem toch, en beloofde daarmee meer dan de check meet.
+    """
+    bevinding = _outcome("net002_hemelwater_zonder_lozingspunt.ttl", "NET-002").findings[0]
+
+    assert bevinding.message == (
+        "Streng van stelseltype 'hemelwater' zonder afvoerpad naar een lozingspunt. "
+        "De graaf bevat geen enkel bereikbaar eindpunt van dit soort, dus geldt dit "
+        "voor elke streng."
+    )
+    assert bevinding.details["stelseltype"] == "hemelwater"
+
+
 def test_net004_vindt_de_kringloop() -> None:
     bevindingen = _outcome("net004_kringloop.ttl", "NET-004").findings
 

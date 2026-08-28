@@ -55,6 +55,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **NET-001 en NET-002 noemen het stelseltype van de streng en het eindpunt dat ze zoeken**
+  (issue #93). De twee checks delen nul objecten -- `vuilwater`/`gemengd` tegenover
+  `hemelwater`, en elk een ander eindpunt -- maar zeiden allebei alleen "Geen afvoerpad
+  naar ⟨doel⟩", zodat uit de melding zelf niet te lezen was welke van de twee aansloeg.
+  De tekst luidt nu "Streng van stelseltype 'gemengd' zonder afvoerpad naar een gemaal,
+  overnamepunt of lozingspunt". Het stelseltype komt per streng uit
+  `[klassen.stelseltypen]` -- NET-001 gaat over twee typen tegelijk, dus de rol waarop hij
+  selecteert (`vuilwater`) zegt minder dan het type van de streng zelf -- en staat ook in
+  het detailveld `stelseltype`, dat tot nu toe de rol herhaalde. **NET-002 noemt als
+  bestemming alleen nog het lozingspunt:** die check leest uitsluitend de rol
+  `lozings_eindpunt`, en `Overnamepunt` staat in `afvoer_eindpunt`, dus een overnamepunt
+  is er nooit een bestemming geweest terwijl de tekst hem wel noemde. De titel uit het
+  checkregister (v0.9) noemt hem nog wel en blijft ongewijzigd. **Conditie, ernst en
+  drempels wijzigen bij geen van beide**, dus de aantallen blijven 8.467 (NET-001) en
+  3.031 (NET-002).
 - **ATTR-016 scheidt een niet-geregistreerde maat van een echte tegenspraak** (issue #92).
   De uitslag bestaat uit twee soorten die om een andere ingreep vragen: op De Wolden en
   Hoogeveen dragen 67 van de 88 gemelde ronde putten een lengte van 0 mm -- geen meting

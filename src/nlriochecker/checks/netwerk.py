@@ -230,25 +230,38 @@ class _ZonderAfvoerpad(Check):
     # Meer dan een rol mag: NET-001 accepteert naast het afvoereindpunt ook het
     # lozingspunt (BO-53). De eindpuntverzameling is de vereniging van hun knopen.
     eindpuntrollen: tuple[str, ...]
+    # De leesbare naam van die eindpuntrollen, zoals hij in de melding verschijnt. Hij
+    # hoort niets te noemen dat `eindpuntrollen` niet zoekt; NET-002 beloofde tot issue
+    # #93 een overnamepunt dat alleen in `afvoer_eindpunt` staat.
     doel: str
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Zoekt strengen van dit stelseltype zonder pad naar een eindpunt."""
+        """Zoekt strengen van dit stelseltype zonder pad naar een eindpunt.
+
+        De melding noemt het stelseltype van DEZE streng en het eindpunt dat deze
+        check zoekt (issue #93). NET-001 en NET-002 delen nul objecten, maar met
+        alleen "Geen afvoerpad naar ..." was uit de melding zelf niet te lezen welke
+        van de twee aansloeg en waarom juist deze streng. NET-001 gaat bovendien over
+        twee stelseltypen tegelijk, dus de rol waarop de check selecteert (`vuilwater`)
+        zegt hier minder dan het type van de streng zelf. Valt de streng onder geen
+        enkel geconfigureerd stelseltype, dan blijft de rol over.
+        """
         onbereikbaar, geen_eindpunten = self._onbereikbaar(context)
         staart = (
-            " De graaf bevat geen enkel bereikbaar eindpunt van dit type, dus geldt dit "
+            " De graaf bevat geen enkel bereikbaar eindpunt van dit soort, dus geldt dit "
             "voor elke streng."
             if geen_eindpunten
             else ""
         )
 
         for conduit, cluster in onbereikbaar:
+            stelsel = _stelseltype(context, conduit) or self.stelselrol
             yield self.finding(
                 context,
                 conduit.uri,
                 conduit.label,
-                f"Geen afvoerpad naar {self.doel}.{staart}",
-                stelseltype=self.stelselrol,
+                f"Streng van stelseltype {stelsel!r} zonder afvoerpad naar {self.doel}.{staart}",
+                stelseltype=stelsel,
                 geen_eindpunten_in_graaf=geen_eindpunten,
                 cluster_id=cluster,
             )
@@ -330,7 +343,13 @@ class VuilwaterZonderAfvoerpad(_ZonderAfvoerpad):
 
 @register
 class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
-    """NET-002: hemelwater zonder pad naar lozingspunt of overnamepunt."""
+    """NET-002: hemelwater zonder pad naar een lozingspunt.
+
+    De titel komt uit het checkregister (v0.9) en noemt daar ook het overnamepunt,
+    maar `Overnamepunt` staat in de rol `afvoer_eindpunt` en die leest NET-002 niet:
+    alleen `lozings_eindpunt` telt hier als bestemming. De melding noemt daarom sinds
+    issue #93 alleen het lozingspunt -- de tekst hoort te zeggen wat de check meet.
+    """
 
     id = "NET-002"
     title = "Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt"
@@ -340,7 +359,7 @@ class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "hemelwater"
     eindpuntrollen = ("lozings_eindpunt",)
-    doel = "een lozingspunt of overnamepunt"
+    doel = "een lozingspunt"
 
 
 @register
