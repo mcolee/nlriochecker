@@ -646,6 +646,56 @@ def _geen_signaal(diagnose: _Richtingsdiagnose) -> bool:
     return diagnose.geometrie == _RICHTING_ONBEKEND and diagnose.bob == _RICHTING_ONBEKEND
 
 
+_STELSEL_GEMENGD = "gemengd"
+_STELSEL_VUILWATER = "vuilwater"
+
+
+def _richting_op_knoop(knoop: str, begin: str | None, eind: str | None, betrouwbaar: bool) -> str:
+    """Of de streng op deze knoop instroomt ('in'), uitstroomt ('uit') of onbekend is.
+
+    Alleen bij een betrouwbare administratieve richting; een streng met een put aan
+    beide zijden gelijk (zelflus) of een onbetrouwbare richting levert '?' en telt als
+    onbekend, zodat de koppeling niet ten onrechte gedempt wordt.
+    """
+    if not betrouwbaar or begin == eind:
+        return "?"
+    if knoop == eind:
+        return "in"
+    if knoop == begin:
+        return "uit"
+    return "?"
+
+
+def _vuilwater_stroomt_in_gemengd(richtingen: dict[str, set[str]]) -> bool:
+    """Geeft aan of op deze knoop enkel vuilwater instroomt en gemengd uitstroomt.
+
+    Dat is de goede afvoerrichting (issue #97): gemengd benedenstrooms van vuilwater.
+    Alleen als het paar precies gemengd+vuilwater is, elk vuilwaterbeen betrouwbaar
+    instroomt en elk gemengd been betrouwbaar uitstroomt. Elke onbekende of omgekeerde
+    richting laat de melding staan.
+    """
+    if set(richtingen) != {_STELSEL_GEMENGD, _STELSEL_VUILWATER}:
+        return False
+    return richtingen[_STELSEL_VUILWATER] == {"in"} and richtingen[_STELSEL_GEMENGD] == {"uit"}
+
+
+def _betrouwbaar_gericht(diagnose: _Richtingsdiagnose) -> bool:
+    """Geeft aan of de administratieve richting van deze streng te vertrouwen is.
+
+    De richtingsbron van blok I (issue #97, #102): #80/BO-76 leverde geen herbruikbare
+    afvoerrichting op, maar NET-009's per-streng oordeel wel. Een streng is betrouwbaar
+    gericht als geen enkel signaal de administratie tegenspreekt en er minstens een
+    signaal is dat haar bevestigt -- precies de strengen die NET-009 niet meldt en die
+    niet zonder enig richtingssignaal zijn.
+    """
+    return not _tegenspraak(diagnose) and not _geen_signaal(diagnose)
+
+
+def _betrouwbare_richting(context: CheckContext) -> dict[str, bool]:
+    """Per streng-URI of haar administratieve van-naar-richting betrouwbaar is."""
+    return {d.conduit.uri: _betrouwbaar_gericht(d) for d in _richtingsdiagnoses(context)}
+
+
 def _geometrie_zin(richting: str) -> str:
     """De geometrieregel van de melding."""
     if richting == _RICHTING_TEGEN:
@@ -855,22 +905,15 @@ class KoppelingTussenStelseltypen(Check):
         Zulke koppelingen bestaan legitiem — een overstort of een aansluiting van
         hemelwater op een gemengd stelsel — maar ze horen bewust te zijn. De
         bevinding staat op de knoop, want daar zit de koppeling.
+
+        Eén paar is met een betrouwbare richting geen fout: vuilwater dat in een
+        gemengd riool overgaat (gemengd benedenstrooms van vuilwater). Die koppeling
+        wordt gedempt; de omgekeerde richting -- gemengd in een vuilwaterriool -- blijft
+        wél gemeld. Zie issue #97 en `_betrouwbare_richting` (de richtingsbron uit #80).
         """
-        netwerk = _netwerk(context)
         dataset = context.dataset
-
-        per_knoop: dict[str, dict[str, list[str]]] = {}
-        for conduit in netwerk.conduits:
-            soort = _stelseltype(context, conduit)
-            if soort is None:
-                continue
-            for uri in verbonden_knopen(context, conduit):
-                if uri is not None:
-                    per_knoop.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
-
-        for uri, soorten in sorted(per_knoop.items()):
-            if len(soorten) < 2:
-                continue
+        knopen, _ = self._koppelingen(context)
+        for uri, soorten in knopen:
             node = dataset.nodes.get(uri)
             omschrijving = "; ".join(
                 f"{soort}: {', '.join(sorted(labels))}" for soort, labels in sorted(soorten.items())
@@ -883,9 +926,61 @@ class KoppelingTussenStelseltypen(Check):
                 stelseltypen=sorted(soorten),
             )
 
+    def _koppelingen(
+        self, context: CheckContext
+    ) -> tuple[list[tuple[str, dict[str, list[str]]]], int]:
+        """De te melden koppelknopen plus het aantal gedempte vuilwater→gemengd-knopen.
+
+        `run()` meldt en `notes()` duidt; beide hebben zowel de meldingen als de
+        demptelling nodig, dus staat de beslissing hier een keer.
+        """
+        return context.cached("net006:koppelingen", lambda: self._bouw_koppelingen(context))
+
+    def _bouw_koppelingen(
+        self, context: CheckContext
+    ) -> tuple[list[tuple[str, dict[str, list[str]]]], int]:
+        """Bepaalt per knoop de samenkomende stelseltypen en of de koppeling gemeld wordt."""
+        netwerk = _netwerk(context)
+        betrouwbaar = _betrouwbare_richting(context)
+
+        per_knoop: dict[str, dict[str, list[str]]] = {}
+        richtingen: dict[str, dict[str, set[str]]] = {}
+        for conduit in netwerk.conduits:
+            soort = _stelseltype(context, conduit)
+            if soort is None:
+                continue
+            begin, eind = verbonden_knopen(context, conduit)
+            for uri in verbonden_knopen(context, conduit):
+                if uri is None:
+                    continue
+                per_knoop.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
+                richting = _richting_op_knoop(uri, begin, eind, betrouwbaar.get(conduit.uri, False))
+                richtingen.setdefault(uri, {}).setdefault(soort, set()).add(richting)
+
+        knopen: list[tuple[str, dict[str, list[str]]]] = []
+        gedempt = 0
+        for uri, soorten in sorted(per_knoop.items()):
+            if len(soorten) < 2:
+                continue
+            if _vuilwater_stroomt_in_gemengd(richtingen[uri]):
+                gedempt += 1
+                continue
+            knopen.append((uri, soorten))
+        return knopen, gedempt
+
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen herkenbaar stelseltype hebben."""
-        return _stelseltype_notities(context)
+        """Meldt de gedempte vuilwater→gemengd-koppelingen en de typeloze strengen."""
+        _, gedempt = self._koppelingen(context)
+        notities = _stelseltype_notities(context)
+        if gedempt:
+            notities.insert(
+                0,
+                f"{getal(gedempt, 'koppeling', 'koppelingen')} waar vuilwater in een gemengd "
+                f"riool overgaat {vorm(gedempt, 'is', 'zijn')} niet gemeld: gemengd "
+                "benedenstrooms van vuilwater is de normale afvoerrichting (issue #97). De "
+                "omgekeerde richting blijft wel gemeld.",
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen in de graaf."""

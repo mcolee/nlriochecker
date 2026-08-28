@@ -720,6 +720,63 @@ FIXTURES["net006_koppeling_stelseltypen.ttl"] = (
     ),
 )
 
+# NET-006 (issue #97): vuilwater komt op knoop B binnen en gaat als gemengd verder. Gemengd
+# benedenstrooms van vuilwater is normaal; beide strengen lopen in de van-naar-richting met
+# dalende BOB en meelopende geometrie, dus hun richting is betrouwbaar (NET-009 spreekt ze
+# niet tegen) en NET-006 dempt de koppelingsmelding.
+FIXTURES["net006_vuilwater_naar_gemengd.ttl"] = (
+    "geen; vuilwater komt op knoop B binnen en gaat als gemengd verder (goede richting, "
+    "issue #97)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        klasse="Vuilwaterriool",
+        bob=(10.5, 10.0),
+    )
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        bob=(10.0, 9.5),
+    ),
+)
+
+# NET-006 (issue #97): de omgekeerde, foute richting. Gemengd komt op knoop B binnen en gaat
+# als vuilwater verder -- gemengd bovenstrooms van vuilwater is wel een koppelingsfout en
+# blijft gemeld. Dezelfde betrouwbare richting (BOB daalt, geometrie mee).
+FIXTURES["net006_gemengd_naar_vuilwater.ttl"] = (
+    "op knoop B komt gemengd binnen en gaat als vuilwater verder (gemengd bovenstrooms van "
+    "vuilwater, issue #97)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        bob=(10.5, 10.0),
+    )
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        bob=(10.0, 9.5),
+    ),
+)
+
 # NET-008: drie lozingsputten in een deelstelsel van vier knopen.
 FIXTURES["net008_veel_lozingspunten.ttl"] = (
     "een deelstelsel van vier knopen heeft drie lozingsputten",

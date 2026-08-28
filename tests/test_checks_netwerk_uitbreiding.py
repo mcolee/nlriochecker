@@ -67,6 +67,43 @@ def test_net005_zwijgt_over_een_streng_aan_de_rand() -> None:
     assert outcome.findings == []
 
 
+def test_net006_dempt_vuilwater_dat_op_gemengd_uitkomt() -> None:
+    """Gemengd benedenstrooms van vuilwater is normaal en hoort niet gemeld (issue #97).
+
+    Op knoop B stroomt vuilwater binnen en gaat het als gemengd verder. Beide strengen
+    hebben een betrouwbare richting (BOB daalt, geometrie mee, NET-009 spreekt ze niet
+    tegen), dus de koppeling is de goede kant op en NET-006 zwijgt. De toelichting maakt
+    de demping zichtbaar in plaats van haar te verzwijgen.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_vuilwater_naar_gemengd.ttl", "NET-006")
+
+    assert outcome.findings == []
+    assert any("vuilwater" in note and "gemengd" in note for note in outcome.notes)
+
+
+def test_net006_meldt_gemengd_dat_op_vuilwater_uitkomt() -> None:
+    """De omgekeerde richting is wél een koppelingsfout (issue #97).
+
+    Gemengd bovenstrooms van vuilwater betekent gemengd afvalwater in een vuilwaterriool;
+    dat blijft een melding op de knoop.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_gemengd_naar_vuilwater.ttl", "NET-006")
+
+    assert labels(outcome) == ["B"]
+    assert outcome.findings[0].details["stelseltypen"] == ["gemengd", "vuilwater"]
+
+
+def test_net006_meldt_andere_typeparen_ongewijzigd() -> None:
+    """De demping geldt alleen voor het paar gemengd+vuilwater; de rest verandert niet.
+
+    Op de bestaande fixture komen gemengd en hemelwater samen -- geen vuilwater -- dus de
+    richting-nuance van issue #97 raakt haar niet en de melding blijft staan.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_koppeling_stelseltypen.ttl", "NET-006")
+
+    assert labels(outcome) == ["B"]
+
+
 def test_net008_telt_de_lozingspunten_en_de_knopen() -> None:
     bevinding = uitkomst(TTL_DIR / "net008_veel_lozingspunten.ttl", "NET-008").findings[0]
 

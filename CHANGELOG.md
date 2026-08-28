@@ -79,6 +79,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **NET-006 dempt vuilwater dat op gemengd uitkomt** (issue #97). Gemengd benedenstrooms
+  van vuilwater is de normale afvoerrichting en geen koppelingsfout: op een knoop waar
+  precies gemengd en vuilwater samenkomen, elk vuilwaterbeen betrouwbaar instroomt en elk
+  gemengd been betrouwbaar uitstroomt, meldt NET-006 niets meer. De omgekeerde richting
+  (gemengd in een vuilwaterriool) en elke onbetrouwbare of onbekende richting blijven
+  gemeld. "Betrouwbaar" leunt op NET-009's per-streng oordeel (de richtingsbron uit #80,
+  BO-76): een streng waarvan geen enkel richtingssignaal de administratie tegenspreekt. De
+  toelichting telt de gedempte koppelingen. Richtgetal De Wolden: tot −213 (hermeet).
 - **NET-009 wordt de integrale richtingscheck en de forsgrens verschuift** (issue #80,
   BO-76). NET-009 meldt elke streng waarvan de tekenrichting of de BOB de administratieve
   van-naar-richting tegenspreekt, en is daarmee een **W** (was F); NET-003 en TOP-020 gaan
