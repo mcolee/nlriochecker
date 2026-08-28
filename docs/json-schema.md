@@ -267,7 +267,9 @@ contract belanden. Wie hem wil, vindt het object in de GeoPackage: de laag `vlak
 draagt dezelfde sleutel in haar kolom `id` (issue #67). De kolom `soort` (`pand`,
 `bouwwerk`, `water`) scheidt de categorieën die vroeger in de aparte lagen `bouwwerken`
 en `waterdelen_zonder_zinker` stonden; `check_ids` somt de checks op die naar het vlak
-wijzen.
+wijzen. Sinds issue #98 draagt diezelfde laag ook de gemengde deelstelsels van RVZ-006
+(`soort = gemengd_deelstelsel`, voorheen de eigen laag `gemengd_zonder_overstort`); hun
+`id` is geen externe sleutel maar de `cluster_id` van de melding.
 
 Een watervlak draagt sinds issue #83 altijd `check_ids = "EXT-003"`: EXT-002 is vervallen
 (BO-66) en EXT-003 registreert zijn doorkruiste waterdeel zelf. Een doorkruising door een

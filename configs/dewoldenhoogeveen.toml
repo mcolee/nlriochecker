@@ -395,7 +395,7 @@ ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0
 
 # #75: bufferafstand om de strengen van een gemengd deelstelsel voor de cartografische
-# laag `gemengd_zonder_overstort`. Projectkeuze, geen externe bron.
+# RVZ-006-vlakken in de laag `vlakken` (#98). Projectkeuze, geen externe bron.
 gemengd_zonder_overstort_buffer_m = 10.0
 
 [netwerk]

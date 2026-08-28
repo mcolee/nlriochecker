@@ -325,8 +325,9 @@ class CheckThresholds(BaseModel):
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
 
     # #75: bufferafstand om de strengen van een gemengd deelstelsel, voor de
-    # cartografische laag `gemengd_zonder_overstort` in de GeoPackage. Geen
-    # check-drempel; alleen de kaartlaag leest hem.
+    # cartografische RVZ-006-vlakken in de laag `vlakken` van de GeoPackage (#98). Geen
+    # check-drempel; alleen de kaartlaag leest hem. De sleutel houdt zijn naam: hij staat
+    # in elke projectconfig en `extra="forbid"` weigert een onbekende.
     gemengd_zonder_overstort_buffer_m: float = Field(default=10.0, gt=0.0)
 
     @property

@@ -4,11 +4,14 @@ Geschreven met `sqlite3` en `shapely.wkb` — dezelfde route waarmee
 `studiegebied.py` een GeoPackage al *leest*, nu de schrijfkant. Dat scheelt een
 afhankelijkheid en houdt lees- en schrijfkant bij elkaar.
 
-Er zijn twee objectlagen -- `putten` en `strengen` -- met de gebreken *op* het object:
-de kolom `status` draagt de uitslag in vier waarden en `popup_html` de voorgebakken
-hoverpopup. Mechanisch riool staat tussen de strengen met status `grijs`, en met een
-studiegebied staat de contextschil er ook grijs bij: wat de checks wel zagen maar niet
-beoordeelden, hoort zichtbaar te zijn.
+Er zijn drie featurelagen, een per geometrievorm: `putten` (punt), `strengen` (lijn) en
+`vlakken` (vlak). De twee objectlagen dragen de gebreken *op* het object: de kolom
+`status` draagt de uitslag in vier waarden en `popup_html` de voorgebakken hoverpopup.
+Mechanisch riool staat tussen de strengen met status `grijs`, en met een studiegebied
+staat de contextschil er ook grijs bij: wat de checks wel zagen maar niet beoordeelden,
+hoort zichtbaar te zijn. `vlakken` draagt wat geen punt of lijn is: de externe objecten
+waarnaar een EXT-melding wijst en de gemengde deelstelsels van RVZ-006, uit elkaar te
+houden met de kolom `soort` (issue #98).
 
 Het bestand is bewust zelfvoorzienend: de featurelagen bevatten genoeg samenvatting
 om zonder join bruikbaar te zijn, de tabel `meldingen` draagt elke melding met haar
@@ -25,7 +28,6 @@ from __future__ import annotations
 import sqlite3
 import struct
 from collections import defaultdict
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from importlib import resources
@@ -89,7 +91,6 @@ FEATURELAGEN = (
     "putten",
     "strengen",
     "vlakken",
-    "gemengd_zonder_overstort",
 )
 
 # De relaties van EXT-001, van zwaar naar licht. De laag toont de sterkste over de
@@ -135,7 +136,6 @@ GEOPACKAGE_STAPPEN = (
     "putten",
     "strengen",
     "vlakken",
-    "gemengd_zonder_overstort",
     "meldingen",
     "overzicht_checks",
     "gwsw_run",
@@ -165,11 +165,14 @@ class _LaagTellingen:
     # Hoeveel van die lijnen mechanisch riool zijn; ze staan sinds issue #13 tussen de
     # strengen met status `grijs` in plaats van in een eigen laag.
     mechanisch: int
-    # De externe vlakken (pand, bouwwerk, water) waarnaar een EXT-melding wijst; sinds
-    # issue #67 één laag `vlakken` in plaats van `bouwwerken` en `waterdelen_zonder_zinker`.
+    # Alle rijen in de laag `vlakken`: de externe vlakken (pand, bouwwerk, water) waarnaar
+    # een EXT-melding wijst plus de gemengde deelstelsels hieronder. Sinds issue #98 is dat
+    # één laag; `n_vlakken` telt haar dus in haar geheel en de regel hieronder zegt hoeveel
+    # daarvan deelstelsels zijn.
     vlakken: int
     # De gemengde deelstelsels waarop RVZ-006 aansloeg en die een vlak kregen (issue
-    # #75).
+    # #75); sinds issue #98 rijen in `vlakken` met `soort = gemengd_deelstelsel` in plaats
+    # van een eigen laag.
     gemengd_zonder_overstort: int
     # En de deelstelsels waarop RVZ-006 wél aansloeg maar die geen vlak konden krijgen,
     # omdat geen enkele streng ervan een bruikbare lijn draagt. Ze staan in geen enkele
@@ -484,7 +487,7 @@ def _schrijf_features(
     voortgang: Voortgang = NUL_VOORTGANG,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> _LaagTellingen:
-    """Schrijft de twee objectlagen plus de vlakkenlaag met externe objecten.
+    """Schrijft de twee objectlagen plus de vlakkenlaag.
 
     Naast de beoordeelde objecten komt erin wat de checks wel zagen maar niet
     beoordeelden: mechanisch riool, dat volgens het checkregister buiten scope valt,
@@ -606,10 +609,7 @@ def _schrijf_features(
         tellingen[laag] = len(rijen)
         voortgang.stap(label=laag)
 
-    vlakken = _schrijf_treffers(verbinding, run, meldingen, voortgang)
-    gemengd, zonder_vlak = _schrijf_gemengd_zonder_overstort(
-        verbinding, run, config, meldingen, voortgang
-    )
+    vlakken, gemengd, zonder_vlak = _schrijf_vlakken(verbinding, run, config, meldingen, voortgang)
 
     return _LaagTellingen(
         putten=tellingen["putten"],
@@ -692,14 +692,26 @@ VLAK_SOORT = {
     "bgt_water": "water",
 }
 
+# De vierde soort in de laag: een gemengd deelstelsel waarop RVZ-006 aansloeg (issue
+# #98). Die vlakken stonden tot dan in een eigen laag `gemengd_zonder_overstort`. Ze
+# komen niet uit een externe bron maar uit de graaf van de run, dus `subtype`, `bron`,
+# `bronbestand`, `relatie` en `afstand_min_m` blijven bij deze soort leeg -- net zoals
+# `relatie` en `afstand_min_m` dat bij water al deden.
+VLAK_SOORT_GEMENGD = "gemengd_deelstelsel"
+
+# De grenzen van de geschreven geometrieen, waarmee `_zet_omhullende` de bounding box
+# van de laag vult.
+_Grenzen = list[tuple[float, float, float, float]]
+
 
 def _vlak_kolommen() -> list[_Kolom]:
     """De kolommen van de laag `vlakken`.
 
-    Eén laag voor de drie soorten externe vlakken (pand, bouwwerk, water). `relatie` en
-    `afstand_min_m` gelden alleen voor pand en bouwwerk (EXT-001) en blijven leeg bij
-    water; `buffer_m` uit de oude waterdelenlaag vervalt -- dat is runmetadata en staat
-    in `gwsw_run`.
+    Eén laag voor vier soorten vlakken: de drie externe (pand, bouwwerk, water) en het
+    gemengde deelstelsel van RVZ-006. Elke soort vult wat zij kent en laat de rest leeg:
+    `relatie` en `afstand_min_m` gelden alleen voor pand en bouwwerk (EXT-001), de vier
+    onderaan alleen voor een deelstelsel. `buffer_m` uit de oude waterdelenlaag vervalt --
+    dat is runmetadata en staat in `gwsw_run`.
     """
     return [
         _Kolom("id", "text"),
@@ -712,7 +724,61 @@ def _vlak_kolommen() -> list[_Kolom]:
         _Kolom("afstand_min_m", "real"),
         _Kolom("aantal_meldingen", "integer"),
         _Kolom("check_ids", "text"),
+        # De vier hieronder gelden alleen voor een gemengd deelstelsel (issue #75): de
+        # omvang van de component waar het vlak omheen ligt, en zijn voorgebakken popup.
+        # Alleen deze soort draagt zo'n popup: zij toont de meldingen zelf, ook de
+        # systemische, want een deelstelselvlak bestaat alleen omdat RVZ-006 aansloeg
+        # (BO-59). Voor de externe vlakken stelt de maptip uit `vlakken.qml` de tekst uit
+        # de kolommen hierboven samen.
+        _Kolom("n_knopen", "integer"),
+        _Kolom("n_strengen", "integer"),
+        _Kolom("strenglengte_m", "real"),
+        _Kolom("popup_html", "text"),
     ]
+
+
+def _schrijf_vlakken(
+    verbinding: sqlite3.Connection,
+    run: CheckRun,
+    config: CheckConfig,
+    meldingen: list[Melding],
+    voortgang: Voortgang,
+) -> tuple[int, int, int]:
+    """Schrijft de laag `vlakken`: alles wat bij een melding hoort en geen punt of lijn is.
+
+    Twee soorten rijen uit twee bronnen, sinds issue #98 in één laag: de externe objecten
+    waarnaar een EXT-melding wijst (`_trefferrijen`) en de gemengde deelstelsels waarop
+    RVZ-006 aansloeg (`_gemengde_deelstelselrijen`). Beide volgen de meldingen van *deze*
+    uitvoer, dus de laag kan niet meer tonen dan de uitslag; de kolom `soort` houdt ze uit
+    elkaar en de QGIS-stijl geeft elke soort een eigen regel.
+
+    Geeft drie getallen terug: het aantal rijen in de laag, hoeveel daarvan een gemengd
+    deelstelsel zijn, en hoeveel gemelde deelstelsels geen vlak konden krijgen.
+    """
+    kolommen = _vlak_kolommen()
+    _maak_featurelaag(
+        verbinding,
+        "vlakken",
+        "MULTIPOLYGON",
+        kolommen,
+        "Vlakken bij de meldingen van deze run: externe objecten (BGT-panden, overige "
+        "bouwwerken en BGT-waterdelen) en de gemengde deelstelsels van RVZ-006; de soort "
+        "staat in de kolom `soort`.",
+    )
+    gemengd, gemengd_grenzen, zonder_vlak = _gemengde_deelstelselrijen(run, config, meldingen)
+    treffers, treffer_grenzen = _trefferrijen(run, meldingen)
+    # De deelstelsels voorop: dat zijn de grote vlakken, en de rijvolgorde is in QGIS ook
+    # de tekenvolgorde. Andersom zou een deelstelsel de panden eronder overdekken.
+    rijen = gemengd + treffers
+    if rijen:
+        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
+        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
+        verbinding.executemany(
+            f'insert into "vlakken" (geom, {velden}) values ({plaatshouders})', rijen
+        )
+    _zet_omhullende(verbinding, "vlakken", gemengd_grenzen + treffer_grenzen)
+    voortgang.stap(label="vlakken")
+    return len(rijen), len(gemengd), zonder_vlak
 
 
 def _vlak_subtype(treffer: Treffer) -> str:
@@ -738,20 +804,15 @@ def _vlak_label(treffer: Treffer) -> str:
     return treffer.label
 
 
-def _schrijf_treffers(
-    verbinding: sqlite3.Connection,
-    run: CheckRun,
-    meldingen: list[Melding],
-    voortgang: Voortgang,
-) -> int:
-    """Schrijft de laag `vlakken`: de externe objecten waarnaar de EXT-meldingen verwijzen.
+def _trefferrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], _Grenzen]:
+    """De rijen voor de externe objecten waarnaar de EXT-meldingen verwijzen.
 
-    Eén laag voor pand, bouwwerk en water (issue #67); de soort staat in de kolom `soort`
-    en volgt uit `Treffer.bron`. Zouden twee checks naar hetzelfde vlak wijzen, dan is dat
-    één rij met beide check-ID's. De watervlakken komen sinds issue #83 uitsluitend van
-    EXT-003, dat zijn doorkruiste waterdeel zelf registreert; een doorkruising door een
-    als zinker geregistreerde streng is geen bevinding en krijgt dus ook geen vlak meer --
-    dat vlak hing aan het vervallen EXT-002 (BO-66).
+    Pand, bouwwerk en water in dezelfde laag (issue #67); de soort staat in de kolom
+    `soort` en volgt uit `Treffer.bron`. Zouden twee checks naar hetzelfde vlak wijzen,
+    dan is dat één rij met beide check-ID's. De watervlakken komen sinds issue #83
+    uitsluitend van EXT-003, dat zijn doorkruiste waterdeel zelf registreert; een
+    doorkruising door een als zinker geregistreerde streng is geen bevinding en krijgt dus
+    ook geen vlak meer -- dat vlak hing aan het vervallen EXT-002 (BO-66).
 
     Strikte aansluiting: de rijen komen uit de meldingen van déze uitvoer, gejoind op
     het trefferregister van de run (`checks/treffers.py`). Deze schrijver bevraagt
@@ -760,40 +821,68 @@ def _schrijf_treffers(
     vanzelf: per gebied alleen de treffers van dat gebied, en een pand op de
     buurtgrens in beide bestanden.
 
+    Een melding die een extern object aanwijst dat niet in het register staat, is een
+    gebroken afspraak: de check heeft de verwijzing wel gezet maar de treffer niet
+    geregistreerd, en dan zou de laag stil kleiner zijn dan de uitslag. Dat is precies
+    de afwijking die dit ontwerp uitsluit, dus faalt het luid in plaats van de rij over
+    te slaan.
+
     Eén beperking erft mee uit de detectie en wordt bewust niet gerepareerd: EXT-001
     meldt per object alleen het sterkste bouwwerk (BO-17). De watergangcheck geeft
     sinds BO-43 elke echte doorkruising terug, ook meerdere per streng.
     """
-    kolommen = _vlak_kolommen()
-    _maak_featurelaag(
-        verbinding,
-        "vlakken",
-        "MULTIPOLYGON",
-        kolommen,
-        "Externe vlakken (BGT-panden, overige bouwwerken en BGT-waterdelen) waarnaar een "
-        "EXT-melding verwijst; de soort staat in de kolom `soort`.",
+    per_treffer = _groepeer_op_treffer(meldingen, *VLAK_CHECKS)
+    rijen = []
+    ontbreekt: list[str] = []
+    grenzen: _Grenzen = []
+    for sleutel in sorted(per_treffer):
+        treffer = run.treffers.get(sleutel)
+        if treffer is None:
+            ontbreekt.append(sleutel)
+            continue
+        if treffer.geometrie.is_empty:
+            continue
+        grenzen.append(treffer.geometrie.bounds)
+        rijen.append(
+            (
+                _blob(_als_multipolygon(treffer.geometrie)),
+                *_trefferrij(run, treffer, per_treffer[sleutel]),
+            )
+        )
+
+    if ontbreekt:
+        raise PipelineError(
+            f"laag 'vlakken': {len(ontbreekt)} melding(en) verwijzen naar een extern object "
+            f"dat niet in het trefferregister van deze run staat "
+            f"({', '.join(sorted(ontbreekt)[:5])}). De laag zou stil kleiner zijn dan de "
+            f"uitslag; controleer of de check zijn treffer registreert."
+        )
+    return rijen, grenzen
+
+
+def _trefferrij(run: CheckRun, treffer: Treffer, verwijzend: list[Melding]) -> tuple[object, ...]:
+    """De attribuutvelden van een extern vlak, in kolomvolgorde.
+
+    De vier deelstelselkolommen blijven leeg: die gelden alleen voor een gemengd
+    deelstelsel, net zoals `relatie` en `afstand_min_m` alleen voor pand en bouwwerk
+    gelden.
+    """
+    return (
+        treffer.sleutel,
+        VLAK_SOORT[treffer.bron],
+        _vlak_subtype(treffer),
+        treffer.bron,
+        treffer.bronbestand,
+        _vlak_label(treffer),
+        _sterkste_relatie(verwijzend),
+        _kleinste_afstand(run, treffer.sleutel, verwijzend),
+        len(verwijzend),
+        _check_ids(verwijzend),
+        None,
+        None,
+        None,
+        "",
     )
-    aantal = _vul_trefferlaag(
-        verbinding,
-        run,
-        "vlakken",
-        kolommen,
-        _groepeer_op_treffer(meldingen, *VLAK_CHECKS),
-        lambda treffer, verwijzend: (
-            treffer.sleutel,
-            VLAK_SOORT[treffer.bron],
-            _vlak_subtype(treffer),
-            treffer.bron,
-            treffer.bronbestand,
-            _vlak_label(treffer),
-            _sterkste_relatie(verwijzend),
-            _kleinste_afstand(run, treffer.sleutel, verwijzend),
-            len(verwijzend),
-            _check_ids(verwijzend),
-        ),
-    )
-    voortgang.stap(label="vlakken")
-    return aantal
 
 
 def _groepeer_op_treffer(meldingen: list[Melding], *check_ids: str) -> dict[str, list[Melding]]:
@@ -808,55 +897,6 @@ def _groepeer_op_treffer(meldingen: list[Melding], *check_ids: str) -> dict[str,
         if melding.check_id in gekozen and melding.object2_uri:
             per_treffer[melding.object2_uri].append(melding)
     return per_treffer
-
-
-def _vul_trefferlaag(
-    verbinding: sqlite3.Connection,
-    run: CheckRun,
-    laag: str,
-    kolommen: list[_Kolom],
-    per_treffer: dict[str, list[Melding]],
-    rij_van: Callable[[Treffer, list[Melding]], tuple[object, ...]],
-) -> int:
-    """Schrijft een trefferlaag en levert het aantal rijen terug.
-
-    Een melding die een extern object aanwijst dat niet in het register staat, is een
-    gebroken afspraak: de check heeft de verwijzing wel gezet maar de treffer niet
-    geregistreerd, en dan zou de laag stil kleiner zijn dan de uitslag. Dat is precies
-    de afwijking die dit ontwerp uitsluit, dus faalt het luid in plaats van de rij over
-    te slaan.
-    """
-    rijen = []
-    ontbreekt: list[str] = []
-    grenzen: list[tuple[float, float, float, float]] = []
-    for sleutel in sorted(per_treffer):
-        treffer = run.treffers.get(sleutel)
-        if treffer is None:
-            ontbreekt.append(sleutel)
-            continue
-        if treffer.geometrie.is_empty:
-            continue
-        grenzen.append(treffer.geometrie.bounds)
-        rijen.append(
-            (_blob(_als_multipolygon(treffer.geometrie)), *rij_van(treffer, per_treffer[sleutel]))
-        )
-
-    if ontbreekt:
-        raise PipelineError(
-            f"laag {laag!r}: {len(ontbreekt)} melding(en) verwijzen naar een extern object "
-            f"dat niet in het trefferregister van deze run staat "
-            f"({', '.join(sorted(ontbreekt)[:5])}). De laag zou stil kleiner zijn dan de "
-            f"uitslag; controleer of de check zijn treffer registreert."
-        )
-
-    if rijen:
-        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
-        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
-        verbinding.executemany(
-            f'insert into "{laag}" (geom, {velden}) values ({plaatshouders})', rijen
-        )
-    _zet_omhullende(verbinding, laag, grenzen)
-    return len(rijen)
 
 
 def _sterkste_relatie(meldingen: list[Melding]) -> str:
@@ -902,60 +942,45 @@ def _check_ids(meldingen: list[Melding]) -> str:
     return ", ".join(sorted({melding.check_id for melding in meldingen}))
 
 
-# De check waarvan de bevindingen de laag `gemengd_zonder_overstort` vullen. Eén laag,
-# één check: elke rij is een gemengd deelstelsel waarop RVZ-006 aansloeg.
+# De check waarvan de bevindingen de deelstelselvlakken vullen. Eén soort, één check:
+# elke zo'n rij is een gemengd deelstelsel waarop RVZ-006 aansloeg.
 CHECK_GEMENGD_ZONDER_OVERSTORT = "RVZ-006"
 
 # Wat de popup boven de meldingenlijst als objecttype toont. Geen GWSW-klassenaam: een
 # gemengd deelstelsel is geen GWSW-object maar een afleiding uit de graaf, en die naam
-# hoort dat te zeggen in plaats van een klasse te suggereren die niet bestaat.
+# hoort dat te zeggen in plaats van een klasse te suggereren die niet bestaat. De kolom
+# `soort` draagt dezelfde soort als filterbare waarde (`VLAK_SOORT_GEMENGD`).
 SOORT_GEMENGD_DEELSTELSEL = "gemengd deelstelsel"
 
 
-def _gemengd_kolommen() -> list[_Kolom]:
-    """De kolommen van de laag `gemengd_zonder_overstort`."""
-    return [
-        # Het deelstelsel-ID dat RVZ-006, NET-001 en NET-002 delen (`deelstelsel_ids`);
-        # ook de sleutel waarop de meldingen van deze laag te koppelen zijn.
-        _Kolom("cluster_id", "text"),
-        _Kolom("n_knopen", "integer"),
-        _Kolom("n_strengen", "integer"),
-        _Kolom("strenglengte_m", "real"),
-        # Het aantal RVZ-006-meldingen op dit deelstelsel: één per gemengde streng.
-        _Kolom("n_meldingen", "integer"),
-        _Kolom("popup_html", "text"),
-    ]
-
-
-def _schrijf_gemengd_zonder_overstort(
-    verbinding: sqlite3.Connection,
+def _gemengde_deelstelselrijen(
     run: CheckRun,
     config: CheckConfig,
     meldingen: list[Melding],
-    voortgang: Voortgang,
-) -> tuple[int, int]:
-    """Schrijft de laag `gemengd_zonder_overstort`; geeft rijen en niet-tekenbare terug.
+) -> tuple[list[tuple], _Grenzen, int]:
+    """De rijen voor de gemengde deelstelsels; geeft ook de niet-tekenbare terug.
 
     Een vlak per gemengd deelstelsel waarop RVZ-006 aansloeg (issue #75): de buffer om
     de vrijvervalstrengen van de hele samenhangende component, samengevoegd tot een
     MULTIPOLYGON. De bevindingen zelf hangen aan de gemengde strengen; dit vlak toont
     waar dat deelstelsel ligt, want een deelstelsel is geen GWSW-object met een eigen
-    geometrie.
+    geometrie. Sinds issue #98 staan die vlakken in de laag `vlakken`, met
+    `soort = gemengd_deelstelsel`, in plaats van in een eigen vierde laag.
 
-    Strikte aansluiting, net als bij de trefferlaag: de rijen komen uit de meldingen van
-    déze uitvoer, gegroepeerd op hun `cluster_id`. De laag kan daardoor niet groter zijn
-    dan de uitslag -- na afbakening tot een studiegebied of na onderdrukking uit
+    Strikte aansluiting, net als bij de treffers: de rijen komen uit de meldingen van
+    déze uitvoer, gegroepeerd op hun `cluster_id`. Er kunnen daardoor niet meer vlakken
+    zijn dan de uitslag -- na afbakening tot een studiegebied of na onderdrukking uit
     `[rapport]` verdwijnen de vlakken mee met hun meldingen. De geometrie komt uit
     `run.context`: dezelfde graaf waarop de check draaide. Met een studiegebied loopt zo'n
     vlak door tot buiten de kern -- een deelstelsel houdt niet op bij de gebiedsgrens, en
     de component is de eenheid waarover RVZ-006 oordeelt.
 
-    Wat er gegarandeerd is, en wat niet. Twee dingen kunnen de laag kleiner maken dan het
-    aantal gemelde deelstelsels, en ze worden verschillend behandeld:
+    Wat er gegarandeerd is, en wat niet. Twee dingen kunnen er minder vlakken opleveren
+    dan er gemelde deelstelsels zijn, en ze worden verschillend behandeld:
 
     * **Een `cluster_id` die de graaf niet kent** is geen datatoestand maar een interne
       tegenspraak: de check en deze schrijver lezen dezelfde `deelstelsel_ids` van dezelfde
-      context. Dat faalt luid, precies zoals `_vul_trefferlaag` doet bij een melding die
+      context. Dat faalt luid, precies zoals `_trefferrijen` doet bij een melding die
       naar een niet-geregistreerde treffer wijst.
     * **Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt** is wel een
       datatoestand: er valt niets te tekenen. Zo'n deelstelsel levert geen rij op maar
@@ -964,18 +989,7 @@ def _schrijf_gemengd_zonder_overstort(
       een lezer "dit deelstelsel bestaat niet" niet kunnen onderscheiden van "we konden
       het niet tekenen". De meldingen zelf staan gewoon in de meldingentabel en op hun
       eigen streng in de laag `strengen`.
-
-    Geeft het aantal geschreven rijen terug plus het aantal deelstelsels zonder vlak.
     """
-    kolommen = _gemengd_kolommen()
-    _maak_featurelaag(
-        verbinding,
-        "gemengd_zonder_overstort",
-        "MULTIPOLYGON",
-        kolommen,
-        "Gemengde deelstelsels zonder externe overstort/BBB of zonder afvoereindpunt "
-        "(RVZ-006), als vlak om de strengen van het deelstelsel.",
-    )
     per_cluster: dict[str, list[Melding]] = defaultdict(list)
     for melding in meldingen:
         if melding.check_id == CHECK_GEMENGD_ZONDER_OVERSTORT and melding.cluster_id:
@@ -986,7 +1000,7 @@ def _schrijf_gemengd_zonder_overstort(
     onbekend = sorted(cluster for cluster in per_cluster if cluster not in knopen_per_cluster)
     if onbekend:
         raise PipelineError(
-            f"laag 'gemengd_zonder_overstort': {len(onbekend)} melding(en) dragen een "
+            f"laag 'vlakken': {len(onbekend)} melding(en) dragen een "
             f"deelstelsel-ID dat de graaf van deze run niet kent "
             f"({', '.join(onbekend[:5])}). De laag zou stil kleiner zijn dan de uitslag; "
             f"controleer of de check en deze schrijver dezelfde context lezen."
@@ -995,7 +1009,7 @@ def _schrijf_gemengd_zonder_overstort(
     index = aansluitingen(run.context, "vrijvervalleiding")
     rijen = []
     zonder_vlak = 0
-    grenzen: list[tuple[float, float, float, float]] = []
+    grenzen: _Grenzen = []
     for cluster in sorted(per_cluster):
         knopen = knopen_per_cluster[cluster]
         conduits = _strengen_van_cluster(index, knopen)
@@ -1010,16 +1024,7 @@ def _schrijf_gemengd_zonder_overstort(
                 *_gemengd_rij(cluster, knopen, conduits, per_cluster[cluster]),
             )
         )
-    if rijen:
-        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
-        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
-        verbinding.executemany(
-            f'insert into "gemengd_zonder_overstort" (geom, {velden}) values ({plaatshouders})',
-            rijen,
-        )
-    _zet_omhullende(verbinding, "gemengd_zonder_overstort", grenzen)
-    voortgang.stap(label="gemengd_zonder_overstort")
-    return len(rijen), zonder_vlak
+    return rijen, grenzen, zonder_vlak
 
 
 def _knopen_per_cluster(run: CheckRun) -> dict[str, frozenset[str]]:
@@ -1059,13 +1064,19 @@ def _gemengd_rij(
 ) -> tuple[object, ...]:
     """De attribuutvelden van een gemengd-deelstelselvlak, in kolomvolgorde.
 
-    De status komt hier niet uit `bepaal_status` en de popup laat niets weg: een rij in
-    deze laag bestaat alleen omdat RVZ-006 op dit deelstelsel aansloeg, dus zij is per
-    constructie een gebrek. `bepaal_status` en `popup_html` filteren systemische
-    meldingen weg -- terecht op een put of een streng, waar zij naast andere gebreken
-    staan, maar hier zou het vlak dan groen worden en "geen eigen gebrek" te lezen geven
-    terwijl het alleen bestaat door de meldingen die het weglaat. Dat gebeurde op
-    Koekangerveld: 26 van de 26 gemengde strengen gemeld, dus systemisch. Zie BO-59.
+    De sleutel staat in `id`, net als bij een extern vlak: het is de `cluster_id` die
+    RVZ-006, NET-001 en NET-002 delen, dus de meldingentabel is erop te koppelen. De vijf
+    kolommen die alleen een extern object kent (`subtype`, `bron`, `bronbestand`,
+    `relatie`, `afstand_min_m`) blijven leeg -- een deelstelsel komt niet uit een externe
+    bron maar uit de graaf van deze run.
+
+    De status komt hier niet uit `bepaal_status` en de popup laat niets weg: zo'n rij
+    bestaat alleen omdat RVZ-006 op dit deelstelsel aansloeg, dus zij is per constructie
+    een gebrek. `bepaal_status` en `popup_html` filteren systemische meldingen weg --
+    terecht op een put of een streng, waar zij naast andere gebreken staan, maar hier zou
+    het vlak dan groen worden en "geen eigen gebrek" te lezen geven terwijl het alleen
+    bestaat door de meldingen die het weglaat. Dat gebeurde op Koekangerveld: 26 van de 26
+    gemengde strengen gemeld, dus systemisch. Zie BO-59.
 
     Grijs komt hier niet voor -- er staat per definitie minstens één melding op.
     """
@@ -1082,10 +1093,18 @@ def _gemengd_rij(
     )
     return (
         cluster,
+        VLAK_SOORT_GEMENGD,
+        "",
+        "",
+        "",
+        cluster,
+        "",
+        None,
+        len(meldingen),
+        _check_ids(meldingen),
         len(knopen),
         len(conduits),
         strenglengte,
-        len(meldingen),
         popup_html(kop, meldingen, toon_systemisch=True),
     )
 
@@ -1548,6 +1567,10 @@ def _schrijf_runmetadata(
         _Kolom("n_putten", "integer"),
         _Kolom("n_strengen", "integer"),
         _Kolom("n_mechanisch", "integer"),
+        # Alle rijen in de laag `vlakken`, de deelstelsels hieronder inbegrepen: sinds
+        # issue #98 is dat één laag, en `n_vlakken` telt haar zoals `n_strengen` de
+        # strengenlaag telt. Hoeveel daarvan een gemengd deelstelsel zijn staat eronder;
+        # het aantal externe vlakken is het verschil.
         _Kolom("n_vlakken", "integer"),
         _Kolom("n_gemengd_zonder_overstort", "integer"),
         # De gemelde deelstelsels die geen vlak konden krijgen (issue #75): geen enkele

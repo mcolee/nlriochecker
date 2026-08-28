@@ -119,8 +119,8 @@ def popup_html(
     De losse rijen blijven in de meldingentabel, de CSV en de JSON staan.
 
     Met `toon_systemisch` staan ze er wél bij, zonder afsluitende regel. Dat is voor een
-    laag waarvan een rij per constructie een gebrek is -- `gemengd_zonder_overstort`,
-    waar elk vlak alleen bestaat omdat RVZ-006 op dat deelstelsel aansloeg. Daar is er
+    rij die per constructie een gebrek is -- een gemengd deelstelsel in de laag `vlakken`,
+    dat alleen bestaat omdat RVZ-006 op dat deelstelsel aansloeg. Daar is er
     geen "andere objecten van dit type" om zich van te onderscheiden. Zie BO-59.
 
     Wat overblijft staat op prioriteit, dan check-ID, dan melding-ID: de zwaarste

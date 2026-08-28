@@ -29,11 +29,13 @@ from nlriochecker.meting import Meetbereik
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import _lees_geopackage, load_study_area
 from nlriochecker.uitvoer.gpkg import (
+    FEATURELAGEN,
     GEOPACKAGE_STAPPEN,
     RD_NEW,
     REDEN_MECHANISCH,
     REDEN_ONDERDRUKT,
     VLAK_CHECKS,
+    VLAK_SOORT_GEMENGD,
     schrijf_geopackage,
 )
 from nlriochecker.uitvoer.melding import bouw_meldingen, bouw_meldingenstroom
@@ -232,12 +234,7 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
         pad, "select f_table_name, styleQML, useAsDefault from layer_styles order by f_table_name"
     )
 
-    assert [naam for naam, _, _ in stijlen] == [
-        "gemengd_zonder_overstort",
-        "putten",
-        "strengen",
-        "vlakken",
-    ]
+    assert [naam for naam, _, _ in stijlen] == ["putten", "strengen", "vlakken"]
     for _, qml, standaard in stijlen:
         assert standaard == 1
         ET.fromstring(qml)
@@ -748,10 +745,17 @@ def test_watervlakken_blijven_bestaan_en_hangen_aan_ext003(tmp_path: Path) -> No
 
 
 def test_lege_vlakkenlaag_bestaat_en_is_geregistreerd(tmp_path: Path) -> None:
-    """Een run zonder EXT-treffers heeft de laag `vlakken`, leeg, met stijl en registratie."""
+    """Een run zonder EXT-treffers heeft de laag `vlakken`, met stijl en registratie.
+
+    Er staat dan geen extern vlak in: die volgen de EXT-meldingen. Een deelstelselvlak van
+    RVZ-006 kan er wél in staan -- dat is sinds issue #98 dezelfde laag, maar een eigen
+    soort uit een eigen bron.
+    """
     pad = _schrijf(_run("schoon.ttl"), tmp_path)
 
-    assert _rijen(pad, 'select count(*) from "vlakken"')[0][0] == 0
+    assert _rijen(pad, 'select count(*) from "vlakken" where soort <> ?', VLAK_SOORT_GEMENGD) == [
+        (0,)
+    ]
     geregistreerd = _rijen(pad, "select count(*) from gpkg_contents where table_name = 'vlakken'")
     gestyled = _rijen(pad, "select count(*) from layer_styles where f_table_name = 'vlakken'")
     assert (geregistreerd[0][0], gestyled[0][0]) == (1, 1)
@@ -855,6 +859,38 @@ def test_runmetadata_telt_de_vlakkenlaag_mee(tmp_path: Path) -> None:
     # (water-1/5/7). Water-2 hing aan het vervallen EXT-002 (issue #83).
     assert aantal == 4
     assert aantal == len(_laagrijen(pad, "vlakken"))
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_de_vlakkenlaag_draagt_beide_bronnen_naast_elkaar(tmp_path: Path) -> None:
+    """De kern van issue #98: externe vlakken en RVZ-006-deelstelsels in één laag.
+
+    Elke soort houdt haar eigen kolommen. Een extern vlak draagt geen deelstelselomvang en
+    geen voorgebakken popup (die stelt de maptip uit de kolommen samen); een deelstelsel
+    draagt geen externe bron. `gwsw_run` telt de laag in haar geheel plus het deel dat een
+    deelstelsel is; het aantal externe vlakken is het verschil.
+    """
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl", [])
+    context = CheckContext(dataset=dataset, config=_config(), bronnen=_ext_bronnen())
+    run = run_checks(context, [*VLAK_CHECKS, "RVZ-006"])
+
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    rijen = _laagrijen(pad, "vlakken")
+    deelstelsels = [rij for rij in rijen if rij["soort"] == VLAK_SOORT_GEMENGD]
+    extern = [rij for rij in rijen if rij["soort"] != VLAK_SOORT_GEMENGD]
+
+    assert deelstelsels and extern
+    assert {rij["soort"] for rij in extern} == {"pand", "water"}
+    assert all(rij["popup_html"] == "" and rij["n_strengen"] is None for rij in extern)
+    assert all(rij["popup_html"] and rij["n_strengen"] for rij in deelstelsels)
+    assert all(rij["bron"] == "" and rij["check_ids"] == "RVZ-006" for rij in deelstelsels)
+    assert _rijen(pad, "select n_vlakken, n_gemengd_zonder_overstort from gwsw_run") == [
+        (len(rijen), len(deelstelsels))
+    ]
 
 
 @pytest.mark.skipif(
@@ -1136,18 +1172,38 @@ def test_de_stelsellaag_bestaat_niet_meer(tmp_path: Path) -> None:
     assert "stelsel" in kolommen
 
 
-def test_gemengd_zonder_overstort_is_een_multipolygon_in_gpkg_contents(tmp_path: Path) -> None:
-    """De nieuwe vlakkenlaag staat geregistreerd, anders vindt QGIS haar niet."""
+def test_de_geopackage_draagt_precies_drie_objectlagen(tmp_path: Path) -> None:
+    """Issue #98: punt, lijn, vlak -- en geen vierde laag ernaast.
+
+    De RVZ-006-deelstelselvlakken staan sinds dit issue in `vlakken`, herkenbaar aan hun
+    eigen soort-waarde. De fixture levert er een op, dus deze test zou werkelijk falen op
+    een vierde featurelaag; de tabellen zonder geometrie staan er los bij.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    soorten = dict(_rijen(pad, "select table_name, data_type from gpkg_contents"))
+
+    assert FEATURELAGEN == ("putten", "strengen", "vlakken")
+    assert {naam for naam, soort in soorten.items() if soort == "features"} == set(FEATURELAGEN)
+    assert set(soorten) == {
+        *FEATURELAGEN,
+        "meldingen",
+        "overzicht_checks",
+        "gwsw_run",
+        "layer_styles",
+    }
+    assert _rijen(pad, "select count(*) from vlakken where soort = ?", VLAK_SOORT_GEMENGD) == [(1,)]
+
+
+def test_de_vlakkenlaag_is_een_multipolygon(tmp_path: Path) -> None:
+    """De laag staat als MULTIPOLYGON geregistreerd, anders vindt QGIS haar niet."""
     pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
     ((soort,),) = _rijen(
         pad,
-        "select geometry_type_name from gpkg_geometry_columns "
-        "where table_name = 'gemengd_zonder_overstort'",
+        "select geometry_type_name from gpkg_geometry_columns where table_name = 'vlakken'",
     )
     assert soort == "MULTIPOLYGON"
-    contents = {naam for (naam,) in _rijen(pad, "select table_name from gpkg_contents")}
-    assert "gemengd_zonder_overstort" in contents
 
 
 def test_gemengd_zonder_overstort_geeft_een_vlak_per_deelstelsel(tmp_path: Path) -> None:
@@ -1160,14 +1216,35 @@ def test_gemengd_zonder_overstort_geeft_een_vlak_per_deelstelsel(tmp_path: Path)
 
     rijen = _rijen(
         pad,
-        "select cluster_id, n_knopen, n_strengen, strenglengte_m, n_meldingen "
-        "from gemengd_zonder_overstort",
+        "select id, label, n_knopen, n_strengen, strenglengte_m, aantal_meldingen, check_ids "
+        "from vlakken where soort = ?",
+        VLAK_SOORT_GEMENGD,
     )
 
     assert len(rijen) == 1
-    cluster, n_knopen, n_strengen, lengte, n_meldingen = rijen[0]
+    cluster, label, n_knopen, n_strengen, lengte, n_meldingen, check_ids = rijen[0]
+    # De sleutel staat in `id`, net als bij een extern vlak: het is de `cluster_id` van de
+    # meldingen, dus de meldingentabel is erop te koppelen.
     assert cluster.startswith("ds-")
-    assert (n_knopen, n_strengen, lengte, n_meldingen) == (3, 2, 100.0, 2)
+    assert label == cluster
+    assert (n_knopen, n_strengen, lengte, n_meldingen, check_ids) == (3, 2, 100.0, 2, "RVZ-006")
+
+
+def test_een_deelstelselvlak_laat_de_kolommen_van_een_extern_vlak_leeg(tmp_path: Path) -> None:
+    """Elke soort vult wat zij kent; de rest blijft leeg, zoals `relatie` bij water.
+
+    Een deelstelsel komt niet uit een externe bron maar uit de graaf van deze run, dus
+    `subtype`, `bron`, `bronbestand`, `relatie` en `afstand_min_m` horen er leeg te zijn.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    ((subtype, bron, bronbestand, relatie, afstand),) = _rijen(
+        pad,
+        "select subtype, bron, bronbestand, relatie, afstand_min_m from vlakken where soort = ?",
+        VLAK_SOORT_GEMENGD,
+    )
+
+    assert (subtype, bron, bronbestand, relatie, afstand) == ("", "", "", "", None)
 
 
 def test_gemengd_zonder_overstort_draagt_een_leesbaar_vlak(tmp_path: Path) -> None:
@@ -1176,7 +1253,7 @@ def test_gemengd_zonder_overstort_draagt_een_leesbaar_vlak(tmp_path: Path) -> No
 
     pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    ((blob,),) = _rijen(pad, "select geom from gemengd_zonder_overstort")
+    ((blob,),) = _rijen(pad, "select geom from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
     vorm = wkb.loads(bytes(blob)[8:])  # de GPKG-kop (magic, versie, vlaggen, srs) overslaan
     assert vorm.geom_type == "MultiPolygon"
     assert not vorm.is_empty
@@ -1185,7 +1262,7 @@ def test_gemengd_zonder_overstort_draagt_een_leesbaar_vlak(tmp_path: Path) -> No
 
 
 def test_gemengd_vlak_zwijgt_niet_over_systemisch_genoemde_meldingen(tmp_path: Path) -> None:
-    """Een vlak in deze laag is per constructie een gebrek (BO-59).
+    """Een deelstelselvlak is per constructie een gebrek (BO-59).
 
     Zou het zijn status en zijn popup uit de systemisch-gefilterde meldingen afleiden,
     dan kreeg het "geen eigen gebrek" te lezen zodra RVZ-006 op een klein gebied de
@@ -1199,26 +1276,33 @@ def test_gemengd_vlak_zwijgt_niet_over_systemisch_genoemde_meldingen(tmp_path: P
 
     pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
 
-    ((popup,),) = _rijen(pad, "select popup_html from gemengd_zonder_overstort")
+    ((popup,),) = _rijen(pad, "select popup_html from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
     assert "RVZ-006" in popup
     assert "s-rood" in popup
     assert "geen eigen gebrek" not in popup
 
 
 def test_gemengd_zonder_overstort_blijft_leeg_zonder_bevinding(tmp_path: Path) -> None:
-    """Zonder RVZ-006-melding blijft de laag leeg; ze volgt de uitslag, niet de graaf."""
+    """Zonder RVZ-006-melding komt er geen deelstelselvlak; het volgt de uitslag."""
     pad = _schrijf(_run("rvz_schoon.ttl", "RVZ-006"), tmp_path)
 
-    assert _rijen(pad, "select count(*) from gemengd_zonder_overstort") == [(0,)]
+    assert _rijen(pad, "select count(*) from vlakken") == [(0,)]
 
 
 def test_runmetadata_telt_de_gemengde_deelstelsels(tmp_path: Path) -> None:
-    """`n_gemengd_zonder_overstort` maakt expliciet hoeveel vlakken er geschreven zijn."""
+    """De runtabel houdt de tellingen, ook nu de vlakken in `vlakken` staan (issue #98).
+
+    `n_vlakken` telt de hele laag en `n_gemengd_zonder_overstort` hoeveel daarvan een
+    gemengd deelstelsel is; hier is dat hetzelfde vlak, want deze fixture heeft geen
+    externe treffers.
+    """
     pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    rij = _rijen(pad, "select n_gemengd_zonder_overstort, n_gemengd_zonder_vlak from gwsw_run")
+    rij = _rijen(
+        pad, "select n_vlakken, n_gemengd_zonder_overstort, n_gemengd_zonder_vlak from gwsw_run"
+    )
 
-    assert rij == [(1, 0)]
+    assert rij == [(1, 1, 0)]
 
 
 def test_gemengd_deelstelsel_zonder_geometrie_wordt_geteld(tmp_path: Path) -> None:
@@ -1226,7 +1310,7 @@ def test_gemengd_deelstelsel_zonder_geometrie_wordt_geteld(tmp_path: Path) -> No
 
     De fixture meldt RVZ-006 op een gemengde streng zonder bruikbare lijn: er valt geen
     vlak omheen te tekenen, maar "dit deelstelsel bestaat niet" en "we konden het niet
-    tekenen" horen in het bestand uit elkaar te houden zijn. De laag blijft leeg en
+    tekenen" horen in het bestand uit elkaar te houden zijn. Er komt geen rij en
     `n_gemengd_zonder_vlak` telt het geval.
     """
     run = _run("rvz006_gemengd_zonder_geometrie.ttl", "RVZ-006")
@@ -1234,7 +1318,7 @@ def test_gemengd_deelstelsel_zonder_geometrie_wordt_geteld(tmp_path: Path) -> No
 
     pad = _schrijf(run, tmp_path)
 
-    assert _rijen(pad, "select count(*) from gemengd_zonder_overstort") == [(0,)]
+    assert _rijen(pad, "select count(*) from vlakken") == [(0,)]
     rij = _rijen(pad, "select n_gemengd_zonder_overstort, n_gemengd_zonder_vlak from gwsw_run")
     assert rij == [(0, 1)]
 
@@ -1244,7 +1328,7 @@ def test_onbekend_deelstelsel_id_faalt_luid(tmp_path: Path) -> None:
 
     De check en deze schrijver lezen dezelfde `deelstelsel_ids` van dezelfde context, dus
     zo'n ID kan alleen ontstaan als die afspraak breekt. De laag zou dan stil kleiner zijn
-    dan de uitslag -- precies wat `_vul_trefferlaag` bij de trefferlaag afvangt.
+    dan de uitslag -- precies wat `_trefferrijen` bij de externe vlakken afvangt.
     """
     run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
     meldingen = [

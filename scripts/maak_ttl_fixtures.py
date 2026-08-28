@@ -1839,7 +1839,7 @@ FIXTURES["rvz005_overstort_op_hemelwater.ttl"] = (
 # RVZ-006 (issue #75): twee gemengde strengen in hetzelfde deelstelsel. De check meldt
 # sinds #75 per gemengde streng en niet meer op een representatieve knoop, dus de fixture
 # heeft er twee nodig om te laten zien dat beide bevindingen dezelfde `cluster_id` dragen
-# en samen één vlak `gemengd_zonder_overstort` opleveren.
+# en samen één deelstelselvlak in de laag `vlakken` opleveren.
 FIXTURES["rvz006_gemengd_zonder_overstort.ttl"] = (
     "een gemengd deelstelsel van twee strengen zonder enige overstort of bergbezinkvoorziening",
     hoogteput("PutA", "A", A)
@@ -1851,8 +1851,8 @@ FIXTURES["rvz006_gemengd_zonder_overstort.ttl"] = (
 
 # RVZ-006 (issue #75): hetzelfde gebrek, maar geen enkele streng draagt een bruikbare
 # lijn -- de posList telt één punt, zoals `net_afvoerpad_zonder_lijn.ttl`. De bevindingen
-# komen er gewoon (de check leest de graaf, niet de geometrie), maar er valt geen vlak
-# `gemengd_zonder_overstort` omheen te tekenen. De GeoPackage telt zo'n deelstelsel in
+# komen er gewoon (de check leest de graaf, niet de geometrie), maar er valt geen
+# deelstelselvlak omheen te tekenen. De GeoPackage telt zo'n deelstelsel in
 # `n_gemengd_zonder_vlak` in plaats van het stil weg te laten.
 FIXTURES["rvz006_gemengd_zonder_geometrie.ttl"] = (
     "een gemengd deelstelsel zonder overstort waarvan de enige streng geen bruikbare "

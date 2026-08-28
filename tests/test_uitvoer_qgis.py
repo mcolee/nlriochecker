@@ -84,12 +84,23 @@ def qgis_app():
 
 @pytest.fixture(scope="module")
 def geschreven_gpkg(tmp_path_factory) -> Path:
-    """Een GeoPackage van de mechanische fixture, met alle vier de lagen."""
+    """Een GeoPackage van de mechanische fixture, met alle drie de lagen."""
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
     dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config))
     map_ = tmp_path_factory.mktemp("qgis")
+    return schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), map_, RUNDATUM)
+
+
+@pytest.fixture(scope="module")
+def gpkg_met_deelstelselvlak(tmp_path_factory) -> Path:
+    """Een GeoPackage met een RVZ-006-deelstelselvlak in de laag `vlakken` (issue #98)."""
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl", [])
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["RVZ-006"])
+    map_ = tmp_path_factory.mktemp("qgis_vlak")
     return schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), map_, RUNDATUM)
 
 
@@ -200,32 +211,88 @@ def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_g
     } <= labels
 
 
-def test_de_gemengde_deelstelsellaag_laadt_haar_stijl(qgis_app, geschreven_gpkg: Path) -> None:
-    """De vlakkenlaag van #75 draagt haar eigen stijl, ook als ze leeg is.
+def test_de_vlakkenlaag_toont_de_vier_soorten(qgis_app, geschreven_gpkg: Path) -> None:
+    """De kern van #67 en #98: één laag met een regel per soort.
 
-    Elke rij in deze laag is een gebrek (RVZ-006 sloeg er aan), dus er is niets te
-    filteren: een enkel vlaksymbool volstaat en de maptip toont de meldingen.
-    """
-    vector = qgis_core.QgsVectorLayer(
-        f"{geschreven_gpkg}|layername=gemengd_zonder_overstort", "gzo", "ogr"
-    )
-    boodschap, gelukt = vector.loadDefaultStyle()
-
-    assert gelukt, f"gemengd_zonder_overstort: {boodschap}"
-    assert vector.mapTipTemplate()
-
-
-def test_de_vlakkenlaag_toont_de_drie_soorten(qgis_app, geschreven_gpkg: Path) -> None:
-    """De kern van #67: één laag met een regel per soort (pand, bouwwerk, water).
-
-    De regels staan vast in de QML, ook op een lege laag; ze filteren elk op `soort`.
+    Drie externe soorten (pand, bouwwerk, water) plus het gemengde deelstelsel van
+    RVZ-006, dat tot #98 een eigen laag had. De regels staan vast in de QML, ook op een
+    lege laag; ze filteren elk op `soort`.
     """
     vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=vlakken", "v", "ogr")
     boodschap, gelukt = vector.loadDefaultStyle()
 
     assert gelukt, f"vlakken: {boodschap}"
     labels = {regel.label() for regel in vector.renderer().rootRule().children()}
-    assert labels == {"Pand (BGT/BAG)", "Overig bouwwerk (BGT)", "Waterdeel (BGT)"}
+    assert labels == {
+        "Pand (BGT/BAG)",
+        "Overig bouwwerk (BGT)",
+        "Waterdeel (BGT)",
+        "Gemengd deelstelsel zonder overstort (RVZ-006)",
+    }
+
+
+def test_de_maptip_van_een_deelstelselvlak_toont_de_voorgebakken_popup(
+    qgis_app, gpkg_met_deelstelselvlak: Path
+) -> None:
+    """QGIS kent één maptip per laag; de expressie kiest per rij welke tekst hij toont.
+
+    Een gemengd deelstelsel draagt zijn popup voorgebakken in `popup_html` -- inclusief de
+    systemische meldingen (BO-59) -- en die hoort de maptip dan te tonen. Klopt de
+    expressie niet, dan blijft er een `[%`-fragment in de uitkomst staan.
+    """
+    vector = qgis_core.QgsVectorLayer(f"{gpkg_met_deelstelselvlak}|layername=vlakken", "v", "ogr")
+    vector.loadDefaultStyle()
+    feature = next(vector.getFeatures())
+
+    gerenderd = _maptip(vector, feature)
+
+    assert "gwsw-popup" in gerenderd
+    assert "RVZ-006" in gerenderd
+    assert "[%" not in gerenderd
+
+
+def test_de_maptip_van_een_extern_vlak_stelt_zijn_tekst_uit_de_kolommen_samen(
+    qgis_app, gpkg_met_deelstelselvlak: Path
+) -> None:
+    """De andere tak van diezelfde expressie: een vlak zonder voorgebakken popup.
+
+    Een extern vlak (pand, bouwwerk, water) laat `popup_html` leeg en krijgt zijn tekst
+    uit de kolommen. De rij is hier met de hand samengesteld, zodat deze tak ook getoetst
+    wordt op een machine zonder de GIS-fixtures van de EXT-checks.
+    """
+    vector = qgis_core.QgsVectorLayer(f"{gpkg_met_deelstelselvlak}|layername=vlakken", "v", "ogr")
+    vector.loadDefaultStyle()
+    feature = qgis_core.QgsFeature(vector.fields())
+    for veld, waarde in (
+        ("soort", "pand"),
+        ("label", "pand pand-1"),
+        ("subtype", "woonfunctie"),
+        ("relatie", "binnen"),
+        ("afstand_min_m", 0.0),
+        ("aantal_meldingen", 4),
+        ("check_ids", "EXT-001"),
+        ("bronbestand", "bgt.gpkg"),
+        ("popup_html", ""),
+    ):
+        feature[veld] = waarde
+
+    gerenderd = _maptip(vector, feature)
+
+    assert "pand pand-1" in gerenderd
+    assert "woonfunctie" in gerenderd
+    assert "binnen" in gerenderd
+    assert "4 melding(en)" in gerenderd
+    assert "EXT-001" in gerenderd
+    assert "bgt.gpkg" in gerenderd
+    assert "[%" not in gerenderd
+
+
+def _maptip(vector, feature) -> str:
+    """De maptip van een laag, uitgerekend voor een enkele rij."""
+    context = qgis_core.QgsExpressionContext()
+    context.appendScopes(qgis_core.QgsExpressionContextUtils.globalProjectLayerScopes(vector))
+    context.setFeature(feature)
+    return qgis_core.QgsExpression.replaceExpressionText(vector.mapTipTemplate(), context)
 
 
 def _renderer_symbolen(renderer):

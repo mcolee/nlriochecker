@@ -55,6 +55,22 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De GeoPackage draagt nog drie objectlagen: `putten`, `strengen` en `vlakken`**
+  (issue #98, BO-73; besluit auteur 28-08). De vierde laag `gemengd_zonder_overstort`
+  vervalt: haar vlakken staan nu in `vlakken` met `soort = gemengd_deelstelsel`, naast de
+  bestaande soorten `pand`, `bouwwerk` en `water`. Alles wat die vlakken bijzonder maakte
+  verhuist mee -- de voorgebakken `popup_html` die als enige óók de systemische meldingen
+  toont (BO-59), de kolommen `n_knopen`/`n_strengen`/`strenglengte_m` (leeg bij een extern
+  vlak, zoals `relatie` en `afstand_min_m` dat al waren), en de harde fout bij een
+  `cluster_id` die de graaf van de run niet kent. Twee kolommen krijgen de naam die de
+  externe vlakken al gebruikten: de sleutel staat in `id` (was `cluster_id`) en het aantal
+  meldingen in `aantal_meldingen` (was `n_meldingen`). `gwsw_run` houdt
+  `n_gemengd_zonder_overstort` en `n_gemengd_zonder_vlak`; `n_vlakken` telt sindsdien de
+  hele laag, dus ook de deelstelsels. Het kaartbeeld blijft gelijk: `vlakken.qml` krijgt
+  het vlaksymbool van de vervallen `gemengd_zonder_overstort.qml` als vierde regel op
+  `soort`. **Contractbreuk:** een QGIS-project dat de oude laag gebruikte moet op `vlakken`
+  met een filter op `soort` gezet worden, en een trendlijn op `n_vlakken` over deze grens
+  heen telt appels en peren.
 - **De datakarakteristieken openen met het aandeel putten zonder aanlegjaar** (issue #91,
   checkaudit 27-08). ATTR-018 is met 9.274 meldingen verreweg de grootste post, en 9.063
   daarvan staan op putten -- 44% van alle putten. Dat is één gebrek in de aanlevering en

@@ -1,7 +1,9 @@
-<!-- Default-stijl voor de laag `vlakken` (issue #67): de externe vlakken waar een
-     EXT-melding naar wijst, in één laag. Rule-based op `soort` met drie regels (pand,
-     bouwwerk, water); elk een eigen omlijning en een doorzichtige vulling, zodat de
-     riolering eronder zichtbaar blijft. De laag volgt de testuitkomst: elk vlak hier is
+<!-- Default-stijl voor de laag `vlakken` (issue #67, uitgebreid in #98): alle vlakken die
+     bij een melding van deze run horen, in één laag. Rule-based op `soort` met vier regels:
+     de drie externe soorten (pand, bouwwerk, water) met een eigen omlijning en een
+     doorzichtige vulling, zodat de riolering eronder zichtbaar blijft, plus het gemengde
+     deelstelsel van RVZ-006 (voorheen de eigen laag `gemengd_zonder_overstort`) met de
+     rode vlakvulling die het daar had. De laag volgt de testuitkomst: elk vlak hier is
      door ten minste één melding aangewezen. `styleCategories` noemt MapTips, anders leest
      QGIS het mapTip-element niet terug uit layer_styles. -->
 <qgis version="3.28" styleCategories="Symbology|MapTips">
@@ -10,6 +12,7 @@
       <rule filter="&quot;soort&quot; = 'pand'" symbol="0" label="Pand (BGT/BAG)" key="{cc000000-0000-4000-8000-000000000001}"/>
       <rule filter="&quot;soort&quot; = 'bouwwerk'" symbol="1" label="Overig bouwwerk (BGT)" key="{cc000000-0000-4000-8000-000000000002}"/>
       <rule filter="&quot;soort&quot; = 'water'" symbol="2" label="Waterdeel (BGT)" key="{cc000000-0000-4000-8000-000000000003}"/>
+      <rule filter="&quot;soort&quot; = 'gemengd_deelstelsel'" symbol="3" label="Gemengd deelstelsel zonder overstort (RVZ-006)" key="{cc000000-0000-4000-8000-000000000004}"/>
     </rules>
     <symbols>
       <symbol type="fill" name="0" alpha="1">
@@ -39,20 +42,53 @@
           <prop k="outline_style" v="solid"/>
         </layer>
       </symbol>
+      <symbol type="fill" name="3" alpha="1">
+        <layer class="SimpleFill">
+          <prop k="color" v="215,48,39,60"/>
+          <prop k="style" v="solid"/>
+          <prop k="outline_color" v="215,48,39,255"/>
+          <prop k="outline_width" v="0.6"/>
+          <prop k="outline_style" v="solid"/>
+        </layer>
+      </symbol>
     </symbols>
   </renderer-v2>
+  <!-- Eén maptip voor beide soorten rijen: een deelstelsel draagt zijn popup voorgebakken
+       in `popup_html` (het toont zijn meldingen, ook de systemische; zie BO-59), een extern
+       vlak draagt die kolom leeg en krijgt zijn tekst hier uit de kolommen. QGIS kent maar
+       één maptip per laag, dus de keuze zit in de expressie. Het stijlblok is de vereniging
+       van de twee: de klassen van `objectkaart.popup_html` plus de drie van het externe
+       vlak (k/l/t, r, c). -->
   <mapTip enabled="1"><![CDATA[<style>
   .gwsw-popup { font-family: sans-serif; font-size: 9pt; color: #222; }
   .gwsw-popup .k { border-bottom: 1px solid #bbb; padding-bottom: 2px; margin-bottom: 4px; }
   .gwsw-popup .l { font-weight: bold; }
   .gwsw-popup .t { color: #555; margin-left: 6px; text-transform: uppercase; font-size: 7pt; }
-  .gwsw-popup .r { color: #555; font-size: 8pt; margin-bottom: 4px; }
-  .gwsw-popup .c { color: #666; font-size: 8pt; margin-top: 4px; }
+  .gwsw-popup .s { float: right; text-transform: uppercase; font-size: 7pt; }
+  .s-rood .s { color: #b2182b; }
+  .s-oranje .s { color: #e08214; }
+  .s-groen .s { color: #4d9221; }
+  .s-grijs .s { color: #777; }
+  .gwsw-popup .f, .gwsw-popup .r { color: #555; font-size: 8pt; margin-bottom: 4px; }
+  .gwsw-popup .m { margin: 0; padding-left: 14px; }
+  .gwsw-popup .m li { margin-bottom: 3px; }
+  .gwsw-popup .e { font-weight: bold; margin-right: 3px; }
+  .e-F .e { color: #b2182b; }
+  .e-W .e { color: #e08214; }
+  .gwsw-popup .c { font-weight: bold; margin-right: 4px; }
+  .gwsw-popup .v, .gwsw-popup .d, .gwsw-popup .h {
+    color: #666; font-size: 8pt; margin-left: 5px;
+  }
+  .gwsw-popup .x, .gwsw-popup .z, .gwsw-popup .n {
+    color: #666; font-size: 8pt; margin-top: 4px;
+  }
 </style>
-<div class="gwsw-popup" style="width:280px">
-  <div class="k"><span class="l">[% "label" %]</span><span class="t">[% "soort" %]</span></div>
-  <div class="r">[% coalesce("subtype", '') %][% CASE WHEN "relatie" IS NOT NULL AND "relatie" <> '' THEN ' &middot; ' || "relatie" ELSE '' END %][% CASE WHEN "afstand_min_m" IS NOT NULL THEN ' &middot; ' || format_number("afstand_min_m", 2) || ' m' ELSE '' END %]</div>
-  <div class="c">[% "aantal_meldingen" %] melding(en) &middot; [% "check_ids" %]<br/>[% "bronbestand" %]</div>
-</div>]]></mapTip>
+<div style="width:300px">[% CASE WHEN coalesce("popup_html", '') <> '' THEN "popup_html" ELSE
+  '<div class="gwsw-popup"><div class="k"><span class="l">' || coalesce("label", '') || '</span><span class="t">' || coalesce("soort", '') || '</span></div>'
+  || '<div class="r">' || coalesce("subtype", '')
+  || CASE WHEN coalesce("relatie", '') <> '' THEN ' &middot; ' || "relatie" ELSE '' END
+  || CASE WHEN "afstand_min_m" IS NOT NULL THEN ' &middot; ' || format_number("afstand_min_m", 2) || ' m' ELSE '' END
+  || '</div><div class="c">' || to_string(coalesce("aantal_meldingen", 0)) || ' melding(en) &middot; ' || coalesce("check_ids", '') || '<br/>' || coalesce("bronbestand", '') || '</div></div>'
+END %]</div>]]></mapTip>
   <legend type="default-vector"/>
 </qgis>

@@ -165,7 +165,8 @@ alleen het bestand waarin zij staat is verhuisd.
   waarborg dat de vier uitvoervormen niet uit elkaar lopen.
 
 ## GeoPackage en QGIS
-- De GeoPackage draagt twee objectlagen: `putten` (punt) en `strengen` (lijn), met de
+- De GeoPackage draagt sinds issue #98 precies drie featurelagen, een per geometrievorm:
+  `putten` (punt), `strengen` (lijn) en `vlakken` (vlak). De twee objectlagen dragen de
   gebreken op het object. Elk object heeft `status` (precies vier waarden: rood, oranje,
   groen, grijs) en `popup_html` (een voorgebakken fragment, zonder stijlblok -- dat
   staat een keer in de maptip). Beide lagen dragen ook `begindatum_jaar` (het aanlegjaar
@@ -196,9 +197,11 @@ alleen het bestand waarin zij staat is verhuisd.
   ("mechanische leiding -- geen vrijvervalrichting" in plaats van "BOB-richting niet te
   bepalen"), via een popup-only sleutel in `RICHTING_IN_WOORDEN` die géén kolomwaarde is.
   Zie issue #74 en BO-29.
-- De GeoPackage draagt naast de rioleringslagen één laag `vlakken` (MULTIPOLYGON) met de
-  externe objecten waarnaar de meldingen van díé uitvoer verwijzen, gejoind op het
-  trefferregister (`checks/treffers.py`) via `object2_uri` (BO-50, issue #67). De kolom
+- De laag `vlakken` (MULTIPOLYGON) draagt naast de rioleringslagen alles wat bij een
+  melding hoort en geen punt of lijn is. Twee bronnen, één laag (BO-73, issue #98), en de
+  kolom `soort` houdt ze uit elkaar. De eerste bron zijn de externe objecten waarnaar de
+  meldingen van díé uitvoer verwijzen, gejoind op het
+  trefferregister (`checks/treffers.py`) via `object2_uri` (BO-50, issue #67); hun
   `soort` scheidt de drie categorieën (`pand`, `bouwwerk`, `water`) en volgt op één plek
   uit `Treffer.bron` (`bgt_pand`/`bag_pand` → `pand`, `bgt_bouwwerk` → `bouwwerk`,
   `bgt_water` → `water`). `subtype` draagt voor water het BGT-`type` (waterloop, greppel;
@@ -206,7 +209,8 @@ alleen het bestand waarin zij staat is verhuisd.
   `relatie` en `afstand_min_m` gelden alleen voor pand en bouwwerk (EXT-001) en blijven
   leeg bij water. `check_ids` somt de checks op die naar het vlak wijzen; sinds EXT-002
   vervallen is (BO-66) draagt een watervlak altijd alleen EXT-003. De vroegere `buffer_m` vervalt --
-  dat is runmetadata en staat in `gwsw_run` (`n_vlakken` telt de laag). De schrijver
+  dat is runmetadata en staat in `gwsw_run` (`n_vlakken` telt de hele laag, de
+  deelstelsels hieronder inbegrepen). De schrijver
   bevraagt zelf nooit een externe bron -- dan zouden laag en uitslag uit elkaar kunnen
   lopen. Eén beperking erft mee en blijft staan: EXT-001 meldt alleen het sterkste
   bouwwerk (BO-17). De watervlakken komen sinds issue #83 uitsluitend van EXT-003, dat
@@ -220,24 +224,30 @@ alleen het bestand waarin zij staat is verhuisd.
   zonder marge). Een tekort boven `[bronnen] dekking_tolerantie_m` (standaard 0) is een
   harde fout: een te kleine bron geeft stilte in plaats van bevindingen. Ontbrekende
   bronnen blijven toegestaan. Zie BO-19.
-- De vierde featurelaag is `gemengd_zonder_overstort` (MULTIPOLYGON, issue #75, BO-57):
-  één vlak per gemengd deelstelsel waarop RVZ-006 aansloeg, als buffer
+- De tweede bron van `vlakken` is RVZ-006 (issue #75, BO-57; sinds issue #98 in deze laag
+  in plaats van in een eigen vierde laag `gemengd_zonder_overstort`, BO-73): één vlak per
+  gemengd deelstelsel waarop de check aansloeg, `soort = gemengd_deelstelsel`, als buffer
   (`[drempels] gemengd_zonder_overstort_buffer_m`, 10 m) om de vrijvervalstrengen van de
   hele samenhangende component. De rijen komen uit de **meldingen van díé uitvoer**,
-  gegroepeerd op `cluster_id` -- dezelfde strikte aansluiting als bij `vlakken`, zodat de
-  laag na afbakening of onderdrukking niet meer kan tonen dan de uitslag; de geometrie
-  komt uit `run.context`, de graaf waarop de check draaide. Kolommen: `cluster_id` (het
-  deelstelsel-ID dat RVZ-006, NET-001 en NET-002 delen), `n_knopen`, `n_strengen`,
-  `strenglengte_m`, `n_meldingen` (één per gemengde streng) en `popup_html`. Die popup is
+  gegroepeerd op `cluster_id` -- dezelfde strikte aansluiting als bij de externe vlakken,
+  zodat de laag na afbakening of onderdrukking niet meer kan tonen dan de uitslag; de
+  geometrie komt uit `run.context`, de graaf waarop de check draaide. Zo'n rij vult wat zij
+  kent en laat de rest leeg, net zoals `relatie` en `afstand_min_m` bij water leeg blijven:
+  `id` en `label` dragen het deelstelsel-ID dat RVZ-006, NET-001 en NET-002 delen (waarop
+  de meldingentabel te koppelen is), `aantal_meldingen` telt de meldingen (één per gemengde
+  streng), `check_ids` staat op `RVZ-006`, en `n_knopen`, `n_strengen`, `strenglengte_m` en
+  `popup_html` gelden uitsluitend voor deze soort -- `subtype`, `bron`, `bronbestand`,
+  `relatie` en `afstand_min_m` blijven leeg. Die popup is
   de enige die systemische meldingen wél toont en zijn status niet uit `bepaal_status`
-  haalt: een rij in deze laag bestaat alleen omdat RVZ-006 aansloeg en is per constructie
+  haalt: zo'n rij bestaat alleen omdat RVZ-006 aansloeg en is per constructie
   een gebrek (BO-59). `gwsw_run`
-  telt de laag in `n_gemengd_zonder_overstort`, net zoals `n_vlakken` de laag `vlakken`
-  telt. Twee dingen kunnen de laag kleiner maken dan het aantal gemelde deelstelsels, en
+  telt deze rijen apart in `n_gemengd_zonder_overstort`, naast `n_vlakken` dat de hele laag
+  telt; het aantal externe vlakken is het verschil. Twee dingen kunnen er minder vlakken
+  opleveren dan er gemelde deelstelsels zijn, en
   ze worden verschillend behandeld. Een `cluster_id` die de graaf van de run niet kent is
   een **harde fout** (`PipelineError`): de check en de schrijver lezen dezelfde
   `deelstelsel_ids` van dezelfde context, dus dat is een interne tegenspraak en geen
-  datatoestand -- dezelfde lijn als `_vul_trefferlaag` bij een niet-geregistreerde
+  datatoestand -- dezelfde lijn als `_trefferrijen` bij een niet-geregistreerde
   treffer. Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt is wél een
   datatoestand: er valt niets te tekenen, dus het krijgt geen rij, maar het wordt geteld
   in de kolom **`n_gemengd_zonder_vlak`** van `gwsw_run`. Zonder die telling zou "dit
@@ -254,12 +264,15 @@ alleen het bestand waarin zij staat is verhuisd.
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
 - De stijlen van `putten` en `strengen` worden opgebouwd uit de tabel in
   `uitvoer/stijlen/symbolen.py` (regelstructuur objecttype x status, ruim honderd
-  bladregels); `vlakken.qml` (rule-based op `soort`) en `gemengd_zonder_overstort.qml`
-  (één vlaksymbool) blijven bestanden. Het symbool volgt het GWSW-objecttype, de kleur
+  bladregels); `vlakken.qml` (rule-based op `soort`, met vier regels: pand, bouwwerk,
+  water en gemengd deelstelsel) blijft een bestand. Het symbool volgt het
+  GWSW-objecttype, de kleur
   uitsluitend de kolom `status`. Een stijl
   draagt alleen regels voor de objecttypen die in zijn laag staan; met de hele tabel
   krijgt de lagenboom van QGIS ruim tweehonderd legendaregels. De maptip is een
-  expressie van een regel op `popup_html`; het stijlblok staat in de QML en niet in
+  expressie van een regel op `popup_html`; op `vlakken` kiest die expressie per rij:
+  een deelstelsel toont zijn voorgebakken `popup_html`, een extern vlak (dat die kolom
+  leeg laat) krijgt zijn tekst uit de kolommen. Het stijlblok staat in de QML en niet in
   elke rij. `styleCategories` moet `MapTips` noemen, anders leest QGIS het element niet
   terug. Zie BO-30.
 - `tests/test_uitvoer_qgis.py` vindt PyQGIS door de systeem-site-packages achter

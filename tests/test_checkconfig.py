@@ -39,7 +39,7 @@ def test_standaardconfig_laadt() -> None:
 
 
 def test_gemengd_zonder_overstort_buffer_heeft_een_default() -> None:
-    """De bufferafstand van de vlakkenlaag `gemengd_zonder_overstort` (#25, #75).
+    """De bufferafstand van de RVZ-006-vlakken in de laag `vlakken` (#25, #75, #98).
 
     Projectkeuze zonder externe bron; 10 m buffert elke strenglijn tot een lint van
     20 m breed, zodat de strengen van een deelstelsel langs een straat samenvloeien.

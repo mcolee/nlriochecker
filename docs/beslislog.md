@@ -3918,3 +3918,73 @@ De ernst van TOP-002/003 verlagen naar W in plaats van de populatie aan te passe
 gebrek is niet minder ernstig, het was er domweg niet -- een streng tussen twee T-stukken is
 aangesloten). TOP-002/003 laten vervallen omdat TOP-022 hetzelfde meldt (verworpen: de ~11 en ~2
 echte snapmissers zijn precies wat deze twee checks moeten vinden, en die ziet TOP-022 niet).
+
+### BO-73 De GeoPackage draagt drie objectlagen; de RVZ-006-vlakken gaan op in `vlakken`
+
+**Wat.** De uitvoer-GeoPackage heeft precies drie featurelagen, een per geometrievorm:
+`putten` (POINT), `strengen` (LINESTRING) en `vlakken` (MULTIPOLYGON). De vierde laag
+`gemengd_zonder_overstort` uit BO-57 vervalt; haar rijen staan sinds issue #98 in `vlakken`
+met `soort = gemengd_deelstelsel`, naast de drie externe soorten `pand`, `bouwwerk` en
+`water` (BO-50). Besluit van de auteur, 28-08.
+
+**Wat er mee verhuist, ongewijzigd.** Alles wat die vlakken bijzonder maakte hangt aan de
+rij en niet aan de laag, dus het verhuist zonder uitzondering:
+
+* De **popup** blijft voorgebakken in de kolom `popup_html` en blijft de enige die
+  systemische meldingen wél toont en zijn status niet uit `bepaal_status` haalt: zo'n rij
+  bestaat alleen omdat RVZ-006 aansloeg en is per constructie een gebrek (BO-59). De
+  externe vlakken laten die kolom leeg en houden hun maptip die de tekst uit de kolommen
+  samenstelt; QGIS kent één maptip per laag, dus die keuze zit nu in de expressie.
+* De **omvangkolommen** `n_knopen`, `n_strengen` en `strenglengte_m` staan op de laag en
+  blijven leeg bij een extern vlak -- dezelfde afspraak waarmee `relatie` en
+  `afstand_min_m` al alleen voor pand en bouwwerk golden.
+* De **harde fout** bij een `cluster_id` die de graaf van de run niet kent blijft een
+  `PipelineError`: check en schrijver lezen dezelfde `deelstelsel_ids` van dezelfde
+  context, dus dat is een interne tegenspraak en geen datatoestand.
+* De **tellingen** in `gwsw_run` blijven allebei bestaan: `n_gemengd_zonder_overstort`
+  telt de geschreven deelstelselvlakken en `n_gemengd_zonder_vlak` de gemelde deelstelsels
+  waarvan geen enkele streng een bruikbare lijn draagt. Zonder die tweede blijft "dit
+  deelstelsel bestaat niet" niet te onderscheiden van "we konden het niet tekenen".
+
+Twee dingen veranderen wél van plaats. De sleutel staat in de kolom `id` in plaats van in
+een eigen kolom `cluster_id` -- dezelfde kolom waarin een extern vlak zijn sleutel draagt,
+en nog steeds de waarde waarop de meldingentabel te koppelen is. En het aantal meldingen
+staat in `aantal_meldingen` in plaats van in `n_meldingen`: dat is bij beide soorten
+hetzelfde begrip (hoeveel meldingen wijzen naar deze rij), en twee kolommen met dezelfde
+betekenis in één laag is precies de verwarring die dit besluit opheft. `n_vlakken` telt
+sindsdien de hele laag, zoals `n_strengen` de strengenlaag telt; het aantal externe vlakken
+is het verschil met `n_gemengd_zonder_overstort`.
+
+**Waarom.** De GeoPackage kent drie geometrievormen, en een lezer die hem opent hoort drie
+lagen te zien in plaats van te moeten uitzoeken waarom er twee vlaklagen zijn. De vierde
+laag ontstond in #75 omdat de RVZ-006-vlakken een andere popupregel volgden dan de externe
+vlakken -- maar dat verschil zit in de rij (een deelstelsel is per constructie een gebrek,
+een pand niet) en niet in de geometrie. De kolom `soort` deed dat onderscheid in `vlakken`
+al voor drie categorieën uit twee bronbestanden; een vierde erbij kost één regel in de QML
+en één waarde in de kolom. Andersom kost een eigen laag een eigen stijl, een eigen
+registratie, een eigen voortgangsstap en een eigen plek in elke laaglijst.
+
+**Kaartbeeld.** Ongewijzigd: de vier stijlregels van `vlakken.qml` zijn de drie bestaande
+plus het vlaksymbool dat `gemengd_zonder_overstort.qml` droeg, met dezelfde kleuren. De
+deelstelsels worden als eerste weggeschreven, want de rijvolgorde is in QGIS ook de
+tekenvolgorde en het grote vlak hoort onder de panden te liggen, niet erover.
+
+**Verwacht effect (De Wolden en Hoogeveen).** `vlakken` telt 614 + 99 = 713 rijen,
+`gemengd_zonder_overstort` bestaat niet meer als laag, `n_vlakken` gaat van 614 naar 713 en
+`n_gemengd_zonder_overstort` blijft 99. De regisseur hermeet na het blok.
+
+**Alternatieven.** De laag laten staan (verworpen: het is het besluit van de auteur, en de
+grond eronder -- een verschil in popupregel -- hangt aan de rij en niet aan de laag). De
+deelstelselkolommen in een aparte attribuuttabel zetten en `vlakken` smal houden (verworpen:
+dan moet elke lezer joinen voor de omvang van een vlak dat hij aanklikt, terwijl het bestand
+juist bewust zelfvoorzienend is). De popup van de externe vlakken ook voorbakken zodat de
+maptip één expressie wordt (verworpen: dat verandert iets wat niemand ter discussie stelde,
+en het zou de status- en meldingssemantiek van `popup_html` opdringen aan een rij die geen
+van beide heeft). `cluster_id` als eigen kolom naast `id` houden (verworpen: twee kolommen
+met dezelfde waarde, en de koppeling op `id` werkt precies zo).
+
+**Contractbreuk.** De laag `gemengd_zonder_overstort` en haar stijl bestaan niet meer;
+QGIS-projecten die erop wezen moeten de laag `vlakken` met een filter op `soort` gebruiken.
+Haar kolommen `cluster_id` en `n_meldingen` heten daar `id` en `aantal_meldingen`.
+`n_vlakken` in `gwsw_run` telt sinds deze wijziging ook de deelstelsels: een trendlijn over
+deze grens heen telt appels en peren, en `vergelijk` zegt dat niet.
