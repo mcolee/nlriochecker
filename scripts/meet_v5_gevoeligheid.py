@@ -22,10 +22,9 @@ from gwsw_orox_helpers.cache import laad_met_cache
 
 from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import CheckContext
-from nlriochecker.checks.selectie import vrijvervalrioolleidingen
 from nlriochecker.checks.topologie import (
     _buren,
-    _topologie,
+    _nabijheid,
     half_diameter_m,
     overlap_length,
     verbonden_knopen,
@@ -39,27 +38,18 @@ dataset, _ = laad_met_cache(
 config = load_check_config(Path("configs/dewoldenhoogeveen.toml"))
 context = CheckContext(dataset=dataset, config=config)
 
-topologie = _topologie(context)
-
-# Scope na #82: vrijverval + duiker.
-vrijverval = {c.uri for c in vrijvervalrioolleidingen(context)}
-
-
-def in_scope(conduit) -> bool:
-    if conduit.uri in vrijverval:
-        return True
-    return any(t.rsplit("/", 1)[-1] == "Duiker" for t in conduit.types)
-
-
-scoped = [c for c in topologie.lined if in_scope(c)]
-print(f"strengen met lijn: {len(topologie.lined)}, in scope (vrijverval+duiker): {len(scoped)}")
-
-scoped_uris = {c.uri for c in scoped}
+# De populatie van TOP-006/010/011 zelf, niet een eigen nabouw ervan: `_nabijheid`
+# draagt sinds #82 de rol `nabijheidsleidingen` (vrijverval + duiker) met een STRtree
+# over hun hartlijnen. `_buren` leest die index; hem een `_Topologie` voeren levert de
+# boom van putpunten en dus plausibel ogende verkeerde getallen (blok C-review).
+nabijheid = _nabijheid(context)
+scoped = nabijheid.conduits
+print(f"leidingen: {nabijheid.totaal}, in scope (vrijverval+duiker, met lijn): {len(scoped)}")
 
 # ---------- TOP-010: verdeling van gap = afstand - (r1 + r2) ----------
-stralen = {c.uri: half_diameter_m(c.breedte_mm, c.hoogte_mm) for c in topologie.lined}
-knopen = {c.uri: verbonden_knopen(context, c) for c in topologie.lined}
-grootste = max((stralen[u] for u in scoped_uris), default=0.0)
+stralen = {c.uri: half_diameter_m(c.breedte_mm, c.hoogte_mm) for c in scoped}
+knopen = {c.uri: verbonden_knopen(context, c) for c in scoped}
+grootste = max(stralen.values(), default=0.0)
 tol_snap = config.drempels.snapping_tolerantie_m
 
 MARGES = [-0.10, -0.05, -0.02, 0.0, 0.05, 0.10]
@@ -73,18 +63,14 @@ def deelt_put(a, b) -> bool:
 
 
 def deelt_uiteinde(a, b) -> bool:
-    ea, eb = topologie.endpoints_of(a), topologie.endpoints_of(b)
-    if ea is None or eb is None:
-        return False
+    ea, eb = nabijheid.eindpunten[a.uri], nabijheid.eindpunten[b.uri]
     return any(p.distance(q) <= tol_snap for p in ea for q in eb)
 
 
 paren_gap: dict[tuple[str, str], float] = {}
 for c in scoped:
     straal = stralen[c.uri]
-    for ander in _buren(topologie, c, straal + grootste + ruimste):
-        if ander.uri not in scoped_uris:
-            continue
+    for ander in _buren(nabijheid, c, straal + grootste + ruimste):
         sleutel = (min(c.uri, ander.uri), max(c.uri, ander.uri))
         if sleutel in paren_gap:
             continue
@@ -119,9 +105,7 @@ max_tol = max(TOLS)
 
 paren_006: dict[tuple[str, str], dict[float, float]] = {}
 for c in scoped:
-    for ander in _buren(topologie, c, max_tol):
-        if ander.uri not in scoped_uris:
-            continue
+    for ander in _buren(nabijheid, c, max_tol):
         sleutel = (min(c.uri, ander.uri), max(c.uri, ander.uri))
         if sleutel in paren_006:
             continue

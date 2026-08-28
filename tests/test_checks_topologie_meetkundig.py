@@ -272,6 +272,35 @@ def test_alleen_het_duikerpaar_valt_binnen_de_scope(check_id: str, paar: set[str
     assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
 
 
+@pytest.mark.parametrize(
+    ("check_id", "paar"),
+    [
+        ("TOP-006", {"W3", "OverDuiker"}),
+        ("TOP-010", {"V3", "KruisDuiker"}),
+        ("TOP-011", {"V3", "KruisDuiker"}),
+    ],
+)
+def test_de_populatie_is_de_eigen_rol_en_niet_haar_doorsnede_met_de_leidingen(
+    check_id: str, paar: set[str]
+) -> None:
+    """`[klassen] streng` en `[klassen] nabijheidsleiding` zijn los configureerbaar.
+
+    Versmalt een project `streng` tot de vrijvervalleiding, dan valt de duiker uit de
+    leidingenrol -- maar niet uit `nabijheidsleiding`. De populatie van TOP-006,
+    TOP-010 en TOP-011 is die rol zelf, dus het duikerpaar hoort te blijven melden.
+    """
+    config = fixtureconfig()
+    config.klassen.streng = ["VrijvervalRioolleiding"]
+
+    gevonden = bevindingen(TTL_DIR / "top_nabijheid_scope.ttl", check_id, config)
+
+    assert len(gevonden) == 1, [
+        (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
+    ]
+    bevinding = gevonden[0]
+    assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
+
+
 @pytest.mark.parametrize("check_id", ["TOP-006", "TOP-010", "TOP-011"])
 def test_de_toelichting_telt_de_leidingen_buiten_de_scope(check_id: str) -> None:
     """Stilte leest als "alles gecontroleerd"; de versmalling hoort in het rapport."""

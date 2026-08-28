@@ -220,18 +220,19 @@ def _nabijheid(context: CheckContext) -> _Nabijheid:
 def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
     """Bouwt de index over de leidingen waarvan de onderlinge ligging getoetst wordt.
 
-    Loopt bewust over de volle leidingenrol en niet over `_Topologie.lined`: alleen zo
-    is te tellen hoeveel leidingen er buiten de versmalde populatie vielen, en dat
-    getal draagt de verantwoording in `notes()`.
+    De populatie is de rol `nabijheidsleidingen` zelf, en niet haar doorsnede met de
+    leidingenrol: `[klassen] streng` en `[klassen] nabijheidsleiding` zijn los
+    configureerbaar, en een duiker zou bij een versmalde `streng` anders stil uit de
+    populatie vallen. De leidingenrol wordt alleen geteld, voor de verantwoording in
+    `notes()`: hoeveel leidingen er buiten de versmalde populatie vielen.
     """
-    binnen = {conduit.uri for conduit in nabijheidsleidingen(context)}
+    binnen = nabijheidsleidingen(context)
+    in_populatie = {conduit.uri for conduit in binnen}
     alle = leidingen(context)
 
     conduits: list[Conduit] = []
     eindpunten: dict[str, tuple[Point, Point]] = {}
-    for conduit in alle:
-        if conduit.uri not in binnen:
-            continue
+    for conduit in binnen:
         uiteinden = endpoints(conduit.line)
         if uiteinden is None:
             continue
@@ -242,7 +243,7 @@ def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
         conduits=conduits,
         tree=STRtree([conduit.line for conduit in conduits]) if conduits else None,
         eindpunten=eindpunten,
-        buiten=sum(1 for conduit in alle if conduit.uri not in binnen),
+        buiten=sum(1 for conduit in alle if conduit.uri not in in_populatie),
         totaal=len(alle),
     )
 
