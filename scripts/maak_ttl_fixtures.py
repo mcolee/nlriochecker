@@ -1419,6 +1419,13 @@ FIXTURES["hgt006_tegenverhang_fors.ttl"] = (
     + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.90)),
 )
 
+FIXTURES["hgt006_net_onder_de_forsgrens.ttl"] = (
+    "de bodem van streng 1 stijgt 0,08 m in de afvoerrichting: licht, onder de forsgrens 0,10 m",
+    hoogteput("PutA", "A", A)
+    + hoogteput("PutB", "B", B)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.68)),
+)
+
 FIXTURES["hgt007_te_weinig_verhang.ttl"] = (
     "gemengde streng 1 daalt 0,01 m over 50 m: 0,2 promille",
     hoogteput("PutA", "A", A)

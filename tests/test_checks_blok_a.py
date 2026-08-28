@@ -620,6 +620,11 @@ def test_hgt005_en_hgt006_sluiten_elkaar_uit() -> None:
     assert uitkomst("hgt006_tegenverhang_fors.ttl", "HGT-005").findings == []
 
 
+def test_hgt006_zwijgt_onder_de_forsgrens_van_tien_centimeter() -> None:
+    # 0,08 m stijging ligt onder de forsgrens van 0,10 m (issue #80): geen forse bevinding.
+    assert uitkomst("hgt006_net_onder_de_forsgrens.ttl", "HGT-006").findings == []
+
+
 def test_hgt011_zwijgt_zonder_drempelobjecten() -> None:
     outcome = uitkomst("hgt_schoon.ttl", "HGT-011")
 

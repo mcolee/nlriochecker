@@ -341,7 +341,7 @@ bob_maximale_diepte_m = 4.0
 # checkregister noemt "onder drempel" en "boven drempel" zonder getal;
 # projectkeuze, geen externe bron.
 tegenverhang_licht_m = 0.01
-tegenverhang_fors_m = 0.05
+tegenverhang_fors_m = 0.10
 # HGT-007: het minimale afschot staat als diameterstaffel in [[verhang_staffel]]
 # hierboven, met de RIONED-citaten. Geen scalaire drempel meer.
 # HGT-008: steiler dan een op zoveel is verdacht. Uit het checkregister: "steiler
