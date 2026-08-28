@@ -79,6 +79,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **NET-004 wordt richting-bewust en onderscheidt vermaasd net** (issue #102, BO-77).
+  Kringlopen worden gezocht op de betrouwbare richting (de strengen die NET-009 niet
+  tegenspreekt, de richtingsbron uit #80/BO-76). Een kring die alleen op een omgekeerd
+  geregistreerde streng leunt, valt met de betrouwbare richting uiteen en wordt niet meer
+  gemeld -- NET-009 draagt dat signaal al. Een vlakke, BOB-consistente ring geldt als bewust
+  vermaasd net (in vlak Nederland legitiem); een ring die alleen via een BOB-sprong omhoog in
+  een put sluit, hoort bij HGT-009. Beide worden gedempt en in de toelichting geteld. Een
+  echte melding blijft een kring die op de betrouwbare richting overeind blijft en waarvan de
+  BOB geen uitsluitsel geeft. Richtgetal De Wolden: 17 → 0 (hermeet).
 - **NET-006 dempt vuilwater dat op gemengd uitkomt** (issue #97). Gemengd benedenstrooms
   van vuilwater is de normale afvoerrichting en geen koppelingsfout: op een knoop waar
   precies gemengd en vuilwater samenkomen, elk vuilwaterbeen betrouwbaar instroomt en elk

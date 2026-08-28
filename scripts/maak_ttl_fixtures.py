@@ -790,6 +790,66 @@ FIXTURES["net008_veel_lozingspunten.ttl"] = (
 )
 
 
+# NET-004 (issue #102): een kring C -> D -> E -> C die alleen administratief bestaat. Streng
+# 7 (E -> C) heeft een stijgende BOB: NET-009 spreekt haar tegen, dus haar richting is
+# onbetrouwbaar. Met de betrouwbare richting valt de kring uiteen en NET-004 zwijgt.
+FIXTURES["net004_lus_door_richtingsfout.ttl"] = (
+    "streng 7 (E->C) stijgt in de BOB; de kring bestaat alleen in de administratieve richting",
+    put("PutC", "C", 2000.0, 3000.0)
+    + put("PutD", "D", 2050.0, 3000.0)
+    + put("PutE", "E", 2025.0, 3050.0)
+    + leiding(
+        "L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 9.5)
+    )
+    + leiding(
+        "L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(9.5, 9.0)
+    )
+    + leiding(
+        "L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(9.0, 9.5)
+    ),
+)
+
+# NET-004 (issue #102): een BOB-consistente ring die vlak ligt en nergens in een put omhoog
+# springt. In vlak Nederland is dit een bewust vermaasd net en geen fout; NET-004 dempt hem
+# en telt hem in de toelichting.
+FIXTURES["net004_vermaasde_ring.ttl"] = (
+    "geen; kring C->D->E->C ligt vlak (BOB gelijk) zonder putsprong: bewust vermaasd net "
+    "(issue #102)",
+    put("PutC", "C", 2000.0, 3000.0)
+    + put("PutD", "D", 2050.0, 3000.0)
+    + put("PutE", "E", 2025.0, 3050.0)
+    + leiding(
+        "L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 10.0)
+    )
+    + leiding(
+        "L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(10.0, 10.0)
+    )
+    + leiding(
+        "L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(10.0, 10.0)
+    ),
+)
+
+# NET-004 (issue #102): een BOB-consistente ring die per been keurig daalt maar alleen sluit
+# via een BOB-sprong omhoog in put C (8,80 -> 10,00 m). Dat is het terrein van HGT-009, niet
+# van NET-004; de kring wordt gedempt en apart geteld.
+FIXTURES["net004_ring_met_putsprong.ttl"] = (
+    "geen; kring C->D->E->C daalt per been maar sluit via een BOB-sprong omhoog in put C "
+    "(HGT-009-terrein, issue #102)",
+    put("PutC", "C", 2000.0, 3000.0)
+    + put("PutD", "D", 2050.0, 3000.0)
+    + put("PutE", "E", 2025.0, 3050.0)
+    + leiding(
+        "L5", "5", [(2000.0, 3000.0), (2050.0, 3000.0)], "PutC", "PutD", bob=(10.0, 9.6)
+    )
+    + leiding(
+        "L6", "6", [(2050.0, 3000.0), (2025.0, 3050.0)], "PutD", "PutE", bob=(9.6, 9.2)
+    )
+    + leiding(
+        "L7", "7", [(2025.0, 3050.0), (2000.0, 3000.0)], "PutE", "PutC", bob=(9.2, 8.8)
+    ),
+)
+
+
 # NET-009: een streng die omgekeerd getekend is terwijl de BOB de administratie volgt.
 # Geometrie tegen, BOB mee: de drie richtingssignalen spreken elkaar tegen.
 FIXTURES["net009_omgekeerd_getekend.ttl"] = (

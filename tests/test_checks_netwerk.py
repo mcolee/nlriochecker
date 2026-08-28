@@ -193,6 +193,38 @@ def test_net004_noemt_dezelfde_streng_ongeacht_de_invoervolgorde(bestand: str) -
     assert bevindingen[0].object_label == "5"
 
 
+def test_net004_dempt_een_lus_die_alleen_administratief_bestaat() -> None:
+    """Een kring die op een omgekeerd geregistreerde streng leunt is geen echte lus (issue #102).
+
+    Streng 7 (E->C) stijgt in de BOB; NET-009 spreekt haar tegen, dus haar richting is
+    onbetrouwbaar. Met de betrouwbare richting valt de kring uiteen en NET-004 zwijgt --
+    NET-009 draagt dit signaal al.
+    """
+    outcome = _outcome("net004_lus_door_richtingsfout.ttl", "NET-004")
+
+    assert outcome.findings == []
+
+
+def test_net004_dempt_een_vermaasde_ring() -> None:
+    """Een vlakke, BOB-consistente ring zonder putsprong is bewust vermaasd net (issue #102).
+
+    In vlak Nederland is zo'n ring legitiem en geen fout; NET-004 dempt hem en telt hem in
+    de toelichting.
+    """
+    outcome = _outcome("net004_vermaasde_ring.ttl", "NET-004")
+
+    assert outcome.findings == []
+    assert any("vermaasd" in note for note in outcome.notes)
+
+
+def test_net004_dempt_een_ring_die_via_een_putsprong_sluit() -> None:
+    """Een ring die per been daalt maar via een BOB-sprong omhoog sluit is HGT-009 (issue #102)."""
+    outcome = _outcome("net004_ring_met_putsprong.ttl", "NET-004")
+
+    assert outcome.findings == []
+    assert any("HGT-009" in note for note in outcome.notes)
+
+
 def test_net007_vindt_it_zonder_drempel() -> None:
     assert _labels("net007_it_zonder_drempel.ttl", "NET-007") == ["8"]
 

@@ -109,7 +109,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | --- | --- | --- | --- | --- | --- |
 | NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt,… | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk; gezocht op de betrouwbare richting (de strengen die NET-009 niet tegenspreekt). Een kring die alleen a… | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid | geimplementeerd met test | infiltratieleidingen, overstortputten, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |

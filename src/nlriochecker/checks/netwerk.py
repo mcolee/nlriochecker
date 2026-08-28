@@ -374,38 +374,122 @@ class KringloopInNetwerk(Check):
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elk deel van de graaf waarin een kringloop zit.
+        """Meldt elk deel van de graaf waarin een echte kringloop zit.
 
         Per sterk samenhangend deel een melding, niet per enkelvoudige kringloop:
         het aantal enkelvoudige kringlopen groeit exponentieel met de graafgrootte,
         en op een echt stelsel loopt dat vast. Een deel met meer dan een knoop
         bevat per definitie minstens een kringloop; van elk deel wordt een
         voorbeeldkringloop getoond.
-        """
-        netwerk = _netwerk(context)
-        dataset = context.dataset
 
-        for deel in nx.strongly_connected_components(netwerk.graph):
-            if len(deel) < 2 and not self._heeft_zelflus(netwerk, deel):
-                continue
-            subgraaf = netwerk.graph.subgraph(deel)
-            kring = self._voorbeeldkring(subgraaf)
-            labels = [self._label(dataset, uri) for uri in kring]
-            uri, label = self._eerste_streng(netwerk, kring, dataset)
+        Richting-bewust sinds issue #102: de kring wordt op de BETROUWBARE richting
+        gezocht (de strengen die NET-009 niet tegenspreekt, de richtingsbron uit #80).
+        Een kring die alleen op een omgekeerd geregistreerde streng leunt, valt met de
+        betrouwbare richting uiteen en wordt niet gemeld -- NET-009 draagt dat signaal
+        al. Een BOB-consistente ring die vlak ligt is bewust vermaasd net (legitiem in
+        vlak Nederland); een ring die alleen via een BOB-sprong omhoog in een put sluit
+        hoort bij HGT-009. Beide worden gedempt en in de toelichting geteld. Zie BO-77.
+        """
+        te_melden, _, _ = self._kringlopen(context)
+        for uri, label, putten, labels in te_melden:
             yield self.finding(
                 context,
                 uri,
                 label,
-                f"Ligt in een deel van het netwerk met {len(deel)} putten waarin een "
+                f"Ligt in een deel van het netwerk met {putten} putten waarin een "
                 f"kringloop zit; voorbeeld: {' -> '.join(labels)}.",
-                putten_in_deel=len(deel),
+                putten_in_deel=putten,
                 voorbeeldkring=labels,
             )
 
-    def _heeft_zelflus(self, netwerk: _Netwerk, deel: set[str]) -> bool:
+    def _kringlopen(
+        self, context: CheckContext
+    ) -> tuple[list[tuple[str, str, int, list[str]]], int, int]:
+        """De te melden kringen plus het aantal gedempte vermaasde en putsprong-ringen."""
+        return context.cached("net004:kringlopen", lambda: self._bouw_kringlopen(context))
+
+    def _bouw_kringlopen(
+        self, context: CheckContext
+    ) -> tuple[list[tuple[str, str, int, list[str]]], int, int]:
+        """Zoekt de kringen op de betrouwbare richting en classificeert ze (issue #102)."""
+        netwerk = _netwerk(context)
+        dataset = context.dataset
+        betrouwbaar = _betrouwbare_richting(context)
+        drempel = context.config.drempels.bob_sprong_m
+
+        reliable: nx.DiGraph = nx.DiGraph()
+        for (begin, eind), strengen in netwerk.strengen_per_kant.items():
+            if any(betrouwbaar.get(streng.uri, False) for streng in strengen):
+                reliable.add_edge(begin, eind)
+
+        te_melden: list[tuple[str, str, int, list[str]]] = []
+        vermaasd = putsprong = 0
+        for deel in nx.strongly_connected_components(reliable):
+            if len(deel) < 2 and not self._heeft_zelflus(reliable, deel):
+                continue
+            kring = self._voorbeeldkring(reliable.subgraph(deel))
+            soort = self._klasseer(netwerk, betrouwbaar, kring, drempel)
+            if soort == "vermaasd":
+                vermaasd += 1
+            elif soort == "putsprong":
+                putsprong += 1
+            else:
+                labels = [self._label(dataset, uri) for uri in kring]
+                uri, label = self._eerste_streng(netwerk, kring, dataset)
+                te_melden.append((uri, label, len(deel), labels))
+        return te_melden, vermaasd, putsprong
+
+    def _klasseer(
+        self,
+        netwerk: _Netwerk,
+        betrouwbaar: dict[str, bool],
+        kring: list[str],
+        drempel: float,
+    ) -> str:
+        """Classificeert een overgebleven kring: 'echte', 'vermaasd' of 'putsprong'.
+
+        Een zelflus of een kring met een been zonder bruikbare BOB is 'echte': er is dan
+        geen BOB-bewijs dat haar tot vermaasd net of een putsprong herleidt. Anders geldt
+        een ring die ergens in een put omhoog springt (boven de sprongdrempel) als
+        putsprong (HGT-009-terrein), en een verder vlakke of dalende ring als vermaasd.
+        """
+        if len(kring) < 2:
+            return "echte"
+        benen = self._benen(netwerk, betrouwbaar, kring)
+        bobben = [
+            (been.bob_start, been.bob_end) if been is not None else (None, None) for been in benen
+        ]
+        if any(start is None or eind is None for start, eind in bobben):
+            return "echte"
+        aantal = len(kring)
+        for i in range(aantal):
+            _, boven = bobben[(i - 1) % aantal]
+            onder, _ = bobben[i]
+            assert boven is not None and onder is not None  # gedekt door de any-check hierboven
+            if onder - boven > drempel:
+                return "putsprong"
+        return "vermaasd"
+
+    def _benen(
+        self, netwerk: _Netwerk, betrouwbaar: dict[str, bool], kring: list[str]
+    ) -> list[Conduit | None]:
+        """De betrouwbare streng op elke opeenvolgende kant van de voorbeeldkring."""
+        benen: list[Conduit | None] = []
+        aantal = len(kring)
+        for i in range(aantal):
+            kant = (kring[i], kring[(i + 1) % aantal])
+            goede = [
+                streng
+                for streng in netwerk.strengen_per_kant.get(kant, ())
+                if betrouwbaar.get(streng.uri, False)
+            ]
+            benen.append(goede[0] if goede else None)
+        return benen
+
+    def _heeft_zelflus(self, graaf: nx.DiGraph, deel: set[str]) -> bool:
         """Geeft aan of het enige knooppunt in dit deel naar zichzelf wijst."""
         knoop = next(iter(deel))
-        return netwerk.graph.has_edge(knoop, knoop)
+        return graaf.has_edge(knoop, knoop)
 
     def _voorbeeldkring(self, subgraaf) -> list[str]:
         """Een kringloop uit dit deel, als illustratie in de melding.
@@ -439,8 +523,22 @@ class KringloopInNetwerk(Check):
         return kring[0], self._label(dataset, kring[0])
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt wat er buiten de graaf viel."""
-        return _netwerk_notities(context)
+        """Meldt de gedempte vermaasde en putsprong-ringen en wat er buiten de graaf viel."""
+        _, vermaasd, putsprong = self._kringlopen(context)
+        notities = _netwerk_notities(context)
+        if vermaasd:
+            notities.append(
+                f"{getal(vermaasd, 'BOB-consistente ring', 'BOB-consistente ringen')} zonder "
+                f"putsprong {vorm(vermaasd, 'geldt', 'gelden')} als bewust vermaasd net (in vlak "
+                f"Nederland legitiem) en {vorm(vermaasd, 'is', 'zijn')} niet gemeld."
+            )
+        if putsprong:
+            notities.append(
+                f"{getal(putsprong, 'ring', 'ringen')} {vorm(putsprong, 'sluit', 'sluiten')} "
+                "alleen via een BOB-sprong omhoog in een put; dat hoort bij HGT-009, niet bij "
+                "NET-004, en is hier niet als kringloop gemeld."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""

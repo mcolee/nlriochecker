@@ -4225,3 +4225,32 @@ signalen zoals hierboven; er is geen lozingspunt-machinerie in de check. De alte
 (waarheid als beslissende referentie; waarheid alleen als duiding in de melding) zijn
 verworpen. Zie [#80](https://github.com/mcolee/nlriochecker/issues/80) en de checkaudit
 (`docs/checks-audit-2026-08.md`, PRE-1).
+
+### BO-77 Kringloop versus bewust vermaasd net: NET-004 wordt richting-bewust
+
+**Wat.** NET-004 (cirkels in het vrijvervalnetwerk) zocht kringlopen op de administratieve
+graaf. Per issue #102 zoekt hij ze op de **betrouwbare richting** -- de strengen die NET-009
+niet tegenspreekt (de richtingsbron uit #80/BO-76: geen herbruikbare afvoerrichting, wél een
+per-streng oordeel). Drie gevolgen, elk een domeinregel:
+
+* **Een kring die alleen administratief bestaat, is geen kringloop.** Leunt de kring op een
+  streng die omgekeerd geregistreerd staat (BOB of geometrie spreekt de administratie tegen),
+  dan valt hij met de betrouwbare richting uiteen en meldt NET-004 niets. NET-009 draagt dat
+  richtingssignaal al; twee checks op hetzelfde verschijnsel is dubbeltelling.
+* **Een BOB-consistente ring die vlak ligt, is bewust vermaasd net.** In vlak Nederland is een
+  ring zonder hoogtesprong een legitieme vermazing (twee wegen naar dezelfde uitstroom), geen
+  fout. NET-004 dempt hem en telt hem in de toelichting.
+* **Een ring die alleen via een BOB-sprong omhoog in een put sluit, hoort bij HGT-009.** Water
+  klimt niet; zo'n sprong is een hoogtefout, niet een topologische kringloop. NET-004 laat hem
+  aan HGT-009 en telt hem apart.
+
+Blijft over als **echte** NET-004-melding: een kring die op de betrouwbare richting overeind
+blijft en waarvan de BOB geen uitsluitsel geeft (een been zonder bruikbare BOB) -- een
+topologische lus die niet als vermaasd net of putsprong te verklaren is.
+
+**Meting (De Wolden en Hoogeveen, V19, 2026-08-28, `scripts/meet_v19_kringlopen.py`).** Van de
+17 auditmeldingen bevatten 14 minstens één been tegen het BOB-verval in (vallen uiteen op de
+betrouwbare richting) en sluiten de overige 3 (Ho5G0680, Zu1V0012, Rw1G0314) via een BOB-sprong
+omhoog in een put (+0,35 / +2,7 / +0,43 m). Richtgetal 17 -> 0; hermeet.
+
+Zie [#102](https://github.com/mcolee/nlriochecker/issues/102) en BO-76.

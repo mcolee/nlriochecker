@@ -123,7 +123,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 |---|---|---|---|
 | NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt, dus de configuratie moet de mechanische leidingklassen noemen zodat de route door het persnet traceerbaar is | F | Consistentie |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie |
-| NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk | F | Consistentie |
+| NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk; gezocht op de betrouwbare richting (de strengen die NET-009 niet tegenspreekt). Een kring die alleen administratief bestaat valt uiteen en telt niet; een vlakke BOB-consistente ring is bewust vermaasd net (legitiem) en een ring die via een BOB-sprong omhoog sluit hoort bij HGT-009 -- beide gedempt (BO-77) | F | Consistentie |
 | NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie |
 | NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid |
