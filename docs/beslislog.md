@@ -3666,3 +3666,66 @@ met het andere object voorop). De uitkomst laten staan en op `[rapport] onderdru
 leunen (verworpen: onderdrukking werkt op het hoofdobject en niet op `object2_uri`, dus een
 kruising met een persleiding als tegenpartij blijft er hoe dan ook staan -- en het zou een
 scope-fout tot een uitvoerinstelling maken).
+
+### BO-70 TOP-006 gaat naar 0,02 m over 2,0 m; de TOP-010-marge blijft 0,0 m
+
+**Wat.** Twee drempels van de nabijheidschecks, in één besluit omdat ze dezelfde vraag stellen
+(hoe dicht is te dicht) en de gevoeligheidsmeting ze naast elkaar legde. `overlap_tolerantie_m`
+gaat van 0,05 naar **0,02 m** en `overlap_minimale_lengte_m` van 1,0 naar **2,0 m** (TOP-006).
+`diameterbuffer_marge_m` blijft **0,0 m** (TOP-010) -- geen wijziging, maar expliciet bekrachtigd,
+zodat de vraag niet elke audit terugkomt. ID's, ernst, dimensie en populatie van beide checks
+blijven ongewijzigd; alleen de getallen in de drie configplekken verschuiven.
+
+**Waarom.** Besluit van de auteur op 28-08 (checkaudit-vervolgvraag V5, aangehouden bij het
+beslisdocument van 28-08 en daarna apart gemeten; issue #100). De aanleiding is de
+steekproefbeoordeling bij TOP-006: dezelfde soort melding werd twee keer terecht genoemd
+(`Kv1G0018-Kv1G0020-1`, `ID5694-ID5693-1`: *"lijkt niet plausibel, dus terecht dat ze naar voren
+komen"*) en één keer plausibel (`Ho8H1118-Ho8H1120-1`: *"Is plausibel, dus geen fout"*). Twee
+buizen die over lengte binnen 5 cm van elkaar blijven zijn niet per se dubbel ingetekend -- dat is
+binnen de inwinnauwkeurigheid ook gewoon twee buizen naast elkaar in dezelfde sleuf. Wat de check
+bedoelt te vinden is het duplicaat: dezelfde buis twee keer in de dataset. Op 2 cm over 2 m blijft
+daar alleen dat van over; wie de bredere nabijheid wil zien houdt TOP-010 (buisbuffer op de
+diameter) en TOP-013 (parallelle strengen tussen hetzelfde putpaar), die dezelfde ligging met een
+andere maat meten.
+
+**Wat de meting zegt** (28-08, `scripts/meet_v5_gevoeligheid.py`, De Wolden en Hoogeveen,
+populatie ná #82: 18.213 strengen vrijverval + duiker, zelfde paarlogica als de checks).
+
+- **TOP-006 -- de drempels sturen wél.** 0,05 m over 1,0 m (huidig) geeft **39** meldingen;
+  0,02 m over 2,0 m geeft **13**.
+- **TOP-010 -- de marge discrimineert niet.** −0,10 m geeft 1.325, 0,0 m geeft 1.359 en +0,10 m
+  geeft 1.401: over 20 cm marge beweegt de uitslag 6%. De overlapdiepte van de huidige meldingen
+  verklaart waarom -- mediaan 0,31 m, p90 0,63 m, max 1,60 m. Dat zijn diepe 2D-overlaps
+  (kruisingen op verschillende diepte), geen schampgevallen die net binnen of net buiten een marge
+  vallen. Een marge verleggen haalt dus geen groep meldingen weg; het verschuift alleen de staart.
+
+**Waarom de TOP-010-marge dan niet weg of juist ruimer.** Omdat de vraag die de marge zou moeten
+beantwoorden -- ligt hier een echt conflict -- niet in het platte vlak beantwoord kan worden. Twee
+buizen die elkaar in 2D kruisen liggen meestal gewoon op verschillende diepte, en dat onderscheid
+zit in de hoogte: HGT-004 (BOB-conflict tussen kruisende strengen), HGT-009 en HGT-018. TOP-010
+levert de kandidaten, de HGT-checks vellen het oordeel. Een marge is dan een knop die aan de
+verkeerde kant van de vraag zit; 0,0 m ("de buizen raken elkaar") is de enige waarde die zonder
+hoogte een uitspraak is.
+
+**Verwacht effect op De Wolden en Hoogeveen.** TOP-006 van 39 (ná #82) naar ~13; TOP-010
+ongewijzigd op 1.359. De hermeting op de volle dataset hoort bij de blokregie, niet bij dit
+besluit.
+
+**Hoe het vastligt.** De twee getallen staan op de drie gebruikelijke plekken -- de default in
+`CheckThresholds`, `src/nlriochecker/checks.toml` en `configs/dewoldenhoogeveen.toml` -- en de
+configdrifttest houdt ze gelijk. De fixture `top006_drempels.ttl` legt drie paren naast elkaar die
+alleen in afstand en samenvallengte verschillen: 3 m op 1 cm (meldt), 1,5 m op 1 cm (onder de
+minimumlengte) en 10 m op 4 cm (buiten de tolerantie). De laatste twee meldden onder 0,05 m / 1,0 m
+nog wel, dus de test valt als iemand één van beide drempels terugdraait zonder dit besluit te
+herzien.
+
+**Alternatieven.** Alleen de tolerantie verlagen en de minimumlengte op 1,0 m laten (verworpen: dan
+blijft precies het geval staan waar de steekproef "plausibel" op zei -- twee buizen die elkaar bij
+een bocht over ruim een meter naderen; de auteur heeft beide knoppen in één beweging gezet). Naar
+5 of 10 m minimumlengte (verworpen: een duplicaat van een korte streng tussen twee putten is even
+echt als een lange, en die zouden dan wegvallen; de meting is op die staffel niet gedraaid, dus er
+is ook geen getal dat het zou dragen). De tolerantie aan de inwinnauwkeurigheid koppelen als
+configureerbare afgeleide (verworpen: de dataset draagt die nauwkeurigheid niet per streng, dus dat
+zou een tweede drempel zijn die zich als een meting voordoet). De TOP-010-marge op −0,05 m zetten
+om de schampgevallen weg te nemen (verworpen: die schampgevallen bestaan niet -- de mediane overlap
+is 0,31 m -- dus het kost meldingen zonder dat iemand kan navertellen waarom juist die).

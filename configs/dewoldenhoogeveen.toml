@@ -243,9 +243,11 @@ snapping_tolerantie_m = 0.10
 # checkregister: "bijv. 0,30 m".
 dubbele_put_tolerantie_m = 0.30
 # TOP-006: hoe ver twee strengen mogen afwijken en hoe lang ze moeten samenvallen
-# om als dubbel ingetekend te gelden. Projectkeuze, geen externe bron.
-overlap_tolerantie_m = 0.05
-overlap_minimale_lengte_m = 1.0
+# om als dubbel ingetekend te gelden. Projectkeuze, geen externe bron. 2 cm over 2 m
+# vangt het echte duplicaat; twee buizen die legitiem naast elkaar liggen vallen
+# erbuiten en blijven zichtbaar via TOP-010 en TOP-013. Zie BO-70.
+overlap_tolerantie_m = 0.02
+overlap_minimale_lengte_m = 2.0
 # TOP-007: onder deze lengte geldt een streng als nul-lengte. Projectkeuze, geen
 # externe bron.
 nul_lengte_m = 0.01
@@ -260,7 +262,9 @@ rd_x_max = 300_000.0
 rd_y_min = 300_000.0
 rd_y_max = 630_000.0
 # TOP-010: extra marge bovenop de halve diameter van beide strengen. Projectkeuze,
-# geen externe bron.
+# geen externe bron. Blijft 0,0 (bekrachtigd 28-08): de marge discrimineert niet --
+# de gemelde overlaps zijn diep, geen schampgevallen -- en of zo'n kruising een echt
+# conflict is beslist de hoogte (HGT-004/009/018), niet deze marge. Zie BO-70.
 diameterbuffer_marge_m = 0.0
 # TOP-013 en TOP-014: aantallen waarboven het onaannemelijk wordt. Uit het
 # checkregister: "meer dan twee parallelle strengen" en "meer dan vier

@@ -55,6 +55,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **TOP-006 meldt pas bij 2 cm samenval over 2 m; de TOP-010-marge blijft 0,0 m**
+  (issue #100, BO-70). `overlap_tolerantie_m` gaat van 0,05 naar 0,02 m en
+  `overlap_minimale_lengte_m` van 1,0 naar 2,0 m: twee buizen die binnen 5 cm van elkaar
+  blijven zijn niet per se dubbel ingetekend -- dat past binnen de inwinnauwkeurigheid --
+  terwijl de check het echte duplicaat zoekt, dezelfde buis twee keer in de dataset. Wie
+  de bredere nabijheid wil zien houdt TOP-010 en TOP-013. `diameterbuffer_marge_m` blijft
+  0,0 m, nu expliciet bekrachtigd: over 20 cm marge beweegt TOP-010 maar 6% (1.325 →
+  1.401) en de gemelde overlaps zijn diep (mediaan 0,31 m), dus of zo'n kruising een echt
+  conflict is beslist de hoogte (HGT-004/009/018) en niet deze marge. Verwacht effect op
+  De Wolden en Hoogeveen, ná #82: TOP-006 **39 → ~13**, TOP-010 ongewijzigd op 1.359. De
+  hermeting hoort bij de blokregie. Meting: `scripts/meet_v5_gevoeligheid.py`.
 - **TOP-006, TOP-010 en TOP-011 toetsen alleen nog vrijverval tegen vrijverval of duiker**
   (issue #82, BO-69). De drie checks die twee leidingen naast elkaar leggen -- overlap,
   buisbuffer en hartlijnkruising -- draaiden op de brede rol `leidingen` en meldden dus ook

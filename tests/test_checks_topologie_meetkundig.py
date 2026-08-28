@@ -96,6 +96,21 @@ def test_top006_meldt_de_overlaplengte() -> None:
     assert bevinding.details["object2_label"] == "2"
 
 
+def test_top006_meldt_alleen_binnen_de_twee_drempels() -> None:
+    """Issue #100: samenvallen binnen 2 cm over minstens 2 m.
+
+    De fixture legt drie paren naast elkaar die alleen in afstand en samenvallengte
+    verschillen. Paar 2 toetst de minimumlengte (1,5 m op 1 cm), paar 3 de tolerantie
+    (10 m op 4 cm); allebei meldden ze onder de oude 0,05 m / 1,0 m nog wel.
+    """
+    gevonden = bevindingen(TTL_DIR / "top006_drempels.ttl", "TOP-006")
+
+    assert labels(gevonden) == ["D1a"], [
+        (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
+    ]
+    assert gevonden[0].details["object2_label"] == "D1b"
+
+
 def test_top007_noemt_de_nul_lengte() -> None:
     bevinding = bevindingen(TTL_DIR / "top007_nul_lengte.ttl", "TOP-007")[0]
 

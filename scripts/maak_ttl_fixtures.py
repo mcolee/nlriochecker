@@ -254,6 +254,40 @@ FIXTURES["top006_overlappende_streng.ttl"] = (
     + leiding("L2", "2", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB"),
 )
 
+
+# Issue #100: de twee drempels van TOP-006 zelf. Drie paren die alleen in tolerantie en
+# in samenvallengte verschillen, zodat de drempelgrens het enige is wat ze scheidt.
+def _drempelpaar(nummer: int, y: float, lengte: float, afstand: float) -> str:
+    """Twee strengen tussen dezelfde putten, `afstand` uit elkaar over `lengte` meter."""
+    return (
+        put(f"DrempelA{nummer}", f"DA{nummer}", 1000.0, y)
+        + put(f"DrempelB{nummer}", f"DB{nummer}", 1000.0 + lengte, y)
+        + leiding(
+            f"D{nummer}a",
+            f"D{nummer}a",
+            [(1000.0, y), (1000.0 + lengte, y)],
+            f"DrempelA{nummer}",
+            f"DrempelB{nummer}",
+        )
+        + leiding(
+            f"D{nummer}b",
+            f"D{nummer}b",
+            [(1000.0, y + afstand), (1000.0 + lengte, y + afstand)],
+            f"DrempelA{nummer}",
+            f"DrempelB{nummer}",
+        )
+    )
+
+
+FIXTURES["top006_drempels.ttl"] = (
+    "alleen paar 1 hoort te melden -- 3 m samenval op 1 cm. Paar 2 ligt even dicht maar "
+    "valt over 1,5 m samen (onder de minimumlengte 2,0 m) en paar 3 valt lang samen maar "
+    "op 4 cm (buiten de tolerantie 0,02 m); issue #100",
+    _drempelpaar(1, 2000.0, 3.0, 0.01)
+    + _drempelpaar(2, 2100.0, 1.5, 0.01)
+    + _drempelpaar(3, 2200.0, 10.0, 0.04),
+)
+
 # TOP-007: een streng zonder lengte.
 FIXTURES["top007_nul_lengte.ttl"] = (
     "streng 2 heeft begin- en eindpunt op dezelfde plek",

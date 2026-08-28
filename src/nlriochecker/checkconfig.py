@@ -197,8 +197,10 @@ class CheckThresholds(BaseModel):
     dubbele_put_tolerantie_m: float = Field(default=0.30, gt=0.0)
 
     # TOP-006: hoeveel twee strengen mogen afwijken en hoe lang ze moeten samenvallen.
-    overlap_tolerantie_m: float = Field(default=0.05, gt=0.0)
-    overlap_minimale_lengte_m: float = Field(default=1.0, gt=0.0)
+    # 2 cm over 2 m vangt het echte duplicaat; legitiem parallelle buizen vallen erbuiten
+    # en blijven zichtbaar via TOP-010 en TOP-013. Zie BO-70.
+    overlap_tolerantie_m: float = Field(default=0.02, gt=0.0)
+    overlap_minimale_lengte_m: float = Field(default=2.0, gt=0.0)
     # TOP-007: onder deze lengte geldt een streng als nul-lengte.
     nul_lengte_m: float = Field(default=0.01, gt=0.0)
     # TOP-008: hoe ver de hartlijn van de rechte put-putverbinding mag afwijken.
@@ -208,7 +210,9 @@ class CheckThresholds(BaseModel):
     rd_x_max: float = 300_000.0
     rd_y_min: float = 300_000.0
     rd_y_max: float = 630_000.0
-    # TOP-010: extra marge bovenop de halve diameter van beide strengen.
+    # TOP-010: extra marge bovenop de halve diameter van beide strengen. Blijft 0,0:
+    # de marge discrimineert niet, het plausibel/terecht-onderscheid zit in de hoogte.
+    # Zie BO-70.
     diameterbuffer_marge_m: float = Field(default=0.0, ge=0.0)
     # TOP-013 en TOP-014: aantallen waarboven het onaannemelijk wordt.
     parallelle_strengen_maximum: int = Field(default=2, ge=1)
