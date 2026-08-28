@@ -42,13 +42,19 @@ put = ["Put"]
 # met een deksel, niet op elke Put of op een gemaal.
 rioolput = ["Rioolput"]
 vrijvervalleiding = ["VrijvervalRioolleiding"]
+# Issue #82: de populatie van TOP-006, TOP-010 en TOP-011, de drie checks die twee
+# leidingen naast elkaar leggen. Beide partijen van een paar moeten hieronder vallen; een
+# duiker hoort erbij, een drain, een aansluitleiding en een mechanische leiding niet.
+# Zie BO-69.
+nabijheidsleiding = ["VrijvervalRioolleiding", "Duiker"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
 # Geen enkele NET-check toetst het mechanische riool inhoudelijk (zie het checkregister);
-# de checks op de bredere rol `streng` zien het wel -- ADM-002/003/010/011 en TOP-001
-# onder meer, en in de praktijk melden vooral TOP-010 en TOP-011 erop -- en
-# `[rapport] onderdruk_klassen` verderop houdt dat uit de uitvoer. Deze lijst
+# de checks op de bredere rol `streng` zien het wel -- ADM-002/003/010 en TOP-001 onder
+# meer -- en `[rapport] onderdruk_klassen` verderop houdt dat uit de uitvoer. TOP-006,
+# TOP-010 en TOP-011 melden er sinds issue #82 niet meer op: zij draaien op
+# `nabijheidsleiding` hierboven. Deze lijst
 # stuurt wel twee dingen: de grijze laag in de GIS-uitvoer (een leeg kaartbeeld daar zou
 # anders als "geen gebreken" lezen) en, sinds issue #72, de ongerichte connectiviteit in
 # de bereikbaarheidsgraaf van NET-001 en NET-002 (BO-54). De twee ontologische wortels in

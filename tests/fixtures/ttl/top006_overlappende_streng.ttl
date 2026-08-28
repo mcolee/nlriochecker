@@ -31,7 +31,11 @@ gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
 gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
-gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+# Drain en Aansluitleiding hangen in de GWSW-ontologie rechtstreeks onder Leiding en
+# niet onder VrijvervalRioolleiding (geverifieerd in de gebundelde ontologie); de
+# prelude zei dat van Drain tot issue #82 verkeerd.
+gwsw:Drain rdfs:subClassOf gwsw:Leiding .
+gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 # DEFECT: twee strengen liggen over hun volle lengte op elkaar

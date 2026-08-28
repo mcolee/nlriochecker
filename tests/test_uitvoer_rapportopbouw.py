@@ -311,9 +311,10 @@ class TestOntbrekendeBronnen:
 class TestOnderdrukking:
     """Issue #65: wat `[rapport]` uit de stroom houdt, staat in de verantwoording.
 
-    De fixture: vrijvervalstreng L1 kruist persleiding L2; TOP-011 meldt het paar een
-    keer, met L1 als hoofdobject. De nulbevinding geeft L2 een eigen melding, en die
-    is het enige wat `MechanischeTransportleiding` hier onderdrukt.
+    De fixture: vrijvervalstreng L1 kruist persleiding L2 en duiker L3. TOP-011 meldt
+    sinds issue #82 alleen het duikerpaar, een keer, met L1 als hoofdobject. De
+    nulbevinding geeft L2 een eigen melding, en die is het enige wat
+    `MechanischeTransportleiding` hier onderdrukt.
     """
 
     @staticmethod

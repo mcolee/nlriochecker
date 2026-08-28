@@ -54,9 +54,11 @@ class TestStatus:
         assert bepaal_status([], geanalyseerd=False) == STATUS_GRIJS
 
     def test_een_gebrek_wint_van_niet_geanalyseerd(self) -> None:
-        """Mechanisch riool wordt wel degelijk door TOP-010 en de nulmeting geraakt.
+        """Mechanisch riool wordt wel degelijk door checks en door de nulmeting geraakt.
 
-        Op de Koekangerveld-run dragen 17 van de 20 mechanische strengen een melding.
+        Op de Koekangerveld-run dragen 17 van de 20 mechanische strengen een melding. Dat
+        waren er destijds vooral van TOP-010 en TOP-011; die twee laten het persnet sinds
+        issue #82 met rust, maar ADM-002/003/010, TOP-001 en de nulmeting niet.
         Zouden die grijs blijven, dan beweert de kaart dat er niets bekeken is terwijl
         er fouten op staan -- en sinds `meldinglocaties` verviel is er geen tweede plek
         meer waar ze wel zichtbaar zijn.

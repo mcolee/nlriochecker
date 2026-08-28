@@ -48,6 +48,14 @@ class ClassRoots(BaseModel):
     # deksel"; alleen daaraan hangen `Putdekselniveau` en de putdiepte betekenis.
     rioolput: list[str] = Field(default_factory=lambda: ["Rioolput"])
     vrijvervalleiding: list[str] = Field(min_length=1)
+    # TOP-006, TOP-010 en TOP-011: de leidingen waarvan de onderlinge ligging getoetst
+    # wordt. Ruimer dan `vrijvervalleiding` (een duiker hoort erbij) en enger dan `streng`
+    # (drains, mechanische leidingen en aansluitleidingen horen er niet bij). De grens
+    # komt uit de ontologie en niet uit een projectkeuze, dus een gevulde default -- zoals
+    # bij `rioolput` en `waterlozingspunt`. Zie issue #82 en BO-69.
+    nabijheidsleiding: list[str] = Field(
+        default_factory=lambda: ["VrijvervalRioolleiding", "Duiker"]
+    )
     # TOP-001 vraagt of er *enige* streng aansluit, niet of er een vrijvervalstreng
     # aansluit; een put aan een persleiding is niet losliggend.
     streng: list[str] = Field(default_factory=lambda: ["Leiding"])

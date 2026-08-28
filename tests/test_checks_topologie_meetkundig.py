@@ -235,6 +235,40 @@ def test_top010_zet_de_foutlocatie_tussen_de_twee_strengen() -> None:
     assert ander.distance(punt) <= bevinding.details["afstand_m"] + 1e-6
 
 
+# Issue #82: TOP-006, TOP-010 en TOP-011 toetsen alleen paren waarvan beide leidingen een
+# vrijvervalrioolleiding of een duiker zijn. De fixture legt per check drie gelijkvormige
+# paren naast elkaar -- met een drain, een aansluitleiding en een duiker -- zodat de
+# populatiegrens het enige verschil is.
+@pytest.mark.parametrize(
+    ("check_id", "paar"),
+    [
+        ("TOP-006", {"W3", "OverDuiker"}),
+        ("TOP-010", {"V3", "KruisDuiker"}),
+        ("TOP-011", {"V3", "KruisDuiker"}),
+    ],
+)
+def test_alleen_het_duikerpaar_valt_binnen_de_scope(check_id: str, paar: set[str]) -> None:
+    gevonden = bevindingen(TTL_DIR / "top_nabijheid_scope.ttl", check_id)
+
+    assert len(gevonden) == 1, [
+        (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
+    ]
+    bevinding = gevonden[0]
+    assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
+
+
+@pytest.mark.parametrize("check_id", ["TOP-006", "TOP-010", "TOP-011"])
+def test_de_toelichting_telt_de_leidingen_buiten_de_scope(check_id: str) -> None:
+    """Stilte leest als "alles gecontroleerd"; de versmalling hoort in het rapport."""
+    dataset = load_dataset(TTL_DIR / "top_nabijheid_scope.ttl", [])
+    context = CheckContext(dataset=dataset, config=fixtureconfig())
+    outcome = run_checks(context, [check_id]).outcomes[0]
+
+    # Vier van de twaalf leidingen zijn een drain of een aansluitleiding.
+    assert any("4 van de 12 leidingen" in note for note in outcome.notes), outcome.notes
+    assert any("VrijvervalRioolleiding, Duiker" in note for note in outcome.notes), outcome.notes
+
+
 def test_top006_zet_de_foutlocatie_op_het_overlappende_deel() -> None:
     dataset, gevonden = _dataset_en_bevindingen("top006_overlappende_streng.ttl", "TOP-006")
     bevinding = gevonden[0]

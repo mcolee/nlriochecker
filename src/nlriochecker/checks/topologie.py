@@ -35,6 +35,7 @@ from nlriochecker.checks.selectie import (
     functieloze_knopen,
     hulpstukken,
     leidingen,
+    nabijheidsleidingen,
     netwerkknopen,
     vrijvervalrioolleidingen,
 )
@@ -190,7 +191,77 @@ def _representatief(geometrie: BaseGeometry | None) -> tuple[float, float] | Non
     return (punt.x, punt.y)
 
 
-def _buren(topologie: _Topologie, conduit: Conduit, marge: float):
+@dataclass(frozen=True)
+class _Nabijheid:
+    """De leidingen waarvan TOP-006, TOP-010 en TOP-011 de onderlinge ligging toetsen.
+
+    Een eigen index naast `_Topologie`, en met opzet: die laatste draagt élke leiding
+    met geometrie, want TOP-021 vraagt of er *enige* streng langs een put doorloopt.
+    Deze drie checks vragen iets anders -- liggen twee leidingen elkaar in de weg -- en
+    dat is alleen zinnig binnen de rol `nabijheidsleidingen`. Zie issue #82 en BO-69.
+    """
+
+    conduits: list[Conduit]
+    tree: STRtree | None
+    # Per streng-URI de uiteinden; alleen voor de strengen in `conduits`, dus altijd
+    # gevuld. TOP-010 gebruikt ze om een gedeeld uiteinde te herkennen.
+    eindpunten: dict[str, tuple[Point, Point]]
+    # Hoeveel leidingen buiten deze populatie vielen, en hoeveel er in totaal zijn;
+    # `notes()` verantwoordt de versmalling ermee.
+    buiten: int
+    totaal: int
+
+
+def _nabijheid(context: CheckContext) -> _Nabijheid:
+    """De nabijheidsindex, een keer per context gebouwd."""
+    return context.cached("topologie:nabijheid", lambda: _bouw_nabijheid(context))
+
+
+def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
+    """Bouwt de index over de leidingen waarvan de onderlinge ligging getoetst wordt.
+
+    Loopt bewust over de volle leidingenrol en niet over `_Topologie.lined`: alleen zo
+    is te tellen hoeveel leidingen er buiten de versmalde populatie vielen, en dat
+    getal draagt de verantwoording in `notes()`.
+    """
+    binnen = {conduit.uri for conduit in nabijheidsleidingen(context)}
+    alle = leidingen(context)
+
+    conduits: list[Conduit] = []
+    eindpunten: dict[str, tuple[Point, Point]] = {}
+    for conduit in alle:
+        if conduit.uri not in binnen:
+            continue
+        uiteinden = endpoints(conduit.line)
+        if uiteinden is None:
+            continue
+        eindpunten[conduit.uri] = uiteinden
+        conduits.append(conduit)
+
+    return _Nabijheid(
+        conduits=conduits,
+        tree=STRtree([conduit.line for conduit in conduits]) if conduits else None,
+        eindpunten=eindpunten,
+        buiten=sum(1 for conduit in alle if conduit.uri not in binnen),
+        totaal=len(alle),
+    )
+
+
+def _nabijheidsnotitie(context: CheckContext) -> list[str]:
+    """Verantwoordt de versmalde populatie van TOP-006, TOP-010 en TOP-011."""
+    nabijheid = _nabijheid(context)
+    klassen = ", ".join(context.config.klassen.nabijheidsleiding) or "(geen)"
+    return [
+        f"Getoetst zijn alleen paren waarvan beide leidingen onder {klassen} vallen "
+        f"(`[klassen] nabijheidsleiding`). {nabijheid.buiten} van de "
+        f"{getal(nabijheid.totaal, 'leiding', 'leidingen')} "
+        f"{vorm(nabijheid.buiten, 'valt', 'vallen')} daarbuiten -- onder meer drains, "
+        "mechanische leidingen en aansluitleidingen -- en elk paar waarin zo'n leiding "
+        "voorkomt is niet beoordeeld."
+    ]
+
+
+def _buren(nabijheid: _Nabijheid, conduit: Conduit, marge: float):
     """De andere strengen die binnen de marge van deze streng liggen.
 
     `dwithin` toetst de echte afstand en is daarmee strenger dan de oude
@@ -198,10 +269,10 @@ def _buren(topologie: _Topologie, conduit: Conduit, marge: float):
     kandidaten alsnog zijn eigen exacte afstandstoets toe, dus de uitkomst
     verandert niet. Bij marge nul blijven alleen rakende of snijdende lijnen over.
     """
-    if topologie.line_tree is None or conduit.line is None:
+    if nabijheid.tree is None or conduit.line is None:
         return
-    for index in topologie.line_tree.query(conduit.line, predicate="dwithin", distance=marge):
-        ander = topologie.lined[int(index)]
+    for index in nabijheid.tree.query(conduit.line, predicate="dwithin", distance=marge):
+        ander = nabijheid.conduits[int(index)]
         if ander.uri != conduit.uri:
             yield ander
 
@@ -465,7 +536,7 @@ class OverlappendeStreng(Check):
     title = "Dubbel ingetekende of (deels) overlappende strengen"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
-    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("leidingen", "nabijheidsleidingen")
     kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -473,16 +544,17 @@ class OverlappendeStreng(Check):
 
         Twee strengen die alleen in een put bij elkaar komen raken elkaar over een
         verwaarloosbare lengte; pas als ze over meer dan de minimumlengte binnen
-        elkaars tolerantie blijven liggen ze dubbel ingetekend.
+        elkaars tolerantie blijven liggen ze dubbel ingetekend. Beide strengen van
+        een paar moeten in de rol `nabijheidsleidingen` zitten (issue #82).
         """
-        topologie = _topologie(context)
+        nabijheid = _nabijheid(context)
         drempels = context.config.drempels
         tolerantie = drempels.overlap_tolerantie_m
         minimum = drempels.overlap_minimale_lengte_m
 
         gemeld: set[tuple[str, str]] = set()
-        for conduit in topologie.lined:
-            for ander in _buren(topologie, conduit, tolerantie):
+        for conduit in nabijheid.conduits:
+            for ander in _buren(nabijheid, conduit, tolerantie):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
                 if sleutel in gemeld:
                     continue
@@ -503,9 +575,13 @@ class OverlappendeStreng(Check):
                     foutlocatie=_dichtste_midden(conduit.line, ander.line),
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de leidingen die buiten de versmalde populatie vielen."""
+        return _nabijheidsnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen met bruikbare geometrie."""
-        return len(_topologie(context).lined)
+        """Het aantal getoetste leidingen met bruikbare geometrie."""
+        return len(_nabijheid(context).conduits)
 
 
 @register
@@ -677,7 +753,7 @@ class StrengenRakenMetBuffer(Check):
     title = "Streng met buffer op basis van diameter kruist of raakt andere strengen"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("leidingen", "nabijheidsleidingen")
     kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -686,25 +762,26 @@ class StrengenRakenMetBuffer(Check):
         Strengen die een put delen raken elkaar per definitie; die vallen af. Wat
         overblijft zijn kruisingen en te dicht langs elkaar lopende buizen. De
         toets is tweedimensionaal: een kruising op verschillende diepte komt er ook
-        in voor. HGT-004 en HGT-009 kijken naar de hoogten.
+        in voor. HGT-004 en HGT-009 kijken naar de hoogten. Beide strengen van een
+        paar moeten in de rol `nabijheidsleidingen` zitten (issue #82).
         """
-        topologie = _topologie(context)
+        nabijheid = _nabijheid(context)
         marge = context.config.drempels.diameterbuffer_marge_m
         tolerantie = context.config.drempels.snapping_tolerantie_m
 
         stralen = {
             conduit.uri: half_diameter_m(conduit.breedte_mm, conduit.hoogte_mm)
-            for conduit in topologie.lined
+            for conduit in nabijheid.conduits
         }
-        knopen = {conduit.uri: verbonden_knopen(context, conduit) for conduit in topologie.lined}
+        knopen = {conduit.uri: verbonden_knopen(context, conduit) for conduit in nabijheid.conduits}
         # De grootste straal in de dataset bepaalt hoe ver een tegenpartij kan
         # liggen en toch nog binnen de gezamenlijke buffer vallen.
         grootste = max(stralen.values(), default=0.0)
 
         gemeld: set[tuple[str, str]] = set()
-        for conduit in topologie.lined:
+        for conduit in nabijheid.conduits:
             straal = stralen[conduit.uri]
-            for ander in _buren(topologie, conduit, straal + grootste + marge):
+            for ander in _buren(nabijheid, conduit, straal + grootste + marge):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
                 if sleutel in gemeld:
                     continue
@@ -714,7 +791,7 @@ class StrengenRakenMetBuffer(Check):
                     continue
                 if self._deelt_put(knopen[conduit.uri], knopen[ander.uri]):
                     continue
-                if self._deelt_uiteinde(topologie, conduit, ander, tolerantie):
+                if self._deelt_uiteinde(nabijheid, conduit, ander, tolerantie):
                     continue
                 gemeld.add(sleutel)
                 yield self.finding(
@@ -735,18 +812,17 @@ class StrengenRakenMetBuffer(Check):
         return bool({uri for uri in links if uri} & {uri for uri in rechts if uri})
 
     def _deelt_uiteinde(
-        self, topologie: _Topologie, conduit: Conduit, ander: Conduit, tolerantie: float
+        self, nabijheid: _Nabijheid, conduit: Conduit, ander: Conduit, tolerantie: float
     ) -> bool:
         """Geeft aan of twee strengen geometrisch een uiteinde delen."""
-        eigen, andere = topologie.endpoints_of(conduit), topologie.endpoints_of(ander)
-        if eigen is None or andere is None:
-            return False
+        eigen, andere = nabijheid.eindpunten[conduit.uri], nabijheid.eindpunten[ander.uri]
         return any(links.distance(rechts) <= tolerantie for links in eigen for rechts in andere)
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt de tweedimensionale afbakening en de strengen zonder maatvoering."""
-        topologie = _topologie(context)
+        """Meldt de populatie, de tweedimensionale afbakening en de strengen zonder maat."""
+        nabijheid = _nabijheid(context)
         notities = [
+            *_nabijheidsnotitie(context),
             "Deze toets is tweedimensionaal. In een stedelijk stelsel kruisen leidingen "
             "elkaar routinematig op verschillende diepte; zo'n kruising is pas een gebrek "
             "als de buizen elkaar ook in hoogte raken. Gebruik HGT-004, HGT-009 en HGT-018 "
@@ -754,20 +830,20 @@ class StrengenRakenMetBuffer(Check):
         ]
         zonder = sum(
             1
-            for conduit in topologie.lined
+            for conduit in nabijheid.conduits
             if half_diameter_m(conduit.breedte_mm, conduit.hoogte_mm) == 0.0
         )
         if zonder:
             notities.append(
-                f"{zonder} van de {len(topologie.lined)} strengen hebben geen bruikbare "
+                f"{zonder} van de {len(nabijheid.conduits)} strengen hebben geen bruikbare "
                 "breedte- of hoogtemaat; die krijgen buffer nul en komen alleen in beeld als "
                 "de tegenpartij dik genoeg is."
             )
         return notities
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen met bruikbare geometrie."""
-        return len(_topologie(context).lined)
+        """Het aantal getoetste leidingen met bruikbare geometrie."""
+        return len(_nabijheid(context).conduits)
 
 
 @register
@@ -778,7 +854,7 @@ class Hartlijnkruising(Check):
     title = "Hartlijnkruisingen strengen onderling (zonder buffer)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("leidingen", "nabijheidsleidingen")
     kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -786,13 +862,14 @@ class Hartlijnkruising(Check):
 
         `crosses` is precies wat het register bedoelt: de binnenkanten snijden
         elkaar. Strengen die alleen in een gedeelde put samenkomen raken elkaar en
-        kruisen niet, en vallen dus vanzelf af.
+        kruisen niet, en vallen dus vanzelf af. Beide strengen van een paar moeten
+        in de rol `nabijheidsleidingen` zitten (issue #82).
         """
-        topologie = _topologie(context)
+        nabijheid = _nabijheid(context)
 
         gemeld: set[tuple[str, str]] = set()
-        for conduit in topologie.lined:
-            for ander in _buren(topologie, conduit, 0.0):
+        for conduit in nabijheid.conduits:
+            for ander in _buren(nabijheid, conduit, 0.0):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
                 if sleutel in gemeld or not _lijn(conduit).crosses(_lijn(ander)):
                     continue
@@ -809,17 +886,18 @@ class Hartlijnkruising(Check):
                 )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt dat een kruising in het platte vlak nog geen conflict is."""
+        """Meldt de populatie en dat een kruising in het platte vlak nog geen conflict is."""
         return [
+            *_nabijheidsnotitie(context),
             "Een hartlijnkruising in het platte vlak is normaal: hemelwater en gemengd "
             "kruisen elkaar in vrijwel elke straat, op verschillende diepte. Deze check "
             "wijst de plaatsen aan waar dat gebeurt; of het een conflict is volgt uit de "
-            "hoogten (HGT-004, HGT-009, HGT-018), niet uit deze bevinding."
+            "hoogten (HGT-004, HGT-009, HGT-018), niet uit deze bevinding.",
         ]
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen met bruikbare geometrie."""
-        return len(_topologie(context).lined)
+        """Het aantal getoetste leidingen met bruikbare geometrie."""
+        return len(_nabijheid(context).conduits)
 
 
 @register

@@ -31,10 +31,14 @@ gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
 gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
-gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+# Drain en Aansluitleiding hangen in de GWSW-ontologie rechtstreeks onder Leiding en
+# niet onder VrijvervalRioolleiding (geverifieerd in de gebundelde ontologie); de
+# prelude zei dat van Drain tot issue #82 verkeerd.
+gwsw:Drain rdfs:subClassOf gwsw:Leiding .
+gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: een vrijvervalstreng kruist een persleiding; onderdrukking per klasse (issue #65)
+# DEFECT: een vrijvervalstreng kruist een persleiding en een duiker; onderdrukking per klasse (issue #65, populatie versmald in #82)
 
 :PutA rdf:type gwsw:Inspectieput ; rdfs:label "A" ;
     gwsw:hasAspect :PutA_ori .
@@ -56,6 +60,16 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :PutD_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1025.0 2025.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:PutE rdf:type gwsw:Inspectieput ; rdfs:label "E" ;
+    gwsw:hasAspect :PutE_ori .
+:PutE_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1035.0 1975.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:PutF rdf:type gwsw:Inspectieput ; rdfs:label "F" ;
+    gwsw:hasAspect :PutF_ori .
+:PutF_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1035.0 2025.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 :L1 rdf:type gwsw:GemengdRiool ; rdfs:label "1" ;
     gwsw:hasAspect :L1_ori .
 :L1_ori rdf:type gwsw:Leidingorientatie ;
@@ -76,3 +90,13 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :L2_e rdf:type gwsw:EindpuntLeiding .
 :L2_b gwsw:hasConnection :PutC_ori .
 :L2_e gwsw:hasConnection :PutD_ori .
+:L3 rdf:type gwsw:Duiker ; rdfs:label "3" ;
+    gwsw:hasAspect :L3_ori .
+:L3_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :L3_b , :L3_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1035.0 1975.0 1035.0 2025.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:L3_b rdf:type gwsw:BeginpuntLeiding .
+:L3_e rdf:type gwsw:EindpuntLeiding .
+:L3_b gwsw:hasConnection :PutE_ori .
+:L3_e gwsw:hasConnection :PutF_ori .

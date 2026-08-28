@@ -55,6 +55,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **TOP-006, TOP-010 en TOP-011 toetsen alleen nog vrijverval tegen vrijverval of duiker**
+  (issue #82, BO-69). De drie checks die twee leidingen naast elkaar leggen -- overlap,
+  buisbuffer en hartlijnkruising -- draaiden op de brede rol `leidingen` en meldden dus ook
+  een vrijvervalriool dat een persleiding, een drain of een aansluitleiding kruist. Dat is
+  geen gebrek: een persleiding ligt er nu eenmaal doorheen. **Beide** partijen van een paar
+  moeten voortaan onder de nieuwe rol `nabijheidsleidingen` vallen (`[klassen]
+  nabijheidsleiding` = `VrijvervalRioolleiding`, `Duiker`); drains, mechanische leidingen
+  en aansluitleidingen vallen erbuiten. Verwacht effect op De Wolden en Hoogeveen:
+  TOP-006 **81 → 39 of minder**, TOP-010 **2.184 → ~1.057** en TOP-011 **1.872 → ~1.012**
+  (de audit-meting van 27-08 gaf 39, 1.359 en 1.161 met alleen de drains en het persnet
+  eruit; de aansluitleidingen kosten TOP-010 er nog 302 en TOP-011 er nog 149). De
+  hermeting hoort bij de blokregie. De toelichting van alle drie noemt de klassen en telt
+  hoeveel leidingen erbuiten vielen. `[klassen] nabijheidsleiding` staat in beide
+  configbestanden en als default in `ClassRoots`, niet in de code.
 - **HGT-003 meldt pas boven de 4,0 m diepteligging** (issue #99, BO-68).
   `bob_maximale_diepte_m` gaat van 3,0 naar 4,0 m: 3,0 m is de aanlegdiepte die het PvE
   Functionele eisen vrijverval riolering van Rotterdam voor *nieuw* gebied stelt, en in

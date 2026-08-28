@@ -15,15 +15,24 @@ put = ["Put"]
 # Valput en de rest via de ontologie.
 rioolput = ["Rioolput"]
 vrijvervalleiding = ["VrijvervalRioolleiding"]
+# Issue #82: de populatie van TOP-006, TOP-010 en TOP-011 -- de drie checks die twee
+# leidingen naast elkaar leggen. Beide partijen van een paar moeten hieronder vallen. Een
+# duiker hoort erbij (hij voert vrijverval water en ligt in hetzelfde vlak), een drain, een
+# aansluitleiding en een mechanische leiding niet: een kruising van vrijverval met
+# drukriolering of met een drain is geen gebrek. Alle drie hangen in de GWSW-ontologie
+# rechtstreeks onder Leiding en niet onder VrijvervalRioolleiding, dus zij zaten wel in de
+# rol `streng` en niet in `vrijvervalleiding`. Zie BO-69.
+nabijheidsleiding = ["VrijvervalRioolleiding", "Duiker"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
 # Mechanisch riool wordt zelf niet getoetst (zie het checkregister): geen enkele
 # NET-check toetst het mechanische riool inhoudelijk, want zij selecteren op
 # `vrijvervalleiding`. De checks op de bredere rol `streng` (`[klassen] streng =
-# ["Leiding"]`) zien het wél -- ADM-002/003/010/011 en TOP-001 onder meer, en in de
-# praktijk melden vooral TOP-010 en TOP-011 erop; wat zij erop melden houdt
-# `[rapport] onderdruk_klassen` desgewenst uit de uitvoer. Deze lijst
+# ["Leiding"]`) zien het wél -- ADM-002/003/010 en TOP-001 onder meer; wat zij erop melden
+# houdt `[rapport] onderdruk_klassen` desgewenst uit de uitvoer. TOP-006, TOP-010 en
+# TOP-011 melden er sinds issue #82 niet meer op: zij draaien op `nabijheidsleiding`
+# hierboven, waar het mechanische riool buiten valt (BO-69). Deze lijst
 # heeft sinds issue #72 twee lezers, en de tweede stuurt wel degelijk uitkomsten.
 #  - `uitvoer/gpkg.py` (via `selectie.mechanischeleidingen`) bepaalt de kaartkleur: een
 #    mechanische streng blijft in de laag `strengen` maar krijgt status `grijs` zolang er

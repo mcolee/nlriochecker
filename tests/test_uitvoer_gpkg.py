@@ -1257,8 +1257,9 @@ def test_onbekend_deelstelsel_id_faalt_luid(tmp_path: Path) -> None:
 
 
 # Issue #65: onderdrukking uit `[rapport]`. De fixture: vrijvervalstreng L1 (GemengdRiool)
-# kruist persleiding L2 (Persleiding). TOP-011 meldt het paar een keer, met L1 als
-# hoofdobject en L2 als tweede object; de nulbevinding hieronder geeft L2 een eigen
+# kruist persleiding L2 (Persleiding) en duiker L3 (Duiker). TOP-011 meldt sinds issue #82
+# alleen het duikerpaar -- een persleiding valt buiten die populatie -- dus een keer, met
+# L1 als hoofdobject en L3 als tweede object; de nulbevinding hieronder geeft L2 een eigen
 # melding, zodat er iets te onderdrukken valt.
 def _run_onderdrukt(klassen: Sequence[str], checks: Sequence[str] = ()) -> CheckRun:
     """TOP-011 op de kruisingsfixture, met de twee lijsten uit `[rapport]` gezet."""

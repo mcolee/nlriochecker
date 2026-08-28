@@ -42,12 +42,12 @@ gebreken" leest.
 | TOP-003 | Streng met slechts aan een zijde een put; geometrische variant, administratieve verplichting alleen via Hyd | F | Consistentie |
 | TOP-004 | Strengeindpunt niet gesnapt op putlocatie (afstand > tolerantie) | F | Consistentie |
 | TOP-005 | Dubbele putten: twee knopen binnen tolerantie (bijv. 0,30 m) | F | Compleetheid |
-| TOP-006 | Dubbel ingetekende of (deels) overlappende strengen | F | Compleetheid |
+| TOP-006 | Dubbel ingetekende of (deels) overlappende strengen. Beide leidingen van een paar moeten een `VrijvervalRioolleiding` of een `Duiker` zijn (`[klassen] nabijheidsleiding`); drains, mechanische leidingen en aansluitleidingen vallen erbuiten, want een vrijvervalriool dat daar dwars doorheen ligt is geen gebrek. v0.9 zei "strengen" zonder die afbakening; afwijking in BO-69 (issue #82) | F | Compleetheid |
 | TOP-007 | Nul-lengte, zelfkruisende of anderszins degeneratieve geometrie | F | Consistentie |
 | TOP-008 | Vrijvervalstreng niet recht van put tot put (bogen, knikpunten zonder put) | F | Consistentie |
 | TOP-009 | Objecten buiten beheergebied of buiten valide RD-bereik, ontbrekende coordinaten | F | Nauwkeurigheid |
-| TOP-010 | Streng met buffer op basis van diameter kruist of raakt andere strengen | F | Plausibiliteit |
-| TOP-011 | Hartlijnkruisingen strengen onderling (zonder buffer) | W | Plausibiliteit |
+| TOP-010 | Streng met buffer op basis van diameter kruist of raakt andere strengen. Zelfde populatie-afbakening als TOP-006: beide leidingen van een paar zijn een `VrijvervalRioolleiding` of een `Duiker` (BO-69, issue #82) | F | Plausibiliteit |
+| TOP-011 | Hartlijnkruisingen strengen onderling (zonder buffer). Zelfde populatie-afbakening als TOP-006 (BO-69, issue #82) | W | Plausibiliteit |
 | TOP-012 | Streng met dezelfde put aan begin- en eindpunt | F | Consistentie |
 | TOP-013 | Meer dan twee parallelle strengen tussen hetzelfde putpaar | W | Plausibiliteit |
 | TOP-014 | Meer dan vier aansluitende strengen op een put | W | Plausibiliteit |

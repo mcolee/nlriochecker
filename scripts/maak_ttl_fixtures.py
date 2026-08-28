@@ -47,7 +47,11 @@ gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
 gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
-gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+# Drain en Aansluitleiding hangen in de GWSW-ontologie rechtstreeks onder Leiding en
+# niet onder VrijvervalRioolleiding (geverifieerd in de gebundelde ontologie); de
+# prelude zei dat van Drain tot issue #82 verkeerd.
+gwsw:Drain rdfs:subClassOf gwsw:Leiding .
+gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 """
 
@@ -311,20 +315,96 @@ FIXTURES["top011_hartlijnkruising.ttl"] = (
     + leiding("L2", "2", [(1025.0, 1975.0), (1025.0, 2025.0)], "PutC", "PutD"),
 )
 
-# Issue #65: dezelfde kruising, maar streng 2 is een persleiding. TOP-011 meldt het paar
-# een keer, met de vrijvervalstreng als hoofdobject en de persleiding als tweede object;
-# die melding hoort te blijven staan als `[rapport] onderdruk_klassen` op de mechanische
-# wortel staat, want de onderdrukking kijkt naar het hoofdobject en niet naar object2.
+
+# Issue #82: TOP-006, TOP-010 en TOP-011 toetsen alleen paren waarvan beide leidingen een
+# VrijvervalRioolleiding of een Duiker zijn. Twee groepen van elk drie paren, met dezelfde
+# drie partnerklassen: bovenin kruist de partner de vrijvervalstreng (TOP-010 en TOP-011),
+# onderin ligt hij er over zijn volle lengte op (TOP-006). Alleen het duikerpaar hoort in
+# beide groepen te melden; het drain- en het aansluitleidingpaar vallen buiten de populatie.
+def _kruispaar(nummer: int, y: float, partner: str, klasse: str) -> str:
+    """Een vrijvervalstreng met een kruisende partner, beide met diameter 400."""
+    return (
+        put(f"KruisA{nummer}", f"KA{nummer}", 1000.0, y)
+        + put(f"KruisB{nummer}", f"KB{nummer}", 1050.0, y)
+        + put(f"KruisC{nummer}", f"KC{nummer}", 1025.0, y - 25.0)
+        + put(f"KruisD{nummer}", f"KD{nummer}", 1025.0, y + 25.0)
+        + leiding(
+            f"V{nummer}",
+            f"V{nummer}",
+            [(1000.0, y), (1050.0, y)],
+            f"KruisA{nummer}",
+            f"KruisB{nummer}",
+            kenmerken=maat(f"V{nummer}", 400, 400),
+        )
+        + leiding(
+            partner,
+            partner,
+            [(1025.0, y - 25.0), (1025.0, y + 25.0)],
+            f"KruisC{nummer}",
+            f"KruisD{nummer}",
+            klasse=klasse,
+            kenmerken=maat(partner, 400, 400),
+        )
+    )
+
+
+def _overlappaar(nummer: int, y: float, partner: str, klasse: str) -> str:
+    """Een vrijvervalstreng met een partner die er over zijn volle lengte op ligt.
+
+    Zonder maatvoering, zodat TOP-010 hier geen buffer heeft en alleen TOP-006 spreekt.
+    """
+    return (
+        put(f"OverA{nummer}", f"OA{nummer}", 1000.0, y)
+        + put(f"OverB{nummer}", f"OB{nummer}", 1050.0, y)
+        + leiding(
+            f"W{nummer}",
+            f"W{nummer}",
+            [(1000.0, y), (1050.0, y)],
+            f"OverA{nummer}",
+            f"OverB{nummer}",
+        )
+        + leiding(
+            partner,
+            partner,
+            [(1000.0, y), (1050.0, y)],
+            f"OverA{nummer}",
+            f"OverB{nummer}",
+            klasse=klasse,
+        )
+    )
+
+
+FIXTURES["top_nabijheid_scope.ttl"] = (
+    "alleen het duikerpaar hoort te melden; de drain en de aansluitleiding vallen buiten "
+    "de populatie van TOP-006, TOP-010 en TOP-011 (issue #82)",
+    _kruispaar(1, 2000.0, "KruisDrain", "Drain")
+    + _kruispaar(2, 2100.0, "KruisAansluiting", "Aansluitleiding")
+    + _kruispaar(3, 2200.0, "KruisDuiker", "Duiker")
+    + _overlappaar(1, 2400.0, "OverDrain", "Drain")
+    + _overlappaar(2, 2500.0, "OverAansluiting", "Aansluitleiding")
+    + _overlappaar(3, 2600.0, "OverDuiker", "Duiker"),
+)
+
+# Issue #65: dezelfde kruising, maar streng 2 is een persleiding. Streng 3 is sinds issue
+# #82 een duiker en levert het paar dat TOP-011 nog meldt: de persleiding valt sindsdien
+# buiten de populatie van die check. TOP-011 meldt het paar een keer, met de
+# vrijvervalstreng als hoofdobject en de duiker als tweede object; die melding hoort te
+# blijven staan als `[rapport] onderdruk_klassen` op de klasse van het tweede object
+# staat, want de onderdrukking kijkt naar het hoofdobject en niet naar object2. De
+# persleiding blijft in de fixture: zij draagt de mechanische kleuring in de GIS-uitvoer
+# en de nulmetingmelding die op klasse onderdrukt wordt.
 FIXTURES["onderdruk_persleiding.ttl"] = (
-    "een vrijvervalstreng kruist een persleiding; onderdrukking per klasse (issue #65)",
+    "een vrijvervalstreng kruist een persleiding en een duiker; onderdrukking per klasse "
+    "(issue #65, populatie versmald in #82)",
     put("PutA", "A", 1000.0, 2000.0)
     + put("PutB", "B", 1050.0, 2000.0)
     + put("PutC", "C", 1025.0, 1975.0)
     + put("PutD", "D", 1025.0, 2025.0)
+    + put("PutE", "E", 1035.0, 1975.0)
+    + put("PutF", "F", 1035.0, 2025.0)
     + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
-    + leiding(
-        "L2", "2", [(1025.0, 1975.0), (1025.0, 2025.0)], "PutC", "PutD", klasse="Persleiding"
-    ),
+    + leiding("L2", "2", [(1025.0, 1975.0), (1025.0, 2025.0)], "PutC", "PutD", klasse="Persleiding")
+    + leiding("L3", "3", [(1035.0, 1975.0), (1035.0, 2025.0)], "PutE", "PutF", klasse="Duiker"),
 )
 
 # TOP-013: drie strengen tussen hetzelfde putpaar.
@@ -2127,6 +2207,11 @@ FIXTURES["selectie_rollen.ttl"] = (
     # geen mechanische leiding (issue #62).
     + leiding(
         "Loos2", "Loos2", [(1300.0, 2000.0), (1300.0, 2050.0)], "Loos1", None, klasse="LozeLeiding"
+    )
+    # Een duiker is wel een gwsw:Leiding maar geen vrijvervalrioolleiding; hij hoort wel
+    # bij de rol `nabijheidsleidingen`, en die grens is zonder hem niet zichtbaar (#82).
+    + leiding(
+        "Duiker1", "Duiker1", [(1000.0, 2200.0), (1050.0, 2200.0)], None, None, klasse="Duiker"
     )
     # Oppervlaktewater is lijnvormig en komt dus bij de verbindingen terecht.
     + leiding("Sloot1", "Sloot1", [(1000.0, 2100.0), (1250.0, 2100.0)], None, None, klasse="Sloot"),

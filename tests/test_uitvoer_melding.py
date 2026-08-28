@@ -350,11 +350,14 @@ def test_prioriteit_volgt_dezelfde_regel_als_bij_een_eigen_check() -> None:
 
 
 # Issue #65: onderdrukking per klasse en per check, in `bouw_meldingenstroom` en nergens
-# anders. De fixture: vrijvervalstreng L1 kruist persleiding L2. TOP-011 meldt het paar
-# een keer, met L1 als hoofdobject en L2 als tweede object; daarnaast levert deze kleine
-# fixture zeven SIG-nulklassemeldingen zonder hoofdobject, die hier buiten beschouwing
-# blijven (`_zonder_signalen`) behalve waar juist bewezen wordt dat ze blijven staan.
+# anders. De fixture: vrijvervalstreng L1 kruist persleiding L2 en duiker L3. TOP-011
+# meldt sinds issue #82 alleen het duikerpaar -- een persleiding valt buiten die
+# populatie -- dus een keer, met L1 als hoofdobject en L3 als tweede object; daarnaast
+# levert deze kleine fixture SIG-nulklassemeldingen zonder hoofdobject, die hier buiten
+# beschouwing blijven (`_zonder_signalen`) behalve waar juist bewezen wordt dat ze blijven
+# staan.
 PERSLEIDING = "http://example.org/toets#L2"
+DUIKER = "http://example.org/toets#L3"
 VRIJVERVAL = "http://example.org/toets#L1"
 
 
@@ -387,24 +390,26 @@ def test_zonder_lijsten_verandert_er_niets() -> None:
 def test_onderdrukking_per_klasse_haalt_het_hoofdobject_weg_en_laat_het_tweede_object_staan() -> (
     None
 ):
-    """De persleiding verliest haar nulmetingmelding; de kruisingsmelding op de
-    vrijvervalstreng, die de persleiding als object2 noemt, blijft."""
-    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
-    stroom = bouw_meldingenstroom(
-        _run_onderdrukt(["MechanischeTransportleiding"], [], nul), RUNDATUM
-    )
+    """De duiker verliest haar nulmetingmelding; de kruisingsmelding op de
+    vrijvervalstreng, die de duiker als object2 noemt, blijft.
+
+    De onderdrukte klasse is die van het tweede object, want alleen dan bewijst de test
+    iets: viel de melding op object2 weg, dan zou zij hier verdwijnen.
+    """
+    nul = _nulbevinding(object_uri=DUIKER, object_label="3", objecttype="Duiker")
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Duiker"], [], nul), RUNDATUM)
 
     over = _zonder_signalen(stroom.meldingen)
     assert [m.object_uri for m in over] == [VRIJVERVAL]
-    assert over[0].object2_uri == PERSLEIDING
+    assert over[0].object2_uri == DUIKER
     # Een: TOP-011 meldt het paar een keer, met de vrijvervalstreng als hoofdobject, dus
-    # alleen de nulmetingmelding op de persleiding valt hier weg. Ze staat in beide
+    # alleen de nulmetingmelding op de duiker valt hier weg. Ze staat in beide
     # tellingen: onder haar wortel en onder haar check-ID.
-    assert stroom.onderdrukking.per_klasse == {"MechanischeTransportleiding": 1}
+    assert stroom.onderdrukking.per_klasse == {"Duiker": 1}
     assert stroom.onderdrukking.per_check == {"NULMETING-Put_HoogtePut_card": 1}
     assert stroom.onderdrukking.totaal == 1
     assert stroom.onderdrukking.actief
-    assert stroom.onderdrukking.klassen == ("MechanischeTransportleiding",)
+    assert stroom.onderdrukking.klassen == ("Duiker",)
 
 
 def test_onderdrukking_per_check_gaat_voor_en_telt_een_melding_maar_een_keer() -> None:

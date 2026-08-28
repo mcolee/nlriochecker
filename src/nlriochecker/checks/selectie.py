@@ -204,6 +204,29 @@ def vrijvervalrioolleidingen(context: CheckContext) -> list[Conduit]:
     )
 
 
+def nabijheidsleidingen(context: CheckContext) -> list[Conduit]:
+    """De leidingen waarvan de onderlinge ligging in het platte vlak getoetst wordt.
+
+    Een *rol*: geen enkele klasse dekt hem. TOP-006 (overlap), TOP-010 (buisbuffer) en
+    TOP-011 (hartlijnkruising) leggen twee leidingen naast elkaar en vragen of ze elkaar
+    in de weg liggen. Die vraag is alleen zinnig als beide leidingen in hetzelfde vlak
+    vrijverval water voeren: een `VrijvervalRioolleiding` of een `Duiker` ("een leiding
+    die oppervlaktewater-elementen verbindt"). Een kruising van vrijverval met
+    drukriolering is geen gebrek -- de persleiding ligt er nu eenmaal doorheen -- en
+    hetzelfde geldt voor een drain en voor een aansluitleiding naar een kolk of perceel.
+
+    Ligt precies tussen twee bestaande rollen in, en beide zijn hier verkeerd: `leidingen`
+    is te breed (dat is elke `gwsw:Leiding`, dus ook het persnet, de drains en de loze
+    leidingen) en `vrijvervalrioolleidingen` te smal, want `Duiker` hangt in de ontologie
+    rechtstreeks onder `Leiding`. `Drain` en `Aansluitleiding` doen dat ook, en die blijven
+    er juist buiten -- de grens is dus geen enkele tak van de hierarchie. Zie issue #82 en
+    BO-69.
+    """
+    return _verbindingen(
+        context, "sel:nabijheidsleidingen", context.config.klassen.nabijheidsleiding
+    )
+
+
 def overstortleidingen(context: CheckContext) -> list[Conduit]:
     """De overstortleidingen: `gwsw:Overstortleiding`."""
     return _verbindingen(context, "sel:overstortleidingen", context.config.klassen.overstortleiding)
@@ -322,6 +345,7 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "hulpstukken": hulpstukken,
     "leidingen": leidingen,
     "vrijvervalrioolleidingen": vrijvervalrioolleidingen,
+    "nabijheidsleidingen": nabijheidsleidingen,
     "overstortleidingen": overstortleidingen,
     "bergbezinkleidingen": bergbezinkleidingen,
     "vuilwaterleidingen": vuilwaterleidingen,
@@ -349,6 +373,7 @@ _ROL_VELDEN: dict[str, str] = {
     "hulpstukken": "hulpstuk",
     "leidingen": "streng",
     "vrijvervalrioolleidingen": "vrijvervalleiding",
+    "nabijheidsleidingen": "nabijheidsleiding",
     "overstortleidingen": "overstortleiding",
     "bergbezinkleidingen": "bergbezinkleiding",
     "vuilwaterleidingen": "vuilwater",

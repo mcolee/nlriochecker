@@ -69,11 +69,15 @@ ROLLENSET_AANTALLEN = {
     # het wordt hier alleen zichtbaar nu de fixture een hulpstuk draagt (issue #60).
     "functieloze_knopen": 2,
     "hulpstukken": 1,
-    # Zes: L1 t/m L4, de persleiding P1 en de loze leiding Loos2 -- die laatste is een
-    # gwsw:Leiding en telt dus mee (issue #62).
-    "leidingen": 6,
+    # Zeven: L1 t/m L4, de persleiding P1, de loze leiding Loos2 -- die laatste is een
+    # gwsw:Leiding en telt dus mee (issue #62) -- en de duiker Duiker1 (issue #82).
+    "leidingen": 7,
     "lozeleidingen": 1,
     "vrijvervalrioolleidingen": 4,
+    # Vijf: de vier vrijvervalleidingen plus de duiker. Precies het verschil dat deze
+    # rol bestaansrecht geeft; zonder de duiker zou hij niet van `vrijvervalrioolleidingen`
+    # te onderscheiden zijn (issue #82).
+    "nabijheidsleidingen": 5,
     "overstortleidingen": 1,
     "bergbezinkleidingen": 1,
     "vuilwaterleidingen": 1,
@@ -173,7 +177,7 @@ def test_putten_zit_echt_binnen_netwerkknopen(rollenset: GwswDataset) -> None:
 
 
 def test_vrijverval_zit_echt_binnen_leidingen(rollenset: GwswDataset) -> None:
-    """Een persleiding en een loze leiding zijn wel `gwsw:Leiding`, geen vrijvervalrioolleiding."""
+    """Persleiding, loze leiding en duiker zijn wel `gwsw:Leiding`, geen vrijvervalrioolleiding."""
     context = context_van(rollenset)
     vrijverval = {conduit.uri for conduit in vrijvervalrioolleidingen(context)}
     alle = {conduit.uri for conduit in leidingen(context)}
@@ -181,8 +185,9 @@ def test_vrijverval_zit_echt_binnen_leidingen(rollenset: GwswDataset) -> None:
     buiten = {conduit.label for conduit in leidingen(context)} - {
         conduit.label for conduit in vrijvervalrioolleidingen(context)
     }
-    # Loos2 valt er sinds issue #62 ook buiten: LozeLeiding hangt onder Leiding.
-    assert buiten == {"P1", "Loos2"}
+    # Loos2 valt er sinds issue #62 ook buiten: LozeLeiding hangt onder Leiding. Duiker1
+    # ook, en die hoort sinds issue #82 juist wel bij `nabijheidsleidingen`.
+    assert buiten == {"P1", "Loos2", "Duiker1"}
 
 
 def test_subklassen_tellen_mee(rollenset: GwswDataset) -> None:

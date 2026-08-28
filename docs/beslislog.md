@@ -3586,3 +3586,83 @@ check-ID voor de bovenmaaiveld-helft, zodat die een eigen ernst kan krijgen (ver
 "één ernst per ID" uit het richtingscluster, #79 §3). De diepte per stelseltype of per
 leidingklasse differentiëren (verworpen: de meting onderbouwt dat niet, en het maakt van één
 drempel een staffel die niemand kan navertellen).
+
+### BO-69 TOP-006, TOP-010 en TOP-011 toetsen alleen vrijverval tegen vrijverval of duiker
+
+**Wat.** De drie checks die twee leidingen naast elkaar leggen -- TOP-006 (overlap over lengte),
+TOP-010 (buisbuffer op de diameter) en TOP-011 (hartlijnkruising) -- draaien niet langer op de
+brede rol `leidingen` maar op een nieuwe, engere rol `nabijheidsleidingen`. **Beide** partijen van
+een paar moeten erin zitten. De klassen staan als `[klassen] nabijheidsleiding` in beide
+configbestanden en als default in `ClassRoots`, niet in de code:
+`VrijvervalRioolleiding` en `Duiker`. Buiten de populatie vallen daarmee de drains, het
+mechanische riool en de aansluitleidingen. ID's, ernst en dimensie van de drie checks blijven
+ongewijzigd; `notes()` van alle drie verantwoordt voortaan hoeveel leidingen buiten de scope
+vielen.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08 (PRE-3 plus vervolgvraag V3),
+uit de checkaudit (`docs/checks-audit-2026-08.md`, TOP-011 is daar als enige met 🟠 scope-bug
+gemarkeerd). De aanleiding is de steekproefbeoordeling van `Ho6V0440-Ho6V0436-1`: *"Let op:
+kruising vrijverval riool met mechanisch riool is geen probleem. Deze check zou alleen kruisingen
+van vrijverval leidingen moeten checken (en duikers, exclusief drains)."* Een persleiding ligt
+onder een straat nu eenmaal dwars door het vrijvervalnet heen, en een drain evengoed; die
+kruising is geen datakwaliteitsgebrek maar de normale ondergrond. Wat de check bedoelt te vinden
+-- twee buizen die elkaar in de weg liggen -- geldt alleen tussen leidingen die in hetzelfde vlak
+vrijverval water voeren.
+
+**Waarom de duiker er wél bij hoort en de aansluitleiding niet.** `Duiker` is in het GWSW "een
+leiding die oppervlaktewater-elementen verbindt": vrijverval, in hetzelfde vlak, en een
+doorkruising ervan is een echt conflict. `Aansluitleiding` ("een leiding voor de aanvoer van
+afvalwater", de kolk- en perceelaansluiting) voert óók vrijverval water, en een letterlijke lezing
+van PRE-3 zou haar dus binnen laten; de auteur heeft haar op 28-08 expliciet buiten de toets
+gehouden. Reden: een aansluitleiding loopt per definitie van de gevel of de kolk dwars naar het
+hoofdriool en kruist daarbij routinematig andere leidingen; die kruisingen dragen geen
+handelingsperspectief. Dat is een bewuste afwijking van de letterlijke PRE-3-tekst en staat
+daarom hier.
+
+**Wat de ontologie zegt** (gebundelde GWSW-ontologie, geverifieerd 28-08). `VrijvervalRioolleiding`
+hangt onder `Rioolleiding` onder `Leiding`. `Duiker`, `Drain` én `Aansluitleiding` hangen alle
+drie **rechtstreeks** onder `Leiding` en niet onder `VrijvervalRioolleiding`. De grens van deze rol
+volgt dus geen enkele tak van de hierarchie -- ze is een opsomming, en daarom een rol met een
+eigen `[klassen]`-lijst en geen bestaande selectie. `gwsw:Aansluitleiding` draagt in de ontologie
+het Engelse label "Drain (EN)"; dat is een labelkwestie en zegt niets over de klassenhierarchie.
+
+**Wat de meting zegt** (audit 27-08, `scripts/checkaudit_meting.py`, De Wolden en Hoogeveen).
+TOP-006 gaf 81 fouten, waarvan 36 vrijverval x vrijverval, 30 mechanisch x vrijverval en 15 met
+een drain, duiker of loze leiding erin. TOP-010 gaf 2.184 fouten: 1.189 vrijverval x vrijverval,
+414 met een drain, 204 met een duiker, 171 met een mechanische leiding en 302 met een
+aansluitleiding. TOP-011 gaf 1.872 waarschuwingen: 1.024 vrijverval x vrijverval, 390 met een
+drain, 170 met een duiker, 170 met een mechanische leiding en 211 met een aansluitleiding. Met
+alleen de drains en het persnet eruit blijven er 39, 1.359 en 1.161 over; met de aansluitleidingen
+er ook uit verliest TOP-010 er nog 302 en TOP-011 er nog 149. De hermeting op de volle dataset
+hoort bij de blokregie, niet bij dit besluit.
+
+**Waarom een eigen index en niet een filter op `_Topologie`.** `_Topologie.lined` draagt élke
+leiding met geometrie, en dat moet zo blijven: TOP-021 vraagt of er *enige* streng langs een put
+doorloopt, en TOP-001 of er *enige* streng op aansluit. De drie nabijheidschecks krijgen daarom
+een eigen structuur `_Nabijheid` (leidingen, STRtree, uiteinden, plus de telling van wat erbuiten
+viel) die zelf over de leidingenrol loopt. Dat is bewust geen goedkopere afgeleide van
+`_Topologie`: zou `_Nabijheid` die aanroepen, dan zou de AST-drifttest van issue #64 de rollen
+`netwerkknopen` en `vrijvervalrioolleidingen` aan TOP-006 en TOP-011 blijven toeschrijven,
+terwijl die twee checks er sinds dit besluit niets meer mee doen. De prijs is één extra pas over
+de leidingen om hun uiteinden te bepalen.
+
+**Waarom `notes()` telt wat erbuiten viel.** Stilte leest als "alles gecontroleerd" (de regel uit
+`CLAUDE.md`). Een versmalde populatie die nergens genoemd wordt maakt van een daling in de
+bevindingen een onzichtbare keuze. De toelichting noemt de klassen uit de configuratie en het
+aantal leidingen dat erbuiten viel, zodat rapport en GeoPackage de versmalling dragen.
+
+**Correctie in de fixtures.** De gedeelde prelude van `scripts/maak_ttl_fixtures.py` verklaarde
+`gwsw:Drain` als subklasse van `gwsw:VrijvervalRioolleiding`. Dat is onjuist -- de ontologie hangt
+hem onder `Leiding` -- en het zou de nieuwe populatiegrens in elke fixture wegpoetsen. De prelude
+volgt nu de ontologie en draagt ook `gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding`. Geen
+enkele bestaande fixture had een `Drain`-instantie, dus geen enkele uitslag verandert erdoor.
+
+**Alternatieven.** De rol beperken tot `vrijvervalrioolleidingen` (verworpen: een duiker is
+vrijverval en een doorkruising ervan is een echt conflict; de auteur noemt hem expliciet).
+`Aansluitleiding` erbij (verworpen door de auteur; zie hierboven -- het kost 302 respectievelijk
+149 meldingen zonder handelingsperspectief). Alleen het hoofdobject beperken en de tegenpartij vrij
+laten (verworpen: dan blijft precies de gemelde kruising vrijverval x persleiding staan, alleen
+met het andere object voorop). De uitkomst laten staan en op `[rapport] onderdruk_klassen`
+leunen (verworpen: onderdrukking werkt op het hoofdobject en niet op `object2_uri`, dus een
+kruising met een persleiding als tegenpartij blijft er hoe dan ook staan -- en het zou een
+scope-fout tot een uitvoerinstelling maken).
