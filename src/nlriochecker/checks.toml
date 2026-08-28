@@ -318,9 +318,12 @@ wandruwheid_schalen = [1.0, 10.0]
 # afwijking is vastgelegd in BO-44.
 ahn_afwijking_waarschuwing_m = 0.10
 ahn_afwijking_fout_m = 0.25
-# HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. Uit het
-# checkregister: "meer dan 3 m eronder".
-bob_maximale_diepte_m = 3.0
+# HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. Het checkregister
+# zegt "meer dan 3 m eronder"; dat is de aanlegdiepte die het PvE Functionele eisen
+# vrijverval riolering van Rotterdam voor NIEUW gebied stelt. In bestaand gebied ligt
+# riool legitiem dieper (bergings- en transportriolen) en een landelijke maximumnorm
+# bestaat niet, dus 4,0 m = die ontwerpnorm plus marge. Zie BO-68.
+bob_maximale_diepte_m = 4.0
 # HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng. Het
 # checkregister noemt "onder drempel" en "boven drempel" zonder getal;
 # projectkeuze, geen externe bron.

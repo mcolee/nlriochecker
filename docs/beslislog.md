@@ -3516,3 +3516,63 @@ populatie niet zien). De rol `lozingspunten` zelf versmallen (verworpen: NET-001
 dan elke vuilwaterstreng die op een lozingsput eindigt als onbereikbaar). `Lozingspunt` als
 wortel opnemen (verworpen: `LozingspuntBodem` hangt eronder). EXT-007 helemaal laten vervallen
 (verworpen: de 39 meldingen op uitlaatconstructies zijn wél een signaal).
+
+### BO-68 HGT-003: de maximale diepteligging gaat van 3,0 naar 4,0 m
+
+**Wat.** De drempel `bob_maximale_diepte_m` gaat van 3,0 naar **4,0 m**: hoe diep een BOB onder
+het AHN-maaiveld mag liggen voordat HGT-003 dat onaannemelijk noemt. De waarde staat op de drie
+gebruikelijke plekken (default in `CheckThresholds`, `src/nlriochecker/checks.toml` en
+`configs/dewoldenhoogeveen.toml`) en nergens anders. De tweede tak van de check -- een BOB bóven
+het AHN-maaiveld -- verandert niet: die is altijd fout en kent geen drempel. ID, ernst (F) en
+dimensie (Plausibiliteit) blijven zoals ze waren.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, HGT-003; het diepteligging-punt van #69). De 3,0 m kwam uit het
+checkregister v0.9 ("meer dan 3 m eronder") en droeg geen externe bron. De research van 28-08
+levert er wel een: het *PvE Functionele eisen vrijverval riolering* van de gemeente Rotterdam
+(https://www.rotterdam.nl/media/2019) stelt de maximale aanlegdiepte -- BOB ten opzichte van
+maaiveld -- in **nieuw** gebied op 3,0 m. Een landelijke máximumnorm bestaat niet; de Leidraad
+Riolering normeert de mínimale gronddekking, niet de maximale diepte. In bestaand gebied ligt
+riool legitiem dieper (bergings- en transportriolen), en de check draait op bestaand gebied. 4,0 m
+is daarom die ontwerpnorm plus marge: onder de 4 m is een diepe ligging normaal, erboven is zij
+het bekijken waard.
+
+**Wat de meting zegt** (audit 27-08, `scripts/checkaudit_meting.py`, De Wolden en Hoogeveen).
+HGT-003 gaf 1.090 fouten: 48 "BOB boven het AHN-maaiveld" en 1.042 "dieper dan 3 m". De verdeling
+van die diepte: minimum 3,00 m, mediaan 3,37 m, p90 4,12 m, p99 7,84 m, maximum 11,75 m. Boven
+4 m blijven er 123 over, boven 5 m 19 en boven 6 m 18. De mediaan van de huidige uitslag is dus
+gewone rioleringsdiepte, en juist daar is het handelingsperspectief het zwakst: bij 3 tot 4 m valt
+er meestal niets te herstellen. De steekproef zei hetzelfde in andere woorden
+(`Ho6H0716-Ho6H0720-1`: "goed, met dezelfde opmerking over diepteligging").
+
+**Waarom 4 en niet 5.** De audit stelde 5 m voor, als projectkeuze zonder externe bron (19
+meldingen). De auteur koos 4 m: daarmee hangt de drempel aan een gepubliceerde ontwerpnorm in
+plaats van aan de vorm van deze ene dataset, en blijft de band 4-5 m zichtbaar. Dat kost 104
+meldingen meer dan de 5 m-variant.
+
+**Waarom de titel neutraal wordt.** De titel luidde "BOB-sanity ten opzichte van AHN (boven
+maaiveld, meer dan 3 m eronder)" en droeg de drempel dus als getal, terwijl de drempel
+configureerbaar is (harde regel). Hij wordt "BOB-sanity ten opzichte van AHN (boven maaiveld of
+onaannemelijk diep eronder)". Dat is geen cosmetiek: de titel voedt ook het registeroverzicht en
+de dekkingsmatrix, dus een verouderd getal daar leest als de gehanteerde grens. Een drifttest
+(`test_hgt003_noemt_de_drempel_niet_als_getal_in_zijn_titel`) houdt hem vast. Het checkregister
+v0.9 zelf blijft ongewijzigd -- dat is een bronbestand met een eigen versienummer; deze afwijking
+ervan staat hier.
+
+**Verwacht effect op De Wolden en Hoogeveen.** De dieptemeldingen gaan van 1.042 naar ~123; de 48
+bovenmaaiveld-meldingen blijven staan, dus het totaal van HGT-003 gaat van 1.090 naar ~171. De
+bekeken populatie (22.138, analyseset) verandert niet. De hermeting hoort bij blok B van de
+auditregie, niet bij dit besluit.
+
+**Hoe de fixture de grens vasthoudt.** Streng 2 in `ext_scenario.ttl` draagt sinds dit besluit
+twee BOB's die precies om de drempel heen liggen, op het vlakke raster van 10,00 m NAP: het
+beginpunt op 6,50 (3,50 m diep, stil) en het eindpunt op 5,50 (4,50 m diep, meldt). Zonder die
+stille kant zou een latere verschuiving van de drempel geen enkele test raken.
+
+**Alternatieven.** De drempel op 5 m (het auditvoorstel; verworpen door de auteur, zie hierboven).
+Hem op 3 m laten met de registerherkomst erbij (verworpen: 1.042 meldingen waarvan de mediaan
+gewone rioleringsdiepte is, kosten de rest van de check haar geloofwaardigheid). Een tweede
+check-ID voor de bovenmaaiveld-helft, zodat die een eigen ernst kan krijgen (verworpen: botst met
+"één ernst per ID" uit het richtingscluster, #79 §3). De diepte per stelseltype of per
+leidingklasse differentiëren (verworpen: de meting onderbouwt dat niet, en het maakt van één
+drempel een staffel die niemand kan navertellen).

@@ -1987,8 +1987,11 @@ FIXTURES["ext_scenario.ttl"] = (
     + put("PuntU1", "U1", 1005.0, 1985.0, klasse="Bouwwerk", orientatie="UitlaatPunt")
     # Streng 1 loopt door pand-1 heen: EXT-001.
     + hoogteleiding("L1", "1", [EXT_A, EXT_B], "PutA", "PutB", bob=(11.00, 9.50))
-    # Streng 2 kruist water-1 en is geen zinker: EXT-003.
-    + hoogteleiding("L2", "2", [EXT_B, EXT_C], "PutB", "PutC", bob=(9.50, 6.30))
+    # Streng 2 kruist water-1 en is geen zinker: EXT-003. Haar twee BOB's zijn tegelijk
+    # de grensgevallen van HGT-003 op het vlakke raster van 10,00 m NAP: het beginpunt
+    # ligt 3,50 m onder het maaiveld en blijft stil, het eindpunt 4,50 m en meldt.
+    # De diepte-drempel ligt sinds BO-68 op 4,0 m.
+    + hoogteleiding("L2", "2", [EXT_B, EXT_C], "PutB", "PutC", bob=(6.50, 5.50))
     # Streng 3 is een zinker die water-2 kruist: een echte doorkruising die EXT-003
     # bewust niet meldt. Een zinker is in de ontologie een VrijvervalRioolleiding en
     # zit dus in de populatie.

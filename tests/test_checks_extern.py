@@ -111,6 +111,8 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
         ("EXT-007", ["U1"]),
         ("HGT-001", ["B", "E"]),
         ("HGT-002", ["C"]),
+        # Streng 1 ligt met haar begin-BOB boven het maaiveld; van streng 2 meldt alleen
+        # het eindpunt (4,50 m diep), niet het beginpunt (3,50 m).
         ("HGT-003", ["1", "2"]),
     ],
 )
@@ -301,6 +303,37 @@ def test_hgt003_meldt_beide_richtingen(config: CheckConfig, bronnen: ExternalDat
 
     assert "boven het AHN-maaiveld" in meldingen["1"]
     assert "onder het AHN-maaiveld" in meldingen["2"]
+
+
+def test_hgt003_meldt_pas_boven_de_diepte_drempel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 2 ligt aan haar beginpunt 3,50 m onder het AHN en aan haar eindpunt 4,50 m.
+
+    Met de drempel op 4,0 m (BO-68) is alleen het eindpunt een bevinding. De twee zijden
+    van dezelfde streng leggen de grens aan beide kanten vast: zonder de stille 3,50 m
+    zou een verschuiving van de drempel hier onopgemerkt blijven.
+    """
+    outcome = uitkomst("HGT-003", config, bronnen)
+    zijden = {(f.object_label, f.details["zijde"]) for f in outcome.findings}
+
+    assert ("2", "beginpunt") not in zijden
+    assert ("2", "eindpunt") in zijden
+    diep = next(f for f in outcome.findings if f.object_label == "2")
+    assert "4.50 m onder" in diep.message
+    assert diep.details["maximale_diepte_m"] == config.drempels.bob_maximale_diepte_m
+
+
+def test_hgt003_noemt_de_drempel_niet_als_getal_in_zijn_titel() -> None:
+    """De gehanteerde diepte staat in de config, niet in de titel.
+
+    Hij luidde "meer dan 3 m eronder" en bleef dat toen de drempel op 4,0 m kwam
+    (BO-68). De titel voedt ook de dekkingsmatrix en het registeroverzicht, dus een
+    getal daarin leest als de gehanteerde grens.
+    """
+    assert REGISTRY["HGT-003"].title == (
+        "BOB-sanity ten opzichte van AHN (boven maaiveld of onaannemelijk diep eronder)"
+    )
 
 
 def test_hgt001_meldt_een_maaiveld_uit_hetzelfde_hoogtemodel(

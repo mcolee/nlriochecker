@@ -55,6 +55,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **HGT-003 meldt pas boven de 4,0 m diepteligging** (issue #99, BO-68).
+  `bob_maximale_diepte_m` gaat van 3,0 naar 4,0 m: 3,0 m is de aanlegdiepte die het PvE
+  Functionele eisen vrijverval riolering van Rotterdam voor *nieuw* gebied stelt, en in
+  bestaand gebied ligt riool legitiem dieper (een landelijke maximumnorm bestaat niet).
+  Op De Wolden en Hoogeveen zakken de dieptemeldingen van **1.042 naar ~123**; de 48
+  meldingen "BOB boven het AHN-maaiveld" blijven staan, dus het totaal gaat van 1.090
+  naar ~171. De titel van de check draagt de drempel niet meer als getal ("boven maaiveld
+  of onaannemelijk diep eronder" in plaats van "meer dan 3 m eronder"), want de drempel
+  is configureerbaar.
 - **EXT-007 toetst alleen nog de lozingspunten die op oppervlaktewater lozen** (issue #94,
   BO-67). De populatie is de nieuwe rol `waterlozingspunten` (`[klassen]
   waterlozingspunt`): `Uitlaatconstructie` (met `Nooduitlaat` en `Uitstroombak` eronder),

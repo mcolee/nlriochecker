@@ -258,8 +258,10 @@ class CheckThresholds(BaseModel):
     # HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN.
     ahn_afwijking_waarschuwing_m: float = Field(default=0.10, gt=0.0)
     ahn_afwijking_fout_m: float = Field(default=0.25, gt=0.0)
-    # HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen.
-    bob_maximale_diepte_m: float = Field(default=3.0, gt=0.0)
+    # HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. 4,0 m = de
+    # ontwerpnorm voor nieuw gebied (3,0 m, PvE Rotterdam) plus marge voor bestaand
+    # gebied; een landelijke maximumnorm bestaat niet. Zie BO-68.
+    bob_maximale_diepte_m: float = Field(default=4.0, gt=0.0)
     # HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng.
     tegenverhang_licht_m: float = Field(default=0.01, gt=0.0)
     tegenverhang_fors_m: float = Field(default=0.05, gt=0.0)

@@ -213,8 +213,8 @@ gwsw:UitlaatPunt rdfs:subClassOf gwsw:Aansluitpunt .
         gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1050.0 2000.0 1090.0 2000.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
 :L2_b rdf:type gwsw:BeginpuntLeiding .
 :L2_e rdf:type gwsw:EindpuntLeiding .
-:L2_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 9.5 ] .
-:L2_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 6.3 ] .
+:L2_b gwsw:hasAspect [ rdf:type gwsw:BobBeginpuntLeiding ; gwsw:hasValue 6.5 ] .
+:L2_e gwsw:hasAspect [ rdf:type gwsw:BobEindpuntLeiding ; gwsw:hasValue 5.5 ] .
 :L2_b gwsw:hasConnection :PutB_ori .
 :L2_e gwsw:hasConnection :PutC_ori .
 :L3 rdf:type gwsw:Zinker ; rdfs:label "3" ;

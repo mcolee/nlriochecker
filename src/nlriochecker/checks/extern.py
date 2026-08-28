@@ -1058,7 +1058,7 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
     """HGT-003: een BOB boven het AHN-maaiveld of onaannemelijk diep eronder."""
 
     id = "HGT-003"
-    title = "BOB-sanity ten opzichte van AHN (boven maaiveld, meer dan 3 m eronder)"
+    title = "BOB-sanity ten opzichte van AHN (boven maaiveld of onaannemelijk diep eronder)"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
     rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
