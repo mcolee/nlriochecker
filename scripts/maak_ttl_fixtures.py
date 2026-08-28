@@ -1070,6 +1070,16 @@ FIXTURES["attr016_ronde_put_ongelijk.ttl"] = (
     + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
 )
 
+FIXTURES["attr016_ronde_put_lengte_nul.ttl"] = (
+    "put A is rond met breedte 800 en lengte 0; 0 is geen maat, dus de lengte is niet\n"
+    "# geregistreerd. Dezelfde conditie als attr016_ronde_put_ongelijk.ttl, maar de andere\n"
+    "# soort binnen die conditie -- en dus een andere boodschap (issue #92). Put B is rond\n"
+    "# met 800 bij 800 (geen bevinding).",
+    nette_put("PutA", "A", *A, VormPut_ref="Rond", BreedtePut=800, LengtePut=0)
+    + nette_put("PutB", "B", *B, VormPut_ref="Rond", BreedtePut=800, LengtePut=800)
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB"),
+)
+
 # ATTR-017: wandruwheid past niet bij het leidingmateriaal. De schaal wordt uit de
 # data zelf bepaald (de lezing met de minste afwijkingen). Hier winnen tienden van
 # een mm: bij schaal 1:10 valt maar een streng buiten zijn band, bij schaal 1:1 alle

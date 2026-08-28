@@ -55,6 +55,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **ATTR-016 scheidt een niet-geregistreerde maat van een echte tegenspraak** (issue #92).
+  De uitslag bestaat uit twee soorten die om een andere ingreep vragen: op De Wolden en
+  Hoogeveen dragen 67 van de 88 gemelde ronde putten een lengte van 0 mm -- geen meting
+  maar een gat in de aanlevering, dat de nulmeting bij 70 van de 88 ook al als
+  `LengtePut_val` meldt -- en de overige circa 21 twee echte maar ongelijke maten, de
+  eigenlijke tegenspraak tussen vorm en maten. Een maat van 0 krijgt daarom de tekst
+  "Putvorm Rond met breedte 800 mm, maar lengte 0 mm; 0 is geen maat, dus de lengte is
+  niet geregistreerd"; twee echte maten houden de bestaande tekst. **De conditie, de
+  ernst en `rondheid_tolerantie_mm` wijzigen niet**, dus het aantal blijft 88; alleen de
+  boodschap splitst. Nieuwe fixture `attr016_ronde_put_lengte_nul.ttl`.
 - **Drie meldingsteksten beweren niet langer meer dan de check meet** (issue #84, PRE-5).
   **HGT-008** laat "mogelijk zijn de BOB's verwisseld" weg: dat was een gok bovenop de
   meting, en een extreem verhang kan net zo goed een lengte- of een BOB-fout zijn of een

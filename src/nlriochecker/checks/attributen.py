@@ -730,6 +730,11 @@ class VormPutVersusAfmetingen(_PutCheck):
 
     De nulmeting toetst alleen de *aanwezigheid* van de vorm (`Put_VormPut_card`), niet
     de samenhang met de afmetingen; dit gat is dus echt.
+
+    Binnen die ene conditie zitten twee soorten, elk met een eigen boodschap
+    (`_putmaatboodschap`, issue #92): een maat van 0 mm is een niet-geregistreerde maat
+    en dus een gat in de aanlevering, twee echte maar ongelijke maten zijn de
+    tegenspraak tussen vorm en maten. De conditie zelf staat daar los van.
     """
 
     id = "ATTR-016"
@@ -746,6 +751,8 @@ class VormPutVersusAfmetingen(_PutCheck):
         breedte of lengte, dan is er geen tegenspraak vast te stellen en zwijgt de
         check; `notes()` verantwoordt die putten. De tolerantie is dezelfde als bij
         ATTR-004 (`rondheid_tolerantie_mm`, default 0): het is dezelfde soort fout.
+        De boodschap volgt uit `_putmaatboodschap`; de conditie hierboven is voor beide
+        varianten dezelfde.
         """
         tolerantie = context.config.drempels.rondheid_tolerantie_mm
 
@@ -761,8 +768,7 @@ class VormPutVersusAfmetingen(_PutCheck):
                 context,
                 node.uri,
                 node.label,
-                f"Putvorm Rond met breedte {breedte:g} mm en lengte {lengte:g} mm; een "
-                "ronde put heeft een diameter, dus breedte en lengte horen gelijk te zijn.",
+                _putmaatboodschap(breedte, lengte),
                 vorm="Rond",
                 breedte_mm=breedte,
                 lengte_mm=lengte,
@@ -786,6 +792,31 @@ class VormPutVersusAfmetingen(_PutCheck):
             f"{zonder} van de {len(rond)} ronde putten missen een breedte of een lengte en "
             "zijn niet op de verhouding getoetst."
         ]
+
+
+def _putmaatboodschap(breedte: float, lengte: float) -> str:
+    """De boodschap bij een ronde put met ongelijke maten, in twee varianten.
+
+    Een maat van 0 mm is geen meting: een put met lengte 0 bestaat niet, dus de maat is
+    niet geregistreerd. Die melding gaat over een gat in de aanlevering -- op De Wolden
+    en Hoogeveen 67 van de 88, waarvan de nulmeting het merendeel ook al als
+    `LengtePut_val` meldt. Staan er twee echte maar ongelijke maten, dan spreken vorm en
+    maten elkaar tegen, en dat is de eigen waarde van deze check. De twee vragen om een
+    andere ingreep -- de maat alsnog vullen tegenover vorm of maat corrigeren -- en
+    krijgen daarom een eigen tekst (issue #92).
+    """
+    if breedte == 0 or lengte == 0:
+        ontbreekt, aanwezig, waarde = (
+            ("lengte", "breedte", breedte) if lengte == 0 else ("breedte", "lengte", lengte)
+        )
+        return (
+            f"Putvorm Rond met {aanwezig} {waarde:g} mm, maar {ontbreekt} 0 mm; 0 is geen "
+            f"maat, dus de {ontbreekt} is niet geregistreerd."
+        )
+    return (
+        f"Putvorm Rond met breedte {breedte:g} mm en lengte {lengte:g} mm; een ronde put "
+        "heeft een diameter, dus breedte en lengte horen gelijk te zijn."
+    )
 
 
 @register

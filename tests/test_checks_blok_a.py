@@ -71,6 +71,8 @@ DEFECTEN = [
     # Alleen put A (rond, 800x1000) telt; put B (rond, 800x800) en put C (rechthoekig,
     # 800x1000) blijven stil -- de drie verificatiegevallen uit issue #39 in een fixture.
     ("attr016_ronde_put_ongelijk.ttl", "ATTR-016", ["A"]),
+    # Dezelfde conditie, de andere soort erbinnen: put A is rond met lengte 0 (issue #92).
+    ("attr016_ronde_put_lengte_nul.ttl", "ATTR-016", ["A"]),
     ("attr007_toekomstig_jaar.ttl", "ATTR-007", ["1"]),
     # ATTR-018: alleen de vrijvervalstreng en de put zonder begindatum; persleiding 3
     # valt buiten de populatie.
@@ -458,6 +460,25 @@ def test_attr016_noemt_de_vorm_en_de_twee_maten() -> None:
     assert bevinding.details["breedte_mm"] == pytest.approx(800)
     assert bevinding.details["lengte_mm"] == pytest.approx(1000)
     assert bevinding.severity.value == "F"
+
+
+def test_attr016_scheidt_een_niet_geregistreerde_maat_van_een_tegenspraak() -> None:
+    """Binnen dezelfde conditie zijn er twee soorten, en die krijgen elk hun eigen tekst.
+
+    Een maat van 0 mm is geen meting maar een niet-geregistreerde maat -- een gat in de
+    aanlevering, dat de nulmeting meestal al als `LengtePut_val` meldt. Twee echte maar
+    ongelijke maten zijn de tegenspraak tussen vorm en maten, en dat is de eigen waarde
+    van deze check (issue #92).
+    """
+    nul = uitkomst("attr016_ronde_put_lengte_nul.ttl", "ATTR-016").findings[0]
+    tegenspraak = uitkomst("attr016_ronde_put_ongelijk.ttl", "ATTR-016").findings[0]
+
+    assert "lengte 0 mm" in nul.message
+    assert "de lengte is niet geregistreerd" in nul.message
+    assert nul.details["breedte_mm"] == pytest.approx(800)
+    assert nul.details["lengte_mm"] == pytest.approx(0)
+    assert "een ronde put heeft een diameter" in tegenspraak.message
+    assert "niet geregistreerd" not in tegenspraak.message
 
 
 def test_attr016_verantwoordt_de_ronde_putten_zonder_maat() -> None:
