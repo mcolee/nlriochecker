@@ -26,9 +26,7 @@ def emit(warns=None, deny=None):
         hso["permissionDecision"] = "deny"
         hso["permissionDecisionReason"] = deny
     if warns:
-        hso["additionalContext"] = (
-            "Nudge (CLAUDE.md/analyse-harness): " + " ".join(warns)
-        )
+        hso["additionalContext"] = "Nudge (CLAUDE.md/analyse-harness): " + " ".join(warns)
     print(json.dumps({"hookSpecificOutput": hso}, ensure_ascii=False))
     sys.exit(0)
 
@@ -63,7 +61,7 @@ def rel(path):
     if not path:
         return ""
     if root != "." and path.startswith(root):
-        path = path[len(root):]
+        path = path[len(root) :]
     return path.lstrip("./")
 
 
@@ -71,7 +69,9 @@ def git(*args):
     try:
         return subprocess.run(
             ["git", "-C", root, *args],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         ).stdout
     except Exception:
         return ""
@@ -80,12 +80,18 @@ def git(*args):
 if tool in ("Edit", "Write", "MultiEdit"):
     fp = rel(ti.get("file_path", ""))
     if any(fp.startswith(d) for d in INPUT_DIRS):
-        emit(deny=f"`{fp}` ligt in een invoermap; invoerbestanden worden nooit "
-                  "overschreven (CLAUDE.md). Uitvoer hoort in uitvoer/.")
+        emit(
+            deny=f"`{fp}` ligt in een invoermap; invoerbestanden worden nooit "
+            "overschreven (CLAUDE.md). Uitvoer hoort in uitvoer/."
+        )
     for rx, gen in GENERATED:
         if rx.search(fp):
-            emit(warns=[f"`{fp}` wordt gegenereerd door `{gen}` -- bewerk de "
-                        "generator en regenereer, anders valt de drifttest."])
+            emit(
+                warns=[
+                    f"`{fp}` wordt gegenereerd door `{gen}` -- bewerk de "
+                    "generator en regenereer, anders valt de drifttest."
+                ]
+            )
     sys.exit(0)
 
 if tool == "Bash":
@@ -95,8 +101,10 @@ if tool == "Bash":
 
     for d in INPUT_DIRS:
         if re.search(r"(>>?|tee(\s+-a)?\s+)\s*['\"]?" + re.escape(d), cmd):
-            emit(deny=f"schrijft naar invoermap `{d}`; invoerbestanden worden nooit "
-                      "overschreven (CLAUDE.md).")
+            emit(
+                deny=f"schrijft naar invoermap `{d}`; invoerbestanden worden nooit "
+                "overschreven (CLAUDE.md)."
+            )
 
     warns = []
     is_commit = bool(re.search(r"\bgit\s+commit\b", cmd))
@@ -105,16 +113,20 @@ if tool == "Bash":
     if is_commit or is_push:
         branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()
         if branch == "main":
-            warns.append("je zit op `main` -- commit/push hoort op `dev` (tenzij dit "
-                         "een uitgave via scripts/uitgave.py is).")
+            warns.append(
+                "je zit op `main` -- commit/push hoort op `dev` (tenzij dit "
+                "een uitgave via scripts/uitgave.py is)."
+            )
 
     if is_commit:
         staged = git("diff", "--cached", "--name-only").splitlines()
         touches_src = any(s.startswith("src/") and s.endswith(".py") for s in staged)
         touches_changelog = "CHANGELOG.md" in staged
         if touches_src and not touches_changelog:
-            warns.append("src/ gewijzigd maar CHANGELOG.md niet gestaged -- zet een "
-                         "regel onder `## [Unreleased]` (uitgave.py weigert een lege sectie).")
+            warns.append(
+                "src/ gewijzigd maar CHANGELOG.md niet gestaged -- zet een "
+                "regel onder `## [Unreleased]` (uitgave.py weigert een lege sectie)."
+            )
 
     if warns:
         emit(warns=warns)
