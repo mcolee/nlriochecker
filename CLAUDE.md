@@ -1,5 +1,8 @@
 # Project: nlriochecker
 
+Lees vóór je code aanraakt `manifesto.md` in de repo-root (lokaal, git-ignored): het
+draagt de missie, de prioriteiten bij botsende doelen en wat we nadrukkelijk niet doen.
+
 ## Doel
 Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen:
 1. Inlezen en analyseren van de GWSW-nulmeting, aangeleverd als SHACL-validatierapporten (apps.gwsw.nl/item_validate_shacl).
