@@ -72,7 +72,6 @@ gebreken" leest.
 | ADM-008 | Putcompartimenten of -onderdelen zonder onderlinge verbinding binnen de put | W | Consistentie |
 | ADM-009 | Leiding gekoppeld aan de put als geheel waar koppeling aan een compartiment vereist is | W | Consistentie |
 | ADM-010 | Loze leiding (`LozeLeiding` en subklassen: buiten gebruik, nog in de ondergrond) waar actief riool op aansluit. Loze leidingen die een knoop delen vormen een keten; per keten in de administratieve richting: actief riool dat in een beginknoop eindigt (aanvoer), actief riool dat in een eindknoop begint (afvoer), of beide (doorgaand: het actieve riool loopt volgens het model door een buiten gebruik gestelde streng). Melding per loze streng met de keten in `cluster_id` en het aantal actieve strengen bovenstrooms als detail; de nulmeting noemt loze leidingen alleen voor attribuutgebreken, nooit voor hun plaats in het net (issue #62) | F | Consistentie |
-| ADM-011 | Loze leiding in een keten zonder aansluiting op actief riool in de afvoerrichting: geen hydraulische fout maar dode data. Zelfde ketenbouw als ADM-010; actieve strengen die een ketenknoop wel raken maar tegen de richting in of ernaast liggen staan in het detail `rakend` (issue #62) | W | Consistentie |
 
 ## ATTR: Attribuutplausibiliteit
 
@@ -202,6 +201,7 @@ uitkomst geven. De ID's worden niet hergebruikt.
 | ID | Check | Vervallen in | Reden |
 |---|---|---|---|
 | EXT-008 | BAG-verblijfsobject zonder riolering binnen X m (dekkingscheck) | v0.8 | Niet relevant voor deze opdracht: de vraag of elk pand op riolering is aangesloten hoort bij het rioleringsplan, niet bij een datakwaliteitstoets op de bestaande registratie. Bovendien zijn er panden aangeleverd en geen verblijfsobjecten, waardoor de check alleen een benadering kon geven. |
+| ADM-011 | Loze leiding in een keten zonder aansluiting op actief riool in de afvoerrichting | v0.9 | Meldde het gewenste eindbeeld als gebrek: een loze leiding is buiten gebruik gesteld, en dat zij geen verbinding meer heeft met het actieve net is precies goed. Er valt niets te herstellen. Het echte gebrek -- actief riool dat wel op een loze keten aansluit -- meldt ADM-010 (F) en dat blijft ongewijzigd. De ketenbouw blijft bestaan en telt de losgekoppelde ketens in de verantwoording van ADM-010. Zie de checkaudit (`docs/checks-audit-2026-08.md`, PRE-2), [#81](https://github.com/mcolee/nlriochecker/issues/81) en BO-60. |
 
 ## Open punten
 
@@ -223,6 +223,14 @@ uitkomst geven. De ID's worden niet hergebruikt.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-28): ADM-011 vervallen (zie de tabel Vervallen checks). De check
+meldde een loze keten zonder aansluiting op actief riool in de afvoerrichting als dode data,
+maar dat is de gewenste eindtoestand: buiten gebruik gesteld en netjes losgekoppeld. Het
+omgekeerde geval -- actief riool dat wel op een loze keten aansluit -- blijft als ADM-010 (F)
+staan, ongewijzigd, en de ketenbouw blijft in de engine. Het ID ADM-011 wordt niet hergebruikt.
+Uit de checkaudit (PRE-2, `docs/checks-audit-2026-08.md`). Zie
+[#81](https://github.com/mcolee/nlriochecker/issues/81) en BO-60.
 
 Versie 0.9, addendum (2026-08-24): ADM-010 (F) en ADM-011 (W), beide Consistentie, toegevoegd:
 loze leidingen, tot ketens gegroepeerd, waar actief riool op aansluit (doorgaand, aanvoer of

@@ -1818,7 +1818,7 @@ FIXTURES["adm009_leiding_aan_put.ttl"] = (
 """,
 )
 
-# ADM-010/ADM-011: loze leidingen in ketens (issue #62). Elke fixture bevat precies een
+# ADM-010: loze leidingen in ketens (issue #62). Elke fixture bevat precies een
 # keten en precies een geval. Streng 0 en 1 zijn actief en komen binnen (bovenstrooms 2),
 # X1 en X2 zijn loos, streng 3 is actief en gaat verder.
 FIXTURES["adm010_loze_keten_doorgaand.ttl"] = (
@@ -1865,30 +1865,16 @@ FIXTURES["adm010_loze_keten_afvoer.ttl"] = (
     + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutC", "PutD"),
 )
 
-FIXTURES["adm011_loze_keten_los.ttl"] = (
-    "loze streng X1 hangt aan geen enkele actieve streng: dode data (issue #62)",
+# Geen defect meer sinds #81: een loze keten zonder aansluiting op actief riool is de
+# gewenste eindtoestand. ADM-010 telt hem in zijn verantwoording en meldt hem niet.
+FIXTURES["adm010_loze_keten_losgekoppeld.ttl"] = (
+    "loze streng X1 hangt aan geen enkele actieve streng; geen gebrek (issue #81)",
     LOZE_KLASSE
     + put("PutB", "B", 1050.0, 2000.0)
     + put("PutC", "C", 1100.0, 2000.0)
     + leiding(
         "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
     ),
-)
-
-# ADM-011: loze streng X1 en actieve streng 9 verlaten allebei put B. In de
-# afvoerrichting komt er niets binnen en gaat er niets verder, dus de keten is
-# losgekoppeld -- maar streng 9 raakt wel een ketenknoop, en dat hoort de lezer te zien.
-FIXTURES["adm011_loze_keten_rakend.ttl"] = (
-    "loze streng X1 hangt in de afvoerrichting aan niets, maar actieve streng 9 verlaat"
-    " dezelfde put B (issue #62)",
-    LOZE_KLASSE
-    + put("PutB", "B", 1050.0, 2000.0)
-    + put("PutC", "C", 1100.0, 2000.0)
-    + put("PutE", "E", 1050.0, 2050.0)
-    + leiding(
-        "X1", "X1", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutB", "PutC", klasse="LozeLeiding"
-    )
-    + leiding("L9", "9", [(1050.0, 2000.0), (1050.0, 2050.0)], "PutB", "PutE"),
 )
 
 # --- BTR ------------------------------------------------------------------

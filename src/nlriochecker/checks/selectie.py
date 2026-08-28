@@ -243,7 +243,7 @@ def lozeleidingen(context: CheckContext) -> list[Conduit]:
     """De loze leidingen: `gwsw:LozeLeiding` en haar subklassen.
 
     Buiten gebruik, maar nog in de ondergrond. Geen vrijvervalrioolleiding, dus elke
-    check die daarop selecteert slaat ze over; ADM-010 en ADM-011 kijken juist of het
+    check die daarop selecteert slaat ze over; ADM-010 kijkt juist of het
     actieve riool er nog op aansluit.
     """
     return _verbindingen(context, "sel:lozeleidingen", context.config.klassen.loze_leiding)

@@ -322,6 +322,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   daardoor één keer als opgelost én nieuw. `schema_versie` blijft 1.0.
   `ext_watergang_buffer_m` is voortaan alleen de zoekstraal. Zie BO-43.
 
+### Verwijderd
+
+- **ADM-011 vervalt** (issue #81, BO-60). De check meldde een keten van loze leidingen die
+  in de administratieve afvoerrichting nergens op het actieve riool aansluit als dode data,
+  maar dat is juist de gewenste eindtoestand: buiten gebruik gesteld en netjes losgekoppeld.
+  Er valt niets te herstellen. ADM-010 (F) blijft ongewijzigd -- dat is het echte gebrek,
+  actief riool dat wél op een loze keten aansluit -- en de ketenbouw blijft, inclusief de
+  telling per geval in zijn verantwoording ("… losgekoppeld (… strengen)"). Op De Wolden en
+  Hoogeveen verdwijnen daarmee 16 waarschuwingen; de 38 ADM-010-fouten blijven staan. Het
+  register zet ADM-011 in de tabel *Vervallen checks*; het ID wordt niet hergebruikt.
+  ADM-011 kwam met #62 in deze zelfde nog niet uitgebrachte cyclus binnen (zie hierboven
+  onder Toegevoegd) en heeft dus nooit in een uitgave gestaan.
+
 ## [0.3.0] - 2026-08-24
 
 ### Toegevoegd

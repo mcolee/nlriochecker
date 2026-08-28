@@ -3,7 +3,8 @@
 ADM-001, ADM-004 en ADM-005 zijn geschrapt: de nulmeting dekt ze aantoonbaar. Wat
 overblijft zijn de dingen die de SHACL-meting niet ziet, hetzij omdat de fout al in
 de RDF-conversie verdwijnt (ADM-002), hetzij omdat het GWSW er geen regel voor kent
-(ADM-003, ADM-006 t/m ADM-011).
+(ADM-003, ADM-006 t/m ADM-010). ADM-011 is per BO-60 vervallen; het ID wordt niet
+hergebruikt.
 """
 
 from __future__ import annotations
@@ -499,8 +500,8 @@ class _LozeKeten:
     inkomend: tuple[Conduit, ...]
     uitgaand: tuple[Conduit, ...]
     # Actieve strengen die een ketenknoop wel raken maar niet in de afvoerrichting
-    # aansluiten: tegen de richting in, of ernaast. Ze veranderen het geval niet, maar
-    # zonder ze zou "hangt aan geen enkele actieve streng" onwaar kunnen zijn.
+    # aansluiten: tegen de richting in, of ernaast. Ze veranderen het geval niet en
+    # staan als detail `rakend` bij de melding.
     rakend: tuple[Conduit, ...]
     bovenstrooms: int
 
@@ -517,7 +518,7 @@ class _LozeKeten:
 
 
 def _loze_ketens(context: CheckContext) -> tuple[_LozeKeten, ...]:
-    """De ketens van loze leidingen; een keer per context, gedeeld door ADM-010 en ADM-011."""
+    """De ketens van loze leidingen; een keer per context gebouwd, voor ADM-010."""
     return context.cached("adm010:ketens", lambda: _bouw_loze_ketens(context))
 
 
@@ -655,21 +656,8 @@ def _labels(strengen: tuple[Conduit, ...]) -> str:
     return ", ".join(conduit.label or conduit.uri for conduit in strengen)
 
 
-def _rakende_zin(keten: _LozeKeten) -> str:
-    """De zin over actieve strengen die een ketenknoop raken zonder erop aan te sluiten."""
-    aantal = len(keten.rakend)
-    if not aantal:
-        return ""
-    return (
-        f" Wel {vorm(aantal, 'raakt', 'raken')} "
-        f"{getal(aantal, 'actieve streng', 'actieve strengen')} een knoop van de keten "
-        f"({_labels(keten.rakend)}); dat is een aansluiting tegen de richting in of naast "
-        "de keten."
-    )
-
-
 class _LozeLeidingen(Check):
-    """Gedeelde basis voor ADM-010 (keten aan actief riool) en ADM-011 (losgekoppeld)."""
+    """Basis voor ADM-010: welke gevallen van een loze keten gemeld worden."""
 
     gevallen: frozenset[str]
 
@@ -700,8 +688,10 @@ class _LozeLeidingen(Check):
 
         Elke tekst claimt uitdrukkelijk de administratieve afvoerrichting, want dat is
         wat het geval toetst. Een actieve streng die een ketenknoop wel raakt maar tegen
-        de richting in of ernaast ligt, verandert het geval niet en wordt daarom apart
-        genoemd; zonder die zin zou "aan geen enkele actieve streng" onwaar zijn.
+        de richting in of ernaast ligt, verandert het geval niet en staat alleen in het
+        detail `rakend`. `run` roept deze methode alleen aan voor een geval uit
+        `gevallen`, dus de laatste tak is `afvoer`; `losgekoppeld` heeft sinds BO-60
+        geen tekst meer, want dat geval wordt niet gemeld.
         """
         boven = getal(keten.bovenstrooms, "actieve streng", "actieve strengen")
         omvang = f" Bovenstrooms {vorm(keten.bovenstrooms, 'ligt', 'liggen')} {boven}."
@@ -717,15 +707,10 @@ class _LozeLeidingen(Check):
                 f"({_labels(keten.inkomend)}) af op deze loze leiding, maar er gaat niets "
                 f"verder.{omvang}"
             )
-        if keten.geval == GEVAL_AFVOER:
-            return (
-                "In de administratieve afvoerrichting voert deze loze leiding af op actief "
-                f"riool ({_labels(keten.uitgaand)}), maar er komt niets binnen."
-            )
         return (
-            "In de administratieve afvoerrichting hangt deze loze leiding aan geen enkele "
-            "actieve streng: er komt niets binnen en er gaat niets verder."
-        ) + _rakende_zin(keten)
+            "In de administratieve afvoerrichting voert deze loze leiding af op actief "
+            f"riool ({_labels(keten.uitgaand)}), maar er komt niets binnen."
+        )
 
     def notes(self, context: CheckContext) -> list[str]:
         """Telt de ketens en strengen per geval, zodat de lezer het geheel ziet."""
@@ -771,21 +756,3 @@ class LozeLeidingAanActiefRiool(_LozeLeidingen):
     rollen = ("leidingen", "lozeleidingen")
     kenmerken = ()
     gevallen = frozenset({GEVAL_DOORGAAND, GEVAL_AANVOER, GEVAL_AFVOER})
-
-
-@register
-class LosgekoppeldeLozeLeiding(_LozeLeidingen):
-    """ADM-011: een keten van loze leidingen zonder aansluiting in de afvoerrichting.
-
-    Richtingsgebaseerd: er komt in de administratieve afvoerrichting niets binnen en er
-    gaat niets verder. Een actieve streng die een ketenknoop wel raakt (tegen de richting
-    in of ernaast) staat in het detail `rakend` en in de tekst.
-    """
-
-    id = "ADM-011"
-    title = "Loze leiding zonder aansluiting op actief riool in de afvoerrichting"
-    severity = Severity.WARNING
-    dimension = Dimension.CONSISTENCY
-    rollen = ("leidingen", "lozeleidingen")
-    kenmerken = ()
-    gevallen = frozenset({GEVAL_LOSGEKOPPELD})

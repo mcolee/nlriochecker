@@ -3170,3 +3170,43 @@ ernst van haar eigen meldingen en toont ze in de popup, ook als zij systemisch h
 geen uitzondering op BO-29: die regel gaat over objecten waarvan de systemische meldingen
 één van vele soorten zijn, terwijl dit vlak niets anders draagt dan de bevinding die hem
 liet bestaan.
+
+### BO-60 ADM-011 vervalt: een losgekoppelde loze leiding is de gewenste eindtoestand
+
+**Wat.** ADM-011 (W, Consistentie) vervalt. De check meldde per loze streng dat haar keten in
+de administratieve afvoerrichting nergens op het actieve riool aansluit -- geval
+`losgekoppeld` -- en noemde dat dode data. Het ID wordt niet hergebruikt; het register zet
+ADM-011 in de tabel *Vervallen checks* naast EXT-008, niet in *Geschrapte checks*, want de
+nulmeting dekt hem niet: er kijkt niets meer naar en dat is precies de bedoeling. ADM-010 (F)
+blijft ongewijzigd, inclusief zijn gevallen (`doorgaand`, `aanvoer`, `afvoer`), zijn
+detailvelden en zijn ketenbouw.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit (PRE-2,
+`docs/checks-audit-2026-08.md`). Bij de handmatige steekproef op `ID8364-ID8365-1` schreef hij:
+"dit is geen fout, maar dit is hoe het hoort te zijn: een loze leiding moet geen bovenstrooms
+in gebruik zijnde riolen hebben, want dan is hij niet loos." Een `LozeLeiding` is buiten
+gebruik gesteld; dat zij netjes van het actieve net is losgekoppeld is het eindbeeld waar het
+beheer naartoe werkt. De check meldde dus de gewenste toestand als gebrek, en er is geen
+handelingsperspectief: er valt niets te herstellen. Het omgekeerde geval -- actief riool dat
+wel op een loze keten aansluit -- is het echte gebrek en dat meldt ADM-010 al volledig.
+
+**Wat er in de engine blijft staan.** De ketenbouw (`_bouw_loze_ketens`), het geval
+`losgekoppeld` en de telling ervan in de verantwoording van ADM-010. Die verantwoording blijft
+melden hoeveel ketens en strengen er per geval zijn, dus "14 losgekoppeld (16 strengen)" staat
+nog gewoon in het rapport -- als feit over de dataset, niet als bevinding. Wat wel weg is: de
+meldingstekst voor `losgekoppeld` en de zin die daarin de actieve strengen noemde die een
+ketenknoop wel raken maar niet in de afvoerrichting aansluiten. Het detail `rakend` zelf blijft
+op de ADM-010-meldingen staan; het is daar een gemeten feit en het weghalen zou de uitvoer van
+ADM-010 veranderen, en die blijft ongemoeid.
+
+**Verwacht effect op De Wolden en Hoogeveen.** De 16 ADM-011-waarschuwingen (14 losgekoppelde
+ketens) verdwijnen; de 38 ADM-010-fouten blijven ongewijzigd ten opzichte van
+`uitvoer/audit_27082026`. De hermeting hoort bij blok A van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De conditie omkeren, zodat een loze leiding *met* bovenstrooms actief riool
+gemeld wordt (verworpen: dat is letterlijk ADM-010 en zou het ID een tweede betekenis geven,
+terwijl `vergelijk` meetmomenten op check-ID naast elkaar zet). De ernst verlagen naar een
+notitie (verworpen: een melding zonder handelingsperspectief hoort niet in de bevindingen,
+ongeacht haar gewicht; de telling in de verantwoording van ADM-010 dekt de informatiebehoefte
+al). Het ID hergebruiken voor een andere loze-leidingcheck (verworpen: harde regel, vervallen
+ID's worden nooit hergebruikt).

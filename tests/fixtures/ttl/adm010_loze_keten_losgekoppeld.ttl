@@ -34,7 +34,7 @@ gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
-# DEFECT: loze streng X1 hangt aan geen enkele actieve streng: dode data (issue #62)
+# DEFECT: loze streng X1 hangt aan geen enkele actieve streng; geen gebrek (issue #81)
 
 gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .
 
