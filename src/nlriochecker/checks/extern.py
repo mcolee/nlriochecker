@@ -958,7 +958,9 @@ class StraatZonderRiolering(_ExterneCheck):
             f"({redenen[REDEN_ONVERHARD]} met {REDEN_ONVERHARD}, "
             f"{redenen[REDEN_DRUKRIOLERING]} met {REDEN_DRUKRIOLERING}). Daar zegt het "
             "ontbreken van vrijverval niets over de datakwaliteit; ze staan grijs in de "
-            "laag `vlakken` en dragen geen melding.",
+            "laag `vlakken` en dragen geen melding. De drukriolering-uitzondering geldt "
+            "alleen waar er wél vrijverval in het straatvlak ligt maar te weinig: een "
+            "straat met nul meter is meetbaar leeg en blijft een bevinding.",
             f"Externe bronnen: {_bronregel(context)}.",
         ]
 

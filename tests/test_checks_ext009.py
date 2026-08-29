@@ -15,14 +15,25 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
+import numpy as np
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, CheckRun, run_checks
+from nlriochecker.checks.wegvakken import (
+    REDEN_DRUKRIOLERING,
+    REDEN_ONVERHARD,
+    STATUS_GRIJS,
+    STATUS_GROEN,
+    STATUS_ROOD,
+    Kenmerken,
+    classificeer,
+)
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.uitvoer.gpkg import VLAK_SOORT_WEGVAK, schrijf_geopackage
 from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.uitvoer.objectkaart import STATUSSEN
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
@@ -138,6 +149,91 @@ def test_een_ontbrekende_bron_slaat_de_check_over(config: CheckConfig) -> None:
     assert outcome.findings == []
     assert outcome.examined == 0
     assert any("laag niet aanwezig in aangeleverde data" in n for n in outcome.notes), outcome.notes
+
+
+def _kenmerken(**waarden: float | bool) -> Kenmerken:
+    """Eén kandidaat met de opgegeven kenmerken; de rest op "niets gemeten"."""
+    basis: dict[str, object] = {
+        "streng_in_cel": 0.0,
+        "put_in_cel": False,
+        "persleiding_langs": 0.0,
+        "pomp_nabij": False,
+        "aandeel_onverhard": float("nan"),
+    }
+    basis.update(waarden)
+    return Kenmerken(**{naam: np.array([waarde]) for naam, waarde in basis.items()})
+
+
+def _status(**waarden: float | bool) -> tuple[str, str]:
+    """De classificatie van één kandidaat met de standaarddrempels."""
+    return classificeer(_kenmerken(**waarden), load_check_config().drempels)[0]
+
+
+def test_genoeg_vrijverval_in_de_eigen_cel_is_bediend() -> None:
+    assert _status(streng_in_cel=0.4) == ("groen", "")
+
+
+def test_een_put_in_de_eigen_cel_bedient_de_straat_ongeacht_de_lengte() -> None:
+    """De lus- en hoefijzeruitzondering: het riool loopt door de as van de straat.
+
+    Zonder deze regel meldt de check elke hoefijzerweg als leeg, want de streng ligt daar
+    niet langs de as maar er dwars doorheen -- en dan valt maar een fractie in de cel.
+    """
+    assert _status(streng_in_cel=0.01, put_in_cel=True) == ("groen", "")
+
+
+def test_geen_vrijverval_is_een_bevinding() -> None:
+    assert _status(streng_in_cel=0.0) == ("rood", "")
+
+
+def test_een_overwegend_onverharde_straat_wordt_niet_beoordeeld() -> None:
+    status, reden = _status(streng_in_cel=0.0, aandeel_onverhard=0.9)
+
+    assert status == "grijs"
+    assert reden == REDEN_ONVERHARD
+
+
+def test_drukriolering_zondert_alleen_het_onzekere_middengebied_uit() -> None:
+    """Een pompunit naast een straat met te weinig vrijverval: niet beoordeeld.
+
+    Maar alleen als er iets ligt. Een straat met nul meter vrijverval in haar eigen cel is
+    niet onzeker maar meetbaar leeg, en die blijft een bevinding -- zonder die grens
+    verdwenen op De Wolden en Hoogeveen 31 terecht gemelde gaten uit beeld (BO-81).
+    """
+    onzeker = _status(streng_in_cel=0.1, pomp_nabij=True)
+    leeg = _status(streng_in_cel=0.0, pomp_nabij=True)
+
+    assert onzeker == ("grijs", REDEN_DRUKRIOLERING)
+    assert leeg == ("rood", "")
+
+
+def test_persleiding_langs_de_straat_telt_net_zo_als_een_pompunit() -> None:
+    assert _status(streng_in_cel=0.1, persleiding_langs=0.5) == ("grijs", REDEN_DRUKRIOLERING)
+    assert _status(streng_in_cel=0.1, persleiding_langs=0.2) == ("rood", "")
+
+
+def test_de_drie_wegvakstatussen_zijn_kaartstatussen() -> None:
+    """De laag `vlakken` schrijft ze ongewijzigd weg; een vijfde waarde mag er niet bij."""
+    assert {STATUS_ROOD, STATUS_GROEN, STATUS_GRIJS} <= set(STATUSSEN)
+
+
+def test_de_nwb_kolom_wordt_hoofdletterongevoelig_gelezen(bronnen: ExternalData) -> None:
+    """De Wolden schrijft `WEGBEHSRT`, Koekangerveld `wegbehsrt`; één lezing dekt beide."""
+    laag = bronnen.layer("nwb_wegvak")
+    assert laag is not None
+
+    assert laag.kolom("WEGBEHSRT") == laag.kolom("wegbehsrt")
+    assert set(laag.kolom("STT_NAAM")) == {
+        "Fixturestraat",
+        "Rioolstraat",
+        "Lege Laan",
+        "Grindweg",
+        "Buitenweg",
+        "Rijksweg",
+        "Fietspad",
+        "Kort Straatje",
+    }
+    assert laag.kolom("bestaat_niet") == [None] * len(laag)
 
 
 def _wegvakrijen(pad: Path) -> list[dict]:

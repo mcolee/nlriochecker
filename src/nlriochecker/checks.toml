@@ -446,10 +446,12 @@ ext_wegvak_verdichting_m = 10.0
 # De dragende maat: vrijvervalstreng in de eigen voronoi-cel gedeeld door de
 # straatlengte. Daaronder heet de straat leeg. Geijkt op de validatieset van 485
 # handmatig beoordeelde straten met `scripts/ijk_ext009.py`; zie BO-81.
-ext_wegvak_streng_in_cel = 0.25
-# Drukriolering-indicatie: een pompunit binnen deze afstand van de straat, of
-# persleiding langs de straat over meer dan dit aandeel van haar lengte. Zo'n straat
-# wordt niet beoordeeld -- daar hoeft geen vrijverval te liggen.
+ext_wegvak_streng_in_cel = 0.30
+# Drukriolering-indicatie: een pompunit binnen deze afstand van de straat, of persleiding
+# langs de straat over meer dan dit aandeel van haar lengte. Zo'n straat wordt niet
+# beoordeeld -- daar hoeft geen vrijverval te liggen -- maar alleen in het onzekere
+# middengebied: ligt er nul meter vrijverval in haar eigen cel, dan is zij meetbaar leeg
+# en blijft de melding staan. Zie BO-81.
 ext_wegvak_pomp_afstand_m = 15.0
 ext_wegvak_persleiding_aandeel = 0.3
 # Boven dit aandeel onverhard wegdek valt de straat buiten scope.

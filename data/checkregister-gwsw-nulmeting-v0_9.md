@@ -244,9 +244,9 @@ lezen als "alles gecontroleerd". Zie BO-79. (3) De check leunt op drie externe b
 register nog niet kende: NWB-wegvakken, TOP10NL `plaats_vlak` (bebouwde kom) en BGT `wegdeel`
 (verharding); ontbreekt er een, dan slaat de check over met de gebruikelijke melding. Zie
 BO-80. De regel is deterministisch en met opzet geen model: op een validatieset van 485
-handmatig beoordeelde straten haalt zij evenveel fouten als een getraind
-gradient-boosting-model, met de foutrichting naar valse alarmen. De ijking van de dragende
-drempel en de fouttabel staan in BO-81. EXT-008 blijft vervallen en is niet hergebruikt; zie de
+handmatig beoordeelde straten haalt zij 32 fouten op 478 beoordeelde straten tegen 27 op
+479 voor een getraind gradient-boosting-model, met de foutrichting naar valse alarmen. De
+ijking van de dragende drempel en de fouttabel staan in BO-81. EXT-008 blijft vervallen en is niet hergebruikt; zie de
 tabel Vervallen checks. Zie [#104](https://github.com/mcolee/nlriochecker/issues/104).
 
 Versie 0.9, addendum (2026-08-28): EXT-002 vervallen (zie de tabel Vervallen checks). De check

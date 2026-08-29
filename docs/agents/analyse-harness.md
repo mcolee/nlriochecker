@@ -88,6 +88,13 @@ zijn geen bug:
 
 - **ATTR-001** toetst de vrijverval-subset (~17603 strengen), niet alle conduits (~23440).
 - **HGT-012** leest `HoogtePut`; De Wolden levert daar **0** instanties.
+- **EXT-009** kijkt niet naar GWSW-objecten maar naar NWB-wegvakken: van de **9787**
+  wegvakken zijn er **4116** kandidaat (412 niet-gemeentelijk, 2211 pad/parkeren, 1661
+  korter dan 25 m, 1387 buiten de bebouwde kom vallen af). `examined` telt dus 4116 en niet
+  een aantal putten of strengen. De ijking en de gemeentebrede telling staan in
+  `scripts/ijk_ext009.py`; die leest alleen de drie lagen die de check nodig heeft
+  (`nwb_wegvak`, `top10nl_kom`, `bgt_wegdeel`) en slaat de panden, waterdelen en het AHN
+  over -- dat scheelt minuten en verandert niets aan de meting.
 - **Baseline ná #60–#63 (0.3.0 + Unreleased, 25-08):** HGT-001 5811 → **2847** en HGT-002
   **2132** (drempel 10 cm inclusief, BO-44); ATTR-018 **9274** (9063 putten, 211 strengen);
   TOP-022 **224** en TOP-023 **37** op 1054 T-stukken; ADM-010/011 **54** loze leidingen in 33
@@ -109,6 +116,7 @@ Bewerk de generator en regenereer; anders valt de bijbehorende drifttest:
 | Bestand | Generator |
 |---|---|
 | `tests/fixtures/ttl/*.ttl` | `scripts/maak_ttl_fixtures.py` |
+| `tests/fixtures/gis/**` | `scripts/maak_gis_fixtures.py` |
 | `docs/dekkingsmatrix.md` | `scripts/dekkingsmatrix.py` |
 
 De vocabulaire-index staat niet meer in deze repo: zij reist mee met `gwsw-orox-helpers`

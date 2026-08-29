@@ -4286,3 +4286,172 @@ melden, alleen niet als twee losse ID's.
 
 Zie [#87](https://github.com/mcolee/nlriochecker/issues/87), BO-26 en
 `docs/checks-audit-2026-08.md`.
+
+### BO-79 De derde uitvoertoestand: "niet beoordeeld" naast rood en groen
+
+**Wat.** EXT-009 kent drie uitkomsten waar elke andere check er twee heeft. Naast *geen
+riolering* (rood, een W-melding) en *wel riolering* (groen, stil) is er **niet beoordeeld**
+(grijs): een straat met overwegend onverhard wegdek, of een straat met een
+drukriolering-indicatie. De laag `vlakken` van de GeoPackage krijgt daarvoor een vijfde
+`soort` (`wegvak`) en een nieuwe kolom `status` met dezelfde waarden als de objectlagen;
+`vlakken.qml` geeft de soort drie regels, een per status.
+
+**Waarom een derde toestand.** Zonder haar zou de kaart twee ongelijke dingen op één hoop
+gooien. Een zandweg in de kom zonder riool is geen datakwaliteitsprobleem maar een straat
+waar het model niet over gaat; hem rood kleuren levert een vals alarm dat de lezer niet
+kan wegredeneren, en hem groen kleuren beweert dat er riolering ligt. Grijs zegt precies
+wat er aan de hand is, en de popup noemt de reden -- grijs zonder reden leest als "in
+orde". Dezelfde redenering als bij het mechanische riool in de objectlagen (BO-29): grijs
+betekent daar "niet beoordeeld én niets gevonden".
+
+**Waarom groen en grijs een vlak krijgen zonder melding.** Voor elke andere soort in
+`vlakken` geldt de regel "een vlak bestaat alleen als er een melding naar wijst" (BO-50,
+BO-57): de laag kan dan niet meer tonen dan de uitslag. Hier is die regel juist verkeerd,
+want de winst van deze check zit in het verschil tussen "hier is gekeken en er ligt
+riolering" en "hier is niet gekeken", en beide dragen per definitie geen melding. Een
+kaart met alleen rode straten laat de lezer raden of de rest bekeken is.
+
+**Hoe de laag toch aan de uitslag vast blijft zitten.** Drie afspraken samen.
+(1) De check legt zijn volledige oordeel in een register op de context
+(`checks/treffers.Wegvakregister`, dezelfde vorm als het trefferregister van BO-50); de
+schrijver bevraagt de NWB-laag nooit zelf, dus laag en uitslag kunnen niet uit elkaar
+lopen. (2) **Rood blijft strikt aan de meldingen hangen**: een wegvak dat het register
+rood noemt maar waarvoor déze uitvoer geen EXT-009-melding draagt -- na de afbakening tot
+een studiegebied, of na `[rapport] onderdruk_checks` -- krijgt geen rij. Anders zou de
+kaart een gebrek tonen dat in geen enkele andere uitvoervorm staat. (3) Het register wordt
+in `beperk_tot_studiegebied` op het **middelpunt** van het wegvak afgebakend, precies zoals
+`hoort_erbij` een bevinding met een eigen locatie afbakent; zo vallen de rode melding en
+het groene vlak van dezelfde straat nooit aan verschillende kanten van de gebiedsgrens.
+
+**Wat het rapport erover zegt.** De toelichting van de check telt drie dingen die anders
+stil zouden blijven: hoeveel wegvakken buiten de kandidaatselectie vielen en waarom,
+hoeveel straten groen zijn (bekeken en in orde), en hoeveel grijs, per reden. Stilte leest
+als "alles gecontroleerd", en een lijst rode straten zonder noemer zegt niets.
+
+**Wat er niet bijkomt.** Geen vijfde statuswaarde: rood, oranje, groen en grijs blijven de
+enige vier, en een wegvak gebruikt er drie van (oranje hoort bij een object met alleen
+waarschuwingen naast andere gebreken, en dat begrip bestaat hier niet). Geen extra kolommen
+voor de gemeten waarden: die staan als feiten in `popup_html`, want de lezer heeft ze nodig
+om het oordeel te begrijpen en niet om erop te filteren. `gwsw_run` telt de rijen wel apart
+in `n_wegvakken`, anders is het aantal externe vlakken niet meer uit `n_vlakken` af te
+leiden.
+
+Zie [#104](https://github.com/mcolee/nlriochecker/issues/104), BO-29, BO-50 en BO-73.
+
+### BO-80 De externe-bron-afhankelijkheid van EXT-009: NWB, TOP10NL en BGT-wegdeel
+
+**Wat.** EXT-009 leunt op drie externe lagen die het project tot nu toe niet las:
+
+- **`nwb_wegvak`** -- de NWB-wegvakken (hartlijnen kruispunt-tot-kruispunt). De laag werd
+  al geladen maar door geen enkele check gelezen; sinds deze check hoort zij bij
+  `bronrollen_met_check()` en meldt het rapport haar ontbreken als een overgeslagen check.
+  `configs/dewoldenhoogeveen.toml` zei "niet aangeleverd voor dit gebied"; dat klopte niet
+  meer (`NWB_wegvakken_DeWoldenHoogeveen.gpkg`, laag `geclipt`, 9787 wegvakken) en is
+  rechtgezet.
+- **`top10nl_kom`** -- het TOP10NL-plaatsvlak met `bebouwdekom`. Nieuwe rol met een eigen
+  laagveld (`top10nl` plus `top10nl_komlagen`), naar het patroon van de BGT-rollen: het De
+  Wolden-extract draagt twee lagen (`output` 27, `plaats_vlak` 117), dus `enige_laag`
+  volstaat er niet en gokken welke bedoeld is levert stille onzin op.
+- **`bgt_wegdeel`** -- de BGT-wegdelen, voor het aandeel onverhard wegdek. Gewone
+  BGT-rol met `bgt_wegdeellagen`; het historiefilter van `_alleen_actueel` geldt (144.008
+  objectversies, 62.108 actueel).
+
+**Kolomnamen verschillen per extract.** De Wolden schrijft `WEGBEHSRT`, `BST_CODE`,
+`WVK_ID` en `STT_NAAM`, Koekangerveld dezelfde velden in kleine letters. De lezing gaat
+daarom hoofdletterongevoelig via één helper (`VectorLayer.kolom`) en niet via twee
+codepaden -- die zouden op een dag uit elkaar lopen, en het verschil is een eigenschap van
+de levering en niet van het gegeven.
+
+**De dekkingspoort (BO-19) krijgt een uitzondering, en precies één.** `top10nl_kom` valt
+erbuiten (`externedata.ZONDER_DEKKINGSEIS`): een bebouwde kom is per definitie een
+deelgebied van het bereik -- het plaatsvlak houdt op waar het buitengebied begint, en dat
+is de bedoeling. De poort zou daar altijd afgaan, en de enige uitweg (`dekking_tolerantie_m`
+verhogen) heft haar ook voor de andere bronnen op. `bgt_wegdeel` blijft er wél onder: die
+laag komt uit hetzelfde BGT-extract als pand en waterdeel en hoort dezelfde buitenmaat te
+hebben, dus een tekort daar is wél een signaal. Wat de uitzondering kost is beperkt en
+zichtbaar: een wegvak zonder komvlak is geen kandidaat, en de toelichting van de check telt
+hoeveel wegvakken daarom afvielen.
+
+**`ext_zoekafstand_max_m` verandert niet.** Die drempel verruimt het bereik waarbinnen een
+EXT-check in een externe *laag* kijkt. EXT-009 kijkt daar hoogstens
+`ext_wegvak_wegdek_buffer_m` (3 m) ver in, ruim onder de bestaande 10 m; de 25 m van het
+straatvlak en de 15 m van de corridor zijn zoekafstanden in de GWSW-data en horen er dus
+niet bij.
+
+**Aan/uit zonder eigen schakelaar.** De spec vroeg om een schakelbare check. Die is er, en
+zonder een extra sleutel: ontbreekt een van de drie rollen, dan slaat de check over met de
+standaardmelding "laag niet aanwezig in aangeleverde data". Een project dat EXT-009 niet
+wil laat `nwb_wegvakken` of `top10nl` weg. Een tweede schakelaar naast dat gedrag zou twee
+plekken maken waar dezelfde vraag beantwoord wordt.
+
+**Vierde bron: het GWSW zelf.** De pompunits en persleidingen komen niet uit een extern
+bestand maar uit de dataset, via de rollen `pompunits` (nieuw, `[klassen] pompunit =
+["Pompunit"]`) en `mechanischeleidingen`. `Pompunit` is in de gebundelde ontologie een
+`owl:Class`, subklasse van `Rioolput`, omschreven als "pompput in een
+drukrioleringsstelsel" -- geverifieerd, GWSW is leidend. `Gemaal` hoort er niet bij: dat is
+een bouwwerk en het einde van de afvoer, en het staat al in `afvoer_eindpunt`.
+
+Zie [#104](https://github.com/mcolee/nlriochecker/issues/104) en BO-19.
+
+### BO-81 EXT-009 is een deterministische regel en geen model; de ijking van de drempel
+
+**Wat.** De classificatie van EXT-009 is een regel van vier stappen op vier gemeten
+waarden, geen getraind model. Er komt geen scikit-learn in de repository, geen
+trainingsstap en geen modelbestand.
+
+**Waarom niet het model.** De POC van issue #104 trainde een gradient-boosting-model op 485
+handmatig beoordeelde straten; dat haalde daar 27 fouten op 479 beoordeelde straten (94,4%).
+De deterministische regel haalt op dezelfde set 32 op 478 (93,3%) -- vijf straten slechter,
+op een populatie van 4116. Dat verschil weegt niet op tegen wat de regel oplevert: zij is in
+één alinea uit te leggen aan een beheerder, zij verandert niet als iemand de dataset opnieuw
+laadt, zij heeft geen trainingsstap die met de data mee moet reizen, en zij voegt geen zware
+afhankelijkheid toe (BO-3 vraagt een licentie- en noodzaakafweging per dependency). Het
+issue verwachtte gelijkspel (26 om 26); de gemeten uitkomst is dat niet, en dat staat hier
+in plaats van de verwachting.
+
+**De regel.** In deze volgorde, en de volgorde doet ertoe:
+
+1. `aandeel_onverhard > ext_wegvak_onverhard_aandeel` -> **grijs**, reden onverhard.
+2. een put in de eigen voronoi-cel, of `streng_in_cel >= ext_wegvak_streng_in_cel` ->
+   **groen**. De putregel is de lus- en hoefijzeruitzondering: ligt de put ín de cel, dan
+   loopt het riool door de as van de straat en zegt de afstand tot de lijn niets meer.
+3. anders, in het **onzekere middengebied**, met een pompunit binnen
+   `ext_wegvak_pomp_afstand_m` of persleiding langs meer dan
+   `ext_wegvak_persleiding_aandeel` van de straat -> **grijs**, reden drukriolering. Twee
+   grenzen aan die uitzondering. Zij geldt ná stap 2 en niet ervoor: een straat waar wél
+   genoeg vrijverval ligt hoeft niet uitgezonderd te worden, ook niet als er toevallig een
+   pompunit naast staat. En zij geldt alleen waar er *iets* in de eigen cel ligt
+   (`streng_in_cel > 0`): een straat met nul meter vrijvervalstreng is niet onzeker, die is
+   meetbaar leeg.
+4. anders -> **rood**, een waarschuwing.
+
+**Het onzekere middengebied is gemeten, niet gegokt.** De POC bepaalde het met de modelkans
+(`0,2 < p < 0,8`); zonder model bestaat die maat niet. De eerste invulling -- "elke straat
+die anders rood zou worden en drukriolering-indicatie heeft" -- bleek te grof: van de 34
+gelabelde straten die daardoor grijs werden waren er **31 handmatig als terecht gemeld
+beoordeeld**, dus 31 echte gaten verdwenen uit beeld. Met de tweede grens
+(`streng_in_cel > 0`) zijn dat er 4, gaat de beoordeelde set van 451 naar 478 straten en
+blijft het aantal fouten gelijk (32). Gemeentebreed: 500 rood, 3593 groen, 23 grijs, tegen
+455/3593/68 zonder die grens. De vergelijking staat in de fouttabel van
+`scripts/ijk_ext009.py`.
+
+**Nog een afwijking van de POC, bewust.** De POC mat de persleiding met een extra
+eindpunttoets (beide uiteinden binnen 20 m van de straat); dat is een zesde drempel die de
+spec niet noemt, en de vlakke kap van de corridor begrenst de meting al tot de eigen
+straatlengte.
+
+**De ijking.** `scripts/ijk_ext009.py` meet de fouttabel per kandidaat-drempel op de
+beoordeelde gelabelde straten. Twee soorten fout, en ze wegen niet gelijk: een *vals-rood*
+(bediende straat als leeg gemeld) is hinderlijk maar meteen zichtbaar op de kaart, een
+*gemiste* (lege straat blijft groen) verdwijnt uit beeld -- en dat is precies het gat dat
+deze check moet vinden. Gekozen is daarom de drempel met de minste fouten waarbij vals-rood
+minstens zo groot is als gemist. De gemeten tabel en de gekozen waarde staan in het
+issue-verslag; de waarde zelf staat in `[drempels] ext_wegvak_streng_in_cel` van beide
+configbestanden.
+
+**Wat de ijking niet is.** De validatieset zijn 485 straten uit één gemeente, met de hand
+beoordeeld; zij hoort bij deze dataset en staat daarom in `uitvoer/` en niet in de
+repository. Het ijkscript slaat over als zij er niet is, met een melding. Een andere
+gemeente hoort de drempel opnieuw te ijken -- daarom is hij een drempel en geen constante.
+
+Zie [#104](https://github.com/mcolee/nlriochecker/issues/104), BO-3 en BO-43.

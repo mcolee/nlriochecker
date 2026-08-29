@@ -351,9 +351,11 @@ class CheckThresholds(BaseModel):
     ext_wegvak_verdichting_m: float = Field(default=10.0, gt=0.0)
     # De dragende maat: strenglengte in de eigen voronoi-cel gedeeld door de straatlengte.
     # Daaronder heet de straat leeg. Geijkt op de validatieset; zie BO-81.
-    ext_wegvak_streng_in_cel: float = Field(default=0.25, gt=0.0)
+    ext_wegvak_streng_in_cel: float = Field(default=0.30, gt=0.0)
     # Drukriolering-indicatie: een pompunit binnen deze afstand van de straat, of
-    # persleiding langs de straat over meer dan dit aandeel van haar lengte.
+    # persleiding langs de straat over meer dan dit aandeel van haar lengte. Zij zondert
+    # alleen het onzekere middengebied uit -- een straat met nul meter vrijverval in haar
+    # eigen cel blijft een bevinding; zie `classificeer` en BO-81.
     ext_wegvak_pomp_afstand_m: float = Field(default=15.0, gt=0.0)
     ext_wegvak_persleiding_aandeel: float = Field(default=0.3, gt=0.0, le=1.0)
     # Boven dit aandeel onverhard wegdek valt de straat buiten scope: het model is voor

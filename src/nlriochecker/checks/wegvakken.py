@@ -18,9 +18,11 @@ zijn omdat ze op gewone arrays en geometrieen werken in plaats van op een `Check
    persleiding, en het aandeel onverhard wegdek uit de BGT.
 4. `classificeer` -- de deterministische regel die daar rood, groen of grijs van maakt.
 
-**Deterministisch, geen model.** Een getraind gradient-boosting model haalde op de
-validatieset van 485 handmatig beoordeelde straten precies evenveel fouten als deze regel
-(26 om 26); de regel is uitlegbaar, kent geen trainingsstap en voegt geen afhankelijkheid
+**Deterministisch, geen model.** Op de validatieset van 485 handmatig beoordeelde straten
+haalt deze regel 32 fouten op 478 beoordeelde straten (93,3%); een getraind
+gradient-boosting-model kwam op dezelfde set uit op 27 op 479 (94,4%). Dat verschil van vijf
+straten weegt niet op tegen wat de regel oplevert: zij is in één alinea uit te leggen, zij
+verandert niet als iemand de dataset opnieuw laadt, en zij voegt geen zware afhankelijkheid
 toe. Zie BO-81 voor de ijking en de fouttabel.
 
 **Vectoriseren is hier geen optimalisatie maar een eis.** De volle gemeente telt ~4100
@@ -400,13 +402,31 @@ def bouw_vlakken(kandidaten: Kandidaten, drempels: CheckThresholds) -> np.ndarra
     doel = plek[eigenaar]
     meedoen = doel >= 0
 
+    # Eerst samenvoegen, dan knippen. Dat is dezelfde uitkomst -- de doorsnede verdeelt
+    # zich over een vereniging -- maar aanzienlijk goedkoper: knippen per cel kostte op De
+    # Wolden en Hoogeveen ruim 50.000 vlak-vlak-doorsnedes (5,3 s van de 11), en per
+    # kandidaat zijn het er 4116. De cellen zijn ook onafgeknipt klein, want de punten
+    # liggen maar `verdichting` meter uit elkaar.
+    vlakken = _voeg_samen(cellen[meedoen], doel[meedoen], len(kandidaten))
     knipvormen = shapely.intersection(
         shapely.buffer(kandidaten.lijnen, buffer_m, cap_style="flat"), kandidaten.komvlakken
     )
-    # Eerst knippen, dan samenvoegen: de cellen zijn na het knippen klein en meestal
-    # aaneengesloten, zodat de vereniging goedkoop is.
-    geknipt = shapely.intersection(cellen[meedoen], knipvormen[doel[meedoen]])
-    return _voeg_samen(geknipt, doel[meedoen], len(kandidaten))
+    return _alleen_vlakken(shapely.intersection(vlakken, knipvormen))
+
+
+def _alleen_vlakken(geometrieen: np.ndarray) -> np.ndarray:
+    """Houdt van elke geometrie het vlakdeel over.
+
+    Twee elkaar rakende vlakken kunnen een doorsnede opleveren waar een lijn- of
+    puntrestje aan hangt, en dan is de uitkomst een `GeometryCollection` die niet als
+    MULTIPOLYGON weg te schrijven is. `buffer(0)` snijdt die restjes eraf; hij draait
+    alleen op de handvol geometrieen waar dat nodig is, want op een vlak is hij niet gratis.
+    """
+    soorten = shapely.get_type_id(geometrieen)
+    gemengd = ~np.isin(soorten, (shapely.GeometryType.POLYGON, shapely.GeometryType.MULTIPOLYGON))
+    if gemengd.any():
+        geometrieen[gemengd] = shapely.buffer(geometrieen[gemengd], 0)
+    return geometrieen
 
 
 def _verdicht(lijnen: np.ndarray, afstand: float) -> tuple[np.ndarray, np.ndarray]:
@@ -562,10 +582,15 @@ def classificeer(kenmerken: Kenmerken, drempels: CheckThresholds) -> tuple[tuple
     2. Riolering aangetoond: **bediend**. Dat is `streng_in_cel` boven de drempel, of --
        de lus- en hoefijzeruitzondering -- een put in de eigen cel. Ligt de put daarin,
        dan loopt het riool door de as van de straat en zegt de lijnafstand niets meer.
-    3. Anders, mét drukriolering-indicatie: **niet beoordeeld**. Een pompunit binnen de
-       pompafstand of persleiding langs meer dan het gegeven aandeel van de straat
-       betekent dat hier geen vrijverval hoeft te liggen. Deze stap staat na stap 2, want
-       een straat waar wél vrijverval ligt hoeft niet uitgezonderd te worden.
+    3. Anders, in het **onzekere middengebied** mét drukriolering-indicatie: **niet
+       beoordeeld**. Een pompunit binnen de pompafstand of persleiding langs meer dan het
+       gegeven aandeel van de straat betekent dat hier geen vrijverval hóéft te liggen.
+       Twee grenzen aan die uitzondering, en beide doen ertoe. Zij geldt alleen ná stap 2
+       -- een straat waar wél genoeg vrijverval ligt hoeft niet uitgezonderd te worden --
+       en alleen waar er *iets* in de eigen cel ligt: een straat met nul meter
+       vrijvervalstreng is niet onzeker, die is meetbaar leeg. Zonder die tweede grens
+       verdween op De Wolden en Hoogeveen 31 van de 34 grijs geworden gelabelde straten
+       als een terecht gemeld gat uit beeld; mét die grens zijn het er 4. Zie BO-81.
     4. Anders: **geen riolering** -- een waarschuwing.
     """
     onverhard = kenmerken.aandeel_onverhard > drempels.ext_wegvak_onverhard_aandeel
@@ -573,7 +598,8 @@ def classificeer(kenmerken: Kenmerken, drempels: CheckThresholds) -> tuple[tuple
     drukriolering = kenmerken.pomp_nabij | (
         kenmerken.persleiding_langs > drempels.ext_wegvak_persleiding_aandeel
     )
-    niet_beoordeeld = onverhard | (~bediend & drukriolering)
+    onzeker = drukriolering & (kenmerken.streng_in_cel > 0)
+    niet_beoordeeld = onverhard | (~bediend & onzeker)
     status = np.where(niet_beoordeeld, STATUS_GRIJS, np.where(bediend, STATUS_GROEN, STATUS_ROOD))
     reden = np.where(onverhard, REDEN_ONVERHARD, np.where(niet_beoordeeld, REDEN_DRUKRIOLERING, ""))
     return tuple(zip(status.tolist(), reden.tolist(), strict=True))

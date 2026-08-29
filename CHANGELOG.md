@@ -13,6 +13,41 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **EXT-009: straat in de bebouwde kom zonder vrijvervalriolering** (issue #104, BO-79 t/m
+  BO-81). De eerste dekkingsvraag in het register: niet "ligt deze streng ergens
+  doorheen?" maar "ligt er langs deze weg riolering?". Het toetsobject is daarom een
+  NWB-wegvak en geen GWSW-object; de melding draagt een sleutel `nwb:wegvak/<WVK_ID>` en
+  het middelpunt van het wegvak als locatie. Kandidaat is een gemeentelijk wegvak, geen pad
+  of parkeervak, minstens 25 m lang, met zijn middelpunt in een TOP10NL-vlak met
+  `bebouwdekom = ja`; buiten de kom hoort niet vanzelfsprekend riolering te liggen. De
+  dragende maat is de lengte vrijvervalstreng in het eigen straatvlak -- de voronoi-cel om
+  de wegas, geknipt op een buffer van 25 m en op de komgrens -- gedeeld door de
+  straatlengte. Ligt er een put ín dat vlak, dan geldt de straat als bediend (lus- en
+  hoefijzerwegen). **Drie uitkomsten in plaats van twee**: naast bediend (groen) en leeg
+  (rood, een waarschuwing) is er *niet beoordeeld* (grijs) voor een overwegend onverharde
+  straat en voor een straat met drukriolering-indicatie. Groen en grijs dragen geen melding
+  maar wel een vlak in de GeoPackage, en het rapport telt ze -- stilte zou lezen als "alles
+  gecontroleerd". De regel is deterministisch en met opzet geen model: op een validatieset
+  van 485 handmatig beoordeelde straten haalt zij 32 fouten op 478 beoordeelde straten
+  (93,3%) tegen 27 op 479 (94,4%) voor een getraind gradient-boosting-model -- vijf straten
+  op een populatie van 4116, en daarvoor geen trainingsstap en geen nieuwe afhankelijkheid.
+  De drempel is op die set geijkt met `scripts/ijk_ext009.py`.
+- **De laag `vlakken` krijgt een vijfde soort en een kolom `status`** (issue #104, BO-79).
+  `soort = wegvak` draagt de uitslag van EXT-009 per straat, met `status` in rood, groen of
+  grijs -- dezelfde waarden als de objectlagen. Dit is de enige soort in die laag die ook
+  zonder melding een rij krijgt; rood blijft strikt aan de meldingen van deze uitvoer
+  hangen. `gwsw_run` telt ze in de nieuwe kolom `n_wegvakken`, en `vlakken.qml` krijgt drie
+  regels met dezelfde kleuren als de objectlagen.
+- **Drie nieuwe externe bronrollen en een nieuwe GWSW-rol** (issue #104, BO-80).
+  `nwb_wegvak` werd al geladen maar door geen check gelezen; `top10nl_kom` (`[bronnen]
+  top10nl` plus `top10nl_komlagen`) en `bgt_wegdeel` (`bgt_wegdeellagen`) zijn nieuw.
+  `configs/dewoldenhoogeveen.toml` wijst ze alle drie aan -- de NWB-regel zei ten onrechte
+  "niet aangeleverd voor dit gebied". De NWB-attributen worden hoofdletterongevoelig
+  gelezen (`VectorLayer.kolom`), want De Wolden schrijft `WEGBEHSRT` en Koekangerveld
+  `wegbehsrt`. De komlaag valt buiten de dekkingspoort van BO-19: een bebouwde kom is per
+  definitie een deelgebied van het bereik. De rol `pompunits` (`[klassen] pompunit =
+  ["Pompunit"]`) levert de pompputten voor de drukriolering-indicatie.
+
 - **ATTR-001 kent een uitzondering per constructietype** (issue #86, BO-75). De nieuwe
   tabel `[[constructietype_diameter]]` in `plausibiliteit.toml` geeft een GWSW-klasse haar
   eigen diameterbereik, en dat gaat vóór het bereik van het materiaal: de materiaaltabellen

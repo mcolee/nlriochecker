@@ -369,6 +369,65 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     assert "Buiten studiegebied" in tekst
 
 
+DEWOLDEN_GIS = DATA_DIR / "gis_dewoldenhoogeveen"
+NWB_DEWOLDEN = DEWOLDEN_GIS / "NWB_wegvakken_DeWoldenHoogeveen.gpkg"
+PROJECTCONFIG = Path(__file__).resolve().parents[1] / "configs" / "dewoldenhoogeveen.toml"
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and NWB_DEWOLDEN.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of de NWB-wegvakken staan niet in data/",
+)
+def test_ext009_op_de_volle_gemeente() -> None:
+    """EXT-009 op alle 9787 NWB-wegvakken, met de geijkte drempel (issue #104, BO-81).
+
+    De baseline van 29-08-2026, gemeten met `scripts/ijk_ext009.py` en daar onderbouwd:
+    4116 kandidaten, 500 rood, 3593 groen, 23 grijs. Een run die hiervan afwijkt vraagt om
+    een verklaring en niet om een nieuw getal -- dat is de hoofdregel uit `CLAUDE.md`, en
+    deze check heeft er extra reden toe: hij leunt op een geijkte drempel, en een
+    verschuiving daarin is aan de aantallen te zien vóór iemand de fouttabel opnieuw draait.
+
+    Alleen de drie lagen die de check leest; de panden, waterdelen en het AHN kosten
+    minuten en veranderen niets aan deze uitslag.
+    """
+    from nlriochecker.checks.wegvakken import STATUS_GRIJS, STATUS_GROEN, STATUS_ROOD, beoordeel
+    from nlriochecker.externedata import load_external_data
+
+    config = load_check_config(PROJECTCONFIG)
+    bronnen = load_external_data(
+        config.bronnen.model_copy(
+            update={
+                "map": ".",
+                "bag_pand": None,
+                "ahn_dtm": None,
+                "bgt_pandlagen": [],
+                "bgt_waterlagen": [],
+                "bgt_putdeksellagen": [],
+                "bgt_overige_bouwwerklagen": [],
+            }
+        ),
+        DEWOLDEN_GIS,
+    )
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    uitslag = beoordeel(context)
+
+    assert len(uitslag) == 4116
+    assert uitslag.wegvakken_totaal == 9787
+    assert (
+        uitslag.aantal(STATUS_ROOD),
+        uitslag.aantal(STATUS_GROEN),
+        uitslag.aantal(STATUS_GRIJS),
+    ) == (500, 3593, 23)
+    # Elk beoordeeld wegvak draagt een tekenbaar straatvlak; de laag `vlakken` toont er
+    # dus evenveel als de check bekeek.
+    assert all(not oordeel.vlak.is_empty for oordeel in uitslag.oordelen)
+
+
 @pytest.mark.zwaar
 @pytest.mark.skipif(
     not (OROX_DEWOLDENHOOGEVEEN.exists() and STUDIEGEBIED.exists()),
