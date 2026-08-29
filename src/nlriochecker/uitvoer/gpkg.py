@@ -41,6 +41,7 @@ from shapely.ops import unary_union
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
+from nlriochecker.checks.randvoorzieningen import aanwijzingen_van
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer, Wegvakoordeel
 from nlriochecker.checks.verbanden import (
@@ -1130,15 +1131,23 @@ def _gemengd_rij(
     gemengde strengen gemeld, dus systemisch. Zie BO-59.
 
     Grijs komt hier niet voor -- er staat per definitie minstens één melding op.
+
+    De feitenregels dragen sinds issue #106 de aanwijzingen van de check: het aandeel
+    gemengde strengen naast het aantal gemelde, en de overige aanwijzingen op een eigen
+    regel. Ze komen uit de eerste melding van het cluster -- de aanwijzingen gelden voor
+    het deelstelsel, dus elke melding ervan draagt dezelfde zin -- en niet uit een eigen
+    afleiding hier: dan zou het vlak iets anders kunnen zeggen dan de melding ernaast.
     """
     strenglengte = sum(conduit.line.length for conduit in conduits if conduit.line is not None)
+    aandeel, overige = aanwijzingen_van(meldingen[0].boodschap)
     kop = Objectkop(
         label=cluster,
         objecttype=SOORT_GEMENGD_DEELSTELSEL,
         status=STATUS_ROOD if any(m.ernst == "F" for m in meldingen) else STATUS_ORANJE,
         feiten=(
             f"{len(putten)} knopen, {len(conduits)} strengen, {strenglengte:.0f} m",
-            f"{len(meldingen)} gemengde strengen gemeld",
+            f"{aandeel}, {len(meldingen)} gemeld",
+            *([overige] if overige else []),
         ),
         reden="",
     )

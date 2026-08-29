@@ -119,10 +119,16 @@ def test_alleen_de_bereikbaarheids_en_dekkingschecks_gaan_over_het_persnet() -> 
     EXT-009 staat er sinds issue #104 bij, om een andere reden: die leest de persleiding
     niet als kant in een graaf maar als geometrie langs een straat. Ligt er persleiding
     langs, dan is dat een drukriolering-indicatie en wordt de straat niet beoordeeld.
+
+    RVZ-006 staat er sinds issue #106 bij, om een derde reden, en juist niet als kant: de
+    check blijft op het zuivere vrijverval rekenen (een persleiding is geen afvoereindpunt,
+    BO-82) en leest het persnet alleen om te kúnnen zeggen waar het water dan wél heen
+    gaat. Zou zij het als kant lezen, dan verdween het gebrek in plaats van dat het
+    verklaard werd.
     """
     met_persnet = {cid for cid in CHECK_IDS if "mechanischeleidingen" in REGISTRY[cid].rollen}
 
-    assert met_persnet == {"EXT-009", "NET-001", "NET-002", "NET-008"}
+    assert met_persnet == {"EXT-009", "NET-001", "NET-002", "NET-008", "RVZ-006"}
 
 
 def test_alleen_een_check_zonder_rol_omschrijft_zijn_populatie() -> None:

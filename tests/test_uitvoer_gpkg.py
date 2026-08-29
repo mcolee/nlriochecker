@@ -1251,6 +1251,37 @@ def test_deelstelselvlak_telt_de_strengen_en_knopen_van_de_graaf(tmp_path: Path)
     assert rijen == [(2, 3, 150.0, 3)]
 
 
+def test_deelstelselvlak_zet_het_aandeel_gemengd_op_de_feitenregel(tmp_path: Path) -> None:
+    """De popup zegt hoeveel van de strengen gemengd zijn, niet alleen hoeveel er gemeld zijn.
+
+    "2 gemengde strengen gemeld" liet in het midden of dat het hele deelstelsel was of een
+    handvol verkeerd getypeerde strengen in een hemelwaterstelsel -- precies het verschil
+    dat de auteur per vlak zelf moest uitzoeken (issue #106). Hier zijn beide strengen
+    gemengd; het vlak heeft verder geen aanwijzing, dus er komt geen derde feitenregel bij.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    ((popup,),) = _rijen(pad, "select popup_html from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
+
+    assert "3 knopen, 2 strengen, 100 m · 2 van 2 strengen gemengd, 2 gemeld</div>" in popup
+
+
+def test_deelstelselvlak_toont_de_aanwijzingen_van_de_melding(tmp_path: Path) -> None:
+    """De aanwijzingen staan als derde feitenregel in de popup (issue #106).
+
+    Ze komen uit de eerste melding van het cluster -- ze zijn per deelstelsel gelijk -- en
+    niet uit een eigen afleiding: dan zou het vlak iets anders kunnen zeggen dan de melding
+    ernaast. `Finding.details` bereikt deze schrijver niet, dus de boodschap is de weg.
+    """
+    pad = _schrijf(_run("rvz006_aanwijzing_persleiding_en_lozingspunt.ttl", "RVZ-006"), tmp_path)
+
+    ((popup,),) = _rijen(pad, "select popup_html from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
+
+    assert "4 van 4 strengen gemengd, 4 gemeld" in popup
+    assert "persleiding p vertrekt uit A; geen afvoereindpunt (BO-82)" in popup
+    assert "… en 1 meer" in popup
+
+
 def test_een_deelstelselvlak_laat_de_kolommen_van_een_extern_vlak_leeg(tmp_path: Path) -> None:
     """Elke soort vult wat zij kent; de rest blijft leeg, zoals `relatie` bij water.
 

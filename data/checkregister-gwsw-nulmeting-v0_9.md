@@ -138,7 +138,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | RVZ-002 | Overstort zonder geregistreerd drempelniveau en/of drempelbreedte (Drempelniveau, Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt; één melding per put die zegt welke maat mist. RVZ-003 (aparte breedtecheck) is hierin opgegaan (BO-78). Overlapt bewust met de nulmetingvorm Overstortput_Overstortdrempel_card, want die toetst alleen of de put een drempel heeft, dekt de Stuwput niet en de check werkt ook zonder nulmeting | W | Compleetheid |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie |
-| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal of overnamepunt); het deelstelsel loopt door over een hulpstuk met een telbare GWSW-functie, dat als knoop in het net geldt (BO-83) | F | Plausibiliteit |
+| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal of overnamepunt); het deelstelsel loopt door over een hulpstuk met een telbare GWSW-functie, dat als knoop in het net geldt (BO-83). De melding noemt de aanwijzingen bij het gebrek (aandeel gemengd, samenvallende knoop, knoop op streng, persleiding, lozingspunt); ze verklaren het en veranderen de uitslag niet (BO-84) | F | Plausibiliteit |
 | RVZ-007 | BBB zonder geregistreerde bergingsinhoud of afmetingen | W | Compleetheid |
 | RVZ-008 | BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel | W | Compleetheid |
 | RVZ-009 | BBB zonder nooduitlaat of externe overstortdrempel | W | Compleetheid |

@@ -114,6 +114,24 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **RVZ-006 benoemt de aanwijzingen bij het gebrek** (issue #106, BO-84). De melding zei
+  wél welke eis een gemengd deelstelsel miste, maar niet waardóór het los lag of
+  onvolledig was; bij de review van alle vlakken moest dat per vlak met de hand worden
+  uitgezocht. Achter het gebrek staat nu een tweede zin met korte feiten die de check al
+  kon zien: `1 van 190 strengen gemengd; knoop X valt samen met Y van ds-… (0,00 m);
+  knoop X ligt op streng Y van ds-… (0,00 m)`, en -- alleen als er géén afvoereindpunt is
+  -- `persleiding X vertrekt uit Y; geen afvoereindpunt (BO-82)` en `lozingspunt X
+  aanwezig; geen afvoereindpunt (BO-82)`. Per soort hooguit drie, op URI-volgorde,
+  gevolgd door "… en N meer". De popup van het deelstelselvlak in de GeoPackage draagt
+  ze ook: `2 gemengde strengen gemeld` wordt `2 van 2 strengen gemengd, 2 gemeld`, met de
+  overige aanwijzingen op een eigen feitenregel. **De uitslag verandert niet**: dezelfde
+  afbakening, dezelfde twee eisen, en op De Wolden en Hoogeveen dezelfde 1058 meldingen op
+  96 deelstelsels; een persleiding of lozingspunt blijft geen afvoereindpunt (BO-82). Er
+  komt geen drempel bij -- de enige grens is de bestaande `snapping_tolerantie_m` -- en
+  geen kolom: de aanwijzingen reizen in de meldingstekst. Gemeten met
+  `scripts/meet_rvz006_aanwijzingen.py`: 13 deelstelsels met minder dan de helft gemengd,
+  8 met een samenvallende knoop, 14 met een knoop op een vreemde streng, 18 met een
+  persleiding, 27 met een lozingspunt en 50 met het kale gebrek.
 - **Een telbaar hulpstuk is een doorgeefknoop in de vrijvervalgraaf** (issue #105, BO-83).
   Een streng die op een `Mof`, `T_stuk`, `Y_stuk` of `Kruisstuk` eindigt viel uit de
   netwerkanalyse -- een `Hulpstuk` is geen `Put`, dus de graaf liet haar vallen -- terwijl

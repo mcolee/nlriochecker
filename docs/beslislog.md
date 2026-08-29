@@ -4626,3 +4626,54 @@ gebruikt daarom dezelfde afleiding als de graaf zelf.
 
 Zie [#105](https://github.com/mcolee/nlriochecker/issues/105), BO-53, BO-54, BO-57 en
 BO-72.
+
+### BO-84 RVZ-006 benoemt de aanwijzingen bij het gebrek, zonder de uitslag te veranderen
+
+**Wat.** De RVZ-006-melding draagt achter het gebrek een tweede zin met korte feiten:
+`Aanwijzingen: <feit>; <feit>; ...`. Vijf soorten, in vaste volgorde en met vaste
+bewoording (`_rvz006_aanwijzingen` in `checks/randvoorzieningen.py`):
+
+| Aanwijzing | Wat zij zegt | De Wolden en Hoogeveen |
+|---|---|---:|
+| `{n} van {m} strengen gemengd` | altijd; een telling, geen oordeel | 96 (13 met n < m/2) |
+| `knoop X valt samen met Y van ds-… (0,00 m)` | een knoop binnen `snapping_tolerantie_m` van een knoop van een ander deel | 8 |
+| `knoop X ligt op streng Y van ds-… (0,00 m)` | een knoop binnen die tolerantie op een vrijvervalstreng van een ander deel | 14 |
+| `persleiding X vertrekt uit Y; geen afvoereindpunt (BO-82)` | alleen zonder afvoereindpunt | 18 |
+| `lozingspunt X aanwezig; geen afvoereindpunt (BO-82)` | alleen zonder afvoereindpunt | 27 |
+| (geen van deze, het kale gebrek) | | 50 |
+
+Per soort noemt de melding er hooguit drie, op URI-volgorde, gevolgd door "… en N meer";
+zo blijft zij leesbaar en geeft zij bij twee runs op dezelfde data dezelfde tekst. De
+diagnose wordt een keer per deelstelsel gerekend: elke gemengde streng ervan draagt
+dezelfde zin. Het vlak in de GeoPackage leest ze uit de eerste melding van zijn cluster
+terug (`aanwijzingen_van`), want `Finding.details` bereikt de meldingenstroom niet.
+
+**Waarom.** De analyse van RVZ-006 klopte, maar de melding zei niet waardóór een
+deelstelsel los lag of onvolledig was; bij de review van alle 99 vlakken (29-08-2026) moest
+de auteur dat per vlak zelf uitzoeken. De vijf feiten hierboven kon de check al zien. Ze
+zijn bewust een *verklaring* en geen extra eis: de afbakening (`netwerkdelen`), de twee
+eisen (overstort/BBB én afvoereindpunt) en dus het aantal meldingen blijven gelijk --
+gemeten: 1058 meldingen op 96 deelstelsels, vóór en na. Een persleiding of een lozingspunt
+blijft géén afvoereindpunt (BO-82); de aanwijzing zegt alleen waar het water dan wél heen
+gaat, en herhaalt daarbij de regel, zodat de lezer de melding niet voor een fout van de
+check houdt. Er komt geen drempel bij: de enige grens is `snapping_tolerantie_m`, dezelfde
+die de topologiechecks hanteren.
+
+De persleiding- en lozingspuntaanwijzing blijven weg zodra het deel wél een afvoereindpunt
+heeft. Dan mist het alleen zijn overstort, en dat verklaren zij niet.
+
+**Wat het betekent voor de cijfers.** Gemeten met `scripts/meet_rvz006_aanwijzingen.py`.
+Het meetscript in issue #106 telde de persleiding *zonder* die voorwaarde en kwam daardoor
+op 45 in plaats van 18 deelstelsels; de 27 delen met zowel een persleiding als een
+afvoereindpunt vallen hier onder het kale gebrek, dat daarmee op 50 uitkomt in plaats van
+de 24 uit dat script. De tabel in de issue-body (13 / 8 / 14 / 18 / 27) is wél precies
+gereproduceerd -- zij is met de hand per vlak samengesteld en hanteert dezelfde voorwaarde
+als de code.
+
+**Wat de check nu meer leest.** De diagnose maakt RVZ-006 breder in zijn declaratie:
+`lozingspunten`, `mechanischeleidingen` en `netwerkknopen` komen erbij (plus
+`config:drempels.snapping_tolerantie_m` als kenmerk). Het persnet leest hij uitdrukkelijk
+niet als kant in een graaf -- dat zou het gebrek laten verdwijnen in plaats van het te
+verklaren -- maar alleen om te kunnen zeggen waar het water heen gaat.
+
+Zie [#106](https://github.com/mcolee/nlriochecker/issues/106), BO-82 en BO-83.

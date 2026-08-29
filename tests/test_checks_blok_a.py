@@ -890,6 +890,88 @@ def test_rvz006_telt_de_strengen_en_knopen_van_het_deel_als_de_graaf() -> None:
         assert bevinding.details["gemengde_strengen"] == 3
 
 
+def _aanwijzingen(bestand: str) -> str:
+    """De aanwijzingen uit de eerste RVZ-006-melding van een fixture (issue #106)."""
+    outcome = uitkomst(bestand, "RVZ-006")
+    assert outcome.findings, f"{bestand}: RVZ-006 meldt niets"
+    boodschappen = {bevinding.message for bevinding in outcome.findings}
+    # De diagnose is per deelstelsel: elke streng van hetzelfde deel draagt dezelfde zin.
+    assert len(boodschappen) == 1
+    return boodschappen.pop().partition("Aanwijzingen: ")[2]
+
+
+def test_rvz006_noemt_het_aandeel_gemengde_strengen() -> None:
+    """Het kale geval draagt alleen de telling, en die is een feit en geen oordeel.
+
+    De fixture is een hemelwaterdeelstelsel met een enkele gemengd getypeerde streng --
+    op De Wolden en Hoogeveen dertien van de gemelde deelstelsels. De melding zegt niet
+    "overwegend hemelwater" (waar die grens ligt is niet aan de check) maar telt: 1 van 3.
+    """
+    assert _aanwijzingen("rvz006_aanwijzing_aandeel_gemengd.ttl") == "1 van 3 strengen gemengd."
+
+
+def test_rvz006_noemt_een_knoop_die_met_een_ander_deel_samenvalt() -> None:
+    """Twee putten op dezelfde coordinaat: zo exporteert BrutIS een gecompartimenteerde put.
+
+    Het deelstelsel lijkt los te liggen, maar zijn put valt binnen de snapping-tolerantie
+    samen met een put van het andere deel. De aanwijzing noemt beide labels, het
+    deelstelsel-ID van de buur en de gemeten afstand.
+
+    Een deelstelsel kan meer dan één aanwijzing dragen, en dit geval draagt er twee: de
+    streng die uit de samenvallende put vertrekt begint per definitie op diezelfde
+    coordinaat, dus put B ligt er ook op. Beide feiten staan er, in vaste volgorde.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_samenvallende_knoop.ttl")
+
+    assert aanwijzingen == (
+        "1 van 1 strengen gemengd; "
+        "knoop B valt samen met B c2 van ds-B c2 (0.00 m); "
+        "knoop B ligt op streng 2 van ds-B c2 (0.00 m)."
+    )
+
+
+def test_rvz006_noemt_een_knoop_op_een_streng_van_een_ander_deel() -> None:
+    """Een put getekend op een leiding die daar niet gesplitst is.
+
+    De twee delen raken elkaar op de kaart maar niet in de graaf; de afstand (0,05 m)
+    staat erbij, zodat de lezer ziet hoe dicht het scheelt.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_knoop_op_streng.ttl")
+
+    assert aanwijzingen == "1 van 1 strengen gemengd; knoop B ligt op streng 2 van ds-C (0.05 m)."
+
+
+def test_rvz006_noemt_de_persleiding_en_de_lozingspunten() -> None:
+    """Waar het water heen gaat zonder afvoereindpunt (BO-82).
+
+    Een persleiding of een lozingspunt telt niet als afvoereindpunt -- een overstort zit
+    niet ná een persleiding -- maar de lezer hoort te zien waar het water dan wél heen
+    gaat. De vierde lozingsput staat er niet bij naam bij: bij meer dan drie treffers van
+    een soort volgt "… en N meer", zodat de melding leesbaar blijft.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_persleiding_en_lozingspunt.ttl")
+
+    assert aanwijzingen == (
+        "4 van 4 strengen gemengd; "
+        "persleiding p vertrekt uit A; geen afvoereindpunt (BO-82); "
+        "lozingspunt L1 aanwezig; geen afvoereindpunt (BO-82); "
+        "lozingspunt L2 aanwezig; geen afvoereindpunt (BO-82); "
+        "lozingspunt L3 aanwezig; geen afvoereindpunt (BO-82); "
+        "… en 1 meer."
+    )
+
+
+def test_rvz006_zwijgt_over_de_uitgangen_zodra_er_een_afvoereindpunt_is() -> None:
+    """Met een gemaal in het deel zeggen de persleiding en de lozingsput niets over het gebrek.
+
+    Het deelstelsel mist alleen zijn overstort; dat er ook een persleiding uit vertrekt en
+    dat er een lozingsput in ligt verklaart dat niet, dus die aanwijzingen blijven weg.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_met_afvoereindpunt.ttl")
+
+    assert aanwijzingen == "2 van 2 strengen gemengd."
+
+
 def test_rvz006_met_overstort_en_afvoereindpunt_zwijgt() -> None:
     """Met een overstort en een gemaal is het gemengde stelsel compleet: geen RVZ-006.
 

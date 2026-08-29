@@ -2146,6 +2146,100 @@ FIXTURES["rvz006_gemengd_alleen_pompunit.ttl"] = (
 )
 
 
+# RVZ-006 (issue #106): de aanwijzingen bij het gebrek. Vijf fixtures, elk met precies
+# een aanwijzing erin, plus het geval waarin de eindpuntaanwijzingen juist moeten zwijgen.
+
+# (a) Het kale geval: een hemelwaterdeelstelsel met een enkele gemengd getypeerde streng.
+# De melding draagt alleen de telling "1 van 3 strengen gemengd" -- een feit, geen oordeel,
+# want waar de grens van "een minderheid" ligt is niet aan de check.
+FIXTURES["rvz006_aanwijzing_aandeel_gemengd.ttl"] = (
+    "een hemelwaterdeelstelsel waarvan één van de drie strengen gemengd getypeerd is, "
+    "zonder overstort en zonder afvoereindpunt",
+    hoogteput("PutA", "A", A)
+    + hoogteput("PutB", "B", B)
+    + hoogteput("PutC", "C", C)
+    + hoogteput("PutD", "D", (1150.0, 2000.0))
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55))
+    + hoogteleiding("L2", "2", [B, C], "PutB", "PutC", bob=(8.55, 8.50)).replace(
+        "gwsw:GemengdRiool", "gwsw:Hemelwaterriool"
+    )
+    + hoogteleiding("L3", "3", [C, (1150.0, 2000.0)], "PutC", "PutD", bob=(8.50, 8.45)).replace(
+        "gwsw:GemengdRiool", "gwsw:Hemelwaterriool"
+    ),
+)
+
+# (b) Twee putten op dezelfde coordinaat in twee deelstelsels: zo exporteert BrutIS een
+# gecompartimenteerde put (`B` en `B c2`). Het gemengde deel lijkt los te liggen, maar zijn
+# put valt samen met die van het andere deel. Dat andere deel is vuilwater, dus RVZ-006
+# oordeelt er niet over.
+FIXTURES["rvz006_aanwijzing_samenvallende_knoop.ttl"] = (
+    "put B van het gemengde deelstelsel ligt op 0,00 m van put 'B c2' uit een ander "
+    "deelstelsel; het gemengde deel heeft geen overstort en geen afvoereindpunt",
+    hoogteput("PutA", "A", A)
+    + hoogteput("PutB", "B", B)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55))
+    + hoogteput("PutB2", "B c2", B)
+    + hoogteput("PutC", "C", (1050.0, 2100.0))
+    + hoogteleiding("L2", "2", [B, (1050.0, 2100.0)], "PutB2", "PutC", bob=(8.55, 8.50)).replace(
+        "gwsw:GemengdRiool", "gwsw:Vuilwaterriool"
+    ),
+)
+
+# (c) Een put die op 0,05 m op een streng van een ander deel ligt: de leiding is daar niet
+# gesplitst, dus de twee delen raken elkaar wel op de kaart maar niet in de graaf.
+FIXTURES["rvz006_aanwijzing_knoop_op_streng.ttl"] = (
+    "put B van het gemengde deelstelsel ligt 0,05 m van streng '2' uit een ander "
+    "deelstelsel, dat daar niet gesplitst is",
+    hoogteput("PutA", "A", A)
+    + hoogteput("PutB", "B", B)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutB", bob=(8.60, 8.55))
+    + hoogteput("PutC", "C", (1050.05, 2050.0))
+    + hoogteput("PutD", "D", (1050.05, 1950.0))
+    + hoogteleiding(
+        "L2",
+        "2",
+        [(1050.05, 2050.0), (1050.05, 1950.0)],
+        "PutC",
+        "PutD",
+        bob=(8.55, 8.50),
+    ).replace("gwsw:GemengdRiool", "gwsw:Vuilwaterriool"),
+)
+
+# (d) Het water gaat er wel uit, maar niet via een afvoereindpunt: een persleiding vertrekt
+# uit put A en er hangen vier lozingsputten aan. Geen van beide telt als afvoereindpunt
+# (BO-82); de aanwijzing zegt alleen waar het water dan heen gaat. Vier lozingsputten,
+# zodat de melding er drie noemt en de rest samenvat.
+FIXTURES["rvz006_aanwijzing_persleiding_en_lozingspunt.ttl"] = (
+    "het gemengde deelstelsel heeft geen afvoereindpunt: er vertrekt een persleiding uit "
+    "put A en het water gaat naar vier lozingsputten",
+    hoogteput("PutA", "A", A)
+    + put("PutL1", "L1", 1050.0, 2050.0, klasse="Lozingsput")
+    + put("PutL2", "L2", 1050.0, 2000.0, klasse="Lozingsput")
+    + put("PutL3", "L3", 1050.0, 1950.0, klasse="Lozingsput")
+    + put("PutL4", "L4", 1050.0, 1900.0, klasse="Lozingsput")
+    + gemaal("Gem", "G", (900.0, 2000.0))
+    + hoogteleiding("L1", "1", [A, (1050.0, 2050.0)], "PutA", "PutL1", bob=(8.60, 8.55))
+    + hoogteleiding("L2", "2", [A, (1050.0, 2000.0)], "PutA", "PutL2", bob=(8.60, 8.55))
+    + hoogteleiding("L3", "3", [A, (1050.0, 1950.0)], "PutA", "PutL3", bob=(8.60, 8.55))
+    + hoogteleiding("L4", "4", [A, (1050.0, 1900.0)], "PutA", "PutL4", bob=(8.60, 8.55))
+    + leiding("P1", "p", [A, (900.0, 2000.0)], "PutA", "Gem", klasse="Persleiding"),
+)
+
+# (e) Dezelfde uitgangen, maar nu ligt het gemaal in het deelstelsel zelf: er is een
+# afvoereindpunt, alleen geen overstort. De persleiding- en lozingspuntaanwijzing zeggen
+# dan niets over het gebrek en horen weg te blijven.
+FIXTURES["rvz006_aanwijzing_met_afvoereindpunt.ttl"] = (
+    "een gemengd deelstelsel met gemaal maar zonder overstort; de lozingsput en de "
+    "persleiding raken het gebrek niet",
+    hoogteput("PutA", "A", A)
+    + put("PutL", "L", B[0], B[1], klasse="Lozingsput")
+    + gemaal("Gem", "G", C)
+    + hoogteleiding("L1", "1", [A, B], "PutA", "PutL", bob=(8.60, 8.55))
+    + hoogteleiding("L2", "2", [B, C], "PutL", "Gem", bob=(8.55, 8.50))
+    + leiding("P1", "p", [A, (1000.0, 2100.0)], "PutA", None, klasse="Persleiding"),
+)
+
+
 def bbb(naam: str, label: str, punt, met_maten: bool = True) -> str:
     """Een bergbezinkbassin, desgewenst met afmetingen."""
     maten = (

@@ -262,7 +262,16 @@ alleen het bestand waarin zij staat is verhuisd.
   `relatie` en `afstand_min_m` blijven leeg. Die popup is
   de enige die systemische meldingen wél toont en zijn status niet uit `bepaal_status`
   haalt: zo'n rij bestaat alleen omdat RVZ-006 aansloeg en is per constructie
-  een gebrek (BO-59). `gwsw_run`
+  een gebrek (BO-59). Haar kopregel draagt sinds issue #106 drie feiten: de omvang
+  ("3 knopen, 2 strengen, 100 m"), het aandeel gemengd naast het aantal gemelde strengen
+  ("1 van 190 strengen gemengd, 1 gemeld") en, als de check er meer gaf, de overige
+  aanwijzingen op een eigen regel. Die twee laatste komen uit de **eerste melding van het
+  cluster** en niet uit een eigen afleiding hier: de aanwijzingen gelden voor het
+  deelstelsel, dus elke melding ervan draagt dezelfde zin, en een tweede afleiding zou het
+  vlak iets anders kunnen laten zeggen dan de melding ernaast. Ze reizen door de
+  boodschaptekst omdat `Finding.details` de meldingenstroom niet haalt -- alleen de
+  gereserveerde sleutels komen erdoor -- en `randvoorzieningen.aanwijzingen_van` schrijft
+  en leest dat formaat op een plek. Zie BO-84. `gwsw_run`
   telt deze rijen apart in `n_gemengd_zonder_overstort`, naast `n_vlakken` dat de hele laag
   telt; het aantal externe vlakken is het verschil. Twee dingen kunnen er minder vlakken
   opleveren dan er gemelde deelstelsels zijn, en
