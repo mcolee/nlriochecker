@@ -309,6 +309,11 @@ def _samenvallende_knopen(context: CheckContext, putten: set[str]) -> list[str]:
     in het veld niet is. De grens is `snapping_tolerantie_m`, dezelfde die de
     topologiechecks hanteren; een eigen drempel zou een tweede grens voor hetzelfde
     verschijnsel zijn.
+
+    Beide ruimtelijke toetsen kijken naar `putknopen` en zoeken in `netwerkknopen`: een
+    telbaar doorgeefhulpstuk dat met een ander deel samenvalt blijft dus onbenoemd. Dat is
+    dezelfde grens als BO-83 voor het tellen en benoemen van knopen trekt -- een hulpstuk
+    is geen beheerobject, en de rol `netwerkknopen` bevat het evenmin.
     """
     dataset = context.dataset
     ids = deelstelsel_ids(context)
@@ -334,7 +339,8 @@ def _knopen_op_vreemde_streng(context: CheckContext, putten: set[str]) -> list[s
     """De knopen van dit deel die op een vrijvervalstreng van een ander deel liggen.
 
     Een put die op een leiding getekend is die daar niet gesplitst is: de twee delen raken
-    elkaar op de kaart, maar niet in de graaf. Dezelfde tolerantie als hierboven.
+    elkaar op de kaart, maar niet in de graaf. Dezelfde tolerantie als hierboven, en
+    dezelfde populatie: `putknopen`, dus zonder de doorgeefhulpstukken (BO-83).
     """
     dataset = context.dataset
     ids = deelstelsel_ids(context)

@@ -262,10 +262,12 @@ alleen het bestand waarin zij staat is verhuisd.
   `relatie` en `afstand_min_m` blijven leeg. Die popup is
   de enige die systemische meldingen wél toont en zijn status niet uit `bepaal_status`
   haalt: zo'n rij bestaat alleen omdat RVZ-006 aansloeg en is per constructie
-  een gebrek (BO-59). Haar kopregel draagt sinds issue #106 drie feiten: de omvang
+  een gebrek (BO-59). Haar `feiten` dragen sinds issue #106 drie elementen: de omvang
   ("3 knopen, 2 strengen, 100 m"), het aandeel gemengd naast het aantal gemelde strengen
   ("1 van 190 strengen gemengd, 1 gemeld") en, als de check er meer gaf, de overige
-  aanwijzingen op een eigen regel. Die twee laatste komen uit de **eerste melding van het
+  aanwijzingen als derde feit. `objectkaart.popup_html` zet die feiten met " · " achter
+  elkaar tot één regel; het zijn dus geen drie regels in de popup. Die twee laatste
+  elementen komen uit de **eerste melding van het
   cluster** en niet uit een eigen afleiding hier: de aanwijzingen gelden voor het
   deelstelsel, dus elke melding ervan draagt dezelfde zin, en een tweede afleiding zou het
   vlak iets anders kunnen laten zeggen dan de melding ernaast. Ze reizen door de

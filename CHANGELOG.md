@@ -118,8 +118,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   wél welke eis een gemengd deelstelsel miste, maar niet waardóór het los lag of
   onvolledig was; bij de review van alle vlakken moest dat per vlak met de hand worden
   uitgezocht. Achter het gebrek staat nu een tweede zin met korte feiten die de check al
-  kon zien: `1 van 190 strengen gemengd; knoop X valt samen met Y van ds-… (0,00 m);
-  knoop X ligt op streng Y van ds-… (0,00 m)`, en -- alleen als er géén afvoereindpunt is
+  kon zien: `1 van 190 strengen gemengd; knoop X valt samen met Y van ds-… (0.00 m);
+  knoop X ligt op streng Y van ds-… (0.00 m)`, en -- alleen als er géén afvoereindpunt is
   -- `persleiding X vertrekt uit Y; geen afvoereindpunt (BO-82)` en `lozingspunt X
   aanwezig; geen afvoereindpunt (BO-82)`. Per soort hooguit drie, op URI-volgorde,
   gevolgd door "… en N meer". De popup van het deelstelselvlak in de GeoPackage draagt

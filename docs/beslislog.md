@@ -4636,8 +4636,8 @@ bewoording (`_rvz006_aanwijzingen` in `checks/randvoorzieningen.py`):
 | Aanwijzing | Wat zij zegt | De Wolden en Hoogeveen |
 |---|---|---:|
 | `{n} van {m} strengen gemengd` | altijd; een telling, geen oordeel | 96 (13 met n < m/2) |
-| `knoop X valt samen met Y van ds-… (0,00 m)` | een knoop binnen `snapping_tolerantie_m` van een knoop van een ander deel | 8 |
-| `knoop X ligt op streng Y van ds-… (0,00 m)` | een knoop binnen die tolerantie op een vrijvervalstreng van een ander deel | 14 |
+| `knoop X valt samen met Y van ds-… (0.00 m)` | een knoop binnen `snapping_tolerantie_m` van een knoop van een ander deel | 8 |
+| `knoop X ligt op streng Y van ds-… (0.00 m)` | een knoop binnen die tolerantie op een vrijvervalstreng van een ander deel | 14 |
 | `persleiding X vertrekt uit Y; geen afvoereindpunt (BO-82)` | alleen zonder afvoereindpunt | 18 |
 | `lozingspunt X aanwezig; geen afvoereindpunt (BO-82)` | alleen zonder afvoereindpunt | 27 |
 | (geen van deze, het kale gebrek) | | 50 |
