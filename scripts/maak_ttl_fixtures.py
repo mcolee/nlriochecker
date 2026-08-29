@@ -104,6 +104,10 @@ HULPSTUK_KLASSEN = (
 # hebben haar nodig. Ze hangt onder Leiding en niet onder VrijvervalRioolleiding.
 LOZE_KLASSE = "gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .\n\n"
 
+# De pompunit ("pompput in een drukrioleringsstelsel") hangt in de GWSW-ontologie onder
+# Rioolput; alleen de fixtures van issue #104 hebben haar nodig.
+POMP_KLASSE = "gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .\n\n"
+
 # De twee drainageklassen die wél onder VrijvervalRioolleiding hangen (geverifieerd in de
 # gebundelde ontologie: DIT-riool en DT-riool zijn rioolleidingen met doorlatende wanden).
 # `Drain` staat in de prelude en hangt rechtstreeks onder Leiding; alleen de
@@ -2509,12 +2513,17 @@ FIXTURES["selectie_rollen.ttl"] = (
     # niet als een losse zwerver leest.
     HULPSTUK_KLASSEN
     + LOZE_KLASSE
+    + POMP_KLASSE
     + (
         "# Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude"
         " kent haar niet.\n"
         "gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .\n\n"
     )
     + put("Put1", "Put1", 1000.0, 2000.0)
+    # De pompunit van issue #104: de drukriolering-indicatie van EXT-009 leest de rol
+    # `pompunits`, en zonder object hier zou die rol uitsluitend op een lege selectie
+    # getoetst worden.
+    + put("Pomp1", "Pomp1", 1400.0, 2000.0, klasse="Pompunit")
     + put("Lozing1", "Lozing1", 1050.0, 2000.0, klasse="Lozingsput")
     + put("Val1", "Val1", 1200.0, 2000.0, klasse="Valput")
     # Overstortput en loze put staan hier ook, zodat de fixture alle zeventien rollen
@@ -2828,6 +2837,24 @@ FIXTURES["richting_persleiding_met_bob.ttl"] = (
         klasse="Persleiding",
         bob=(8.00, 7.50),
     ),
+)
+
+
+# EXT-009 (issue #104): drie kandidaat-wegvakken uit `tests/fixtures/gis/ext`, waarvan
+# er precies een riolering in zijn eigen voronoi-cel heeft. De NWB-lijnen, de bebouwde
+# kom en de BGT-wegdelen komen uit `scripts/maak_gis_fixtures.py`:
+#   Rioolstraat  (920, 1940)-(1000, 1940)  asfalt  -> deze riolering ligt erin: groen
+#   Lege Laan   (1020, 1940)-(1100, 1940)  klinkers -> geen riolering: rood, W-melding
+#   Grindweg     (920, 1910)-(1000, 1910)  zand     -> onverhard: niet beoordeeld, grijs
+# De twee putten liggen ruim binnen de voronoi-cel van Rioolstraat (de buffer heeft een
+# platte kap en eindigt op x = 920 en x = 1000, dus een put op het uiteinde zou op de
+# rand liggen). Kale putten en leidingen zonder hoogte of BOB: alleen EXT-009 hoort
+# deze fixture te lezen.
+FIXTURES["ext009_straten.ttl"] = (
+    "een van de drie kandidaat-straten heeft geen riolering in haar eigen voronoi-cel",
+    put("PutW1", "W1", 930.0, 1940.0)
+    + put("PutW2", "W2", 990.0, 1940.0)
+    + leiding("LW1", "W1-W2", [(930.0, 1940.0), (990.0, 1940.0)], "PutW1", "PutW2"),
 )
 
 

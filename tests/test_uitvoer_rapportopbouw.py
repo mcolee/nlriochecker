@@ -298,14 +298,24 @@ class TestOntbrekendeBronnen:
         assert "Niet aangeleverd of leeg:** bgt_water (geen laagnaam geconfigureerd)." in tekst
 
     def test_een_bron_zonder_check_haalt_de_banner_niet(self, tmp_path: Path) -> None:
-        """Geen check leest `bgt_putdeksel` sinds EXT-005 en EXT-006 vervielen."""
-        tekst = self._met_missing(
-            tmp_path, "bgt_putdeksel (lagen put bevatten geen features)", "nwb_wegvak"
-        )
+        """Geen check leest `bgt_putdeksel` sinds EXT-005 en EXT-006 vervielen.
+
+        `nwb_wegvak` stond hier tot issue #104 naast: die laag werd wel geladen maar door
+        geen check gelezen. Sinds EXT-009 leunt er wél een check op, dus hij hoort nu juist
+        in de banner -- zie de test hieronder.
+        """
+        tekst = self._met_missing(tmp_path, "bgt_putdeksel (lagen put bevatten geen features)")
 
         assert "bgt_putdeksel" not in tekst
-        assert "nwb_wegvak" not in tekst
         assert "Niet aangeleverd of leeg" not in tekst
+
+    def test_de_wegvakbronnen_van_ext009_staan_wel_in_de_banner(self, tmp_path: Path) -> None:
+        """EXT-009 leunt op drie bronnen die het register tot issue #104 niet kende."""
+        tekst = self._met_missing(tmp_path, "nwb_wegvak", "top10nl_kom", "bgt_wegdeel")
+
+        assert "nwb_wegvak" in tekst
+        assert "top10nl_kom" in tekst
+        assert "bgt_wegdeel" in tekst
 
 
 class TestOnderdrukking:

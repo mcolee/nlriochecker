@@ -51,11 +51,15 @@ def context_van(dataset: GwswDataset) -> CheckContext:
 # De aantallen per rol op de rollenfixture: 7 knopen en 7 verbindingen. Alle
 # zeventien rollen komen erin voor; dat bewaakt `test_elke_rol_komt_erin_voor`.
 ROLLENSET_AANTALLEN = {
-    "netwerkknopen": 7,
-    "putten": 5,
-    # Alle vijf de putten in de fixture zijn een Rioolput-subklasse (inspectie-, lozings-,
-    # overstort-, loze en valput); een gemaal of uitlaat zit er niet bij. Issue #64.
-    "rioolputten": 5,
+    "netwerkknopen": 8,
+    "putten": 6,
+    # Alle zes de putten in de fixture zijn een Rioolput-subklasse (inspectie-, lozings-,
+    # overstort-, loze en valput, plus de pompunit van issue #104); een gemaal of uitlaat
+    # zit er niet bij. Issue #64.
+    "rioolputten": 6,
+    # De pompunit: een Rioolput, en dus een deelverzameling van `putten` hierboven. EXT-009
+    # leest deze rol als drukriolering-indicatie (issue #104).
+    "pompunits": 1,
     "lozingspunten": 2,
     # Alleen de uitlaatconstructie: de lozingsput hoort bij de bredere rol hierboven maar
     # loost volgens het GWSW naar een ander rioolstelsel en niet op open water (BO-67).

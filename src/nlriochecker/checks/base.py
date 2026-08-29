@@ -14,7 +14,7 @@ from shapely.geometry import Point
 
 from nlriochecker.afbakening import Analyseset, objecten_in_gebied
 from nlriochecker.checkconfig import CheckConfig
-from nlriochecker.checks.treffers import Trefferregister
+from nlriochecker.checks.treffers import Trefferregister, Wegvakregister
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import ExternalData
 from nlriochecker.karakteristiek import DataCharacteristics, bepaal_karakteristiek
@@ -123,6 +123,11 @@ class CheckContext:
     # uitspraken -- alleen wat een melding aanwijst komt in de uitvoer terecht -- dus
     # een entry die blijft staan kan geen verkeerde laag opleveren.
     treffers: Trefferregister = field(default_factory=Trefferregister, compare=False, repr=False)
+    # Het oordeel van EXT-009 over elk kandidaat-wegvak (issue #104). Om dezelfde reden
+    # mutabel als `treffers` hierboven; het verschil is dat de groene en grijze rijen
+    # zonder melding in de laag `vlakken` terechtkomen, dus dit register bepaalt wél mee
+    # wat de uitvoer toont. Zie `checks/treffers.Wegvakregister` en BO-79.
+    wegvakken: Wegvakregister = field(default_factory=Wegvakregister, compare=False, repr=False)
     _cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     def volledige_context(self) -> CheckContext:
@@ -309,6 +314,11 @@ class CheckRun:
     # GeoPackage-schrijver joint de meldingen erop om de lagen met externe objecten te
     # vullen. Zie `checks/treffers.py`.
     treffers: Trefferregister = field(default_factory=Trefferregister, compare=False, repr=False)
+    # Het wegvakregister van diezelfde context: de volledige EXT-009-classificatie,
+    # waaruit de laag `vlakken` haar groene en grijze wegvakken haalt (BO-79). Anders dan
+    # `treffers` wordt dit register in `beperk_tot_studiegebied` mee afgebakend, want zijn
+    # rijen hangen niet aan een melding die daar al doorheen gaat.
+    wegvakken: Wegvakregister = field(default_factory=Wegvakregister, compare=False, repr=False)
     _binnen: frozenset[str] | None = field(default=None, compare=False, repr=False)
 
     @property
@@ -426,6 +436,10 @@ class CheckRun:
             nulbevindingen=nulbevindingen,
             nulbevindingen_weggelaten=len(self.nulbevindingen) - len(nulbevindingen),
             study_area=area,
+            # Op hun middelpunt, precies zoals `hoort_erbij` een bevinding met een eigen
+            # locatie afbakent: de rode melding en het groene vlak van hetzelfde wegvak
+            # horen niet aan verschillende kanten van de gebiedsgrens te vallen.
+            wegvakken=self.wegvakken.binnen(area.bevat),
             _binnen=binnen,
         )
 
@@ -619,7 +633,7 @@ def run_checks(
                 # vinden -- precies de stille afwijking tussen laag en uitslag die dit
                 # ontwerp uitsluit. `replace` deelt het cachewoordenboek, dus de dure
                 # structuren van de volledige export blijven hergebruikt.
-                gebruikt = replace(gebruikt, treffers=context.treffers)
+                gebruikt = replace(gebruikt, treffers=context.treffers, wegvakken=context.wegvakken)
             # De bevindingen bewust vóór de toelichting: `notes()` van de EXT-checks
             # leest wat `run()` in het register meldde. Als keyword-argument zou de
             # volgorde ook kloppen, maar dan staat ze nergens.
@@ -665,4 +679,5 @@ def run_checks(
         context=context,
         analyseset=context.analyseset,
         treffers=context.treffers,
+        wegvakken=context.wegvakken,
     )

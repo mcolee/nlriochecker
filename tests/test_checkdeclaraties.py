@@ -105,8 +105,8 @@ def test_register_weigert_check_zonder_declaratie() -> None:
     assert "TST-000" not in REGISTRY
 
 
-def test_alleen_de_bereikbaarheidschecks_gaan_over_het_persnet() -> None:
-    """Alleen wie de bereikbaarheidsgraaf leest declareert `mechanischeleidingen`.
+def test_alleen_de_bereikbaarheids_en_dekkingschecks_gaan_over_het_persnet() -> None:
+    """Alleen wie het persnet echt leest declareert `mechanischeleidingen`.
 
     Het mechanische riool wordt inhoudelijk niet getoetst; het draagt alleen
     connectiviteit voor de vraag of vrijverval ergens uitkomt (BO-54). Die vraag stellen
@@ -115,10 +115,14 @@ def test_alleen_de_bereikbaarheidschecks_gaan_over_het_persnet() -> None:
     het scherpste geval: elke ongerichte persleidingkant zou er een kringloop van twee
     knopen zijn, dus die check mág het persnet niet zien -- en hoort het dan ook niet te
     declareren.
+
+    EXT-009 staat er sinds issue #104 bij, om een andere reden: die leest de persleiding
+    niet als kant in een graaf maar als geometrie langs een straat. Ligt er persleiding
+    langs, dan is dat een drukriolering-indicatie en wordt de straat niet beoordeeld.
     """
     met_persnet = {cid for cid in CHECK_IDS if "mechanischeleidingen" in REGISTRY[cid].rollen}
 
-    assert met_persnet == {"NET-001", "NET-002", "NET-008"}
+    assert met_persnet == {"EXT-009", "NET-001", "NET-002", "NET-008"}
 
 
 def test_alleen_een_check_zonder_rol_omschrijft_zijn_populatie() -> None:

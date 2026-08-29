@@ -55,6 +55,8 @@ gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,
 
 gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .
 
+gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .
+
 # Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude kent haar niet.
 gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 
@@ -63,6 +65,11 @@ gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 :Put1_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:Pomp1 rdf:type gwsw:Pompunit ; rdfs:label "Pomp1" ;
+    gwsw:hasAspect :Pomp1_ori .
+:Pomp1_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1400.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 :Lozing1 rdf:type gwsw:Lozingsput ; rdfs:label "Lozing1" ;
     gwsw:hasAspect :Lozing1_ori .
 :Lozing1_ori rdf:type gwsw:Putorientatie ;

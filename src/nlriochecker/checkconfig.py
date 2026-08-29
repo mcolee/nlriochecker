@@ -76,6 +76,12 @@ class ClassRoots(BaseModel):
     waterlozingspunt: list[str] = Field(
         default_factory=lambda: ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlaktewater"]
     )
+    # EXT-009: de pompputten van de drukriolering. `Pompunit` is in de GWSW-ontologie een
+    # `Rioolput` ("pompput in een drukrioleringsstelsel"), dus een echte deelverzameling
+    # van `put`; `Gemaal` hoort er niet bij, want dat is een bouwwerk en het einde van de
+    # afvoer in plaats van een buurtaansluiting. De wortel komt uit de ontologie en niet
+    # uit een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`.
+    pompunit: list[str] = Field(default_factory=lambda: ["Pompunit"])
     vuilwater: list[str] = Field(default_factory=list)
     hemelwater: list[str] = Field(default_factory=list)
     infiltratie: list[str] = Field(default_factory=list)
@@ -326,6 +332,69 @@ class CheckThresholds(BaseModel):
     ext_lozingspunt_water_afstand_m: float = Field(default=10.0, gt=0.0)
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
 
+    # EXT-009 (issue #104): straten in de bebouwde kom zonder vrijvervalriolering. Alle
+    # elf waarden komen uit de POC op De Wolden en Hoogeveen; `ext_wegvak_streng_in_cel`
+    # is de dragende maat en is op de validatieset van 485 handmatig beoordeelde straten
+    # geijkt (BO-81). Geen ervan telt mee in `ext_zoekafstand_max_m`: die drempel verruimt
+    # het bereik waarbinnen de EXT-checks in een externe laag kijken, en EXT-009 kijkt daar
+    # hoogstens `ext_wegvak_wegdek_buffer_m` (3 m) ver in -- ruim onder de bestaande 10 m.
+    # De 25 m en 15 m eromheen zijn zoekafstanden in de GWSW-data, niet in een bron.
+    #
+    # Halve breedte van het straatvlak: de voronoi-cel wordt op deze buffer om de
+    # NWB-lijn geknipt (platte kap, zodat het vlak bij de kruising ophoudt).
+    ext_wegvak_buffer_m: float = Field(default=25.0, gt=0.0)
+    # De strook waarin een persleiding als "langs deze straat" telt.
+    ext_wegvak_corridor_m: float = Field(default=15.0, gt=0.0)
+    # Korter dan dit is geen straat maar een stukje kruisingsgeometrie.
+    ext_wegvak_minimale_lengte_m: float = Field(default=25.0, gt=0.0)
+    # Om de hoeveel meter de wegvakken verdicht worden voordat de voronoi eroverheen gaat.
+    ext_wegvak_verdichting_m: float = Field(default=10.0, gt=0.0)
+    # De dragende maat: strenglengte in de eigen voronoi-cel gedeeld door de straatlengte.
+    # Daaronder heet de straat leeg. Geijkt op de validatieset; zie BO-81.
+    ext_wegvak_streng_in_cel: float = Field(default=0.25, gt=0.0)
+    # Drukriolering-indicatie: een pompunit binnen deze afstand van de straat, of
+    # persleiding langs de straat over meer dan dit aandeel van haar lengte.
+    ext_wegvak_pomp_afstand_m: float = Field(default=15.0, gt=0.0)
+    ext_wegvak_persleiding_aandeel: float = Field(default=0.3, gt=0.0, le=1.0)
+    # Boven dit aandeel onverhard wegdek valt de straat buiten scope: het model is voor
+    # vrijverval-kernstraten gemaakt.
+    ext_wegvak_onverhard_aandeel: float = Field(default=0.5, gt=0.0, le=1.0)
+    # De strook om de NWB-lijn waarin het BGT-wegdek gemeten wordt.
+    ext_wegvak_wegdek_buffer_m: float = Field(default=3.0, gt=0.0)
+    # De NWB-wegbeheerdersoort van een gemeentelijke weg (`WEGBEHSRT`). Alleen die
+    # straten horen bij de gemeentelijke riolering.
+    ext_wegvak_wegbeheerder: str = "G"
+    # De NWB-baansubsoorten (`BST_CODE`) die geen straat zijn: paden, parkeerplaatsen,
+    # op- en afritten. Daar hoort geen riool onder te liggen.
+    ext_wegvak_uitgesloten_bst: list[str] = Field(
+        default_factory=lambda: [
+            "FP",
+            "VP",
+            "VZ",
+            "OPR",
+            "AFR",
+            "PC",
+            "PKP",
+            "PKB",
+            "PR",
+            "PP",
+            "PST",
+        ]
+    )
+    # De BGT-waarden van `plus_fysiek_voorkomen` die als onverhard tellen.
+    ext_wegvak_onverhard_wegdek: list[str] = Field(
+        default_factory=lambda: [
+            "zand",
+            "grind",
+            "gravel",
+            "puin",
+            "schelpen",
+            "boomschors",
+            "half verhard",
+            "onverhard",
+        ]
+    )
+
     # #75: bufferafstand om de strengen van een gemengd deelstelsel, voor de
     # cartografische RVZ-006-vlakken in de laag `vlakken` van de GeoPackage (#98). Geen
     # check-drempel; alleen de kaartlaag leest hem. De sleutel houdt zijn naam: hij staat
@@ -495,11 +564,18 @@ class ExternalSources(BaseModel):
     bgt: str | None = None
     bag_pand: str | None = None
     nwb_wegvakken: str | None = None
+    # EXT-009: het TOP10NL-plaatsvlak met de bebouwde kom. Anders dan `bag_pand` en
+    # `nwb_wegvakken` is dit geen eenlaagsbestand -- het De Wolden-extract draagt er twee
+    # -- dus de rol noemt haar laagnaam apart, zoals de BGT-rollen dat doen.
+    top10nl: str | None = None
+    top10nl_komlagen: list[str] = Field(default_factory=list)
     studiegebied: str | None = None
     ahn_dtm: str | None = None
     # Welke BGT-lagen welke rol vervullen; per aangeleverde export in te vullen.
     bgt_pandlagen: list[str] = Field(default_factory=list)
     bgt_waterlagen: list[str] = Field(default_factory=list)
+    # EXT-009: de BGT-wegdelen, voor het aandeel onverhard wegdek langs een straat.
+    bgt_wegdeellagen: list[str] = Field(default_factory=list)
     # Geen check leest deze rol meer sinds EXT-005 en EXT-006 met issue #95 vervielen
     # (BO-64 en BO-65); de sleutel blijft staan en de laag wordt nog wel geladen.
     bgt_putdeksellagen: list[str] = Field(default_factory=list)

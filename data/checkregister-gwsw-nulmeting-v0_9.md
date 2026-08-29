@@ -168,6 +168,7 @@ Bevindingen uit de eerste run op echte data (De Wolden, 2026-08-16), zie open pu
 | EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie van deze check, het rapport meldt hoeveel dat er zijn. Getoetst wordt op BGT-waterdelen; waterschapsdata is toegestaan maar niet aangeleverd | W | Compleetheid |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit |
 | EXT-007 | Lozingspunt zonder watergang binnen X m; alleen de klassen die op oppervlaktewater lozen (`[klassen] waterlozingspunt`); scopeafwijking in BO-67 | W | Plausibiliteit |
+| EXT-009 | Straat in de bebouwde kom zonder vrijvervalriolering. Het toetsobject is een NWB-wegvak en geen GWSW-object: gemeentelijk beheer, geen pad of parkeervak, minstens de minimale lengte, en het middelpunt in een TOP10NL-vlak met `bebouwdekom = ja`. De maat is de lengte vrijvervalstreng in het eigen straatvlak (de voronoi-cel om de wegas, geknipt op buffer en komgrens) gedeeld door de straatlengte; een put in dat vlak telt als bediend (lus- en hoefijzerwegen). Drie uitkomsten in plaats van twee: naast bediend en leeg is er *niet beoordeeld* voor een overwegend onverharde straat en voor een straat met drukriolering-indicatie (BO-79). Deterministische regel, geen model (BO-81); de bronafhankelijkheid staat in BO-80 | W | Compleetheid |
 
 ## Geschrapte checks (gedekt door GWSW-nulmeting)
 
@@ -228,6 +229,25 @@ terug onder een nieuw ID.
 13. Verplaatst naar de issuetracker: [#5 _bouw_netwerk overschrijft de kantattributen van parallelle strengen](https://github.com/mcolee/nlriochecker/issues/5).
 
 ## Versiehistorie
+
+Versie 0.9, addendum (2026-08-29): EXT-009 toegevoegd -- straat in de bebouwde kom zonder
+vrijvervalriolering (W, Compleetheid). Nieuw is niet alleen de check maar ook zijn soort: dit
+is de eerste **dekkingsvraag** in het register. EXT-001, EXT-003 en EXT-007 toetsen een
+GWSW-object tegen een externe bron; EXT-009 vraagt of er langs een weg riolering *bestaat*, en
+neemt daarvoor het NWB-wegvak als toetsobject. Drie gevolgen die het register vastlegt. (1) De
+melding hangt aan een sleutel `nwb:wegvak/<WVK_ID>` en niet aan een dataset-URI; haar plek op
+de kaart komt uit het middelpunt van het wegvak. (2) De uitslag kent drie toestanden in plaats
+van twee: naast bediend (groen) en leeg (rood) is er *niet beoordeeld* (grijs) voor een
+overwegend onverharde straat en voor een straat met drukriolering-indicatie. Groen en grijs
+dragen geen melding maar wel een vlak in de GeoPackage, en het rapport telt ze -- stilte zou
+lezen als "alles gecontroleerd". Zie BO-79. (3) De check leunt op drie externe bronnen die het
+register nog niet kende: NWB-wegvakken, TOP10NL `plaats_vlak` (bebouwde kom) en BGT `wegdeel`
+(verharding); ontbreekt er een, dan slaat de check over met de gebruikelijke melding. Zie
+BO-80. De regel is deterministisch en met opzet geen model: op een validatieset van 485
+handmatig beoordeelde straten haalt zij evenveel fouten als een getraind
+gradient-boosting-model, met de foutrichting naar valse alarmen. De ijking van de dragende
+drempel en de fouttabel staan in BO-81. EXT-008 blijft vervallen en is niet hergebruikt; zie de
+tabel Vervallen checks. Zie [#104](https://github.com/mcolee/nlriochecker/issues/104).
 
 Versie 0.9, addendum (2026-08-28): EXT-002 vervallen (zie de tabel Vervallen checks). De check
 meldde elke vrijvervalstreng die een BGT-waterdeel echt doorkruist, zonder te vragen of dat een

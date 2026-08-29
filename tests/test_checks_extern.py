@@ -87,8 +87,12 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
         "bgt_water": 7,
         "bgt_putdeksel": 3,
         "bgt_bouwwerk": 1,
+        # De twee lagen van EXT-009 (issue #104): drie BGT-wegdelen en acht NWB-wegvakken,
+        # waarvan er drie kandidaat zijn. `top10nl_kom` staat er niet bij: deze bronnenset
+        # zet `top10nl` niet, en de EXT-009-tests staan in `test_checks_ext009.py`.
+        "bgt_wegdeel": 3,
         "bag_pand": 2,
-        "nwb_wegvak": 1,
+        "nwb_wegvak": 8,
     }
     assert all(laag.crs == "EPSG:28992" for laag in bronnen.layers.values())
     assert all(laag.reprojected_from is None for laag in bronnen.layers.values())

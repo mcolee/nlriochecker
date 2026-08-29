@@ -308,6 +308,11 @@ def test_externe_bronnen_van_koekangerveld() -> None:
         # Alleen `waterdeel`; `ondersteunendwaterdeel` (94 oevers) valt buiten scope.
         "bgt_water": 120,
         "bgt_bouwwerk": 41,
+        # De drie lagen van EXT-009 (issue #104). Het TOP10NL-plaatsvlak is uit het De
+        # Wolden-extract geknipt met `scripts/knip_top10nl_koekangerveld.py`: er is voor
+        # dit gebied geen eigen levering, en Koekangerveld is er de enige woonkern in.
+        "bgt_wegdeel": 124,
+        "top10nl_kom": 1,
         "bag_pand": 166,
         "nwb_wegvak": 13,
     }

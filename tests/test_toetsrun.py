@@ -49,6 +49,7 @@ BRONBESTANDEN = {
     'bgt = "BGT.gpkg"': 'bgt = "bgt.gpkg"',
     'bag_pand = "bag_pand_koekangerveld.gpkg"': 'bag_pand = "bag_pand.gpkg"',
     'nwb_wegvakken = "nwb_wegvakken_koekangerveld.gpkg"': 'nwb_wegvakken = "nwb_wegvakken.gpkg"',
+    'top10nl = "top10nl_plaats_vlak_koekangerveld.gpkg"': ('top10nl = "top10nl_plaats_vlak.gpkg"'),
     'studiegebied = "cbs_buurt_koekangerveld_studiegebied.gpkg"': (
         'studiegebied = "studiegebied.gpkg"'
     ),
@@ -361,11 +362,13 @@ class TestExterneBronnen:
         )
 
         assert uitslag.bronnen is not None
-        assert len(uitslag.bronnen.layers) == 6
+        # Acht lagen sinds issue #104: de zes van voorheen plus `bgt_wegdeel` en
+        # `top10nl_kom`, de twee die EXT-009 naast de NWB-wegvakken nodig heeft.
+        assert len(uitslag.bronnen.layers) == 8
         assert uitslag.bronnen.raster is not None
         assert uitslag.bronnen.missing == ()
         assert any(
-            regel.startswith("  Externe bronnen: 6 lagen, hoogteraster, bereik ")
+            regel.startswith("  Externe bronnen: 8 lagen, hoogteraster, bereik ")
             for regel in uitslag.regels()
         )
         assert not any("Geen externe bronnen geladen" in regel for regel in uitslag.regels())

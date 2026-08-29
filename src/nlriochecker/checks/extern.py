@@ -40,6 +40,14 @@ from nlriochecker.checks.selectie import (
 )
 from nlriochecker.checks.treffers import Treffer, bouw_sleutel
 from nlriochecker.checks.verbanden import verbonden_knopen
+from nlriochecker.checks.wegvakken import (
+    REDEN_DRUKRIOLERING,
+    REDEN_ONVERHARD,
+    STATUS_GRIJS,
+    STATUS_GROEN,
+    STATUS_ROOD,
+    beoordeel,
+)
 from nlriochecker.externedata import ROL_RASTER, ROL_STUDIEGEBIED, VectorLayer
 from nlriochecker.taal import getal, met_lidwoord
 
@@ -234,9 +242,10 @@ def bronrollen_met_check() -> frozenset[str]:
 
     Het rapport zegt van een ontbrekende bron dat de checks die hem nodig hebben zijn
     overgeslagen; die zin mag alleen over deze bronnen gaan. `bgt_putdeksel` staat er
-    niet meer bij sinds EXT-005 en EXT-006 vervielen (BO-64, BO-65) en `nwb_wegvak`
-    stond er nooit bij: beide worden nog geladen en op dekking getoetst, maar hun
-    ontbreken slaat niets over. De opdrachtregel van `toets` somt wel alles op wat
+    niet meer bij sinds EXT-005 en EXT-006 vervielen (BO-64, BO-65): die laag wordt nog
+    geladen en op dekking getoetst, maar haar ontbreken slaat niets over. `nwb_wegvak`
+    stond er tot issue #104 evenmin bij; sinds EXT-009 hoort hij er wel bij, samen met
+    `top10nl_kom` en `bgt_wegdeel`. De opdrachtregel van `toets` somt wel alles op wat
     niet geladen is.
     """
     return frozenset().union(
@@ -819,6 +828,159 @@ class LozingspuntZonderWatergang(_ExterneCheck):
                 f"Geen BGT-waterdeel binnen {afstand:g} m van dit lozingspunt.",
                 afstand_m=afstand,
             )
+
+
+# De drie externe bronnen die EXT-009 nodig heeft. Ontbreekt er een, dan slaat de check
+# over met de standaardmelding; er is geen aparte aan/uit-schakelaar in de config, want
+# de afwezigheid van een rol geeft dat gedrag al (BO-80). Een project dat de check niet
+# wil, laat `nwb_wegvakken` of `top10nl` weg.
+WEGVAKROLLEN = ("nwb_wegvak", "top10nl_kom", "bgt_wegdeel")
+
+
+@register
+class StraatZonderRiolering(_ExterneCheck):
+    """EXT-009: een straat in de bebouwde kom zonder vrijvervalriolering.
+
+    De enige EXT-check waarvan het toetsobject geen GWSW-object is. Hij vraagt niet of
+    een streng ergens doorheen ligt maar of er langs deze weg riolering *bestaat*, en
+    dus is de populatie het NWB-wegvak. De melding draagt daarom een eigen sleutel
+    (`nwb:wegvak/<WVK_ID>`) en haar plek op de kaart via `Finding.location`, de weg die
+    `uitvoer/locatie.py` openhoudt voor een bevinding zonder dataset-object.
+
+    De uitslag kent drie toestanden en niet twee: naast rood (geen riolering, deze
+    waarschuwing) en groen (riolering aangetoond) is er grijs -- niet beoordeeld, omdat
+    de straat onverhard is of op drukriolering ligt. Groen en grijs dragen geen melding
+    maar wel een vlak in de GeoPackage; die komen uit het register op de context
+    (`context.wegvakken`), zodat de schrijver de NWB-laag niet zelf hoeft te bevragen.
+    Zie BO-79 en BO-81, en `checks/wegvakken.py` voor de regel zelf.
+    """
+
+    id = "EXT-009"
+    title = "Straat in de bebouwde kom zonder vrijvervalriolering"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    rollen = ("mechanischeleidingen", "pompunits", "putten", "vrijvervalrioolleidingen")
+    kenmerken = ()
+    rol = "nwb_wegvak"
+    soort = "wegvakken"
+
+    @classmethod
+    def bronrollen(cls) -> frozenset[str]:
+        """Alle drie de wegvakrollen, niet alleen `rol`."""
+        return frozenset({ROL_STUDIEGEBIED, *WEGVAKROLLEN})
+
+    def objecten(self, context: CheckContext) -> list:
+        """Leeg: de populatie van deze check zijn wegvakken en geen GWSW-objecten.
+
+        De basisklasse splitst GWSW-objecten in toetsbaar, buiten het gebied en niet
+        betrouwbaar getypeerd. Die drieslag hoort bij een check op een streng of een put;
+        hier zou hij een lege bak zijn met een misleidend getal erin. `examined()` en
+        `notes()` tellen daarom de wegvakken.
+        """
+        return []
+
+    def ontbrekende_rol(self, context: CheckContext) -> str | None:
+        """De eerste bron die deze check mist, of None."""
+        if context.bronnen is None:
+            return WEGVAKROLLEN[0]
+        return next(
+            (rol for rol in WEGVAKROLLEN if context.bronnen.layer(rol) is None),
+            None,
+        )
+
+    def bruikbaar(self, context: CheckContext) -> bool:
+        """Deze check heeft alle drie de wegvakrollen nodig."""
+        if context.bronnen is None or context.bronnen.extent is None:
+            return False
+        return self.ontbrekende_rol(context) is None
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal kandidaat-wegvakken dat beoordeeld is."""
+        return len(beoordeel(context)) if self.bruikbaar(context) else 0
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke straat zonder riolering en legt het hele oordeel in het register.
+
+        Ook groen en grijs gaan het register in: de laag `vlakken` toont ze, en zij zijn
+        de enige plek waar "hier is gekeken en er ligt riolering" van "hier is niet
+        gekeken" te onderscheiden is.
+        """
+        drempel = context.config.drempels.ext_wegvak_streng_in_cel
+        for oordeel in beoordeel(context).oordelen:
+            context.wegvakken.registreer(oordeel)
+            if oordeel.status != STATUS_ROOD:
+                continue
+            punt = oordeel.middelpunt
+            yield self.finding(
+                context,
+                oordeel.sleutel,
+                oordeel.label,
+                "Deze straat ligt in de bebouwde kom, maar er ligt geen "
+                f"vrijvervalriolering in haar eigen straatvlak: {oordeel.streng_in_cel:.2f} "
+                f"maal de straatlengte, minder dan de drempel {drempel:g}.",
+                location=(punt.x, punt.y),
+                waarde=round(oordeel.streng_in_cel, 3),
+                drempel=drempel,
+                straat=oordeel.straat,
+                plaats=oordeel.plaats,
+                straatlengte_m=round(oordeel.straatlengte_m, 1),
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt wat er beoordeeld is, wat niet, en waarom niet.
+
+        Drie dingen die zonder deze regels stil zouden blijven: de wegvakken die buiten
+        de kandidaatselectie vielen, de straten die wél bekeken zijn en in orde bleken
+        (groen), en de straten die de regel bewust niet beoordeelt (grijs). Alleen de
+        rode staan als melding in het rapport, en een lijst rode straten zonder noemer
+        zegt niets.
+        """
+        if context.bronnen is None or context.bronnen.extent is None:
+            return _bereiknotities(context, self.selectie(context), self.soort)
+        ontbreekt = self.ontbrekende_rol(context)
+        if ontbreekt is not None:
+            return [context.bronnen.ontbreekt(ontbreekt)]
+
+        uitslag = beoordeel(context)
+        redenen = uitslag.reden_telling()
+        grijs = uitslag.aantal(STATUS_GRIJS)
+        drempels = context.config.drempels
+        return [
+            f"Kandidaten: {getal(len(uitslag), 'wegvak', 'wegvakken')} van de "
+            f"{uitslag.wegvakken_totaal} NWB-wegvakken. Afgevallen: "
+            f"{_afvalregel(uitslag.afgevallen)}.",
+            f"Beoordeeld: {uitslag.aantal(STATUS_GROEN)} groen (riolering aangetoond) en "
+            f"{uitslag.aantal(STATUS_ROOD)} rood (geen riolering). Een straat heet bediend "
+            f"vanaf {drempels.ext_wegvak_streng_in_cel:g} maal haar lengte aan "
+            "vrijvervalstreng in haar eigen straatvlak, of zodra er een put in dat vlak "
+            "ligt (lus- en hoefijzerwegen).",
+            f"Niet beoordeeld: {getal(grijs, 'wegvak', 'wegvakken')} "
+            f"({redenen[REDEN_ONVERHARD]} met {REDEN_ONVERHARD}, "
+            f"{redenen[REDEN_DRUKRIOLERING]} met {REDEN_DRUKRIOLERING}). Daar zegt het "
+            "ontbreken van vrijverval niets over de datakwaliteit; ze staan grijs in de "
+            "laag `vlakken` en dragen geen melding.",
+            f"Externe bronnen: {_bronregel(context)}.",
+        ]
+
+
+def _afvalregel(afgevallen: dict[str, int] | None) -> str:
+    """De redenen waarom wegvakken buiten de kandidaatselectie vielen, met aantallen."""
+    if not afgevallen:
+        return "geen"
+    return "; ".join(f"{aantal} {reden}" for reden, aantal in afgevallen.items())
+
+
+def _bronregel(context: CheckContext) -> str:
+    """Welke externe lagen EXT-009 gebruikt heeft, met hun omvang."""
+    bronnen = context.bronnen
+    if bronnen is None:
+        return "geen"
+    delen = []
+    for rol in WEGVAKROLLEN:
+        laag = bronnen.layer(rol)
+        if laag is not None:
+            delen.append(f"{rol} ({len(laag)} features uit `{laag.source.name}`)")
+    return ", ".join(delen)
 
 
 class _AhnCheck(_ExterneCheck):

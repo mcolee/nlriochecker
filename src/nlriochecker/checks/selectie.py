@@ -96,6 +96,19 @@ def rioolputten(context: CheckContext) -> list[Node]:
     return _knopen(context, "sel:rioolputten", context.config.klassen.rioolput)
 
 
+def pompunits(context: CheckContext) -> list[Node]:
+    """De pompputten van de drukriolering: `gwsw:Pompunit` en haar subklassen.
+
+    De ontologie omschrijft haar als "pompput in een drukrioleringsstelsel" en hangt
+    haar onder `gwsw:Rioolput`; het is dus een echte deelverzameling van `putten`. Een
+    `Gemaal` hoort er niet bij: dat is een bouwwerk en het einde van de afvoer, geen
+    aansluitpunt van een buurt. EXT-009 leest deze rol als drukriolering-indicatie --
+    staat er een pompunit naast de straat, dan zegt het ontbreken van vrijverval
+    daar niets over de datakwaliteit.
+    """
+    return _knopen(context, "sel:pompunits", context.config.klassen.pompunit)
+
+
 def lozingspunten(context: CheckContext) -> list[Node]:
     """De punten waar het afvalwater het stelsel verlaat of binnenkomt.
 
@@ -336,6 +349,7 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "netwerkknopen": netwerkknopen,
     "putten": putten,
     "rioolputten": rioolputten,
+    "pompunits": pompunits,
     "lozingspunten": lozingspunten,
     "waterlozingspunten": waterlozingspunten,
     "overstortputten": overstortputten,
@@ -364,6 +378,7 @@ _ROL_VELDEN: dict[str, str] = {
     "netwerkknopen": "netwerkknopen",
     "putten": "put",
     "rioolputten": "rioolput",
+    "pompunits": "pompunit",
     "lozingspunten": "lozings_eindpunt",
     "waterlozingspunten": "waterlozingspunt",
     "overstortputten": "overstortput",

@@ -103,6 +103,13 @@ lozings_eindpunt = [
 # verlaat naar, of ontvangt uit, een ander rioolstelsel") en de wortel Lozingspunt, want
 # daaronder hangt ook LozingspuntBodem ("de locatie bevindt zich in de bodem"). Zie BO-67.
 waterlozingspunt = ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlaktewater"]
+# EXT-009: de pompputten van de drukriolering. De GWSW-ontologie omschrijft `Pompunit`
+# als "pompput in een drukrioleringsstelsel" en hangt haar onder `Rioolput`; ze is dus
+# een deelverzameling van `put` hierboven. `Gemaal` hoort er niet bij -- dat is een
+# bouwwerk en het einde van de afvoer, geen aansluitpunt van een buurt, en het staat al
+# in `afvoer_eindpunt`. Staat er een pompunit naast een straat, dan zegt het ontbreken
+# van vrijverval daar niets over de datakwaliteit: die straat wordt niet beoordeeld.
+pompunit = ["Pompunit"]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]
@@ -216,6 +223,12 @@ dekking_tolerantie_m = 300.0
 bgt = "BGT.gpkg"
 bag_pand = "bag_pand_koekangerveld.gpkg"
 nwb_wegvakken = "nwb_wegvakken_koekangerveld.gpkg"
+# EXT-009: het TOP10NL-plaatsvlak met de bebouwde kom. Er is voor Koekangerveld geen
+# eigen TOP10NL-levering; dit bestand is uit het De Wolden-extract geknipt met
+# `scripts/knip_top10nl_koekangerveld.py`. De laagnaam staat er apart bij: anders dan
+# `bag_pand` en `nwb_wegvakken` is dit geen eenlaagsbestand.
+top10nl = "top10nl_plaats_vlak_koekangerveld.gpkg"
+top10nl_komlagen = ["plaats_vlak"]
 studiegebied = "cbs_buurt_koekangerveld_studiegebied.gpkg"
 ahn_dtm = "ahn5_dtm_koekangerveld.tif"
 # Welke BGT-lagen welke rol vervullen. De namen komen uit de aangeleverde export;
@@ -233,6 +246,10 @@ bgt_waterlagen = ["waterdeel"]
 # dekking getoetst.
 bgt_putdeksellagen = ["put"]
 bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
+# EXT-009: de wegdelen, voor het aandeel onverhard wegdek langs een straat. De verharding
+# staat in `plus_fysiek_voorkomen` (zand, grind, gravel, puin, ...); het historiefilter
+# van `_alleen_actueel` geldt hier net als bij de andere BGT-lagen.
+bgt_wegdeellagen = ["wegdeel"]
 
 [drempels]
 # Elke drempel draagt zijn check-ID en herkomst: een getal uit het checkregister,
@@ -409,6 +426,44 @@ ext_watergang_buffer_m = 1.0
 ext_putdeksel_afstand_m = 2.0
 ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0
+
+# EXT-009 (issue #104): straten in de bebouwde kom zonder vrijvervalriolering. Alle elf
+# waarden komen uit de POC op De Wolden en Hoogeveen; het checkregister noemt de check
+# maar geen getal. Geen ervan telt mee in `ext_zoekafstand_max_m`: die verruimt het
+# bereik waarbinnen een EXT-check in een externe *laag* kijkt, en dat doet EXT-009
+# hoogstens `ext_wegvak_wegdek_buffer_m` (3 m) ver -- de 25 m en 15 m hieronder zijn
+# zoekafstanden in de GWSW-data. Zie BO-80.
+#
+# Halve breedte van het straatvlak: de voronoi-cel wordt op deze buffer om de NWB-lijn
+# geknipt, met een platte kap zodat het vlak bij de kruising ophoudt.
+ext_wegvak_buffer_m = 25.0
+# De strook waarin een persleiding als "langs deze straat" telt.
+ext_wegvak_corridor_m = 15.0
+# Korter dan dit is geen straat maar een stukje kruisingsgeometrie.
+ext_wegvak_minimale_lengte_m = 25.0
+# Om de hoeveel meter de wegvakken verdicht worden voordat de voronoi eroverheen gaat.
+ext_wegvak_verdichting_m = 10.0
+# De dragende maat: vrijvervalstreng in de eigen voronoi-cel gedeeld door de
+# straatlengte. Daaronder heet de straat leeg. Geijkt op de validatieset van 485
+# handmatig beoordeelde straten met `scripts/ijk_ext009.py`; zie BO-81.
+ext_wegvak_streng_in_cel = 0.25
+# Drukriolering-indicatie: een pompunit binnen deze afstand van de straat, of
+# persleiding langs de straat over meer dan dit aandeel van haar lengte. Zo'n straat
+# wordt niet beoordeeld -- daar hoeft geen vrijverval te liggen.
+ext_wegvak_pomp_afstand_m = 15.0
+ext_wegvak_persleiding_aandeel = 0.3
+# Boven dit aandeel onverhard wegdek valt de straat buiten scope.
+ext_wegvak_onverhard_aandeel = 0.5
+# De strook om de NWB-lijn waarin het BGT-wegdek gemeten wordt: het wegdek zelf en niet
+# de berm ernaast.
+ext_wegvak_wegdek_buffer_m = 3.0
+# De NWB-wegbeheerdersoort van een gemeentelijke weg (`WEGBEHSRT`).
+ext_wegvak_wegbeheerder = "G"
+# De NWB-baansubsoorten (`BST_CODE`) die geen straat zijn: paden, parkeerplaatsen en
+# op- en afritten. Daar hoort geen riool onder te liggen.
+ext_wegvak_uitgesloten_bst = ["FP", "VP", "VZ", "OPR", "AFR", "PC", "PKP", "PKB", "PR", "PP", "PST"]
+# De BGT-waarden van `plus_fysiek_voorkomen` die als onverhard tellen.
+ext_wegvak_onverhard_wegdek = ["zand", "grind", "gravel", "puin", "schelpen", "boomschors", "half verhard", "onverhard"]
 
 # #75: bufferafstand om de strengen van een gemengd deelstelsel, voor de cartografische
 # RVZ-006-vlakken in de laag `vlakken` van de GeoPackage (#98). Projectkeuze, geen externe

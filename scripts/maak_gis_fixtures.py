@@ -35,9 +35,18 @@ BUURTEN = {
     "Zuid": (1060.0, 1990.0, 1160.0, 2010.0),
 }
 
-# Het studiegebied van de fixtures: een strook rond de TTL-coordinaten.
-GEBIED = (980.0, 1980.0, 1120.0, 2020.0)
+# Het studiegebied van de fixtures: een vlak rond de TTL-coordinaten. Het was een
+# smalle strook (980, 1980)-(1120, 2020) tot issue #104; de EXT-009-straten hebben
+# ruimte nodig voor hun voronoi-vlakken (buffer 25 m) en liggen daarom zuidelijker.
+# Put D op (2000, 2000) valt er nog steeds buiten -- daar leunen de EXT-tests op.
+GEBIED = (900.0, 1900.0, 1200.0, 2100.0)
 NODATA = 3.4028234663852886e38
+
+# De bebouwde kom van de EXT-009-fixture (TOP10NL `plaats_vlak`) en het buitengebied
+# erboven. De drie kandidaat-straten liggen in de kom; `Buitenweg` en `Fixturestraat`
+# liggen erbuiten en vallen daarom af.
+KOM = (900.0, 1900.0, 1200.0, 1970.0)
+BUITEN_KOM = (900.0, 1970.0, 1200.0, 2100.0)
 
 
 def schrijf(frame, pad: Path, laag: str) -> None:
@@ -136,6 +145,7 @@ def main() -> None:
         bgt,
         "overigbouwwerk",
     )
+    _schrijf_wegdelen(gpd, bgt)
 
     # Pand 1 ligt bij de riolering, pand 2 ver ervandaan.
     schrijf(
@@ -154,18 +164,89 @@ def main() -> None:
         "output",
     )
 
+    _schrijf_wegvakken(gpd)
+    _schrijf_kom(gpd)
+    _schrijf_buurten(gpd)
+
+    print(f"Geschreven in {DOEL}")
+
+
+# De acht NWB-wegvakken van de EXT-009-fixture: drie kandidaten en vijf die om elk een
+# eigen reden afvallen. De kolomnamen staan in kleine letters, net als in het
+# Koekangerveld-extract; het De Wolden-extract schrijft ze in hoofdletters, en de lezer
+# hoort daar ongevoelig voor te zijn.
+#
+# (naam, wegbehsrt, bst_code, wvk_id, lijn, waarom)
+WEGVAKKEN = [
+    ("Fixturestraat", "G", "VOW", 1, [(998.0, 2000.0), (1092.0, 2000.0)], "buiten de kom"),
+    ("Rioolstraat", "G", "VOW", 2, [(920.0, 1940.0), (1000.0, 1940.0)], "kandidaat: bediend"),
+    ("Lege Laan", "G", "VOW", 3, [(1020.0, 1940.0), (1100.0, 1940.0)], "kandidaat: leeg"),
+    ("Grindweg", "G", "VOW", 4, [(920.0, 1910.0), (1000.0, 1910.0)], "kandidaat: onverhard"),
+    ("Buitenweg", "G", "VOW", 5, [(920.0, 2050.0), (1000.0, 2050.0)], "buiten de kom"),
+    ("Rijksweg", "R", "VOW", 6, [(1020.0, 1910.0), (1100.0, 1910.0)], "niet gemeentelijk"),
+    ("Fietspad", "G", "FP", 7, [(1020.0, 1960.0), (1100.0, 1960.0)], "pad"),
+    ("Kort Straatje", "G", "VOW", 8, [(920.0, 1960.0), (940.0, 1960.0)], "korter dan 25 m"),
+]
+
+
+def _schrijf_wegvakken(gpd) -> None:
+    """Schrijft de NWB-wegvakken voor EXT-009."""
     schrijf(
         gpd.GeoDataFrame(
-            {"stt_naam": ["Fixturestraat"], "frc": ["6"]},
-            geometry=[LineString([(998.0, 2000.0), (1092.0, 2000.0)])],
+            {
+                "stt_naam": [rij[0] for rij in WEGVAKKEN],
+                "wegbehsrt": [rij[1] for rij in WEGVAKKEN],
+                "bst_code": [rij[2] for rij in WEGVAKKEN],
+                "wvk_id": [rij[3] for rij in WEGVAKKEN],
+                "frc": ["6"] * len(WEGVAKKEN),
+            },
+            geometry=[LineString(rij[4]) for rij in WEGVAKKEN],
         ),
         DOEL / "nwb_wegvakken.gpkg",
         "output",
     )
 
-    _schrijf_buurten(gpd)
 
-    print(f"Geschreven in {DOEL}")
+def _schrijf_kom(gpd) -> None:
+    """Schrijft het TOP10NL-plaatsvlak: een bebouwde kom en een buitengebied.
+
+    Twee lagen in een bestand, net als het De Wolden-extract: `enige_laag` volstaat
+    daar niet, dus de rol noemt haar laagnaam (`top10nl_komlagen`).
+    """
+    frame = gpd.GeoDataFrame(
+        {
+            "naamnl": ["Fixturekom", "Buitengebied"],
+            "bebouwdekom": ["ja", "nee"],
+            "typegebied": ["woonkern", "buurtschap"],
+        },
+        geometry=[box(*KOM), box(*BUITEN_KOM)],
+    )
+    pad = DOEL / "top10nl_plaats_vlak.gpkg"
+    schrijf(frame, pad, "plaats_vlak")
+    schrijf(frame.iloc[:1], pad, "output")
+
+
+def _schrijf_wegdelen(gpd, bgt: Path) -> None:
+    """Schrijft de BGT-wegdelen onder de EXT-009-straten.
+
+    Rioolstraat en Lege Laan liggen op asfalt en klinkers, Grindweg op zand: die laatste
+    komt daardoor boven het onverhard-aandeel uit en wordt niet beoordeeld.
+    """
+    schrijf(
+        gpd.GeoDataFrame(
+            {
+                "lokaal_id": ["weg-1", "weg-2", "weg-3"],
+                "plus_fysiek_voorkomen": ["asfalt", "betonstraatstenen", "zand"],
+            },
+            geometry=[
+                box(920.0, 1937.0, 1000.0, 1943.0),
+                box(1020.0, 1937.0, 1100.0, 1943.0),
+                box(920.0, 1907.0, 1000.0, 1913.0),
+            ],
+        ),
+        bgt,
+        "wegdeel",
+    )
 
 
 def _schrijf_buurten(gpd) -> None:

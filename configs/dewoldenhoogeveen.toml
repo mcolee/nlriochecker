@@ -9,7 +9,8 @@
 # De afwijkingen ten opzichte van checks.toml, met de meting waarop ze rusten:
 #   map                  data/gis_dewoldenhoogeveen in plaats van data/gis_koekangerveld
 #   bag_pand             BAG_light_pand.gpkg (58.067 panden)
-#   nwb_wegvakken        niet aangeleverd voor dit gebied
+#   nwb_wegvakken        NWB_wegvakken_DeWoldenHoogeveen.gpkg (9787 wegvakken)
+#   top10nl              TOP10NL_plaats_vlak_DeWoldenHoogeveen.gpkg (laag plaats_vlak)
 #   studiegebied         de CBS-buurtenkaart met 100 m buffer (36.708,5 ha, een feature)
 #   ahn_dtm              AHN6 in plaats van AHN5
 #   bgt_putdeksellagen   leeg; zie de toelichting bij dat veld
@@ -111,6 +112,11 @@ lozings_eindpunt = [
 # daaronder hangt ook LozingspuntBodem. De Wolden en Hoogeveen levert alleen
 # Uitlaatconstructie (712); van de andere twee nul instanties. Zie BO-67.
 waterlozingspunt = ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlaktewater"]
+# EXT-009: de pompputten van de drukriolering. `Pompunit` is in de GWSW-ontologie een
+# `Rioolput` ("pompput in een drukrioleringsstelsel"); De Wolden en Hoogeveen levert er
+# 1107. `Gemaal` hoort er niet bij -- dat is een bouwwerk en staat al in
+# `afvoer_eindpunt`. Een straat met een pompunit ernaast wordt niet beoordeeld.
+pompunit = ["Pompunit"]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]
@@ -210,7 +216,12 @@ map = "data/gis_dewoldenhoogeveen"
 dekking_tolerantie_m = 300.0
 bgt = "BGT.gpkg"
 bag_pand = "BAG_light_pand.gpkg"
-# nwb_wegvakken: niet aangeleverd voor dit gebied
+# EXT-009: de NWB-wegvakken (laag `geclipt`, 9787 stuks) en het TOP10NL-plaatsvlak met
+# de bebouwde kom (laag `plaats_vlak`, 117 vlakken waarvan 27 met `bebouwdekom = ja`).
+# Het TOP10NL-bestand draagt twee lagen, dus de rol noemt haar laagnaam apart.
+nwb_wegvakken = "NWB_wegvakken_DeWoldenHoogeveen.gpkg"
+top10nl = "TOP10NL_plaats_vlak_DeWoldenHoogeveen.gpkg"
+top10nl_komlagen = ["plaats_vlak"]
 studiegebied = "CBS_buurten_DeWoldenHoogeveen_buffer_100m.gpkg"
 ahn_dtm = "AHN6_DeWoldenHoogeveen_DTM.tif"
 # Welke BGT-lagen welke rol vervullen. De namen komen uit de aangeleverde export;
@@ -228,6 +239,9 @@ bgt_waterlagen = ["waterdeel"]
 # (BO-64 en BO-65); geen check leest deze rol meer. De sleutel blijft leeg staan.
 bgt_putdeksellagen = []
 bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
+# EXT-009: de wegdelen, voor het aandeel onverhard wegdek langs een straat. De laag telt
+# 144.008 objectversies waarvan 62.108 actueel; `_alleen_actueel` houdt de rest eruit.
+bgt_wegdeellagen = ["wegdeel"]
 
 [drempels]
 # Elke drempel draagt zijn check-ID en herkomst: een getal uit het checkregister,
@@ -394,6 +408,22 @@ ext_watergang_buffer_m = 1.0
 ext_putdeksel_afstand_m = 2.0
 ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0
+
+# EXT-009 (issue #104): straten in de bebouwde kom zonder vrijvervalriolering. De
+# waarden komen uit de POC op deze dataset; `ext_wegvak_streng_in_cel` is geijkt op de
+# validatieset van 485 handmatig beoordeelde straten (`scripts/ijk_ext009.py`, BO-81).
+ext_wegvak_buffer_m = 25.0
+ext_wegvak_corridor_m = 15.0
+ext_wegvak_minimale_lengte_m = 25.0
+ext_wegvak_verdichting_m = 10.0
+ext_wegvak_streng_in_cel = 0.25
+ext_wegvak_pomp_afstand_m = 15.0
+ext_wegvak_persleiding_aandeel = 0.3
+ext_wegvak_onverhard_aandeel = 0.5
+ext_wegvak_wegdek_buffer_m = 3.0
+ext_wegvak_wegbeheerder = "G"
+ext_wegvak_uitgesloten_bst = ["FP", "VP", "VZ", "OPR", "AFR", "PC", "PKP", "PKB", "PR", "PP", "PST"]
+ext_wegvak_onverhard_wegdek = ["zand", "grind", "gravel", "puin", "schelpen", "boomschors", "half verhard", "onverhard"]
 
 # #75: bufferafstand om de strengen van een gemengd deelstelsel voor de cartografische
 # RVZ-006-vlakken in de laag `vlakken` (#98). Projectkeuze, geen externe bron.

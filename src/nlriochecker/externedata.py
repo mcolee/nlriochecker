@@ -73,6 +73,28 @@ class VectorLayer:
         """De attributen van een feature, of een lege dict."""
         return self.attributes[positie] if positie < len(self.attributes) else {}
 
+    def kolom(self, naam: str) -> list[object]:
+        """De waarden van een kolom, hoofdletterongevoelig, per feature.
+
+        De kolomnamen van eenzelfde bron verschillen per extract: het NWB-bestand van De
+        Wolden en Hoogeveen schrijft `WEGBEHSRT` en `STT_NAAM`, dat van Koekangerveld
+        `wegbehsrt` en `stt_naam`. Twee codepaden zouden op een dag uit elkaar lopen; deze
+        ene lezing is de plek waar dat verschil verdwijnt. Een kolom die niet bestaat
+        levert `None` per feature op, net als een lege waarde.
+        """
+        gezocht = naam.casefold()
+        return [
+            next(
+                (
+                    waarde
+                    for kolom, waarde in rij.items()
+                    if kolom.casefold() == gezocht and waarde is not None
+                ),
+                None,
+            )
+            for rij in self.attributes
+        ]
+
 
 @dataclass(frozen=True)
 class RasterSampler:
@@ -143,7 +165,17 @@ ROLLEN = {
     "bgt_water": "bgt_waterlagen",
     "bgt_putdeksel": "bgt_putdeksellagen",
     "bgt_bouwwerk": "bgt_overige_bouwwerklagen",
+    "bgt_wegdeel": "bgt_wegdeellagen",
 }
+
+# De rollen die per definitie geen gebiedsdekkend extract zijn en daarom buiten de
+# dekkingspoort vallen (`_toets_dekking`, BO-19 en BO-80). Een bebouwde kom is een
+# deelgebied van het bereik: het TOP10NL-plaatsvlak houdt op waar het buitengebied
+# begint, en dat is precies de bedoeling. De poort zou daar altijd afgaan, en een
+# ruimere `dekking_tolerantie_m` zou de poort dan ook voor de andere bronnen opheffen.
+# Wat EXT-009 hiermee kwijtraakt staat in zijn toelichting: een wegvak zonder komvlak
+# is geen kandidaat, en het rapport telt hoeveel wegvakken dat waren.
+ZONDER_DEKKINGSEIS = frozenset({"top10nl_kom"})
 
 # De twee bronnen die geen vectorrol zijn maar wel in `missing` kunnen belanden. Ze
 # staan hier als naam, zodat de checks kunnen declareren dat ze erop leunen zonder de
@@ -198,6 +230,12 @@ def load_external_data(
         if laag is not None:
             lagen[rol] = laag
 
+    kom = _lees_rol(
+        map_pad, bronnen.top10nl, "top10nl_kom", bronnen.top10nl_komlagen, ontbrekend, notities
+    )
+    if kom is not None:
+        lagen["top10nl_kom"] = kom
+
     raster = _lees_raster(map_pad, bronnen.ahn_dtm, ontbrekend, notities)
 
     data = ExternalData(
@@ -233,6 +271,9 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
     buiten het bereik telt mee voor een object er net binnen. Het raster krijgt geen
     marge: bemonsteren is puntsgewijs.
 
+    De rollen in `ZONDER_DEKKINGSEIS` blijven erbuiten: die zijn per definitie een
+    deelgebied van het bereik, en daar zou de poort altijd afgaan (BO-80).
+
     Wat deze poort *niet* kan: bbox-dekking is noodzakelijk maar niet voldoende. Een
     gat midden in het extract valt er niet mee op, en een tekort op een dunne laag
     betekent "hier staan geen features", niet per se "extract afgeknipt". De
@@ -244,6 +285,8 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
     bereik = data.extent.bounds
     tekorten: list[str] = []
     for rol, laag in sorted(data.layers.items()):
+        if rol in ZONDER_DEKKINGSEIS:
+            continue
         omhullende = _omhullende(laag.geometries)
         if omhullende is None:
             continue

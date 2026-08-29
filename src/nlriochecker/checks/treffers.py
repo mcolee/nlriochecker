@@ -12,14 +12,21 @@ Het register doet zelf geen uitspraken: het is een opzoektabel. Een treffer die 
 staat maar door geen enkele melding wordt aangewezen, komt nergens terecht. Daardoor
 kan een register dat te veel bevat -- bijvoorbeeld doordat een gedeelde context er
 entries in achterlaat -- geen verkeerde laag opleveren.
+
+Sinds issue #104 staat er een tweede register naast, met dezelfde vorm maar een andere
+afspraak: `Wegvakregister` draagt het volledige oordeel van EXT-009 over elk
+kandidaat-wegvak, ook de groene en de grijze, want die krijgen een vlak zonder dat er
+een melding naar wijst (BO-79). Daar telt élke rij mee in de uitvoer, en dus wordt dat
+register wél tot het studiegebied afgebakend.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from hashlib import sha256
 
+from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
 # De kolommen waarin de aangeleverde bronnen hun identificatie dragen, in de volgorde
@@ -130,3 +137,89 @@ class Trefferregister:
     def __iter__(self) -> Iterator[Treffer]:
         """Loopt over de geregistreerde treffers."""
         return iter(self._treffers.values())
+
+
+@dataclass(frozen=True)
+class Wegvakoordeel:
+    """Het oordeel van EXT-009 over een kandidaat-wegvak (issue #104).
+
+    Anders dan een `Treffer` hierboven staat dit oordeel *wel* op zichzelf: de laag
+    `vlakken` toont naast de rode wegvakken ook de groene en de grijze, en die dragen
+    per definitie geen melding. Dat is de derde uitvoertoestand van BO-79, en dit
+    register is de enige weg waarlangs de schrijver eraan komt -- hij mag de NWB-laag
+    niet zelf bevragen, want dan kunnen laag en uitslag uit elkaar lopen.
+
+    `sleutel` is `nwb:wegvak/<WVK_ID>` en is ook de `object_uri` van de melding bij een
+    rood wegvak; `middelpunt` is haar foutlocatie en tegelijk het punt waarop de
+    afbakening tot een studiegebied werkt. `aandeel_onverhard` is `None` als er geen
+    BGT-wegdeel naast de straat ligt: dan is er niets gemeten, en dat is iets anders
+    dan een aandeel van nul.
+
+    Het veld heet `straatlengte_m` en niet `lengte_m`: dat laatste is op een `Conduit`
+    de afgeleide eigenschap achter `LengteLeiding`, en de AST-sweep van issue #64 zou
+    elke lezing ervan als een kenmerklezing tellen -- dezelfde val als bij
+    `_Kruising.waterdeel` in `checks/extern.py` (issue #96).
+    """
+
+    sleutel: str
+    straat: str
+    plaats: str
+    status: str
+    reden: str
+    straatlengte_m: float
+    streng_in_cel: float
+    aandeel_onverhard: float | None
+    middelpunt: Point
+    vlak: BaseGeometry
+    bronbestand: str
+
+    @property
+    def label(self) -> str:
+        """De aanduiding van dit wegvak: de straatnaam, met de plaats erachter."""
+        return f"{self.straat} ({self.plaats})" if self.plaats else self.straat
+
+
+@dataclass
+class Wegvakregister:
+    """De wegvakken die EXT-009 tijdens deze run beoordeeld heeft.
+
+    Dezelfde vorm als het trefferregister hierboven -- een opzoektabel op sleutel, door
+    de check gevuld terwijl hij draait -- met een verschil dat er wezenlijk toe doet:
+    hier telt élke rij mee in de uitvoer, ook zonder melding. Daarom is dit register wél
+    aan de afbakening onderworpen (`binnen`), terwijl het trefferregister vanzelf
+    meebeweegt met de meldingen die ernaar wijzen.
+    """
+
+    _oordelen: dict[str, Wegvakoordeel] = field(default_factory=dict)
+
+    def registreer(self, oordeel: Wegvakoordeel) -> None:
+        """Legt het oordeel over een wegvak vast; de eerste registratie wint."""
+        self._oordelen.setdefault(oordeel.sleutel, oordeel)
+
+    def get(self, sleutel: str) -> Wegvakoordeel | None:
+        """Het oordeel bij deze sleutel, of None."""
+        return self._oordelen.get(sleutel)
+
+    def binnen(self, bevat: Callable[[Point], bool]) -> Wegvakregister:
+        """Een register met alleen de wegvakken waarvan het middelpunt binnen valt.
+
+        Het predicaat komt van de aanroeper (`StudyArea.bevat`), zodat deze module niets
+        van studiegebieden hoeft te weten. Het middelpunt is dezelfde plek waarop
+        `beperk_tot_studiegebied` de meldingen afbakent, dus laag en uitslag houden
+        dezelfde grens.
+        """
+        return Wegvakregister(
+            {
+                sleutel: oordeel
+                for sleutel, oordeel in self._oordelen.items()
+                if bevat(oordeel.middelpunt)
+            }
+        )
+
+    def __len__(self) -> int:
+        """Het aantal beoordeelde wegvakken."""
+        return len(self._oordelen)
+
+    def __iter__(self) -> Iterator[Wegvakoordeel]:
+        """Loopt over de oordelen, op sleutel gesorteerd."""
+        return iter([self._oordelen[sleutel] for sleutel in sorted(self._oordelen)])
