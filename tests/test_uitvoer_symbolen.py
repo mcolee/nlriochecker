@@ -185,6 +185,28 @@ def test_de_vlakkenlaag_blijft_een_gewoon_bestand() -> None:
     assert aanwezig == {"vlakken.qml"}
 
 
+def test_de_vlakkenlaag_geeft_elke_check_precies_een_regel() -> None:
+    """De labels van `vlakken.qml`, getoetst zonder QGIS (issue #107, BO-85).
+
+    De legenda hoort te lezen als de checklijst: één regel per check, met de checkcode
+    voorop. `tests/test_uitvoer_qgis.py` doet de andere helft (of QGIS die regels ook
+    werkelijk toepast), maar die test slaat over waar geen PyQGIS staat -- op de CI-runner
+    dus. Dat deze test het bestand ontleedt is daar het tweede nut van: een QML die geen
+    geldige XML meer is (een dubbel koppelteken in een commentaar volstaat) laat QGIS
+    stilzwijgend met een lege foutboodschap vallen.
+    """
+    boom = ET.fromstring((STIJLEN / "vlakken.qml").read_text(encoding="utf-8"))
+
+    labels = [regel.get("label") for regel in boom.iter("rule")]
+
+    assert labels == [
+        "EXT-001 - Pand of bouwwerk (BGT/BAG)",
+        "EXT-003 - Waterdeel (BGT)",
+        "RVZ-006 - Gemengd stelsel zonder overstort",
+        "EXT-009 - Mogelijk ontbrekend riool",
+    ]
+
+
 def test_elk_objecttype_in_de_voorbeelddataset_staat_in_de_tabel(juinen) -> None:
     """Een type zonder eigen regel valt in het vangnet en is dan niet te herkennen."""
     knopen = {juinen.beheerobjecttype(uri) for uri in juinen.nodes}

@@ -20,10 +20,12 @@ from __future__ import annotations
 import os
 import sys
 import sysconfig
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
 import pytest
+from shapely.geometry import Point, box
 
 
 def _systeem_pyqgis_pad() -> Path | None:
@@ -62,6 +64,7 @@ from gwsw_orox_helpers.dataset import load_dataset  # noqa: E402
 
 from nlriochecker.checkconfig import load_check_config  # noqa: E402
 from nlriochecker.checks import CheckContext, run_checks  # noqa: E402
+from nlriochecker.checks.treffers import Wegvakoordeel, Wegvakregister  # noqa: E402
 from nlriochecker.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
 from nlriochecker.uitvoer.melding import bouw_meldingen  # noqa: E402
 
@@ -102,6 +105,45 @@ def gpkg_met_deelstelselvlak(tmp_path_factory) -> Path:
     run = run_checks(CheckContext(dataset=dataset, config=config), ["RVZ-006"])
     map_ = tmp_path_factory.mktemp("qgis_vlak")
     return schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), map_, RUNDATUM)
+
+
+@pytest.fixture(scope="module")
+def gpkg_met_wegvakken(tmp_path_factory) -> Path:
+    """Een GeoPackage met een groen en een grijs EXT-009-wegvak in `vlakken`.
+
+    Het wegvakregister wordt hier met de hand gevuld in plaats van door EXT-009: die
+    check heeft de externe GIS-bronnen nodig, en dat is voor een stijltest een dure
+    omweg -- de rij die de schrijver ervan maakt is dezelfde. Een rood wegvak zit er
+    niet in: rood krijgt alleen een rij als er een EXT-009-melding naar wijst.
+    """
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl", [])
+    run = run_checks(CheckContext(dataset=dataset, config=config))
+    register = Wegvakregister()
+    for nummer, (straat, status, reden) in enumerate(
+        (("Rioolstraat", "groen", ""), ("Grindweg", "grijs", "overwegend onverhard")), start=1
+    ):
+        register.registreer(
+            Wegvakoordeel(
+                sleutel=f"nwb:wegvak/{nummer}",
+                straat=straat,
+                plaats="Fixturekom",
+                status=status,
+                reden=reden,
+                straatlengte_m=100.0,
+                streng_in_cel=0.0,
+                aandeel_onverhard=None,
+                middelpunt=Point(1010.0 + nummer * 20.0, 2010.0),
+                vlak=box(1000.0 + nummer * 20.0, 2000.0, 1020.0 + nummer * 20.0, 2020.0),
+                bronbestand="nwb_wegvakken.gpkg",
+            )
+        )
+    met_wegvakken = replace(run, wegvakken=register)
+    map_ = tmp_path_factory.mktemp("qgis_wegvak")
+    return schrijf_geopackage(
+        met_wegvakken, bouw_meldingen(met_wegvakken, RUNDATUM), map_, RUNDATUM
+    )
 
 
 @pytest.mark.parametrize("laag", FEATURELAGEN)
@@ -211,29 +253,60 @@ def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_g
     } <= labels
 
 
-def test_de_vlakkenlaag_toont_elke_soort(qgis_app, geschreven_gpkg: Path) -> None:
-    """De kern van #67, #98 en #104: één laag met een regel per soort.
+def test_de_vlakkenlaag_geeft_elke_check_een_regel(qgis_app, geschreven_gpkg: Path) -> None:
+    """De kern van #107: één regel per check, met de checkcode voorop.
 
-    Drie externe soorten (pand, bouwwerk, water), het gemengde deelstelsel van RVZ-006
-    dat tot #98 een eigen laag had, en de wegvakken van EXT-009. Die laatste krijgen drie
-    regels in plaats van één: hun kleur volgt de kolom `status`, want groen ("gekeken, er
-    ligt riolering") en grijs ("niet beoordeeld") zijn het onderscheid dat de kaart moet
-    tonen (BO-79). De regels staan vast in de QML, ook op een lege laag.
+    De laag draagt vlakken van vier checks (EXT-001, EXT-003, RVZ-006 en EXT-009) en de
+    legenda leest daarmee als de checklijst. Pand en bouwwerk delen hun regel -- ze komen
+    van dezelfde check -- en van de wegvakken tekent alleen de rode; groen en grijs
+    blijven wel als rij bestaan (BO-85). De regels staan vast in de QML, ook op een lege
+    laag.
     """
     vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=vlakken", "v", "ogr")
     boodschap, gelukt = vector.loadDefaultStyle()
 
     assert gelukt, f"vlakken: {boodschap}"
-    labels = {regel.label() for regel in vector.renderer().rootRule().children()}
-    assert labels == {
-        "Pand (BGT/BAG)",
-        "Overig bouwwerk (BGT)",
-        "Waterdeel (BGT)",
-        "Gemengd deelstelsel zonder overstort (RVZ-006)",
-        "Straat zonder riolering (EXT-009)",
-        "Straat met riolering (EXT-009)",
-        "Straat niet beoordeeld (EXT-009)",
+    labels = [regel.label() for regel in vector.renderer().rootRule().children()]
+    assert labels == [
+        "EXT-001 - Pand of bouwwerk (BGT/BAG)",
+        "EXT-003 - Waterdeel (BGT)",
+        "RVZ-006 - Gemengd stelsel zonder overstort",
+        "EXT-009 - Mogelijk ontbrekend riool",
+    ]
+
+
+def test_een_groen_of_grijs_wegvak_blijft_een_rij_maar_krijgt_geen_regel(
+    qgis_app, gpkg_met_wegvakken: Path
+) -> None:
+    """De bewuste afwijking van BO-79, vastgelegd in BO-85.
+
+    De rijen blijven -- dat is de kern van BO-79: in de attributentabel, in een filter en
+    in de popup is nog steeds na te gaan of een straat bekeken is. De standaardstijl
+    tekent ze alleen niet meer, want met 3593 groene en 23 grijze vlakken over 500 rode
+    was de kaart niet te lezen. De rode straat toont dat het filter zelf wél aanslaat;
+    zonder haar zou een stukgeslagen regel deze test ook groen laten.
+    """
+    vector = qgis_core.QgsVectorLayer(f"{gpkg_met_wegvakken}|layername=vlakken", "v", "ogr")
+    boodschap, gelukt = vector.loadDefaultStyle()
+
+    assert gelukt, f"vlakken: {boodschap}"
+    # De fixture levert naast de twee wegvakken het gemengde deelstelsel van RVZ-006.
+    assert vector.featureCount() == 3
+    wegvakken = {
+        kenmerk["status"]: kenmerk  # type: ignore[index]
+        for kenmerk in vector.getFeatures()
+        if kenmerk["soort"] == "wegvak"  # type: ignore[index]
     }
+
+    assert set(wegvakken) == {"groen", "grijs"}
+    for status, kenmerk in wegvakken.items():
+        assert _regels_voor(vector, kenmerk) == set(), status
+
+    rood = qgis_core.QgsFeature(vector.fields())
+    rood["soort"] = "wegvak"
+    rood["status"] = "rood"
+
+    assert _regels_voor(vector, rood) == {"EXT-009 - Mogelijk ontbrekend riool"}
 
 
 def test_de_maptip_van_een_deelstelselvlak_toont_de_voorgebakken_popup(
@@ -298,6 +371,22 @@ def _maptip(vector, feature) -> str:
     context.appendScopes(qgis_core.QgsExpressionContextUtils.globalProjectLayerScopes(vector))
     context.setFeature(feature)
     return qgis_core.QgsExpression.replaceExpressionText(vector.mapTipTemplate(), context)
+
+
+def _regels_voor(vector, feature) -> set[str]:
+    """De labels van de stijlregels waarvan het filter op deze rij aanslaat.
+
+    Een lege verzameling betekent dat QGIS de rij niet tekent: een regelgebaseerde
+    renderer laat een object waarop geen enkel filter past ongemoeid.
+    """
+    context = qgis_core.QgsExpressionContext()
+    context.appendScopes(qgis_core.QgsExpressionContextUtils.globalProjectLayerScopes(vector))
+    context.setFeature(feature)
+    return {
+        regel.label()
+        for regel in vector.renderer().rootRule().children()
+        if qgis_core.QgsExpression(regel.filterExpression()).evaluate(context)
+    }
 
 
 def _renderer_symbolen(renderer):

@@ -114,6 +114,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De laag `vlakken` krijgt één stijlregel per check, en tekent groen en grijs niet meer**
+  (issue #107, BO-85). De zeven regels van de standaardstijl worden er vier, met de
+  checkcode voorop: `EXT-001 - Pand of bouwwerk (BGT/BAG)`, `EXT-003 - Waterdeel (BGT)`,
+  `RVZ-006 - Gemengd stelsel zonder overstort` en `EXT-009 - Mogelijk ontbrekend riool`.
+  Pand en bouwwerk delen nu één regel en de pand-kleur; de oranje bouwwerkkleur vervalt.
+  **De groene en grijze wegvakken van EXT-009 worden niet meer getekend**: op De Wolden en
+  Hoogeveen overstemden 3593 groene en 23 grijze vlakken de 500 rode. Ze blijven volledig
+  als rij in de laag staan -- attributentabel, filter, popup en `n_wegvakken` -- zodat
+  "gekeken, er ligt riolering" en "niet beoordeeld" na te gaan blijven; alleen bij openen
+  zijn ze niet als kaartvlak te zien. Dat wijkt bewust af van BO-79. De GeoPackage zelf
+  verandert niet: dezelfde rijen, dezelfde kolommen, dezelfde `gwsw_run`.
 - **RVZ-006 benoemt de aanwijzingen bij het gebrek** (issue #106, BO-84). De melding zei
   wél welke eis een gemengd deelstelsel miste, maar niet waardóór het los lag of
   onvolledig was; bij de review van alle vlakken moest dat per vlak met de hand worden

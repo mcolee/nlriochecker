@@ -1,23 +1,29 @@
-<!-- Default-stijl voor de laag `vlakken` (issue #67, uitgebreid in #98 en #104): alles wat
-     bij de uitslag van deze run hoort en geen punt of lijn is, in één laag. Rule-based op
-     `soort`: de drie externe soorten (pand, bouwwerk, water) met een eigen omlijning en een
-     doorzichtige vulling, zodat de riolering eronder zichtbaar blijft, het gemengde
-     deelstelsel van RVZ-006 (voorheen de eigen laag `gemengd_zonder_overstort`) met de
-     rode vlakvulling die het daar had, en de wegvakken van EXT-009 in drie regels op de
-     kolom `status`. Die laatste drie zijn de enige vlakken die ook zonder melding bestaan:
-     groen betekent "gekeken, er ligt riolering", grijs "niet beoordeeld" (BO-79). De kleur
-     volgt `status` en is dezelfde als in de objectlagen. `styleCategories` noemt MapTips,
-     anders leest QGIS het mapTip-element niet terug uit layer_styles. -->
+<!-- Default-stijl voor de laag `vlakken` (issue #67, uitgebreid in #98 en #104,
+     herzien in #107): alles wat bij de uitslag van deze run hoort en geen punt of lijn
+     is, in één laag. Rule-based op `soort`, met precies één regel per check en de
+     checkcode voorop, zodat de legenda leest als de checklijst: EXT-001 (pand én
+     bouwwerk komen van dezelfde check, dus één regel en één kleur), EXT-003, RVZ-006 en
+     EXT-009. De externe soorten krijgen een omlijning met een doorzichtige vulling,
+     zodat de riolering eronder zichtbaar blijft; het gemengde deelstelsel van RVZ-006
+     (voorheen de eigen laag `gemengd_zonder_overstort`) houdt de rode vlakvulling die
+     het daar had.
+     Van de wegvakken tekent alleen de rode. Groen ("gekeken, er ligt riolering") en
+     grijs ("niet beoordeeld") blijven wél als rij in de laag staan, na te gaan in de
+     attributentabel, in een filter en in de popup, maar krijgen geen regel: op De
+     Wolden en Hoogeveen staan 3593 groene en 23 grijze vlakken tegenover 500 rode, en
+     die overstemmen de kaart. Dat wijkt bewust af van BO-79; zie BO-85.
+     `styleCategories` noemt MapTips, anders leest QGIS het mapTip-element niet terug
+     uit layer_styles.
+     Let op bij het bijwerken van dit commentaar: XML staat geen dubbel koppelteken in
+     een commentaar toe. Eén ervan maakt de hele QML onleesbaar, en QGIS laat de stijl
+     dan vallen met een lege foutboodschap. -->
 <qgis version="3.28" styleCategories="Symbology|MapTips">
   <renderer-v2 type="RuleRenderer" forceraster="0" symbollevels="0">
     <rules key="{cc000000-0000-4000-8000-000000000000}">
-      <rule filter="&quot;soort&quot; = 'pand'" symbol="0" label="Pand (BGT/BAG)" key="{cc000000-0000-4000-8000-000000000001}"/>
-      <rule filter="&quot;soort&quot; = 'bouwwerk'" symbol="1" label="Overig bouwwerk (BGT)" key="{cc000000-0000-4000-8000-000000000002}"/>
-      <rule filter="&quot;soort&quot; = 'water'" symbol="2" label="Waterdeel (BGT)" key="{cc000000-0000-4000-8000-000000000003}"/>
-      <rule filter="&quot;soort&quot; = 'gemengd_deelstelsel'" symbol="3" label="Gemengd deelstelsel zonder overstort (RVZ-006)" key="{cc000000-0000-4000-8000-000000000004}"/>
-      <rule filter="&quot;soort&quot; = 'wegvak' AND &quot;status&quot; = 'rood'" symbol="4" label="Straat zonder riolering (EXT-009)" key="{cc000000-0000-4000-8000-000000000005}"/>
-      <rule filter="&quot;soort&quot; = 'wegvak' AND &quot;status&quot; = 'groen'" symbol="5" label="Straat met riolering (EXT-009)" key="{cc000000-0000-4000-8000-000000000006}"/>
-      <rule filter="&quot;soort&quot; = 'wegvak' AND &quot;status&quot; = 'grijs'" symbol="6" label="Straat niet beoordeeld (EXT-009)" key="{cc000000-0000-4000-8000-000000000007}"/>
+      <rule filter="&quot;soort&quot; IN ('pand', 'bouwwerk')" symbol="0" label="EXT-001 - Pand of bouwwerk (BGT/BAG)" key="{cc000000-0000-4000-8000-000000000001}"/>
+      <rule filter="&quot;soort&quot; = 'water'" symbol="1" label="EXT-003 - Waterdeel (BGT)" key="{cc000000-0000-4000-8000-000000000002}"/>
+      <rule filter="&quot;soort&quot; = 'gemengd_deelstelsel'" symbol="2" label="RVZ-006 - Gemengd stelsel zonder overstort" key="{cc000000-0000-4000-8000-000000000003}"/>
+      <rule filter="&quot;soort&quot; = 'wegvak' AND &quot;status&quot; = 'rood'" symbol="3" label="EXT-009 - Mogelijk ontbrekend riool" key="{cc000000-0000-4000-8000-000000000004}"/>
     </rules>
     <symbols>
       <symbol type="fill" name="0" alpha="1">
@@ -31,15 +37,6 @@
       </symbol>
       <symbol type="fill" name="1" alpha="1">
         <layer class="SimpleFill">
-          <prop k="color" v="230,97,1,0"/>
-          <prop k="style" v="no"/>
-          <prop k="outline_color" v="230,97,1,255"/>
-          <prop k="outline_width" v="0.4"/>
-          <prop k="outline_style" v="solid"/>
-        </layer>
-      </symbol>
-      <symbol type="fill" name="2" alpha="1">
-        <layer class="SimpleFill">
           <prop k="color" v="33,102,172,0"/>
           <prop k="style" v="no"/>
           <prop k="outline_color" v="33,102,172,255"/>
@@ -47,7 +44,7 @@
           <prop k="outline_style" v="solid"/>
         </layer>
       </symbol>
-      <symbol type="fill" name="3" alpha="1">
+      <symbol type="fill" name="2" alpha="1">
         <layer class="SimpleFill">
           <prop k="color" v="215,48,39,60"/>
           <prop k="style" v="solid"/>
@@ -56,30 +53,12 @@
           <prop k="outline_style" v="solid"/>
         </layer>
       </symbol>
-      <symbol type="fill" name="4" alpha="1">
+      <symbol type="fill" name="3" alpha="1">
         <layer class="SimpleFill">
           <prop k="color" v="178,24,43,70"/>
           <prop k="style" v="solid"/>
           <prop k="outline_color" v="178,24,43,255"/>
           <prop k="outline_width" v="0.5"/>
-          <prop k="outline_style" v="solid"/>
-        </layer>
-      </symbol>
-      <symbol type="fill" name="5" alpha="1">
-        <layer class="SimpleFill">
-          <prop k="color" v="77,146,33,50"/>
-          <prop k="style" v="solid"/>
-          <prop k="outline_color" v="77,146,33,255"/>
-          <prop k="outline_width" v="0.4"/>
-          <prop k="outline_style" v="solid"/>
-        </layer>
-      </symbol>
-      <symbol type="fill" name="6" alpha="1">
-        <layer class="SimpleFill">
-          <prop k="color" v="119,119,119,50"/>
-          <prop k="style" v="solid"/>
-          <prop k="outline_color" v="119,119,119,255"/>
-          <prop k="outline_width" v="0.4"/>
           <prop k="outline_style" v="solid"/>
         </layer>
       </symbol>

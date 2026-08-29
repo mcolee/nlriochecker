@@ -311,15 +311,19 @@ alleen het bestand waarin zij staat is verhuisd.
   grens als de meldingen, zodat de rode melding en het groene vlak niet aan verschillende
   kanten ervan vallen. De schrijver bevraagt de NWB-laag nooit zelf. `gwsw_run` telt de
   rijen in **`n_wegvakken`**, naast `n_gemengd_zonder_overstort`; het aantal externe
-  vlakken is `n_vlakken` min die twee. `vlakken.qml` geeft de soort drie regels, een per
-  status, met dezelfde kleuren als de objectlagen.
+  vlakken is `n_vlakken` min die twee. In de standaardstijl tekent `vlakken.qml` sinds
+  issue #107 alleen het rode wegvak: groen en grijs blijven volledig als rij in de laag
+  staan -- attributentabel, filter en popup -- maar krijgen geen stijlregel en zijn bij
+  openen dus niet als kaartvlak te zien (BO-85, een bewuste afwijking van BO-79).
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
 - De stijlen van `putten` en `strengen` worden opgebouwd uit de tabel in
   `uitvoer/stijlen/symbolen.py` (regelstructuur objecttype x status, ruim honderd
-  bladregels); `vlakken.qml` (rule-based op `soort`, met zeven regels: pand, bouwwerk,
-  water, gemengd deelstelsel en drie voor het wegvak, een per `status`) blijft een bestand. Het symbool volgt het
+  bladregels); `vlakken.qml` (rule-based op `soort`, sinds issue #107 met vier regels:
+  een per check, met de checkcode voorop in de vorm `CODE - omschrijving` -- EXT-001 voor
+  pand en bouwwerk samen, EXT-003 voor water, RVZ-006 voor het gemengde deelstelsel en
+  EXT-009 voor het rode wegvak) blijft een bestand. Het symbool volgt het
   GWSW-objecttype, de kleur
   uitsluitend de kolom `status`. Een stijl
   draagt alleen regels voor de objecttypen die in zijn laag staan; met de hele tabel

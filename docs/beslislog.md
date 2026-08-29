@@ -4677,3 +4677,54 @@ niet als kant in een graaf -- dat zou het gebrek laten verdwijnen in plaats van 
 verklaren -- maar alleen om te kunnen zeggen waar het water heen gaat.
 
 Zie [#106](https://github.com/mcolee/nlriochecker/issues/106), BO-82 en BO-83.
+
+### BO-85 De laag `vlakken` krijgt één stijlregel per check, en tekent groen en grijs niet
+
+**Wat.** De standaardstijl van de laag `vlakken` (`uitvoer/stijlen/vlakken.qml`) draagt
+precies één regel per check die vlakken in die laag zet, met de checkcode voorop in de vorm
+`CODE - omschrijving` (spatie, koppelteken, spatie):
+
+| Label | Filter |
+|---|---|
+| `EXT-001 - Pand of bouwwerk (BGT/BAG)` | `"soort" IN ('pand', 'bouwwerk')` |
+| `EXT-003 - Waterdeel (BGT)` | `"soort" = 'water'` |
+| `RVZ-006 - Gemengd stelsel zonder overstort` | `"soort" = 'gemengd_deelstelsel'` |
+| `EXT-009 - Mogelijk ontbrekend riool` | `"soort" = 'wegvak' AND "status" = 'rood'` |
+
+Pand en bouwwerk delen sinds deze beslissing één regel en één kleur (de pand-omlijning
+`178,24,43`); de oranje bouwwerkkleur vervalt. De kolom `soort` blijft de twee wél
+onderscheiden (`VLAK_SOORT` in `gpkg.py`): alleen de stijl voegt ze samen, de data niet.
+
+**Waarom.** De legenda hoort te lezen als de checklijst. Zeven regels voor vier checks
+lieten de lezer zelf uitzoeken welke regel bij welke check hoorde; drie ervan noemden hun
+check alleen tussen haakjes achteraan, en pand en bouwwerk noemden hem helemaal niet. Met
+de code voorop staat naast elk vlak op de kaart welke controle erover gaat, en is de
+legenda tegen het checkregister te leggen.
+
+**Groen en grijs krijgen geen regel, en dat wijkt af van BO-79.** BO-79 schreef: "een kaart
+met alleen rode straten laat de lezer raden of de rest bekeken is", en gaf de soort daarom
+drie regels, een per `status`. Bij de review van 29-08-2026 bleek de prijs daarvan op de
+kaart zelf: op De Wolden en Hoogeveen draagt de laag 99 deelstelselvlakken en 4116
+wegvakken, waarvan 500 rood, 3593 groen en 23 grijs. De groene laag legt zich over vrijwel
+de hele bebouwde kom en overstemt alles wat de kaart moet tonen, de 500 rode straten
+inbegrepen. De auteur besluit daarom: **de rijen blijven, de standaardstijl toont ze niet.**
+
+Dat is een afwijking van de *stijl* uit BO-79 en niet van de *kern* ervan. Die kern is dat
+groen en grijs als rij bestaan, zodat "gekeken, er ligt riolering" en "niet beoordeeld" na
+te gaan zijn; dat blijft ongewijzigd, in de attributentabel, in een eigen filter, in de
+popup en in `n_wegvakken` van `gwsw_run`. Wie de groene straten wil zien, zet in QGIS zelf
+een regel of een filter -- een handeling van seconden, waar het omgekeerde (elke keer
+duizenden vlakken wegklikken) dat niet is. Ook het rapport blijft ze tellen: de toelichting
+van EXT-009 noemt hoeveel straten groen zijn en hoeveel grijs, per reden.
+
+Ze krijgen geen *uitgeschakelde* regel (`checkstate="0"`) maar helemaal geen regel: "één
+regel per check" is letterlijk genomen, en een uitgeschakelde regel zet de status weer als
+tweede ordening naast de check in de legenda. Wil de auteur ze later met een vinkje kunnen
+aanzetten, dan is dat een nieuwe beslissing.
+
+**Wat hier niet verandert.** De GeoPackage zelf: dezelfde rijen, dezelfde kolommen
+(`soort`, `status`, `check_ids`, `popup_html`), dezelfde `gwsw_run` met `n_wegvakken` en
+`n_gemengd_zonder_overstort`. En de objectlagen `putten` en `strengen`: die zijn objecttype
+x status en kennen geen regel per check, dus de naamgeving hierboven geldt voor `vlakken`.
+
+Zie [#107](https://github.com/mcolee/nlriochecker/issues/107), BO-73 en BO-79.
