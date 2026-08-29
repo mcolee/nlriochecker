@@ -869,6 +869,27 @@ def test_rvz006_meldt_nog_steeds_achter_een_afsluitstuk() -> None:
     assert labels(uitkomst("net_hulpstuk_afsluitstuk.ttl", "RVZ-006")) == ["1"]
 
 
+def test_rvz006_telt_de_strengen_en_knopen_van_het_deel_als_de_graaf() -> None:
+    """Wat de graaf verbindt telt de check mee, en wat zij doorgeeft telt zij niet (BO-83).
+
+    Twee kanten van dezelfde lijn, op een deelstelsel dat over twee T-stukken doorloopt:
+
+    * streng '2' hangt met béide einden aan een hulpstuk. Zij ligt als kant in het
+      deelstelsel, maar staat in geen enkele put-index; wie de strengen van een deel bij
+      `aansluitingen` opzoekt mist haar en meldt haar niet.
+    * de twee T-stukken zijn doorgeefknopen en geen beoordeeld object. Het deel telt dus
+      twee knopen -- put A en put B -- en dat is het getal dat in de melding en in
+      `knopen_in_deelstelsel` hoort te staan.
+    """
+    outcome = uitkomst("rvz006_gemengd_over_hulpstukken.ttl", "RVZ-006")
+
+    assert labels(outcome) == ["1", "2", "3"]
+    for bevinding in outcome.findings:
+        assert "gemengd deelstelsel van 2 knopen" in bevinding.message
+        assert bevinding.details["knopen_in_deelstelsel"] == 2
+        assert bevinding.details["gemengde_strengen"] == 3
+
+
 def test_rvz006_met_overstort_en_afvoereindpunt_zwijgt() -> None:
     """Met een overstort en een gemaal is het gemengde stelsel compleet: geen RVZ-006.
 

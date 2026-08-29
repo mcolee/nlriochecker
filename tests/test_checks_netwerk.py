@@ -468,6 +468,24 @@ def test_net001_bereikt_het_gemaal_door_het_telbare_hulpstuk(tmp_path: Path) -> 
     assert notitie.startswith("2 vrijvervalstrengen")
 
 
+def test_de_knooptellingen_laten_de_doorgeefknopen_buiten_beschouwing() -> None:
+    """Een "knoop" in een melding, een drempel of `examined` is een beoordeeld object.
+
+    De graaf draagt het hulpstuk wél als knoop -- daar geeft het door -- maar geen enkele
+    NET-check beoordeelt het. Zou het meetellen, dan telde `examined` objecten die nooit
+    een bevinding kunnen krijgen en zou de drempel `klein_deelstelsel_knopen` bij een
+    T-stukrijk net eerder overlopen. De fixture heeft vier graafknopen waarvan er een een
+    T-stuk is (issue #105, BO-83).
+    """
+    dataset = load_dataset(TTL_DIR / "net_hulpstuk_doorgeefknoop.ttl", [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    assert _netwerk(context).graph.number_of_nodes() == 4
+
+    for check_id in ("NET-006", "NET-008"):
+        assert run_checks(context, [check_id]).outcomes[0].examined == 3
+
+
 def test_een_afsluitstuk_blijft_een_breuk_in_de_vrijvervalgraaf() -> None:
     """Alleen een hulpstuk met een telbare functie geeft door; een afsluitstuk niet.
 

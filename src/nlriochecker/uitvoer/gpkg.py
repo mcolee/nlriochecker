@@ -44,12 +44,12 @@ from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer, Wegvakoordeel
 from nlriochecker.checks.verbanden import (
-    Aansluitingen,
     Afvoer,
-    aansluitingen,
     afvoerpad_van_streng,
     afvoerpaden,
     deelstelsel_ids,
+    putknopen,
+    strengen_per_knoop,
 )
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
@@ -1046,7 +1046,7 @@ def _gemengde_deelstelselrijen(
             f"controleer of de check en deze schrijver dezelfde context lezen."
         )
 
-    index = aansluitingen(run.context, "vrijvervalleiding")
+    index = strengen_per_knoop(run.context)
     rijen = []
     zonder_vlak = 0
     grenzen: _Grenzen = []
@@ -1061,7 +1061,9 @@ def _gemengde_deelstelselrijen(
         rijen.append(
             (
                 _blob(_als_multipolygon(geometrie)),
-                *_gemengd_rij(cluster, knopen, conduits, per_cluster[cluster]),
+                *_gemengd_rij(
+                    cluster, putknopen(run.context, knopen), conduits, per_cluster[cluster]
+                ),
             )
         )
     return rijen, grenzen, zonder_vlak
@@ -1075,11 +1077,16 @@ def _knopen_per_cluster(run: CheckRun) -> dict[str, frozenset[str]]:
     return {cluster: frozenset(knopen) for cluster, knopen in gevonden.items()}
 
 
-def _strengen_van_cluster(index: Aansluitingen, knopen: frozenset[str]) -> list[Conduit]:
-    """De vrijvervalstrengen die op de knopen van dit deelstelsel uitkomen, ontdubbeld."""
+def _strengen_van_cluster(index: dict[str, list[Conduit]], knopen: frozenset[str]) -> list[Conduit]:
+    """De vrijvervalstrengen die op de knopen van dit deelstelsel uitkomen, ontdubbeld.
+
+    Uit `strengen_per_knoop` en niet uit `aansluitingen`: die laatste indexeert op de
+    herleide put, en dan mist het vlak precies de strengen die tussen twee telbare
+    hulpstukken liggen -- ze horen bij het deel, maar staan in geen put-index (BO-83).
+    """
     gevonden: dict[str, Conduit] = {}
     for knoop in sorted(knopen):
-        for conduit in index.strengen(knoop):
+        for conduit in index.get(knoop, []):
             gevonden[conduit.uri] = conduit
     return [gevonden[uri] for uri in sorted(gevonden)]
 
@@ -1098,11 +1105,15 @@ def _gemengd_geometrie(conduits: list[Conduit], buffer_m: float) -> BaseGeometry
 
 def _gemengd_rij(
     cluster: str,
-    knopen: frozenset[str],
+    putten: set[str],
     conduits: list[Conduit],
     meldingen: list[Melding],
 ) -> tuple[object, ...]:
     """De attribuutvelden van een gemengd-deelstelselvlak, in kolomvolgorde.
+
+    `putten` zijn de beoordeelde knopen van het deel: `n_knopen` en de popup tellen
+    hetzelfde getal als de melding, dus zonder de doorgeefhulpstukken (BO-83). De
+    geometrie eromheen komt wél van het hele deel.
 
     De sleutel staat in `id`, net als bij een extern vlak: het is de `cluster_id` die
     RVZ-006, NET-001 en NET-002 delen, dus de meldingentabel is erop te koppelen. De vijf
@@ -1126,7 +1137,7 @@ def _gemengd_rij(
         objecttype=SOORT_GEMENGD_DEELSTELSEL,
         status=STATUS_ROOD if any(m.ernst == "F" for m in meldingen) else STATUS_ORANJE,
         feiten=(
-            f"{len(knopen)} knopen, {len(conduits)} strengen, {strenglengte:.0f} m",
+            f"{len(putten)} knopen, {len(conduits)} strengen, {strenglengte:.0f} m",
             f"{len(meldingen)} gemengde strengen gemeld",
         ),
         reden="",
@@ -1142,7 +1153,7 @@ def _gemengd_rij(
         None,
         len(meldingen),
         _check_ids(meldingen),
-        len(knopen),
+        len(putten),
         len(conduits),
         strenglengte,
         popup_html(kop, meldingen, toon_systemisch=True),

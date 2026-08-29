@@ -28,6 +28,7 @@ from nlriochecker.checks.verbanden import (
     _Netwerk,
     _netwerk,
     deelstelsel_ids,
+    putknopen,
     verbonden_knopen,
 )
 from nlriochecker.taal import getal, vorm
@@ -131,12 +132,12 @@ def _richtingsverlies(
     ongemelde last verschijnen in een getal dat de lezer op de bevindingen betrekt.
 
     Sinds BO-83 staan de telbare hulpstukken zelf in `netwerk.graph` -- ze geven daar
-    door -- dus worden ze hier expliciet afgetrokken. Zonder die aftrek zou dit getal ze
-    meetellen en de zin erboven onwaar maken.
+    door -- dus reduceert `putknopen` de verzameling hier tot de beoordeelde objecten.
+    Zonder die aftrek zou dit getal ze meetellen en de zin erboven onwaar maken.
     """
     endpoints = _eindpuntset(context, rollen)
     bereikt = _bereikbaar_vanaf(context, endpoints)
-    vrijverval = set(netwerk.graph) - telbare_hulpstukken(context)
+    vrijverval = putknopen(context, netwerk.graph)
 
     zonder = met = 0
     for deel in nx.weakly_connected_components(_bereikbaarheid(context)):
@@ -1145,8 +1146,8 @@ class KoppelingTussenStelseltypen(Check):
         return notities
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal knopen in de graaf."""
-        return _netwerk(context).graph.number_of_nodes()
+        """Het aantal beoordeelde knopen in de graaf, zonder de doorgeefhulpstukken."""
+        return len(putknopen(context, _netwerk(context).graph))
 
 
 @register
@@ -1180,7 +1181,10 @@ class VeelLozingspuntenInDeelstelsel(Check):
 
         for deel in nx.weakly_connected_components(netwerk.graph):
             lozingen = sorted(deel & endpoints)
-            if len(deel) > drempels.klein_deelstelsel_knopen:
+            # "Klein" gaat over de beoordeelde knopen: een doorgeefhulpstuk is geen put,
+            # en zou een T-stukrijk deelstelsel over de drempel duwen (BO-83).
+            putten = len(putknopen(context, deel))
+            if putten > drempels.klein_deelstelsel_knopen:
                 continue
             if len(lozingen) <= drempels.lozingspunten_per_deelstelsel:
                 continue
@@ -1191,10 +1195,10 @@ class VeelLozingspuntenInDeelstelsel(Check):
                     uri,
                     self._label(context, uri),
                     f"Een van {len(lozingen)} lozingspunten in een deelstelsel van "
-                    f"{len(deel)} knopen (maximaal {drempels.lozingspunten_per_deelstelsel} "
+                    f"{putten} knopen (maximaal {drempels.lozingspunten_per_deelstelsel} "
                     f"bij ten hoogste {drempels.klein_deelstelsel_knopen} knopen): "
                     f"{', '.join(labels)}.",
-                    knopen_in_deelstelsel=len(deel),
+                    knopen_in_deelstelsel=putten,
                     lozingspunten=len(lozingen),
                 )
 
@@ -1208,8 +1212,8 @@ class VeelLozingspuntenInDeelstelsel(Check):
         return _netwerk_notities(context) + _eindpuntnotities(context, ("lozings_eindpunt",))
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal knopen in de graaf."""
-        return _netwerk(context).graph.number_of_nodes()
+        """Het aantal beoordeelde knopen in de graaf, zonder de doorgeefhulpstukken."""
+        return len(putknopen(context, _netwerk(context).graph))
 
 
 def _stelseltype_notities(context: CheckContext) -> list[str]:

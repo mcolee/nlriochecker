@@ -1907,6 +1907,25 @@ FIXTURES["net_hulpstuk_doorgeefknoop.ttl"] = (
     + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutO", "Gem"),
 )
 
+# RVZ-006 (#105): een gemengd deelstelsel dat over twee T-stukken doorloopt, zonder
+# overstort en zonder afvoereindpunt. Streng '2' hangt met BEIDE einden aan een hulpstuk:
+# zij ligt als kant in het deelstelsel maar staat in geen enkele put-index, dus wie de
+# strengen van een deel bij `aansluitingen` opzoekt telt haar niet mee. En de twee
+# T-stukken zijn doorgeefknopen: het deel telt twee knopen (put A en put B), niet vier.
+FIXTURES["rvz006_gemengd_over_hulpstukken.ttl"] = (
+    "een gemengd deelstelsel van drie strengen over twee T-stukken, zonder overstort en "
+    "zonder afvoereindpunt; streng '2' hangt met beide einden aan een T-stuk",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + hulpstuk("T2", "T2", 1100.0, 2000.0)
+    + put("PutB", "B", 1150.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T1")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "T2")
+    + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "T2", "PutB"),
+)
+
+
 # NET/RVZ (#105): dezelfde keten met een afsluitstuk op de plaats van het T-stuk. Een
 # `Afsluitstuk` draagt wel een GWSW-functie maar geen aantal leidingen (AfsluitenVanLeidingen),
 # dus het is geen doorgeefknoop en blijft een breuk -- dezelfde grens als BO-72 voor TOP-002

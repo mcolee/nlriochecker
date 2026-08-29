@@ -127,6 +127,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   drie valse deelstelsels uit de review van 29-08, en niets nieuws), NET-001 8467 → **8499**,
   NET-002 3031 → **3046**, NET-006 329 → **332** en NET-009 3656 → **3667** -- strengen die
   nu voor het eerst beoordeeld worden. De deelstelsel-ID's (`ds-...`) kunnen verschuiven.
+  Wie de graaf leest gebruikt dezelfde afleiding: de bereikbaarheid van NET-001/002, het
+  afvoerpad van een streng (en daarmee het uitstroompunt in de GeoPackage) en de strengen
+  van een deelstelsel, dat laatste via de nieuwe index `strengen_per_knoop` — de put-index
+  `aansluitingen` kent een streng tussen twee T-stukken niet en blijft van TOP, HGT en
+  ATTR. **Tellen gebeurt in putten**: een doorgeefhulpstuk zit wel in de graaf maar telt
+  niet mee in "een deelstelsel van N knopen", in `knopen_in_deelstelsel`, in de drempel
+  `klein_deelstelsel_knopen`, in `examined()` van NET-006/NET-008 of in `n_knopen` van het
+  deelstelselvlak; het krijgt immers nooit een bevinding.
 - **NET-004 wordt richting-bewust en onderscheidt vermaasd net** (issue #102, BO-77).
   Kringlopen worden gezocht op de betrouwbare richting (de strengen die NET-009 niet
   tegenspreekt, de richtingsbron uit #80/BO-76). Een kring die alleen op een omgekeerd

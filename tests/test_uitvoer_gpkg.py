@@ -1230,6 +1230,27 @@ def test_gemengd_zonder_overstort_geeft_een_vlak_per_deelstelsel(tmp_path: Path)
     assert (n_knopen, n_strengen, lengte, n_meldingen, check_ids) == (3, 2, 100.0, 2, "RVZ-006")
 
 
+def test_deelstelselvlak_telt_de_strengen_en_knopen_van_de_graaf(tmp_path: Path) -> None:
+    """Het vlak dekt het hele deel, ook waar het over een T-stuk doorloopt (issue #105).
+
+    De fixture heeft drie gemengde strengen over twee T-stukken; de middelste hangt met
+    beide einden aan een hulpstuk en staat dus in geen enkele put-index. Zou de schrijver
+    de strengen daar opzoeken, dan tekende hij een vlak om twee van de drie strengen -- en
+    `n_knopen` telde de twee doorgeefknopen mee, terwijl de meldingen van twee knopen
+    spreken.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_over_hulpstukken.ttl", "RVZ-006"), tmp_path)
+
+    rijen = _rijen(
+        pad,
+        "select n_knopen, n_strengen, strenglengte_m, aantal_meldingen from vlakken "
+        "where soort = ?",
+        VLAK_SOORT_GEMENGD,
+    )
+
+    assert rijen == [(2, 3, 150.0, 3)]
+
+
 def test_een_deelstelselvlak_laat_de_kolommen_van_een_extern_vlak_leeg(tmp_path: Path) -> None:
     """Elke soort vult wat zij kent; de rest blijft leeg, zoals `relatie` bij water.
 

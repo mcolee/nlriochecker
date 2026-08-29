@@ -21,6 +21,8 @@ Gemeten op `data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl` met
 | NET-002                                 |  3031 |      3049 |    3046 |
 | NET-006                                 |   329 |         - |     332 |
 | NET-009                                 |  3656 |         - |    3667 |
+| knopen in de graaf / beoordeeld         |     - |         - |   17514 / 17379 |
+| strengen zonder afvoerpad               |     - |         - |   12654 |
 
 De "vóór"-kolom komt uit `uitvoer/29082027-02/bevindingen.csv` (de koude herhaling van
 `uitvoer/29082026_ext009_slotrun`); "voorspeld" is de monkeypatchmeting uit issue #105.
@@ -32,6 +34,15 @@ Wijkt een uitkomst hiervan af, verklaar het verschil -- verzin er geen nieuwe wa
 bij. NET-004, NET-005, NET-007 en NET-008 staan er niet omdat er iets van verwacht wordt,
 maar omdat de graaf onder ze allemaal ligt: schuift een van die getallen, dan hoort dat
 gezien te worden.
+
+Twee getallen vragen om uitleg voor wie ze naast een check legt. Het verschil tussen de
+17514 graafknopen en de 17379 beoordeelde zijn de 135 doorgeefhulpstukken; `examined()`
+van NET-006 en NET-008 telt het tweede getal (BO-83). En de 12654 strengen zonder
+afvoerpad zijn niet te vergelijken met de 8499 van NET-001: dit telt élke
+vrijvervalstreng (9464 daarvan zijn vuilwater of gemengd) en `afvoerpaden` rekent op de
+ZUIVERE vrijvervalgraaf, terwijl NET-001 de bereikbaarheidsgraaf leest -- 576 van deze
+strengen bereiken langs het persnet wél een eindpunt. Dat is de scheiding van BO-54 en
+staat los van dit issue.
 
 Gebruik:  uv run python scripts/meet_hulpstukgraaf.py
 """
@@ -47,7 +58,12 @@ from gwsw_orox_helpers.dataset import markeer_vulwaarden
 
 from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.checks.verbanden import _netwerk, netwerkdelen
+from nlriochecker.checks.verbanden import (
+    _netwerk,
+    afvoerpad_van_streng,
+    netwerkdelen,
+    putknopen,
+)
 
 WORTEL = Path(__file__).resolve().parents[1]
 DATASET = WORTEL / "data" / "gwsw_orox_ttl" / "dewoldenhoogeveen_orox.ttl"
@@ -89,10 +105,18 @@ def main() -> int:
     print(f"dataset geladen in {time.perf_counter() - begin:.1f} s")
 
     netwerk = _netwerk(context)
+    zonder_pad = sum(
+        1 for conduit in netwerk.conduits if afvoerpad_van_streng(context, conduit) is None
+    )
     print(f"strengen in de netwerkanalyse : {len(netwerk.conduits)}")
     print(f"strengen buiten de analyse    : {len(netwerk.unconnected)}")
     print(f"knopen in de vrijvervalgraaf  : {netwerk.graph.number_of_nodes()}")
+    print(f"beoordeelde knopen (putknopen): {len(putknopen(context, netwerk.graph))}")
     print(f"netwerkdelen                  : {len(netwerkdelen(context))}")
+    # Een streng zonder `Afvoer` krijgt in de GeoPackage geen uitstroompunt en geen
+    # padlengte. Dit getal hoort in de buurt van NET-001 te liggen (die telt alleen de
+    # vuilwater- en gemengde strengen) en niet in de buurt van het aantal strengen.
+    print(f"strengen zonder afvoerpad     : {zonder_pad}")
 
     for check_id in CHECKS:
         outcome = run_checks(context, [check_id]).outcomes[0]

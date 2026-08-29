@@ -14,6 +14,7 @@ ontstaan.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 import networkx as nx
@@ -58,6 +59,25 @@ def _doorgeefknopen(context: CheckContext, conduit: Conduit) -> tuple[str | None
     if eind is None and conduit.end_node in telbaar:
         eind = conduit.end_node
     return begin, eind
+
+
+def putknopen(context: CheckContext, knopen: Iterable[str]) -> set[str]:
+    """Dezelfde knopen zonder de doorgeefhulpstukken: wat er te beoordelen valt (BO-83).
+
+    De graaf draagt een telbaar hulpstuk als knoop, want daar geeft het door. Geen enkele
+    check beoordeelt het: een hulpstuk is geen put, draagt geen dekselniveau en krijgt
+    nooit een bevinding. Waar knopen geteld worden -- een drempel als
+    `klein_deelstelsel_knopen`, de zin "een deelstelsel van N knopen", het detailveld
+    `knopen_in_deelstelsel`, `examined()` en `n_knopen` in de GeoPackage -- betekent
+    "knoop" daarom een beheerobject uit de rol `netwerkknopen` (put, gemaal,
+    bergbezinkvoorziening, uitlaat), en hoort het doorgeefhulpstuk er niet bij.
+
+    De verzamelingen zelf blijven ongemoeid: `netwerkdelen`, `_Netwerk.graph` en
+    `deelstelsel_ids` dragen het hulpstuk gewoon, anders zou het net er weer op stukvallen.
+    Alleen de tellingen lopen langs deze functie, zodat de aftrek op een plek staat en niet
+    als losse `- telbare_hulpstukken(...)` door de checks verspreid raakt.
+    """
+    return set(knopen) - telbare_hulpstukken(context)
 
 
 @dataclass(frozen=True)
@@ -139,6 +159,36 @@ def _bouw_netwerkdelen(context: CheckContext) -> list[set[str]]:
             continue
         graaf.add_edge(begin, eind)
     return sorted((set(deel) for deel in nx.connected_components(graaf)), key=min)
+
+
+def strengen_per_knoop(context: CheckContext) -> dict[str, list[Conduit]]:
+    """Per graafknoop de vrijvervalstrengen die erop uitkomen; een keer per context.
+
+    De tegenhanger van `aansluitingen` voor wie met de graaf werkt. Die index herleidt elk
+    strengeinde naar een put en is daarmee precies goed voor TOP, HGT en ATTR -- die lezen
+    putkenmerken -- maar zij kent een streng die met beide einden aan een hulpstuk hangt
+    helemaal niet, en van een streng met een hulpstuk aan een kant alleen de andere kant.
+    Wie de strengen van een netwerkdeel opvraagt (RVZ-006, en de deelstelselvlakken in de
+    GeoPackage) moet dezelfde afleiding lezen als de graaf zelf (`_doorgeefknopen`), anders
+    ligt zo'n streng wel als kant in het deel maar telt zij niet mee. Op De Wolden en
+    Hoogeveen gaat het om enkele tientallen strengen tussen twee T-stukken. Zie BO-83.
+
+    De strengen staan per knoop in selectievolgorde, en een streng met beide einden op
+    dezelfde knoop staat er een keer -- net als in `_bouw_aansluitingen`.
+    """
+    return context.cached(
+        "vrijverval:strengen_per_knoop", lambda: _bouw_strengen_per_knoop(context)
+    )
+
+
+def _bouw_strengen_per_knoop(context: CheckContext) -> dict[str, list[Conduit]]:
+    """Indexeert de vrijvervalstrengen op de knopen waarmee de graaf ze verbindt."""
+    index: dict[str, list[Conduit]] = {}
+    for conduit in vrijvervalrioolleidingen(context):
+        knopen = _doorgeefknopen(context, conduit)
+        for knoop in dict.fromkeys(uri for uri in knopen if uri is not None):
+            index.setdefault(knoop, []).append(conduit)
+    return index
 
 
 def deelstelsel_ids(context: CheckContext) -> dict[str, str]:
@@ -446,12 +496,16 @@ def afvoerpad_van_streng(context: CheckContext, conduit: Conduit) -> Afvoer | No
     Verder None als de streng geen herleidbaar eindpunt heeft of vanaf daar geen
     uitstroompunt bereikt. De streng telt als eerste stap; haar eigen lengte telt bij de
     meters, en ontbreekt die (geen bruikbare lijngeometrie) dan valt de hele padlengte weg.
+
+    De eindknoop komt uit dezelfde afleiding als de graaf (`_doorgeefknopen`, BO-83) en
+    niet uit de putherleiding: een streng die op een telbaar hulpstuk eindigt zit in de
+    graaf, en `afvoerpaden` draagt die hulpstuk-URI's als sleutel. Met de putherleiding
+    zou zij hier stil op None uitkomen -- geen uitstroompunt en geen padlengte in de
+    GeoPackage -- terwijl NET-001 haar wel bereikbaar noemt.
     """
     if conduit.uri not in _netwerkstrengen(context):
         return None
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
-    eind = dataset.resolve_network_node(conduit.end_node, wortels)
+    _, eind = _doorgeefknopen(context, conduit)
     if eind is None:
         return None
     vervolg = afvoerpaden(context).get(eind)

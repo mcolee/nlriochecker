@@ -45,6 +45,8 @@ from nlriochecker.checks.verbanden import (
     aansluitingen,
     deelstelsel_ids,
     netwerkdelen,
+    putknopen,
+    strengen_per_knoop,
 )
 
 
@@ -181,12 +183,17 @@ def _gemengde_strengen_van(context: CheckContext, knopen: set[str]) -> list[Cond
     zijn dus de dragers van een gebrek aan het deelstelsel als geheel: RVZ-006 meldt
     op elk van hen (issue #75). De volgorde is die van de URI, zodat twee runs op
     dezelfde data dezelfde meldingen in dezelfde volgorde opleveren.
+
+    De strengen komen uit `strengen_per_knoop` en niet uit `aansluitingen`: die laatste
+    indexeert op de herleide put, en een streng die met beide einden aan een telbaar
+    hulpstuk hangt staat er dus niet in terwijl zij wel als kant in dit deel ligt (BO-83).
+    Deze index leest dezelfde knoopafleiding als de graaf die het deel bepaalde.
     """
-    index = aansluitingen(context, "vrijvervalleiding")
+    index = strengen_per_knoop(context)
     klassen = context.config.klassen
     gevonden: dict[str, Conduit] = {}
     for knoop in knopen:
-        for conduit in index.strengen(knoop):
+        for conduit in index.get(knoop, []):
             if klassen.stelseltype(conduit.types, context.dataset.closure) == "gemengd":
                 gevonden[conduit.uri] = conduit
     return [gevonden[uri] for uri in sorted(gevonden)]
@@ -515,14 +522,17 @@ class GemengdDeelstelselZonderOverstort(Check):
             if heeft_overstort and heeft_eindpunt:
                 continue
             cluster = clusters.get(min(deel), "")
+            # De melding telt de beoordeelde knopen: een telbaar hulpstuk is een
+            # doorgeefknoop en geen put, dus het hoort niet in "van N knopen" (BO-83).
+            putten = len(putknopen(context, deel))
             for conduit in strengen:
                 yield self.finding(
                     context,
                     conduit.uri,
                     conduit.label,
-                    f"Ligt in een gemengd deelstelsel van {len(deel)} knopen "
+                    f"Ligt in een gemengd deelstelsel van {putten} knopen "
                     f"{_rvz006_gebrek(heeft_overstort, heeft_eindpunt)}.",
-                    knopen_in_deelstelsel=len(deel),
+                    knopen_in_deelstelsel=putten,
                     gemengde_strengen=len(strengen),
                     cluster_id=cluster,
                 )

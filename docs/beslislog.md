@@ -4550,6 +4550,27 @@ persnet draagt alleen connectiviteit en wordt inhoudelijk niet getoetst, terwijl
 vrijvervalknoop de plek is waar een NET-check zijn oordeel op hangt. Of de telbare grens
 ook voor het persnet hetzelfde net oplevert, is niet gemeten.
 
+**Wie de graaf leest, leest hem helemaal.** Elke afleiding die op de graaf leunt gebruikt
+`_doorgeefknopen` en niet meer de putherleiding: `_ZonderAfvoerpad._bouw_onbereikbaar`
+(anders geldt een streng die op een T-stuk begint onvoorwaardelijk als onbereikbaar),
+`afvoerpad_van_streng` (anders draagt zo'n streng geen uitstroompunt en geen padlengte in
+de GeoPackage terwijl NET-001 haar bereikbaar noemt) en `strengen_per_knoop`, de index
+waarmee RVZ-006 en het deelstelselvlak de strengen van een deel opzoeken. Die laatste is
+er omdat `aansluitingen` op de herleide put indexeert: een streng die met béide einden aan
+een telbaar hulpstuk hangt staat daar in het geheel niet in, terwijl zij wel als kant in
+het deelstelsel ligt (op De Wolden en Hoogeveen enkele tientallen). `aansluitingen` zelf
+blijft ongemoeid -- dat is en blijft de put-index van TOP, HGT en ATTR.
+
+**Tellen doe je in putten.** De verzamelingen dragen het hulpstuk (`netwerkdelen`,
+`_Netwerk.graph`, `deelstelsel_ids`), de tellingen niet: waar knopen geteld worden --
+de drempel `klein_deelstelsel_knopen`, de zinnen "een deelstelsel van N knopen", het
+detailveld `knopen_in_deelstelsel`, `examined()` van NET-006 en NET-008, en `n_knopen`
+van het deelstelselvlak -- betekent "knoop" een beheerobject uit de rol `netwerkknopen`,
+en gaat het doorgeefhulpstuk eraf via de ene helper `verbanden.putknopen`. Een hulpstuk
+krijgt immers nooit een bevinding; het meetellen zou een noemer opleveren met objecten
+die niet beoordeeld worden, en een T-stukrijk deelstelsel eerder over een configdrempel
+duwen.
+
 **Waarom.** Een `Hulpstuk` is in het GWSW geen `Put` en klimt via `hasPart` niet naar een
 put, dus `resolve_network_node` gaf er `None` voor en de graaf liet elke streng vallen
 die op een T-stuk eindigt -- terwijl diezelfde streng er in werkelijkheid aan vastzit en
@@ -4573,6 +4594,16 @@ Wolden en Hoogeveen; de kolom "vóór" komt uit `uitvoer/29082027-02/bevindingen
 | NET-002 | 3031 | **3046** |
 | NET-006 | 329 | **332** |
 | NET-009 | 3656 | **3667** |
+
+De graaf telt 17603 strengen en 17514 knopen, waarvan er 135 een doorgeefhulpstuk zijn;
+`examined()` van NET-006 en NET-008 telt daarom 17379 beoordeelde knopen. Van de
+vrijvervalstrengen hangen er 45 met béide einden aan een telbaar hulpstuk -- zij zijn de
+reden dat `strengen_per_knoop` bestaat -- en geen van die 45 is gemengd, zodat RVZ-006 er
+geen melding bij krijgt: met de put-index en met de graaf-index meldt de check precies
+dezelfde 1058 strengen. Ook NET-008 blijft op 11: geen enkel deelstelsel valt door de
+aftrek van de doorgeefknopen aan de andere kant van `klein_deelstelsel_knopen`. Beide
+correcties veranderen dus geen enkel totaal op déze dataset; ze bepalen wat er gebeurt
+zodra er wél een gemengde streng tussen twee T-stukken ligt, en wat er in de melding staat.
 
 RVZ-006 verliest precies de drie vlakken die de auteur bij de review van 29-08 als vals
 aanwees (`ds-Fo1G0080`, `ds-Wi1G0416`, `ds-Zu1G0510`) en er komt niets voor terug. De
