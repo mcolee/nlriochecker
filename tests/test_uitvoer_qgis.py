@@ -67,6 +67,7 @@ from nlriochecker.checks import CheckContext, run_checks  # noqa: E402
 from nlriochecker.checks.treffers import Wegvakoordeel, Wegvakregister  # noqa: E402
 from nlriochecker.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
 from nlriochecker.uitvoer.melding import bouw_meldingen  # noqa: E402
+from test_uitvoer_symbolen import VLAKKEN_LEGENDA  # noqa: E402
 
 pytestmark = pytest.mark.qgis
 
@@ -267,12 +268,36 @@ def test_de_vlakkenlaag_geeft_elke_check_een_regel(qgis_app, geschreven_gpkg: Pa
 
     assert gelukt, f"vlakken: {boodschap}"
     labels = [regel.label() for regel in vector.renderer().rootRule().children()]
-    assert labels == [
-        "EXT-001 - Pand of bouwwerk (BGT/BAG)",
-        "EXT-003 - Waterdeel (BGT)",
-        "RVZ-006 - Gemengd stelsel zonder overstort",
-        "EXT-009 - Mogelijk ontbrekend riool",
-    ]
+    assert labels == list(VLAKKEN_LEGENDA)
+
+
+def test_elke_stijlregel_slaat_aan_op_de_soort_waarvoor_zij_bedoeld_is(
+    qgis_app, gpkg_met_wegvakken: Path
+) -> None:
+    """De vier filters positief getoetst; een filter dat op niets past tekent niets.
+
+    Zonder deze test zou een tikfout in een filterwaarde onopgemerkt blijven: de laag
+    wordt er leeg van en QGIS meldt niets. Pand en bouwwerk staan er allebei in omdat
+    juist zij sinds issue #107 één regel delen, en het rode wegvak omdat de test hiernaast
+    vastlegt dat groen en grijs er géén krijgen.
+    """
+    vector = qgis_core.QgsVectorLayer(f"{gpkg_met_wegvakken}|layername=vlakken", "v", "ogr")
+    boodschap, gelukt = vector.loadDefaultStyle()
+    ext001, ext003, rvz006, ext009 = VLAKKEN_LEGENDA
+
+    assert gelukt, f"vlakken: {boodschap}"
+    for soort, status, verwacht in (
+        ("pand", "", ext001),
+        ("bouwwerk", "", ext001),
+        ("water", "", ext003),
+        ("gemengd_deelstelsel", "", rvz006),
+        ("wegvak", "rood", ext009),
+    ):
+        kenmerk = qgis_core.QgsFeature(vector.fields())
+        kenmerk["soort"] = soort
+        kenmerk["status"] = status
+
+        assert _regels_voor(vector, kenmerk) == {verwacht}, soort
 
 
 def test_een_groen_of_grijs_wegvak_blijft_een_rij_maar_krijgt_geen_regel(
@@ -283,30 +308,30 @@ def test_een_groen_of_grijs_wegvak_blijft_een_rij_maar_krijgt_geen_regel(
     De rijen blijven -- dat is de kern van BO-79: in de attributentabel, in een filter en
     in de popup is nog steeds na te gaan of een straat bekeken is. De standaardstijl
     tekent ze alleen niet meer, want met 3593 groene en 23 grijze vlakken over 500 rode
-    was de kaart niet te lezen. De rode straat toont dat het filter zelf wél aanslaat;
-    zonder haar zou een stukgeslagen regel deze test ook groen laten.
+    was de kaart niet te lezen. Het deelstelselvlak uit dezelfde fixture is de controle:
+    een rij die wél getekend wordt, zodat "geen regel" hier niet "de hele stijl doet
+    niets" kan betekenen.
     """
     vector = qgis_core.QgsVectorLayer(f"{gpkg_met_wegvakken}|layername=vlakken", "v", "ogr")
     boodschap, gelukt = vector.loadDefaultStyle()
+    rijen = list(vector.getFeatures())
+    wegvakken = [kenmerk for kenmerk in rijen if kenmerk["soort"] == "wegvak"]  # type: ignore[index]
 
     assert gelukt, f"vlakken: {boodschap}"
-    # De fixture levert naast de twee wegvakken het gemengde deelstelsel van RVZ-006.
-    assert vector.featureCount() == 3
-    wegvakken = {
-        kenmerk["status"]: kenmerk  # type: ignore[index]
-        for kenmerk in vector.getFeatures()
-        if kenmerk["soort"] == "wegvak"  # type: ignore[index]
-    }
+    assert len(wegvakken) == 2
+    assert {kenmerk["status"] for kenmerk in wegvakken} == {"groen", "grijs"}  # type: ignore[index]
+    for kenmerk in wegvakken:
+        assert _regels_voor(vector, kenmerk) == set(), kenmerk["status"]  # type: ignore[index]
 
-    assert set(wegvakken) == {"groen", "grijs"}
-    for status, kenmerk in wegvakken.items():
-        assert _regels_voor(vector, kenmerk) == set(), status
+    gemengd = [
+        kenmerk
+        for kenmerk in rijen
+        if kenmerk["soort"] == "gemengd_deelstelsel"  # type: ignore[index]
+    ]
 
-    rood = qgis_core.QgsFeature(vector.fields())
-    rood["soort"] = "wegvak"
-    rood["status"] = "rood"
-
-    assert _regels_voor(vector, rood) == {"EXT-009 - Mogelijk ontbrekend riool"}
+    assert gemengd, "de fixture levert geen deelstelselvlak als controle"
+    for kenmerk in gemengd:
+        assert _regels_voor(vector, kenmerk) == {"RVZ-006 - Gemengd stelsel zonder overstort"}
 
 
 def test_de_maptip_van_een_deelstelselvlak_toont_de_voorgebakken_popup(
@@ -377,16 +402,22 @@ def _regels_voor(vector, feature) -> set[str]:
     """De labels van de stijlregels waarvan het filter op deze rij aanslaat.
 
     Een lege verzameling betekent dat QGIS de rij niet tekent: een regelgebaseerde
-    renderer laat een object waarop geen enkel filter past ongemoeid.
+    renderer laat een object waarop geen enkel filter past ongemoeid. Een filter dat niet
+    te ontleden is of op deze rij niet uit te rekenen valt, levert stil NULL op en zou dan
+    niet van "bewust niet getekend" te onderscheiden zijn; daarom faalt dat hier luid.
     """
     context = qgis_core.QgsExpressionContext()
     context.appendScopes(qgis_core.QgsExpressionContextUtils.globalProjectLayerScopes(vector))
     context.setFeature(feature)
-    return {
-        regel.label()
-        for regel in vector.renderer().rootRule().children()
-        if qgis_core.QgsExpression(regel.filterExpression()).evaluate(context)
-    }
+    labels = set()
+    for regel in vector.renderer().rootRule().children():
+        expressie = qgis_core.QgsExpression(regel.filterExpression())
+        assert not expressie.hasParserError(), f"{regel.label()}: {expressie.parserErrorString()}"
+        uitkomst = expressie.evaluate(context)
+        assert not expressie.hasEvalError(), f"{regel.label()}: {expressie.evalErrorString()}"
+        if uitkomst:
+            labels.add(regel.label())
+    return labels
 
 
 def _renderer_symbolen(renderer):

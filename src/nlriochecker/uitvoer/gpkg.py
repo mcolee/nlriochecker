@@ -709,8 +709,11 @@ VLAK_SOORT_GEMENGD = "gemengd_deelstelsel"
 
 # De vijfde soort: een door EXT-009 beoordeeld wegvak (issue #104). De enige soort in
 # deze laag die ook zonder melding een rij krijgt -- juist het onderscheid tussen
-# "gekeken, er ligt riolering" (groen) en "niet gekeken" (grijs) is wat de kaart moet
-# tonen. De kolom `status` draagt dat, en zij is voor deze soort verplicht. Zie BO-79.
+# "gekeken, er ligt riolering" (groen) en "niet gekeken" (grijs) moet na te gaan zijn.
+# De kolom `status` draagt dat, en zij is voor deze soort verplicht. Alle drie de
+# waarden krijgen een rij; de standaardstijl tekent er sinds BO-85 alleen de rode van,
+# zodat groen en grijs in de attributentabel, een filter en de popup te vinden blijven
+# maar de kaart niet overstemmen. Zie BO-79 en BO-85.
 VLAK_SOORT_WEGVAK = "wegvak"
 
 # De check waarvan de meldingen een wegvak rood maken. Rood is uitsluitend een wegvak
@@ -781,13 +784,15 @@ def _schrijf_vlakken(
     EXT-melding wijst (`_trefferrijen`, issue #67), de gemengde deelstelsels waarop
     RVZ-006 aansloeg (`_gemengde_deelstelselrijen`, issue #98) en de wegvakken die
     EXT-009 beoordeelde (`_wegvakrijen`, issue #104). De kolom `soort` houdt ze uit
-    elkaar en de QGIS-stijl geeft elke soort een eigen regel.
+    elkaar en de QGIS-stijl geeft elke check een eigen regel (BO-85).
 
     De eerste twee volgen de meldingen van *deze* uitvoer, dus die kunnen niet meer tonen
     dan de uitslag. De derde is de uitzondering en met opzet: een groen of grijs wegvak
-    draagt per definitie geen melding, en juist dat onderscheid moet de kaart tonen. De
+    draagt per definitie geen melding, en juist dat onderscheid moet na te gaan zijn. De
     rijen komen daar uit het register op de run (`run.wegvakken`), dat op dezelfde
-    middelpunten tot het studiegebied is afgebakend als de meldingen. Zie BO-79.
+    middelpunten tot het studiegebied is afgebakend als de meldingen. Ze staan in de
+    laag maar worden in de standaardstijl niet getekend; die heeft alleen een regel voor
+    het rode wegvak. Zie BO-79 en BO-85.
 
     Geeft vier getallen terug: het aantal rijen in de laag, hoeveel daarvan een gemengd
     deelstelsel zijn, hoeveel gemelde deelstelsels geen vlak konden krijgen, en hoeveel
@@ -801,7 +806,10 @@ def _schrijf_vlakken(
         kolommen,
         "Vlakken bij de uitslag van deze run: externe objecten (BGT-panden, overige "
         "bouwwerken en BGT-waterdelen), de gemengde deelstelsels van RVZ-006 en de door "
-        "EXT-009 beoordeelde wegvakken; de soort staat in de kolom `soort`.",
+        "EXT-009 beoordeelde wegvakken; de soort staat in de kolom `soort`. De "
+        "standaardstijl tekent per check een regel en toont van de wegvakken alleen de "
+        "rode; de groene en grijze staan wel in deze tabel (kolom `status`) maar niet op "
+        "de kaart (BO-85).",
     )
     gemengd, gemengd_grenzen, zonder_vlak = _gemengde_deelstelselrijen(run, config, meldingen)
     treffers, treffer_grenzen = _trefferrijen(run, meldingen)
@@ -1179,8 +1187,10 @@ def _wegvakrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], 
     De enige soort in deze laag die ook zonder melding een rij krijgt. Voor de andere
     soorten geldt "een vlak bestaat alleen als een melding ernaar wijst"; hier is juist
     het onderscheid tussen een straat waar riolering ligt (groen) en een straat die de
-    regel niet beoordeelt (grijs) wat de kaart moet tonen, en beide dragen per definitie
-    geen melding. Dat is de derde uitvoertoestand van BO-79.
+    regel niet beoordeelt (grijs) wat na te gaan moet zijn, en beide dragen per definitie
+    geen melding. Dat is de derde uitvoertoestand van BO-79. Zij bestaan als rij, niet
+    als kaartvlak: de standaardstijl tekent sinds BO-85 alleen de rode wegvakken. Hier
+    verandert dat niets aan -- deze functie schrijft alle drie de statussen weg.
 
     Rood blijft wél aan de meldingen hangen, en strikt: een wegvak dat het register rood
     noemt maar waarvoor deze uitvoer geen EXT-009-melding draagt -- afgebakend tot een

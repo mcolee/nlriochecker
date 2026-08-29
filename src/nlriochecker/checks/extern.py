@@ -850,9 +850,10 @@ class StraatZonderRiolering(_ExterneCheck):
     De uitslag kent drie toestanden en niet twee: naast rood (geen riolering, deze
     waarschuwing) en groen (riolering aangetoond) is er grijs -- niet beoordeeld, omdat
     de straat onverhard is of op drukriolering ligt. Groen en grijs dragen geen melding
-    maar wel een vlak in de GeoPackage; die komen uit het register op de context
+    maar wel een rij in de laag `vlakken`; die komen uit het register op de context
     (`context.wegvakken`), zodat de schrijver de NWB-laag niet zelf hoeft te bevragen.
-    Zie BO-79 en BO-81, en `checks/wegvakken.py` voor de regel zelf.
+    Getekend worden ze niet: de standaardstijl heeft sinds BO-85 alleen een regel voor
+    rood. Zie BO-79 en BO-81, en `checks/wegvakken.py` voor de regel zelf.
     """
 
     id = "EXT-009"
@@ -901,9 +902,10 @@ class StraatZonderRiolering(_ExterneCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke straat zonder riolering en legt het hele oordeel in het register.
 
-        Ook groen en grijs gaan het register in: de laag `vlakken` toont ze, en zij zijn
-        de enige plek waar "hier is gekeken en er ligt riolering" van "hier is niet
-        gekeken" te onderscheiden is.
+        Ook groen en grijs gaan het register in: zij worden een rij in de laag `vlakken`,
+        en die rij is de enige plek waar "hier is gekeken en er ligt riolering" van "hier
+        is niet gekeken" te onderscheiden is. Op de kaart komen ze niet: de standaardstijl
+        tekent alleen de rode (BO-85).
         """
         drempel = context.config.drempels.ext_wegvak_streng_in_cel
         for oordeel in beoordeel(context).oordelen:
@@ -957,8 +959,9 @@ class StraatZonderRiolering(_ExterneCheck):
             f"Niet beoordeeld: {getal(grijs, 'wegvak', 'wegvakken')} "
             f"({redenen[REDEN_ONVERHARD]} met {REDEN_ONVERHARD}, "
             f"{redenen[REDEN_DRUKRIOLERING]} met {REDEN_DRUKRIOLERING}). Daar zegt het "
-            "ontbreken van vrijverval niets over de datakwaliteit; ze staan grijs in de "
-            "laag `vlakken` en dragen geen melding. De drukriolering-uitzondering geldt "
+            "ontbreken van vrijverval niets over de datakwaliteit; ze staan als grijze "
+            "rij in de laag `vlakken`, niet getekend in de standaardstijl (BO-85), en "
+            "dragen geen melding. De drukriolering-uitzondering geldt "
             "alleen waar er wél vrijverval in het straatvlak ligt maar te weinig: een "
             "straat met nul meter is meetbaar leeg en blijft een bevinding.",
             f"Externe bronnen: {_bronregel(context)}.",

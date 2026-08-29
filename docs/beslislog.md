@@ -4701,6 +4701,13 @@ check alleen tussen haakjes achteraan, en pand en bouwwerk noemden hem helemaal 
 de code voorop staat naast elk vlak op de kaart welke controle erover gaat, en is de
 legenda tegen het checkregister te leggen.
 
+De omschrijving achter de code is niet de `title` van de check en wordt daar ook niet uit
+afgeleid: de auteur heeft deze vier zelf gekozen. Een checktitel is een zin voor een
+rapport ("Straat in de bebouwde kom zonder vrijvervalriolering") en staat als zodanig in
+`overzicht_checks` en in de checktabel; een legendaregel moet in een smalle lagenboom
+passen en zegt wat je op de kaart ziet ("Mogelijk ontbrekend riool"). De code bindt de
+twee aan elkaar, en dat is genoeg.
+
 **Groen en grijs krijgen geen regel, en dat wijkt af van BO-79.** BO-79 schreef: "een kaart
 met alleen rode straten laat de lezer raden of de rest bekeken is", en gaf de soort daarom
 drie regels, een per `status`. Bij de review van 29-08-2026 bleek de prijs daarvan op de

@@ -297,7 +297,9 @@ alleen het bestand waarin zij staat is verhuisd.
   enige soort in de laag die ook **zonder melding** een rij krijgt, en dat is de hele
   winst: het onderscheid tussen een straat waar riolering ligt (`status = groen`) en een
   straat die de regel niet beoordeelt (`grijs`, met de reden in de popup) is er anders
-  niet. De nieuwe kolom **`status`** draagt dat, in dezelfde waarden als de objectlagen
+  niet. Die winst zit sinds issue #107 in de *tabel* en niet meer in de kaart: groen en
+  grijs krijgen geen stijlregel meer (BO-85, zie verderop), maar blijven volledig als rij
+  bestaan. De nieuwe kolom **`status`** draagt dat, in dezelfde waarden als de objectlagen
   (rood, groen, grijs -- oranje komt hier niet voor); elke andere soort laat hem leeg,
   want een geraakt pand of een gemeld deelstelsel draagt geen eigen oordeel. `subtype` is
   de plaatsnaam uit het TOP10NL-komvlak, `bron` staat op `nwb_wegvak` en `check_ids` op

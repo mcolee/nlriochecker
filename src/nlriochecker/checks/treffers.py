@@ -15,9 +15,10 @@ entries in achterlaat -- geen verkeerde laag opleveren.
 
 Sinds issue #104 staat er een tweede register naast, met dezelfde vorm maar een andere
 afspraak: `Wegvakregister` draagt het volledige oordeel van EXT-009 over elk
-kandidaat-wegvak, ook de groene en de grijze, want die krijgen een vlak zonder dat er
+kandidaat-wegvak, ook de groene en de grijze, want die krijgen een rij zonder dat er
 een melding naar wijst (BO-79). Daar telt élke rij mee in de uitvoer, en dus wordt dat
-register wél tot het studiegebied afgebakend.
+register wél tot het studiegebied afgebakend. Zichtbaar op de kaart zijn alleen de rode:
+de standaardstijl van `vlakken` tekent er sinds BO-85 geen groen of grijs meer bij.
 """
 
 from __future__ import annotations
@@ -146,10 +147,11 @@ class Wegvakoordeel:
     """Het oordeel van EXT-009 over een kandidaat-wegvak (issue #104).
 
     Anders dan een `Treffer` hierboven staat dit oordeel *wel* op zichzelf: de laag
-    `vlakken` toont naast de rode wegvakken ook de groene en de grijze, en die dragen
+    `vlakken` draagt naast de rode wegvakken ook de groene en de grijze, en die dragen
     per definitie geen melding. Dat is de derde uitvoertoestand van BO-79, en dit
     register is de enige weg waarlangs de schrijver eraan komt -- hij mag de NWB-laag
-    niet zelf bevragen, want dan kunnen laag en uitslag uit elkaar lopen.
+    niet zelf bevragen, want dan kunnen laag en uitslag uit elkaar lopen. Getekend wordt
+    alleen rood; groen en grijs blijven een rij zonder stijlregel (BO-85).
 
     `sleutel` is `nwb:wegvak/<WVK_ID>` en is ook de `object_uri` van de melding bij een
     rood wegvak; `middelpunt` is haar foutlocatie en tegelijk het punt waarop de

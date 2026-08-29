@@ -25,12 +25,33 @@ from nlriochecker.uitvoer.stijlen.symbolen import (
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 STIJLEN = Path(__file__).resolve().parents[1] / "src" / "nlriochecker" / "uitvoer" / "stijlen"
+VLAKKEN_QML = STIJLEN / "vlakken.qml"
+
+# De legendaregels van `vlakken.qml`, op volgorde: één per check, met de checkcode voorop
+# (issue #107, BO-85). Ze staan hier en niet in beide testbestanden, want
+# `tests/test_uitvoer_qgis.py` toetst dezelfde labels op wat QGIS eruit terugleest; twee
+# losse lijsten zouden apart van elkaar kunnen verouderen.
+VLAKKEN_LEGENDA = (
+    "EXT-001 - Pand of bouwwerk (BGT/BAG)",
+    "EXT-003 - Waterdeel (BGT)",
+    "RVZ-006 - Gemengd stelsel zonder overstort",
+    "EXT-009 - Mogelijk ontbrekend riool",
+)
 
 
 @pytest.fixture(params=["putten", "strengen"])
 def laag(request: pytest.FixtureRequest) -> str:
     """De twee objectlagen met een opgebouwde stijl."""
     return str(request.param)
+
+
+@pytest.fixture(params=["putten", "strengen", "vlakken"])
+def stijlboom(request: pytest.FixtureRequest) -> ET.Element:
+    """De QML van elke laag: de twee opgebouwde plus het bestand van `vlakken`."""
+    gekozen = str(request.param)
+    if gekozen == "vlakken":
+        return ET.fromstring(VLAKKEN_QML.read_text(encoding="utf-8"))
+    return _boom(gekozen)
 
 
 def _boom(laag: str) -> ET.Element:
@@ -64,12 +85,16 @@ def test_de_qml_is_geldige_xml(laag: str) -> None:
     assert _boom(laag).tag == "qgis"
 
 
-def test_elke_regel_verwijst_naar_een_bestaand_symbool(laag: str) -> None:
-    """Een regel zonder symbool tekent niets, zonder dat QGIS iets meldt."""
-    boom = _boom(laag)
-    namen = {symbool.get("name") for symbool in boom.iter("symbol") if symbool.get("type")}
+def test_elke_regel_verwijst_naar_een_bestaand_symbool(stijlboom: ET.Element) -> None:
+    """Een regel zonder symbool tekent niets, zonder dat QGIS iets meldt.
+
+    Ook over `vlakken.qml`, en daar zit het echte risico: die symboolnummers staan met de
+    hand in het bestand en zijn bij issue #107 hernummerd. Een verwijzing die na zo'n
+    hernummering naast een verdwenen symbool valt, levert een lege kaart op.
+    """
+    namen = {symbool.get("name") for symbool in stijlboom.iter("symbol") if symbool.get("type")}
     verwijzingen = {
-        regel.get("symbol") for regel in boom.iter("rule") if regel.get("symbol") is not None
+        regel.get("symbol") for regel in stijlboom.iter("rule") if regel.get("symbol") is not None
     }
 
     assert verwijzingen
@@ -195,16 +220,11 @@ def test_de_vlakkenlaag_geeft_elke_check_precies_een_regel() -> None:
     geldige XML meer is (een dubbel koppelteken in een commentaar volstaat) laat QGIS
     stilzwijgend met een lege foutboodschap vallen.
     """
-    boom = ET.fromstring((STIJLEN / "vlakken.qml").read_text(encoding="utf-8"))
+    boom = ET.fromstring(VLAKKEN_QML.read_text(encoding="utf-8"))
 
     labels = [regel.get("label") for regel in boom.iter("rule")]
 
-    assert labels == [
-        "EXT-001 - Pand of bouwwerk (BGT/BAG)",
-        "EXT-003 - Waterdeel (BGT)",
-        "RVZ-006 - Gemengd stelsel zonder overstort",
-        "EXT-009 - Mogelijk ontbrekend riool",
-    ]
+    assert labels == list(VLAKKEN_LEGENDA)
 
 
 def test_elk_objecttype_in_de_voorbeelddataset_staat_in_de_tabel(juinen) -> None:
