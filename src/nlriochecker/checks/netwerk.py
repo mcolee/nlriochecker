@@ -16,12 +16,14 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
+from nlriochecker.checks.hulpstukken import telbare_hulpstukken
 from nlriochecker.checks.selectie import (
     infiltratieleidingen,
     overstortputten,
 )
 from nlriochecker.checks.verbanden import (
     _bereikbaarheid,
+    _doorgeefknopen,
     _eindpunten,
     _Netwerk,
     _netwerk,
@@ -127,10 +129,14 @@ def _richtingsverlies(
     een knoop die uitsluitend aan het persnet hangt wordt door geen enkele NET-check
     beoordeeld (mechanisch riool valt buiten het checkregister), en zou hier als
     ongemelde last verschijnen in een getal dat de lezer op de bevindingen betrekt.
+
+    Sinds BO-83 staan de telbare hulpstukken zelf in `netwerk.graph` -- ze geven daar
+    door -- dus worden ze hier expliciet afgetrokken. Zonder die aftrek zou dit getal ze
+    meetellen en de zin erboven onwaar maken.
     """
     endpoints = _eindpuntset(context, rollen)
     bereikt = _bereikbaar_vanaf(context, endpoints)
-    vrijverval = set(netwerk.graph)
+    vrijverval = set(netwerk.graph) - telbare_hulpstukken(context)
 
     zonder = met = 0
     for deel in nx.weakly_connected_components(_bereikbaarheid(context)):
@@ -166,8 +172,9 @@ def _netwerk_notities(context: CheckContext) -> list[str]:
     if netwerk.unconnected:
         labels = ", ".join(sorted(conduit.label for conduit in netwerk.unconnected)[:10])
         notities.append(
-            f"{len(netwerk.unconnected)} vrijvervalstrengen hebben geen herleidbare "
-            f"put aan beide zijden en vallen buiten de netwerkanalyse: {labels}."
+            f"{len(netwerk.unconnected)} vrijvervalstrengen hebben niet aan beide zijden "
+            f"een herleidbare put of een telbaar hulpstuk en vallen buiten de "
+            f"netwerkanalyse: {labels}."
         )
     if netwerk.reversed_count:
         notities.append(
@@ -284,7 +291,6 @@ class _ZonderAfvoerpad(Check):
             endpoints |= _eindpunten(context, rol)
         bereikt = _bereikbaar_vanaf(context, endpoints)
         dataset = context.dataset
-        wortels = context.config.klassen.netwerkknopen
         clusters = deelstelsel_ids(context)
         soorten = getattr(context.config.klassen, self.stelselrol)
 
@@ -296,7 +302,11 @@ class _ZonderAfvoerpad(Check):
         for conduit in netwerk.conduits:
             if conduit.uri not in gezocht:
                 continue
-            begin = dataset.resolve_network_node(conduit.start_node, wortels)
+            # Dezelfde knoopafleiding als de graaf zelf (`_doorgeefknopen`, BO-83), en
+            # niet `resolve_network_node`: sinds een telbaar hulpstuk doorgeeft staat een
+            # streng die op een T-stuk begint in de graaf, en zou de putherleiding er
+            # None voor geven en haar onvoorwaardelijk als onbereikbaar melden.
+            begin, _ = _doorgeefknopen(context, conduit)
             if begin not in bereikt:
                 # Een streng waarvan het beginpunt niet op te lossen is hoort hier
                 # thuis -- onbereikbaar is onbereikbaar -- maar heeft geen cluster.
@@ -334,7 +344,12 @@ class VuilwaterZonderAfvoerpad(_ZonderAfvoerpad):
     )
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("lozingspunten", "mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = (
+        "hulpstukken",
+        "lozingspunten",
+        "mechanischeleidingen",
+        "vrijvervalrioolleidingen",
+    )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "vuilwater"
     eindpuntrollen = ("afvoer_eindpunt", "lozings_eindpunt")
@@ -355,7 +370,12 @@ class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
     title = "Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("lozingspunten", "mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = (
+        "hulpstukken",
+        "lozingspunten",
+        "mechanischeleidingen",
+        "vrijvervalrioolleidingen",
+    )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "hemelwater"
     eindpuntrollen = ("lozings_eindpunt",)
@@ -370,7 +390,7 @@ class KringloopInNetwerk(Check):
     title = "Cirkels (kringlopen) in het vrijvervalnetwerk"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("hulpstukken", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -578,7 +598,12 @@ class ItStelselZonderDrempel(Check):
     title = "IT-stelsel zonder drempel"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
-    rollen = ("infiltratieleidingen", "overstortputten", "vrijvervalrioolleidingen")
+    rollen = (
+        "hulpstukken",
+        "infiltratieleidingen",
+        "overstortputten",
+        "vrijvervalrioolleidingen",
+    )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -707,6 +732,11 @@ def _knooplabel(context: CheckContext, uri: str | None) -> str:
     """Het label van de knoop boven een strengkoppeling, of de URI als er geen label is."""
     dataset = context.dataset
     knoop = dataset.resolve_network_node(uri, context.config.klassen.netwerkknopen)
+    # Een streng die op een telbaar hulpstuk eindigt zit sinds BO-83 in de graaf en wordt
+    # dus door NET-009 beoordeeld; zonder deze terugval noemt de melding daar een lege
+    # naam ("van 'A' naar ''") in plaats van het T-stuk waar zij werkelijk op uitkomt.
+    if knoop is None and uri is not None and uri in telbare_hulpstukken(context):
+        knoop = uri
     node = dataset.nodes.get(knoop or "")
     return node.label if node is not None and node.label else (knoop or "")
 
@@ -854,7 +884,7 @@ class RichtingssignalenSprekenElkaarTegen(Check):
     title = "Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("hulpstukken", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -940,7 +970,7 @@ class StelseltypeWijktAfVanBuren(Check):
     title = "Stelseltype streng wijkt af van boven- en benedenstroomse buren"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("hulpstukken", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -1026,7 +1056,7 @@ class KoppelingTussenStelseltypen(Check):
     title = "Koppelingen tussen verschillende stelseltypen"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("vrijvervalrioolleidingen",)
+    rollen = ("hulpstukken", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -1127,7 +1157,12 @@ class VeelLozingspuntenInDeelstelsel(Check):
     title = "Opvallend veel lozingspunten binnen een klein deelstelsel"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("lozingspunten", "mechanischeleidingen", "vrijvervalrioolleidingen")
+    rollen = (
+        "hulpstukken",
+        "lozingspunten",
+        "mechanischeleidingen",
+        "vrijvervalrioolleidingen",
+    )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:

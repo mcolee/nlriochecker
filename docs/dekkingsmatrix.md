@@ -107,14 +107,14 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |
 | --- | --- | --- | --- | --- | --- | --- |
-| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt,… | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk; gezocht op de betrouwbare richting (de strengen die NET-009 niet tegenspreekt). Een kring die alleen a… | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-007 | IT-stelsel zonder drempel | F | Compleetheid | geimplementeerd met test | infiltratieleidingen, overstortputten, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit | geimplementeerd met test | lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
-| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | W | Consistentie | geimplementeerd met test | vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt,… | F | Consistentie | geimplementeerd met test | hulpstukken, lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie | geimplementeerd met test | hulpstukken, lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk; gezocht op de betrouwbare richting (de strengen die NET-009 niet tegenspreekt). Een kring die alleen a… | F | Consistentie | geimplementeerd met test | hulpstukken, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie | geimplementeerd met test | hulpstukken, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit | geimplementeerd met test | hulpstukken, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-007 | IT-stelsel zonder drempel | F | Compleetheid | geimplementeerd met test | hulpstukken, infiltratieleidingen, overstortputten, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit | geimplementeerd met test | hulpstukken, lozingspunten, mechanischeleidingen, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
+| NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | W | Consistentie | geimplementeerd met test | hulpstukken, vrijvervalrioolleidingen · BobBeginpuntLeiding, BobEindpuntLeiding | — |
 
 ## RVZ
 
@@ -124,7 +124,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | RVZ-002 | Overstort zonder geregistreerd drempelniveau en/of drempelbreedte (Drempelniveau, Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt; één m… | W | Compleetheid | geimplementeerd met test | overstortputten · Drempelbreedte, Drempelniveau | — |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit | geimplementeerd met test | oppervlaktewaterobjecten, overstortputten · — | — |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie | geimplementeerd met test | overstortputten, vrijvervalrioolleidingen · — | — |
-| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal of overnamepunt) | F | Plausibiliteit | geimplementeerd met test | bergbezinkvoorzieningen, overstortputten, vrijvervalrioolleidingen · — | — |
+| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal of overnamepunt); het deelstelsel loopt door over een hul… | F | Plausibiliteit | geimplementeerd met test | bergbezinkvoorzieningen, hulpstukken, overstortputten, vrijvervalrioolleidingen · — | — |
 | RVZ-007 | BBB zonder geregistreerde bergingsinhoud of afmetingen | W | Compleetheid | geimplementeerd met test | bergbezinkleidingen, bergbezinkvoorzieningen · Inhoud, NettoBerging, NuttigeBerging, BreedteBouwwerk, LengteBouwwerk, HoogteBouwwerk | — |
 | RVZ-008 | BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel | W | Compleetheid | geimplementeerd met test | bergbezinkleidingen, bergbezinkvoorzieningen · — | — |
 | RVZ-009 | BBB zonder nooduitlaat of externe overstortdrempel | W | Compleetheid | geimplementeerd met test | bergbezinkleidingen, bergbezinkvoorzieningen, overstortleidingen · Drempelbreedte, Drempelniveau | — |

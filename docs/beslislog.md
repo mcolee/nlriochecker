@@ -4530,3 +4530,68 @@ verschil met NET-001 -- die het persnet wél doorloopt -- is bedoeld: NET-001 vr
 water ergens uitkomt, RVZ-006 of het deelstelsel zijn eigen randvoorziening heeft.
 
 Zie [#106](https://github.com/mcolee/nlriochecker/issues/106), BO-54 en BO-55.
+
+### BO-83 Een hulpstuk met een telbare GWSW-functie is een doorgeefknoop in de vrijvervalgraaf
+
+**Wat.** De vrijvervalgraaf (`_bouw_netwerk` en `_bouw_netwerkdelen` in
+`checks/verbanden.py`) leidt de knopen van een streng af met `_doorgeefknopen`: de
+herleide put, en waar die ontbreekt de rauwe `Conduit.start_node`/`end_node` zolang die
+op een hulpstuk met een telbare GWSW-functie wijst -- `Mof`, `T_stuk`, `Y_stuk`,
+`Kruisstuk`. Een `Afsluitstuk` of `Ontstoppingsstuk` draagt een functie zonder aantal en
+blijft een breuk. Het is precies de populatie van BO-72, en zij staat sinds dit besluit
+op één plek: `checks/hulpstukken.py` (`AANTAL_PER_FUNCTIE`, `_functie_met_aantal`), een
+module die alleen `base` en `selectie` leest zodat `verbanden` en `topologie` haar
+allebei kunnen importeren.
+
+Wat níét verandert: `verbonden_knopen` blijft de putten geven -- TOP, HGT en ATTR lezen
+putkenmerken, en een hulpstuk hoort daar niet bij -- en `_bouw_bereikbaarheid` houdt zijn
+eigen, ruimere terugval op élk rauw eindpunt (BO-54). Dat verschil is bedoeld: het
+persnet draagt alleen connectiviteit en wordt inhoudelijk niet getoetst, terwijl een
+vrijvervalknoop de plek is waar een NET-check zijn oordeel op hangt. Of de telbare grens
+ook voor het persnet hetzelfde net oplevert, is niet gemeten.
+
+**Waarom.** Een `Hulpstuk` is in het GWSW geen `Put` en klimt via `hasPart` niet naar een
+put, dus `resolve_network_node` gaf er `None` voor en de graaf liet elke streng vallen
+die op een T-stuk eindigt -- terwijl diezelfde streng er in werkelijkheid aan vastzit en
+de leeslaag die koppeling zelfs herstelde (`SIG-hulpstukkoppeling`, issue #60). Op De
+Wolden en Hoogeveen vielen daardoor 152 vrijvervalstrengen buiten de netwerkanalyse; hun
+197 losse einden liggen álle op een telbaar hulpstuk, er is geen tweede oorzaak. Zij
+kregen geen bevinding maar ook geen oordeel, en het net eromheen viel in stukken uiteen:
+drie gemengde deelstelsels golden als "zonder overstort en zonder afvoereindpunt" terwijl
+ze een T-stuk verderop allebei hebben. Het persnet had die terugval sinds BO-54 al, om
+exact dezelfde reden.
+
+**Wat het betekent voor de cijfers.** Gemeten met `scripts/meet_hulpstukgraaf.py` op De
+Wolden en Hoogeveen; de kolom "vóór" komt uit `uitvoer/29082027-02/bevindingen.csv`.
+
+| Meting | vóór | ná |
+|---|---:|---:|
+| strengen buiten de netwerkanalyse | 152 | **0** |
+| netwerkdelen | 794 | **733** |
+| RVZ-006 | 1062 op 99 deelstelsels | **1058 op 96** |
+| NET-001 | 8467 | **8499** |
+| NET-002 | 3031 | **3046** |
+| NET-006 | 329 | **332** |
+| NET-009 | 3656 | **3667** |
+
+RVZ-006 verliest precies de drie vlakken die de auteur bij de review van 29-08 als vals
+aanwees (`ds-Fo1G0080`, `ds-Wi1G0416`, `ds-Zu1G0510`) en er komt niets voor terug. De
+overige verschillen zijn strengen die nu voor het eerst beoordeeld worden: NET-001 +32 en
+NET-002 +15 zonder afvoerpad, NET-009 +11 met tegenstrijdige richtingssignalen, en NET-006
++3 knopen waar door die strengen twee stelseltypen samenkomen. NET-004, NET-005, NET-007
+en NET-008 blijven gelijk. Of elk van die nieuwe bevindingen terecht is, is niet per stuk
+nagelopen. De deelstelsel-ID's (`ds-...`) verschuiven waar `min(deel)` nu een hulpstuk-URI
+is; die namen zijn per run deterministisch maar niet stabiel over codewijzigingen heen
+(BO-57).
+
+**Waarom de meting in issue #105 hogere getallen noemde.** De monkeypatch waarmee dat
+issue de verwachting bepaalde (8543 en 3049) raakte alleen de twee graafbouwers en liet
+`_ZonderAfvoerpad._bouw_onbereikbaar` staan. Die leidde het beginpunt van een streng nog
+met `resolve_network_node` af, en dat geeft `None` voor een streng die op een T-stuk
+begint: `None not in bereikt` is altijd waar, dus zulke strengen werden onvoorwaardelijk
+gemeld. Nagemeten met beide varianten naast elkaar: zonder die correctie 8543 en 3049,
+mét 8499 en 3046 -- de voorspelling bevatte 44 + 3 vals-positieven. `_bouw_onbereikbaar`
+gebruikt daarom dezelfde afleiding als de graaf zelf.
+
+Zie [#105](https://github.com/mcolee/nlriochecker/issues/105), BO-53, BO-54, BO-57 en
+BO-72.

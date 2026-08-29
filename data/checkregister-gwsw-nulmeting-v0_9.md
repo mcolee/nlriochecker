@@ -121,7 +121,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
-| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt, dus de configuratie moet de mechanische leidingklassen noemen zodat de route door het persnet traceerbaar is | F | Consistentie |
+| NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt, dus de configuratie moet de mechanische leidingklassen noemen zodat de route door het persnet traceerbaar is. Een hulpstuk met een telbare GWSW-functie geldt als knoop in het net (BO-83) | F | Consistentie |
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk; gezocht op de betrouwbare richting (de strengen die NET-009 niet tegenspreekt). Een kring die alleen administratief bestaat valt uiteen en telt niet; een vlakke BOB-consistente ring is bewust vermaasd net (legitiem) en een ring die via een BOB-sprong omhoog sluit hoort bij HGT-009 -- beide gedempt (BO-77) | F | Consistentie |
 | NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie |
@@ -138,7 +138,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | RVZ-002 | Overstort zonder geregistreerd drempelniveau en/of drempelbreedte (Drempelniveau, Drempelbreedte), ook als het drempelonderdeel zelf ontbreekt; één melding per put die zegt welke maat mist. RVZ-003 (aparte breedtecheck) is hierin opgegaan (BO-78). Overlapt bewust met de nulmetingvorm Overstortput_Overstortdrempel_card, want die toetst alleen of de put een drempel heeft, dekt de Stuwput niet en de check werkt ook zonder nulmeting | W | Compleetheid |
 | RVZ-004 | Externe overstort zonder ontvangend oppervlaktewater binnen X m | W | Plausibiliteit |
 | RVZ-005 | Overstort aangesloten op een hemelwater- of IT-stelsel | W | Consistentie |
-| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal of overnamepunt) | F | Plausibiliteit |
+| RVZ-006 | Gemengd deelstelsel zonder enige externe overstort of BBB, óf zonder afvoereindpunt (gemaal of overnamepunt); het deelstelsel loopt door over een hulpstuk met een telbare GWSW-functie, dat als knoop in het net geldt (BO-83) | F | Plausibiliteit |
 | RVZ-007 | BBB zonder geregistreerde bergingsinhoud of afmetingen | W | Compleetheid |
 | RVZ-008 | BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel | W | Compleetheid |
 | RVZ-009 | BBB zonder nooduitlaat of externe overstortdrempel | W | Compleetheid |

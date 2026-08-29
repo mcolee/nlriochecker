@@ -114,6 +114,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Een telbaar hulpstuk is een doorgeefknoop in de vrijvervalgraaf** (issue #105, BO-83).
+  Een streng die op een `Mof`, `T_stuk`, `Y_stuk` of `Kruisstuk` eindigt viel uit de
+  netwerkanalyse -- een `Hulpstuk` is geen `Put`, dus de graaf liet haar vallen -- terwijl
+  zij daar in werkelijkheid aan het net vastzit; het persnet had die terugval sinds BO-54
+  al. Een `Afsluitstuk` of `Ontstoppingsstuk` blijft een breuk (dezelfde grens als BO-72).
+  De telbare populatie verhuist naar de nieuwe module `checks/hulpstukken.py`, zodat
+  `checks/verbanden.py` en `checks/topologie.py` haar allebei kunnen lezen zonder
+  importkring. Gemeten op De Wolden en Hoogeveen
+  (`scripts/meet_hulpstukgraaf.py`): strengen buiten de netwerkanalyse 152 → **0**,
+  netwerkdelen 794 → **733**, RVZ-006 1062 op 99 deelstelsels → **1058 op 96** (precies de
+  drie valse deelstelsels uit de review van 29-08, en niets nieuws), NET-001 8467 → **8499**,
+  NET-002 3031 → **3046**, NET-006 329 → **332** en NET-009 3656 → **3667** -- strengen die
+  nu voor het eerst beoordeeld worden. De deelstelsel-ID's (`ds-...`) kunnen verschuiven.
 - **NET-004 wordt richting-bewust en onderscheidt vermaasd net** (issue #102, BO-77).
   Kringlopen worden gezocht op de betrouwbare richting (de strengen die NET-009 niet
   tegenspreekt, de richtingsbron uit #80/BO-76). Een kring die alleen op een omgekeerd

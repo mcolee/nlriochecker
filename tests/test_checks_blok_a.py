@@ -849,6 +849,26 @@ def test_rvz006_telt_een_pompunit_niet_als_afvoereindpunt() -> None:
         assert "externe overstort" not in bevinding.message
 
 
+def test_rvz006_zwijgt_als_het_deelstelsel_door_een_t_stuk_doorloopt() -> None:
+    """Een T-stuk knipt het deelstelsel niet meer in tweeën (issue #105, BO-83).
+
+    De gemengde strengen '1' en '2' hangen aan T-stuk T1 en komen via overstortput O bij
+    het gemaal uit. Zolang het T-stuk geen knoop was, hield put A een eigen deelstelsel
+    over -- zonder overstort en zonder afvoereindpunt -- en meldde RVZ-006 daarop. Dat
+    was een vals vlak: op De Wolden en Hoogeveen drie stuks.
+    """
+    assert labels(uitkomst("net_hulpstuk_doorgeefknoop.ttl", "RVZ-006")) == []
+
+
+def test_rvz006_meldt_nog_steeds_achter_een_afsluitstuk() -> None:
+    """Een afsluitstuk draagt geen functie met een aantal en geeft dus niet door (BO-72).
+
+    De keten is verder gelijk aan die van de vorige test; alleen het T-stuk is een
+    `Afsluitstuk`. Put A houdt daarmee zijn eigen deelstelsel, en de melding erop blijft.
+    """
+    assert labels(uitkomst("net_hulpstuk_afsluitstuk.ttl", "RVZ-006")) == ["1"]
+
+
 def test_rvz006_met_overstort_en_afvoereindpunt_zwijgt() -> None:
     """Met een overstort en een gemaal is het gemengde stelsel compleet: geen RVZ-006.
 

@@ -11,7 +11,12 @@ from gwsw_orox_helpers.dataset import GWSW, load_dataset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.netwerk import KringloopInNetwerk
-from nlriochecker.checks.verbanden import _netwerk, deelstelsel_ids, verbonden_knopen
+from nlriochecker.checks.verbanden import (
+    _netwerk,
+    deelstelsel_ids,
+    netwerkdelen,
+    verbonden_knopen,
+)
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 NET_IDS = ["NET-001", "NET-002", "NET-004", "NET-007"]
@@ -408,6 +413,75 @@ def test_pompunit_zonder_persnet_is_geen_afvoereindpunt(tmp_path: Path) -> None:
         "afvoer_eindpunt = ['Gemaal', 'Pompunit']\nvuilwater = ['Vuilwaterriool']\n",
     )
     assert _labels(bestand, "NET-001", met_pompunit) == []
+
+
+# De vrijvervalketen door een hulpstuk, zonder pompunit en zonder persnet: het T-stuk
+# is hier de enige schakel tussen put A en de rest. `mechanisch` staat er alleen omdat
+# `ClassRoots._pompunit_heeft_een_uitweg` een geschreven config zonder persnet weigert.
+_HULPSTUKKETEN_KLASSEN = (
+    "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+    "mechanisch = ['MechanischeRioolleiding']\nafvoer_eindpunt = ['Gemaal']\n"
+    "vuilwater = ['GemengdRiool']\n"
+)
+
+
+def test_netwerkdelen_lopen_door_een_telbaar_hulpstuk() -> None:
+    """Een T-stuk is een doorgeefknoop in de vrijvervalgraaf (issue #105, BO-83).
+
+    Een `Hulpstuk` is geen `Put`, dus `resolve_network_node` geeft er None voor en de
+    graaf liet de streng erop vallen. Het net zit er in werkelijkheid wel aan vast --
+    de leeslaag herstelde die koppeling zelfs (`SIG-hulpstukkoppeling`) -- dus valt de
+    vrijvervalgraaf sinds dit issue terug op de rauwe koppeling zolang die op een
+    hulpstuk met een telbare GWSW-functie wijst. Put A, T-stuk T1, overstortput O en het
+    gemaal horen daarmee in een deelstelsel, met een gedeeld ID.
+    """
+    dataset = load_dataset(TTL_DIR / "net_hulpstuk_doorgeefknoop.ttl", [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    delen = netwerkdelen(context)
+
+    assert len(delen) == 1
+    assert "http://example.org/toets#T1" in delen[0]
+    assert len(set(deelstelsel_ids(context).values())) == 1
+
+
+def test_net001_bereikt_het_gemaal_door_het_telbare_hulpstuk(tmp_path: Path) -> None:
+    """De strengen aan het T-stuk doen weer mee aan de netwerkanalyse (issue #105).
+
+    Ze vielen er niet uit met een bevinding maar zonder oordeel: "geen herleidbare put
+    aan beide zijden", alleen zichtbaar in de notitie. De controlehelft haalt `hulpstuk`
+    uit de config: dan is het T-stuk geen doorgeefknoop meer en vallen dezelfde twee
+    strengen weer buiten de analyse.
+    """
+    bestand = "net_hulpstuk_doorgeefknoop.ttl"
+
+    outcome = _outcome(bestand, "NET-001")
+
+    assert outcome.findings == []
+    assert not any("buiten de netwerkanalyse" in notitie for notitie in outcome.notes)
+
+    zonder_hulpstuk = _testconfig(
+        tmp_path, "zonder_hulpstuk", _HULPSTUKKETEN_KLASSEN + "hulpstuk = []\n"
+    )
+    andere = _outcome(bestand, "NET-001", zonder_hulpstuk)
+    notitie = next(n for n in andere.notes if "buiten de netwerkanalyse" in n)
+    assert notitie.startswith("2 vrijvervalstrengen")
+
+
+def test_een_afsluitstuk_blijft_een_breuk_in_de_vrijvervalgraaf() -> None:
+    """Alleen een hulpstuk met een telbare functie geeft door; een afsluitstuk niet.
+
+    Dezelfde grens als BO-72 voor TOP-002/TOP-003 trekt: `Afsluitstuk` draagt de functie
+    `AfsluitenVanLeidingen`, en die schrijft geen aantal leidingen voor. De keten valt
+    hier dus wel uiteen, en dat hoort in de notitie te staan.
+    """
+    dataset = load_dataset(TTL_DIR / "net_hulpstuk_afsluitstuk.ttl", [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    assert len(netwerkdelen(context)) == 2
+
+    outcome = _outcome("net_hulpstuk_afsluitstuk.ttl", "NET-001")
+    assert any("buiten de netwerkanalyse" in notitie for notitie in outcome.notes)
 
 
 def _zonder_persnet(config: CheckConfig) -> CheckConfig:

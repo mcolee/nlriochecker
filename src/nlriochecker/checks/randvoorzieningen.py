@@ -478,7 +478,12 @@ class GemengdDeelstelselZonderOverstort(Check):
     title = "Gemengd deelstelsel zonder externe overstort/BBB of zonder afvoereindpunt"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("bergbezinkvoorzieningen", "overstortputten", "vrijvervalrioolleidingen")
+    rollen = (
+        "bergbezinkvoorzieningen",
+        "hulpstukken",
+        "overstortputten",
+        "vrijvervalrioolleidingen",
+    )
     kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:

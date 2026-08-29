@@ -1887,6 +1887,45 @@ FIXTURES["net001_pompunit_zonder_persnet.ttl"] = (
     ),
 )
 
+# NET/RVZ (#105): een hulpstuk met een telbare GWSW-functie is een doorgeefknoop in de
+# VRIJVERVALgraaf, niet alleen in het persnet. De gemengde streng '1' loopt van put A naar
+# T-stuk T1 en '2' van T1 naar overstortput O; '3' brengt het water van O naar het gemaal.
+# Zonder de terugval op de rauwe koppeling valt de graaf hier in twee delen uiteen -- put A
+# alleen, en O met het gemaal -- vallen '1' en '2' buiten de netwerkanalyse en meldt RVZ-006
+# op streng '1'. Met het T-stuk als doorgeefknoop is het een deelstelsel mét overstort en
+# afvoereindpunt, en is er niets te melden.
+FIXTURES["net_hulpstuk_doorgeefknoop.ttl"] = (
+    "geen; de gemengde strengen '1' en '2' hangen aan T-stuk T1 en bereiken via "
+    "overstortput O het gemaal",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + put("PutO", "O", 1100.0, 2000.0, klasse="Overstortput")
+    + gemaal("Gem", "G", (1150.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T1")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "PutO")
+    + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutO", "Gem"),
+)
+
+# NET/RVZ (#105): dezelfde keten met een afsluitstuk op de plaats van het T-stuk. Een
+# `Afsluitstuk` draagt wel een GWSW-functie maar geen aantal leidingen (AfsluitenVanLeidingen),
+# dus het is geen doorgeefknoop en blijft een breuk -- dezelfde grens als BO-72 voor TOP-002
+# en TOP-003 trekt. Put A houdt daarom zijn eigen deelstelsel, zonder overstort en zonder
+# afvoereindpunt.
+FIXTURES["net_hulpstuk_afsluitstuk.ttl"] = (
+    "de gemengde streng '1' eindigt op afsluitstuk A1, dat geen functie met een aantal "
+    "draagt; put A blijft daardoor een deelstelsel zonder overstort en zonder afvoereindpunt",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + hulpstuk("A1", "A1", 1050.0, 2000.0, klasse="Afsluitstuk")
+    + put("PutO", "O", 1100.0, 2000.0, klasse="Overstortput")
+    + gemaal("Gem", "G", (1150.0, 2000.0))
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "A1")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "A1", "PutO")
+    + leiding("L3", "3", [(1100.0, 2000.0), (1150.0, 2000.0)], "PutO", "Gem"),
+)
+
+
 # Afbakening (#73): de kern kan het gemaal alleen via het persnet bereiken, en dat
 # gemaal ligt ver buiten de contextbuffer van 50 m. Zonder de mechanische kanten in
 # de componentberekening valt de route buiten de contextschil en meldt een
