@@ -111,6 +111,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   blokken `aspecten_van` en `onderdelen_van`. Het rapport toont per eigen check een regel
   "Toetst ⟨klassen⟩ op ⟨kenmerken⟩", en `docs/dekkingsmatrix.md` krijgt een kolom
   *Rollen · kenmerken*.
+- **Een getrackt voorbeeld om `toets` op te draaien** (issue #103). `voorbeelden/koekangerveld/`
+  draagt de buurt Koekangerveld als volwaardige invoer: de OroX-uitsnede van haar analyseset
+  (kern, contextschil, onderdelen, orientaties en stelsels), de drie SHACL-rapporten
+  teruggebracht tot de regels die op een object in het voorbeeld uitkomen, het studiegebied,
+  de vier vectorbronnen en een projectconfiguratie. Zonder dit voorbeeld had een lezer van de
+  repository niets om de package op te draaien: `data/` staat op het checkregister na buiten
+  versiebeheer. Gebouwd met `scripts/maak_voorbeeld.py`, bewaakt door een rooktest die geen
+  `data/` nodig heeft en dus op de CI-runner meedraait (`tests/test_voorbeeld.py`), en
+  vastgezet met een gelijkheidstest: voor de eigen checks levert het voorbeeld dezelfde
+  bevindingen als een gebiedsrun Koekangerveld op de volledige export.
 
 ### Gewijzigd
 
