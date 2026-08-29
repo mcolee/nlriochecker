@@ -4502,3 +4502,31 @@ repository. Het ijkscript slaat over als zij er niet is, met een melding. Een an
 gemeente hoort de drempel opnieuw te ijken -- daarom is hij een drempel en geen constante.
 
 Zie [#104](https://github.com/mcolee/nlriochecker/issues/104), BO-3 en BO-43.
+
+### BO-82 Voor RVZ-006 is een persleiding of een lozingspunt geen afvoereindpunt
+
+**Wat.** RVZ-006 eist van een gemengd deelstelsel een externe overstort of BBB én een
+afvoereindpunt, en beide moeten via het vrijverval bereikbaar zijn, binnen het
+deelstelsel zoals `netwerkdelen` het afbakent. Een persleiding die uit het deelstelsel
+vertrekt telt niet als afvoereindpunt, ook niet als er achter het persnet een gemaal
+ligt; een lozingspunt (`Lozingsput`, `Uitlaatconstructie`) evenmin. `afvoer_eindpunt`
+blijft `Gemaal` en `Overnamepunt`, en de check blijft op het zuivere vrijverval
+(`_stelseldelen`) rekenen en niet op de bereikbaarheidsgraaf die NET-001 leest (BO-54).
+
+**Waarom.** Een overstort zit niet ná een persleiding. Het gemengde vrijverval moet zijn
+overschot kwijt kunnen vóór het water in het persnet verdwijnt; een gemaal achter het
+persnet zegt niets over de randvoorziening van het deelstelsel ervoor. Besluit van de
+auteur bij de review van alle 99 RVZ-006-vlakken op De Wolden en Hoogeveen (29-08-2026):
+*"een overstort zit niet ná een persleiding. Dus voor deze analyse zijn lozingsputten of
+persleidingen GEEN geldig afvoereindpunt. Dat moet echt een overstort zijn, bereikbaar via
+een vrijverval riool."*
+
+**Wat het betekent voor de cijfers.** Van de 99 gemelde deelstelsels
+(`uitvoer/29082027-02`) hebben er 18 een persleiding als enige uitgang en 27 een
+lozingspunt zonder gemaal of overnamepunt; die meldingen zijn terecht en blijven staan.
+De melding hoort wél te zeggen wáár het water dan heen gaat, zodat de lezer het gebrek
+begrijpt; dat is [#106](https://github.com/mcolee/nlriochecker/issues/106). Het
+verschil met NET-001 -- die het persnet wél doorloopt -- is bedoeld: NET-001 vraagt of het
+water ergens uitkomt, RVZ-006 of het deelstelsel zijn eigen randvoorziening heeft.
+
+Zie [#106](https://github.com/mcolee/nlriochecker/issues/106), BO-54 en BO-55.
