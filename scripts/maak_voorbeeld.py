@@ -28,8 +28,12 @@ Wat er gebeurt, in deze volgorde:
    EXT-uitslag per constructie niet van de gebiedsrun verschillen. Het studiegebied
    wordt met `VACUUM INTO` gecompacteerd (7,8 MB aan vrije pagina's om een enkel vlak).
    Het AHN gaat niet mee (12 MB); HGT-001 t/m HGT-003 melden dan zelf dat ze niets
-   konden toetsen.
-5. **De projectconfiguratie en de README** van de voorbeeldmap.
+   konden toetsen. Welk bestand welke rol vervult komt uit `[bronnen]` in de
+   meegeleverde `checks.toml`, niet uit een tweede lijst hier.
+5. **De README** van de voorbeeldmap. Een eigen projectconfiguratie krijgt het voorbeeld
+   niet: `toets` overschrijft `[bronnen] map` toch met de map achter `--bronnen`, dus een
+   kopie van `checks.toml` zou geen enkele werkzame wijziging dragen en alleen uit de pas
+   kunnen gaan lopen.
 
 De uitvoer is gegenereerd en wordt nooit met de hand bijgewerkt; zie de tabel
 "Gegenereerde bestanden" in `docs/agents/analyse-harness.md`.
@@ -54,12 +58,7 @@ from gwsw_orox_helpers.graaf import naar_rdflib
 from rdflib import Graph
 
 from nlriochecker.afbakening import Analyseset, bouw_analyseset
-from nlriochecker.checkconfig import (
-    FALLBACK_ENCODING,
-    CheckConfig,
-    default_check_config_path,
-    load_check_config,
-)
+from nlriochecker.checkconfig import FALLBACK_ENCODING, CheckConfig, load_check_config
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.nulbevinding import bouw_nulbevindingen
 from nlriochecker.shaclrapport import DELIMITER, ENCODING, KOLOMMEN, VORM_TE_GLOBAAL
@@ -73,15 +72,6 @@ BRON_SHACL = WORTEL / "data" / "shacl_nulmeting"
 BRON_GIS = WORTEL / "data" / "gis_koekangerveld"
 
 DOEL_TTL = "koekangerveld_orox.ttl"
-STUDIEGEBIED = "cbs_buurt_koekangerveld_studiegebied.gpkg"
-# Bit voor bit overgenomen: de vier vectorbronnen die de EXT-checks lezen.
-VECTORBRONNEN = (
-    "BGT.gpkg",
-    "bag_pand_koekangerveld.gpkg",
-    "nwb_wegvakken_koekangerveld.gpkg",
-    "top10nl_plaats_vlak_koekangerveld.gpkg",
-)
-DOEL_CONFIG = "koekangerveld.toml"
 
 # De relaties waarlangs het voorbeeld omlaag sluit. `hasPart` en `hasAspect` zijn
 # insluitingen: wat eraan hangt hoort bij de houder en moet mee, anders verliest een put
@@ -211,14 +201,18 @@ def _naamruimte(gekozen: set[pyoxigraph.NamedNode]) -> str:
 
 def _schrijf_ttl(
     triples: Triples, gekozen: set[pyoxigraph.NamedNode], doel: Path, alle_subjecten: set[str]
-) -> int:
-    """Schrijft de gekozen triples als Turtle en geeft het aantal terug.
+) -> tuple[int, int]:
+    """Schrijft de gekozen triples als Turtle; geeft (triples, subjecten) terug.
 
     Een verwijzing naar een subject dat niet meekomt gaat eruit: anders draagt het
     voorbeeld dode verwijzingen die alleen ruimte kosten. Verwijzingen naar iets dat in
     de volledige export ook geen subject is blijven staan -- de BrutIS-export koppelt
     elk leidingeinde op een hulpstuk aan een `<hulpstuk>_put`-URI zonder eigen triples,
     en het koppelingsherstel van de lader hangt daarop (SIG-hulpstukkoppeling).
+
+    Het aantal subjecten komt uit de geschreven graaf en niet uit `gekozen`: die
+    verzameling draagt ook de dertig `hasConnection`-doelen zonder eigen triples, en die
+    komen als subject nergens in het bestand terug.
     """
     graaf = Graph()
     for prefix, ruimte in {**PREFIXEN, "": _naamruimte(gekozen)}.items():
@@ -232,48 +226,42 @@ def _schrijf_ttl(
             graaf.add((naar_rdflib(subject), naar_rdflib(predicaat), naar_rdflib(object_)))
             aantal += 1
     graaf.serialize(destination=doel, format="turtle", encoding="utf-8")
-    return aantal
+    return aantal, len(set(graaf.subjects()))
 
 
-def _kopieer_bronnen(doel: Path) -> None:
+def _vectorbronnen(config: CheckConfig) -> list[str]:
+    """De bestandsnamen van de vectorbronnen, uit de meegeleverde configuratie.
+
+    Niet als eigen lijst hier: `[bronnen]` in `checks.toml` is de plek waar staat welk
+    bestand welke rol vervult, en een tweede lijst zou bij een hernoeming stil
+    achterblijven. Het hoogteraster staat er bewust niet bij -- dat gaat niet mee.
+    """
+    bronnen = config.bronnen
+    namen = [bronnen.bgt, bronnen.bag_pand, bronnen.nwb_wegvakken, bronnen.top10nl]
+    return [naam for naam in namen if naam]
+
+
+def _kopieer_bronnen(doel: Path, config: CheckConfig) -> None:
     """Kopieert de vectorbronnen en compacteert het studiegebied."""
-    for naam in VECTORBRONNEN:
+    for naam in _vectorbronnen(config):
         shutil.copy2(BRON_GIS / naam, doel / naam)
 
-    uit = doel / STUDIEGEBIED
+    gebied = _studiegebiednaam(config)
+    uit = doel / gebied
     uit.unlink(missing_ok=True)
-    verbinding = sqlite3.connect(f"file:{BRON_GIS / STUDIEGEBIED}?mode=ro", uri=True)
+    verbinding = sqlite3.connect(f"file:{BRON_GIS / gebied}?mode=ro", uri=True)
     try:
         verbinding.execute("vacuum into ?", (str(uit),))
     finally:
         verbinding.close()
 
 
-def _schrijf_config(doel: Path) -> None:
-    """Schrijft de projectconfiguratie: `checks.toml` met de bronnenmap verlegd.
-
-    Alleen de regel `map` verandert. De meegeleverde configuratie wijst naar
-    `data/gis_koekangerveld`, een pad ten opzichte van de repository-wortel; het
-    voorbeeld draait ook buiten die wortel en leest zijn bronnen daarom uit de map die
-    `--bronnen` aanwijst. `tests/test_checkconfig.py` bewaakt dat de rest gelijk blijft.
-    """
-    regels = default_check_config_path().read_text(encoding="utf-8").splitlines(keepends=True)
-    uitvoer = []
-    for regel in regels:
-        if regel.startswith("map = "):
-            uitvoer.append(
-                "# De bronnen staan in deze map zelf; `--bronnen voorbeelden/koekangerveld`\n"
-                "# wijst hem aan, en dat werkt ook buiten de repository-wortel.\n"
-                'map = "."\n'
-            )
-            continue
-        uitvoer.append(regel)
-    kop = (
-        "# Projectconfiguratie van het voorbeeld Koekangerveld.\n"
-        "# GEGENEREERD door scripts/maak_voorbeeld.py uit src/nlriochecker/checks.toml;\n"
-        "# bewerk dat bestand en draai de generator opnieuw.\n"
-    )
-    (doel / DOEL_CONFIG).write_text(kop + "".join(uitvoer), encoding="utf-8")
+def _studiegebiednaam(config: CheckConfig) -> str:
+    """Het bestand dat `[bronnen] studiegebied` als bereik aanwijst."""
+    naam = config.bronnen.studiegebied
+    if not naam:
+        raise SystemExit("`[bronnen] studiegebied` staat niet in de meegeleverde configuratie.")
+    return naam
 
 
 def _schrijf_shacl(doel: Path, voorbeeld: GwswDataset, config: CheckConfig) -> tuple[int, int]:
@@ -305,7 +293,11 @@ def _schrijf_shacl(doel: Path, voorbeeld: GwswDataset, config: CheckConfig) -> t
         for rij in rijen[kop + 1 :]:
             if not rij or not any(rij):
                 continue
-            if (rij[1].strip(), rij[0].strip()) in behouden_sleutels:
+            # Een rij met minder dan twee velden draagt geen vorm en kan dus nooit
+            # behouden worden; `shaclrapport._meldingen` vult zo'n rij op met lege
+            # velden en laat hem staan, dus hij mag hier niet omvallen maar wel weg.
+            sleutel = (rij[1].strip(), rij[0].strip()) if len(rij) > 1 else None
+            if sleutel is not None and sleutel in behouden_sleutels:
                 gekozen.append(rij)
             else:
                 weggelaten += 1
@@ -354,11 +346,14 @@ nlriochecker toets \\
   --shacl voorbeelden/koekangerveld/gwsw_shacl_report_conformiteit_Hyd.csv \\
   --shacl voorbeelden/koekangerveld/gwsw_shacl_report_conformiteit_MdsPlan.csv \\
   --shacl voorbeelden/koekangerveld/gwsw_shacl_report_MdsProj.csv \\
-  --studiegebied voorbeelden/koekangerveld/{STUDIEGEBIED} \\
-  --projectconfig voorbeelden/koekangerveld/{DOEL_CONFIG} \\
+  --studiegebied voorbeelden/koekangerveld/{feiten["gebied"]} \\
   --bronnen voorbeelden/koekangerveld \\
   --output uitvoer/voorbeeld
 ```
+
+Er is geen `--projectconfig` bij: het voorbeeld draait op de meegeleverde
+standaardconfiguratie (`src/nlriochecker/checks.toml`). Wil je zien hoe een eigen
+projectconfiguratie eruitziet, kijk dan in `configs/dewoldenhoogeveen.toml`.
 
 ## Wat erin zit
 
@@ -401,7 +396,7 @@ nlriochecker toets \\
 - **`BGT.gpkg`** en **`bag_pand_koekangerveld.gpkg`** -- BGT en BAG via PDOK, CC0.
 - **`nwb_wegvakken_koekangerveld.gpkg`** -- Nationaal Wegenbestand (Rijkswaterstaat), CC0.
 - **`top10nl_plaats_vlak_koekangerveld.gpkg`** -- TOP10NL (Kadaster), CC-BY 4.0.
-- **`{STUDIEGEBIED}`** -- CBS-buurtkaart, CC-BY 4.0 (CBS).
+- **`{feiten["gebied"]}`** -- CBS-buurtkaart, CC-BY 4.0 (CBS).
 
 De GWSW-ontologie waarmee `toets` de klassenhierarchie leest zit niet in deze map: zij
 reist als package-resource mee met `gwsw-orox-helpers` en is CC0.
@@ -415,9 +410,10 @@ def main() -> None:
     DOEL.mkdir(parents=True, exist_ok=True)
     config = load_check_config()
 
+    gebied = _studiegebiednaam(config)
     begin = time.monotonic()
     dataset, cache = laad_met_cache(BRON_TTL, None, fallback_encoding=FALLBACK_ENCODING)
-    area = load_study_area(BRON_GIS / STUDIEGEBIED)
+    area = load_study_area(BRON_GIS / gebied)
     analyseset = bouw_analyseset(dataset, area, config)
     print(
         f"analyseset: {len(analyseset.kern)} kern, {len(analyseset.schil)} schil, "
@@ -427,11 +423,10 @@ def main() -> None:
 
     triples = _lees_export(BRON_TTL)
     gekozen = _subjectverzameling(triples, dataset, analyseset)
-    aantal = _schrijf_ttl(triples, gekozen, DOEL / DOEL_TTL, {s.value for s in triples})
-    print(f"TTL: {aantal} triples over {len(gekozen)} subjecten", flush=True)
+    aantal, subjecten = _schrijf_ttl(triples, gekozen, DOEL / DOEL_TTL, {s.value for s in triples})
+    print(f"TTL: {aantal} triples over {subjecten} subjecten", flush=True)
 
-    _kopieer_bronnen(DOEL)
-    _schrijf_config(DOEL)
+    _kopieer_bronnen(DOEL, config)
 
     voorbeeld = load_dataset(DOEL / DOEL_TTL, None)
     print(f"voorbeeld: {len(voorbeeld.nodes)} knopen, {len(voorbeeld.conduits)} strengen")
@@ -445,8 +440,9 @@ def main() -> None:
             "schil": len(analyseset.schil),
             "export": analyseset.volledig_aantal,
             "triples": aantal,
-            "subjecten": len(gekozen),
+            "subjecten": subjecten,
             "shacl": behouden,
+            "gebied": gebied,
         },
     )
     totaal = sum(pad.stat().st_size for pad in DOEL.iterdir())

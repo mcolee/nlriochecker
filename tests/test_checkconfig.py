@@ -27,9 +27,6 @@ from nlriochecker.checkconfig import (
 from nlriochecker.errors import ConfigError
 
 PROJECTCONFIG = Path(__file__).resolve().parents[1] / "configs" / "dewoldenhoogeveen.toml"
-VOORBEELDCONFIG = (
-    Path(__file__).resolve().parents[1] / "voorbeelden" / "koekangerveld" / "koekangerveld.toml"
-)
 
 
 def test_standaardconfig_laadt() -> None:
@@ -319,11 +316,6 @@ DREMPELMODELLEN: list[tuple[str, type[BaseModel]]] = [
 CONFIGBESTANDEN = [
     pytest.param(default_check_config_path(), "src/nlriochecker/checks.toml", id="checks.toml"),
     pytest.param(PROJECTCONFIG, "configs/dewoldenhoogeveen.toml", id="dewoldenhoogeveen.toml"),
-    pytest.param(
-        VOORBEELDCONFIG,
-        "voorbeelden/koekangerveld/koekangerveld.toml",
-        id="koekangerveld.toml",
-    ),
 ]
 
 # Sleutels van `[drempels]` waarvoor `configs/dewoldenhoogeveen.toml` bewust van de
@@ -497,44 +489,6 @@ def test_bewuste_klassenafwijking_wijkt_ook_werkelijk_af() -> None:
             f"{sleutel} staat op BEWUSTE_KLASSEN_AFWIJKINGEN maar is gelijk in beide "
             f"bestanden; haal hem eruit ({reden})"
         )
-
-
-# De enige sleutel waarin de voorbeeldconfiguratie van `checks.toml` mag afwijken, met
-# de sectie eromheen. `map` wijst in de meegeleverde configuratie naar
-# `data/gis_koekangerveld`, een pad ten opzichte van de repository-wortel; het voorbeeld
-# leest zijn bronnen uit de map die `--bronnen` aanwijst en zet hem daarom op ".".
-VOORBEELD_SECTIE, VOORBEELD_SLEUTEL = "bronnen", "map"
-
-
-def test_de_voorbeeldconfig_is_een_kopie_van_checks_toml() -> None:
-    """De derde kopie van dezelfde reeks moet dezelfde reeks blijven.
-
-    `scripts/maak_voorbeeld.py` schrijft `voorbeelden/koekangerveld/koekangerveld.toml`
-    uit `checks.toml`, maar niemand draait die generator bij een drempelwijziging: het
-    voorbeeld hangt aan getrackte data die dan niet verandert. Zonder deze test loopt de
-    configuratie waarop de rooktest en het voorbeeld in de README draaien stil uit de pas
-    met de standaard, en toetst het voorbeeld iets anders dan de package doet.
-    """
-    standaard = tomllib.loads(default_check_config_path().read_text(encoding="utf-8"))
-    voorbeeld = tomllib.loads(VOORBEELDCONFIG.read_text(encoding="utf-8"))
-    zonder = {
-        sleutel: waarde
-        for sleutel, waarde in standaard[VOORBEELD_SECTIE].items()
-        if sleutel != VOORBEELD_SLEUTEL
-    }
-    afwijkend = voorbeeld[VOORBEELD_SECTIE].pop(VOORBEELD_SLEUTEL)
-    standaard[VOORBEELD_SECTIE] = zonder
-
-    assert voorbeeld == standaard, (
-        "voorbeelden/koekangerveld/koekangerveld.toml wijkt af van "
-        "src/nlriochecker/checks.toml. Draai `uv run python scripts/maak_voorbeeld.py` "
-        "opnieuw, of pas beide bestanden samen aan."
-    )
-    assert afwijkend == ".", (
-        f"de voorbeeldconfiguratie zet [{VOORBEELD_SECTIE}] {VOORBEELD_SLEUTEL} op "
-        f"{afwijkend!r}; het voorbeeld leest zijn bronnen uit de map die --bronnen "
-        "aanwijst en verwacht daar '.'."
-    )
 
 
 def test_vulwaarden_uit_de_standaardconfig() -> None:

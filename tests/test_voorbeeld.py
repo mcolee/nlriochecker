@@ -20,12 +20,14 @@ from pathlib import Path
 
 import pytest
 
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import REGISTRY
+from nlriochecker.externedata import ROL_RASTER
 from nlriochecker.toetsrun import Toetsopdracht, voer_toets_uit
 
 WORTEL = Path(__file__).resolve().parents[1]
 VOORBEELD = WORTEL / "voorbeelden" / "koekangerveld"
 VOORBEELD_TTL = VOORBEELD / "koekangerveld_orox.ttl"
-VOORBEELD_CONFIG = VOORBEELD / "koekangerveld.toml"
 VOORBEELD_GEBIED = VOORBEELD / "cbs_buurt_koekangerveld_studiegebied.gpkg"
 VOORBEELD_SHACL = (
     VOORBEELD / "gwsw_shacl_report_conformiteit_Hyd.csv",
@@ -53,31 +55,57 @@ VOLLE_SHACL = (
 # dit getal vanzelf laten schuiven; deze export heeft die niet.
 MELDINGEN_IN_HET_VOORBEELD = 337
 
+
+def _leunt_op_raster(check) -> bool:
+    """Of deze check het hoogteraster als externe bron declareert.
+
+    Alleen de EXT-familie kent `bronrollen()`; een check zonder die classmethod leunt op
+    geen enkele externe bron. Geen handlijst van HGT-nummers: die zou verouderen zodra er
+    een AHN-check bij komt of afvalt.
+    """
+    bronrollen = getattr(check, "bronrollen", None)
+    return bronrollen is not None and ROL_RASTER in bronrollen()
+
+
 # De twee soorten check die op het voorbeeld per definitie iets anders zien dan op de
-# volledige export. Ze staan buiten de gelijkheidseis hieronder, met hun reden erbij.
+# volledige export. Ze staan buiten de gelijkheidseis hieronder, met hun reden erbij, en
+# ze worden uit de engine afgeleid in plaats van met de hand opgesomd.
 #
 # Zonder hoogteraster: het AHN-extract is 12 MB en gaat niet mee in de repository, dus de
-# drie checks die erop leunen vinden hier niets. Ze zeggen dat zelf in het rapport.
-ZONDER_HOOGTERASTER = frozenset({"HGT-001", "HGT-002", "HGT-003"})
+# checks die erop leunen vinden hier niets. Ze zeggen dat zelf in het rapport. Vandaag zijn
+# dat HGT-001, HGT-002 en HGT-003.
+ZONDER_HOOGTERASTER = frozenset(
+    check_id for check_id, check in REGISTRY.items() if _leunt_op_raster(check)
+)
 # Over de volledige export: deze checks gaan niet over losse objecten maar over de hele
-# populatie (`Check.volledig_bereik`), en die populatie *is* in het voorbeeld deze ene
-# buurt. ATTR-015 slaat er daardoor aan waar hij dat gemeentebreed niet doet -- 1985 draagt
-# 45,5% van de 44 gedateerde objecten hier, tegen niets in de buurt van de drempel over
-# 46.925 objecten -- en ATTR-014 noemt in zijn boodschap een andere noemer.
-OVER_DE_VOLLEDIGE_EXPORT = frozenset({"ADM-002", "ATTR-014", "ATTR-015"})
+# populatie -- `Check.volledig_bereik`, of aangewezen via `[studiegebied]
+# volledige_dataset_checks` -- en die populatie *is* in het voorbeeld deze ene buurt.
+# ATTR-015 slaat er daardoor aan waar hij dat gemeentebreed niet doet (1985 draagt 45,5%
+# van de 44 gedateerde objecten hier, tegen niets in de buurt van de drempel over 46.925
+# objecten) en ATTR-014 noemt in zijn boodschap een andere noemer. Vandaag: ADM-002,
+# ATTR-014 en ATTR-015.
+OVER_DE_VOLLEDIGE_EXPORT = frozenset(
+    {check_id for check_id, check in REGISTRY.items() if check.volledig_bereik}
+    | set(load_check_config().studiegebied.volledige_dataset_checks)
+)
 
 
 def _opdracht(uitvoermap: Path, dataset: Path, bronnen: Path, shacl, gebied: Path):
-    """De toetsopdracht van een run; alleen dataset, bronnen en SHACL verschillen."""
+    """De toetsopdracht van een run; alleen dataset, bronnen en SHACL verschillen.
+
+    Zonder `projectconfig`: het voorbeeld draait op de meegeleverde `checks.toml`, net
+    als het commando in `voorbeelden/koekangerveld/README.md`. Dat beide runs dezelfde
+    configuratie krijgen, is wat de gelijkheidstest hieronder betekenis geeft.
+    """
     return Toetsopdracht(
         dataset_pad=dataset,
         uitvoermap=uitvoermap,
         shacl=tuple(shacl),
         studiegebied=gebied,
-        projectconfig=VOORBEELD_CONFIG,
         bronnen=bronnen,
-        # Geen cache: een rooktest hoort niet van een eerdere run af te hangen, en op
-        # een schone kloon zou hij er een aanleggen die niemand vroeg.
+        # Geen cache: de uitslag mag niet van een eerdere run afhangen. De cache staat
+        # buiten de repository (`~/.cache/gwsw-orox-helpers`), dus dit gaat niet over wat
+        # er in de werkboom achterblijft maar over reproduceerbaarheid.
         gebruik_cache=False,
     )
 
@@ -89,11 +117,25 @@ def _voorbeeldrun(uitvoermap: Path):
     )
 
 
-def test_het_voorbeeld_levert_de_vier_uitvoervormen(tmp_path: Path) -> None:
-    """De rooktest: `toets` op het voorbeeld schrijft rapport, CSV, GeoPackage en JSON."""
-    uitslag = _voorbeeldrun(tmp_path)
+@pytest.fixture(scope="module")
+def voorbeeld(tmp_path_factory):
+    """Eén `toets` op het getrackte voorbeeld, gedeeld door de tests hieronder.
 
-    geschreven = uitslag.uitvoer.per_gebied[uitslag.runs[0].naam]
+    Module-scoped, want de run kost anderhalve seconde per test en de uitslag is voor
+    elke test dezelfde; `tmp_path_factory` levert de uitvoermap, want de gewone
+    `tmp_path` bestaat alleen per test.
+    """
+    return _voorbeeldrun(tmp_path_factory.mktemp("voorbeeld"))
+
+
+def _geschreven(uitslag):
+    """De vier uitvoerpaden van de enige gebiedsrun."""
+    return uitslag.uitvoer.per_gebied[uitslag.runs[0].naam]
+
+
+def test_het_voorbeeld_levert_de_vier_uitvoervormen(voorbeeld) -> None:
+    """De rooktest: `toets` op het voorbeeld schrijft rapport, CSV, GeoPackage en JSON."""
+    geschreven = _geschreven(voorbeeld)
 
     assert geschreven.markdown.exists()
     assert geschreven.csv is not None and geschreven.csv.exists()
@@ -101,15 +143,14 @@ def test_het_voorbeeld_levert_de_vier_uitvoervormen(tmp_path: Path) -> None:
     assert geschreven.json is not None and geschreven.json.exists()
 
 
-def test_het_voorbeeld_levert_hetzelfde_aantal_meldingen(tmp_path: Path) -> None:
+def test_het_voorbeeld_levert_hetzelfde_aantal_meldingen(voorbeeld) -> None:
     """Het vastgelegde getal uit de JSON; een stille verschuiving valt hier op."""
-    uitslag = _voorbeeldrun(tmp_path)
-    pad = uitslag.uitvoer.per_gebied[uitslag.runs[0].naam].json
+    pad = _geschreven(voorbeeld).json
     assert pad is not None
 
     envelop = json.loads(pad.read_text(encoding="utf-8"))
 
-    assert len(envelop["meldingen"]) == MELDINGEN_IN_HET_VOORBEELD
+    assert envelop["aantal_meldingen"] == MELDINGEN_IN_HET_VOORBEELD
 
 
 @pytest.mark.zwaar
@@ -118,12 +159,14 @@ def test_het_voorbeeld_levert_hetzelfde_aantal_meldingen(tmp_path: Path) -> None
     reason="de De Wolden en Hoogeveen-OroX, de SHACL-rapporten of de GIS-bronnen staan "
     "niet in data/",
 )
-def test_het_voorbeeld_geeft_dezelfde_eigen_bevindingen_als_de_gebiedsrun(tmp_path: Path) -> None:
+def test_het_voorbeeld_geeft_dezelfde_eigen_bevindingen_als_de_gebiedsrun(
+    voorbeeld, tmp_path: Path
+) -> None:
     """De acceptatie-eis van issue #103, in de opzet van de bestaande equivalentietests.
 
-    Beide runs krijgen dezelfde projectconfiguratie mee; alleen de dataset, de
-    bronnenmap en de SHACL-rapporten verschillen. Dat de configuratie identiek is, is de
-    reden dat een verschil in de uitkomst alleen van het voorbeeld zelf kan komen.
+    Beide runs draaien op de meegeleverde `checks.toml`; alleen de dataset, de bronnenmap
+    en de SHACL-rapporten verschillen. Dat de configuratie identiek is, is de reden dat
+    een verschil in de uitkomst alleen van het voorbeeld zelf kan komen.
 
     Gemeten op 29-08-2026: 125 bevindingen in het voorbeeld tegen 131 in de gebiedsrun,
     over achttien checks gelijk, met precies de twee uitgezonderde soorten als verschil
@@ -132,7 +175,6 @@ def test_het_voorbeeld_geeft_dezelfde_eigen_bevindingen_als_de_gebiedsrun(tmp_pa
     die zijn stuk voor stuk onherleid: de gemeentebrede stelsels waarvan de focusnode
     geen put of streng is. Er is geen bevinding die alleen het voorbeeld heeft.
     """
-    voorbeeld = _voorbeeldrun(tmp_path / "voorbeeld")
     volledig = voer_toets_uit(
         _opdracht(tmp_path / "volledig", VOLLE_OROX, VOLLE_BRONNEN, VOLLE_SHACL, VOLLE_GEBIED)
     )
@@ -161,8 +203,13 @@ def test_het_voorbeeld_geeft_dezelfde_eigen_bevindingen_als_de_gebiedsrun(tmp_pa
         for bevinding in volledig.runs[0].run.nulbevindingen
         if (bevinding.vorm, bevinding.focus_node) not in in_voorbeeld
     ]
-    assert verschil and all(not bevinding.herleid for bevinding in verschil), (
-        f"{sum(1 for b in verschil if b.herleid)} van de {len(verschil)} nulmeting-"
-        "verschillen komen wel op een object uit; het voorbeeld mist dan SHACL-regels "
-        "die het wel had moeten dragen."
+    herleid = [bevinding for bevinding in verschil if bevinding.herleid]
+    assert not herleid, (
+        f"{len(herleid)} van de {len(verschil)} nulmeting-verschillen komen wel op een "
+        "object uit; het voorbeeld mist dan SHACL-regels die het wel had moeten dragen."
+    )
+    assert verschil, (
+        "de gebiedsrun draagt geen enkele nulmetingbevinding meer die het voorbeeld mist; "
+        "de onherleide regels (gemeentebrede stelsels) horen er te zijn, dus dit wijst op "
+        "een verandering in de join of in de meting."
     )

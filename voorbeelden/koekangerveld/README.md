@@ -14,10 +14,13 @@ nlriochecker toets \
   --shacl voorbeelden/koekangerveld/gwsw_shacl_report_conformiteit_MdsPlan.csv \
   --shacl voorbeelden/koekangerveld/gwsw_shacl_report_MdsProj.csv \
   --studiegebied voorbeelden/koekangerveld/cbs_buurt_koekangerveld_studiegebied.gpkg \
-  --projectconfig voorbeelden/koekangerveld/koekangerveld.toml \
   --bronnen voorbeelden/koekangerveld \
   --output uitvoer/voorbeeld
 ```
+
+Er is geen `--projectconfig` bij: het voorbeeld draait op de meegeleverde
+standaardconfiguratie (`src/nlriochecker/checks.toml`). Wil je zien hoe een eigen
+projectconfiguratie eruitziet, kijk dan in `configs/dewoldenhoogeveen.toml`.
 
 ## Wat erin zit
 
@@ -25,7 +28,7 @@ nlriochecker toets \
   (98 objecten) plus contextschil (118), van
   46925 objecten in de volledige export.
 - Hun **onderdelen, orientaties en stelsels**: samen 8455 triples over
-  2977 subjecten.
+  2947 subjecten.
 - De **SHACL-nulmeting** op alle drie de conformiteitsklassen, teruggebracht tot de
   1247 regels die op een object in dit voorbeeld uitkomen, plus de
   `CfkTypes_typ`-regels van de typeringspoort.
@@ -41,7 +44,6 @@ nlriochecker toets \
 | `gwsw_shacl_report_MdsProj.csv` | 0,13 MB |
 | `gwsw_shacl_report_conformiteit_Hyd.csv` | 0,19 MB |
 | `gwsw_shacl_report_conformiteit_MdsPlan.csv` | 0,13 MB |
-| `koekangerveld.toml` | 0,03 MB |
 | `koekangerveld_orox.ttl` | 0,36 MB |
 | `nwb_wegvakken_koekangerveld.gpkg` | 0,13 MB |
 | `top10nl_plaats_vlak_koekangerveld.gpkg` | 0,10 MB |
