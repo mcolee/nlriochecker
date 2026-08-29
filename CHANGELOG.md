@@ -142,6 +142,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De README is een landingspagina geworden** (issue #103). De 388 regels opgestapeld
+  wijzigingslog zijn er nog 149, Nederlands en zonder inhoudsopgave (GitHub maakt die uit de
+  koppen), met een vaste opbouw: één alinea over wat het is, drie badges (de CI-workflow
+  `toets` op `main`, de licentie, Python 3.12+), *Stand van zaken* (fase 4, getoetst op één
+  echte export, niet op PyPI, API nog niet stabiel, versienummer via dit wijzigingslog in
+  plaats van in de tekst), *Wat je krijgt* met de vier uitvoervormen en de twee
+  schermafdrukken, *Snel proberen* met het getrackte voorbeeld in drie commando's en de
+  echte CLI-uitvoer erbij, *Met je eigen data*, *Verder lezen*, *Ontwikkelen*, *Bijdragen*
+  en *Licentie*. Het eerste scherm is voor de rioolbeheerder of data-adviseur; de
+  ontwikkelaar staat onderaan. De gebruiksdocumentatie zelf staat in `docs/gebruik.md`, en
+  de README linkt per onderwerp naar de kop daar. Bewust niet meegenomen: een "waarom"-blok,
+  CONTRIBUTING.md, CODE_OF_CONDUCT, CITATION.cff, een roadmapsectie en een Engelse
+  samenvatting.
 - **De laag `vlakken` krijgt één stijlregel per check, en tekent groen en grijs niet meer**
   (issue #107, BO-85). De zeven regels van de standaardstijl worden er vier, met de
   checkcode voorop: `EXT-001 - Pand of bouwwerk (BGT/BAG)`, `EXT-003 - Waterdeel (BGT)`,
