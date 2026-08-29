@@ -123,6 +123,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `data/` nodig heeft en dus op de CI-runner meedraait (`tests/test_voorbeeld.py`), en
   vastgezet met een gelijkheidstest: voor de eigen checks levert het voorbeeld dezelfde
   bevindingen als een gebiedsrun Koekangerveld op de volledige export.
+- **`docs/gebruik.md` en twee schermafdrukken** (issue #103). De gebruiksdocumentatie die
+  in de README stond -- de commando's, de ontologie, de CFK-deelset, de nulmeting tussen
+  de eigen bevindingen, de rapportage per gebied, het rapport, de uitvoer, de externe
+  bronnen, de projectconfiguratie en de voortgang -- staat nu als eigen document in
+  `docs/gebruik.md`, met een sectie *Snel proberen met het voorbeeld* erboven en elke
+  bewering opnieuw tegen de code gehouden. Rechtgezet: de GeoPackage draagt drie
+  featurelagen en niet twee plus `bouwwerken`/`waterdelen_zonder_zinker` (die bestaan
+  sinds issue #98 niet meer); `dekking_tolerantie_m` staat in de code op 0,0 maar in de
+  meegeleverde `checks.toml` op 300; zonder ontologie zien 63 van de 89 checks nul
+  objecten (gemeten 29-08-2026, niet 62), en de veertien die het meest zien er 767 in
+  plaats van 1.874; de nulmetingtelling van 105.963 is die vóór de onderdrukking uit
+  `[rapport]`.
 
 ### Gewijzigd
 

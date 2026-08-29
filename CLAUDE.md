@@ -256,6 +256,9 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - Wat een check NIET heeft bekeken hoort in het rapport: objecten buiten de graaf, weggelaten bevindingen, ontbrekende typeringspoort. Stilte leest als "alles gecontroleerd".
 
 ## Naslag
+- **`docs/gebruik.md`** is de gebruiksaanwijzing voor de vier subcommando's: opties,
+  uitvoerbestanden en wat er in de GeoPackage staat. Raak je gedrag aan dat een gebruiker
+  ziet (een CLI-optie, een uitvoervorm, een laag of kolom), werk dan die tekst bij.
 - **`docs/architectuur.md`** draagt de geverifieerde feiten en de engine/uitvoer-interna.
   Lees het vóór je aan het betreffende deel werkt:
   - invoerbestanden lezen of parsen: SHACL-CSV-kolommen, OroX-grafmodel (knoop is een
