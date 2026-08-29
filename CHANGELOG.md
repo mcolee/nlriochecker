@@ -134,7 +134,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   meegeleverde `checks.toml` op 300; zonder ontologie zien 63 van de 89 checks nul
   objecten (gemeten 29-08-2026, niet 62), en de veertien die het meest zien er 767 in
   plaats van 1.874; de nulmetingtelling van 105.963 is die vóór de onderdrukking uit
-  `[rapport]`.
+  `[rapport]`. Daarnaast rendert `scripts/maak_schermafdruk.py` uit de voorbeeldrun twee
+  schermafdrukken: `docs/img/kaart-koekangerveld.png` (de drie featurelagen met hun stijl
+  uit `layer_styles`, headless via PyQGIS, met de statuslegenda en een popup erop) en
+  `docs/img/rapport-kop.png` (de kop van `bevindingen.md`). Beide zijn gegenereerd en
+  worden nooit met de hand bijgewerkt.
 
 ### Gewijzigd
 

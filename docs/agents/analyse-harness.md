@@ -119,6 +119,7 @@ Bewerk de generator en regenereer; anders valt de bijbehorende drifttest:
 | `tests/fixtures/gis/**` | `scripts/maak_gis_fixtures.py` |
 | `docs/dekkingsmatrix.md` | `scripts/dekkingsmatrix.py` |
 | `voorbeelden/koekangerveld/**` | `scripts/maak_voorbeeld.py` |
+| `docs/img/*.png` | `scripts/maak_schermafdruk.py` (na een `toets` naar `uitvoer/voorbeeld`) |
 
 De vocabulaire-index staat niet meer in deze repo: zij reist mee met `gwsw-orox-helpers`
 en wordt daar geregenereerd.
