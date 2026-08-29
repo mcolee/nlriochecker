@@ -119,7 +119,12 @@ Bewerk de generator en regenereer; anders valt de bijbehorende drifttest:
 | `tests/fixtures/gis/**` | `scripts/maak_gis_fixtures.py` |
 | `docs/dekkingsmatrix.md` | `scripts/dekkingsmatrix.py` |
 | `voorbeelden/koekangerveld/**` | `scripts/maak_voorbeeld.py` |
-| `docs/img/*.png` | `scripts/maak_schermafdruk.py` (na een `toets` naar `uitvoer/voorbeeld`) |
+| `docs/img/*.png` | `scripts/maak_schermafdruk.py` (na een `toets` naar `uitvoer/voorbeeld`) — **geen drifttest** |
+
+De laatste rij is de enige zonder vangnet: PyQGIS staat niet op de CI-runner, dus een
+verouderde schermafdruk valt nergens op en niemand stuurt je terug naar de generator.
+Regenereer hem zelf zodra je de stijlen (`uitvoer/stijlen/`) of de kop van het
+bevindingenrapport wijzigt — draai eerst `toets` op het voorbeeld naar `uitvoer/voorbeeld`.
 
 De vocabulaire-index staat niet meer in deze repo: zij reist mee met `gwsw-orox-helpers`
 en wordt daar geregenereerd.

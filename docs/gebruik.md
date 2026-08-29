@@ -26,13 +26,16 @@ nlriochecker toets \
 ```
 
 Er hoeft geen `--projectconfig` bij: het voorbeeld draait op de meegeleverde
-`src/nlriochecker/checks.toml`. Wat je ziet (ingekort: de regel per check en een paar
-regels over de bronnen staan er niet bij):
+`src/nlriochecker/checks.toml`. Wat je ziet, ingekort tot de hoofdregels -- er staat een
+regel per check, plus een regel over de cache en een waarschuwing dat het net in dit
+gebied met vrijwel de hele export samenhangt:
 
 ```
 koekangerveld_orox.ttl: 109 knooppunten, 107 strengen
   Externe bronnen: 7 lagen, bereik cbs_buurt_koekangerveld_studiegebied:buurt_gegeneraliseerd.
+    Niet aanwezig: bgt_putdeksel (lagen put bevatten geen features)
     Niet aanwezig: ahn_dtm (voorbeelden/koekangerveld/ahn5_dtm_koekangerveld.tif)
+  Studiegebied cbs_buurt_koekangerveld_studiegebied:buurt_gegeneraliseerd (43.2 ha): 390 bevindingen buiten het gebied weggelaten.
   Analyseset: 98 objecten in de kern, 118 in de contextschil, van 216 in de export.
   ADM-010   F      2 bevindingen
   ...
@@ -46,8 +49,13 @@ Geschreven: uitvoer/voorbeeld/bevindingen.json
 
 Vier bestanden dus, en samen 337 meldingen in `bevindingen.json` (de eigen bevindingen,
 de nulmeting en de datasetsignalen). De naam van de GeoPackage draagt de rundatum, dus
-die verschilt bij jou. Het hoogteraster gaat niet mee in de repository; HGT-001 tot en
-met HGT-003 melden daarom zelf dat ze niets konden toetsen.
+die verschilt bij jou.
+
+Twee bronnen ontbreken, en dat scheelt maar één ding. Het **hoogteraster** (AHN) is te
+groot voor een repository; HGT-001 tot en met HGT-003 melden daarom zelf dat ze niets
+konden toetsen. De **BGT-putdekselaag** is leeg in dit extract, maar geen enkele check
+leest die rol nog sinds EXT-005 en EXT-006 vervielen: zij wordt alleen nog geladen en op
+dekking getoetst, en haar ontbreken slaat niets over.
 
 ## De commando's
 

@@ -69,7 +69,16 @@ POPUPSCHAAL = 1.5
 # en niet als een uitvergroting.
 RAPPORTBREEDTE = 900
 RAPPORTMARGE = 12
-WEGGELATEN = "*[ tabel met de rollen en klassen waar de checks op selecteren -- ingekort ]*"
+# Wat er in de plaats komt van het afhankelijkhedenblok. Het noemt alles wat er wegvalt --
+# de twee tabellen én de notities eronder -- want een placeholder die minder opsomt dan hij
+# wegknipt, laat het plaatje beweren dat het rapport daar niets meer heeft.
+WEGGELATEN = (
+    "*[ het blok met de rollen, klassen en afvoereindpunten waar de checks van afhangen, "
+    "met de notities eronder -- ingekort ]*"
+)
+
+# De plaatshouder die de maptip voor de voorgebakken popupkolom draagt.
+PLAATSHOUDER = '[% "popup_html" %]'
 
 
 def _systeem_pyqgis_pad() -> Path | None:
@@ -311,10 +320,16 @@ def _popup(gpkg: Path, kaart: QImage) -> None:
     if rij is None:
         return
 
-    css, _, rest = MAPTIP.partition("</style>")
+    css, scheiding, rest = MAPTIP.partition("</style>")
+    if not scheiding or not css.startswith("<style>") or PLAATSHOUDER not in rest:
+        raise SystemExit(
+            "de maptip in `uitvoer/stijlen/symbolen.py` heeft niet de vorm die dit script "
+            f"verwacht (een <style>-blok gevolgd door de plaatshouder {PLAATSHOUDER}); "
+            "zonder die vorm zou de popup hier stil zonder opmaak of zonder inhoud komen."
+        )
     doc = _document(
         css.removeprefix("<style>"),
-        rest.replace('[% "popup_html" %]', rij[0]).replace("</span>", "</span> "),
+        rest.replace(PLAATSHOUDER, rij[0]).replace("</span>", "</span> "),
         markdown=False,
     )
     afbeelding = _teken_document(doc, POPUPBREEDTE, POPUPSCHAAL, 8)
@@ -332,21 +347,31 @@ def _popup(gpkg: Path, kaart: QImage) -> None:
 def _kop(rapport: Path) -> str:
     """De kop van het bevindingenrapport: titel tot en met de managementsamenvatting.
 
-    De grenzen komen uit de vaste kopregels van `uitvoer/bevindingen.py`; verandert de
-    opbouw van het rapport, dan valt dit script om in plaats van stil een ander stuk te
-    tonen.
+    De grenzen komen uit `uitvoer/bevindingen.py`, en twee van de drie staan er niet
+    altijd. **Rode draad** komt er alleen als de bevindingen een gezamenlijke oorzaak
+    hebben (`synthese.rode_draad` mag leeg teruggeven) en het afhankelijkhedenblok
+    vervalt zonder klassenhierarchie (issue #33). Alleen `## Verantwoording` is
+    onvoorwaardelijk; die is daarom de harde eindgrens, met de rode draad ervoor als
+    hij er is. Ontbreekt het afhankelijkhedenblok, dan wordt er niets ingekort.
     """
     regels = rapport.read_text(encoding="utf-8").splitlines()
 
-    def eerste(begin: str) -> int:
+    def zoek(begin: str) -> int | None:
         for index, regel in enumerate(regels):
             if regel.startswith(begin):
                 return index
-        raise SystemExit(f"{rapport}: geen regel die met {begin!r} begint.")
+        return None
 
-    weg_van = eerste("**Objecten waar de checks van afhangen**")
-    weg_tot = eerste("## Voldoen we in dit gebied?")
-    einde = eerste("**Rode draad**")
+    verantwoording = zoek("## Verantwoording")
+    if verantwoording is None:
+        raise SystemExit(f"{rapport}: geen regel '## Verantwoording'; is dit een rapport?")
+    draad = zoek("**Rode draad**")
+    einde = verantwoording if draad is None else min(verantwoording, draad)
+
+    weg_van = zoek("**Objecten waar de checks van afhangen**")
+    weg_tot = zoek("## Voldoen we in dit gebied?")
+    if weg_van is None or weg_tot is None or not weg_van < weg_tot < einde:
+        return "\n".join(regels[:einde])
     return "\n".join(regels[:weg_van] + [WEGGELATEN, ""] + regels[weg_tot:einde])
 
 
@@ -389,12 +414,15 @@ def _studiegebied() -> Path:
 
 
 def _bewaar(afbeelding: QImage, pad: Path) -> None:
-    """Schrijft de afbeelding weg als PNG met een beperkt palet.
+    """Schrijft de afbeelding weg als PNG: verliesvrij, zonder alfakanaal.
 
-    Beperkt palet (8 bits): een schermafdruk van kaart of tekst draagt weinig kleuren en
-    wordt daarmee ruim drie keer zo klein, zonder zichtbaar verschil.
+    RGB32 en geen palet van 8 bits. `convertToFormat(Format_Indexed8)` dithert met de
+    standaardvlaggen, en dat is op deze plaatjes wel degelijk te zien: speckle in de
+    halftransparante RVZ-006-buffer, losse pixels op het wit en gerafelde tekstranden.
+    De winst was een paar honderd kilobyte, en die is hier niet nodig -- PNG comprimeert
+    een schermafdruk ook verliesvrij ruim onder de grens van 1 MB.
     """
-    if not afbeelding.convertToFormat(QImage.Format_Indexed8).save(str(pad), "PNG"):
+    if not afbeelding.convertToFormat(QImage.Format_RGB32).save(str(pad), "PNG"):
         raise SystemExit(f"kon {pad} niet schrijven.")
     print(
         f"{pad.relative_to(WORTEL)}: {afbeelding.width()}x{afbeelding.height()} px, "

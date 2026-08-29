@@ -32,9 +32,10 @@ per SHACL-vorm en per eigen check. [Meer](docs/gebruik.md#het-bevindingenrapport
 
 **`bevindingen.csv`** -- elke melding als rij: check-ID, ernst, object, gebied, locatie en boodschap.
 
-**De GeoPackage** (`dq_<dataset>_<datum>.gpkg`) -- de bevindingen op de kaart, in de lagen `putten`, `strengen` en
-`vlakken`: rood bij een fout, oranje bij alleen waarschuwingen, groen als er geen eigen gebrek is, grijs als er niet
-beoordeeld is. Opmaak (`layer_styles`) en hoverpopup zitten erin ([meer](docs/gebruik.md#wat-je-in-qgis-ziet)).
+**De GeoPackage** (`dq_<dataset>_<datum>.gpkg`) -- de bevindingen op de kaart. Elk object in `putten` en `strengen`
+kleurt naar zijn status: rood bij een fout, oranje bij alleen waarschuwingen, groen als er geen eigen gebrek is, grijs
+als er niet beoordeeld is. De derde laag, `vlakken`, draagt wat geen punt of lijn is: geraakte panden, watergangen,
+gemengde deelstelsels, beoordeelde wegvakken. Opmaak (`layer_styles`) en popup zitten erin ([meer](docs/gebruik.md#wat-je-in-qgis-ziet)).
 
 ![De drie lagen van de voorbeeldrun in QGIS](docs/img/kaart-koekangerveld.png)
 
@@ -60,7 +61,7 @@ nlriochecker toets \
   --output uitvoer/voorbeeld
 ```
 
-Zonder [uv](https://docs.astral.sh/uv/) doet `pipx install git+https://github.com/mcolee/nlriochecker` hetzelfde.
+Dit vraagt [uv](https://docs.astral.sh/uv/): de leeslaag komt uit git via `[tool.uv.sources]`, wat pip en pipx negeren.
 Wat je ziet, ingekort -- er staat een regel per check:
 
 ```
