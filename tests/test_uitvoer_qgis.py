@@ -211,12 +211,14 @@ def test_de_stijl_van_de_strengen_kent_de_richtingsregels(qgis_app, geschreven_g
     } <= labels
 
 
-def test_de_vlakkenlaag_toont_de_vier_soorten(qgis_app, geschreven_gpkg: Path) -> None:
-    """De kern van #67 en #98: één laag met een regel per soort.
+def test_de_vlakkenlaag_toont_elke_soort(qgis_app, geschreven_gpkg: Path) -> None:
+    """De kern van #67, #98 en #104: één laag met een regel per soort.
 
-    Drie externe soorten (pand, bouwwerk, water) plus het gemengde deelstelsel van
-    RVZ-006, dat tot #98 een eigen laag had. De regels staan vast in de QML, ook op een
-    lege laag; ze filteren elk op `soort`.
+    Drie externe soorten (pand, bouwwerk, water), het gemengde deelstelsel van RVZ-006
+    dat tot #98 een eigen laag had, en de wegvakken van EXT-009. Die laatste krijgen drie
+    regels in plaats van één: hun kleur volgt de kolom `status`, want groen ("gekeken, er
+    ligt riolering") en grijs ("niet beoordeeld") zijn het onderscheid dat de kaart moet
+    tonen (BO-79). De regels staan vast in de QML, ook op een lege laag.
     """
     vector = qgis_core.QgsVectorLayer(f"{geschreven_gpkg}|layername=vlakken", "v", "ogr")
     boodschap, gelukt = vector.loadDefaultStyle()
@@ -228,6 +230,9 @@ def test_de_vlakkenlaag_toont_de_vier_soorten(qgis_app, geschreven_gpkg: Path) -
         "Overig bouwwerk (BGT)",
         "Waterdeel (BGT)",
         "Gemengd deelstelsel zonder overstort (RVZ-006)",
+        "Straat zonder riolering (EXT-009)",
+        "Straat met riolering (EXT-009)",
+        "Straat niet beoordeeld (EXT-009)",
     }
 
 

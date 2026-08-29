@@ -1,11 +1,13 @@
-<!-- Default-stijl voor de laag `vlakken` (issue #67, uitgebreid in #98): alle vlakken die
-     bij een melding van deze run horen, in één laag. Rule-based op `soort` met vier regels:
-     de drie externe soorten (pand, bouwwerk, water) met een eigen omlijning en een
-     doorzichtige vulling, zodat de riolering eronder zichtbaar blijft, plus het gemengde
+<!-- Default-stijl voor de laag `vlakken` (issue #67, uitgebreid in #98 en #104): alles wat
+     bij de uitslag van deze run hoort en geen punt of lijn is, in één laag. Rule-based op
+     `soort`: de drie externe soorten (pand, bouwwerk, water) met een eigen omlijning en een
+     doorzichtige vulling, zodat de riolering eronder zichtbaar blijft, het gemengde
      deelstelsel van RVZ-006 (voorheen de eigen laag `gemengd_zonder_overstort`) met de
-     rode vlakvulling die het daar had. De laag volgt de testuitkomst: elk vlak hier is
-     door ten minste één melding aangewezen. `styleCategories` noemt MapTips, anders leest
-     QGIS het mapTip-element niet terug uit layer_styles. -->
+     rode vlakvulling die het daar had, en de wegvakken van EXT-009 in drie regels op de
+     kolom `status`. Die laatste drie zijn de enige vlakken die ook zonder melding bestaan:
+     groen betekent "gekeken, er ligt riolering", grijs "niet beoordeeld" (BO-79). De kleur
+     volgt `status` en is dezelfde als in de objectlagen. `styleCategories` noemt MapTips,
+     anders leest QGIS het mapTip-element niet terug uit layer_styles. -->
 <qgis version="3.28" styleCategories="Symbology|MapTips">
   <renderer-v2 type="RuleRenderer" forceraster="0" symbollevels="0">
     <rules key="{cc000000-0000-4000-8000-000000000000}">
@@ -13,6 +15,9 @@
       <rule filter="&quot;soort&quot; = 'bouwwerk'" symbol="1" label="Overig bouwwerk (BGT)" key="{cc000000-0000-4000-8000-000000000002}"/>
       <rule filter="&quot;soort&quot; = 'water'" symbol="2" label="Waterdeel (BGT)" key="{cc000000-0000-4000-8000-000000000003}"/>
       <rule filter="&quot;soort&quot; = 'gemengd_deelstelsel'" symbol="3" label="Gemengd deelstelsel zonder overstort (RVZ-006)" key="{cc000000-0000-4000-8000-000000000004}"/>
+      <rule filter="&quot;soort&quot; = 'wegvak' AND &quot;status&quot; = 'rood'" symbol="4" label="Straat zonder riolering (EXT-009)" key="{cc000000-0000-4000-8000-000000000005}"/>
+      <rule filter="&quot;soort&quot; = 'wegvak' AND &quot;status&quot; = 'groen'" symbol="5" label="Straat met riolering (EXT-009)" key="{cc000000-0000-4000-8000-000000000006}"/>
+      <rule filter="&quot;soort&quot; = 'wegvak' AND &quot;status&quot; = 'grijs'" symbol="6" label="Straat niet beoordeeld (EXT-009)" key="{cc000000-0000-4000-8000-000000000007}"/>
     </rules>
     <symbols>
       <symbol type="fill" name="0" alpha="1">
@@ -48,6 +53,33 @@
           <prop k="style" v="solid"/>
           <prop k="outline_color" v="215,48,39,255"/>
           <prop k="outline_width" v="0.6"/>
+          <prop k="outline_style" v="solid"/>
+        </layer>
+      </symbol>
+      <symbol type="fill" name="4" alpha="1">
+        <layer class="SimpleFill">
+          <prop k="color" v="178,24,43,70"/>
+          <prop k="style" v="solid"/>
+          <prop k="outline_color" v="178,24,43,255"/>
+          <prop k="outline_width" v="0.5"/>
+          <prop k="outline_style" v="solid"/>
+        </layer>
+      </symbol>
+      <symbol type="fill" name="5" alpha="1">
+        <layer class="SimpleFill">
+          <prop k="color" v="77,146,33,50"/>
+          <prop k="style" v="solid"/>
+          <prop k="outline_color" v="77,146,33,255"/>
+          <prop k="outline_width" v="0.4"/>
+          <prop k="outline_style" v="solid"/>
+        </layer>
+      </symbol>
+      <symbol type="fill" name="6" alpha="1">
+        <layer class="SimpleFill">
+          <prop k="color" v="119,119,119,50"/>
+          <prop k="style" v="solid"/>
+          <prop k="outline_color" v="119,119,119,255"/>
+          <prop k="outline_width" v="0.4"/>
           <prop k="outline_style" v="solid"/>
         </layer>
       </symbol>

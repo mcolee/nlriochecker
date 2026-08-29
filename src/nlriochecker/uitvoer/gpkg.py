@@ -42,7 +42,7 @@ from shapely.ops import unary_union
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.selectie import mechanischeleidingen
-from nlriochecker.checks.treffers import Treffer
+from nlriochecker.checks.treffers import Treffer, Wegvakoordeel
 from nlriochecker.checks.verbanden import (
     Aansluitingen,
     Afvoer,
@@ -174,6 +174,10 @@ class _LaagTellingen:
     # #75); sinds issue #98 rijen in `vlakken` met `soort = gemengd_deelstelsel` in plaats
     # van een eigen laag.
     gemengd_zonder_overstort: int
+    # De beoordeelde wegvakken van EXT-009 (issue #104), `soort = wegvak`. Ze staan in
+    # dezelfde laag; zonder deze telling zou het aantal externe vlakken niet meer uit
+    # `n_vlakken` af te leiden zijn.
+    wegvakken: int
     # En de deelstelsels waarop RVZ-006 wél aansloeg maar die geen vlak konden krijgen,
     # omdat geen enkele streng ervan een bruikbare lijn draagt. Ze staan in geen enkele
     # rij van de laag; zonder deze telling zou "dit deelstelsel bestaat niet" niet van
@@ -609,7 +613,9 @@ def _schrijf_features(
         tellingen[laag] = len(rijen)
         voortgang.stap(label=laag)
 
-    vlakken, gemengd, zonder_vlak = _schrijf_vlakken(verbinding, run, config, meldingen, voortgang)
+    vlakken, gemengd, zonder_vlak, wegvakken = _schrijf_vlakken(
+        verbinding, run, config, meldingen, voortgang
+    )
 
     return _LaagTellingen(
         putten=tellingen["putten"],
@@ -618,6 +624,7 @@ def _schrijf_features(
         vlakken=vlakken,
         gemengd_zonder_overstort=gemengd,
         gemengd_zonder_vlak=zonder_vlak,
+        wegvakken=wegvakken,
     )
 
 
@@ -699,6 +706,23 @@ VLAK_SOORT = {
 # `relatie` en `afstand_min_m` dat bij water al deden.
 VLAK_SOORT_GEMENGD = "gemengd_deelstelsel"
 
+# De vijfde soort: een door EXT-009 beoordeeld wegvak (issue #104). De enige soort in
+# deze laag die ook zonder melding een rij krijgt -- juist het onderscheid tussen
+# "gekeken, er ligt riolering" (groen) en "niet gekeken" (grijs) is wat de kaart moet
+# tonen. De kolom `status` draagt dat, en zij is voor deze soort verplicht. Zie BO-79.
+VLAK_SOORT_WEGVAK = "wegvak"
+
+# De check waarvan de meldingen een wegvak rood maken. Rood is uitsluitend een wegvak
+# waarvoor in *deze* uitvoer een melding staat: na de afbakening tot een studiegebied en
+# na de onderdrukking uit `[rapport]`. Wat het register rood noemt maar wat de uitvoer
+# niet meer draagt, krijgt geen rij -- precies zoals een onderdrukte melding nergens
+# terechtkomt.
+CHECK_STRAAT_ZONDER_RIOLERING = "EXT-009"
+
+# Wat de popup van een wegvak als objecttype toont. Geen GWSW-klassenaam: een wegvak
+# komt uit het NWB en niet uit de dataset, en die naam hoort dat te zeggen.
+SOORT_WEGVAK = "wegvak (NWB)"
+
 # De grenzen van de geschreven geometrieen, waarmee `_zet_omhullende` de bounding box
 # van de laag vult.
 _Grenzen = list[tuple[float, float, float, float]]
@@ -734,6 +758,12 @@ def _vlak_kolommen() -> list[_Kolom]:
         _Kolom("n_strengen", "integer"),
         _Kolom("strenglengte_m", "real"),
         _Kolom("popup_html", "text"),
+        # De uitslag per wegvak (issue #104), in dezelfde drie van de vier waarden die de
+        # objectlagen kennen: rood, groen of grijs. Alleen `soort = wegvak` vult hem; de
+        # andere soorten laten hem leeg, want een geraakt pand of een gemeld deelstelsel
+        # draagt geen eigen oordeel -- daar zit de uitslag op het GWSW-object ernaast.
+        # Achteraan toegevoegd, zodat een lezer die op kolompositie werkt niet omvalt.
+        _Kolom("status", "text"),
     ]
 
 
@@ -743,17 +773,24 @@ def _schrijf_vlakken(
     config: CheckConfig,
     meldingen: list[Melding],
     voortgang: Voortgang,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, int]:
     """Schrijft de laag `vlakken`: alles wat bij een melding hoort en geen punt of lijn is.
 
-    Twee soorten rijen uit twee bronnen, sinds issue #98 in één laag: de externe objecten
-    waarnaar een EXT-melding wijst (`_trefferrijen`) en de gemengde deelstelsels waarop
-    RVZ-006 aansloeg (`_gemengde_deelstelselrijen`). Beide volgen de meldingen van *deze*
-    uitvoer, dus de laag kan niet meer tonen dan de uitslag; de kolom `soort` houdt ze uit
+    Drie soorten rijen uit drie bronnen in één laag: de externe objecten waarnaar een
+    EXT-melding wijst (`_trefferrijen`, issue #67), de gemengde deelstelsels waarop
+    RVZ-006 aansloeg (`_gemengde_deelstelselrijen`, issue #98) en de wegvakken die
+    EXT-009 beoordeelde (`_wegvakrijen`, issue #104). De kolom `soort` houdt ze uit
     elkaar en de QGIS-stijl geeft elke soort een eigen regel.
 
-    Geeft drie getallen terug: het aantal rijen in de laag, hoeveel daarvan een gemengd
-    deelstelsel zijn, en hoeveel gemelde deelstelsels geen vlak konden krijgen.
+    De eerste twee volgen de meldingen van *deze* uitvoer, dus die kunnen niet meer tonen
+    dan de uitslag. De derde is de uitzondering en met opzet: een groen of grijs wegvak
+    draagt per definitie geen melding, en juist dat onderscheid moet de kaart tonen. De
+    rijen komen daar uit het register op de run (`run.wegvakken`), dat op dezelfde
+    middelpunten tot het studiegebied is afgebakend als de meldingen. Zie BO-79.
+
+    Geeft vier getallen terug: het aantal rijen in de laag, hoeveel daarvan een gemengd
+    deelstelsel zijn, hoeveel gemelde deelstelsels geen vlak konden krijgen, en hoeveel
+    rijen een beoordeeld wegvak zijn.
     """
     kolommen = _vlak_kolommen()
     _maak_featurelaag(
@@ -761,24 +798,25 @@ def _schrijf_vlakken(
         "vlakken",
         "MULTIPOLYGON",
         kolommen,
-        "Vlakken bij de meldingen van deze run: externe objecten (BGT-panden, overige "
-        "bouwwerken en BGT-waterdelen) en de gemengde deelstelsels van RVZ-006; de soort "
-        "staat in de kolom `soort`.",
+        "Vlakken bij de uitslag van deze run: externe objecten (BGT-panden, overige "
+        "bouwwerken en BGT-waterdelen), de gemengde deelstelsels van RVZ-006 en de door "
+        "EXT-009 beoordeelde wegvakken; de soort staat in de kolom `soort`.",
     )
     gemengd, gemengd_grenzen, zonder_vlak = _gemengde_deelstelselrijen(run, config, meldingen)
     treffers, treffer_grenzen = _trefferrijen(run, meldingen)
-    # De deelstelsels voorop: dat zijn de grote vlakken, en de rijvolgorde is in QGIS ook
-    # de tekenvolgorde. Andersom zou een deelstelsel de panden eronder overdekken.
-    rijen = gemengd + treffers
+    wegvakken, wegvak_grenzen = _wegvakrijen(run, meldingen)
+    # De grote vlakken voorop: de rijvolgorde is in QGIS ook de tekenvolgorde, en
+    # andersom zouden de deelstelsels en de straatvlakken de panden eronder overdekken.
+    rijen = gemengd + wegvakken + treffers
     if rijen:
         velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
         plaatshouders = ", ".join("?" * (len(kolommen) + 1))
         verbinding.executemany(
             f'insert into "vlakken" (geom, {velden}) values ({plaatshouders})', rijen
         )
-    _zet_omhullende(verbinding, "vlakken", gemengd_grenzen + treffer_grenzen)
+    _zet_omhullende(verbinding, "vlakken", gemengd_grenzen + wegvak_grenzen + treffer_grenzen)
     voortgang.stap(label="vlakken")
-    return len(rijen), len(gemengd), zonder_vlak
+    return len(rijen), len(gemengd), zonder_vlak, len(wegvakken)
 
 
 def _vlak_subtype(treffer: Treffer) -> str:
@@ -865,7 +903,8 @@ def _trefferrij(run: CheckRun, treffer: Treffer, verwijzend: list[Melding]) -> t
 
     De vier deelstelselkolommen blijven leeg: die gelden alleen voor een gemengd
     deelstelsel, net zoals `relatie` en `afstand_min_m` alleen voor pand en bouwwerk
-    gelden.
+    gelden. `status` blijft ook leeg: een geraakt pand draagt geen eigen oordeel -- dat
+    zit op het GWSW-object ernaast, in de laag `putten` of `strengen`.
     """
     return (
         treffer.sleutel,
@@ -881,6 +920,7 @@ def _trefferrij(run: CheckRun, treffer: Treffer, verwijzend: list[Melding]) -> t
         None,
         None,
         None,
+        "",
         "",
     )
 
@@ -1106,7 +1146,116 @@ def _gemengd_rij(
         len(conduits),
         strenglengte,
         popup_html(kop, meldingen, toon_systemisch=True),
+        # `status` blijft leeg: de kolom hoort bij de wegvakken van EXT-009. Zo'n
+        # deelstelselvlak draagt zijn oordeel in zijn popup en is per constructie een
+        # gebrek; een tweede kolom met dezelfde waarde zou twee bronnen maken.
+        "",
     )
+
+
+def _wegvakrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], _Grenzen]:
+    """De rijen voor de wegvakken die EXT-009 beoordeelde (issue #104).
+
+    De enige soort in deze laag die ook zonder melding een rij krijgt. Voor de andere
+    soorten geldt "een vlak bestaat alleen als een melding ernaar wijst"; hier is juist
+    het onderscheid tussen een straat waar riolering ligt (groen) en een straat die de
+    regel niet beoordeelt (grijs) wat de kaart moet tonen, en beide dragen per definitie
+    geen melding. Dat is de derde uitvoertoestand van BO-79.
+
+    Rood blijft wél aan de meldingen hangen, en strikt: een wegvak dat het register rood
+    noemt maar waarvoor deze uitvoer geen EXT-009-melding draagt -- afgebakend tot een
+    studiegebied, of onderdrukt via `[rapport] onderdruk_checks` -- krijgt geen rij. Zou
+    hij die wel krijgen, dan toonde de kaart een gebrek dat in geen enkele andere
+    uitvoervorm staat.
+
+    Een melding die naar een wegvak wijst dat het register niet kent is, net als bij
+    `_trefferrijen`, een gebroken afspraak en geen datatoestand: check en schrijver lezen
+    hetzelfde register van dezelfde run.
+
+    Een wegvak waarvan het straatvlak leeg is levert geen rij op; dat is wél een
+    datatoestand (voronoi-cel volledig buiten de komgrens geknipt). Het verschil met de
+    `bekeken`-telling van de check maakt dat zichtbaar.
+    """
+    per_sleutel: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        if melding.check_id == CHECK_STRAAT_ZONDER_RIOLERING and melding.object_uri:
+            per_sleutel[melding.object_uri].append(melding)
+
+    onbekend = sorted(sleutel for sleutel in per_sleutel if run.wegvakken.get(sleutel) is None)
+    if onbekend:
+        raise PipelineError(
+            f"laag 'vlakken': {len(onbekend)} EXT-009-melding(en) wijzen naar een wegvak dat "
+            f"niet in het wegvakregister van deze run staat ({', '.join(onbekend[:5])}). De "
+            "laag zou stil kleiner zijn dan de uitslag; controleer of de check zijn oordeel "
+            "registreert."
+        )
+
+    rijen: list[tuple] = []
+    grenzen: _Grenzen = []
+    for oordeel in run.wegvakken:
+        eigen = per_sleutel.get(oordeel.sleutel, [])
+        if oordeel.status == STATUS_ROOD and not eigen:
+            continue
+        if oordeel.vlak is None or oordeel.vlak.is_empty:
+            continue
+        grenzen.append(oordeel.vlak.bounds)
+        rijen.append((_blob(_als_multipolygon(oordeel.vlak)), *_wegvakrij(oordeel, eigen)))
+    return rijen, grenzen
+
+
+def _wegvakrij(oordeel: Wegvakoordeel, meldingen: list[Melding]) -> tuple[object, ...]:
+    """De attribuutvelden van een wegvak, in kolomvolgorde.
+
+    `subtype` draagt de plaatsnaam uit het TOP10NL-komvlak: dat is de nadere aanduiding
+    binnen deze soort, zoals het BGT-type dat bij een waterdeel is. De vier
+    deelstelselkolommen blijven leeg.
+
+    De status komt uit het register en niet uit `bepaal_status`: een groen wegvak is
+    beoordeeld en in orde, en een grijs wegvak is bewust niet beoordeeld -- dat verschil
+    kent alleen de check. `bepaal_status` zou beide op "geen meldingen" gooien.
+    """
+    return (
+        oordeel.sleutel,
+        VLAK_SOORT_WEGVAK,
+        oordeel.plaats,
+        "nwb_wegvak",
+        oordeel.bronbestand,
+        oordeel.label,
+        "",
+        None,
+        len(meldingen),
+        CHECK_STRAAT_ZONDER_RIOLERING,
+        None,
+        None,
+        None,
+        popup_html(
+            Objectkop(
+                label=oordeel.label,
+                objecttype=SOORT_WEGVAK,
+                status=oordeel.status,
+                feiten=_wegvakfeiten(oordeel),
+                reden=oordeel.reden,
+            ),
+            meldingen,
+        ),
+        oordeel.status,
+    )
+
+
+def _wegvakfeiten(oordeel: Wegvakoordeel) -> tuple[str, ...]:
+    """De gemeten waarden achter het oordeel, voor de kopregel van de popup.
+
+    Ze staan in de popup en niet in eigen kolommen: het zijn er drie, ze gelden voor een
+    van de vijf soorten in deze laag, en de lezer heeft ze nodig om het oordeel te
+    begrijpen -- niet om erop te filteren.
+    """
+    feiten = [
+        f"Straatlengte: {oordeel.straatlengte_m:.0f} m",
+        f"Vrijverval in het straatvlak: {oordeel.streng_in_cel:.2f} maal de straatlengte",
+    ]
+    if oordeel.aandeel_onverhard is not None:
+        feiten.append(f"Onverhard wegdek: {oordeel.aandeel_onverhard:.0%}")
+    return tuple(feiten)
 
 
 def _begindatum_jaar(object_: object) -> int | None:
@@ -1584,6 +1733,10 @@ def _schrijf_runmetadata(
         # streng ervan draagt een bruikbare lijn. Ze staan in geen rij van de laag, dus
         # zonder deze kolom zou het bestand erover zwijgen.
         _Kolom("n_gemengd_zonder_vlak", "integer"),
+        # De door EXT-009 beoordeelde wegvakken in de laag `vlakken` (issue #104). Zonder
+        # deze telling is het aantal externe vlakken niet meer uit `n_vlakken` af te
+        # leiden: dat is nu `n_vlakken` min de deelstelsels min de wegvakken.
+        _Kolom("n_wegvakken", "integer"),
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
@@ -1638,6 +1791,7 @@ def _schrijf_runmetadata(
             tellingen.vlakken,
             tellingen.gemengd_zonder_overstort,
             tellingen.gemengd_zonder_vlak,
+            tellingen.wegvakken,
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,

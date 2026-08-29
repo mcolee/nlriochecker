@@ -11,6 +11,8 @@ kandidaatselectie; zie `scripts/maak_gis_fixtures.py`.
 
 from __future__ import annotations
 
+import sqlite3
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -19,10 +21,13 @@ from gwsw_orox_helpers.dataset import load_dataset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, CheckRun, run_checks
 from nlriochecker.externedata import ExternalData, load_external_data
+from nlriochecker.uitvoer.gpkg import VLAK_SOORT_WEGVAK, schrijf_geopackage
+from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
 STRATEN = TTL_DIR / "ext009_straten.ttl"
+RUNDATUM = date(2026, 8, 29)
 
 pytestmark = pytest.mark.skipif(
     not (GIS_DIR / "top10nl_plaats_vlak.gpkg").exists(),
@@ -133,3 +138,70 @@ def test_een_ontbrekende_bron_slaat_de_check_over(config: CheckConfig) -> None:
     assert outcome.findings == []
     assert outcome.examined == 0
     assert any("laag niet aanwezig in aangeleverde data" in n for n in outcome.notes), outcome.notes
+
+
+def _wegvakrijen(pad: Path) -> list[dict]:
+    """De rijen van de laag `vlakken` met soort `wegvak`, zonder geometrie en fid."""
+    verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    verbinding.row_factory = sqlite3.Row
+    try:
+        return [
+            {naam: rij[naam] for naam in rij.keys() if naam not in {"geom", "fid"}}
+            for rij in verbinding.execute(
+                'select * from "vlakken" where soort = ?', (VLAK_SOORT_WEGVAK,)
+            )
+        ]
+    finally:
+        verbinding.close()
+
+
+def test_de_vlakkenlaag_draagt_elk_beoordeeld_wegvak(
+    config: CheckConfig, bronnen: ExternalData, tmp_path: Path
+) -> None:
+    """De derde uitvoertoestand (BO-79): groen en grijs krijgen een vlak zonder melding.
+
+    Voor elke andere soort in deze laag geldt "een vlak bestaat alleen als er een melding
+    naar wijst". Hier niet: juist het onderscheid tussen "gekeken, er ligt riolering" en
+    "niet gekeken" is de winst, en dat is zonder groene en grijze vlakken niet te zien.
+    """
+    run = draai(config, bronnen)
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    rijen = {rij["label"]: rij for rij in _wegvakrijen(pad)}
+
+    assert {label: rij["status"] for label, rij in rijen.items()} == {
+        "Rioolstraat (Fixturekom)": "groen",
+        "Lege Laan (Fixturekom)": "rood",
+        "Grindweg (Fixturekom)": "grijs",
+    }
+    assert {label: rij["aantal_meldingen"] for label, rij in rijen.items()} == {
+        "Rioolstraat (Fixturekom)": 0,
+        "Lege Laan (Fixturekom)": 1,
+        "Grindweg (Fixturekom)": 0,
+    }
+    leeg = rijen["Lege Laan (Fixturekom)"]
+    assert (leeg["id"], leeg["bron"], leeg["check_ids"]) == (
+        "nwb:wegvak/3",
+        "nwb_wegvak",
+        "EXT-009",
+    )
+    assert leeg["bronbestand"] == "nwb_wegvakken.gpkg"
+    # De grijze straat zegt in haar popup waarom zij niet beoordeeld is; grijs zonder
+    # reden leest als "in orde".
+    assert "onverhard" in rijen["Grindweg (Fixturekom)"]["popup_html"]
+
+
+def test_de_runmetadata_telt_de_wegvakken_apart(
+    config: CheckConfig, bronnen: ExternalData, tmp_path: Path
+) -> None:
+    """Zonder eigen telling zou `n_vlakken` de externe vlakken niet meer laten narekenen."""
+    run = draai(config, bronnen)
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    try:
+        rij = verbinding.execute("select n_vlakken, n_wegvakken from gwsw_run").fetchone()
+    finally:
+        verbinding.close()
+
+    assert rij == (3, 3)

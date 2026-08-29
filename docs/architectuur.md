@@ -218,8 +218,9 @@ alleen het bestand waarin zij staat is verhuisd.
   ("mechanische leiding -- geen vrijvervalrichting" in plaats van "BOB-richting niet te
   bepalen"), via een popup-only sleutel in `RICHTING_IN_WOORDEN` die géén kolomwaarde is.
   Zie issue #74 en BO-29.
-- De laag `vlakken` (MULTIPOLYGON) draagt naast de rioleringslagen alles wat bij een
-  melding hoort en geen punt of lijn is. Twee bronnen, één laag (BO-73, issue #98), en de
+- De laag `vlakken` (MULTIPOLYGON) draagt naast de rioleringslagen alles wat bij de
+  uitslag hoort en geen punt of lijn is. Sinds issue #104 drie bronnen, één laag (BO-73,
+  issue #98), en de
   kolom `soort` houdt ze uit elkaar. De eerste bron zijn de externe objecten waarnaar de
   meldingen van díé uitvoer verwijzen, gejoind op het
   trefferregister (`checks/treffers.py`) via `object2_uri` (BO-50, issue #67); hun
@@ -280,13 +281,34 @@ alleen het bestand waarin zij staat is verhuisd.
   de focusnode een geregistreerd stelsel is houdt haar stelsel als `object_uri` maar krijgt
   géén kaartobject; het rapport telt haar samen met de `CfkTypes_typ`-klassenamen in de
   regel "geen kaartobject" (op De Wolden 567 van de 578).
+- De derde bron van `vlakken` is EXT-009 (issue #104, BO-79): een vlak per beoordeeld
+  NWB-wegvak, `soort = wegvak`, met de voronoi-cel om de wegas als geometrie. Dit is de
+  enige soort in de laag die ook **zonder melding** een rij krijgt, en dat is de hele
+  winst: het onderscheid tussen een straat waar riolering ligt (`status = groen`) en een
+  straat die de regel niet beoordeelt (`grijs`, met de reden in de popup) is er anders
+  niet. De nieuwe kolom **`status`** draagt dat, in dezelfde waarden als de objectlagen
+  (rood, groen, grijs -- oranje komt hier niet voor); elke andere soort laat hem leeg,
+  want een geraakt pand of een gemeld deelstelsel draagt geen eigen oordeel. `subtype` is
+  de plaatsnaam uit het TOP10NL-komvlak, `bron` staat op `nwb_wegvak` en `check_ids` op
+  `EXT-009`; de vier deelstelselkolommen blijven leeg op `popup_html` na, waarin de
+  gemeten waarden als feiten staan (straatlengte, streng-in-cel, aandeel onverhard).
+  Rood blijft strikt aan de meldingen hangen: een wegvak dat het register rood noemt maar
+  waarvoor deze uitvoer geen EXT-009-melding draagt -- na de afbakening tot een
+  studiegebied of na `[rapport] onderdruk_checks` -- krijgt geen rij. Groen en grijs komen
+  uit het register op de run (`run.wegvakken`, `checks/treffers.Wegvakregister`), dat in
+  `beperk_tot_studiegebied` op het middelpunt van het wegvak wordt afgebakend -- dezelfde
+  grens als de meldingen, zodat de rode melding en het groene vlak niet aan verschillende
+  kanten ervan vallen. De schrijver bevraagt de NWB-laag nooit zelf. `gwsw_run` telt de
+  rijen in **`n_wegvakken`**, naast `n_gemengd_zonder_overstort`; het aantal externe
+  vlakken is `n_vlakken` min die twee. `vlakken.qml` geeft de soort drie regels, een per
+  status, met dezelfde kleuren als de objectlagen.
 - De QGIS-stijlen gaan mee in de tabel `layer_styles` van de GeoPackage, die zelf in
   `gpkg_contents` geregistreerd moet staan; zonder die rij vindt QGIS haar niet. Een QML
   los naast het bestand werkt niet bij meerdere lagen en leggen we dus niet neer.
 - De stijlen van `putten` en `strengen` worden opgebouwd uit de tabel in
   `uitvoer/stijlen/symbolen.py` (regelstructuur objecttype x status, ruim honderd
-  bladregels); `vlakken.qml` (rule-based op `soort`, met vier regels: pand, bouwwerk,
-  water en gemengd deelstelsel) blijft een bestand. Het symbool volgt het
+  bladregels); `vlakken.qml` (rule-based op `soort`, met zeven regels: pand, bouwwerk,
+  water, gemengd deelstelsel en drie voor het wegvak, een per `status`) blijft een bestand. Het symbool volgt het
   GWSW-objecttype, de kleur
   uitsluitend de kolom `status`. Een stijl
   draagt alleen regels voor de objecttypen die in zijn laag staan; met de hele tabel
