@@ -4391,7 +4391,20 @@ bestand maar uit de dataset, via de rollen `pompunits` (nieuw, `[klassen] pompun
 drukrioleringsstelsel" -- geverifieerd, GWSW is leidend. `Gemaal` hoort er niet bij: dat is
 een bouwwerk en het einde van de afvoer, en het staat al in `afvoer_eindpunt`.
 
-Zie [#104](https://github.com/mcolee/nlriochecker/issues/104) en BO-19.
+**`pompunits` valt buiten de nul-bewaking; dat is een nieuw soort rol.** De nul-signalering
+van issue #22/#71 leidt haar populatie af uit `check.rollen`, dus elke nieuwe rol komt er
+vanzelf in. Voor `pompunits` is dat verkeerd: EXT-009 *toetst* geen pompunits, hij leest ze
+als **indicator** om een straat juist búíten zijn oordeel te houden. Nul pompunits -- een
+gemeente zonder drukriolering -- betekent dan niet "deze check heeft niets te beoordelen"
+(de standaardtekst van `SIG-nulklasse`) maar "deze uitzondering gaat nooit af"; de check
+werkt verder volledig. Zo'n rol staat daarom in `uitvoer/omvang.INDICATORROLLEN` en blijft
+buiten `klassen_op_nul`. Alleen buiten de bewaking: in de rollentelling van het rapport
+blijft zij gewoon staan, want daar is nul een feit en geen oordeel. Dit is de derde
+uitzondering op de generieke bewaking, naast de twee van BO-52 (het afvoereindpunt per
+klasse, de overstortdrempel via `subjects_of_class`), en de eerste die over de *aard* van
+de rol gaat in plaats van over de manier van tellen.
+
+Zie [#104](https://github.com/mcolee/nlriochecker/issues/104), BO-19 en BO-52.
 
 ### BO-81 EXT-009 is een deterministische regel en geen model; de ijking van de drempel
 
@@ -4432,8 +4445,16 @@ gelabelde straten die daardoor grijs werden waren er **31 handmatig als terecht 
 beoordeeld**, dus 31 echte gaten verdwenen uit beeld. Met de tweede grens
 (`streng_in_cel > 0`) zijn dat er 4, gaat de beoordeelde set van 451 naar 478 straten en
 blijft het aantal fouten gelijk (32). Gemeentebreed: 500 rood, 3593 groen, 23 grijs, tegen
-455/3593/68 zonder die grens. De vergelijking staat in de fouttabel van
-`scripts/ijk_ext009.py`.
+455/3593/68 zonder die grens. De drie varianten naast elkaar, op dezelfde meting:
+
+| grijs-regel | rood | groen | grijs | beoordeeld | fouten | juist | lege straten grijs |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| druk & niet-bediend | 455 | 3593 | 68 | 451 | 32 | 92,9% | 31 |
+| **druk & niet-bediend & streng > 0** | **500** | **3593** | **23** | **478** | **32** | **93,3%** | **4** |
+| geen drukuitzondering | 512 | 3593 | 11 | 479 | 32 | 93,3% | 3 |
+
+De middelste is uitgeleverd: zij haalt dezelfde nauwkeurigheid als de derde en houdt de
+uitzondering die de spec vraagt.
 
 **Nog een afwijking van de POC, bewust.** De POC mat de persleiding met een extra
 eindpunttoets (beide uiteinden binnen 20 m van de straat); dat is een zesde drempel die de
@@ -4445,8 +4466,34 @@ beoordeelde gelabelde straten. Twee soorten fout, en ze wegen niet gelijk: een *
 (bediende straat als leeg gemeld) is hinderlijk maar meteen zichtbaar op de kaart, een
 *gemiste* (lege straat blijft groen) verdwijnt uit beeld -- en dat is precies het gat dat
 deze check moet vinden. Gekozen is daarom de drempel met de minste fouten waarbij vals-rood
-minstens zo groot is als gemist. De gemeten tabel en de gekozen waarde staan in het
-issue-verslag; de waarde zelf staat in `[drempels] ext_wegvak_streng_in_cel` van beide
+minstens zo groot is als gemist.
+
+De tabel hoort hier en niet in een verslag of een issue-comment: zonder de validatieset --
+die buiten de repository blijft -- is dit de enige plek waar de drempel te verantwoorden is,
+en BO-43 beschrijft precies wat er gebeurt met een meting die alleen in een verslag leeft.
+Gemeten op De Wolden en Hoogeveen, 29-08-2026, met de hierboven beschreven regel (dus mét de
+grens `streng_in_cel > 0`), 9787 wegvakken, 4116 kandidaten, 485 labels:
+
+| drempel | beoordeeld | vals-rood | gemist | fouten | juist |
+|---:|---:|---:|---:|---:|---:|
+| 0,05 | 478 | 10 | 25 | 35 | 92,7% |
+| 0,10 | 478 | 12 | 23 | 35 | 92,7% |
+| 0,15 | 478 | 14 | 18 | 32 | 93,3% |
+| 0,20 | 478 | 14 | 16 | 30 | 93,7% |
+| 0,25 | 478 | 14 | 15 | 29 | 93,9% |
+| **0,30** | **478** | **17** | **15** | **32** | **93,3%** |
+| 0,35 | 478 | 18 | 15 | 33 | 93,1% |
+| 0,40 | 478 | 18 | 15 | 33 | 93,1% |
+| 0,50 | 477 | 21 | 14 | 35 | 92,7% |
+| 0,60 | 477 | 30 | 14 | 44 | 90,8% |
+| 0,75 | 477 | 63 | 14 | 77 | 83,9% |
+
+0,25 heeft de minste fouten (29) maar de verkeerde foutrichting: 14 vals-rood tegen 15
+gemist. 0,30 is de eerste rij die de richting haalt (17 tegen 15) en heeft daar de minste
+fouten van. Dat kost drie straten nauwkeurigheid en levert de veilige kant op. Van de 485
+gelabelde straten blijven er bij 0,30 zeven onbeoordeeld (vier leeg, drie bediend).
+Gemeentebreed: **500 rood, 3593 groen, 23 grijs** (12 door drukriolering, 11 door onverhard
+wegdek). De waarde zelf staat in `[drempels] ext_wegvak_streng_in_cel` van beide
 configbestanden.
 
 **Wat de ijking niet is.** De validatieset zijn 485 straten uit één gemeente, met de hand

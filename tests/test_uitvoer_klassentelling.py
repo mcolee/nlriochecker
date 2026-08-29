@@ -161,6 +161,23 @@ class TestKlassenOpNul:
         signaal = next(s for s in klassen_op_nul(_run(tmp_path, {"Gemaal"})) if s.label == "Gemaal")
         assert "NET-001" in signaal.boodschap
 
+    def test_een_lege_indicatorrol_geeft_geen_signaal(self, tmp_path: Path) -> None:
+        """`pompunits` is voor EXT-009 een uitzonderingsindicator, geen toetspopulatie.
+
+        Nul pompunits -- een gemeente zonder drukriolering -- betekent niet dat EXT-009
+        niets te beoordelen heeft, maar dat zijn drukriolering-uitzondering nooit afgaat.
+        De standaardboodschap ("Wat op deze rol toetst, heeft niets te beoordelen") zou
+        daar het omgekeerde beweren van wat er aan de hand is. Zie BO-80 en
+        `omvang.INDICATORROLLEN`.
+        """
+        op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, {"Pompunit"}))}
+
+        assert "pompunits" not in op_nul
+        # De rol blijft wél in de rollentelling van het rapport staan: daar is nul een
+        # feit en geen oordeel.
+        telling = klassentelling(_run(tmp_path, {"Pompunit"}))
+        assert (telling.loc[telling["Rol"] == "pompunits", "Aantal"] == 0).all()
+
 
 class TestGedeclareerdeRollen:
     def test_elke_gedeclareerde_rol_krijgt_een_bewaking(self) -> None:

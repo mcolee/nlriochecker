@@ -139,6 +139,39 @@ def test_zonder_bronnen_wordt_er_niets_getoetst(config: CheckConfig) -> None:
     assert any("geen externe bronnen" in notitie for notitie in outcome.notes)
 
 
+def test_zonder_begrenzingspolygoon_meldt_de_check_niets(config: CheckConfig) -> None:
+    """Zonder studiegebied geeft geen enkele EXT-check een uitslag; ook deze niet.
+
+    De andere EXT-checks zijn hier per constructie veilig: zij lopen via `_selecteer` en
+    `binnen_bereik`, en dat is bij `extent is None` altijd onwaar. EXT-009 komt daar niet
+    langs -- zijn populatie zijn wegvakken en geen GWSW-objecten -- dus hij toetst het zelf
+    in `_beoordeel`. Zonder die poort meldde hij straten naast de zin "er is dus niets
+    getoetst", vulde hij de laag `vlakken` met drie vlakken, en deelde
+    `percentage_populatie` door nul.
+    """
+    basis = load_check_config().bronnen
+    zonder_gebied = basis.model_copy(
+        update={
+            "map": ".",
+            "bgt": "bgt.gpkg",
+            "nwb_wegvakken": "nwb_wegvakken.gpkg",
+            "top10nl": "top10nl_plaats_vlak.gpkg",
+            "studiegebied": None,
+            "ahn_dtm": None,
+        }
+    )
+    bronnen = load_external_data(zonder_gebied, GIS_DIR)
+    run = draai(config, bronnen)
+    outcome = run.outcomes[0]
+
+    assert bronnen.extent is None
+    assert bronnen.layer("nwb_wegvak") is not None
+    assert outcome.findings == []
+    assert outcome.examined == 0
+    assert len(run.wegvakken) == 0
+    assert any("geen begrenzingspolygoon" in notitie for notitie in outcome.notes), outcome.notes
+
+
 def test_een_ontbrekende_bron_slaat_de_check_over(config: CheckConfig) -> None:
     """Zonder komlaag is er geen bebouwde kom en dus geen kandidaatselectie."""
     basis = load_check_config().bronnen

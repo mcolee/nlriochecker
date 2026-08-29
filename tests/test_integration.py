@@ -280,6 +280,11 @@ def test_studiegebied_koekangerveld(tmp_path: Path) -> None:
 
 
 AHN_TIF = GIS_DIR / "ahn5_dtm_koekangerveld.tif"
+# Anders dan de rest van `data/gis_koekangerveld/` is dit bestand geen onderdeel van de
+# levering: er is voor dit gebied geen TOP10NL-extract, en het wordt geknipt uit dat van De
+# Wolden met `scripts/knip_top10nl_koekangerveld.py`. Wie de aangeleverde data heeft maar
+# die stap niet draaide, hoort deze test te zien overslaan en niet te zien falen.
+TOP10NL_GPKG = GIS_DIR / "top10nl_plaats_vlak_koekangerveld.gpkg"
 
 
 def _koekangerveld_bronnen():
@@ -291,7 +296,11 @@ def _koekangerveld_bronnen():
 
 
 @pytest.mark.skipif(
-    not AHN_TIF.exists(), reason="de externe bronnen staan niet in data/gis_koekangerveld/"
+    not (AHN_TIF.exists() and TOP10NL_GPKG.exists()),
+    reason=(
+        "de externe bronnen staan niet in data/gis_koekangerveld/ (het TOP10NL-plaatsvlak "
+        "komt uit scripts/knip_top10nl_koekangerveld.py)"
+    ),
 )
 def test_externe_bronnen_van_koekangerveld() -> None:
     """Legt de inventarisatie uit docs/gis-inventarisatie.md vast."""

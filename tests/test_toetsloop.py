@@ -500,6 +500,125 @@ def test_treffers_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
     assert _laag_ids(zuid, "vlakken") == []
 
 
+EXT_DIR = GIS_DIR / "ext"
+
+# De twee buurten van de EXT-009-equivalentietest, op de straten uit
+# `scripts/maak_gis_fixtures.py`. `Buiten` omsluit Lege Laan (1060, 1940) plus de losse put
+# W3 (1200, 1905); `Kern` omsluit Rioolstraat (960, 1940), Grindweg (960, 1910) en de hele
+# riolering van de fixture. Tussen de twee zit een gat van 20 m, ruim genoeg dat de
+# contextschil van 50 m om `Buiten` de riolering van `Kern` niet meepakt -- en dat is precies
+# het punt: `Buiten` ziet nul meter streng en noemt Rioolstraat dus rood, terwijl `Kern` haar
+# groen noemt. W3 zorgt dat `Buiten` niet leeg is; een leeg gebied is bij een run op een
+# enkel gebied een harde fout en dan valt de losse run niet te draaien.
+#
+# De vololgorde doet ertoe voor de regressie, niet voor de assertie: `load_studiegebieden`
+# houdt de bestandsvolgorde aan, en met een gedeeld register won het eerste gebied. Staat
+# `Buiten` voorop, dan erft `Kern` diens "rood" voor Rioolstraat en verdwijnt die straat uit
+# zijn laag `vlakken` -- rood zonder melding krijgt geen rij.
+WEGVAKBUURTEN = [("Buiten", box(1050, 1900, 1250, 1970)), ("Kern", box(900, 1900, 1030, 1970))]
+
+
+def _wegvakbronnen():
+    """De miniatuurbronnen van EXT-009 uit tests/fixtures/gis/ext."""
+    return load_external_data(
+        load_check_config().bronnen.model_copy(
+            update={
+                "map": ".",
+                "bgt": "bgt.gpkg",
+                "bag_pand": None,
+                "nwb_wegvakken": "nwb_wegvakken.gpkg",
+                "top10nl": "top10nl_plaats_vlak.gpkg",
+                "studiegebied": "studiegebied.gpkg",
+                "ahn_dtm": None,
+            }
+        ),
+        EXT_DIR,
+    )
+
+
+def _wegvakstatus(pad: Path) -> dict[str, str]:
+    """De wegvakrijen van de laag `vlakken` als sleutel -> status."""
+    verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    try:
+        return dict(verbinding.execute("select id, status from vlakken where soort = 'wegvak'"))
+    finally:
+        verbinding.close()
+
+
+def _ext009_run(gebiedsbestand: Path, uit: Path) -> list[GebiedsRun]:
+    """Draait EXT-009 over de gegeven studiegebieden en schrijft de uitvoer."""
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "ext009_straten.ttl", []),
+        load_studiegebieden(gebiedsbestand),
+        _config(),
+        bronnen=_wegvakbronnen(),
+        check_ids=["EXT-009"],
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    schrijf_uitvoer_gebieden(runs, uit, RUNDATUM)
+    return runs
+
+
+@pytest.mark.skipif(
+    not (EXT_DIR / "top10nl_plaats_vlak.gpkg").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_wegvakken_per_gebied_gelijk_aan_een_losse_run(tmp_path: Path) -> None:
+    """De equivalentie-eis voor het wegvakregister van EXT-009 (BO-79, issue #104).
+
+    Anders dan het trefferregister wordt dit register niet via de meldingen gejoind: élke
+    rij erin komt in de laag `vlakken` terecht. Deelden de gebieden er een, dan won het
+    eerste gebied met `setdefault` -- terwijl elk gebied het oordeel opnieuw berekent tegen
+    zijn eigen uitgedunde dataset, waarin een straat van de buren geen riolering heeft.
+    Stil gevolg: een bediende straat verdwijnt uit de laag (rood zonder melding krijgt geen
+    rij), of zij krijgt een groen vlak met een rode melding in de popup.
+    """
+    samen_map = tmp_path / "samen"
+    beide = tmp_path / "beide.gpkg"
+    schrijf_buurten(beide, WEGVAKBUURTEN)
+    _ext009_run(beide, samen_map)
+
+    for naam, vak in WEGVAKBUURTEN:
+        los_bestand = tmp_path / f"{naam}.gpkg"
+        schrijf_buurten(los_bestand, [(naam, vak)])
+        los_map = tmp_path / f"los_{naam}"
+        _ext009_run(los_bestand, los_map)
+
+        samen_gpkg = next((samen_map / naam.lower()).glob("*.gpkg"))
+        los_gpkg = next(los_map.glob("*.gpkg"))
+        assert _wegvakstatus(samen_gpkg) == _wegvakstatus(los_gpkg), naam
+
+    # En het oordeel zelf klopt: Kern ziet zijn eigen riolering, Buiten alleen de lege straat.
+    kern = _wegvakstatus(next((samen_map / "kern").glob("*.gpkg")))
+    buiten = _wegvakstatus(next((samen_map / "buiten").glob("*.gpkg")))
+    assert kern == {"nwb:wegvak/2": "groen", "nwb:wegvak/4": "grijs"}
+    assert buiten == {"nwb:wegvak/3": "rood"}
+
+
+@pytest.mark.skipif(
+    not (EXT_DIR / "top10nl_plaats_vlak.gpkg").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_ext009_meldingen_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
+    """De melding hangt aan het middelpunt van het wegvak, net als het vlak.
+
+    Zouden die twee op verschillende grenzen afgebakend worden, dan kon een gebied een
+    rode melding krijgen zonder vlak of andersom.
+    """
+    beide = tmp_path / "beide.gpkg"
+    schrijf_buurten(beide, WEGVAKBUURTEN)
+    runs = _ext009_run(beide, tmp_path / "uit")
+
+    per_gebied = {
+        run.naam: [
+            m.object_uri for m in bouw_meldingen(run.run, RUNDATUM) if m.check_id == "EXT-009"
+        ]
+        for run in runs
+    }
+
+    assert per_gebied == {"Buiten": ["nwb:wegvak/3"], "Kern": []}
+
+
 def _ext_bronnen(bron: Path, panden: list[tuple[dict[str, str], object]]) -> object:
     """Miniatuurbronnen met een eigen pandenlaag over de EXT-scenariofixture."""
     bron.mkdir(parents=True, exist_ok=True)

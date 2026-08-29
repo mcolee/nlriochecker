@@ -191,6 +191,17 @@ class _Rol:
     per_klasse: bool = False
 
 
+# Rollen die een check wél declareert maar die géén toetspopulatie zijn: hij leest ze als
+# *indicator* om objecten juist buiten zijn oordeel te houden. Nul instanties betekent daar
+# niet "deze check heeft niets te beoordelen" maar "deze uitzondering gaat nooit af", en de
+# check werkt verder volledig. `pompunits` is het enige geval: EXT-009 gebruikt de pompput
+# om een straat met drukriolering niet te beoordelen, en een gemeente zonder drukriolering
+# krijgt anders een systemische waarschuwing die het omgekeerde beweert van wat er aan de
+# hand is. Zij vallen alleen buiten de nul-bewaking; in de rollentelling van het rapport
+# blijven ze gewoon staan, want daar is nul een feit en geen oordeel. Zie BO-80 en BO-52.
+INDICATORROLLEN = frozenset({"pompunits"})
+
+
 def _gedeclareerde_rollen() -> dict[str, tuple[str, ...]]:
     """Per gedeclareerde rol de check-ID's die haar in `check.rollen` noemen.
 
@@ -318,12 +329,17 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
     nul is nul en vraagt geen drempel. Zonder klassenhierarchie herkent `of_class` geen
     klassen -- dan zou elke telling nul zijn en elke waarschuwing vals -- dus dan valt er
     niets te bewaken; het rapport draagt daarvoor al zijn eigen voorbehoud (issue #33).
+
+    De rollen in `INDICATORROLLEN` blijven erbuiten: daar zegt nul niet dat een check niets
+    te beoordelen heeft maar dat een uitzondering nooit afgaat.
     """
     dataset = run.dataset
     if not dataset.klassenhierarchie_bekend:
         return []
     signalen: list[NulSignaal] = []
     for rol in _rollen(run.config):
+        if rol.label in INDICATORROLLEN:
+            continue
         if rol.per_klasse:
             signalen += [
                 NulSignaal(klasse, _per_klasse_boodschap(klasse, rol))

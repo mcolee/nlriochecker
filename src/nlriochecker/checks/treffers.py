@@ -29,6 +29,8 @@ from hashlib import sha256
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
+from nlriochecker.errors import PipelineError
+
 # De kolommen waarin de aangeleverde bronnen hun identificatie dragen, in de volgorde
 # waarin ze gezocht worden. Gemeten op data/gis_koekangerveld en op de fixtures: de
 # BGT-lagen dragen `lokaal_id`, de BAG-laag `identificatie`, en beide daarnaast een `id`.
@@ -193,8 +195,27 @@ class Wegvakregister:
     _oordelen: dict[str, Wegvakoordeel] = field(default_factory=dict)
 
     def registreer(self, oordeel: Wegvakoordeel) -> None:
-        """Legt het oordeel over een wegvak vast; de eerste registratie wint."""
-        self._oordelen.setdefault(oordeel.sleutel, oordeel)
+        """Legt het oordeel over een wegvak vast, en weigert een tegenspraak luid.
+
+        Anders dan bij het trefferregister hierboven is een tweede, *afwijkend* oordeel op
+        dezelfde sleutel hier geen onschuldige dubbeling maar een fout: élke rij in dit
+        register komt in de laag `vlakken` terecht, dus stil de eerste laten winnen betekent
+        een kaart die iets anders zegt dan de uitslag. Precies zo ging het mis toen
+        `toetsloop._per_gebied` het register niet per gebied ververste: elk gebied
+        herberekende het oordeel tegen zijn eigen uitgedunde dataset en het eerste gebied
+        won. Een gelijk oordeel opnieuw registreren mag; dat is geen tegenspraak.
+        """
+        eerder = self._oordelen.setdefault(oordeel.sleutel, oordeel)
+        if eerder is not oordeel and (eerder.status, eerder.reden) != (
+            oordeel.status,
+            oordeel.reden,
+        ):
+            raise PipelineError(
+                f"wegvakregister: {oordeel.sleutel} ({oordeel.label}) is al geregistreerd als "
+                f"{eerder.status!r} en wordt nu {oordeel.status!r}. Twee runs delen hetzelfde "
+                "register terwijl zij op verschillende datasets draaien; geef elke run een "
+                "eigen `Wegvakregister` (zie `toetsloop._per_gebied`)."
+            )
 
     def get(self, sleutel: str) -> Wegvakoordeel | None:
         """Het oordeel bij deze sleutel, of None."""

@@ -60,3 +60,9 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :LW1_e rdf:type gwsw:EindpuntLeiding .
 :LW1_b gwsw:hasConnection :PutW1_ori .
 :LW1_e gwsw:hasConnection :PutW2_ori .
+# Losse put ver van elke straat; zie de toelichting in scripts/maak_ttl_fixtures.py.
+:PutW3 rdf:type gwsw:Inspectieput ; rdfs:label "W3" ;
+    gwsw:hasAspect :PutW3_ori .
+:PutW3_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1200.0 1905.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .

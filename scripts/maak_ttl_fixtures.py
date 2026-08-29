@@ -2850,11 +2850,19 @@ FIXTURES["richting_persleiding_met_bob.ttl"] = (
 # platte kap en eindigt op x = 920 en x = 1000, dus een put op het uiteinde zou op de
 # rand liggen). Kale putten en leidingen zonder hoogte of BOB: alleen EXT-009 hoort
 # deze fixture te lezen.
+# Put W3 staat er los bij, op (1200, 1905): buiten elke kandidaat-cel (die reiken tot
+# x = 1125), buiten elke corridor en buiten elke wegdekstrook, dus hij verandert geen enkel
+# oordeel. Hij is er voor de equivalentietest van `tests/test_toetsloop.py`: die heeft een
+# oostelijk studiegebied nodig dat de riolering van Rioolstraat *niet* in zijn analyseset
+# krijgt maar wel een GWSW-object bevat -- een gebied zonder enig object is bij een run op
+# een enkel gebied een harde fout, en dan valt de losse run niet te draaien.
 FIXTURES["ext009_straten.ttl"] = (
     "een van de drie kandidaat-straten heeft geen riolering in haar eigen voronoi-cel",
     put("PutW1", "W1", 930.0, 1940.0)
     + put("PutW2", "W2", 990.0, 1940.0)
-    + leiding("LW1", "W1-W2", [(930.0, 1940.0), (990.0, 1940.0)], "PutW1", "PutW2"),
+    + leiding("LW1", "W1-W2", [(930.0, 1940.0), (990.0, 1940.0)], "PutW1", "PutW2")
+    + "# Losse put ver van elke straat; zie de toelichting in scripts/maak_ttl_fixtures.py.\n"
+    + put("PutW3", "W3", 1200.0, 1905.0),
 )
 
 

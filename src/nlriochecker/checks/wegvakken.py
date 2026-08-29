@@ -188,9 +188,18 @@ def beoordeel(context: CheckContext) -> Wegvakuitslag:
 
 
 def _beoordeel(context: CheckContext) -> Wegvakuitslag:
-    """Rijgt de vier eenheden aaneen tot een oordeel per wegvak."""
+    """Rijgt de vier eenheden aaneen tot een oordeel per wegvak.
+
+    De poort staat hier en niet in `run()`: dan volgen de bevindingen, `examined()`,
+    `notes()` én het register uit één beslissing en kunnen zij elkaar niet tegenspreken.
+    Zonder begrenzingspolygoon (`bronnen.extent`) geeft geen enkele EXT-check een uitslag
+    -- de andere lopen daarvoor via `_selecteer` en `binnen_bereik`, dat bij `extent is
+    None` altijd onwaar is. EXT-009 komt daar niet langs, want zijn populatie zijn
+    wegvakken en geen GWSW-objecten, dus hij toetst het hier zelf. Zonder die poort meldde
+    hij straten naast de zin "er is dus niets getoetst", met `examined = 0` ernaast.
+    """
     bronnen = context.bronnen
-    if bronnen is None:
+    if bronnen is None or bronnen.extent is None:
         return Wegvakuitslag()
     nwb = bronnen.layer("nwb_wegvak")
     kom = bronnen.layer("top10nl_kom")
