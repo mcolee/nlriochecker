@@ -12,15 +12,18 @@ kandidaatselectie; zie `scripts/maak_gis_fixtures.py`.
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
 import numpy as np
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
+from shapely.geometry import GeometryCollection, LineString, box
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, CheckRun, run_checks
+from nlriochecker.checks.treffers import Wegvakregister
 from nlriochecker.checks.wegvakken import (
     REDEN_DRUKRIOLERING,
     REDEN_ONVERHARD,
@@ -28,11 +31,16 @@ from nlriochecker.checks.wegvakken import (
     STATUS_GROEN,
     STATUS_ROOD,
     Kenmerken,
+    _alleen_vlakken,
+    _bevat,
+    _lengte_in,
+    _nabij,
     classificeer,
 )
+from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.uitvoer.gpkg import VLAK_SOORT_WEGVAK, schrijf_geopackage
-from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.uitvoer.melding import bouw_meldingen, bouw_meldingenstroom
 from nlriochecker.uitvoer.objectkaart import STATUSSEN
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -212,6 +220,35 @@ def test_persleiding_langs_de_straat_telt_net_zo_als_een_pompunit() -> None:
     assert _status(streng_in_cel=0.1, persleiding_langs=0.2) == ("rood", "")
 
 
+def test_een_lege_bron_levert_een_meetbare_nul_en_geen_fout() -> None:
+    """Een dataset zonder pompunits of zonder riolering mag de meting niet laten omvallen.
+
+    De drie meetfuncties krijgen dan een lege array. Nul meter streng in de cel is een
+    meting en geen ontbrekende waarde; het onverhard-aandeel is dat juist niet -- zonder
+    wegdeel naast de straat is er niets gemeten, en dat blijft NaN.
+    """
+    vlak = np.array([box(0.0, 0.0, 10.0, 10.0)], dtype=object)
+    leeg = np.array([], dtype=object)
+
+    assert _lengte_in(vlak, leeg).tolist() == [0.0]
+    assert _bevat(vlak, leeg).tolist() == [False]
+    assert _nabij(vlak, leeg, 5.0).tolist() == [False]
+
+
+def test_een_lijnrestje_aan_een_doorsnede_verdwijnt(tmp_path: Path) -> None:
+    """De laag `vlakken` is MULTIPOLYGON; een `GeometryCollection` past daar niet in.
+
+    Twee elkaar rakende vlakken kunnen een doorsnede met een lijnstukje opleveren. Zonder
+    deze opschoning zou zo'n straatvlak niet weg te schrijven zijn.
+    """
+    gemengd = GeometryCollection([box(0.0, 0.0, 1.0, 1.0), LineString([(2.0, 0.0), (3.0, 0.0)])])
+
+    (schoon,) = _alleen_vlakken(np.array([gemengd], dtype=object))
+
+    assert schoon.geom_type in {"Polygon", "MultiPolygon"}
+    assert schoon.area == pytest.approx(1.0)
+
+
 def test_de_drie_wegvakstatussen_zijn_kaartstatussen() -> None:
     """De laag `vlakken` schrijft ze ongewijzigd weg; een vijfde waarde mag er niet bij."""
     assert {STATUS_ROOD, STATUS_GROEN, STATUS_GRIJS} <= set(STATUSSEN)
@@ -285,6 +322,43 @@ def test_de_vlakkenlaag_draagt_elk_beoordeeld_wegvak(
     # De grijze straat zegt in haar popup waarom zij niet beoordeeld is; grijs zonder
     # reden leest als "in orde".
     assert "onverhard" in rijen["Grindweg (Fixturekom)"]["popup_html"]
+
+
+def test_een_onderdrukte_melding_haalt_haar_rode_vlak_weg(
+    config: CheckConfig, bronnen: ExternalData, tmp_path: Path
+) -> None:
+    """Rood hangt aan de meldingen van déze uitvoer, ook na `[rapport] onderdruk_checks`.
+
+    Zou het register de kaart alleen vullen, dan toonde zij een gebrek dat in geen enkele
+    andere uitvoervorm staat. Groen en grijs blijven wél staan: die zijn geen gebrek maar
+    het antwoord op "is hier gekeken?" (BO-79).
+    """
+    config.rapport.onderdruk_checks = ["EXT-009"]
+    run = draai(config, bronnen)
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    pad = schrijf_geopackage(
+        run, stroom.meldingen, tmp_path, RUNDATUM, onderdrukking=stroom.onderdrukking
+    )
+
+    assert stroom.onderdrukking.totaal == 1
+    assert {rij["status"] for rij in _wegvakrijen(pad)} == {"groen", "grijs"}
+
+
+def test_een_melding_zonder_geregistreerd_wegvak_faalt_luid(
+    config: CheckConfig, bronnen: ExternalData, tmp_path: Path
+) -> None:
+    """Dezelfde strikte aansluiting als bij de externe vlakken.
+
+    Check en schrijver lezen hetzelfde register van dezelfde run; wijst een melding naar
+    een wegvak dat er niet in staat, dan is dat een interne tegenspraak en geen
+    datatoestand. Stil overslaan zou de laag kleiner maken dan de uitslag.
+    """
+    run = draai(config, bronnen)
+    meldingen = bouw_meldingen(run, RUNDATUM)
+    zonder_register = replace(run, wegvakken=Wegvakregister())
+
+    with pytest.raises(PipelineError, match="wegvakregister"):
+        schrijf_geopackage(zonder_register, meldingen, tmp_path, RUNDATUM)
 
 
 def test_de_runmetadata_telt_de_wegvakken_apart(

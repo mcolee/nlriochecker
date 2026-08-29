@@ -33,10 +33,12 @@ bron, een `query` over alle vlakken tegelijk, en `np.bincount` om per wegvak op 
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 
 import numpy as np
 import shapely
+from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely import STRtree
 from shapely.geometry import box
 
@@ -155,7 +157,7 @@ class Wegvakuitslag:
     """
 
     oordelen: tuple[Wegvakoordeel, ...] = ()
-    afgevallen: dict[str, int] | None = None
+    afgevallen: dict[str, int] = field(default_factory=dict)
     wegvakken_totaal: int = 0
 
     def __len__(self) -> int:
@@ -241,14 +243,14 @@ def _riool(context: CheckContext) -> Riool:
     )
 
 
-def _lijnen(conduits) -> np.ndarray:
+def _lijnen(conduits: Sequence[Conduit]) -> np.ndarray:
     """De bruikbare lijngeometrieen van een verbindingsselectie."""
     return np.array(
         [c.line for c in conduits if c.line is not None and not c.line.is_empty], dtype=object
     )
 
 
-def _punten(nodes) -> np.ndarray:
+def _punten(nodes: Sequence[Node]) -> np.ndarray:
     """De bruikbare puntgeometrieen van een knoopselectie."""
     return np.array(
         [n.point for n in nodes if n.point is not None and not n.point.is_empty], dtype=object

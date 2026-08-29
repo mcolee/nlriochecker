@@ -965,7 +965,7 @@ class StraatZonderRiolering(_ExterneCheck):
         ]
 
 
-def _afvalregel(afgevallen: dict[str, int] | None) -> str:
+def _afvalregel(afgevallen: dict[str, int]) -> str:
     """De redenen waarom wegvakken buiten de kandidaatselectie vielen, met aantallen."""
     if not afgevallen:
         return "geen"
