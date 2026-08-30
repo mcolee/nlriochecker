@@ -53,6 +53,7 @@ from gwsw_orox_helpers.dataset import load_dataset, markeer_vulwaarden
 from nlriochecker.checkconfig import FALLBACK_ENCODING, CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.checks import administratief as _administratief
+from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.toetsrun import Toetsopdracht, voer_toets_uit
 
 WORTEL = Path(__file__).resolve().parents[1]
@@ -74,25 +75,27 @@ VOORBEELD_SHACL = (
 PEILDATUM = date(2026, 1, 1)
 
 
-class _Peildatum(date):
-    """`date` met een vastgezette `today()`, voor de checks die de klok lezen."""
-
-    @classmethod
-    def today(cls) -> date:  # type: ignore[override]
-        return PEILDATUM
-
-
 @contextmanager
-def _klok_op_peildatum() -> Iterator[None]:
-    """Zet `date.today()` in `checks/administratief.py` op de peildatum.
+def klok_op(peildatum: date) -> Iterator[None]:
+    """Zet `date.today()` in `checks/administratief.py` op deze datum.
 
     ADM-006 heeft geen configknop voor "vandaag" en die erbij bouwen raakt
     `src/nlriochecker/checks/` -- een auteursbesluit, geen testkwestie. De module heeft
     `from __future__ import annotations`, dus het vervangen van het module-attribuut
     raakt de annotaties niet.
+
+    De datum is een parameter en geen vaste waarde, zodat een test de pin kan aantonen:
+    met een peildatum vóór de einddatum van `adm006_vervallen_object.ttl` hoort ADM-006
+    te zwijgen. Zie `tests/test_ledger.py`.
     """
+
+    class _Gepind(date):
+        @classmethod
+        def today(cls) -> date:  # type: ignore[override]
+            return peildatum
+
     origineel = _administratief.date
-    _administratief.date = _Peildatum  # type: ignore[misc]
+    _administratief.date = _Gepind  # type: ignore[misc]
     try:
         yield
     finally:
@@ -113,21 +116,34 @@ def veegconfig() -> CheckConfig:
     return config
 
 
+def context_voor(
+    pad: Path, config: CheckConfig, plausibiliteit: PlausibilityTables
+) -> CheckContext:
+    """Laadt een fixture zoals de pijplijn dat doet: met de vulwaarde-leesregel erop.
+
+    De plausibiliteitstabellen komen van buiten: `CheckContext` leest ze anders per
+    exemplaar opnieuw uit de TOML, en over 183 fixtures is dat een halve seconde parsen
+    voor 183 identieke tabellen.
+    """
+    dataset = markeer_vulwaarden(
+        load_dataset(pad, [], fallback_encoding=FALLBACK_ENCODING),
+        config.vulwaarden.hoogte_kenmerken,
+        config.vulwaarden.hoogte_band_m,
+    )
+    return CheckContext(dataset=dataset, config=config, plausibiliteit=plausibiliteit)
+
+
 def veeg(config: CheckConfig) -> dict[str, CheckRun]:
     """Per fixturenaam de `CheckRun` van de volledige registry over alle TTL-fixtures.
 
-    Het laadrecept en de klokpin staan in de moduledocstring; ze horen bij deze lus en
-    niet bij de beller, zodat de generator en de suite niet uit elkaar kunnen lopen.
+    Het laadrecept staat in `context_voor` en de klokpin hier, allebei binnen deze lus
+    en niet bij de beller: zo kunnen de generator en de suite niet uit elkaar lopen.
     """
+    plausibiliteit = load_plausibility()
     runs: dict[str, CheckRun] = {}
-    with _klok_op_peildatum():
+    with klok_op(PEILDATUM):
         for pad in sorted(TTL_DIR.glob("*.ttl")):
-            dataset = markeer_vulwaarden(
-                load_dataset(pad, [], fallback_encoding=FALLBACK_ENCODING),
-                config.vulwaarden.hoogte_kenmerken,
-                config.vulwaarden.hoogte_band_m,
-            )
-            runs[pad.name] = run_checks(CheckContext(dataset=dataset, config=config))
+            runs[pad.name] = run_checks(context_voor(pad, config, plausibiliteit))
     return runs
 
 
@@ -158,26 +174,49 @@ def ledger(runs: Mapping[str, CheckRun]) -> dict[str, object]:
     }
 
 
+def voorbeeldopdracht(uitvoermap: Path) -> Toetsopdracht:
+    """De `toets`-opdracht van het getrackte voorbeeld, op één plek.
+
+    Precies het commando uit `voorbeelden/koekangerveld/README.md`: zonder
+    `--projectconfig`, dus op de meegeleverde `checks.toml`. Zonder cache, want de
+    uitslag mag niet van een eerdere run afhangen. De klok wordt hier bewust NIET
+    gepind -- de voorbeeldrun hoort te draaien zoals een gebruiker hem draait.
+
+    `tests/test_voorbeeld.py` gebruikt deze functie ook; een tweede, net iets andere
+    opdracht daar zou de ledger tegen een andere run vergelijken dan zij vastlegt.
+    """
+    return Toetsopdracht(
+        dataset_pad=VOORBEELD_TTL,
+        uitvoermap=uitvoermap,
+        shacl=VOORBEELD_SHACL,
+        studiegebied=VOORBEELD_GEBIED,
+        bronnen=VOORBEELD,
+        gebruik_cache=False,
+    )
+
+
 def _voorbeeldtelling() -> dict[str, int]:
     """Per check het aantal meldingen van een `toets` op het getrackte voorbeeld.
 
     Uit `envelop["meldingen"]`, dus inclusief de `NULMETING-*`-vormen en de
-    `SIG-*`-datasetsignalen: die zitten in dezelfde meldingenstroom. De opdracht is die
-    van `voorbeelden/koekangerveld/README.md` -- zonder `--projectconfig` en zonder
-    klokpin. `tests/test_voorbeeld.py` draait dezelfde opdracht en vergelijkt de telling
-    met deze sectie; wijken de twee opdrachten uit elkaar, dan valt die test om.
+    `SIG-*`-datasetsignalen: die zitten in dezelfde meldingenstroom.
+
+    Het hoogteraster hoort er niet te zijn: het AHN-extract is 12 MB en gaat niet mee in
+    de repository, dus HGT-001 t/m HGT-003 vinden hier niets. Ligt er lokaal tóch een
+    `[bronnen] ahn_dtm`-bestand in de voorbeeldmap -- niet getrackt en door niets
+    genegeerd -- dan zou deze telling drie checks dragen die op een schone kloon en op de
+    CI-runner ontbreken, en faalt `tests/test_voorbeeld.py` daar zonder aanwijsbare
+    oorzaak. Daarom breekt de generator af in plaats van dat stil vast te leggen.
     """
     with tempfile.TemporaryDirectory() as tijdelijk:
-        uitslag = voer_toets_uit(
-            Toetsopdracht(
-                dataset_pad=VOORBEELD_TTL,
-                uitvoermap=Path(tijdelijk),
-                shacl=VOORBEELD_SHACL,
-                studiegebied=VOORBEELD_GEBIED,
-                bronnen=VOORBEELD,
-                gebruik_cache=False,
+        uitslag = voer_toets_uit(voorbeeldopdracht(Path(tijdelijk)))
+        bronnen = uitslag.runs[0].run.bronnen
+        if bronnen is not None and bronnen.raster is not None:
+            raise SystemExit(
+                f"de voorbeeldrun laadde een hoogteraster ({bronnen.raster.source.name}); "
+                "het voorbeeld hoort er geen te dragen. Haal het uit "
+                f"{VOORBEELD.relative_to(WORTEL)} voordat je de ledger regenereert."
             )
-        )
         pad = uitslag.uitvoer.per_gebied[uitslag.runs[0].naam].json
         if pad is None:
             raise SystemExit("de voorbeeldrun schreef geen JSON; ledger niet te vullen.")
@@ -198,12 +237,18 @@ def _tekst(inhoud: Mapping[str, object]) -> str:
     return _RIJ_OP_EEN_REGEL.sub(r"[\1, \2, \3]", ruw) + "\n"
 
 
-def _rijen(inhoud: Mapping[str, object]) -> dict[tuple[str, str], list[int]]:
-    """De rijen als platte afbeelding (fixture, check) -> rij, om te kunnen vergelijken."""
+def rijen(inhoud: Mapping[str, object]) -> dict[tuple[str, str], list[int]]:
+    """De rijen als platte afbeelding (fixture, check) -> rij, om te kunnen vergelijken.
+
+    Zowel de verschilmelding hieronder als `tests/test_ledger.py` leest hem, zodat het
+    vastgelegde en het gemeten document langs dezelfde afvlakking naast elkaar komen.
+    """
     fixtures = inhoud["fixtures"]
     assert isinstance(fixtures, dict)
     return {
-        (fixture, check): rij for fixture, rijen in fixtures.items() for check, rij in rijen.items()
+        (fixture, check): rij
+        for fixture, per_check in fixtures.items()
+        for check, rij in per_check.items()
     }
 
 
@@ -213,7 +258,7 @@ def _meld_verschil(oud: Mapping[str, object], nieuw: Mapping[str, object]) -> No
     Wie de ledger regenereert accepteert een verschuiving; hij hoort te zien hoe groot
     zij is voordat het bestand overschreven wordt.
     """
-    voor, na = _rijen(oud), _rijen(nieuw)
+    voor, na = rijen(oud), rijen(nieuw)
     erbij = sorted(set(na) - set(voor))
     weg = sorted(set(voor) - set(na))
     anders = sorted(sleutel for sleutel in set(voor) & set(na) if voor[sleutel] != na[sleutel])
@@ -241,16 +286,18 @@ def main() -> None:
     """Bouwt de ledger opnieuw op."""
     begin = time.monotonic()
     runs = veeg(veegconfig())
+    geveegd = time.monotonic() - begin
     inhoud = ledger(runs)
-    inhoud["voorbeeld"] = _voorbeeldtelling()
 
-    fixtures = inhoud["fixtures"]
-    assert isinstance(fixtures, dict)
+    begin = time.monotonic()
+    inhoud["voorbeeld"] = _voorbeeldtelling()
+    voorbeeldrun = time.monotonic() - begin
+
     checks = len(next(iter(runs.values())).outcomes) if runs else 0
     print(
         f"veeg: {len(runs)} fixtures x {checks} checks, "
-        f"{len(_rijen(inhoud))} rijen met minstens een bevinding "
-        f"({time.monotonic() - begin:.1f} s)"
+        f"{len(rijen(inhoud))} rijen met minstens een bevinding ({geveegd:.1f} s); "
+        f"voorbeeldrun {voorbeeldrun:.1f} s"
     )
 
     if DOEL.exists():

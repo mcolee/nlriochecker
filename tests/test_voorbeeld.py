@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -24,18 +25,12 @@ import pytest
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import REGISTRY
 from nlriochecker.externedata import ROL_RASTER
-from nlriochecker.toetsrun import Toetsopdracht, voer_toets_uit
+from nlriochecker.toetsrun import voer_toets_uit
 
 WORTEL = Path(__file__).resolve().parents[1]
-VOORBEELD = WORTEL / "voorbeelden" / "koekangerveld"
-VOORBEELD_TTL = VOORBEELD / "koekangerveld_orox.ttl"
-VOORBEELD_GEBIED = VOORBEELD / "cbs_buurt_koekangerveld_studiegebied.gpkg"
-VOORBEELD_SHACL = (
-    VOORBEELD / "gwsw_shacl_report_conformiteit_Hyd.csv",
-    VOORBEELD / "gwsw_shacl_report_conformiteit_MdsPlan.csv",
-    VOORBEELD / "gwsw_shacl_report_MdsProj.csv",
-)
-
+# De paden van het voorbeeld zelf staan niet hier maar in `scripts/maak_ledger.py`
+# (`voorbeeldopdracht`), zodat de run die de ledger vastlegt en de run die deze module
+# toetst er een is.
 DATA = WORTEL / "data"
 VOLLE_OROX = DATA / "gwsw_orox_ttl" / "dewoldenhoogeveen_orox.ttl"
 VOLLE_BRONNEN = DATA / "gis_koekangerveld"
@@ -96,42 +91,21 @@ OVER_DE_VOLLEDIGE_EXPORT = frozenset(
 )
 
 
-def _opdracht(uitvoermap: Path, dataset: Path, bronnen: Path, shacl, gebied: Path):
-    """De toetsopdracht van een run; alleen dataset, bronnen en SHACL verschillen.
-
-    Zonder `projectconfig`: het voorbeeld draait op de meegeleverde `checks.toml`, net
-    als het commando in `voorbeelden/koekangerveld/README.md`. Dat beide runs dezelfde
-    configuratie krijgen, is wat de gelijkheidstest hieronder betekenis geeft.
-    """
-    return Toetsopdracht(
-        dataset_pad=dataset,
-        uitvoermap=uitvoermap,
-        shacl=tuple(shacl),
-        studiegebied=gebied,
-        bronnen=bronnen,
-        # Geen cache: de uitslag mag niet van een eerdere run afhangen. De cache staat
-        # buiten de repository (`~/.cache/gwsw-orox-helpers`), dus dit gaat niet over wat
-        # er in de werkboom achterblijft maar over reproduceerbaarheid.
-        gebruik_cache=False,
-    )
-
-
-def _voorbeeldrun(uitvoermap: Path):
-    """Draait `toets` op het getrackte voorbeeld."""
-    return voer_toets_uit(
-        _opdracht(uitvoermap, VOORBEELD_TTL, VOORBEELD, VOORBEELD_SHACL, VOORBEELD_GEBIED)
-    )
-
-
 @pytest.fixture(scope="module")
-def voorbeeld(tmp_path_factory):
+def voorbeeld(ledgergenerator, tmp_path_factory):
     """Eén `toets` op het getrackte voorbeeld, gedeeld door de tests hieronder.
+
+    De opdracht komt uit `scripts/maak_ledger.py` (`voorbeeldopdracht`): dat is de ene
+    plek waar het commando uit `voorbeelden/koekangerveld/README.md` staat -- zonder
+    `--projectconfig`, dus op de meegeleverde `checks.toml`, en zonder cache. Zou deze
+    module haar eigen opdracht bouwen, dan kan de ledger tegen een andere run
+    vergeleken worden dan zij vastlegt.
 
     Module-scoped, want de run kost anderhalve seconde per test en de uitslag is voor
     elke test dezelfde; `tmp_path_factory` levert de uitvoermap, want de gewone
     `tmp_path` bestaat alleen per test.
     """
-    return _voorbeeldrun(tmp_path_factory.mktemp("voorbeeld"))
+    return voer_toets_uit(ledgergenerator.voorbeeldopdracht(tmp_path_factory.mktemp("voorbeeld")))
 
 
 def _geschreven(uitslag):
@@ -182,13 +156,15 @@ def test_het_voorbeeld_meldt_per_check_hetzelfde_aantal(voorbeeld) -> None:
     "niet in data/",
 )
 def test_het_voorbeeld_geeft_dezelfde_eigen_bevindingen_als_de_gebiedsrun(
-    voorbeeld, tmp_path: Path
+    voorbeeld, ledgergenerator, tmp_path: Path
 ) -> None:
     """De acceptatie-eis van issue #103, in de opzet van de bestaande equivalentietests.
 
     Beide runs draaien op de meegeleverde `checks.toml`; alleen de dataset, de bronnenmap
     en de SHACL-rapporten verschillen. Dat de configuratie identiek is, is de reden dat
-    een verschil in de uitkomst alleen van het voorbeeld zelf kan komen.
+    een verschil in de uitkomst alleen van het voorbeeld zelf kan komen -- vandaar
+    `replace()` op de voorbeeldopdracht in plaats van een tweede constructie: zo kan er
+    geen vlag tussen de twee runs uit elkaar lopen.
 
     Gemeten op 29-08-2026: 125 bevindingen in het voorbeeld tegen 131 in de gebiedsrun,
     over achttien checks gelijk, met precies de twee uitgezonderde soorten als verschil
@@ -198,7 +174,13 @@ def test_het_voorbeeld_geeft_dezelfde_eigen_bevindingen_als_de_gebiedsrun(
     geen put of streng is. Er is geen bevinding die alleen het voorbeeld heeft.
     """
     volledig = voer_toets_uit(
-        _opdracht(tmp_path / "volledig", VOLLE_OROX, VOLLE_BRONNEN, VOLLE_SHACL, VOLLE_GEBIED)
+        replace(
+            ledgergenerator.voorbeeldopdracht(tmp_path / "volledig"),
+            dataset_pad=VOLLE_OROX,
+            bronnen=VOLLE_BRONNEN,
+            shacl=VOLLE_SHACL,
+            studiegebied=VOLLE_GEBIED,
+        )
     )
 
     def sleutels(uitslag, *, uitgezonderd: frozenset[str] = frozenset()):

@@ -89,10 +89,15 @@ def ledgergenerator() -> ModuleType:
 def fixtureveeg(ledgergenerator: ModuleType) -> dict[str, CheckRun]:
     """De volledige registry over elke TTL-fixture, een keer per pytest-run.
 
-    Session-scoped: de veeg kost circa drie seconden en meer dan een test leunt erop
-    (`test_ledger.py` en `test_uitvoer_identiteit_sweep.py`). De klokpin van ADM-006 en
-    de peildatum van ATTR-007 zitten in `veeg()` respectievelijk `veegconfig()` van de
-    generator, zodat het vastgelegde bestand en deze veeg dezelfde dag lezen.
+    Session-scoped, want meer dan een test leunt erop (`test_ledger.py` en
+    `test_uitvoer_identiteit_sweep.py`) en de veeg kost geld: gemeten op 30-08-2026
+    2,0 s als setup in de suite (`pytest --durations`) en 1,8 s los in
+    `scripts/maak_ledger.py`. Dat was 4,2 s respectievelijk 3,0 s voordat de
+    plausibiliteitstabellen een keer in plaats van 183 keer geladen werden.
+
+    De klokpin van ADM-006 en de peildatum van ATTR-007 zitten in `veeg()`
+    respectievelijk `veegconfig()` van de generator, zodat het vastgelegde bestand en
+    deze veeg dezelfde dag lezen.
     """
     return ledgergenerator.veeg(ledgergenerator.veegconfig())
 
