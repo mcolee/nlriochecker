@@ -47,6 +47,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `NotImplementedError`, want `_flat_coords` vangt die uitzondering niet zoals
   `coords_of` dat wel doet. Gelijktrekken is een auteursbesluit en gebeurt hier niet.
   Test-only; geen regel in `src/` verandert (issue #116).
+- **Data-vrije drifttest op de vertaaltabel van de SHACL-vormen**
+  (`tests/test_nulmeting_teksten.py`): de 17 unieke vormen van het getrackte voorbeeld
+  `voorbeelden/koekangerveld/` worden via `laad_nulmeting` gemeten en tegen de tabel van
+  BO-74 gehouden. De bestaande drifttest tegen echte serveruitvoer staat in
+  `test_integration.py` en heeft `data/` nodig; op de CI-runner en in elke schone kloon
+  sloeg die over, zodat daar alleen de tabel-tegen-zichzelf overbleef en een vorm zonder
+  tekst stil op de technische SHACL-boodschap terugviel. De telling gaat vóór de
+  vertaalvraag, want over een lege verzameling is "alles vertaald" waar. Het 43-vangnet
+  blijft ongewijzigd staan; de omgekeerde bewering (elke tabeltekst komt voor) hoort daar
+  en niet hier -- 26 van de 43 teksten komen in het voorbeeld niet voor. Test-only; geen
+  regel in `src/` verandert (issue #117).
 
 ### Gewijzigd
 
