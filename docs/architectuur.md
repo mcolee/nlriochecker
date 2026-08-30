@@ -184,10 +184,14 @@ alleen het bestand waarin zij staat is verhuisd.
   zelf `to_csv`, `write_text` of `json.dump` aan -- de sweep in
   `tests/test_uitvoer_herkomst.py` verbiedt een tweede schrijver in `src/`. Die sweep
   borgt dat er **één schrijver** is; dat de uitvoervormen dezelfde **waarden** dragen
-  borgt `tests/test_uitvoer_gelijkheid.py` (issue #114): per `melding_id` legt hij elk
-  veld van `Melding` in CSV, JSON en de meldingentabel naast elkaar, en de
-  samenvattingskolommen van `putten` en `strengen` naast diezelfde meldingentabel. De
-  twee kolomdrifttests ernaast vergelijken alleen kolomnamen.
+  borgt `tests/test_uitvoer_gelijkheid.py` (issue #114): per melding legt hij elk veld van
+  `Melding` **uit de stroom** naast wat CSV, JSON en de meldingentabel ervan schreven --
+  de stroom is het orakel, want drie schrijvers met hetzelfde verkeerde antwoord zouden
+  elkaar anders gelijk geven -- en de samenvattingskolommen van `putten` en `strengen`
+  naast diezelfde meldingentabel. Dat gaat over de **drie archieven**; het
+  Markdown-rapport valt er bewust buiten, want dat is een view die samenvat en weglaat
+  (systemische bevindingen, `max_bevindingen_per_check`) en dus per definitie niet
+  dezelfde rijen draagt. De twee kolomdrifttests ernaast vergelijken alleen kolomnamen.
 
 ## GeoPackage en QGIS
 - De GeoPackage draagt sinds issue #98 precies drie featurelagen, een per geometrievorm:

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from gwsw_orox_helpers.dataset import load_dataset
 
+from helpers_melding import nulbevinding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.nulbevinding import Nulbevinding
@@ -240,26 +241,6 @@ def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
     assert _is_systemisch(beperkt.outcomes[0], config)
 
 
-def _nulbevinding(**overschrijf: object) -> Nulbevinding:
-    """Een nulbevinding met verder onbelangrijke velden ingevuld."""
-    velden: dict[str, object] = {
-        "check_id": "NULMETING-Put_HoogtePut_card",
-        "vorm": "Put_HoogtePut_card",
-        "focus_node": "PutA",
-        "ernst": "F",
-        "object_uri": "http://example.org/toets#PutA",
-        "object_label": "A",
-        "objecttype": "Inspectieput",
-        "boodschap": "aantal voorkomens wijkt af (exact=1)",
-        "waarde": "te weinig voorkomens",
-        "cfk": ("MdsPlan", "MdsProj"),
-        "systemisch": False,
-        "herleid": True,
-    }
-    velden.update(overschrijf)
-    return Nulbevinding(**velden)  # type: ignore[arg-type]
-
-
 def _run_met_nulbevindingen(bestand: str, *bevindingen: Nulbevinding) -> CheckRun:
     """Een run zonder eigen checkbevindingen, met alleen nulmetingbevindingen."""
     dataset = load_dataset(TTL_DIR / bestand, [])
@@ -282,7 +263,7 @@ def test_eigen_checkmelding_noemt_geen_conformiteitsklasse() -> None:
 
 def test_nulbevinding_wordt_een_melding_uit_de_nulmeting() -> None:
     """Bron, categorie en dimensie liggen vast; de CFK's komen van de bevinding."""
-    run = _run_met_nulbevindingen("nulmeting_join.ttl", _nulbevinding())
+    run = _run_met_nulbevindingen("nulmeting_join.ttl", nulbevinding())
 
     (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
@@ -294,7 +275,7 @@ def test_nulbevinding_wordt_een_melding_uit_de_nulmeting() -> None:
 
 
 def test_nulmelding_op_een_object_met_geometrie_krijgt_een_plek_op_de_kaart() -> None:
-    run = _run_met_nulbevindingen("nulmeting_join.ttl", _nulbevinding())
+    run = _run_met_nulbevindingen("nulmeting_join.ttl", nulbevinding())
 
     (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
@@ -303,7 +284,7 @@ def test_nulmelding_op_een_object_met_geometrie_krijgt_een_plek_op_de_kaart() ->
 
 def test_onherleide_nulmelding_heeft_geen_object_en_geen_gebied() -> None:
     """Een klassenaam of stelsel is aan geen enkel gebied toe te wijzen."""
-    onherleid = _nulbevinding(
+    onherleid = nulbevinding(
         check_id="NULMETING-CfkTypes_typ",
         vorm="CfkTypes_typ",
         focus_node="Rioolstelsel",
@@ -328,8 +309,8 @@ def test_twee_nulmeldingen_op_hetzelfde_object_krijgen_een_eigen_id() -> None:
     """
     run = _run_met_nulbevindingen(
         "nulmeting_join.ttl",
-        _nulbevinding(focus_node="L1_b", object_uri="http://example.org/toets#L1"),
-        _nulbevinding(focus_node="L1_e", object_uri="http://example.org/toets#L1"),
+        nulbevinding(focus_node="L1_b", object_uri="http://example.org/toets#L1"),
+        nulbevinding(focus_node="L1_e", object_uri="http://example.org/toets#L1"),
     )
 
     eerste, tweede = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
@@ -341,7 +322,7 @@ def test_prioriteit_volgt_dezelfde_regel_als_bij_een_eigen_check() -> None:
     """Fout is 2 (of 1 op een kritiek object), waarschuwing is 3."""
     run = _run_met_nulbevindingen(
         "nulmeting_join.ttl",
-        _nulbevinding(ernst="W", focus_node="L1_e"),
+        nulbevinding(ernst="W", focus_node="L1_e"),
     )
 
     (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
@@ -396,7 +377,7 @@ def test_onderdrukking_per_klasse_haalt_het_hoofdobject_weg_en_laat_het_tweede_o
     De onderdrukte klasse is die van het tweede object, want alleen dan bewijst de test
     iets: viel de melding op object2 weg, dan zou zij hier verdwijnen.
     """
-    nul = _nulbevinding(object_uri=DUIKER, object_label="3", objecttype="Duiker")
+    nul = nulbevinding(object_uri=DUIKER, object_label="3", objecttype="Duiker")
     stroom = bouw_meldingenstroom(_run_onderdrukt(["Duiker"], [], nul), RUNDATUM)
 
     over = _zonder_signalen(stroom.meldingen)
@@ -433,7 +414,7 @@ def test_de_eerste_treffende_wortel_uit_de_lijst_krijgt_de_telling() -> None:
     Beide wortels dekken L2; zonder die regel zou een melding onder twee wortels kunnen
     vallen en zou de som van `per_klasse` hoger zijn dan het aantal weggevallen meldingen.
     """
-    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
+    nul = nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
     stroom = bouw_meldingenstroom(
         _run_onderdrukt(["Leiding", "MechanischeTransportleiding"], [], nul), RUNDATUM
     )
@@ -451,7 +432,7 @@ def test_een_klassetreffer_telt_in_beide_tellingen_maar_een_keer_in_het_totaal()
     welke wortel dat gebeurde. `totaal` telt alleen `per_check`, dus elke melding een
     keer.
     """
-    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
+    nul = nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
     stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], [], nul), RUNDATUM)
 
     assert stroom.onderdrukking.per_check == {
@@ -466,7 +447,7 @@ def test_een_klassetreffer_telt_in_beide_tellingen_maar_een_keer_in_het_totaal()
 def test_een_melding_zonder_object_valt_nooit_op_klasse_weg() -> None:
     """Een onherleide nulmelding en de datasetsignalen hebben geen hoofdobject, dus geen
     klasse; alleen de TOP-011-melding op de vrijvervalstreng valt op `Leiding` weg."""
-    los = _nulbevinding(object_uri="", object_label="", objecttype="", herleid=False)
+    los = nulbevinding(object_uri="", object_label="", objecttype="", herleid=False)
     zonder = bouw_meldingenstroom(_run_onderdrukt([], [], los), RUNDATUM)
     stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], [], los), RUNDATUM)
 

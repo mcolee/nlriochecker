@@ -1,13 +1,15 @@
-"""Een `Melding` bouwen met alleen de velden die een test aangaan.
+"""Een `Melding` of een `Nulbevinding` bouwen met alleen de velden die een test aangaan.
 
-Drie testbestanden hadden hun eigen versie van deze constructor
+Drie testbestanden hadden hun eigen versie van de meldingconstructor
 (`test_uitvoer_objectkaart.py`, `test_uitvoer_synthese.py`,
 `test_uitvoer_rapportopbouw.py`). Een gedeelde plek voorkomt dat ze uit elkaar lopen
-zodra `Melding` een veld krijgt.
+zodra `Melding` een veld krijgt. `nulbevinding` staat hier om dezelfde reden: hij komt
+uit `test_uitvoer_melding.py` en wordt ook door `test_uitvoer_gelijkheid.py` gebruikt.
 """
 
 from __future__ import annotations
 
+from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.uitvoer.melding import Melding
 
 
@@ -43,3 +45,28 @@ def melding(**velden: object) -> Melding:
     if "categorie" not in velden and "check_id" in velden:
         basis["categorie"] = str(velden["check_id"]).split("-", 1)[0]
     return Melding(**basis)  # type: ignore[arg-type]
+
+
+def nulbevinding(**overschrijf: object) -> Nulbevinding:
+    """Een nulbevinding met verder onbelangrijke velden ingevuld.
+
+    De standaardwaarden wijzen naar `PutA`, de put die de meeste TTL-fixtures kennen;
+    een test die een ander object nodig heeft overschrijft `object_uri`, `object_label`
+    en `objecttype`.
+    """
+    velden: dict[str, object] = {
+        "check_id": "NULMETING-Put_HoogtePut_card",
+        "vorm": "Put_HoogtePut_card",
+        "focus_node": "PutA",
+        "ernst": "F",
+        "object_uri": "http://example.org/toets#PutA",
+        "object_label": "A",
+        "objecttype": "Inspectieput",
+        "boodschap": "aantal voorkomens wijkt af (exact=1)",
+        "waarde": "te weinig voorkomens",
+        "cfk": ("MdsPlan", "MdsProj"),
+        "systemisch": False,
+        "herleid": True,
+    }
+    velden.update(overschrijf)
+    return Nulbevinding(**velden)  # type: ignore[arg-type]
