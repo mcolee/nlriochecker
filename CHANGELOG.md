@@ -11,6 +11,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-30
+
 ### Toegevoegd
 
 - **Release-workflow** (`.github/workflows/release.yml`): op de tag `vX.Y.Z` bouwt CI de
@@ -1875,6 +1877,7 @@ Eerste uitgave onder een vast versienummer.
 - Hernoemd naar `nlriochecker`: package, commando en cachemap.
 - Onder EUPL-1.2 gebracht.
 
-[Unreleased]: https://github.com/mcolee/nlriochecker/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mcolee/nlriochecker/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/mcolee/nlriochecker/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/mcolee/nlriochecker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mcolee/nlriochecker/releases/tag/v0.2.0
