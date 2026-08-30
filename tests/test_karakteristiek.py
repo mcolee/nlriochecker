@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset, markeer_vulwaarden
+
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.dataset import load_dataset, markeer_vulwaarden
+from nlriochecker.checks import CheckContext, Severity, run_checks
 from nlriochecker.karakteristiek import bepaal_karakteristiek
 from nlriochecker.reporting import write_check_report
 
@@ -22,7 +23,7 @@ FIXTURE = TTL_DIR / "karakteristiek_datums.ttl"
 
 def _karakteristiek(config: CheckConfig | None = None):
     """De karakteristieken van de fixture."""
-    return bepaal_karakteristiek(load_dataset(FIXTURE), config or load_check_config())
+    return bepaal_karakteristiek(load_dataset(FIXTURE, []), config or load_check_config())
 
 
 def _vulling(karakteristiek, kenmerk: str):
@@ -51,7 +52,7 @@ def test_alles_op_1_januari_geldt_als_jaarprecisie(tmp_path: Path) -> None:
     kopie = tmp_path / "jaarprecisie.ttl"
     kopie.write_text(tekst, encoding="utf-8")
 
-    karakteristiek = bepaal_karakteristiek(load_dataset(kopie), load_check_config())
+    karakteristiek = bepaal_karakteristiek(load_dataset(kopie, []), load_check_config())
 
     begindatum = next(item for item in karakteristiek.datums if item.kenmerk == "Begindatum")
     assert begindatum.jaarprecisie
@@ -103,7 +104,7 @@ def test_kenmerken_zonder_waarden_komen_niet_in_de_tabel() -> None:
 
 def test_de_sectie_staat_in_het_bevindingenrapport(tmp_path: Path) -> None:
     """Het rapport hoort te vermelden op welke precisie de datums staan."""
-    context = CheckContext(dataset=load_dataset(FIXTURE), config=load_check_config())
+    context = CheckContext(dataset=load_dataset(FIXTURE, []), config=load_check_config())
     run = run_checks(context, ["ATTR-007"])
 
     markdown_path, _ = write_check_report(run, tmp_path)
@@ -113,6 +114,86 @@ def test_de_sectie_staat_in_het_bevindingenrapport(tmp_path: Path) -> None:
     assert "| Begindatum | 4 | 3 (75.0%) | dag |" in tekst
     assert "| maaiveldhoogte | 5 | 2 | 1 (50.0%) |" in tekst
     assert "expliciet dat de inwinning niet te achterhalen is" in tekst
+
+
+def test_het_aandeel_putten_zonder_aanlegjaar_opent_de_sectie(tmp_path: Path) -> None:
+    """Het ontbrekende aanlegjaar is een aanleveringsgebrek en hoort in de kop (issue #91).
+
+    De fixture heeft vier putten waarvan er een geen begindatum draagt: 25%. Teller en
+    noemer komen uit wat er al is -- de ATTR-018-meldingen van deze uitvoer en de
+    putpopulatie -- en niet uit een tweede telling naast de check.
+    """
+    context = CheckContext(
+        dataset=load_dataset(TTL_DIR / "attr018_zonder_begindatum.ttl", []),
+        config=load_check_config(),
+    )
+    run = run_checks(context, ["ATTR-018"])
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "**25.0% van de putten draagt geen aanlegjaar** (1 van de 4)" in tekst
+    assert "aanleveringssignaal" in tekst
+    assert "de volledige lijst staat in `bevindingen.csv`" in tekst
+    # De regel opent de sectie; de tabellen komen erna.
+    assert tekst.index("**Datakarakteristieken**") < tekst.index("van de putten draagt geen")
+    assert tekst.index("van de putten draagt geen") < tekst.index("| Datumkenmerk |")
+
+    # Zonder CSV mag de regel er niet naar verwijzen (issue #66): dan staat er een
+    # bestand genoemd dat `--uitvoer` heeft uitgezet.
+    zonder_csv, _ = write_check_report(run, tmp_path, met_csv=False)
+    regel = next(
+        r
+        for r in zonder_csv.read_text(encoding="utf-8").splitlines()
+        if "van de putten draagt geen aanlegjaar" in r
+    )
+    assert "`bevindingen.csv`" not in regel
+    assert "`bevindingen.json`" in regel
+
+
+def test_de_kopregel_belooft_geen_plek_die_de_vouwing_wegneemt(tmp_path: Path) -> None:
+    """Boven de systemisch-drempel toont het rapport ATTR-018 niet meer per object.
+
+    `_detail_eigen` vervangt de tabel dan door één generieke regel (issue #76) en de
+    popup laat de meldingen weg terwijl `status` ze negeert (BO-59); een afgekapte tabel
+    (`max_bevindingen_per_check`) doet hetzelfde met een deel. Een kopregel die "in dit
+    rapport en op de kaart" belooft, is daar onwaar. Zij verwijst daarom alleen naar het
+    archief, en dat is de enige belofte die in elke toestand klopt.
+    """
+    config = load_check_config()
+    config.rapport.systemisch_minimum_bekeken = 0
+    config.rapport.systemisch_drempel = 0.1
+    context = CheckContext(
+        dataset=load_dataset(TTL_DIR / "attr018_zonder_begindatum.ttl", []), config=config
+    )
+    run = run_checks(context, ["ATTR-018"])
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    # De vouwing is werkelijk opgetreden: het detail toont de bevindingen niet per object.
+    assert "dus dit rapport toont ze niet per object" in tekst
+
+    regel = next(r for r in tekst.splitlines() if "van de putten draagt geen aanlegjaar" in r)
+    assert "op de kaart" not in regel
+    assert "in dit rapport" not in regel
+    assert "`bevindingen.csv`" in regel
+
+
+def test_zonder_ontbrekend_aanlegjaar_blijft_de_regel_weg(tmp_path: Path) -> None:
+    """Nul meldingen is geen karakteristiek; "0% van de putten" zou ruis zijn."""
+    context = CheckContext(
+        dataset=load_dataset(TTL_DIR / "attr_schoon.ttl", []), config=load_check_config()
+    )
+    run = run_checks(context, ["ATTR-018"])
+
+    assert run.count(Severity.ERROR) == 0
+
+    markdown_path, _ = write_check_report(run, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "**Datakarakteristieken**" in tekst
+    assert "van de putten draagt geen aanlegjaar" not in tekst
 
 
 def test_de_weggezette_vulwaarden_staan_onder_de_inwinningstabel(tmp_path: Path) -> None:
@@ -125,7 +206,7 @@ def test_de_weggezette_vulwaarden_staan_onder_de_inwinningstabel(tmp_path: Path)
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
     dataset = markeer_vulwaarden(
-        load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl"),
+        load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl", []),
         config.vulwaarden.hoogte_kenmerken,
         config.vulwaarden.hoogte_band_m,
     )

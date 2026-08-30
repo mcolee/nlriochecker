@@ -63,6 +63,20 @@ bewijs = [
 tegenbewijs = []
 
 [[check]]
+id = "ATTR-008"
+onderwerp = "Strenglengte korter dan X m of langer dan X m"
+claim = """Alle drie de CFK's: waardebereik LengteLeiding 1-75 m (vorm LengteLeiding_val, \
+bevestigd in Mds-datatype Dt_LengteLeiding) - dezelfde dekking als ATTR-011. Gemeten op \
+De Wolden en Hoogeveen (checkaudit 27-08): alle 443 ATTR-008-objecten staan ook in \
+LengteLeiding_val, die er 932 telt en dus breder is (ook drains, duikers en \
+aansluitleidingen)"""
+vereiste_cfk = ["Hyd", "MdsPlan", "MdsProj"]
+bewijs = [
+  { vorm = "LengteLeiding_val" },
+]
+tegenbewijs = []
+
+[[check]]
 id = "ATTR-011"
 onderwerp = "Absurde lengtewaarde boven harde bovengrens"
 claim = """Beide CFK's: waardebereik LengteLeiding 1-75 m (bevestigd in Mds-datatype \

@@ -6,9 +6,16 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import (
+    KLASSE_BOB_BEGIN,
+    KLASSE_BOB_EIND,
+    KLASSE_MAAIVELDHOOGTE,
+    KLASSE_PUTDEKSELNIVEAU,
+)
 from pydantic import BaseModel
 
 from nlriochecker.checkconfig import (
+    VULWAARDE_KENMERKEN,
     CheckThresholds,
     ExternalSources,
     ReportOptions,
@@ -31,22 +38,25 @@ def test_standaardconfig_laadt() -> None:
     assert config.drempels.dubbele_put_tolerantie_m == 0.30
 
 
-def test_stelselvlak_buffer_heeft_een_default() -> None:
-    """De bufferafstand van de cartografische stelsellaag (#25).
+def test_gemengd_zonder_overstort_buffer_heeft_een_default() -> None:
+    """De bufferafstand van de RVZ-006-vlakken in de laag `vlakken` (#25, #75, #98).
 
     Projectkeuze zonder externe bron; 10 m buffert elke strenglijn tot een lint van
-    20 m breed, zodat de strengen van een stelsel langs een straat samenvloeien.
+    20 m breed, zodat de strengen van een deelstelsel langs een straat samenvloeien.
     """
-    assert load_check_config().drempels.stelselvlak_buffer_m == 10.0
+    assert load_check_config().drempels.gemengd_zonder_overstort_buffer_m == 10.0
 
 
 def test_maximale_strenglengte_volgt_de_ontologie() -> None:
-    """De bovengrens van ATTR-008 is de GWSW-ontologiegrens, niet 200 m (issue #35).
+    """De strenglengtegrenzen zijn de GWSW-ontologiegrenzen, niet 200 m (issue #35).
 
     `Dt_LengteLeiding` declareert een bereik van 1-75 m. De oude drempel 200 keurde
     strengen goed die de SHACL-nulmeting in hetzelfde rapport afkeurde (op De Wolden en Hoogeveen
     431 vrijvervalstrengen); GWSW is leidend. De ondergrens 1 m valt al samen met de
-    ontologie.
+    ontologie. ATTR-008 las deze twee drempels tot issue #90; die check is geschrapt
+    omdat de vorm `LengteLeiding_val` hem volledig dekt (BO-61), dus vandaag leest geen
+    check ze. De sleutels blijven wel in de drie configbestanden staan, en dan hoort hun
+    waarde de ontologiegrens te blijven in plaats van stil terug te lopen.
     """
     drempels = load_check_config().drempels
     assert drempels.maximale_strenglengte_m == 75.0
@@ -77,6 +87,92 @@ def test_mechanisch_riool_is_geconfigureerd() -> None:
     config = load_check_config()
 
     assert config.klassen.mechanisch == ["MechanischeRioolleiding", "MechanischeTransportleiding"]
+
+
+def test_afvoereindpunt_is_overnamepunt_en_gemaal() -> None:
+    """`Pompunit` hoort niet in `afvoer_eindpunt` (BO-55, verfijnt BO-33).
+
+    Een pompput is een overdrachtspunt naar de drukriolering, geen einde van de
+    afvoer; sinds issue #72 is het persnet erachter traceerbaar, dus de streng die
+    erop eindigt wordt via de bereikbaarheidsgraaf beoordeeld en niet meer door de
+    pompput zelf als eindpunt te tellen. `Gemaal` blijft staan zolang `Overnamepunt`
+    nul instanties heeft (het loslaatcriterium van BO-33).
+
+    Deze lijst voedt NET-001 (`_eindpunten`) en RVZ-006 (`_afvoereindpunten`); wie
+    haar wijzigt verschuift beide checks tegelijk, en dat hoort een bewuste daad met
+    een BO te zijn.
+    """
+    assert load_check_config().klassen.afvoer_eindpunt == ["Overnamepunt", "Gemaal"]
+
+
+def test_pompunit_eruit_zonder_persnet_is_een_configuratiefout(tmp_path: Path) -> None:
+    """De voorwaarde onder BO-55 wordt afgedwongen, niet aangenomen.
+
+    `load_check_config` valideert een projectbestand op zichzelf en legt het NIET over
+    `checks.toml` heen: een projectconfig die `mechanisch` weglaat krijgt een lege lijst.
+    Staat `Pompunit` dan ook niet meer in `afvoer_eindpunt`, dan is de pompput geen
+    eindpunt en is er geen persnet om achterlangs bij het gemaal te komen -- precies de
+    toestand met +645 valse NET-001-bevindingen waar BO-33 voor waarschuwde en waarvoor
+    issue #73 op #72 moest wachten. Zonder deze poort zou zo'n config stil draaien: de
+    nul-bewaking laat een rol met een lege klassenlijst juist weg, dus ook daar komt geen
+    signaal vandaan.
+    """
+    pad = tmp_path / "zonder_persnet.toml"
+    pad.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Overnamepunt', 'Gemaal']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError) as fout:
+        load_check_config(pad)
+
+    boodschap = str(fout.value)
+    assert "afvoer_eindpunt" in boodschap
+    assert "mechanisch" in boodschap
+    assert "BO-55" in boodschap
+
+
+def test_persnet_of_pompunit_maakt_de_config_wel_geldig(tmp_path: Path) -> None:
+    """Beide uitwegen werken: het persnet declareren, of Pompunit laten staan.
+
+    De tweede is de toestand van vóór issue #73 en blijft geldig; een project dat de
+    drukriolering niet kan traceren hoort haar pompputten als eindpunt te houden.
+    """
+    basis = (
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Overnamepunt', 'Gemaal']\n{extra}"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
+    )
+    met_persnet = tmp_path / "met_persnet.toml"
+    met_persnet.write_text(
+        basis.format(extra="mechanisch = ['MechanischeRioolleiding']\n"), encoding="utf-8"
+    )
+    met_pompunit = tmp_path / "met_pompunit.toml"
+    met_pompunit.write_text(
+        basis.format(extra="").replace("'Gemaal'", "'Gemaal', 'Pompunit'"), encoding="utf-8"
+    )
+
+    assert load_check_config(met_persnet).klassen.mechanisch == ["MechanischeRioolleiding"]
+    assert "Pompunit" in load_check_config(met_pompunit).klassen.afvoer_eindpunt
+
+
+def test_een_lege_eindpuntlijst_valt_buiten_de_poort(tmp_path: Path) -> None:
+    """Zonder enig afvoereindpunt gaat de poort van BO-55 niet op.
+
+    Dan is er geen pompput-zonder-uitweg maar een config die NET-001 helemaal geen
+    eindpunt geeft; dat is een andere, meteen zichtbare toestand, en de vele minimale
+    testconfigs in deze suite leunen erop.
+    """
+    pad = tmp_path / "leeg.toml"
+    pad.write_text(
+        "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        encoding="utf-8",
+    )
+
+    assert load_check_config(pad).klassen.afvoer_eindpunt == []
 
 
 def test_netwerkknopen_bundelen_putten_en_eindpunten() -> None:
@@ -172,7 +268,30 @@ def test_rapportinstellingen_hebben_bruikbare_defaults() -> None:
     assert rapport.multi_melding_checks == 3
     assert rapport.max_bevindingen_per_check == 0
     assert rapport.systemisch_drempel == 0.80
+    assert rapport.systemisch_minimum_bekeken == 100
     assert rapport.register_versie == "v0.9"
+    assert rapport.onderdruk_klassen == []
+    assert rapport.onderdruk_checks == []
+
+
+def test_onbekend_onderdruk_check_id_faalt_bij_het_laden(tmp_path: Path) -> None:
+    """Een typefout in `onderdruk_checks` zou stil niets onderdrukken (issue #65)."""
+    bron = default_check_config_path().read_text(encoding="utf-8")
+    pad = tmp_path / "checks.toml"
+    pad.write_text(
+        bron.replace("onderdruk_checks = []", 'onderdruk_checks = ["XYZ-999"]'), encoding="utf-8"
+    )
+
+    with pytest.raises(ConfigError, match="XYZ-999"):
+        load_check_config(pad)
+
+
+def test_de_projectconfig_onderdrukt_het_mechanische_riool() -> None:
+    """De Wolden: dezelfde twee wortels als `[klassen] mechanisch` (issue #56, #65)."""
+    config = load_check_config(PROJECTCONFIG)
+
+    assert config.rapport.onderdruk_klassen == config.klassen.mechanisch
+    assert config.rapport.onderdruk_checks == []
 
 
 def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
@@ -182,7 +301,7 @@ def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
 
 # De configuratiemodellen met drempelvormige velden, met de TOML-sectie waarin ze
 # horen. `CheckThresholds` was de enige die #28 afdekte; de acht velden daarbuiten
-# (`context_buffer_m`, `hoogte_band_m`, `dekking_tolerantie_m`, de vier van `[rapport]`)
+# (`context_buffer_m`, `hoogte_band_m`, `dekking_tolerantie_m`, de velden van `[rapport]`)
 # vielen buiten elke bewaking, en een negende veld zou morgen hetzelfde gat heropenen.
 # `ClassRoots`, `NulmetingOptions` en `NamingOptions` staan er niet bij: die dragen geen
 # drempels maar klassenlijsten, en de eerste twee zijn al verplicht.
@@ -383,3 +502,22 @@ def test_vulwaarden_uit_de_standaardconfig() -> None:
         "Putdekselniveau",
     ]
     assert config.vulwaarden.hoogte_band_m == 0.01
+
+
+def test_ondersteunde_kenmerken_volgen_de_vier_geladen_klassen() -> None:
+    """`VULWAARDE_KENMERKEN` is precies wat `markeer_vulwaarden` inspecteert.
+
+    De lijst hoort bij de afnemer sinds de leeslaag naar gwsw-orox-helpers verhuisde:
+    `markeer_vulwaarden` neemt de kenmerken als parameter en kent deze keuze niet meer.
+    De config weigert elke andere naam; loopt deze lijst uit de pas met de klassen die
+    de lader in de vier hoogtevelden zet, dan zou ze een geldig kenmerk weigeren of een
+    inert kenmerk toelaten.
+    """
+    klassen = (
+        KLASSE_MAAIVELDHOOGTE,
+        KLASSE_PUTDEKSELNIVEAU,
+        KLASSE_BOB_BEGIN,
+        KLASSE_BOB_EIND,
+    )
+
+    assert VULWAARDE_KENMERKEN == {str(klasse).rsplit("/", 1)[-1] for klasse in klassen}

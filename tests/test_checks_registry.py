@@ -58,6 +58,15 @@ def test_ernst_en_dimensie_volgen_het_register(check_id: str) -> None:
 @pytest.mark.parametrize("check_id", sorted(REGISTRY))
 def test_geschrapte_checks_worden_niet_opnieuw_gebouwd(check_id: str) -> None:
     # De schrapronde dekt deze ID's al via de nulmeting; ze horen niet in de engine.
-    geschrapt = {"ADM-001", "ADM-004", "ADM-005", "ATTR-011"}
+    geschrapt = {"ADM-001", "ADM-004", "ADM-005", "ATTR-008", "ATTR-011"}
 
     assert check_id not in geschrapt
+
+
+@pytest.mark.parametrize("check_id", sorted(REGISTRY))
+def test_vervallen_ids_worden_nooit_hergebruikt(check_id: str) -> None:
+    # ID's die in een andere check zijn opgegaan; een vervallen ID hergebruik je nooit
+    # (harde regel in CLAUDE.md). RVZ-003 ging op in RVZ-002 (#87, BO-78).
+    vervallen = {"RVZ-003"}
+
+    assert check_id not in vervallen

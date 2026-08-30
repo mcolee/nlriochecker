@@ -7,9 +7,9 @@ docs/beslislog.md): overstorten staan er als `Overstortput` met een
 `Overstortleiding` eraan. Losse `Overstortdrempel`-onderdelen met `Drempelniveau`
 en `Drempelbreedte` komen er niet in voor, terwijl het GWSW-voorbeeldbestand ze wel
 kent. Deze module leest daarom beide vormen, en meldt in de toelichting welke ze in
-deze dataset heeft aangetroffen. RVZ-002 en RVZ-003 melden dat per overstortput: een
-put zonder geregistreerd drempelniveau of zonder geregistreerde drempelbreedte, ook
-als het drempelonderdeel zelf ontbreekt.
+deze dataset heeft aangetroffen. RVZ-002 meldt dat per overstortput: een put zonder
+geregistreerd drempelniveau en/of zonder geregistreerde drempelbreedte, ook als het
+drempelonderdeel zelf ontbreekt, en zegt in één melding welke van de twee maten mist.
 
 Een *externe* overstort loost op oppervlaktewater en heeft een overstortleiding naar
 buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put.
@@ -17,10 +17,14 @@ buiten; een *interne* overstort verbindt twee compartimenten binnen dezelfde put
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar
+
+from gwsw_orox_helpers.dataset import Conduit, Node, part_holders_of
+from shapely.geometry import Point
+from shapely.geometry.base import BaseGeometry
+from shapely.strtree import STRtree
 
 from nlriochecker import taal
 from nlriochecker.checks.base import (
@@ -34,16 +38,34 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import (
     bergbezinkleidingen,
     bergbezinkvoorzieningen,
+    lozeleidingen,
+    lozingspunten,
+    mechanischeleidingen,
+    netwerkknopen,
     oppervlaktewaterobjecten,
     overstortleidingen,
     overstortputten,
+    vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import (
     aansluitingen,
     deelstelsel_ids,
     netwerkdelen,
+    putknopen,
+    strengen_per_knoop,
+    verbonden_knopen,
 )
-from nlriochecker.dataset import Node, part_holders_of
+
+# De vaste inleiding van de aanwijzingen in de RVZ-006-melding, en het scheidingsteken
+# ertussen. De GeoPackage leest ze uit de boodschap terug (`aanwijzingen_van`), want
+# `Finding.details` bereikt de meldingenstroom niet; de vorm staat daarom op één plek.
+AANWIJZINGEN_KOP = "Aanwijzingen: "
+AANWIJZING_SCHEIDING = "; "
+
+# Zoveel treffers van één soort noemt de melding bij naam; daarna volgt "… en N meer". Een
+# deelstelsel met veertig lozingsputten hoort leesbaar te blijven, en de volgorde is die
+# van de URI, zodat twee runs op dezelfde data dezelfde zin opleveren.
+MAX_AANWIJZINGEN_PER_SOORT = 3
 
 
 @dataclass(frozen=True)
@@ -161,26 +183,6 @@ def drempelnotitie(context: CheckContext) -> list[str]:
     return notities
 
 
-def _zwaartepunt(context: CheckContext, knopen: set[str]) -> tuple[float, float] | None:
-    """Het gemiddelde van de knooppunten van een deelstelsel.
-
-    Een melding over een deelstelsel hangt aan een enkele knoop, maar hoort op de
-    kaart midden in dat deel te staan; anders lijkt het gebrek bij die ene put te
-    zitten.
-    """
-    punten = [
-        node.point
-        for uri in knopen
-        if (node := context.dataset.nodes.get(uri)) is not None and node.point is not None
-    ]
-    if not punten:
-        return None
-    return (
-        sum(punt.x for punt in punten) / len(punten),
-        sum(punt.y for punt in punten) / len(punten),
-    )
-
-
 def _stelseldelen(context: CheckContext) -> list[set[str]]:
     """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen.
 
@@ -191,25 +193,56 @@ def _stelseldelen(context: CheckContext) -> list[set[str]]:
     return netwerkdelen(context)
 
 
-def _stelseltypen_van(context: CheckContext, knopen: set[str]) -> set[str]:
-    """De stelseltypen van de strengen binnen dit deel van het netwerk."""
-    index = aansluitingen(context, "vrijvervalleiding")
+def _strengen_van_deel(context: CheckContext, knopen: set[str]) -> list[Conduit]:
+    """De vrijvervalstrengen binnen dit deel van het netwerk, op URI gesorteerd.
+
+    De strengen komen uit `strengen_per_knoop` en niet uit `aansluitingen`: die laatste
+    indexeert op de herleide put, en een streng die met beide einden aan een telbaar
+    hulpstuk hangt staat er dus niet in terwijl zij wel als kant in dit deel ligt (BO-83).
+    Deze index leest dezelfde knoopafleiding als de graaf die het deel bepaalde.
+
+    De volgorde is die van de URI, zodat twee runs op dezelfde data dezelfde meldingen in
+    dezelfde volgorde opleveren.
+    """
+    index = strengen_per_knoop(context)
+    gevonden = {conduit.uri: conduit for knoop in knopen for conduit in index.get(knoop, [])}
+    return [gevonden[uri] for uri in sorted(gevonden)]
+
+
+def _gemengde_strengen_van(context: CheckContext, strengen: list[Conduit]) -> list[Conduit]:
+    """De gemengde strengen uit deze verzameling, in dezelfde volgorde.
+
+    "Gemengd" is geen eigen GWSW-object maar een eigenschap van de leiding
+    (`GemengdRiool` en haar subklassen, via `[klassen] stelseltypen`). Deze strengen
+    zijn dus de dragers van een gebrek aan het deelstelsel als geheel: RVZ-006 meldt
+    op elk van hen (issue #75).
+    """
     klassen = context.config.klassen
-    soorten: set[str] = set()
-    for knoop in knopen:
-        for conduit in index.strengen(knoop):
-            soort = klassen.stelseltype(conduit.types, context.dataset.closure)
-            if soort is not None:
-                soorten.add(soort)
-    return soorten
+    return [
+        conduit
+        for conduit in strengen
+        if klassen.stelseltype(conduit.types, context.dataset.closure) == "gemengd"
+    ]
+
+
+def _gemengde_strengen(context: CheckContext) -> list[Conduit]:
+    """Alle gemengde vrijvervalstrengen: de populatie waarover RVZ-006 oordeelt."""
+    klassen = context.config.klassen
+    return [
+        conduit
+        for conduit in vrijvervalrioolleidingen(context)
+        if klassen.stelseltype(conduit.types, context.dataset.closure) == "gemengd"
+    ]
 
 
 def _afvoereindpunten(context: CheckContext) -> set[str]:
-    """De knopen die als afvoereindpunt gelden: gemaal, pompunit of overnamepunt.
+    """De knopen die als afvoereindpunt gelden: gemaal of overnamepunt.
 
     Dezelfde klassen als NET-001 gebruikt (`klassen.afvoer_eindpunt`), zodat de twee
     checks over hetzelfde begrip oordelen. `of_class` sluit de subklassen in, dus
-    `Gemaal` dekt de 893 `Rioolgemaal` van De Wolden zonder ze los op te sommen.
+    `Gemaal` dekt de 893 `Rioolgemaal` van De Wolden zonder ze los op te sommen. Een
+    `Pompunit` telt sinds issue #73 niet mee: dat is een overdrachtspunt naar de
+    drukriolering, geen einde van de afvoer (BO-55).
     """
     dataset = context.dataset
     return {
@@ -220,12 +253,256 @@ def _afvoereindpunten(context: CheckContext) -> set[str]:
 def _rvz006_gebrek(heeft_overstort: bool, heeft_eindpunt: bool) -> str:
     """De deelreden voor RVZ-006: welke van de twee eisen het deelstelsel mist."""
     zonder_overstort = "zonder enige externe overstort of bergbezinkvoorziening"
-    zonder_eindpunt = "zonder afvoereindpunt (gemaal, pompunit of overnamepunt)"
+    zonder_eindpunt = "zonder afvoereindpunt (gemaal of overnamepunt)"
     if not heeft_overstort and not heeft_eindpunt:
         return f"{zonder_overstort} en {zonder_eindpunt}"
     if not heeft_overstort:
         return zonder_overstort
     return zonder_eindpunt
+
+
+def _rvz006_aanwijzingen(
+    context: CheckContext,
+    putten: set[str],
+    strengen: list[Conduit],
+    gemengd: list[Conduit],
+    heeft_eindpunt: bool,
+) -> list[str]:
+    """De feiten die verklaren waarom dit deelstelsel los ligt of onvolledig is (issue #106).
+
+    Korte feiten in vaste volgorde, geen oordeel: het aandeel gemengde strengen, de knopen
+    die met een ander deel samenvallen of op een streng ervan liggen, en -- alleen zonder
+    afvoereindpunt -- waar het water dan wél heen gaat. Ze veranderen de uitslag niet en
+    kennen geen eigen drempel; ze zeggen wat de check toch al kon zien, zodat de lezer het
+    gebrek begrijpt zonder elk vlak zelf na te lopen (BO-84).
+
+    De laatste twee blijven weg zodra er wél een afvoereindpunt is: dan mist het deel
+    alleen zijn overstort, en een persleiding of een lozingspunt verklaart dat niet.
+    """
+    aanwijzingen = [f"{len(gemengd)} van {len(strengen)} strengen gemengd"]
+    aanwijzingen += _beperkt(_samenvallende_knopen(context, putten))
+    aanwijzingen += _beperkt(_knopen_op_vreemde_streng(context, putten))
+    if not heeft_eindpunt:
+        aanwijzingen += _beperkt(_vertrekkende_persleidingen(context, putten))
+        aanwijzingen += _beperkt(_lozingspunten_in(context, putten))
+    return aanwijzingen
+
+
+def _beperkt(regels: list[str]) -> list[str]:
+    """De eerste drie regels van een soort, met een samenvatting als er meer zijn."""
+    if len(regels) <= MAX_AANWIJZINGEN_PER_SOORT:
+        return regels
+    rest = len(regels) - MAX_AANWIJZINGEN_PER_SOORT
+    return [*regels[:MAX_AANWIJZINGEN_PER_SOORT], f"… en {rest} meer"]
+
+
+def _aanduiding(object_: Node | Conduit) -> str:
+    """Het label van een object, of anders zijn URI: een aanwijzing moet aanwijsbaar zijn."""
+    return object_.label or object_.uri
+
+
+def _samenvallende_knopen(context: CheckContext, putten: set[str]) -> list[str]:
+    """De knopen van dit deel die op een knoop van een ander deel liggen.
+
+    Zo exporteert BrutIS een gecompartimenteerde put: elk compartiment wordt een eigen
+    put op dezelfde coordinaat, en dan lijkt het deelstelsel los te liggen terwijl het dat
+    in het veld niet is. De grens is `snapping_tolerantie_m`, dezelfde die de
+    topologiechecks hanteren; een eigen drempel zou een tweede grens voor hetzelfde
+    verschijnsel zijn.
+
+    Beide ruimtelijke toetsen kijken naar `putknopen` en zoeken in `netwerkknopen`: een
+    telbaar doorgeefhulpstuk dat met een ander deel samenvalt blijft dus onbenoemd. Dat is
+    dezelfde grens als BO-83 voor het tellen en benoemen van knopen trekt -- een hulpstuk
+    is geen beheerobject, en de rol `netwerkknopen` bevat het evenmin.
+    """
+    dataset = context.dataset
+    ids = deelstelsel_ids(context)
+    index = _knoopindex(context)
+    tolerantie = context.config.drempels.snapping_tolerantie_m
+    regels: list[str] = []
+    for uri in sorted(putten):
+        node = dataset.nodes.get(uri)
+        if node is None or node.point is None:
+            continue
+        for ander, afstand in index.nabij(node.point, tolerantie):
+            cluster = ids.get(ander)
+            if cluster is None or cluster == ids.get(uri):
+                continue
+            regels.append(
+                f"knoop {_aanduiding(node)} valt samen met {_aanduiding(dataset.nodes[ander])} "
+                f"van {cluster} ({afstand:.2f} m)"
+            )
+    return regels
+
+
+def _knopen_op_vreemde_streng(context: CheckContext, putten: set[str]) -> list[str]:
+    """De knopen van dit deel die op een vrijvervalstreng van een ander deel liggen.
+
+    Een put die op een leiding getekend is die daar niet gesplitst is: de twee delen raken
+    elkaar op de kaart, maar niet in de graaf. Dezelfde tolerantie als hierboven, en
+    dezelfde populatie: `putknopen`, dus zonder de doorgeefhulpstukken (BO-83).
+    """
+    dataset = context.dataset
+    ids = deelstelsel_ids(context)
+    per_streng = _cluster_per_streng(context)
+    index = _strengindex(context)
+    tolerantie = context.config.drempels.snapping_tolerantie_m
+    regels: list[str] = []
+    for uri in sorted(putten):
+        node = dataset.nodes.get(uri)
+        if node is None or node.point is None:
+            continue
+        for streng, afstand in index.nabij(node.point, tolerantie):
+            cluster = per_streng.get(streng)
+            if cluster is None or cluster == ids.get(uri):
+                continue
+            regels.append(
+                f"knoop {_aanduiding(node)} ligt op streng "
+                f"{_aanduiding(dataset.conduits[streng])} van {cluster} ({afstand:.2f} m)"
+            )
+    return regels
+
+
+def _vertrekkende_persleidingen(context: CheckContext, putten: set[str]) -> list[str]:
+    """De mechanische leidingen die uit een knoop van dit deel vertrekken.
+
+    Het gemaal ligt dan achter het persnet, en dat telt niet als afvoereindpunt: een
+    overstort zit niet ná een persleiding (BO-82). De aanwijzing zegt alleen waar het
+    water dan wél heen gaat, en herhaalt daarbij de regel, zodat de lezer de melding niet
+    voor een fout van de check houdt.
+    """
+    dataset = context.dataset
+    index = _persleidingen_per_knoop(context)
+    gevonden: dict[str, tuple[Conduit, str]] = {}
+    for uri in sorted(putten):
+        for conduit in index.get(uri, []):
+            gevonden.setdefault(conduit.uri, (conduit, uri))
+    return [
+        f"persleiding {_aanduiding(conduit)} vertrekt uit "
+        f"{_aanduiding(dataset.nodes[knoop])}; geen afvoereindpunt (BO-82)"
+        for conduit, knoop in (gevonden[uri] for uri in sorted(gevonden))
+    ]
+
+
+def _lozingspunten_in(context: CheckContext, putten: set[str]) -> list[str]:
+    """De lozingspunten in dit deel: `Lozingsput`, `Uitlaatconstructie` en de puntvormen.
+
+    Ook een lozingspunt is geen afvoereindpunt (BO-82); het water verlaat er wel het
+    stelsel, maar de overstort die het deelstelsel mist zit er niet achter.
+    """
+    dataset = context.dataset
+    return [
+        f"lozingspunt {_aanduiding(dataset.nodes[uri])} aanwezig; geen afvoereindpunt (BO-82)"
+        for uri in sorted(putten & _lozingspunt_uris(context))
+    ]
+
+
+@dataclass(frozen=True)
+class _Meetkundeindex:
+    """Geometrieen met hun sleutel in een STRtree; sleutel en vorm staan op dezelfde plaats."""
+
+    sleutels: tuple[str, ...]
+    vormen: tuple[BaseGeometry, ...]
+    boom: STRtree | None
+
+    def nabij(self, punt: Point, tolerantie: float) -> list[tuple[str, float]]:
+        """De sleutels binnen de tolerantie van dit punt, met hun afstand, op sleutel gesorteerd."""
+        if self.boom is None:
+            return []
+        return sorted(
+            (self.sleutels[i], afstand)
+            for i in self.boom.query(punt.buffer(tolerantie))
+            if (afstand := punt.distance(self.vormen[i])) <= tolerantie
+        )
+
+
+def _meetkundeindex(paren: list[tuple[str, BaseGeometry]]) -> _Meetkundeindex:
+    """Bouwt de ruimtelijke index; zonder geometrie is er geen boom om te doorzoeken."""
+    sleutels = tuple(sleutel for sleutel, _ in paren)
+    vormen = tuple(vorm for _, vorm in paren)
+    return _Meetkundeindex(sleutels, vormen, STRtree(vormen) if vormen else None)
+
+
+def _knoopindex(context: CheckContext) -> _Meetkundeindex:
+    """De netwerkknopen met een punt, ruimtelijk doorzoekbaar; een keer per context."""
+    return context.cached(
+        "rvz:knoopindex",
+        lambda: _meetkundeindex(
+            [(node.uri, node.point) for node in netwerkknopen(context) if node.point is not None]
+        ),
+    )
+
+
+def _strengindex(context: CheckContext) -> _Meetkundeindex:
+    """De vrijvervalstrengen met een bruikbare lijn, ruimtelijk doorzoekbaar."""
+    return context.cached(
+        "rvz:strengindex",
+        lambda: _meetkundeindex(
+            [
+                (conduit.uri, conduit.line)
+                for conduit in vrijvervalrioolleidingen(context)
+                if conduit.line is not None and not conduit.line.is_empty
+            ]
+        ),
+    )
+
+
+def _cluster_per_streng(context: CheckContext) -> dict[str, str]:
+    """Per vrijvervalstreng het deelstelsel waarin zij ligt; een keer per context."""
+    return context.cached("rvz:cluster_per_streng", lambda: _bouw_cluster_per_streng(context))
+
+
+def _bouw_cluster_per_streng(context: CheckContext) -> dict[str, str]:
+    """Keert `strengen_per_knoop` om naar het deelstelsel van elke streng.
+
+    Uit die index en niet uit `verbonden_knopen`: die laatste herleidt naar de put, en een
+    streng tussen twee telbare hulpstukken zou dan geen deelstelsel dragen terwijl zij er
+    wel in ligt (BO-83). Beide einden van een streng liggen in hetzelfde deel, dus de
+    toewijzing is eenduidig.
+    """
+    index = strengen_per_knoop(context)
+    return {
+        conduit.uri: cluster
+        for knoop, cluster in deelstelsel_ids(context).items()
+        for conduit in index.get(knoop, [])
+    }
+
+
+def _persleidingen_per_knoop(context: CheckContext) -> dict[str, list[Conduit]]:
+    """Per netwerkknoop de mechanische leidingen die erop uitkomen; een keer per context."""
+    return context.cached("rvz:persleidingen", lambda: _bouw_persleidingen_per_knoop(context))
+
+
+def _bouw_persleidingen_per_knoop(context: CheckContext) -> dict[str, list[Conduit]]:
+    """Indexeert het mechanische riool op de putten aan weerszijden."""
+    index: dict[str, list[Conduit]] = {}
+    for conduit in sorted(mechanischeleidingen(context), key=lambda leiding: leiding.uri):
+        for knoop in dict.fromkeys(uri for uri in verbonden_knopen(context, conduit) if uri):
+            index.setdefault(knoop, []).append(conduit)
+    return index
+
+
+def _lozingspunt_uris(context: CheckContext) -> frozenset[str]:
+    """De URI's van de lozingspunten; een keer per context."""
+    return context.cached(
+        "rvz:lozingspunt_uris", lambda: frozenset(node.uri for node in lozingspunten(context))
+    )
+
+
+def aanwijzingen_van(boodschap: str) -> tuple[str, str]:
+    """De aanwijzingen uit een RVZ-006-boodschap: het aandeel gemengd en de rest.
+
+    De GeoPackage zet het aandeel op de feitenregel met de gemelde strengen en de rest op
+    een eigen regel. Splitsen op de eerste puntkomma volstaat en is het enige wat werkt:
+    alleen het aandeel is een aanwijzing zonder puntkomma erin.
+
+    De aanwijzingen reizen door de boodschap en niet door `Finding.details`, want de
+    meldingenstroom laat details niet doorstromen -- alleen de gereserveerde sleutels
+    (`uitvoer/melding.py`). Vandaar dat de vorm hier staat, naast de code die haar schrijft.
+    """
+    staart = boodschap.partition(AANWIJZINGEN_KOP)[2].rstrip(".")
+    aandeel, _, rest = staart.partition(AANWIJZING_SCHEIDING)
+    return aandeel, rest
 
 
 @register
@@ -236,23 +513,32 @@ class RandvoorzieningNietAangesloten(Check):
     title = "Randvoorziening (BBB, overstortput) topologisch niet aangesloten op het netwerk"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("bergbezinkvoorzieningen", "lozeleidingen", "overstortputten")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Zoekt overstortputten en BBB's zonder enige aangesloten streng.
+        """Zoekt overstortputten en BBB's zonder enige actief aangesloten streng.
 
         Dit is de geometrisch-topologische variant: er wordt gekeken of er
         werkelijk een streng op uitkomt. De administratieve koppeling dekt de
         nulmeting al.
+
+        Een loze leiding telt niet mee (issue #84): `LozeLeiding` is in het GWSW een
+        leiding buiten gebruik, dus een randvoorziening die alleen daaraan hangt is
+        feitelijk niet aangesloten. Dezelfde grens als ADM-010 hanteert -- de rol
+        `lozeleidingen` -- zodat er niet twee begrippen van "loos" naast elkaar staan.
         """
         index = aansluitingen(context)
+        loos = {conduit.uri for conduit in lozeleidingen(context)}
         for node in (*overstortputten(context), *bergbezinkvoorzieningen(context)):
-            if index.strengen(node.uri):
+            if any(conduit.uri not in loos for conduit in index.strengen(node.uri)):
                 continue
             yield self.finding(
                 context,
                 node.uri,
                 node.label,
-                "Deze randvoorziening heeft geen enkele aangesloten streng.",
+                "Deze randvoorziening heeft geen actieve aangesloten streng (loze "
+                "leidingen niet meegerekend).",
                 soort=_soortnaam(context, node),
             )
 
@@ -261,48 +547,77 @@ class RandvoorzieningNietAangesloten(Check):
         return len(overstortputten(context)) + len(bergbezinkvoorzieningen(context))
 
 
-class _OverstortZonderDrempelkenmerk(Check):
-    """Basis voor RVZ-002 en RVZ-003: een overstortput waarvan geen enkele drempel
-    het gevraagde kenmerk draagt -- ook als er helemaal geen drempelonderdeel is.
+def _ontbrekende_maten(groep: list[Drempel]) -> list[tuple[str, str]]:
+    """De drempelmaten die op geen enkele drempel van de put geregistreerd staan.
+
+    Elke maat als (omschrijving, GWSW-kenmerk). De volgorde ligt vast -- eerst niveau,
+    dan breedte -- zodat twee runs op dezelfde data dezelfde melding opleveren.
+    """
+    ontbreekt: list[tuple[str, str]] = []
+    if not any(drempel.niveau is not None for drempel in groep):
+        ontbreekt.append(("drempelniveau", "Drempelniveau"))
+    if not any(drempel.breedte is not None for drempel in groep):
+        ontbreekt.append(("drempelbreedte", "Drempelbreedte"))
+    return ontbreekt
+
+
+@register
+class OverstortZonderDrempelmaat(Check):
+    """RVZ-002: overstortput zonder geregistreerd drempelniveau en/of drempelbreedte.
+
+    De aparte breedtecheck RVZ-003 is hierin opgegaan (#87, BO-78): op De Wolden meldden
+    de twee checks exact dezelfde 245 putten, want de export draagt geen enkel
+    drempelobject en dan ontbreken beide maten altijd samen. RVZ-002 zegt nu in één
+    melding per put welke van {`Drempelniveau`, `Drempelbreedte`} ontbreekt -- ook als er
+    helemaal geen drempelonderdeel aan de put hangt.
 
     De nulmetingvorm `Overstortput_Overstortdrempel_card` meldt het ontbreken van het
     onderdeel zelf al; die overlap is bewust (BO-26): het register vraagt naar de
-    geregistreerde waarde, en `toets` moet ook zonder `--shacl` iets zien.
+    geregistreerde waarde, en `toets` moet ook zonder `--shacl` iets zien. De SHACL-vorm
+    dekt bovendien alleen de `Overstortput`, niet de `Stuwput`.
     """
 
-    kenmerk: ClassVar[str] = ""
-    omschrijving: ClassVar[str] = ""
-
-    @abstractmethod
-    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
-        """De waarde van het gevraagde kenmerk op deze drempel."""
+    id = "RVZ-002"
+    title = "Overstort zonder geregistreerde drempelhoogte of -breedte"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    rollen = ("overstortputten",)
+    kenmerken = ("Drempelbreedte", "Drempelniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke overstortput zonder geregistreerd kenmerk op een van haar drempels."""
+        """Meldt elke overstortput die een drempelniveau en/of -breedte mist."""
         per_put = drempels_per_put(context)
         for node in overstortputten(context):
             groep = per_put.get(node.uri, [])
-            if any(self._kenmerkwaarde(drempel) is not None for drempel in groep):
+            ontbrekend = _ontbrekende_maten(groep)
+            if not ontbrekend:
                 continue
-            # Het voltooid deelwoord achteraan: `drempelniveau` is onzijdig en
-            # `drempelbreedte` niet, dus "een geregistreerd {omschrijving}" klopt maar
-            # voor een van de twee checks.
-            if len(groep) == 1:
-                tekst = (
-                    "De enige overstortdrempel van deze put heeft geen "
-                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
-                )
-            elif groep:
-                tekst = (
-                    f"Geen van de {len(groep)} overstortdrempels van deze put heeft een "
-                    f"{self.omschrijving} (`{self.kenmerk}`) geregistreerd."
-                )
-            else:
-                tekst = (
+            yield self.finding(
+                context,
+                node.uri,
+                node.label,
+                self._melding(groep, ontbrekend),
+                drempels=len(groep),
+                ontbrekende_maten=[kenmerk for _, kenmerk in ontbrekend],
+            )
+
+    def _melding(self, groep: list[Drempel], ontbrekend: list[tuple[str, str]]) -> str:
+        """De meldingstekst; de opsomming noemt elke ontbrekende maat één keer.
+
+        Bij één of geen drempel leest de zin met "geen X (en geen Y)"; bij meerdere
+        drempels met "een X (of een Y)", zodat "Geen van de N ... heeft een X" geen
+        dubbele ontkenning wordt.
+        """
+        if len(groep) <= 1:
+            geen = " en ".join(f"geen {oms} (`{kenmerk}`)" for oms, kenmerk in ontbrekend)
+            if not groep:
+                return (
                     "Deze overstortput heeft geen enkel `Overstortdrempel`-onderdeel, en dus "
-                    f"ook geen {self.omschrijving}."
+                    f"{geen}."
                 )
-            yield self.finding(context, node.uri, node.label, tekst, drempels=len(groep))
+            return f"De enige overstortdrempel van deze put heeft {geen} geregistreerd."
+        een = " of ".join(f"een {oms} (`{kenmerk}`)" for oms, kenmerk in ontbrekend)
+        return f"Geen van de {len(groep)} overstortdrempels van deze put heeft {een} geregistreerd."
 
     def notes(self, context: CheckContext) -> list[str]:
         """Zegt hoeveel putten geen drempel hebben en dat de nulmeting dat ook meldt."""
@@ -330,38 +645,6 @@ class _OverstortZonderDrempelkenmerk(Check):
 
 
 @register
-class OverstortZonderDrempelniveau(_OverstortZonderDrempelkenmerk):
-    """RVZ-002: overstortput zonder geregistreerd drempelniveau."""
-
-    id = "RVZ-002"
-    title = "Overstort zonder geregistreerde drempelhoogte"
-    severity = Severity.WARNING
-    dimension = Dimension.COMPLETENESS
-    kenmerk = "Drempelniveau"
-    omschrijving = "drempelniveau"
-
-    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
-        """Het geregistreerde drempelniveau."""
-        return drempel.niveau
-
-
-@register
-class OverstortZonderDrempelbreedte(_OverstortZonderDrempelkenmerk):
-    """RVZ-003: overstortput zonder geregistreerde drempelbreedte."""
-
-    id = "RVZ-003"
-    title = "Overstort zonder geregistreerde drempelbreedte"
-    severity = Severity.WARNING
-    dimension = Dimension.COMPLETENESS
-    kenmerk = "Drempelbreedte"
-    omschrijving = "drempelbreedte"
-
-    def _kenmerkwaarde(self, drempel: Drempel) -> float | None:
-        """De geregistreerde drempelbreedte."""
-        return drempel.breedte
-
-
-@register
 class ExterneOverstortZonderWater(Check):
     """RVZ-004: een externe overstort zonder ontvangend oppervlaktewater in de buurt."""
 
@@ -369,6 +652,8 @@ class ExterneOverstortZonderWater(Check):
     title = "Externe overstort zonder ontvangend oppervlaktewater binnen X m"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("oppervlaktewaterobjecten", "overstortputten")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt overstortputten zonder GWSW-oppervlaktewater binnen de afstand.
@@ -423,6 +708,8 @@ class OverstortOpVerkeerdStelsel(Check):
     title = "Overstort aangesloten op een hemelwater- of IT-stelsel"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("overstortputten", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt overstorten waarvan de aanvoer hemelwater of infiltratie is.
@@ -468,6 +755,18 @@ class GemengdDeelstelselZonderOverstort(Check):
     title = "Gemengd deelstelsel zonder externe overstort/BBB of zonder afvoereindpunt"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = (
+        "bergbezinkvoorzieningen",
+        "hulpstukken",
+        "lozingspunten",
+        "mechanischeleidingen",
+        "netwerkknopen",
+        "overstortputten",
+        "vrijvervalrioolleidingen",
+    )
+    # De snapping-tolerantie is geen GWSW-kenmerk maar de enige grens die de aanwijzingen
+    # gebruiken (issue #106); zij staat hier zodat de dekkingsmatrix haar noemt.
+    kenmerken = ("config:drempels.snapping_tolerantie_m",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt gemengde deelstelsels zonder overstort of zonder afvoereindpunt.
@@ -476,6 +775,17 @@ class GemengdDeelstelselZonderOverstort(Check):
         externe overstort/BBB bij hoogwater, en via een afvoereindpunt (gemaal of
         overnamepunt) in de gewone toestand. Ontbreekt een van beide, dan is het
         stelsel onvolledig geregistreerd; de melding noemt welke eis faalt.
+
+        De bevinding hangt per gemengde streng van het falende deel (issue #75) en
+        niet meer op de lexicografisch eerste knoop ervan. Er is geen GWSW-object
+        "gemengd stelsel" om het gebrek aan te hangen -- gemengd volgt uit het
+        leidingtype -- dus de gemengde strengen zijn de dragers, net zoals NET-001
+        een subsysteem dat iets mist per streng meldt. De gedeelde `cluster_id`
+        houdt zichtbaar dat het om één deelstelsel gaat en niet om losse gebreken.
+
+        De aanwijzingen achter de melding (issue #106) gelden voor het deelstelsel en
+        worden dus een keer per deel gerekend, niet per streng: elke streng van hetzelfde
+        deel draagt dezelfde zin.
         """
         randvoorzieningen = {node.uri for node in overstortputten(context)}
         randvoorzieningen |= {node.uri for node in bergbezinkvoorzieningen(context)}
@@ -483,42 +793,62 @@ class GemengdDeelstelselZonderOverstort(Check):
         clusters = deelstelsel_ids(context)
 
         for deel in _stelseldelen(context):
-            if "gemengd" not in _stelseltypen_van(context, deel):
+            alle_strengen = _strengen_van_deel(context, deel)
+            strengen = _gemengde_strengen_van(context, alle_strengen)
+            if not strengen:
                 continue
             heeft_overstort = bool(deel & randvoorzieningen)
             heeft_eindpunt = bool(deel & afvoereindpunten)
             if heeft_overstort and heeft_eindpunt:
                 continue
-            knopen = sorted(deel)
-            uri = knopen[0]
-            node = context.dataset.nodes.get(uri)
-            yield self.finding(
-                context,
-                uri,
-                node.label if node is not None else uri,
-                f"Ligt in een gemengd deelstelsel van {len(deel)} knopen "
-                f"{_rvz006_gebrek(heeft_overstort, heeft_eindpunt)}.",
-                knopen_in_deelstelsel=len(deel),
-                cluster_id=clusters.get(uri, ""),
-                foutlocatie=_zwaartepunt(context, deel),
+            cluster = clusters.get(min(deel), "")
+            # De melding telt de beoordeelde knopen: een telbaar hulpstuk is een
+            # doorgeefknoop en geen put, dus het hoort niet in "van N knopen" (BO-83).
+            putten = putknopen(context, deel)
+            aanwijzingen = _rvz006_aanwijzingen(
+                context, putten, alle_strengen, strengen, heeft_eindpunt
             )
+            boodschap = (
+                f"Ligt in een gemengd deelstelsel van {len(putten)} knopen "
+                f"{_rvz006_gebrek(heeft_overstort, heeft_eindpunt)}. "
+                f"{AANWIJZINGEN_KOP}{AANWIJZING_SCHEIDING.join(aanwijzingen)}."
+            )
+            for conduit in strengen:
+                yield self.finding(
+                    context,
+                    conduit.uri,
+                    conduit.label,
+                    boodschap,
+                    knopen_in_deelstelsel=len(putten),
+                    gemengde_strengen=len(strengen),
+                    cluster_id=cluster,
+                )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Legt uit dat de melding op een representatieve knoop hangt."""
+        """Legt uit waaraan de melding hangt en waar het gebrek werkelijk zit."""
         return [
-            "De bevinding hangt per deelstelsel aan een enkele knoop; het gebrek zit in het "
-            "deelstelsel als geheel, niet in die knoop."
+            "Het gebrek zit in het deelstelsel als geheel; de bevinding hangt aan elke "
+            "gemengde streng ervan, want een gemengd stelsel is geen GWSW-object. De "
+            "bevindingen van hetzelfde deelstelsel dragen dezelfde `cluster_id`.",
+            "Achter de melding staan de aanwijzingen bij het gebrek: het aandeel gemengde "
+            "strengen, knopen die binnen "
+            f"{context.config.drempels.snapping_tolerantie_m:g} m samenvallen met een knoop "
+            "of een streng van een ander deelstelsel, en -- alleen zonder afvoereindpunt -- "
+            "de persleidingen en lozingspunten waarlangs het water het deel verlaat. Het "
+            "zijn feiten bij het gebrek en geen extra eis: zij veranderen de uitslag niet, "
+            "en een persleiding of lozingspunt blijft geen afvoereindpunt (BO-82). Per "
+            f"soort noemt de melding er hooguit {MAX_AANWIJZINGEN_PER_SOORT}.",
         ]
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal samenhangende delen van het vrijvervalnetwerk."""
-        return len(_stelseldelen(context))
+        """Het aantal gemengde vrijvervalstrengen."""
+        return len(_gemengde_strengen(context))
 
 
 class _BbbKenmerk(Check):
     """Basis voor de checks op ontbrekende BBB-kenmerken."""
 
-    kenmerken: tuple[str, ...] = ()
+    kenmerken: ClassVar[tuple[str, ...]] = ()
     ontbreekt: str = ""
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -555,6 +885,7 @@ class BbbZonderBerging(_BbbKenmerk):
     title = "BBB zonder geregistreerde bergingsinhoud of afmetingen"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen")
     kenmerken = (
         "Inhoud",
         "NettoBerging",
@@ -574,6 +905,8 @@ class BbbZonderLediging(Check):
     title = "BBB zonder ledigingsvoorziening of ledigingsroute terug naar het stelsel"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BBB's zonder geregistreerde lediging.
@@ -634,6 +967,8 @@ class BbbZonderNooduitlaat(Check):
     title = "BBB zonder nooduitlaat of externe overstortdrempel"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen", "overstortleidingen")
+    kenmerken = ("Drempelbreedte", "Drempelniveau")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BBB's zonder overstortdrempel en zonder overstortleiding."""
@@ -672,6 +1007,8 @@ class InterneOverstortZelfdeStelseltype(Check):
     title = "Interne overstort waarbij beide zijden hetzelfde stelseltype hebben"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("overstortleidingen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het stelseltype aan weerszijden van een overstortleiding.
@@ -742,6 +1079,12 @@ class OnvoldoendeWaking(Check):
     title = "Waking overstortdrempel kleiner dan 0,40 m (dekselniveau minus drempelniveau)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ()
+    kenmerken = ("Drempelbreedte", "Drempelniveau", "Maaiveldhoogte", "Putdekselniveau")
+    # De populatie komt uit `drempels_per_put()` en niet uit een rol; zonder deze zin
+    # zei het rapport "Toetst de hele export" over een check die alleen de drempels aan
+    # een put bekijkt -- op De Wolden en Hoogeveen nul stuks (issue #96).
+    populatie_omschrijving = "de overstortdrempels die aan een put hangen"
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Berekent de waking per drempel en toetst die op het minimum."""

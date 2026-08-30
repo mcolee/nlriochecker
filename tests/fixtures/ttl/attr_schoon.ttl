@@ -31,7 +31,11 @@ gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
 gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
-gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+# Drain en Aansluitleiding hangen in de GWSW-ontologie rechtstreeks onder Leiding en
+# niet onder VrijvervalRioolleiding (geverifieerd in de gebundelde ontologie); de
+# prelude zei dat van Drain tot issue #82 verkeerd.
+gwsw:Drain rdfs:subClassOf gwsw:Leiding .
+gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 # DEFECT: geen; alle attributen zijn aannemelijk en onderling consistent
@@ -41,7 +45,8 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :PutA gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
     [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
     [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
-    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] ,
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date ] .
 :PutA_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
@@ -54,7 +59,8 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 :PutB gwsw:hasAspect [ rdf:type gwsw:BreedtePut ; gwsw:hasValue 1000 ] ,
     [ rdf:type gwsw:LengtePut ; gwsw:hasValue 1000 ] ,
     [ rdf:type gwsw:MateriaalPut ; gwsw:hasReference gwsw:Beton ] ,
-    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] .
+    [ rdf:type gwsw:HoogtePut ; gwsw:hasValue 1500 ] ,
+    [ rdf:type gwsw:Begindatum ; gwsw:hasValue "1980-01-01"^^xsd:date ] .
 :PutB_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1050.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .

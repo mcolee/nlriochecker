@@ -4,17 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
+
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext
 from nlriochecker.checks.verbanden import afvoerpad_van_streng, afvoerpaden
-from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
 
 def _context(bestand: str) -> CheckContext:
     """Bouwt een context op een netwerkfixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     return CheckContext(dataset=dataset, config=load_check_config())
 
 
@@ -129,6 +130,25 @@ def test_mechanische_streng_krijgt_geen_afvoerpad() -> None:
     assert vrijverval.eindpunt == _uri(dataset, "G")
 
     assert afvoerpad_van_streng(context, _streng(dataset, "p")) is None
+
+
+def test_afvoerpad_loopt_door_een_telbaar_hulpstuk() -> None:
+    """Een streng die op een T-stuk eindigt houdt haar afvoerpad (issue #105, BO-83).
+
+    Sinds het telbare hulpstuk een doorgeefknoop is, zit streng '1' in de graaf en noemt
+    NET-001 haar bereikbaar. Zou het afvoerpad haar eindknoop nog met de putherleiding
+    zoeken, dan bleef het pad leeg: de GeoPackage toonde dan geen uitstroompunt en geen
+    padlengte op een streng die er wel een heeft, en de notitie die dat gat uitlegde staat
+    inmiddels op nul.
+    """
+    context = _context("net_hulpstuk_doorgeefknoop.ttl")
+    dataset = context.dataset
+
+    pad = afvoerpad_van_streng(context, _streng(dataset, "1"))
+
+    assert pad is not None
+    # A -> T1 -> O -> gemaal: drie stappen van 50 m, met het T-stuk als doorgeefknoop.
+    assert (pad.eindpunt, pad.stappen, pad.meters) == (_uri(dataset, "G"), 3, 150.0)
 
 
 def test_knoop_zonder_afvoerpad_staat_niet_in_de_uitkomst() -> None:

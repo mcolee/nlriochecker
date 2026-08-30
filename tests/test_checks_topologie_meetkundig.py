@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import Point
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, Finding, run_checks
-from nlriochecker.dataset import load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -27,7 +27,6 @@ MEETKUNDIGE_IDS = [
     "TOP-017",
     "TOP-018",
     "TOP-019",
-    "TOP-020",
     "TOP-021",
 ]
 
@@ -47,7 +46,7 @@ def fixtureconfig() -> CheckConfig:
 
 def bevindingen(pad: Path, check_id: str, config: CheckConfig | None = None) -> list[Finding]:
     """Draait een enkele check op een fixture."""
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=config or fixtureconfig())
     return run_checks(context, [check_id]).outcomes[0].findings
 
@@ -73,7 +72,7 @@ def labels(gevonden: list[Finding]) -> list[str]:
         ("top017_zelfkruisend.ttl", "TOP-017", ["1"]),
         ("top018_spike.ttl", "TOP-018", ["1"]),
         ("top019_pseudoknoop.ttl", "TOP-019", ["B"]),
-        ("top020_omgekeerd_getekend.ttl", "TOP-020", ["1"]),
+        ("top019_pseudoknoop_hulpstuk.ttl", "TOP-019", ["T1"]),
         ("top021_put_op_streng.ttl", "TOP-021", ["C"]),
     ],
 )
@@ -94,6 +93,21 @@ def test_top006_meldt_de_overlaplengte() -> None:
 
     assert bevinding.details["overlaplengte_m"] == pytest.approx(50.0, abs=0.2)
     assert bevinding.details["object2_label"] == "2"
+
+
+def test_top006_meldt_alleen_binnen_de_twee_drempels() -> None:
+    """Issue #100: samenvallen binnen 2 cm over minstens 2 m.
+
+    De fixture legt drie paren naast elkaar die alleen in afstand en samenvallengte
+    verschillen. Paar 2 toetst de minimumlengte (1,5 m op 1 cm), paar 3 de tolerantie
+    (10 m op 4 cm); allebei meldden ze onder de oude 0,05 m / 1,0 m nog wel.
+    """
+    gevonden = bevindingen(TTL_DIR / "top006_drempels.ttl", "TOP-006")
+
+    assert labels(gevonden) == ["D1a"], [
+        (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
+    ]
+    assert gevonden[0].details["object2_label"] == "D1b"
 
 
 def test_top007_noemt_de_nul_lengte() -> None:
@@ -119,7 +133,7 @@ def test_top009_buiten_het_standaard_rd_bereik() -> None:
 
 
 def test_top009_meldt_ook_wat_er_niet_getoetst_is() -> None:
-    dataset = load_dataset(TTL_DIR / "top009_buiten_rd.ttl")
+    dataset = load_dataset(TTL_DIR / "top009_buiten_rd.ttl", [])
     context = CheckContext(dataset=dataset, config=fixtureconfig())
     outcome = run_checks(context, ["TOP-009"]).outcomes[0]
 
@@ -153,23 +167,42 @@ def test_top018_meldt_de_scherpste_hoek() -> None:
     assert "graden" in bevinding.message
 
 
+def test_top019_herleidt_ook_via_een_hulpstuk() -> None:
+    """Issue #88: een T-stuk is geen netwerkknoop, maar wel een functieloze knoop.
+
+    `verbonden_knopen()` herleidt elk strengeinde naar de rol `netwerkknopen`, en een
+    hulpstuk zit daar niet in; zonder terugval op de rauwe koppeling bleef de index per
+    constructie leeg en meldde de check nul. T2 staat ernaast om te tonen dat de
+    kenmerkvergelijking onverkort geldt: ongelijke diameter is geen pseudo-knoop.
+    """
+    gevonden = bevindingen(TTL_DIR / "top019_pseudoknoop_hulpstuk.ttl", "TOP-019")
+
+    assert labels(gevonden) == ["T1"]
+    assert gevonden[0].details["strengen"] == ["1", "2"]
+
+
+def test_top019_telt_een_streng_op_zichzelf_niet_als_twee() -> None:
+    """Een streng met beide einden op dezelfde knoop is een streng, geen pseudo-knoop.
+
+    Dezelfde grens als in `_bouw_hulpstuktelling` en `_bouw_aansluitingen`: zonder
+    ontdubbeling staat streng 5 twee keer in de lijst van T3 en zou de check hem met
+    zichzelf vergelijken -- altijd gelijk, dus altijd een melding.
+    """
+    gevonden = bevindingen(TTL_DIR / "top019_pseudoknoop_hulpstuk.ttl", "TOP-019")
+
+    assert "T3" not in labels(gevonden)
+
+
 def test_top019_draait_niet_zonder_functieloze_klassen() -> None:
     config = fixtureconfig()
     config.klassen.functieloze_knoop = []
 
-    dataset = load_dataset(TTL_DIR / "top019_pseudoknoop.ttl")
+    dataset = load_dataset(TTL_DIR / "top019_pseudoknoop.ttl", [])
     context = CheckContext(dataset=dataset, config=config)
     outcome = run_checks(context, ["TOP-019"]).outcomes[0]
 
     assert outcome.findings == []
     assert any("niet gedraaid" in note for note in outcome.notes)
-
-
-def test_top020_noemt_beide_putten() -> None:
-    bevinding = bevindingen(TTL_DIR / "top020_omgekeerd_getekend.ttl", "TOP-020")[0]
-
-    assert bevinding.details["administratief_begin"] == "A"
-    assert bevinding.details["administratief_eind"] == "B"
 
 
 def test_top021_meldt_de_streng_waarlangs_de_put_ligt() -> None:
@@ -199,7 +232,7 @@ def test_paarmeldingen_dragen_het_tweede_object() -> None:
 
 def _dataset_en_bevindingen(bestand: str, check_id: str):
     """De dataset plus de bevindingen van een check erop."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=fixtureconfig())
     return dataset, run_checks(context, [check_id]).outcomes[0].findings
 
@@ -233,6 +266,75 @@ def test_top010_zet_de_foutlocatie_tussen_de_twee_strengen() -> None:
 
     assert eigen.distance(punt) <= bevinding.details["afstand_m"] + 1e-6
     assert ander.distance(punt) <= bevinding.details["afstand_m"] + 1e-6
+
+
+# Issue #82: TOP-006, TOP-010 en TOP-011 toetsen alleen paren waarvan beide leidingen een
+# vrijvervalrioolleiding of een duiker zijn. De fixture legt per check drie gelijkvormige
+# paren naast elkaar -- met een drain, een aansluitleiding en een duiker -- zodat de
+# populatiegrens het enige verschil is.
+@pytest.mark.parametrize(
+    ("check_id", "paar"),
+    [
+        ("TOP-006", {"W3", "OverDuiker"}),
+        ("TOP-010", {"V3", "KruisDuiker"}),
+        ("TOP-011", {"V3", "KruisDuiker"}),
+    ],
+)
+def test_alleen_het_duikerpaar_valt_binnen_de_scope(check_id: str, paar: set[str]) -> None:
+    gevonden = bevindingen(TTL_DIR / "top_nabijheid_scope.ttl", check_id)
+
+    assert len(gevonden) == 1, [
+        (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
+    ]
+    bevinding = gevonden[0]
+    assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
+
+
+@pytest.mark.parametrize(
+    ("check_id", "paar"),
+    [
+        ("TOP-006", {"W3", "OverDuiker"}),
+        ("TOP-010", {"V3", "KruisDuiker"}),
+        ("TOP-011", {"V3", "KruisDuiker"}),
+    ],
+)
+def test_de_populatie_is_de_eigen_rol_en_niet_haar_doorsnede_met_de_leidingen(
+    check_id: str, paar: set[str]
+) -> None:
+    """`[klassen] streng` en `[klassen] nabijheidsleiding` zijn los configureerbaar.
+
+    Versmalt een project `streng` tot de vrijvervalleiding, dan valt de duiker uit de
+    leidingenrol -- maar niet uit `nabijheidsleiding`. De populatie van TOP-006,
+    TOP-010 en TOP-011 is die rol zelf, dus het duikerpaar hoort te blijven melden, en
+    de verantwoordingsregel hoort over diezelfde populatie te tellen: totaal min buiten
+    is de populatie, hier de zes vrijvervalleidingen plus de twee duikers.
+    """
+    config = fixtureconfig()
+    config.klassen.streng = ["VrijvervalRioolleiding"]
+
+    dataset = load_dataset(TTL_DIR / "top_nabijheid_scope.ttl", [])
+    context = CheckContext(dataset=dataset, config=config)
+    outcome = run_checks(context, [check_id]).outcomes[0]
+    gevonden = outcome.findings
+
+    assert len(gevonden) == 1, [
+        (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
+    ]
+    bevinding = gevonden[0]
+    assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
+    assert any("0 van de 8 leidingen" in note for note in outcome.notes), outcome.notes
+
+
+@pytest.mark.parametrize("check_id", ["TOP-006", "TOP-010", "TOP-011"])
+def test_de_toelichting_telt_de_leidingen_buiten_de_scope(check_id: str) -> None:
+    """Stilte leest als "alles gecontroleerd"; de versmalling hoort in het rapport."""
+    dataset = load_dataset(TTL_DIR / "top_nabijheid_scope.ttl", [])
+    context = CheckContext(dataset=dataset, config=fixtureconfig())
+    outcome = run_checks(context, [check_id]).outcomes[0]
+
+    # Vier van de twaalf leidingen zijn een drain of een aansluitleiding.
+    assert any("4 van de 12 leidingen" in note for note in outcome.notes), outcome.notes
+    assert any("VrijvervalRioolleiding, Duiker" in note for note in outcome.notes), outcome.notes
 
 
 def test_top006_zet_de_foutlocatie_op_het_overlappende_deel() -> None:

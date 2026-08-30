@@ -13,8 +13,9 @@ gwsw:Rioolleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Uitlaatconstructie rdfs:subClassOf gwsw:Bouwwerk .
 
 # GEEN DEFECT in de data: streng '1' loopt van een inspectieput naar een
-# uitlaatconstructie. Voor NET-001 (afvoer naar gemaal of overnamepunt) is die
-# uitlaat terecht een doodlopende eindknoop.
+# uitlaatconstructie. Die uitlaat is sinds issue #72 een geldig eindpunt voor NET-001
+# (gemaal, overnamepunt OF lozingspunt, BO-53), dus streng '1' voert af en er blijft
+# geen doodlopende eindknoop over.
 #
 # Waar het hier om gaat is de NAAM in de eindknoop-verdeling. Een bouwwerk draagt
 # zijn topologische rol op een Bouwwerkorientatie, en dat aspecttype hoort niet de

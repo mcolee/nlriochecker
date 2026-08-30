@@ -13,39 +13,50 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from nlriochecker.checkconfig import load_check_config
-from nlriochecker.checks import CheckContext, CheckRun
-from nlriochecker.dataset import load_dataset
+from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.uitvoer.bevindingen import _omvang_section, meldingen_json
-from nlriochecker.uitvoer.melding import BRON_DATASET, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    BRON_DATASET,
+    CHECK_HULPSTUKKOPPELING,
+    bouw_meldingen,
+)
 from nlriochecker.uitvoer.omvang import (
+    _rollen,
     eindpunttelling,
     klassen_op_nul,
     klassentelling,
 )
 
-# De veertien klassen uit de zes rollen die checks.toml als afhankelijkheid noemt.
-ALLE_KLASSEN = {
-    "Overnamepunt",
-    "Gemaal",
-    "Pompunit",
-    "Lozingspunt",
-    "UitlaatPunt",
-    "Lozingsput",
-    "Uitlaatconstructie",
-    "Bergbezinkbassin",
-    "Bergingsbassin",
-    "Bezinkbassin",
-    "Overstortdrempel",
-    "Infiltratieriool",
-    "MechanischeRioolleiding",
-    "MechanischeTransportleiding",
-}
+TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
+
+# Elke klasse waar een gedeclareerde of speciale rol op leunt, uit dezelfde bron als
+# de code (issue #71). De nul-bewaking loopt sinds #71 over álle gedeclareerde rollen,
+# niet meer over een handlijst van zes; de fixture moet daarom voor elke rolklasse een
+# instantie kunnen bevatten, zodat "alle klassen aanwezig" ook echt nul signalen geeft.
+ALLE_KLASSEN = {klasse for rol in _rollen(load_check_config()) for klasse in rol.klassen}
 
 # Klassen die het GWSW op de orientatie van een knoop legt (subklassen van Aansluitpunt).
-_ORIENTATIE_KLASSEN = {"Overnamepunt", "Lozingspunt", "UitlaatPunt"}
+_ORIENTATIE_KLASSEN = {
+    "Overnamepunt",
+    "Lozingspunt",
+    "LozingspuntOppervlaktewater",
+    "UitlaatPunt",
+}
 # Klassen die als streng in de graaf staan.
-_CONDUIT_KLASSEN = {"Infiltratieriool", "MechanischeRioolleiding", "MechanischeTransportleiding"}
+_CONDUIT_KLASSEN = {
+    "Leiding",
+    "VrijvervalRioolleiding",
+    "Infiltratieriool",
+    "Overstortleiding",
+    "Bergbezinkleiding",
+    "Bergingsleiding",
+    "Vuilwaterriool",
+    "GemengdRiool",
+    "LozeLeiding",
+}
 # Onderdelen zonder eigen geometrie, alleen via subjects_of_class te vinden.
 _ONDERDEEL_KLASSEN = {"Overstortdrempel"}
 
@@ -55,6 +66,7 @@ gwsw:Bouwwerkorientatie rdfs:subClassOf gwsw:Knooppunt .
 gwsw:Aansluitpunt rdfs:subClassOf gwsw:Knooppunt .
 gwsw:Overnamepunt rdfs:subClassOf gwsw:Aansluitpunt .
 gwsw:Lozingspunt rdfs:subClassOf gwsw:Aansluitpunt .
+gwsw:LozingspuntOppervlaktewater rdfs:subClassOf gwsw:Lozingspunt .
 gwsw:UitlaatPunt rdfs:subClassOf gwsw:Aansluitpunt .
 gwsw:Leidingorientatie rdfs:subClassOf gwsw:Verbinding .
 """
@@ -93,7 +105,7 @@ def _run(tmp_path: Path, weglaten: set[str]) -> CheckRun:
     """Een run over een fixture met alle klassen behalve de weggelaten."""
     pad = tmp_path / "klassen.ttl"
     pad.write_text(_maak_ttl(ALLE_KLASSEN - weglaten), encoding="utf-8")
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     config = load_check_config()
     return CheckRun(
         dataset=dataset,
@@ -115,14 +127,67 @@ class TestKlassenOpNul:
     def test_een_ongebruikte_alternatieve_schrijfwijze_geeft_geen_signaal(
         self, tmp_path: Path
     ) -> None:
-        # lozingseindpunt heeft vier klassen; ontbreekt er een terwijl de rol als
+        # lozingspunten heeft vier klassen; ontbreekt er een terwijl de rol als
         # geheel gevuld is, dan is dat geen gebrek maar een andere schrijfwijze.
         assert klassen_op_nul(_run(tmp_path, {"Lozingspunt"})) == []
 
     def test_een_hele_lege_rol_geeft_een_signaal_op_rolniveau(self, tmp_path: Path) -> None:
-        leeg = {"Lozingspunt", "UitlaatPunt", "Lozingsput", "Uitlaatconstructie"}
+        # `LozingspuntOppervlaktewater` hoort erbij: hij is een subklasse van
+        # `Lozingspunt` en houdt de rol dus in zijn eentje gevuld. Beide lozingsrollen
+        # vallen zo tegelijk leeg -- de smalle van EXT-007 (BO-67) is een deelverzameling.
+        leeg = {
+            "Lozingspunt",
+            "LozingspuntOppervlaktewater",
+            "UitlaatPunt",
+            "Lozingsput",
+            "Uitlaatconstructie",
+        }
         op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, leeg))}
-        assert op_nul == {"lozingseindpunt"}
+        assert op_nul == {"lozingspunten", "waterlozingspunten"}
+
+    def test_een_lege_gedeclareerde_rol_geeft_een_signaal(self, tmp_path: Path) -> None:
+        # Sinds #71 bewaakt de nul-signalering elke gedeclareerde rol, niet alleen de
+        # zes uit de oude handlijst: ontbreekt `Put`, dan staat de rol `putten` op nul.
+        op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, {"Put"}))}
+        assert "putten" in op_nul
+
+    def test_de_boodschap_noemt_de_checks_die_op_de_rol_leunen(self, tmp_path: Path) -> None:
+        # Het gat uit #22, nu generiek: de melding noemt welke checks op de lege rol
+        # leunen. `putten` wordt onder meer door ATTR-006 gedeclareerd.
+        signaal = next(s for s in klassen_op_nul(_run(tmp_path, {"Put"})) if s.label == "putten")
+        assert "ATTR-006" in signaal.boodschap
+
+    def test_de_afvoereindpuntmelding_noemt_de_check(self, tmp_path: Path) -> None:
+        signaal = next(s for s in klassen_op_nul(_run(tmp_path, {"Gemaal"})) if s.label == "Gemaal")
+        assert "NET-001" in signaal.boodschap
+
+    def test_een_lege_indicatorrol_geeft_geen_signaal(self, tmp_path: Path) -> None:
+        """`pompunits` is voor EXT-009 een uitzonderingsindicator, geen toetspopulatie.
+
+        Nul pompunits -- een gemeente zonder drukriolering -- betekent niet dat EXT-009
+        niets te beoordelen heeft, maar dat zijn drukriolering-uitzondering nooit afgaat.
+        De standaardboodschap ("Wat op deze rol toetst, heeft niets te beoordelen") zou
+        daar het omgekeerde beweren van wat er aan de hand is. Zie BO-80 en
+        `omvang.INDICATORROLLEN`.
+        """
+        op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, {"Pompunit"}))}
+
+        assert "pompunits" not in op_nul
+        # De rol blijft wél in de rollentelling van het rapport staan: daar is nul een
+        # feit en geen oordeel.
+        telling = klassentelling(_run(tmp_path, {"Pompunit"}))
+        assert (telling.loc[telling["Rol"] == "pompunits", "Aantal"] == 0).all()
+
+
+class TestGedeclareerdeRollen:
+    def test_elke_gedeclareerde_rol_krijgt_een_bewaking(self) -> None:
+        # `_rollen` moet elke rol dekken die een geregistreerde check declareert,
+        # anders bewaakt de code een rol niet die een check wel nodig heeft.
+        from nlriochecker.checks.base import REGISTRY
+
+        bewaakt = {rol.label for rol in _rollen(load_check_config())}
+        gedeclareerd = {rol for check in REGISTRY.values() for rol in check.rollen}
+        assert gedeclareerd <= bewaakt
 
 
 class TestSignaalMelding:
@@ -153,7 +218,7 @@ class TestEindpunttelling:
     def test_toont_elke_afvoereindpuntklasse_met_haar_aantal(self, tmp_path: Path) -> None:
         tabel = eindpunttelling(_run(tmp_path, {"Overnamepunt"}))
         rijen = dict(zip(tabel["Klasse"], tabel["Aantal"], strict=True))
-        assert rijen == {"Overnamepunt": 0, "Gemaal": 1, "Pompunit": 1}
+        assert rijen == {"Overnamepunt": 0, "Gemaal": 1}
 
 
 class TestKlassentelling:
@@ -167,8 +232,9 @@ class TestKlassentelling:
     def test_telt_een_rol_over_haar_klassen(self, tmp_path: Path) -> None:
         tabel = klassentelling(_run(tmp_path, set()))
         rijen = dict(zip(tabel["Rol"], tabel["Aantal"], strict=True))
-        # afvoereindpunt telt Overnamepunt + Gemaal + Pompunit.
-        assert rijen["afvoereindpunt"] == 3
+        # afvoereindpunt telt Overnamepunt + Gemaal; Pompunit hoort er sinds BO-55
+        # niet meer bij.
+        assert rijen["afvoereindpunt"] == 2
 
 
 class TestOmvangSectie:
@@ -210,3 +276,31 @@ class TestZonderLocatie:
         )
         regels = _zonder_locatie([onherleid])
         assert regels and "geen plek op de kaart" in regels[0]
+
+
+class TestKoppelingsherstel:
+    """Het herstel van de fantoomkoppeling is een datasetsignaal, geen stille reparatie."""
+
+    def _run(self) -> CheckRun:
+        config = load_check_config()
+        config.drempels.rd_y_min = 0.0
+        dataset = load_dataset(TTL_DIR / "dataset_fantoomkoppeling.ttl", [])
+        return run_checks(CheckContext(dataset=dataset, config=config), ["TOP-001"])
+
+    def test_herstelde_koppelingen_geven_een_systemische_waarschuwing(self) -> None:
+        meldingen = bouw_meldingen(self._run(), date(2026, 8, 24))
+        signaal = [m for m in meldingen if m.check_id == CHECK_HULPSTUKKOPPELING]
+
+        assert len(signaal) == 1
+        assert signaal[0].bron == BRON_DATASET
+        assert signaal[0].ernst == "W" and signaal[0].systemisch is True
+        # Een hasConnection naar een URI die niet bestaat is een consistentiegebrek,
+        # geen compleetheidsgebrek zoals de nul-bewaking ernaast.
+        assert signaal[0].dimensie == "Consistentie"
+        assert signaal[0].object_uri == "" and signaal[0].foutlocatie is None
+        assert signaal[0].waarde == "1"
+        assert "1 leidingeind" in signaal[0].boodschap and "1 hulpstuk" in signaal[0].boodschap
+
+    def test_het_rapport_noemt_het_herstel(self) -> None:
+        tekst = "\n".join(_omvang_section(self._run()))
+        assert "Herstelde hulpstukkoppelingen" in tekst

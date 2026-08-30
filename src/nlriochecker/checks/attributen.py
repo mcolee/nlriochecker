@@ -13,6 +13,7 @@ from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date
 
+from gwsw_orox_helpers.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
 from rdflib import RDF, URIRef
 
 from nlriochecker import taal
@@ -31,13 +32,17 @@ from nlriochecker.checks.selectie import (
     vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import putten_van, verbonden_knopen
-from nlriochecker.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
 from nlriochecker.plausibiliteit import (
+    ConstructionTypeDiameter,
     MaterialDiameter,
     MaterialRoughness,
     MinimumDiameter,
-    PlausibilityTables,
 )
+
+# Het diameterbereik van een streng hangt aan haar constructietype of aan haar materiaal
+# (issue #86). De twee regelsoorten dragen dezelfde grenzen en verschillen alleen in
+# waaraan ze hangen; ATTR-001 leest ze daarom door elkaar.
+type Diameterregel = ConstructionTypeDiameter | MaterialDiameter
 
 
 @dataclass(frozen=True)
@@ -99,19 +104,25 @@ class _StrengCheck(Check):
 
 @register
 class DiameterPastNietBijMateriaal(_StrengCheck):
-    """ATTR-001: de diameter valt buiten het bereik dat bij het materiaal hoort."""
+    """ATTR-001: de diameter valt buiten het bereik dat bij het materiaal hoort.
+
+    Met één uitzondering (issue #86, BO-75): draagt de streng een constructietype met een
+    eigen bereik in `[[constructietype_diameter]]`, dan gaat dat bereik voor. De
+    materiaaltabellen zijn op vrijvervalriool geschreven, en een drainageleiding is naar
+    haar functie dunner -- een drain van Ø65 is gangbaar en geen gebrek.
+    """
 
     id = "ATTR-001"
     title = "Diameter past niet bij materiaal"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding", "MateriaalLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de grootste profielmaat met het bereik uit de tabel."""
-        tabel = context.plausibiliteit
-
         for conduit in vrijvervalrioolleidingen(context):
-            regel = tabel.diameter(conduit.materiaal)
+            regel = _diameterregel(context, conduit)
             maat = _grootste_maat(conduit)
             if regel is None or maat is None:
                 continue
@@ -119,15 +130,28 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
             if kant is not None:
                 yield self._bevinding(context, conduit, maat, regel, kant)
 
-    def _bevinding(self, context, conduit: Conduit, maat: float, regel, kant: str) -> Finding:
-        """Bouwt de bevinding met het overschreden bereik erbij."""
+    def _bevinding(
+        self, context, conduit: Conduit, maat: float, regel: Diameterregel, kant: str
+    ) -> Finding:
+        """Bouwt de bevinding met het overschreden bereik erbij.
+
+        De boodschap noemt waaraan het bereik hangt: het constructietype als de streng
+        er een regel voor heeft (issue #86), en anders het materiaal. Er komt geen
+        detailveld naast; `materiaal` blijft staan omdat het hoe dan ook bekend is, en
+        welk van de twee bereiken gold staat in de boodschap zelf.
+        """
         bereik = f"{regel.minimum_mm or 0:g}-{regel.maximum_mm or 0:g} mm"
+        waarbij = (
+            f"constructietype {regel.klasse}"
+            if isinstance(regel, ConstructionTypeDiameter)
+            else f"materiaal {conduit.materiaal}"
+        )
         return self.finding(
             context,
             conduit.uri,
             conduit.label,
-            f"Profielmaat {maat:g} mm ligt {kant} het bereik {bereik} dat bij materiaal "
-            f"{conduit.materiaal} hoort. {regel.toelichting}".strip(),
+            f"Profielmaat {maat:g} mm ligt {kant} het bereik {bereik} dat bij {waarbij} "
+            f"hoort. {regel.toelichting}".strip(),
             materiaal=conduit.materiaal,
             maat_mm=maat,
             minimum_mm=regel.minimum_mm,
@@ -143,20 +167,48 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
         met daarbinnen de strengen die een 0 als meting registreerden. De tabel toont
         per materiaal de feitelijke min- en max-diameter, zodat een onzinnige grens in
         de tabel opvalt.
+
+        Daarboven staat sinds issue #86 hoeveel strengen niet tegen hun materiaal maar
+        tegen hun constructietype getoetst zijn, en welke constructietypen uit de tabel
+        in *deze* configuratie buiten de getoetste populatie vallen. Dat laatste wordt
+        afgeleid en niet opgeschreven: bij de standaardconfiguratie is dat `Drain` (zij
+        hangt rechtstreeks onder `Leiding`), maar een project dat `[klassen]
+        vrijvervalleiding` verbreedt haalt haar erin. `Duiker` valt daar ook buiten maar
+        komt hier nooit voorbij -- die staat bewust niet in de tabel.
         """
         tabel = context.plausibiliteit
         strengen = vrijvervalrioolleidingen(context)
         totaal = len(strengen)
         populatie = _ongetoetst(
             context,
-            lambda conduit: conduit.materiaal,
-            lambda conduit: tabel.diameter(conduit.materiaal),
+            lambda conduit: _diameteranker(context, conduit),
+            lambda conduit: _diameterregel(context, conduit),
         )
         regels = _ongetoetst_notes(
             populatie,
             "geen materiaal",
             "een materiaal zonder diameterregel in `plausibiliteit.toml`",
         )
+        uitzonderingen = tabel.constructietype_diameter
+        if uitzonderingen:
+            met_eigen_bereik = sum(
+                1 for conduit in strengen if _constructietyperegel(context, conduit) is not None
+            )
+            namen = ", ".join(regel.klasse for regel in uitzonderingen)
+            buiten = _buiten_de_rol(context, uitzonderingen)
+            staart = (
+                f" {', '.join(buiten)} {taal.vorm(len(buiten), 'valt', 'vallen')} in deze "
+                f"configuratie buiten de getoetste populatie en "
+                f"{taal.vorm(len(buiten), 'komt', 'komen')} deze check dus niet tegen."
+                if buiten
+                else ""
+            )
+            regels.append(
+                f"{met_eigen_bereik} van de {totaal} strengen zijn tegen het bereik van hun "
+                f"constructietype getoetst in plaats van tegen dat van hun materiaal "
+                f"({namen}); een drainageleiding is naar haar functie dunner dan een "
+                f"riool.{staart}"
+            )
         zonder_maat = [conduit for conduit in strengen if _grootste_maat(conduit) is None]
         if zonder_maat:
             nul = sum(1 for conduit in zonder_maat if _registreert_nulmaat(conduit))
@@ -169,7 +221,7 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
                 f"{len(zonder_maat)} van de {totaal} strengen hebben geen bruikbare "
                 f"profielmaat{staart}; ze zijn niet getoetst."
             )
-        verdeling = _diameterverdeling(tabel, strengen)
+        verdeling = _diameterverdeling(context, strengen)
         if verdeling is not None:
             regels.append(verdeling)
         return regels
@@ -183,6 +235,8 @@ class DiameterOnderMinimum(_StrengCheck):
     title = "Diameter kleiner dan rond 200 mm"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt strengen waarvan de grootste profielmaat onder het stelselminimum ligt."""
@@ -264,6 +318,8 @@ class MateriaalPastNietBijBegindatum(_StrengCheck):
     title = "Materiaal past niet bij begindatum"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("Begindatum", "MateriaalLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het begindatumjaar met het tijdvak waarin het materiaal bestond."""
@@ -280,13 +336,21 @@ class MateriaalPastNietBijBegindatum(_StrengCheck):
                 yield self._bevinding(context, conduit, jaar, regel.tot_jaar, "na", regel)
 
     def _bevinding(self, context, conduit, jaar: int, grens: int, kant: str, regel) -> Finding:
-        """Bouwt de bevinding met de grens en de toelichting erbij."""
+        """Bouwt de bevinding met de grens en de toelichting erbij.
+
+        De boodschap vraagt om een controle en stelt niets vast (issue #84): de
+        tijdvakken zijn ervaringsregels -- alleen het asbestverbod van 1993 is hard --
+        en een gerenoveerd riool zonder `DatumMaatregel` geeft dezelfde uitslag. Voor
+        een te vroege begindatum is de vraag of het materiaal er toen *al* was, voor een
+        te late of het er toen *nog* was.
+        """
+        toen = "al" if kant == "voor" else "nog"
         return self.finding(
             context,
             conduit.uri,
             conduit.label,
-            f"Materiaal {conduit.materiaal} met begindatum {jaar}, {kant} {grens}. "
-            f"{regel.toelichting}".strip(),
+            f"Te controleren of materiaal {conduit.materiaal} in {jaar} {toen} werd "
+            f"toegepast: dat is {kant} {grens}. {regel.toelichting}".strip(),
             materiaal=conduit.materiaal,
             begindatum_jaar=jaar,
             grensjaar=grens,
@@ -333,6 +397,8 @@ class VormVersusAfmetingen(_StrengCheck):
     title = "Vorm versus afmetingen inconsistent"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding", "VormLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de verhouding tussen breedte en hoogte tegen de profielvorm.
@@ -410,6 +476,8 @@ class EenhedenfoutBinnenBereik(_StrengCheck):
     # Deze check meldt per profielmaat, niet per strengeinde: breedte en hoogte van
     # dezelfde streng zijn twee bevindingen en horen twee melding-ID's te krijgen.
     id_sleutels = ("kenmerk",)
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt maten die zelf geen handelsmaat zijn maar maal tien wel.
@@ -451,7 +519,8 @@ class EenhedenfoutBinnenBereik(_StrengCheck):
         return [
             f"Alleen breedte en hoogte van leidingen zijn getoetst, en alleen onder "
             f"{drempel:g} mm. Eenhedenfouten in lengte- of hoogtewaarden vallen hier niet "
-            "onder; ATTR-008, ATTR-009 en de HGT-categorie kijken daarnaar."
+            "onder; ATTR-009, de HGT-categorie en de nulmetingvorm `LengteLeiding_val` "
+            "kijken daarnaar."
         ]
 
 
@@ -463,6 +532,16 @@ class DiameterGroterDanPut(_StrengCheck):
     title = "Strengdiameter groter dan afmeting van de aangesloten put"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("putten", "vrijvervalrioolleidingen")
+    kenmerken = (
+        "BreedteBouwwerk",
+        "BreedteLeiding",
+        "BreedtePut",
+        "DiameterPut",
+        "HoogteLeiding",
+        "LengteBouwwerk",
+        "LengtePut",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de profielmaat met de grootste binnenmaat van de put.
@@ -589,6 +668,8 @@ class WandruwheidPastNietBijMateriaal(_LeidingCheck):
     title = "Wandruwheid past niet bij materiaal"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen",)
+    kenmerken = ("MateriaalLeiding", "WandruwheidBinnenboven", "WandruwheidBinnenonder")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke leiding waarvan de wandruwheid buiten de band van haar materiaal valt."""
@@ -699,12 +780,19 @@ class VormPutVersusAfmetingen(_PutCheck):
 
     De nulmeting toetst alleen de *aanwezigheid* van de vorm (`Put_VormPut_card`), niet
     de samenhang met de afmetingen; dit gat is dus echt.
+
+    Binnen die ene conditie zitten twee soorten, elk met een eigen boodschap
+    (`_putmaatboodschap`, issue #92): een maat van 0 mm is een niet-geregistreerde maat
+    en dus een gat in de aanlevering, twee echte maar ongelijke maten zijn de
+    tegenspraak tussen vorm en maten. De conditie zelf staat daar los van.
     """
 
     id = "ATTR-016"
     title = "Vorm put versus afmetingen inconsistent"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("putten",)
+    kenmerken = ("BreedtePut", "LengtePut", "VormPut")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke ronde put waarvan breedte en lengte meer dan de tolerantie schelen.
@@ -713,6 +801,8 @@ class VormPutVersusAfmetingen(_PutCheck):
         breedte of lengte, dan is er geen tegenspraak vast te stellen en zwijgt de
         check; `notes()` verantwoordt die putten. De tolerantie is dezelfde als bij
         ATTR-004 (`rondheid_tolerantie_mm`, default 0): het is dezelfde soort fout.
+        De boodschap volgt uit `_putmaatboodschap`; de conditie hierboven is voor beide
+        varianten dezelfde.
         """
         tolerantie = context.config.drempels.rondheid_tolerantie_mm
 
@@ -728,8 +818,7 @@ class VormPutVersusAfmetingen(_PutCheck):
                 context,
                 node.uri,
                 node.label,
-                f"Putvorm Rond met breedte {breedte:g} mm en lengte {lengte:g} mm; een "
-                "ronde put heeft een diameter, dus breedte en lengte horen gelijk te zijn.",
+                _putmaatboodschap(breedte, lengte),
                 vorm="Rond",
                 breedte_mm=breedte,
                 lengte_mm=lengte,
@@ -755,6 +844,31 @@ class VormPutVersusAfmetingen(_PutCheck):
         ]
 
 
+def _putmaatboodschap(breedte: float, lengte: float) -> str:
+    """De boodschap bij een ronde put met ongelijke maten, in twee varianten.
+
+    Een maat van 0 mm is geen meting: een put met lengte 0 bestaat niet, dus de maat is
+    niet geregistreerd. Die melding gaat over een gat in de aanlevering -- op De Wolden
+    en Hoogeveen 67 van de 88, waarvan de nulmeting het merendeel ook al als
+    `LengtePut_val` meldt. Staan er twee echte maar ongelijke maten, dan spreken vorm en
+    maten elkaar tegen, en dat is de eigen waarde van deze check. De twee vragen om een
+    andere ingreep -- de maat alsnog vullen tegenover vorm of maat corrigeren -- en
+    krijgen daarom een eigen tekst (issue #92).
+    """
+    if breedte == 0 or lengte == 0:
+        ontbreekt, aanwezig, waarde = (
+            ("lengte", "breedte", breedte) if lengte == 0 else ("breedte", "lengte", lengte)
+        )
+        return (
+            f"Putvorm Rond met {aanwezig} {waarde:g} mm, maar {ontbreekt} 0 mm; 0 is geen "
+            f"maat, dus de {ontbreekt} is niet geregistreerd."
+        )
+    return (
+        f"Putvorm Rond met breedte {breedte:g} mm en lengte {lengte:g} mm; een ronde put "
+        "heeft een diameter, dus breedte en lengte horen gelijk te zijn."
+    )
+
+
 @register
 class BegindatumBuitenBereik(_StrengCheck):
     """ATTR-007: een begindatum in de toekomst of voor het riooltijdperk."""
@@ -763,6 +877,8 @@ class BegindatumBuitenBereik(_StrengCheck):
     title = "Begindatum in de toekomst of voor 1870"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("putten", "vrijvervalrioolleidingen")
+    kenmerken = ("Begindatum",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de begindatum van strengen en putten op een aannemelijk bereik."""
@@ -799,38 +915,87 @@ class BegindatumBuitenBereik(_StrengCheck):
         Geen melding en geen drempel: een grens voor "te weinig gedateerd" hebben we
         niet en zouden we verzinnen. Zonder deze regel leest een schone ATTR-007 als
         "alle aanlegdatums gecontroleerd", terwijl een groot deel van de objecten er
-        geen draagt (issue #21). De tweede regel telt de hele meetset -- ook de objecten
-        die ATTR-007 niet toetst (persleidingen, drains, niet-put-knopen) -- want het gat
-        in de aanlevering is breder dan wat deze check aanraakt.
+        geen draagt (issue #21). Dat gat zelf meldt ATTR-018 per object (issue #61);
+        deze regel zegt alleen wat ATTR-007 daardoor niet kon toetsen.
         """
         strengen = vrijvervalrioolleidingen(context)
         alle_putten = putten(context)
         zonder_streng = sum(1 for conduit in strengen if conduit.date("Begindatum") is None)
         zonder_put = sum(1 for node in alle_putten if node.date("Begindatum") is None)
 
-        objecten = [*context.dataset.nodes.values(), *context.dataset.conduits.values()]
-        zonder_totaal = sum(1 for object_ in objecten if object_.date("Begindatum") is None)
-        totaal = len(objecten)
-
-        notities = []
-        if zonder_streng or zonder_put:
-            notities.append(
-                f"{zonder_streng} van de {len(strengen)} strengen en {zonder_put} van de "
-                f"{len(alle_putten)} putten in deze toets dragen geen begindatum en zijn niet "
-                "getoetst."
-            )
-        if zonder_totaal and totaal:
-            notities.append(
-                f"In deze meetset hebben {zonder_totaal} van de {totaal} objecten "
-                f"({zonder_totaal / totaal * 100:.1f}%) geen begindatum; daarin tellen ook de "
-                "objecten buiten deze toets mee (persleidingen, drains, niet-put-knopen)."
-            )
-        return notities
+        if not (zonder_streng or zonder_put):
+            return []
+        return [
+            f"{zonder_streng} van de {len(strengen)} strengen en {zonder_put} van de "
+            f"{len(alle_putten)} putten in deze toets dragen geen begindatum en zijn niet "
+            "getoetst."
+        ]
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen plus putten."""
         alle_putten = putten(context)
         return len(vrijvervalrioolleidingen(context)) + len(alle_putten)
+
+
+@register
+class BegindatumOntbreekt(Check):
+    """ATTR-018: een vrijvervalrioolleiding of put zonder begindatum.
+
+    ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een *aanwezige* datum en de
+    SHACL-nulmeting eist `Begindatum` nergens, zodat een object zonder aanlegjaar tot
+    dit issue nergens een melding kreeg en op de kaart groen bleef -- en groen betekent
+    daar "beoordeeld en niets gevonden". Zonder aanlegjaar is er geen
+    vervangingsplanning, geen levensduurberekening en geen ATTR-003; vandaar een fout
+    en niet een waarschuwing. Op De Wolden en Hoogeveen zijn het er ongeveer 9274,
+    vooral putten; dat is het echte gat en geen modelleerfout (issue #61).
+    """
+
+    id = "ATTR-018"
+    title = "Begindatum ontbreekt"
+    severity = Severity.ERROR
+    dimension = Dimension.COMPLETENESS
+    rollen = ("leidingen", "putten", "vrijvervalrioolleidingen")
+    kenmerken = ("Begindatum",)
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke vrijvervalstreng en elke put zonder `Begindatum`."""
+        alles: list[Node | Conduit] = [*vrijvervalrioolleidingen(context), *putten(context)]
+        for object_ in alles:
+            if object_.date("Begindatum") is not None:
+                continue
+            soort = "streng" if isinstance(object_, Conduit) else "put"
+            yield self.finding(
+                context,
+                object_.uri,
+                object_.label,
+                f"Deze {soort} draagt geen begindatum; het aanlegjaar is onbekend.",
+                objectsoort=soort,
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de leidingen buiten de populatie.
+
+        Mechanisch riool valt buiten het checkregister en andere leidingen (loze
+        leidingen, duikers) zijn geen vrijvervalrioolleiding; ook daar ontbreekt het
+        aanlegjaar vaak. Zonder deze regel leest de telling als het hele gat.
+        """
+        vrijverval = {conduit.uri for conduit in vrijvervalrioolleidingen(context)}
+        alle = leidingen(context)
+        buiten = [conduit for conduit in alle if conduit.uri not in vrijverval]
+        if not buiten:
+            return []
+        zonder = sum(1 for conduit in buiten if conduit.date("Begindatum") is None)
+        return [
+            f"{len(buiten)} van de {len(alle)} leidingen "
+            f"{taal.vorm(len(buiten), 'valt', 'vallen')} buiten deze toets omdat ze "
+            f"geen vrijvervalrioolleiding {taal.vorm(len(buiten), 'is', 'zijn')} "
+            "(mechanisch riool en andere leidingen); daarvan "
+            f"{taal.vorm(zonder, 'is', 'zijn')} er {zonder} zonder begindatum."
+        ]
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal vrijvervalstrengen plus putten."""
+        return len(vrijvervalrioolleidingen(context)) + len(putten(context))
 
 
 @register
@@ -854,6 +1019,8 @@ class BegindatumVulwaardejaar(Check):
     # net als ATTR-014 rekent deze detector daarom over de volledige export, zodat het
     # aandeel niet per gebied verschilt.
     volledig_bereik = True
+    rollen = ("putten", "vrijvervalrioolleidingen")
+    kenmerken = ("Begindatum",)
 
     def _jaren(self, context: CheckContext) -> Counter[int]:
         """Telt per jaartal de gedateerde strengen en putten samen (een keer per context)."""
@@ -926,45 +1093,6 @@ class BegindatumVulwaardejaar(Check):
 
 
 @register
-class StrenglengteBuitenBereik(_StrengCheck):
-    """ATTR-008: een strenglengte buiten het aannemelijke bereik."""
-
-    id = "ATTR-008"
-    title = "Strenglengte korter dan X m of langer dan X m"
-    severity = Severity.WARNING
-    dimension = Dimension.PLAUSIBILITY
-
-    def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Toetst de administratieve lengte op het geconfigureerde bereik."""
-        drempels = context.config.drempels
-        minimum = drempels.minimale_strenglengte_m
-        maximum = drempels.maximale_strenglengte_m
-
-        for conduit in vrijvervalrioolleidingen(context):
-            lengte = conduit.lengte_m
-            if lengte is None or minimum <= lengte <= maximum:
-                continue
-            kant = "onder" if lengte < minimum else "boven"
-            grens = minimum if lengte < minimum else maximum
-            yield self.finding(
-                context,
-                conduit.uri,
-                conduit.label,
-                f"Administratieve lengte {lengte:g} m ligt {kant} de grens van {grens:g} m.",
-                lengte_m=lengte,
-                grens_m=grens,
-            )
-
-    def notes(self, context: CheckContext) -> list[str]:
-        """Meldt hoeveel strengen geen lengte hebben."""
-        strengen = vrijvervalrioolleidingen(context)
-        zonder = sum(1 for conduit in strengen if conduit.lengte_m is None)
-        if not zonder:
-            return []
-        return [f"{zonder} van de {len(strengen)} strengen hebben geen administratieve lengte."]
-
-
-@register
 class LengteWijktAfVanGeometrie(_StrengCheck):
     """ATTR-009: de getekende lengte klopt niet met de geregistreerde lengte."""
 
@@ -972,6 +1100,8 @@ class LengteWijktAfVanGeometrie(_StrengCheck):
     title = "Geometrische lengte wijkt meer dan X% af van administratieve lengte"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("LengteLeiding",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de lengte van de hartlijn met de administratieve lengte."""
@@ -1023,6 +1153,8 @@ class LeidingmateriaalPastNietBijPut(_StrengCheck):
     title = "Leidingmateriaal beton of metselwerk terwijl het putmateriaal daar niet bij past"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("MateriaalBouwwerk", "MateriaalLeiding", "MateriaalPut")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt het leidingmateriaal met dat van de aangesloten putten."""
@@ -1082,6 +1214,8 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
     title = "Materiaal past niet bij profielvorm"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("vrijvervalrioolleidingen",)
+    kenmerken = ("MateriaalLeiding", "VormLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst de profielvorm tegen de vormen die bij het materiaal horen."""
@@ -1122,15 +1256,17 @@ class MateriaalPastNietBijProfielvorm(_StrengCheck):
 class HoogteOpVulwaarde(Check):
     """ATTR-013: een hoogtekenmerk dat een vulwaarde draagt in plaats van een meting.
 
-    De leesregel zelf staat in `dataset.markeer_vulwaarden` (toegepast in `toetsrun`);
-    deze check meldt per object een keer wat die regel heeft weggezet, zodat het in de
-    uitvoer staat en niet alleen in de toelichting van de hoogtechecks.
+    De leesregel zelf staat in `gwsw_orox_helpers.dataset.markeer_vulwaarden` (toegepast
+    in `toetsrun`); deze check meldt per object een keer wat die regel heeft weggezet,
+    zodat het in de uitvoer staat en niet alleen in de toelichting van de hoogtechecks.
     """
 
     id = "ATTR-013"
     title = "Hoogtekenmerk op vulwaarde (rond 0 m NAP) geregistreerd als meting"
     severity = Severity.WARNING
     dimension = Dimension.COMPLETENESS
+    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("config:vulwaarden.hoogte_kenmerken",)
 
     def _objecten(self, context: CheckContext) -> list[Node | Conduit]:
         """De objecten die een hoogtekenmerk kunnen dragen: knopen plus strengen."""
@@ -1285,6 +1421,12 @@ class PropertyTegenOntologie(Check):
     dimension = Dimension.CONSISTENCY
     id_sleutels = ("kenmerk",)
     volledig_bereik = True
+    # `examined()` telt kenmerkinstanties, geen objecten: op De Wolden 459.108 tegenover
+    # 45.803 objecten. Zonder deze vlag zou het rapport dat getal "bekeken objecten"
+    # noemen (issue #77).
+    telt_instanties = True
+    rollen = ()
+    kenmerken = ("*",)
 
     def _tellingen(self, context: CheckContext) -> dict[str, _PropertyTelling]:
         return context.cached("attr014:tellingen", lambda: _property_tellingen(context))
@@ -1354,7 +1496,78 @@ def _diameterondergrens(context: CheckContext, conduit: Conduit) -> MinimumDiame
     return context.plausibiliteit.ondergrens(stelseltype)
 
 
-def _kant_van_bereik(regel: MaterialDiameter, maat: float) -> str | None:
+def _constructietyperegel(
+    context: CheckContext, conduit: Conduit
+) -> ConstructionTypeDiameter | None:
+    """Het diameterbereik van het constructietype van deze streng, of None.
+
+    Subklassen tellen mee -- via dezelfde klassenafsluiting waarmee de rollen selecteren --
+    en de eerste regel in tabelvolgorde wint, net als bij `ClassRoots.stelseltype`.
+    """
+    for regel in context.plausibiliteit.constructietype_diameter:
+        if conduit.types & context.dataset.closure(regel.klasse):
+            return regel
+    return None
+
+
+def _diameterregel(context: CheckContext, conduit: Conduit) -> Diameterregel | None:
+    """Het diameterbereik voor deze streng: het constructietype gaat voor het materiaal."""
+    regel = _constructietyperegel(context, conduit)
+    if regel is not None:
+        return regel
+    return context.plausibiliteit.diameter(conduit.materiaal)
+
+
+def _buiten_de_rol(
+    context: CheckContext, uitzonderingen: Sequence[ConstructionTypeDiameter]
+) -> list[str]:
+    """De constructietypen uit de tabel die buiten de populatie van ATTR-001 vallen.
+
+    Afgeleid uit `[klassen] vrijvervalleiding` plus de klassenhierarchie, en niet als
+    vaste zin opgeschreven. De uitkomst kan nooit meer zijn dan wat er in
+    `[[constructietype_diameter]]` staat: bij de standaardconfiguratie is dat `Drain` --
+    zij hangt in de GWSW-ontologie rechtstreeks onder `Leiding` -- maar een project dat
+    die rol verbreedt haalt haar erin, en dan zou een vaste zin onwaar zijn. `Duiker`
+    valt net zo goed buiten die rol maar staat bewust niet in de tabel, en komt hier dus
+    ook niet uit. Zonder
+    klassenhierarchie blijft elke afsluiting bij zichzelf steken; de uitkomst is dan
+    nog steeds waar, want dan selecteert de rol ook alleen haar eigen wortels.
+    """
+    return [
+        regel.klasse
+        for regel in uitzonderingen
+        if not any(
+            context.dataset.closure(regel.klasse) & context.dataset.closure(wortel)
+            for wortel in context.config.klassen.vrijvervalleiding
+        )
+    ]
+
+
+def _diameteranker(context: CheckContext, conduit: Conduit) -> object | None:
+    """Waaraan het diameterbereik van deze streng hangt, of None als er niets is.
+
+    `_ongetoetst` leest dit als "het attribuut". Een drainageleiding zonder materiaal is
+    wel degelijk getoetst -- haar constructietype draagt het bereik -- en hoort dus niet
+    als "geen materiaal en niet getoetst" in de toelichting te belanden.
+    """
+    regel = _constructietyperegel(context, conduit)
+    return regel if regel is not None else conduit.materiaal
+
+
+def _buiten_diameterbereik(context: CheckContext, conduit: Conduit) -> bool:
+    """True als deze streng buiten het bereik valt waarop ATTR-001 haar toetst.
+
+    Dezelfde voorwaarde als `DiameterPastNietBijMateriaal.run`, zodat de kolom Buiten
+    bereik in de verdelingstabel de bevindingen telt en niet iets anders.
+    """
+    regel = _diameterregel(context, conduit)
+    maat = _grootste_maat(conduit)
+    if regel is None or maat is None:
+        return False
+    return _kant_van_bereik(regel, maat) is not None
+
+
+def _kant_van_bereik(regel: Diameterregel, maat: float) -> str | None:
     """'onder' of 'boven' als de maat buiten het diameterbereik valt, anders None."""
     if regel.minimum_mm is not None and maat < regel.minimum_mm:
         return "onder"
@@ -1376,7 +1589,7 @@ def _registreert_nulmaat(conduit: Conduit) -> bool:
     return False
 
 
-def _diameterverdeling(tabel: PlausibilityTables, strengen: Sequence[Conduit]) -> str | None:
+def _diameterverdeling(context: CheckContext, strengen: Sequence[Conduit]) -> str | None:
     """Een Markdown-tabel met per materiaal het aantal, het aantal buiten bereik en de
     feitelijke min- en max-diameter uit de data.
 
@@ -1384,6 +1597,10 @@ def _diameterverdeling(tabel: PlausibilityTables, strengen: Sequence[Conduit]) -
     strengen met een bruikbare profielmaat, en het aantal buiten bereik is 0 voor een
     materiaal zonder regel -- zonder grens valt er niets te overschrijden. Geeft None als
     geen streng een materiaal draagt.
+
+    Buiten bereik telt per streng tegen het bereik waarop zij feitelijk getoetst is
+    (issue #86), dus een drainageleiding tegen dat van haar constructietype. Anders zou
+    de kolom meer tellen dan de check meldt.
     """
     per_materiaal: dict[str, list[Conduit]] = defaultdict(list)
     for conduit in strengen:
@@ -1397,13 +1614,8 @@ def _diameterverdeling(tabel: PlausibilityTables, strengen: Sequence[Conduit]) -
     ]
     for materiaal in sorted(per_materiaal):
         groep = per_materiaal[materiaal]
-        regel = tabel.diameter(materiaal)
         maten = [maat for conduit in groep if (maat := _grootste_maat(conduit)) is not None]
-        buiten = (
-            sum(1 for maat in maten if _kant_van_bereik(regel, maat) is not None)
-            if regel is not None
-            else 0
-        )
+        buiten = sum(1 for conduit in groep if _buiten_diameterbereik(context, conduit))
         min_mm = f"{min(maten):g}" if maten else "–"
         max_mm = f"{max(maten):g}" if maten else "–"
         regels.append(f"| {materiaal} | {len(groep)} | {buiten} | {min_mm} | {max_mm} |")

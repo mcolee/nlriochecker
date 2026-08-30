@@ -25,37 +25,27 @@ De test gaat *uitsluitend* over de vraag of een begrip in het model bestaat. Of 
 instanties van in een dataset voorkomen is een andere vraag met een ander antwoord.
 
 **Wat de AST-sweep niet ziet.** Hij ziet de aanroep zelf, dus alleen een aspectnaam die
-als stringliteraal het eerste argument is -- op dit moment zestien van de eenentwintig
-kandidaat-aanroepen in `src/`, goed voor tien namen. Wie zijn naam eerst in een tuple of
-een modulevariabele zet en die pas daarna doorgeeft, blijft buiten beeld:
-`checks/attributen.py` (`_grootste_putmaat`), `checks/randvoorzieningen.py` (de
-bergingskenmerken) en `dataset.py` (de vertex- en BOB-klassen) dragen samen ruim een
-dozijn van zulke namen. Ze zijn met de hand tegen de index gehouden en alle geldig, maar
-deze module bewaakt ze niet; ze komen er pas onder zodra ze een directe aanroep worden.
+als stringliteraal het eerste argument is. Wie zijn naam eerst in een tuple of een
+modulevariabele zet en die pas daarna doorgeeft, blijft buiten beeld:
+`checks/attributen.py` (`_grootste_putmaat`) en `checks/randvoorzieningen.py` (de
+bergingskenmerken) dragen samen ruim een dozijn van zulke namen. Ze zijn met de hand
+tegen de index gehouden en alle geldig, maar deze module bewaakt ze niet; ze komen er
+pas onder zodra ze een directe aanroep worden. De sweep loopt over `src/nlriochecker`
+en dus niet over de leeslaag: die leeft sinds 0.1 in `gwsw-orox-helpers` en wordt daar
+door dezelfde test bewaakt.
 
-**Wat waar draait.** De ontologie zelf is 2,6 MB en staat buiten versiebeheer, dus de
-test leest niet de TTL maar de getrackte afgeleide `data/gwsw-vocabulaire-index.json`:
-per GWSW-naam zijn `rdf:type`s en zijn directe superklassen, en niets meer. Daardoor
-draait alles hier gewoon mee op de CI-runner -- dat was het hele punt van #30, en eerder
-sloegen daar 140 van de 142 gevallen over. Het bestand is geen invoerdata maar een
-afgeleide; het wordt nooit met de hand bijgewerkt maar met `scripts/maak_gwsw_index.py`.
-Zie BO-32 voor de afweging om het te tracken.
-
-Eén test heeft de ontologie zelf nodig: `test_index_volgt_de_ontologie` vergelijkt de
-getrackte index met een vers geparseerde TTL, en dat kan alleen op een machine waar
-`data/gwsw_ontologieen/` staat -- op de CI-runner dus niet. Dat is geen ongedekt gat.
-De enige die de index kan laten verouderen is de auteur die GWSW 1.7 neerzet, en dat
-is dezelfde persoon op dezelfde machine die deze test wél draait. `scripts/uitgave.py`
-draait `uv run pytest -q` als uitgavepoort en `TAKVOORWAARDE` dwingt die poort af op
-`main`; een verouderde index kan dus geen uitgave overleven. Automatisch ophalen bij
-data.gwsw.nl is geen alternatief: `CLAUDE.md` verbiedt dat expliciet, en upgraden is
-met opzet handwerk van de auteur.
+**Wat waar draait.** De ontologie zelf is 2,6 MB, dus de test leest niet de TTL maar de
+afgeleide `gwsw-vocabulaire-index.json`: per GWSW-naam zijn `rdf:type`s en zijn directe
+superklassen, en niets meer. Die index komt sinds de afsplitsing als package-resource
+mee met `gwsw-orox-helpers` (`bronnen.vocabulaire_index_pad()`) en wordt daar
+gegenereerd en tegen de ontologie bewaakt. Daardoor draait alles hier gewoon mee op de
+CI-runner -- dat was het hele punt van #30, en eerder sloegen daar 140 van de 142
+gevallen over. Zie BO-32 voor de afweging om een index te tracken.
 
 Eén restrisico blijft, en het hoort hier genoemd: een naam die GWSW 1.7 **hernoemt** of
 naar een andere collectie verplaatst valideert gewoon door tegen de 1.6-index, tot de
-index vervangen is. Nieuwe namen vallen luid om, hernoemde niet. `versie=` uit de index
-moet daarom in `CLAUDE.md` terugkomen (`test_indexversie_staat_in_claude_md`), zodat de
-twee niet elk hun eigen GWSW-versie kunnen gaan dragen.
+package een nieuwe index meelevert. Nieuwe namen vallen luid om, hernoemde niet. De
+koppeling tussen index en de leidende GWSW-versie wordt in de package-repo bewaakt.
 
 Er zit met opzet **geen skip** op het inlezen van de index: ontbreekt het bestand, dan
 valt de hele module om. Een skip zou de oude stilte in een nieuwe vorm terugbrengen.
@@ -65,26 +55,21 @@ from __future__ import annotations
 
 import ast
 import difflib
-import importlib.util
 import json
-import re
-import sys
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType
 
 import pytest
+from gwsw_orox_helpers.bronnen import vocabulaire_index_pad
 
-from nlriochecker.checkconfig import ClassRoots, load_check_config
-from nlriochecker.dataset import VULWAARDE_KENMERKEN
+from nlriochecker.checkconfig import VULWAARDE_KENMERKEN, ClassRoots, load_check_config
 from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.uitvoer.stijlen.symbolen import LIJNSYMBOLEN, MECHANISCHE_LIJNEN, PUNTSYMBOLEN
 
 WORTEL = Path(__file__).resolve().parents[1]
 BRON = WORTEL / "src" / "nlriochecker"
 PROJECTCONFIG = WORTEL / "configs" / "dewoldenhoogeveen.toml"
-INDEXBESTAND = WORTEL / "data" / "gwsw-vocabulaire-index.json"
-INDEXSCRIPT = WORTEL / "scripts" / "maak_gwsw_index.py"
+INDEXBESTAND = vocabulaire_index_pad()
 
 OWL = "http://www.w3.org/2002/07/owl#"
 OWL_KLASSE = f"{OWL}Class"
@@ -205,6 +190,10 @@ def _termen_uit_config(pad: Path | None, herkomst: str) -> list[Term]:
         Term(naam, f"{herkomst} [vulwaarden] hoogte_kenmerken")
         for naam in config.vulwaarden.hoogte_kenmerken
     ]
+    termen += [
+        Term(naam, f"{herkomst} [rapport] onderdruk_klassen")
+        for naam in config.rapport.onderdruk_klassen
+    ]
     return termen
 
 
@@ -225,6 +214,12 @@ def _termen_uit_plausibiliteit() -> list[Term]:
                 "MateriaalLeidingColl",
             )
         )
+    # De constructietype-uitzondering van issue #86 draagt geen domeinlijstwaarde maar een
+    # klassenaam, dus de standaardcollectie `owl:Class` -- net als de rollen uit [klassen].
+    termen += [
+        Term(regel.klasse, "plausibiliteit.toml [[constructietype_diameter]]")
+        for regel in tabellen.constructietype_diameter
+    ]
     for regel in tabellen.materiaal_wandruwheid:
         termen.append(
             Term(
@@ -319,7 +314,7 @@ def _alle_termen() -> list[Term]:
         *_termen_uit_plausibiliteit(),
         *[Term(naam, "symbolen.py PUNTSYMBOLEN") for naam in PUNTSYMBOLEN],
         *[Term(naam, "symbolen.py LIJNSYMBOLEN") for naam in LIJNSYMBOLEN],
-        *[Term(naam, "dataset.py VULWAARDE_KENMERKEN") for naam in sorted(VULWAARDE_KENMERKEN)],
+        *[Term(naam, "checkconfig.py VULWAARDE_KENMERKEN") for naam in sorted(VULWAARDE_KENMERKEN)],
         *_termen_uit_broncode(),
     ]
 
@@ -448,7 +443,12 @@ BRONSENTINELS: tuple[tuple[str, str], ...] = (
     ("configs/dewoldenhoogeveen.toml [[puttyperegels]]", "Overstortput"),
     ("configs/dewoldenhoogeveen.toml [inwinning]", "AHN4"),
     ("configs/dewoldenhoogeveen.toml [vulwaarden]", "Maaiveldhoogte"),
+    # `checks.toml` laat de lijst leeg; alleen de projectconfig levert hier een term.
+    ("configs/dewoldenhoogeveen.toml [rapport]", "MechanischeRioolleiding"),
     ("plausibiliteit.toml [[materiaal_diameter]]", "Beton"),
+    # `Drain` staat ook in de symbolentabel; de sentinel toetst op de vindplaats, dus die
+    # andere bron houdt deze regel niet groen.
+    ("plausibiliteit.toml [[constructietype_diameter]]", "DT_riool"),
     ("plausibiliteit.toml [[materiaal_begindatum]]", "PVC"),
     ("plausibiliteit.toml [[materiaal_vorm]]", "PVC"),
     # Een naam die alleen aan de leidingkant staat: `PVC` en `PE` staan sinds issue #43
@@ -458,11 +458,11 @@ BRONSENTINELS: tuple[tuple[str, str], ...] = (
     ("plausibiliteit.toml [[vorm_afmeting]]", "Rond"),
     ("symbolen.py PUNTSYMBOLEN", "Inspectieput"),
     ("symbolen.py LIJNSYMBOLEN", "Drain"),
-    ("dataset.py VULWAARDE_KENMERKEN", "Maaiveldhoogte"),
-    # De AST-sweep schrijft `<module>.py:<regel> .<methode>()`; de dubbele punt scheidt
-    # hem van de VULWAARDE_KENMERKEN-regel hierboven, en het regelnummer valt buiten
-    # het voorvoegsel zodat een verschuiving in `dataset.py` deze test niet raakt.
-    ("dataset.py:", "Begindatum"),
+    ("checkconfig.py VULWAARDE_KENMERKEN", "Maaiveldhoogte"),
+    # De AST-sweep schrijft `<module>.py:<regel> .<methode>()`; het regelnummer valt
+    # buiten het voorvoegsel zodat een verschuiving in `checks/attributen.py` deze test
+    # niet raakt.
+    ("checks/attributen.py:", "Begindatum"),
 )
 
 
@@ -710,60 +710,4 @@ def test_symbolen_en_checks_zijn_het_eens_over_mechanisch() -> None:
     assert not ontbreekt, (
         f"{', '.join(sorted(ontbreekt))} wordt in symbolen.py als mechanisch getekend maar "
         f"valt niet onder [klassen] mechanisch = {wortels}."
-    )
-
-
-def _laad_indexscript() -> ModuleType:
-    """Importeert `scripts/maak_gwsw_index.py` als module.
-
-    De drifttest bouwt de index met precies dezelfde code als het script; een
-    nagebouwde parser hier zou vroeg of laat iets anders opleveren dan wat er in het
-    bestand staat, en dan meet de test zichzelf.
-    """
-    specificatie = importlib.util.spec_from_file_location("maak_gwsw_index", INDEXSCRIPT)
-    assert specificatie is not None and specificatie.loader is not None
-    module = importlib.util.module_from_spec(specificatie)
-    sys.modules["maak_gwsw_index"] = module
-    specificatie.loader.exec_module(module)
-    return module
-
-
-def test_index_volgt_de_ontologie(ontologie: list[Path]) -> None:
-    """De getrackte index is bij tot en met de ontologie die er nu ligt.
-
-    Draait alleen waar `data/gwsw_ontologieen/` staat -- op de CI-runner niet. Dit is
-    de test die voorkomt dat de index stil veroudert zodra de auteur GWSW 1.7
-    neerzet; zonder haar zou deze module een verleden bewaken dat niemand meer
-    draait. De hele bestandstekst wordt vergeleken en niet alleen de termen, zodat
-    ook de meegedragen `owl:versionInfo` en de opmaak niet uit de pas kunnen lopen.
-    """
-    verwacht = _laad_indexscript().documenttekst(ontologie[0])
-
-    assert INDEXBESTAND.read_text(encoding="utf-8") == verwacht, (
-        f"{INDEXBESTAND.relative_to(WORTEL)} loopt achter op "
-        f"{ontologie[0].relative_to(WORTEL)}.\n"
-        "Draai: uv run python scripts/maak_gwsw_index.py"
-    )
-
-
-def test_indexversie_staat_in_claude_md() -> None:
-    """De index en `CLAUDE.md` dragen dezelfde GWSW-versie.
-
-    De drifttest hierboven bewaakt maar één richting: `CLAUDE.md` bijwerken zonder het
-    script te draaien valt om (op een machine met de ontologie). De omgekeerde richting
-    -- het script draaien op 1.7 terwijl `CLAUDE.md` nog 1.6 zegt -- merkt niemand, en
-    dan is `CLAUDE.md` niet langer "de enige plek waar hij staat". Beide bestanden zijn
-    getrackt, dus deze test draait wél op CI.
-
-    Alleen het `versie=X.Y`-deel wordt vergeleken en niet de hele regel: de
-    conversiedatum erachter hoort bij de ontologie en niet bij de projectafspraak.
-    """
-    versieregel = json.loads(INDEXBESTAND.read_text(encoding="utf-8"))["gwsw_versie"]
-    gevonden = re.search(r"versie=[0-9]+(?:\.[0-9]+)*", versieregel)
-
-    assert gevonden is not None, f"geen versie= in {versieregel!r}"
-    assert gevonden.group() in (WORTEL / "CLAUDE.md").read_text(encoding="utf-8"), (
-        f"{INDEXBESTAND.name} draagt {gevonden.group()}, maar CLAUDE.md noemt die versie "
-        "niet. CLAUDE.md is de gezaghebbende plek; werk de alinea over de leidende "
-        "GWSW-versie bij."
     )

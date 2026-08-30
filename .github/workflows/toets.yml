@@ -57,39 +57,25 @@ jobs:
       # is: tests/test_gwsw_vocabulaire.py sloeg hier eerst 140 van zijn 142 gevallen
       # over en draait nu op een na volledig mee. Die ene is de drifttest, die de
       # ontologie zelf nodig heeft.
-      NLRIOCHECKER_MIN_GESLAAGD: "1200"
-      # De ondergrens hierboven is nu tweemaal met de hand nagetrokken nadat hij was
-      # opgehouden te bijten, en dat blijft zo: "geslaagd" kruipt met de suite mee
-      # omhoog. Wat de poort wil vangen is stille overslag, en dat is een bovengrens op
-      # "overgeslagen" -- die beweegt niet mee met suitegroei. Bovendien levert de
-      # vocabulairemodule een geval per GWSW-naam in de configuratie, dus een
-      # configwijziging die namen schrapt zou een ondergrens op "geslaagd" ten onrechte
-      # rood laten vallen; op overslagen heeft datzelfde geen effect.
       #
-      # Gemeten in een kopie van de werkboom met alleen de getrackte delen van data/ en
-      # met PyQGIS uitgezet (GWSW_QGIS_SITE_PACKAGES=/nonexistent) -- de toestand van
-      # deze runner: 1300 geslaagd, 44 overgeslagen. Die 44 zijn 41 tests die data/
-      # nodig hebben, 1 modulewijde skip van tests/test_uitvoer_qgis.py en de 2
-      # openstaande BEKENDE_AFWIJKINGEN uit tests/test_gwsw_vocabulaire.py. 50 laat
-      # ruimte voor een handvol nieuwe datagebonden tests en valt om zodra er zeven
-      # losse overslagen bijkomen -- een fixture die niet meekomt, een bron die op de
-      # runner ineens ontbreekt.
-      #
-      # Wat deze twee grenzen *niet* vingen: een `pytest.skip(allow_module_level=True)`
-      # telt als één overslag, hoeveel tests de module ook draagt. Gemeten: een module
-      # van 29 tests zo uitzetten laat het aantal overslagen op 44 staan en het aantal
-      # geslaagden naar 1271 zakken -- ruim boven de ondergrens. Voor dat geval hadden
-      # beide grenzen te veel lucht; de derde grens hieronder vangt het wel (issue #52).
-      #
-      # Herijkt 2026-08-24: de teller stond op 51 (de testaanwas van issues #18, #25,
-      # #26, #37-#39 en #55 bracht legitieme datagebonden overslagen mee) en de grens
-      # van 50 klapte -- precies waarvoor hij bestaat, alleen was de groei hier echt.
-      # Nagemeten in de runner-conditie (alleen de getrackte delen van data/): 50
-      # overslagen plus de PyQGIS-moduleskip = 51. Zelfde marge van zes als bij de
-      # vorige ijking.
-      NLRIOCHECKER_MAX_OVERGESLAGEN: "57"
-      # De bovengrens op modulewijde overslagen. Anders dan de twee hierboven beweegt hij
-      # niet mee met suitegroei: een hele module die met `allow_module_level=True`
+      # Gemeten 2026-08-26 met `uv run python scripts/runnerpoort.py` (de conditie van
+      # deze runner) na de verhuizing van de leeslaag naar gwsw-orox-helpers: 1695
+      # geslaagd, 21 overgeslagen. De negen verhuisde testbestanden vielen weg en de
+      # ontologie en de vocabulaire-index komen nu als package-resource mee, dus de
+      # index-overslagen zijn er ook af. 1670 houdt daar een marge van 25 onder.
+      NLRIOCHECKER_MIN_GESLAAGD: "1670"
+      # Overslagen worden niet geteld maar op reden geclassificeerd (BO-48). Een telgrens
+      # (`NLRIOCHECKER_MAX_OVERGESLAGEN`, 50 → 57 → 65) telde ook de bedoelde, datagebonden
+      # overslagen mee -- het Juinen-voorbeeld, de OroX-export en de SHACL-rapporten staan
+      # niet op deze runner -- en klapte op 24-08 en 25-08 op legitieme testgroei. Met deze
+      # vlag is elke test-overslag waarvan de reden geen `data/` en geen `BO-` noemt een
+      # harde fout: een fixture die niet meekomt, een generator die niet gedraaid is, een
+      # tool die hier ontbreekt. Geen getal meer om te herijken. Lokaal na te spelen met
+      # `uv run python scripts/runnerpoort.py`. De controle zelf staat in tests/conftest.py.
+      NLRIOCHECKER_STRIKTE_OVERSLAG: "1"
+      # De bovengrens op modulewijde overslagen. Net als de strikte vlag hierboven, en
+      # anders dan de ondergrens op "geslaagd", beweegt hij niet mee met suitegroei:
+      # een hele module die met `allow_module_level=True`
       # afhaakt is precies "een fixturemap die niet meekomt", en dat is wat de poort wil
       # vangen. Vandaag 1 op deze runner -- tests/test_uitvoer_qgis.py, want ubuntu-latest
       # heeft geen PyQGIS. Komt er een tweede bij, dan is er een module weggevallen.

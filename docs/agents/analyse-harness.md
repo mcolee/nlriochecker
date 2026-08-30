@@ -7,14 +7,79 @@ want de code kan schuiven.
 
 ## Dataset-, config- en registry-API
 
-Voor een scratch-script tegen de echte data:
+De leeslaag (dataset, graaf, geometrie, ontologie, cache, voortgang) leeft sinds 0.4 in de
+package `gwsw-orox-helpers`; de mechaniek hieronder blijft gelden, alleen de importregels
+wijzen naar `gwsw_orox_helpers`. De GWSW-ontologie reist als package-resource mee en wordt
+niet meer uit `data/` gelezen.
 
-- Laad via de **cache**, niet vers, als het even kan (scheelt de volledige laadtijd).
-- `dataset.conduits` is een **dict** → itereer met `.values()`, niet als lijst.
-- Config laden met **`load_check_config()`**, niet `CheckConfig()`.
+Voor een scratch-script tegen de echte data — dit recept, verbatim, zodat je de
+signaturen niet elke sessie opnieuw hoeft op te zoeken:
+
+```python
+from pathlib import Path
+
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
+from gwsw_orox_helpers.cache import laad_met_cache
+
+from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checks import CheckContext, run_checks
+
+# Cachetreffer = geen parse: seconden i.p.v. de koude ~0,5 min. De cache staat in
+# standaard_cachemap() (~/.cache/gwsw-orox-helpers); laad_met_cache geeft (dataset, cache).
+dataset, _ = laad_met_cache(
+    Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl"),
+    [gebundelde_ontologie()],
+)
+config = load_check_config(Path("configs/dewoldenhoogeveen.toml"))
+context = CheckContext(dataset=dataset, config=config)
+```
+
+- `dataset.nodes` en `dataset.conduits` zijn **dicts** (`dict[str, Node]` /
+  `dict[str, Conduit]`) → itereer met `.values()`, niet als lijst.
+- Geometrie zit op **`Node.point`** (`shapely.Point | None`) en **`Conduit.line`**
+  (`LineString | None`); beide kunnen `None` zijn.
+- Config laden met **`load_check_config()`**, niet `CheckConfig()`; zonder pad krijg je
+  de defaults, met `configs/dewoldenhoogeveen.toml` de projectwaarden.
 - De checks komen uit **`REGISTRY`**; kijk hoe bestaande code eroverheen loopt vóór je de
   iteratievorm gokt.
+- `bevindingen.csv` is **`;`-gescheiden** (zie `uitvoer/herkomst.py`), niet komma.
 - Nieuwe `src/`-bestanden moeten `git add` krijgen vóór de tracked-sweep-test slaagt.
+- **Welke objecten "vrijverval", "mechanisch", "put" of "lozingspunt" zijn, staat in
+  `checks/selectie.py`** (één rolfunctie per rol, klassen uit `[klassen]` in de config). Niet
+  opnieuw uit de ontologie afleiden: dat kostte 4 calls en gaf een andere grens dan de checks
+  hanteren.
+- **Er is geen `sqlite3`-CLI** op deze machine. Een GeoPackage lees je met
+  `python3 -c 'import sqlite3'` of `ogrinfo -q -sql`.
+- **Een scratch-script tegen De Wolden overschrijdt de 2-minuten-timeout van een
+  voorgrond-Bash.** Start het vanaf de eerste poging met `run_in_background`; het meldt zich.
+  De `nohup` + `until … sleep`-omweg kostte in één sessie 16 calls en een hangend proces.
+- **Laad zwaar spul één keer en pickle het in het scratchpad** (`raw.pkl`, `_alle.pkl`): een
+  GeoPackage plus de BGT-lagen (97k waterdelen) per vraag opnieuw inlezen kostte een sessie
+  14 herlaadbeurten van elk tientallen seconden.
+
+## Bestaande runs en meetscripts
+
+- `uitvoer/` (git-ignored) bevat volledige `toets`-runs: `volledig_24082026/` is de
+  0.3.0-baseline (162.046 meldingen, met `steekproef_checks.gpkg`) en `issue58/` t/m
+  `issue63/` zijn de nametingen per issue — `issue62/` is de recentste. **Tel eerst daarop**
+  (`bevindingen.json`) voordat je een nieuwe run van ~6 minuten start; noem in je verslag
+  welke run je gebruikte, want de baseline dateert van vóór #60–#63. `26082026_godspeed/`
+  is de volle run (mét `--bronnen`) na de fixgolf van #72–#77; `steekproef_dorpen/` is de
+  handmatige steekproef daarop voor de checkaudit (#68–#70): 3 per check in Koekangerveld,
+  Verspreide huizen Koekange, Veeningen, Fluitenberg kern en Schutlanden-Oost/-West, 14
+  bestanden van ≤10 rijen met een kolom `feedback` van de auteur, plus `steekproef_extra_01/02`
+  (Zuidwolde kern en Ruinerwold-Buiten, alleen de zeven checks die in de dorpen leeg
+  bleven: TOP-004/013/020, ATTR-006/016, HGT-004, NET-008) — lees die feedback vóór je een
+  auditverslag schrijft. Het commando staat in de docstring van `scripts/steekproef.py`.
+- **Een vergelijkbare gemeentebrede run heeft dezelfde vlaggen als de baseline nodig**, en
+  `volledig_24082026/` draaide mét `--bronnen data/gis_dewoldenhoogeveen` (de EXT-checks).
+  Zonder die vlag ontbreken de EXT-bevindingen en klopt de totaaltelling niet; op 26-08
+  kostte dat een tweede run van ~6 minuten. Kijk vóór je start of het baseline-rapport
+  (`.md`) de sectie **Externe bronnen** draagt: dan draaide hij met `--bronnen`.
+- **Een meetscript dat een getal in een issue of BO onderbouwt, bewaar je** — in het
+  scratchpad volstaat niet. Zet het onder `scripts/` of naast het verslag in `docs/`, met de
+  commit-hash van de dataset-lader erin. Op 24-08 bleef een 234-telling alleen als inline
+  heredoc bestaan; de volgende sessie kwam op 319 en het verschil is nooit herleid (BO-43).
 
 ## Verrassende, maar correcte aantallen
 
@@ -23,6 +88,23 @@ zijn geen bug:
 
 - **ATTR-001** toetst de vrijverval-subset (~17603 strengen), niet alle conduits (~23440).
 - **HGT-012** leest `HoogtePut`; De Wolden levert daar **0** instanties.
+- **EXT-009** kijkt niet naar GWSW-objecten maar naar NWB-wegvakken: van de **9787**
+  wegvakken zijn er **4116** kandidaat (412 niet-gemeentelijk, 2211 pad/parkeren, 1661
+  korter dan 25 m, 1387 buiten de bebouwde kom vallen af). `examined` telt dus 4116 en niet
+  een aantal putten of strengen. De ijking en de gemeentebrede telling staan in
+  `scripts/ijk_ext009.py`; die leest alleen de drie lagen die de check nodig heeft
+  (`nwb_wegvak`, `top10nl_kom`, `bgt_wegdeel`) en slaat de panden, waterdelen en het AHN
+  over -- dat scheelt minuten en verandert niets aan de meting.
+- **Baseline ná #60–#63 (0.3.0 + Unreleased, 25-08):** HGT-001 5811 → **2847** en HGT-002
+  **2132** (drempel 10 cm inclusief, BO-44); ATTR-018 **9274** (9063 putten, 211 strengen);
+  TOP-022 **224** en TOP-023 **37** op 1054 T-stukken; ADM-010/011 **54** loze leidingen in 33
+  ketens (38 F, 16 W); EXT-001 **455**, EXT-003 **319** doorkruisingen op 281 strengen,
+  EXT-007 **71**; `SIG-hulpstukkoppeling` 3024 herstelde leidingeinden naar 1122 hulpstukken.
+  Bron: `CHANGELOG.md` onder Unreleased en de BO's 43–47; een run die hiervan afwijkt vraagt om
+  een verklaring, niet om een nieuwe waarheid.
+- **NET-001/NET-002** telden op 24-08 9062 en 3054 bevindingen, vóór de laderfix van #60
+  (3024 losse strengeinden → 0); die twee cijfers zijn verouderd, meet ze opnieuw voor je ze
+  citeert.
 - Een before/after-telling moet door de **echte pijplijn** (`markeer_vulwaarden` vóór de
   checks). Een losstaand snel script mist die markering en geeft afwijkende cijfers die later
   niet met de geleverde getallen kloppen.
@@ -34,8 +116,24 @@ Bewerk de generator en regenereer; anders valt de bijbehorende drifttest:
 | Bestand | Generator |
 |---|---|
 | `tests/fixtures/ttl/*.ttl` | `scripts/maak_ttl_fixtures.py` |
+| `tests/fixtures/gis/**` | `scripts/maak_gis_fixtures.py` |
 | `docs/dekkingsmatrix.md` | `scripts/dekkingsmatrix.py` |
-| `data/gwsw-vocabulaire-index.json` | `scripts/maak_gwsw_index.py` |
+| `voorbeelden/koekangerveld/**` | `scripts/maak_voorbeeld.py` |
+| `docs/img/*.png` | `scripts/maak_schermafdruk.py` (na een `toets` naar `uitvoer/voorbeeld`) — **geen drifttest** |
+
+De laatste rij is de enige zonder vangnet: PyQGIS staat niet op de CI-runner, dus een
+verouderde schermafdruk valt nergens op en niemand stuurt je terug naar de generator.
+Regenereer hem zelf zodra je de stijlen (`uitvoer/stijlen/`) of de kop van het
+bevindingenrapport wijzigt — draai eerst `toets` op het voorbeeld naar `uitvoer/voorbeeld`.
+
+De vocabulaire-index staat niet meer in deze repo: zij reist mee met `gwsw-orox-helpers`
+en wordt daar geregenereerd.
+
+Check dit **vóór** je een fixture aanraakt: met de hand bewerken lijkt lokaal te werken maar
+is een valse start — de drifttest en de review sturen je terug naar de generator (kostte in
+twee sessies ~15 calls herwerk). Een nieuwe fixture: declareer lokale subklassen inline (de
+PRELUDE is over ~140 fixtures gedeeld), draai `uv run python scripts/maak_ttl_fixtures.py`,
+en diff.
 
 ## Drempelrecept: vijf gekoppelde plekken
 
@@ -49,3 +147,31 @@ bewaakt:
 5. een regel onder `## [Unreleased]` in `CHANGELOG.md`.
 
 Een config-drifttest faalt als deze uit elkaar lopen.
+
+## Valkuilen die elke sessie opnieuw kostten
+
+Mechanisch, geen domeinlogica — maar telkens teruggevonden door te zoeken:
+
+- **Een nieuwe check raakt meer dan het drempelrecept.** Naast de vijf plekken hierboven:
+  de check-module zelf (bv. `attributen.py`), de tests, `test_gwsw_vocabulaire.py` (bewaakt
+  materiaal- en aspectnamen), een regel in het checkregister, `scripts/dekkingsmatrix.py`
+  regenereren, een BO in `docs/beslislog.md`, en `CHANGELOG.md`.
+- **Het volgende BO-nummer**: `grep -n '^### BO-' docs/beslislog.md | tail -1`; een nieuw BO
+  komt chronologisch onderaan. Drie sessies zochten dit in 12 calls bij elkaar.
+- **De huisstijl van een issue** staat in `docs/agents/issue-tracker.md`; lees die in plaats
+  van een bestaande issue-body te reverse-engineeren.
+- **Check-ID's in issue-teksten zijn vaak al bezet.** Grep het eerste vrije nummer uit de
+  check-module (`id = "ATTR-0` enz.) in plaats van de aanbeveling in het issue te vertrouwen;
+  ATTR-014/015/016 waren telkens al vergeven toen het issue ze voorstelde.
+- **CI kan "N geslaagd" tonen én toch exit 1 geven.** `.github/workflows/toets.yml` zet
+  `NLRIOCHECKER_STRIKTE_OVERSLAG`: elke test-overslag waarvan de reden geen `data/` en geen
+  `BO-` noemt is daar een harde fout (BO-48). Een nieuwe test die echte data laadt hoort dus
+  "… staat niet in data/" in zijn skip-reden te dragen; een bewuste uitzondering noemt haar
+  BO-nummer. Speel de runner-conditie lokaal na met `uv run python scripts/runnerpoort.py`
+  vóór je pusht: alleen de getrackte `data/`-bestanden, geen PyQGIS, dezelfde grenzen.
+- **`gh`-schrijfacties falen soms tijdelijk** (`gh pr create` → GraphQL-permissie/404)
+  terwijl `git push` en reads gewoon werken; opnieuw proberen slaagt meestal. Niet je
+  token-scope of account onderzoeken — dat is dood werk.
+- **Byte-/inhoudsvergelijking van `toets`-gpkg tussen runs:** de `update_time`-kolom in
+  `layer_styles` is een tijdstempel die per schrijfactie verandert; normaliseer hem, anders
+  faalt een verder identieke vergelijking.

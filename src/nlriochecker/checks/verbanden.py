@@ -14,14 +14,16 @@ ontstaan.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 import networkx as nx
+from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely.geometry import LineString
 
 from nlriochecker.checks.base import CheckContext
-from nlriochecker.checks.selectie import vrijvervalrioolleidingen
-from nlriochecker.dataset import Conduit, Node
+from nlriochecker.checks.hulpstukken import telbare_hulpstukken
+from nlriochecker.checks.selectie import mechanischeleidingen, vrijvervalrioolleidingen
 
 
 def verbonden_knopen(context: CheckContext, conduit: Conduit) -> tuple[str | None, str | None]:
@@ -32,6 +34,50 @@ def verbonden_knopen(context: CheckContext, conduit: Conduit) -> tuple[str | Non
         dataset.resolve_network_node(conduit.start_node, wortels),
         dataset.resolve_network_node(conduit.end_node, wortels),
     )
+
+
+def _doorgeefknopen(context: CheckContext, conduit: Conduit) -> tuple[str | None, str | None]:
+    """De knopen van een streng, met een telbaar hulpstuk als doorgeefknoop (BO-83).
+
+    Als `verbonden_knopen`, maar waar `resolve_network_node` niets oplevert valt deze
+    terug op de rauwe `Conduit.start_node`/`end_node` zolang die op een hulpstuk met een
+    telbare GWSW-functie wijst (`hulpstukken.telbare_hulpstukken`: mof, T-stuk, Y-stuk,
+    kruisstuk). Een `Hulpstuk` is geen `Put` en klimt via `hasPart` niet naar een put,
+    dus zonder terugval laat de vrijvervalgraaf elke streng vallen die op een T-stuk
+    eindigt -- terwijl zij daar in werkelijkheid aan het net vastzit. Een `Afsluitstuk`
+    of `Ontstoppingsstuk` draagt een functie zonder aantal en blijft een breuk; dezelfde
+    grens die TOP-002/TOP-003 sinds BO-72 hanteren.
+
+    Alleen de vrijvervalgraaf leest deze terugval. `verbonden_knopen` zelf blijft de
+    putten geven -- TOP, HGT en ATTR lezen putkenmerken, en een hulpstuk hoort daar niet
+    bij -- en `_bouw_bereikbaarheid` houdt zijn eigen, ruimere terugval voor het persnet.
+    """
+    begin, eind = verbonden_knopen(context, conduit)
+    telbaar = telbare_hulpstukken(context)
+    if begin is None and conduit.start_node in telbaar:
+        begin = conduit.start_node
+    if eind is None and conduit.end_node in telbaar:
+        eind = conduit.end_node
+    return begin, eind
+
+
+def putknopen(context: CheckContext, knopen: Iterable[str]) -> set[str]:
+    """Dezelfde knopen zonder de doorgeefhulpstukken: wat er te beoordelen valt (BO-83).
+
+    De graaf draagt een telbaar hulpstuk als knoop, want daar geeft het door. Geen enkele
+    check beoordeelt het: een hulpstuk is geen put, draagt geen dekselniveau en krijgt
+    nooit een bevinding. Waar knopen geteld worden -- een drempel als
+    `klein_deelstelsel_knopen`, de zin "een deelstelsel van N knopen", het detailveld
+    `knopen_in_deelstelsel`, `examined()` en `n_knopen` in de GeoPackage -- betekent
+    "knoop" daarom een beheerobject uit de rol `netwerkknopen` (put, gemaal,
+    bergbezinkvoorziening, uitlaat), en hoort het doorgeefhulpstuk er niet bij.
+
+    De verzamelingen zelf blijven ongemoeid: `netwerkdelen`, `_Netwerk.graph` en
+    `deelstelsel_ids` dragen het hulpstuk gewoon, anders zou het net er weer op stukvallen.
+    Alleen de tellingen lopen langs deze functie, zodat de aftrek op een plek staat en niet
+    als losse `- telbare_hulpstukken(...)` door de checks verspreid raakt.
+    """
+    return set(knopen) - telbare_hulpstukken(context)
 
 
 @dataclass(frozen=True)
@@ -95,20 +141,54 @@ def netwerkdelen(context: CheckContext) -> list[set[str]]:
     Ongericht: voor de vraag of twee putten tot hetzelfde deelstelsel horen doet de
     afvoerrichting niet ter zake. De delen staan op volgorde van hun eerste knoop,
     zodat de nummering tussen runs gelijk blijft.
+
+    Een knoop is een put of een hulpstuk met een telbare GWSW-functie: zo'n hulpstuk
+    geeft door (`_doorgeefknopen`, BO-83), en twee putten aan weerszijden van een T-stuk
+    horen dus tot hetzelfde deelstelsel.
     """
     return context.cached("netwerkdelen", lambda: _bouw_netwerkdelen(context))
 
 
 def _bouw_netwerkdelen(context: CheckContext) -> list[set[str]]:
     """Bouwt een ongerichte graaf van het vrijverval en splitst hem in delen."""
-    index = aansluitingen(context, "vrijvervalleiding")
     graaf = nx.Graph()
-    for uri, (begin, eind) in index.knopen_per_streng.items():
+    for conduit in vrijvervalrioolleidingen(context):
+        begin, eind = _doorgeefknopen(context, conduit)
         if begin is None or eind is None:
-            graaf.add_node(begin or eind or uri)
+            graaf.add_node(begin or eind or conduit.uri)
             continue
         graaf.add_edge(begin, eind)
     return sorted((set(deel) for deel in nx.connected_components(graaf)), key=min)
+
+
+def strengen_per_knoop(context: CheckContext) -> dict[str, list[Conduit]]:
+    """Per graafknoop de vrijvervalstrengen die erop uitkomen; een keer per context.
+
+    De tegenhanger van `aansluitingen` voor wie met de graaf werkt. Die index herleidt elk
+    strengeinde naar een put en is daarmee precies goed voor TOP, HGT en ATTR -- die lezen
+    putkenmerken -- maar zij kent een streng die met beide einden aan een hulpstuk hangt
+    helemaal niet, en van een streng met een hulpstuk aan een kant alleen de andere kant.
+    Wie de strengen van een netwerkdeel opvraagt (RVZ-006, en de deelstelselvlakken in de
+    GeoPackage) moet dezelfde afleiding lezen als de graaf zelf (`_doorgeefknopen`), anders
+    ligt zo'n streng wel als kant in het deel maar telt zij niet mee. Op De Wolden en
+    Hoogeveen gaat het om enkele tientallen strengen tussen twee T-stukken. Zie BO-83.
+
+    De strengen staan per knoop in selectievolgorde, en een streng met beide einden op
+    dezelfde knoop staat er een keer -- net als in `_bouw_aansluitingen`.
+    """
+    return context.cached(
+        "vrijverval:strengen_per_knoop", lambda: _bouw_strengen_per_knoop(context)
+    )
+
+
+def _bouw_strengen_per_knoop(context: CheckContext) -> dict[str, list[Conduit]]:
+    """Indexeert de vrijvervalstrengen op de knopen waarmee de graaf ze verbindt."""
+    index: dict[str, list[Conduit]] = {}
+    for conduit in vrijvervalrioolleidingen(context):
+        knopen = _doorgeefknopen(context, conduit)
+        for knoop in dict.fromkeys(uri for uri in knopen if uri is not None):
+            index.setdefault(knoop, []).append(conduit)
+    return index
 
 
 def deelstelsel_ids(context: CheckContext) -> dict[str, str]:
@@ -158,7 +238,16 @@ class _Netwerk:
 
     De richting is de administratieve van-naar-richting: van BeginpuntLeiding naar
     EindpuntLeiding. Dat is de richting die het GWSW-model als afvoerrichting
-    bedoelt; NET-003 toetst later of de geometrie daarmee overeenkomt.
+    bedoelt; NET-009 toetst of de geometrie en de BOB daarmee overeenkomen.
+
+    `graph` is het zuivere vrijverval. Het mechanische riool zit in een tweede laag
+    die `_bereikbaarheid` los opbouwt, want kringlopen (NET-004), stelseltypen
+    (NET-005/006) en de afvoerpadanalyse zijn vrijverval-begrippen en zouden op
+    ongerichte persleidingkanten onzin opleveren. Zie BO-54.
+
+    Een knoop is een put of een hulpstuk met een telbare GWSW-functie (`_doorgeefknopen`,
+    BO-83). Het onderscheid met de tweede laag is bewust: het vrijverval geeft alleen
+    door op zo'n telbaar hulpstuk, het persnet op elk rauw eindpunt.
     """
 
     graph: nx.DiGraph
@@ -188,7 +277,7 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     omgedraaid = 0
     per_kant: dict[tuple[str, str], list[Conduit]] = {}
     for conduit in conduits:
-        begin, eind = verbonden_knopen(context, conduit)
+        begin, eind = _doorgeefknopen(context, conduit)
         if begin is None or eind is None:
             los.append(conduit)
             continue
@@ -211,6 +300,50 @@ def _bouw_netwerk(context: CheckContext) -> _Netwerk:
     )
 
 
+def _bereikbaarheid(context: CheckContext) -> nx.DiGraph:
+    """De bereikbaarheidsgraaf; die wordt per context een keer gebouwd.
+
+    Bewust een eigen gecachte laag naast `_netwerk` en niet een tweede veld erin: wie
+    hem opvraagt leest daarmee de rol `mechanischeleidingen`, en dat is precies wat een
+    check hoort te declareren. Zat de laag in `_bouw_netwerk`, dan zou elke check die
+    de graaf aanraakt het persnet declareren -- ook NET-004, dat er per se buiten moet
+    blijven. Zie BO-54.
+    """
+    return context.cached("bereikbaarheid", lambda: _bouw_bereikbaarheid(context))
+
+
+def _bouw_bereikbaarheid(context: CheckContext) -> nx.DiGraph:
+    """De vrijvervalgraaf plus het mechanische riool als ongerichte kanten (BO-54).
+
+    Ongericht, want een persleiding is pompgestuurd en haar administratieve
+    van-naar-richting vertrouwen we niet; voor de vraag of het water ergens uitkomt
+    telt alleen de connectiviteit. Beide richtingen als kant, zodat de gerichte
+    doorloop van `_bereikbaar_vanaf` er in beide richtingen doorheen kan.
+
+    Waar `resolve_network_node` geen netwerkknoop oplevert valt de kant terug op de
+    rauwe koppeling. Het persnet komt namelijk samen op hulpstukken (T-stukken), en
+    die klimmen via hasPart niet naar een put; zonder terugval versplintert elke T
+    het persnet in losse stukken en blijft het gemaal erachter onbereikbaar. Met de
+    terugval is het hulpstuk een doorgeefknoop.
+
+    Deze terugval is ruimer dan die van het vrijverval (`_doorgeefknopen`, BO-83): hier
+    telt élk rauw eindpunt, daar alleen een hulpstuk met een telbare GWSW-functie. Het
+    verschil is niet gemeten maar wel bedoeld -- het persnet wordt inhoudelijk niet
+    getoetst en draagt hier alleen connectiviteit, terwijl een vrijvervalknoop de plek is
+    waar de NET-checks een oordeel op hangen.
+    """
+    graaf: nx.DiGraph = _netwerk(context).graph.copy()
+    for conduit in mechanischeleidingen(context):
+        begin, eind = verbonden_knopen(context, conduit)
+        begin = begin or conduit.start_node
+        eind = eind or conduit.end_node
+        if begin is None or eind is None:
+            continue
+        graaf.add_edge(begin, eind)
+        graaf.add_edge(eind, begin)
+    return graaf
+
+
 def _stijgt(conduit: Conduit) -> bool:
     """Geeft aan of de bodem stijgt van begin- naar eindpunt."""
     verval = conduit.bob_verval
@@ -218,14 +351,20 @@ def _stijgt(conduit: Conduit) -> bool:
 
 
 def _eindpunten(context: CheckContext, rol: str) -> set[str]:
-    """De knopen in de graaf die als eindpunt van deze soort afvoer gelden."""
-    netwerk = _netwerk(context)
+    """De knopen in de graaf die als eindpunt van deze soort afvoer gelden.
+
+    Getoetst op de bereikbaarheidsgraaf en niet op het zuivere vrijverval: een gemaal
+    dat alleen aan het persnet hangt is wel degelijk een eindpunt, maar komt in de
+    vrijvervalgraaf niet voor. Die graaf is een deelverzameling van deze, dus voor de
+    lezers die met vrijvervalknopen werken verandert er niets.
+    """
+    graaf = _bereikbaarheid(context)
     dataset = context.dataset
     return {
         uri
         for wortel in getattr(context.config.klassen, rol)
         for uri in dataset.of_class(wortel)
-        if uri in netwerk.graph
+        if uri in graaf
     }
 
 
@@ -357,12 +496,16 @@ def afvoerpad_van_streng(context: CheckContext, conduit: Conduit) -> Afvoer | No
     Verder None als de streng geen herleidbaar eindpunt heeft of vanaf daar geen
     uitstroompunt bereikt. De streng telt als eerste stap; haar eigen lengte telt bij de
     meters, en ontbreekt die (geen bruikbare lijngeometrie) dan valt de hele padlengte weg.
+
+    De eindknoop komt uit dezelfde afleiding als de graaf (`_doorgeefknopen`, BO-83) en
+    niet uit de putherleiding: een streng die op een telbaar hulpstuk eindigt zit in de
+    graaf, en `afvoerpaden` draagt die hulpstuk-URI's als sleutel. Met de putherleiding
+    zou zij hier stil op None uitkomen -- geen uitstroompunt en geen padlengte in de
+    GeoPackage -- terwijl NET-001 haar wel bereikbaar noemt.
     """
     if conduit.uri not in _netwerkstrengen(context):
         return None
-    dataset = context.dataset
-    wortels = context.config.klassen.netwerkknopen
-    eind = dataset.resolve_network_node(conduit.end_node, wortels)
+    _, eind = _doorgeefknopen(context, conduit)
     if eind is None:
         return None
     vervolg = afvoerpaden(context).get(eind)

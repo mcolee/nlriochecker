@@ -31,7 +31,11 @@ gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
 gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
-gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+# Drain en Aansluitleiding hangen in de GWSW-ontologie rechtstreeks onder Leiding en
+# niet onder VrijvervalRioolleiding (geverifieerd in de gebundelde ontologie); de
+# prelude zei dat van Drain tot issue #82 verkeerd.
+gwsw:Drain rdfs:subClassOf gwsw:Leiding .
+gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 # DEFECT: geen; de vier door issue #20 gecorrigeerde bereiken passen nu -- PP Ø80 (min 100->80), GewapendBeton Ø300 (min 400->300), Gres Ø1200 (max 1000->1400), Asbestcement Ø1500 (max 1000->1800)

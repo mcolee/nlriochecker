@@ -21,10 +21,6 @@ class ComparisonError(PipelineError):
     """De twee aangeboden nulmetingen zijn niet vergelijkbaar."""
 
 
-class DatasetError(PipelineError):
-    """De OroX-dataset ontbreekt, is onleesbaar of bevat geen toetsbare objecten."""
-
-
 class StudyAreaError(PipelineError):
     """Het studiegebied ontbreekt, is onleesbaar of staat in een ander stelsel."""
 

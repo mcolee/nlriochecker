@@ -17,7 +17,7 @@ status *buiten studiegebied* en geen check-uitslag.
 | Bestand | Formaat | CRS | Lagen (features) | Gekoppeld aan |
 | --- | --- | --- | --- | --- |
 | `cbs_buurt_koekangerveld_studiegebied.gpkg` | GeoPackage | EPSG:28992 | `buurt_gegeneraliseerd` (1) | begrenzing van alle EXT- en AHN-checks |
-| `BGT.gpkg` | GeoPackage | EPSG:28992 | 49 lagen, 12 gevuld (zie hieronder) | EXT-001, EXT-002, EXT-003, EXT-005, EXT-006, EXT-007 |
+| `BGT.gpkg` | GeoPackage | EPSG:28992 | 49 lagen, 12 gevuld (zie hieronder) | EXT-001, EXT-003, EXT-005, EXT-006, EXT-007 |
 | `bag_pand_koekangerveld.gpkg` | GeoPackage | EPSG:28992 | `output` (166) | EXT-001 (aanvulling) |
 | `nwb_wegvakken_koekangerveld.gpkg` | GeoPackage | EPSG:28992 | `output` (13) | geen registercheck; zie `docs/nwb-voorstel.md` |
 | `ahn5_dtm_koekangerveld.tif` | GeoTIFF | EPSG:28992 | 1617 x 1833 cellen van 0,5 m | HGT-001, HGT-002, HGT-003 |
@@ -48,7 +48,7 @@ voordat een EXT- of AHN-check draait.
 | Laag | Features | Geometrie | Rol in de engine |
 | --- | ---: | --- | --- |
 | `pand` | 199 | multipolygoon | `bgt_pand` — EXT-001 |
-| `waterdeel` | 233 | polygoon | `bgt_water` — EXT-002, EXT-003, EXT-007 |
+| `waterdeel` | 233 | polygoon | `bgt_water` — EXT-003, EXT-007 |
 | `ondersteunendwaterdeel` | 94 | polygoon | geen check — buiten scope, zie BO-24 |
 | `wegdeel` | 192 | polygoon | geen check |
 | `begroeidterreindeel` | 429 | polygoon | geen check |
@@ -60,6 +60,11 @@ voordat een EXT- of AHN-check draait.
 | `overigbouwwerk` | 11 | polygoon | `bgt_bouwwerk` — EXT-001 |
 | `kunstwerkdeel_vlak` | 1 | polygoon | `bgt_bouwwerk` — EXT-001 |
 
+De kolom *Features* telt de rijen in het bestand, inclusief de afgesloten oudere
+objectversies. De engine leest sinds issue #58 alleen de actuele versie (rijen met
+`eind_registratie` én `termination_date` leeg) en houdt daarvan 138 panden,
+120 waterdelen en 41 bouwwerken over.
+
 **De laag `put` bestaat wel maar bevat nul features.** Dat is de BGT-laag met de
 putdeksels. EXT-005 (put zonder BGT-putdeksel) en EXT-006 (BGT-putdeksel zonder
 put) kunnen daardoor niet draaien; beide melden *laag niet aanwezig in
@@ -68,7 +73,7 @@ zodra er een BGT-export met gevulde `put`-laag komt, draaien ze zonder wijziging
 
 Bruikbare attributen: `type` en `plus_type` (bij `waterdeel` bijvoorbeeld
 `waterloop`), `status` (`bestaand`), `relatieve_hoogteligging`, `lokaal_id` en
-`bronhouder`. De engine gebruikt `type` in de melding bij EXT-002 en EXT-003 en
+`bronhouder`. De engine gebruikt `type` in de melding bij EXT-003 en
 `lokaal_id` als identificatie bij EXT-006.
 
 ## BAG-panden
@@ -118,7 +123,7 @@ studiegebied op een nodata-cel vielen.
 | Bron | Gevolg |
 | --- | --- |
 | BRK-percelen | EXT-004 is skelet met de markering *bron buiten scope in deze fase*. |
-| Waterschapsdata (watergangen, overstortnormen) | EXT-002 draait alleen op BGT-waterdelen; het register staat die bron expliciet toe. |
+| Waterschapsdata (watergangen, overstortnormen) | EXT-003 draait alleen op BGT-waterdelen; het register staat die bron expliciet toe. |
 | BGT-putdeksels (`put`-laag leeg) | EXT-005 en EXT-006 worden overgeslagen met de melding *laag niet aanwezig in aangeleverde data*. |
 | Beheergebiedpolygoon | TOP-009 toetst wel het RD-bereik maar niet het beheergebied; het studiegebied is daar geen vervanging voor. |
 | Grondsoortenkaart | BTR-003 blijft skelet; de drempel per grondsoort is niet te differentiëren. |

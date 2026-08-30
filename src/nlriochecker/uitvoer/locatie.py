@@ -12,11 +12,11 @@ De uitvoer draagt hem als `X`/`Y` in de CSV, als `foutlocatie` in de JSON en als
 
 from __future__ import annotations
 
+from gwsw_orox_helpers.dataset import GwswDataset
 from shapely.geometry import LinearRing, LineString, Point
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checks import Finding
-from nlriochecker.dataset import GwswDataset
 
 # Onder deze detailsleutel geeft een check zelf de plek van het probleem op, als
 # een (x, y)-paar in Rijksdriehoek.
@@ -29,8 +29,9 @@ def foutlocatie(finding: Finding, dataset: GwswDataset) -> Point | None:
     if eigen is not None:
         return _punt(eigen)
 
-    # Een object dat niet uit de GWSW-dataset komt (bijvoorbeeld een BGT-putdeksel
-    # zonder put, EXT-003) draagt zijn coordinaat zelf.
+    # Een object dat niet uit de GWSW-dataset komt draagt zijn coordinaat zelf. EXT-006
+    # (een BGT-putdeksel zonder put) was zo'n check; die is met issue #95 vervallen, maar
+    # de weg blijft bestaan voor een volgende check op een externe bron.
     if finding.location is not None:
         return _punt(finding.location)
 

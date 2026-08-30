@@ -130,6 +130,52 @@ bron = "ervaringsregel"
 minimum_mm = 80
 maximum_mm = 2000
 
+# ATTR-001, de uitzondering per constructietype (issue #86, BO-75). Een regel hier gaat
+# vóór de materiaalregel hierboven: de maattabellen per materiaal zijn op vrijvervalriool
+# geschreven, en een drainageleiding is naar haar functie dunner dan een riool. De
+# klassenamen zijn GWSW-begrippen en hun subklassen tellen mee, net als bij `[klassen]`.
+#
+# RESEARCH (28-08). De handelsmaatreeks voor drainagebuis loopt van 50 tot 200 mm (50, 60,
+# 80, 100, 125, 160, 200; leveranciersassortiment Pipelife/Wavin via drainagebuizen.nl en
+# irritech.nl), met 80 mm als meest toegepaste maat; RIONED noemt in Kostenkengetallen
+# drainage 80 of 100 mm voor een drainageleiding die bij rioolvervanging wordt aangelegd.
+# Elke materiaalondergrens hierboven ligt boven die reeks (PVC 100, Polypropyleen 80,
+# Beton 200), dus een drainageleiding tegen haar materiaalbereik houden geeft vals alarm --
+# precies wat issue #86 meldt (drain Ø65).
+#
+# Een gangbare BOVENgrens levert de research niet op: geen bron geeft er een die zowel een
+# drainagebuis als een DIT- of DT-riool dekt -- die laatste twee zijn rioolleidingen met
+# doorlatende wanden en dus op rioolmaat. De bovengrens volgt daarom de GWSW-waardegrens
+# (`Dt_BreedteLeiding` en `Dt_HoogteLeiding` declareren beide 63-4000 mm); daarboven keurt
+# de nulmeting de waarde zelf al af.
+#
+# `Duiker` krijgt bewust geen regel: geen bron voor een gangbaar duikerbereik, en een
+# duiker hangt in de ontologie rechtstreeks onder `Leiding` en valt dus buiten de rol
+# `vrijvervalleiding` waarop ATTR-001 draait. Datzelfde geldt voor `Drain`; die regel staat
+# er wel, omdat zij de klasse ís waar het issue over gaat en een project de rol mag
+# verbreden. Zie BO-75.
+
+[[constructietype_diameter]]
+klasse = "Drain"
+bron = "ervaringsregel"
+minimum_mm = 50
+maximum_mm = 4000
+toelichting = "Een drainageleiding wordt geleverd vanaf 50 mm (80 mm is de meest toegepaste maat) en is naar haar functie dunner dan een riool."
+
+[[constructietype_diameter]]
+klasse = "DIT_riool"
+bron = "ervaringsregel"
+minimum_mm = 50
+maximum_mm = 4000
+toelichting = "Een drainageleiding wordt geleverd vanaf 50 mm (80 mm is de meest toegepaste maat) en is naar haar functie dunner dan een riool."
+
+[[constructietype_diameter]]
+klasse = "DT_riool"
+bron = "ervaringsregel"
+minimum_mm = 50
+maximum_mm = 4000
+toelichting = "Een drainageleiding wordt geleverd vanaf 50 mm (80 mm is de meest toegepaste maat) en is naar haar functie dunner dan een riool."
+
 # ATTR-017: wandruwheid past niet bij het leidingmateriaal (W, Plausibiliteit).
 # De band omsluit de door RIONED geautoriseerde defaultwaarde uit Leidraad Riolering
 # module C2100, tabel B2.1 (p. 58) -- k-Nikuradse in mm -- met ruimte voor een beter

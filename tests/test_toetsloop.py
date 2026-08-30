@@ -8,16 +8,17 @@ Zonder die eigenschap is rapportage per gebied niet te vertrouwen.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import Point, box, mapping
 
 from gpkghelper import schrijf_buurten, schrijf_vlakken
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import StudyAreaError
 from nlriochecker.externedata import load_external_data
 from nlriochecker.meting import Meetbereik
@@ -63,7 +64,7 @@ def _draai(
     """Draait de toetsloop op een fixture, met of zonder studiegebiedbestand."""
     gebieden = load_studiegebieden(GIS_DIR / bestand) if bestand is not None else None
     return toets_gebieden(
-        load_dataset(TTL_DIR / ttl),
+        load_dataset(TTL_DIR / ttl, []),
         gebieden,
         _config(),
         onbetrouwbaar=frozenset(),
@@ -176,17 +177,28 @@ def test_onbekend_gebied_faalt_met_de_beschikbare_namen() -> None:
         gebieden.selecteer(["Oost"])
 
 
-def _schrijf(bestand: str, doel: Path, ttl: str = "hgt010_diameterverjonging.ttl"):
+def _schrijf(
+    bestand: str,
+    doel: Path,
+    ttl: str = "hgt010_diameterverjonging.ttl",
+    config: CheckConfig | None = None,
+    **opties,
+):
     """Draait de toetsloop en schrijft de uitvoer weg."""
     gebieden = load_studiegebieden(GIS_DIR / bestand)
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / ttl),
+        load_dataset(TTL_DIR / ttl, []),
         gebieden,
-        _config(),
+        config or _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
     )
     return runs, schrijf_uitvoer_gebieden(
-        runs, doel, RUNDATUM, beschikbaar=gebieden.beschikbaar, overgeslagen=gebieden.overgeslagen
+        runs,
+        doel,
+        RUNDATUM,
+        beschikbaar=gebieden.beschikbaar,
+        overgeslagen=gebieden.overgeslagen,
+        **opties,
     )
 
 
@@ -199,6 +211,27 @@ def test_twee_gebieden_leveren_twee_submappen_en_een_totaal(tmp_path: Path) -> N
     assert (tmp_path / "totaal" / "bevindingen.csv").exists()
     assert uitvoer.totaal_json is not None
     assert set(uitvoer.per_gebied) == {"Noord", "Zuid"}
+
+
+def test_zonder_csv_schrijft_ook_totaal_geen_csv(tmp_path: Path) -> None:
+    """Issue #66: `met_csv=False` geldt per gebied én voor `totaal/`."""
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path, met_csv=False, met_geopackage=False)
+
+    assert uitvoer.totaal_csv is None
+    assert all(geschreven.csv is None for geschreven in uitvoer.per_gebied.values())
+    assert not list(tmp_path.rglob("bevindingen.csv"))
+    assert uitvoer.synthese is not None and uitvoer.synthese.exists()
+
+
+def test_de_synthese_noemt_alleen_de_geschreven_totaalbestanden(tmp_path: Path) -> None:
+    """Issue #66: een verwijzing naar een uitgezette CSV stuurt de lezer naar niets."""
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path, met_csv=False, met_geopackage=False)
+
+    assert uitvoer.synthese is not None
+    tekst = uitvoer.synthese.read_text(encoding="utf-8")
+
+    assert "`bevindingen.json` hiernaast bevat" in tekst
+    assert "bevindingen.csv" not in tekst
 
 
 def test_een_gebied_schrijft_zonder_submap(tmp_path: Path) -> None:
@@ -226,6 +259,25 @@ def test_totaal_json_noemt_alle_gebieden(tmp_path: Path) -> None:
     assert document["gebieden"] == ["Noord", "Zuid"]
 
 
+def test_de_json_per_gebied_labelt_bekeken_en_de_totaal_json_niet(tmp_path: Path) -> None:
+    """`bekeken` is per gebied gemeten; over gebieden heen is er geen noemer (issue #77).
+
+    Een som zou objecten op een gebiedsgrens dubbel tellen en het eerste gebied nemen
+    zou een dekking beweren die niemand gemeten heeft.
+    """
+    _schrijf("buurten_twee.gpkg", tmp_path)
+
+    gebied = json.loads((tmp_path / "noord" / "bevindingen.json").read_text(encoding="utf-8"))
+    totaal = json.loads((tmp_path / "totaal" / "bevindingen.json").read_text(encoding="utf-8"))
+
+    assert {rij["bekeken_scope"] for rij in gebied["checks"]} <= {
+        "analyseset",
+        "volledige_export",
+        "attribuut_instanties",
+    }
+    assert "checks" not in totaal
+
+
 def test_json_van_een_enkel_gebied_draagt_geen_gebiedsveld(tmp_path: Path) -> None:
     """Een run op een enkelvoudig bestand blijft precies wat hij was."""
     _schrijf("buurt_noord.gpkg", tmp_path)
@@ -248,11 +300,46 @@ def test_synthese_telt_unieke_en_meervoudige_meldingen(tmp_path: Path) -> None:
     assert totaal["aantal_meldingen"] < per_gebied
 
 
+def test_synthese_telt_de_onderdrukte_meldingen_over_alle_gebieden(tmp_path: Path) -> None:
+    """Issue #65: wat `[rapport]` uit de stroom hield, staat ook in de totaalsynthese.
+
+    De som over de gebieden, niet ontdubbeld -- net als de kolom Meldingen ernaast; de
+    telling per check en per klasse staat in de verantwoording van elk gebied.
+    """
+    config = _config()
+    config.rapport.onderdruk_klassen = ["Leiding"]
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path, config=config)
+    assert uitvoer.synthese is not None
+
+    tekst = uitvoer.synthese.read_text(encoding="utf-8")
+    treffer = re.search(r"Over alle gebieden samen zijn (\d+) meldingen onderdrukt", tekst)
+    totaal = json.loads((tmp_path / "totaal" / "bevindingen.json").read_text(encoding="utf-8"))
+
+    assert treffer is not None, tekst
+    assert int(treffer.group(1)) > 0
+    assert "op grond van `[rapport]`" in tekst
+    # Dezelfde som in de totaal-JSON: twee uitvoervormen die uit elkaar lopen is precies
+    # wat de gedeelde meldingenstroom uitsluit.
+    assert totaal["onderdrukt"] == {
+        "klassen": ["Leiding"],
+        "checks": [],
+        "meldingen": int(treffer.group(1)),
+    }
+
+
+def test_synthese_zwijgt_zonder_onderdrukking(tmp_path: Path) -> None:
+    """Geen keuze om te verantwoorden, dus geen regel."""
+    _, uitvoer = _schrijf("buurten_twee.gpkg", tmp_path)
+
+    assert uitvoer.synthese is not None
+    assert "op grond van `[rapport]`" not in uitvoer.synthese.read_text(encoding="utf-8")
+
+
 def test_synthese_vermeldt_een_selectie(tmp_path: Path) -> None:
     gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
     keuze = gebieden.selecteer(["Noord"])
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         keuze,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -277,7 +364,7 @@ def test_een_leeg_gebied_sloopt_de_run_niet(tmp_path: Path) -> None:
     gebieden = load_studiegebieden(_met_leeg_gebied(tmp_path / "b.gpkg"))
 
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         gebieden,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -293,7 +380,7 @@ def test_een_leeg_gebied_wordt_luid_gemeld(tmp_path: Path) -> None:
     """Nul bevindingen op een leeg gebied leest anders als 'hier is alles in orde'."""
     gebieden = load_studiegebieden(_met_leeg_gebied(tmp_path / "b.gpkg"))
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         gebieden,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -313,7 +400,7 @@ def test_een_leeg_enkel_gebied_blijft_een_harde_fout(tmp_path: Path) -> None:
 
     with pytest.raises(StudyAreaError, match="geen GWSW-objecten"):
         toets_gebieden(
-            load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+            load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
             load_studiegebieden(bestand),
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -342,7 +429,7 @@ def test_overgeslagen_geometrieen_staan_in_het_rapport(tmp_path: Path) -> None:
     )
     gebieden = load_studiegebieden(pad)
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl"),
+        load_dataset(TTL_DIR / "hgt010_diameterverjonging.ttl", []),
         gebieden,
         _config(),
         meetbereik=Meetbereik.niet_gemeten(()),
@@ -397,7 +484,7 @@ def test_treffers_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
     gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
 
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_dataset(TTL_DIR / "ext_scenario.ttl", []),
         gebieden,
         config,
         bronnen=bronnen,
@@ -409,8 +496,127 @@ def test_treffers_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
     noord = next((tmp_path / "uit" / "noord").glob("*.gpkg"))
     zuid = next((tmp_path / "uit" / "zuid").glob("*.gpkg"))
 
-    assert _laag_ids(noord, "bouwwerken") == ["bgt:pand/p-noord"]
-    assert _laag_ids(zuid, "bouwwerken") == []
+    assert _laag_ids(noord, "vlakken") == ["bgt:pand/p-noord"]
+    assert _laag_ids(zuid, "vlakken") == []
+
+
+EXT_DIR = GIS_DIR / "ext"
+
+# De twee buurten van de EXT-009-equivalentietest, op de straten uit
+# `scripts/maak_gis_fixtures.py`. `Buiten` omsluit Lege Laan (1060, 1940) plus de losse put
+# W3 (1200, 1905); `Kern` omsluit Rioolstraat (960, 1940), Grindweg (960, 1910) en de hele
+# riolering van de fixture. Tussen de twee zit een gat van 20 m, ruim genoeg dat de
+# contextschil van 50 m om `Buiten` de riolering van `Kern` niet meepakt -- en dat is precies
+# het punt: `Buiten` ziet nul meter streng en noemt Rioolstraat dus rood, terwijl `Kern` haar
+# groen noemt. W3 zorgt dat `Buiten` niet leeg is; een leeg gebied is bij een run op een
+# enkel gebied een harde fout en dan valt de losse run niet te draaien.
+#
+# De vololgorde doet ertoe voor de regressie, niet voor de assertie: `load_studiegebieden`
+# houdt de bestandsvolgorde aan, en met een gedeeld register won het eerste gebied. Staat
+# `Buiten` voorop, dan erft `Kern` diens "rood" voor Rioolstraat en verdwijnt die straat uit
+# zijn laag `vlakken` -- rood zonder melding krijgt geen rij.
+WEGVAKBUURTEN = [("Buiten", box(1050, 1900, 1250, 1970)), ("Kern", box(900, 1900, 1030, 1970))]
+
+
+def _wegvakbronnen():
+    """De miniatuurbronnen van EXT-009 uit tests/fixtures/gis/ext."""
+    return load_external_data(
+        load_check_config().bronnen.model_copy(
+            update={
+                "map": ".",
+                "bgt": "bgt.gpkg",
+                "bag_pand": None,
+                "nwb_wegvakken": "nwb_wegvakken.gpkg",
+                "top10nl": "top10nl_plaats_vlak.gpkg",
+                "studiegebied": "studiegebied.gpkg",
+                "ahn_dtm": None,
+            }
+        ),
+        EXT_DIR,
+    )
+
+
+def _wegvakstatus(pad: Path) -> dict[str, str]:
+    """De wegvakrijen van de laag `vlakken` als sleutel -> status."""
+    verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+    try:
+        return dict(verbinding.execute("select id, status from vlakken where soort = 'wegvak'"))
+    finally:
+        verbinding.close()
+
+
+def _ext009_run(gebiedsbestand: Path, uit: Path) -> list[GebiedsRun]:
+    """Draait EXT-009 over de gegeven studiegebieden en schrijft de uitvoer."""
+    runs = toets_gebieden(
+        load_dataset(TTL_DIR / "ext009_straten.ttl", []),
+        load_studiegebieden(gebiedsbestand),
+        _config(),
+        bronnen=_wegvakbronnen(),
+        check_ids=["EXT-009"],
+        meetbereik=Meetbereik.niet_gemeten(()),
+    )
+    schrijf_uitvoer_gebieden(runs, uit, RUNDATUM)
+    return runs
+
+
+@pytest.mark.skipif(
+    not (EXT_DIR / "top10nl_plaats_vlak.gpkg").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_wegvakken_per_gebied_gelijk_aan_een_losse_run(tmp_path: Path) -> None:
+    """De equivalentie-eis voor het wegvakregister van EXT-009 (BO-79, issue #104).
+
+    Anders dan het trefferregister wordt dit register niet via de meldingen gejoind: élke
+    rij erin komt in de laag `vlakken` terecht. Deelden de gebieden er een, dan won het
+    eerste gebied met `setdefault` -- terwijl elk gebied het oordeel opnieuw berekent tegen
+    zijn eigen uitgedunde dataset, waarin een straat van de buren geen riolering heeft.
+    Stil gevolg: een bediende straat verdwijnt uit de laag (rood zonder melding krijgt geen
+    rij), of zij krijgt een groen vlak met een rode melding in de popup.
+    """
+    samen_map = tmp_path / "samen"
+    beide = tmp_path / "beide.gpkg"
+    schrijf_buurten(beide, WEGVAKBUURTEN)
+    _ext009_run(beide, samen_map)
+
+    for naam, vak in WEGVAKBUURTEN:
+        los_bestand = tmp_path / f"{naam}.gpkg"
+        schrijf_buurten(los_bestand, [(naam, vak)])
+        los_map = tmp_path / f"los_{naam}"
+        _ext009_run(los_bestand, los_map)
+
+        samen_gpkg = next((samen_map / naam.lower()).glob("*.gpkg"))
+        los_gpkg = next(los_map.glob("*.gpkg"))
+        assert _wegvakstatus(samen_gpkg) == _wegvakstatus(los_gpkg), naam
+
+    # En het oordeel zelf klopt: Kern ziet zijn eigen riolering, Buiten alleen de lege straat.
+    kern = _wegvakstatus(next((samen_map / "kern").glob("*.gpkg")))
+    buiten = _wegvakstatus(next((samen_map / "buiten").glob("*.gpkg")))
+    assert kern == {"nwb:wegvak/2": "groen", "nwb:wegvak/4": "grijs"}
+    assert buiten == {"nwb:wegvak/3": "rood"}
+
+
+@pytest.mark.skipif(
+    not (EXT_DIR / "top10nl_plaats_vlak.gpkg").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_ext009_meldingen_blijven_bij_hun_eigen_gebied(tmp_path: Path) -> None:
+    """De melding hangt aan het middelpunt van het wegvak, net als het vlak.
+
+    Zouden die twee op verschillende grenzen afgebakend worden, dan kon een gebied een
+    rode melding krijgen zonder vlak of andersom.
+    """
+    beide = tmp_path / "beide.gpkg"
+    schrijf_buurten(beide, WEGVAKBUURTEN)
+    runs = _ext009_run(beide, tmp_path / "uit")
+
+    per_gebied = {
+        run.naam: [
+            m.object_uri for m in bouw_meldingen(run.run, RUNDATUM) if m.check_id == "EXT-009"
+        ]
+        for run in runs
+    }
+
+    assert per_gebied == {"Buiten": ["nwb:wegvak/3"], "Kern": []}
 
 
 def _ext_bronnen(bron: Path, panden: list[tuple[dict[str, str], object]]) -> object:
@@ -450,7 +656,7 @@ def test_grenspand_staat_in_beide_gebieden(tmp_path: Path) -> None:
         tmp_path / "bron", [({"lokaal_id": "p-grens"}, box(1055, 1999, 1065, 2001))]
     )
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_dataset(TTL_DIR / "ext_scenario.ttl", []),
         load_studiegebieden(GIS_DIR / "buurten_twee.gpkg"),
         _config(),
         bronnen=bronnen,
@@ -462,8 +668,8 @@ def test_grenspand_staat_in_beide_gebieden(tmp_path: Path) -> None:
     noord = next((tmp_path / "uit" / "noord").glob("*.gpkg"))
     zuid = next((tmp_path / "uit" / "zuid").glob("*.gpkg"))
 
-    assert _laag_ids(noord, "bouwwerken") == ["bgt:pand/p-grens"]
-    assert _laag_ids(zuid, "bouwwerken") == ["bgt:pand/p-grens"]
+    assert _laag_ids(noord, "vlakken") == ["bgt:pand/p-grens"]
+    assert _laag_ids(zuid, "vlakken") == ["bgt:pand/p-grens"]
 
 
 def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: Path) -> None:
@@ -480,7 +686,7 @@ def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: 
     config.studiegebied.volledige_dataset_checks = ["EXT-001"]
 
     runs = toets_gebieden(
-        load_dataset(TTL_DIR / "ext_scenario.ttl"),
+        load_dataset(TTL_DIR / "ext_scenario.ttl", []),
         load_studiegebieden(GIS_DIR / "buurten_twee.gpkg"),
         config,
         bronnen=bronnen,
@@ -491,7 +697,7 @@ def test_een_check_op_de_volledige_export_verliest_zijn_treffers_niet(tmp_path: 
 
     noord = next(run for run in runs if run.naam == "Noord")
     aangewezen = {m.object2_uri for m in bouw_meldingen(noord.run, RUNDATUM) if m.object2_uri}
-    geschreven = set(_laag_ids(next((tmp_path / "uit" / "noord").glob("*.gpkg")), "bouwwerken"))
+    geschreven = set(_laag_ids(next((tmp_path / "uit" / "noord").glob("*.gpkg")), "vlakken"))
 
     assert aangewezen == {"bgt:pand/p-noord"}
     assert geschreven == aangewezen
@@ -529,7 +735,7 @@ class TestNulmetingPerGebied:
         """In `totaal/` staat hij een keer, want daar wordt op melding-ID ontdubbeld."""
         gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),

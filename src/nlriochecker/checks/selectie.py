@@ -26,8 +26,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
+
 from nlriochecker.checks.base import CheckContext
-from nlriochecker.dataset import Conduit, GwswDataset, Node
 
 
 # `Object` is het objecttype van de verzameling waarin gezocht wordt: een knoop of
@@ -83,6 +84,31 @@ def putten(context: CheckContext) -> list[Node]:
     return _knopen(context, "sel:putten", context.config.klassen.put)
 
 
+def rioolputten(context: CheckContext) -> list[Node]:
+    """De rioolputten: `gwsw:Rioolput` en haar subklassen (inspectie-, lozings-, overstortput, ...).
+
+    Enger dan `putten`: alleen de putten met een verwijderbare deksel. De ontologie
+    definieert `Rioolput` als "een put met een verwijderbare deksel", en alleen daaraan
+    hangen het `Putdekselniveau` (via de `Dekselorientatie`) en daarmee de putdiepte
+    betekenis. Een `Kolk`, een `Drainageput` of een gemaal is wel (of geen) `Put` maar
+    geen `Rioolput` en valt erbuiten. Issue #64.
+    """
+    return _knopen(context, "sel:rioolputten", context.config.klassen.rioolput)
+
+
+def pompunits(context: CheckContext) -> list[Node]:
+    """De pompputten van de drukriolering: `gwsw:Pompunit` en haar subklassen.
+
+    De ontologie omschrijft haar als "pompput in een drukrioleringsstelsel" en hangt
+    haar onder `gwsw:Rioolput`; het is dus een echte deelverzameling van `putten`. Een
+    `Gemaal` hoort er niet bij: dat is een bouwwerk en het einde van de afvoer, geen
+    aansluitpunt van een buurt. EXT-009 leest deze rol als drukriolering-indicatie --
+    staat er een pompunit naast de straat, dan zegt het ontbreken van vrijverval
+    daar niets over de datakwaliteit.
+    """
+    return _knopen(context, "sel:pompunits", context.config.klassen.pompunit)
+
+
 def lozingspunten(context: CheckContext) -> list[Node]:
     """De punten waar het afvalwater het stelsel verlaat of binnenkomt.
 
@@ -99,6 +125,26 @@ def lozingspunten(context: CheckContext) -> list[Node]:
     dus de regel voegde niets toe en las als dekking die er niet was.
     """
     return _knopen(context, "sel:lozingspunten", context.config.klassen.lozings_eindpunt)
+
+
+def waterlozingspunten(context: CheckContext) -> list[Node]:
+    """De lozingspunten die volgens het GWSW op oppervlaktewater lozen.
+
+    Een *rol*: geen enkele klasse dekt hem. Enger dan `lozingspunten`, en met opzet.
+    EXT-007 vraagt of er open water naast een lozingspunt ligt, en die vraag hoort
+    alleen bij de punten die daar volgens de ontologie op lozen: `Uitlaatconstructie`
+    ("de constructie waar uitstroming van water uit een leiding naar het
+    oppervlaktewater mogelijk is"), `UitlaatPunt` (datzelfde als punt) en
+    `LozingspuntOppervlaktewater` ("de locatie van de lozing bevindt zich in het
+    oppervlaktewater"). `Lozingsput` valt erbuiten -- die loost "naar, of ontvangt uit,
+    een ander rioolstelsel" -- en de wortel `Lozingspunt` ook, want daaronder hangt naast
+    `LozingspuntOppervlaktewater` ook `LozingspuntBodem`.
+
+    De brede rol `lozingspunten` blijft ongemoeid: NET-001, NET-002 en NET-008 hebben
+    haar als netwerkeindpunt nodig, en daar telt elke uitweg uit het stelsel mee. Zie
+    issue #94 en BO-67.
+    """
+    return _knopen(context, "sel:waterlozingspunten", context.config.klassen.waterlozingspunt)
 
 
 def overstortputten(context: CheckContext) -> list[Node]:
@@ -140,12 +186,22 @@ def functieloze_knopen(context: CheckContext) -> list[Node]:
     return _knopen(context, "sel:functieloze_knopen", context.config.klassen.functieloze_knoop)
 
 
+def hulpstukken(context: CheckContext) -> list[Node]:
+    """De hulpstukken: `gwsw:Hulpstuk` en haar subklassen (T-stuk, kruisstuk, mof, ...).
+
+    Een hulpstuk is een knoop -- zijn `Hulpstukorientatie` is een `Knooppunt` -- maar
+    geen put en geen netwerkknoop. TOP-022 en TOP-023 tellen er de leidingen op.
+    """
+    return _knopen(context, "sel:hulpstukken", context.config.klassen.hulpstuk)
+
+
 def leidingen(context: CheckContext) -> list[Conduit]:
     """Alle leidingen: `gwsw:Leiding` en haar subklassen.
 
-    Dus inclusief pers-, druk- en vacuumleidingen. Niet te verwarren met de streng:
-    `gwsw:Streng` bestaat niet en `gwsw:Rioolstreng` is de NEN 3300-aanduiding voor
-    de riolering tussen twee putmiddelpunten.
+    Dus inclusief het mechanische riool (zie `mechanischeleidingen`) en de loze
+    leidingen. Niet te verwarren met de streng: `gwsw:Streng` bestaat niet en
+    `gwsw:Rioolstreng` is de NEN 3300-aanduiding voor de riolering tussen twee
+    putmiddelpunten.
     """
     return _verbindingen(context, "sel:leidingen", context.config.klassen.streng)
 
@@ -158,6 +214,29 @@ def vrijvervalrioolleidingen(context: CheckContext) -> list[Conduit]:
     """
     return _verbindingen(
         context, "sel:vrijvervalrioolleidingen", context.config.klassen.vrijvervalleiding
+    )
+
+
+def nabijheidsleidingen(context: CheckContext) -> list[Conduit]:
+    """De leidingen waarvan de onderlinge ligging in het platte vlak getoetst wordt.
+
+    Een *rol*: geen enkele klasse dekt hem. TOP-006 (overlap), TOP-010 (buisbuffer) en
+    TOP-011 (hartlijnkruising) leggen twee leidingen naast elkaar en vragen of ze elkaar
+    in de weg liggen. Die vraag is alleen zinnig als beide leidingen in hetzelfde vlak
+    vrijverval water voeren: een `VrijvervalRioolleiding` of een `Duiker` ("een leiding
+    die oppervlaktewater-elementen verbindt"). Een kruising van vrijverval met
+    drukriolering is geen gebrek -- de persleiding ligt er nu eenmaal doorheen -- en
+    hetzelfde geldt voor een drain en voor een aansluitleiding naar een kolk of perceel.
+
+    Ligt precies tussen twee bestaande rollen in, en beide zijn hier verkeerd: `leidingen`
+    is te breed (dat is elke `gwsw:Leiding`, dus ook het persnet, de drains en de loze
+    leidingen) en `vrijvervalrioolleidingen` te smal, want `Duiker` hangt in de ontologie
+    rechtstreeks onder `Leiding`. `Drain` en `Aansluitleiding` doen dat ook, en die blijven
+    er juist buiten -- de grens is dus geen enkele tak van de hierarchie. Zie issue #82 en
+    BO-69.
+    """
+    return _verbindingen(
+        context, "sel:nabijheidsleidingen", context.config.klassen.nabijheidsleiding
     )
 
 
@@ -192,14 +271,38 @@ def infiltratieleidingen(context: CheckContext) -> list[Conduit]:
 
 
 def mechanischeleidingen(context: CheckContext) -> list[Conduit]:
-    """De leidingen van het mechanische stelsel: pers-, druk- en vacuumleiding.
+    """De leidingen van het mechanische stelsel.
 
-    Een *rol*: de ontologie kent de drie klassen los van elkaar. Deze selectie doet
-    niet mee aan de checks -- mechanisch riool valt buiten het checkregister -- maar
-    de GIS-uitvoer heeft haar nodig om die leidingen uit de strengenlaag te houden,
-    waar "geen melding" ten onrechte als "getoetst en in orde" zou lezen.
+    Een *rol*: de ontologie kent de klassen los van elkaar en `[klassen] mechanisch`
+    noemt ze via twee wortels. `MechanischeRioolleiding` dekt Drukleiding,
+    Luchtpersleiding en Vacuumleiding; `MechanischeTransportleiding` dekt Persleiding,
+    Leidingsegment en Spoelleiding -- zes klassen samen (issue #56).
+
+    Getoetst wordt het mechanische riool niet: het valt buiten het checkregister, en
+    geen enkele check leest zijn kenmerken. Maar de selectie stuurt wel degelijk
+    uitkomsten, op drie plekken:
+
+    * `checks/verbanden._bouw_bereikbaarheid` legt deze leidingen als ongerichte kanten
+      in de bereikbaarheidsgraaf, en beslist daarmee mee over NET-001 en NET-002 (en over
+      de lozingspunten die NET-008 telt): een streng die op een pompput eindigt bereikt
+      het gemaal erachter via het persnet. Zie BO-54.
+    * `afbakening._componentstructuur` laat de contextschil er sinds issue #73 doorheen
+      lopen, want anders valt dat gemaal bij een gebiedsrun buiten de schil (BO-56).
+    * `uitvoer/gpkg.py` houdt deze leidingen uit de beoordeelde kleuring -- ze krijgen
+      status `grijs` zolang er niets op staat, want "geen melding" zou daar ten onrechte
+      als "getoetst en in orde" lezen -- en laat hun richtingspijl weg (issue #74).
     """
     return _verbindingen(context, "sel:mechanischeleidingen", context.config.klassen.mechanisch)
+
+
+def lozeleidingen(context: CheckContext) -> list[Conduit]:
+    """De loze leidingen: `gwsw:LozeLeiding` en haar subklassen.
+
+    Buiten gebruik, maar nog in de ondergrond. Geen vrijvervalrioolleiding, dus elke
+    check die daarop selecteert slaat ze over; ADM-010 kijkt juist of het
+    actieve riool er nog op aansluit.
+    """
+    return _verbindingen(context, "sel:lozeleidingen", context.config.klassen.loze_leiding)
 
 
 def oppervlaktewaterobjecten(context: CheckContext) -> list[Node | Conduit]:
@@ -245,17 +348,60 @@ def oppervlaktewaterobjecten(context: CheckContext) -> list[Node | Conduit]:
 _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "netwerkknopen": netwerkknopen,
     "putten": putten,
+    "rioolputten": rioolputten,
+    "pompunits": pompunits,
     "lozingspunten": lozingspunten,
+    "waterlozingspunten": waterlozingspunten,
     "overstortputten": overstortputten,
     "bergbezinkvoorzieningen": bergbezinkvoorzieningen,
     "valconstructies": valconstructies,
     "functieloze_knopen": functieloze_knopen,
+    "hulpstukken": hulpstukken,
     "leidingen": leidingen,
     "vrijvervalrioolleidingen": vrijvervalrioolleidingen,
+    "nabijheidsleidingen": nabijheidsleidingen,
     "overstortleidingen": overstortleidingen,
     "bergbezinkleidingen": bergbezinkleidingen,
     "vuilwaterleidingen": vuilwaterleidingen,
     "infiltratieleidingen": infiltratieleidingen,
     "mechanischeleidingen": mechanischeleidingen,
+    "lozeleidingen": lozeleidingen,
     "oppervlaktewaterobjecten": oppervlaktewaterobjecten,
 }
+
+
+# Per rol het `[klassen]`-veld dat haar wortelklassen draagt. De rolfuncties hierboven
+# lezen `context.config.klassen.<veld>`; deze tabel maakt datzelfde opvraagbaar zonder een
+# context, voor de toelichtingsregel per check in het rapport en de dekkingsmatrix (issue
+# #64). `test_checks_selectie` bewaakt dat de sleutels gelijk blijven aan `_ROLLEN`.
+_ROL_VELDEN: dict[str, str] = {
+    "netwerkknopen": "netwerkknopen",
+    "putten": "put",
+    "rioolputten": "rioolput",
+    "pompunits": "pompunit",
+    "lozingspunten": "lozings_eindpunt",
+    "waterlozingspunten": "waterlozingspunt",
+    "overstortputten": "overstortput",
+    "bergbezinkvoorzieningen": "bergbezinkvoorziening",
+    "valconstructies": "valconstructie",
+    "functieloze_knopen": "functieloze_knoop",
+    "hulpstukken": "hulpstuk",
+    "leidingen": "streng",
+    "vrijvervalrioolleidingen": "vrijvervalleiding",
+    "nabijheidsleidingen": "nabijheidsleiding",
+    "overstortleidingen": "overstortleiding",
+    "bergbezinkleidingen": "bergbezinkleiding",
+    "vuilwaterleidingen": "vuilwater",
+    "infiltratieleidingen": "infiltratie",
+    "mechanischeleidingen": "mechanisch",
+    "lozeleidingen": "loze_leiding",
+    "oppervlaktewaterobjecten": "oppervlaktewater",
+}
+
+
+def klassen_van_rol(rol: str, klassen) -> list[str]:
+    """De wortelklassen van een rol in deze `[klassen]`-configuratie.
+
+    `netwerkknopen` is een samengestelde property; de andere rollen lezen één veld.
+    """
+    return list(getattr(klassen, _ROL_VELDEN[rol]))

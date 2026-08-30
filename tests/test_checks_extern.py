@@ -10,21 +10,26 @@ een nodata-vlek rond (1040, 2010).
 
 from __future__ import annotations
 
+import logging
+from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
+from shapely.geometry import LineString, box
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
-from nlriochecker.dataset import load_dataset
 from nlriochecker.externedata import ExternalData, load_external_data
+from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis" / "ext"
 SCENARIO = TTL_DIR / "ext_scenario.ttl"
+GRENS = TTL_DIR / "hgt001_grens.ttl"
 
-EXT_IDS = ["EXT-001", "EXT-002", "EXT-003", "EXT-005", "EXT-006", "EXT-007"]
+EXT_IDS = ["EXT-001", "EXT-003", "EXT-007"]
 AHN_IDS = ["HGT-001", "HGT-002", "HGT-003"]
 
 pytestmark = pytest.mark.skipif(
@@ -65,7 +70,7 @@ def uitkomst(
     bestand: Path = SCENARIO,
 ) -> CheckOutcome:
     """Draait een enkele check op de scenariofixture."""
-    dataset = load_dataset(bestand)
+    dataset = load_dataset(bestand, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
     return run_checks(context, [check_id]).outcomes[0]
 
@@ -79,11 +84,15 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
     assert bronnen.extent is not None
     assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
         "bgt_pand": 1,
-        "bgt_water": 2,
+        "bgt_water": 7,
         "bgt_putdeksel": 3,
         "bgt_bouwwerk": 1,
+        # De twee lagen van EXT-009 (issue #104): drie BGT-wegdelen en acht NWB-wegvakken,
+        # waarvan er drie kandidaat zijn. `top10nl_kom` staat er niet bij: deze bronnenset
+        # zet `top10nl` niet, en de EXT-009-tests staan in `test_checks_ext009.py`.
+        "bgt_wegdeel": 3,
         "bag_pand": 2,
-        "nwb_wegvak": 1,
+        "nwb_wegvak": 8,
     }
     assert all(laag.crs == "EPSG:28992" for laag in bronnen.layers.values())
     assert all(laag.reprojected_from is None for laag in bronnen.layers.values())
@@ -99,13 +108,15 @@ def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:
     ("check_id", "verwacht"),
     [
         ("EXT-001", ["1", "4", "P", "Q"]),
-        ("EXT-002", ["2", "3"]),
-        ("EXT-003", ["2"]),
-        ("EXT-005", ["C", "E", "F", "L1", "L2", "P", "Q"]),
-        ("EXT-006", ["deksel-los"]),
-        ("EXT-007", ["L1"]),
+        # Streng 9 doorkruist twee greppels (water-5 en water-7) en meldt dus twee keer.
+        ("EXT-003", ["2", "9", "9"]),
+        # Alleen het uitlaatpunt: de twee lozingsputten vallen sinds issue #94 buiten
+        # de populatie van EXT-007 (BO-67).
+        ("EXT-007", ["U1"]),
         ("HGT-001", ["B", "E"]),
         ("HGT-002", ["C"]),
+        # Streng 1 ligt met haar begin-BOB boven het maaiveld; van streng 2 meldt alleen
+        # het eindpunt (4,50 m diep), niet het beginpunt (3,50 m).
         ("HGT-003", ["1", "2"]),
     ],
 )
@@ -141,7 +152,10 @@ def test_buiten_studiegebied_wordt_geteld_in_de_toelichting(
     outcome = uitkomst("HGT-001", config, bronnen)
 
     # Putten P en Q liggen binnen het fixturegebied; alleen D valt erbuiten.
-    assert any("Buiten studiegebied: 1 van de 10 putten" in note for note in outcome.notes)
+    # 19 netwerkknopen: de tien van voorheen, de acht van de grensgevallen (issue #59)
+    # en het uitlaatpunt van issue #94 -- een UitlaatPunt is een lozingseindpunt en dus
+    # een netwerkknoop, ook al is het object een bouwwerk en geen put.
+    assert any("Buiten studiegebied: 1 van de 19 putten" in note for note in outcome.notes)
 
 
 def test_nodata_cellen_worden_gemeld(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -155,7 +169,7 @@ def test_nodata_cellen_worden_gemeld(config: CheckConfig, bronnen: ExternalData)
 def test_typeringspoort_haalt_objecten_uit_de_uitslag(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     verdacht = next(uri for uri, node in dataset.nodes.items() if node.label == "C")
     context = CheckContext(
         dataset=dataset,
@@ -184,44 +198,32 @@ def test_ext001_benoemt_de_relatie_met_het_bouwwerk(
 
 
 def test_ext003_zwijgt_over_een_zinker(config: CheckConfig, bronnen: ExternalData) -> None:
-    # Streng 3 is een zinker en kruist water-2; EXT-002 meldt hem wel, EXT-003 niet.
-    assert "3" in labels(uitkomst("EXT-002", config, bronnen))
-    assert "3" not in labels(uitkomst("EXT-003", config, bronnen))
+    """Streng 3 is een zinker die water-2 echt doorkruist: geteld, niet gemeld.
 
-
-def test_de_twee_kruisingschecks_delen_een_populatie(
-    config: CheckConfig, bronnen: ExternalData
-) -> None:
-    """De gedeelde kruisingenlijst mag alleen bestaan zolang de populatie gedeeld is.
-
-    EXT-002 en EXT-003 lezen dezelfde cache-ingang `ext:watergangkruisingen`. Kreeg een
-    van de twee een eigen, bredere populatie -- BO-25 verwierp dat, maar dat is een
-    besluit en geen onmogelijkheid -- dan zou de check die het eerst draait de lijst van
-    de ander bepalen, zonder uitzondering en met de verkeerde uitslag.
+    Sinds EXT-002 vervallen is (issue #83) is er geen check meer die hem wel meldt; dat
+    de doorkruising gezien is blijkt nog uit de telling in de toelichting -- vier
+    doorkruisingen op drie gemelde strengen.
     """
-    dataset = load_dataset(SCENARIO)
-    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
-    ext002 = REGISTRY["EXT-002"]()
-    ext003 = REGISTRY["EXT-003"]()
+    outcome = uitkomst("EXT-003", config, bronnen)
 
-    assert ext002.selectie(context).toetsbaar == ext003.selectie(context).toetsbaar
-    assert ext002.laag(context) is ext003.laag(context)
+    assert "3" not in labels(outcome)
+    assert any("4 doorkruisingen" in note for note in outcome.notes), outcome.notes
 
 
-def test_een_duiker_valt_buiten_beide_kruisingschecks(
+def test_een_duiker_valt_buiten_de_kruisingscheck(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
     """Streng 6 is een Duiker: in de ontologie een Leiding, geen VrijvervalRioolleiding.
 
-    Hij kruist water-2 net als streng 3, maar zit in geen van beide populaties. De
-    toelichting van beide checks zegt dat hij niet bekeken is.
+    Hij kruist water-2 net als streng 3, maar zit niet in de populatie. De toelichting
+    van de check zegt dat hij niet bekeken is.
     """
-    for check_id in ("EXT-002", "EXT-003"):
-        outcome = uitkomst(check_id, config, bronnen)
-        assert "6" not in labels(outcome)
-        assert any(
-            "niet bekeken: 1 streng van de klasse Duiker" in note for note in outcome.notes
-        ), outcome.notes
+    outcome = uitkomst("EXT-003", config, bronnen)
+
+    assert "6" not in labels(outcome)
+    assert any("niet bekeken: 1 streng van de klasse Duiker" in note for note in outcome.notes), (
+        outcome.notes
+    )
 
 
 def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
@@ -232,7 +234,7 @@ def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
     die van streng 6. Een assertie op zijn eigen label zou dat dus missen; deze kijkt
     daarom ook in de meldingsteksten.
     """
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     resultaat = run_checks(CheckContext(dataset=dataset, config=config))
     betrokken = [
         (outcome.check_id, finding.message)
@@ -241,6 +243,37 @@ def test_de_duiker_raakt_geen_enkele_andere_check(config: CheckConfig) -> None:
         if finding.object_label == "6" or "'6'" in finding.message
     ]
     assert betrokken == []
+
+
+def test_ext007_zwijgt_over_een_lozingsput(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Lozingsput L1 ligt ver van elk waterdeel en is toch geen bevinding (issue #94).
+
+    Het GWSW definieert een `Lozingsput` als een put waarmee het afvalwater naar een
+    ander rioolstelsel gaat; daar hoort geen open water te liggen. Uitlaatpunt U1 ligt
+    even ver van het water en is wel een bevinding -- dat is het verschil dat deze
+    check sinds BO-67 maakt. U1 bewijst bovendien dat de klassen op de orientatie
+    meetellen: `UitlaatPunt` staat daar en niet op het object.
+    """
+    outcome = uitkomst("EXT-007", config, bronnen)
+
+    assert labels(outcome) == ["U1"]
+    assert any(
+        "waterlozingspunt" in note and "Uitlaatconstructie" in note for note in outcome.notes
+    )
+    assert any("Buiten deze check: 2 lozingspunten" in note for note in outcome.notes), (
+        outcome.notes
+    )
+
+
+def test_ext007_zonder_klassen_toetst_niets(config: CheckConfig, bronnen: ExternalData) -> None:
+    """Een lege klassenlijst zet de check uit, en dat hoort in de toelichting te staan."""
+    config.klassen.waterlozingspunt = []
+
+    outcome = uitkomst("EXT-007", config, bronnen)
+
+    assert outcome.findings == []
+    assert outcome.examined == 0
+    assert any("geen lozingsklassen geconfigureerd" in note for note in outcome.notes)
 
 
 def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -252,28 +285,18 @@ def test_ext004_is_een_skelet_met_markering(config: CheckConfig, bronnen: Extern
 
 
 def test_ontbrekende_laag_laat_de_check_overslaan(config: CheckConfig) -> None:
-    # Zonder BGT-bestand is er geen putdeksellaag; EXT-005 hoort dat te melden in
-    # plaats van elke put als dekselloos te bestempelen.
+    # Zonder BGT-bestand is er geen waterlaag; EXT-003 hoort dat te melden in plaats
+    # van elke streng als kruisingsvrij te bestempelen.
     basis = load_check_config().bronnen
     zonder_bgt = basis.model_copy(
         update={"map": ".", "bgt": None, "studiegebied": "studiegebied.gpkg", "ahn_dtm": "ahn.tif"}
     )
     bronnen = load_external_data(zonder_bgt, GIS_DIR)
-    outcome = uitkomst("EXT-005", config, bronnen)
+    outcome = uitkomst("EXT-003", config, bronnen)
 
     assert outcome.findings == []
     assert outcome.examined == 0
     assert any("laag niet aanwezig in aangeleverde data" in note for note in outcome.notes)
-
-
-def test_externe_bevindingen_dragen_een_eigen_locatie(
-    config: CheckConfig, bronnen: ExternalData
-) -> None:
-    # EXT-006 meldt objecten die niet uit de GWSW-dataset komen; zonder eigen
-    # coordinaat zou het bij de afbakening tot een studiegebied wegvallen.
-    for check_id in ("EXT-006",):
-        for bevinding in uitkomst(check_id, config, bronnen).findings:
-            assert bevinding.location is not None
 
 
 def test_hgt003_meldt_beide_richtingen(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -284,6 +307,57 @@ def test_hgt003_meldt_beide_richtingen(config: CheckConfig, bronnen: ExternalDat
 
     assert "boven het AHN-maaiveld" in meldingen["1"]
     assert "onder het AHN-maaiveld" in meldingen["2"]
+
+
+def test_hgt003_meldt_pas_boven_de_diepte_drempel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 2 ligt aan haar beginpunt 3,50 m onder het AHN en aan haar eindpunt 4,50 m.
+
+    Met de drempel op 4,0 m (BO-68) is alleen het eindpunt een bevinding. De twee zijden
+    van dezelfde streng leggen de grens aan beide kanten vast: zonder de stille 3,50 m
+    zou een verschuiving van de drempel hier onopgemerkt blijven.
+    """
+    outcome = uitkomst("HGT-003", config, bronnen)
+    zijden = {(f.object_label, f.details["zijde"]) for f in outcome.findings}
+
+    assert ("2", "beginpunt") not in zijden
+    assert ("2", "eindpunt") in zijden
+    diep = next(f for f in outcome.findings if f.object_label == "2")
+    assert "4.50 m onder" in diep.message
+    assert diep.details["maximale_diepte_m"] == config.drempels.bob_maximale_diepte_m
+
+
+def test_hgt003_noemt_de_gehanteerde_diepte_in_de_toelichting(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """De titel noemt de drempel niet meer, dus de toelichting moet het doen.
+
+    Bij nul bevindingen zegt het rapport anders nergens welke grens gold, en leest een
+    gehalveerde telling als "de data is beter geworden" -- dezelfde reden waarom
+    HGT-001 en HGT-002 hun band noemen.
+    """
+    outcome = uitkomst("HGT-003", config, bronnen)
+    diepte = config.drempels.bob_maximale_diepte_m
+
+    assert any(
+        f"meer dan {diepte:g} m onder het AHN-maaiveld" in note and "boven het AHN-maaiveld" in note
+        for note in outcome.notes
+    ), outcome.notes
+
+
+def test_hgt003_noemt_de_drempel_niet_als_getal_in_zijn_titel() -> None:
+    """De gehanteerde diepte staat in de config, niet in de titel.
+
+    Hij luidde "meer dan 3 m eronder" en bleef dat toen de drempel op 4,0 m kwam
+    (BO-68). De titel voedt de checkkop in het rapport, de kolom Omschrijving in de CSV
+    en `overzicht_checks` in de GeoPackage, dus een getal daarin leest als de
+    gehanteerde grens. De dekkingsmatrix rendert de registertitel en niet deze;
+    die regel is los geannoteerd.
+    """
+    assert REGISTRY["HGT-003"].title == (
+        "BOB-sanity ten opzichte van AHN (boven maaiveld of onaannemelijk diep eronder)"
+    )
 
 
 def test_hgt001_meldt_een_maaiveld_uit_hetzelfde_hoogtemodel(
@@ -350,8 +424,42 @@ def test_hgt001_en_hgt002_claimen_geen_dekselhoogte() -> None:
     de titel voedt ook de dekkingsmatrix en het registeroverzicht, dus hij hoort
     beide kenmerken te dekken in plaats van er een te claimen.
     """
-    assert REGISTRY["HGT-001"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 5 cm"
-    assert REGISTRY["HGT-002"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: meer dan 25 cm"
+    assert REGISTRY["HGT-001"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: 10 cm of meer"
+    assert REGISTRY["HGT-002"].title == "Deksel- of maaiveldhoogte wijkt af van AHN: 25 cm of meer"
+
+
+def test_hgt001_en_hgt002_delen_een_halfopen_band_op_de_millimeter(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """0,099 m zwijgt, 0,100 m meldt (ondergrens inclusief), 0,249 m blijft HGT-001
+    en 0,250 m is al HGT-002; geen enkele put krijgt beide meldingen.
+
+    De put met 10,100 m op een raster van 10,000 m bewijst de afronding op
+    millimeters: onafgerond is dat verschil 0,0999 en zou de put zwijgen. De put op
+    precies 0,250 m is de enige plek waar de bovengrens zichtbaar is: alleen daar
+    verschillen `>= boven` en `> boven` van elkaar.
+    """
+    licht = uitkomst("HGT-001", config, bronnen, GRENS)
+    fors = uitkomst("HGT-002", config, bronnen, GRENS)
+
+    assert labels(licht) == ["100", "249"]
+    assert labels(fors) == ["250", "251"]
+    per_label = {f.object_label: f.details["afwijking_m"] for f in licht.findings + fors.findings}
+    assert per_label == {"100": 0.1, "249": 0.249, "250": 0.25, "251": 0.251}
+
+
+def test_hgt001_en_hgt002_noemen_de_gehanteerde_drempel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Zonder deze regel leest een gehalveerde telling als 'de data is beter geworden'."""
+    licht = uitkomst("HGT-001", config, bronnen, GRENS)
+    fors = uitkomst("HGT-002", config, bronnen, GRENS)
+
+    assert any(
+        "vanaf een afwijking van 0.100 m" in note and "tot 0.250 m" in note for note in licht.notes
+    )
+    assert any("vanaf een afwijking van 0.250 m" in note for note in fors.notes)
+    assert any("millimeter" in note for note in licht.notes)
 
 
 def test_hgt001_benoemt_welk_kenmerk_vergeleken_is(
@@ -385,7 +493,7 @@ def test_ext001_wijst_het_geraakte_pand_aan(config: CheckConfig, bronnen: Extern
 def test_ext001_registreert_de_treffer_met_geometrie(
     config: CheckConfig, bronnen: ExternalData
 ) -> None:
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-001"])
@@ -400,7 +508,7 @@ def test_ext001_registreert_de_treffer_met_geometrie(
 
 def test_ext001_bewaart_de_afstand_per_melding(config: CheckConfig, bronnen: ExternalData) -> None:
     """`Melding` draagt de afstand niet; de laag haalt hem uit het register."""
-    dataset = load_dataset(SCENARIO)
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-001"])
@@ -427,19 +535,141 @@ def test_ext003_wijst_het_geraakte_waterdeel_aan(
         for finding in outcome.findings
     }
 
-    assert verwijzingen == {("bgt:waterdeel/water-1", "waterloop")}
+    assert verwijzingen == {
+        ("bgt:waterdeel/water-1", "waterloop"),
+        ("bgt:waterdeel/water-5", "greppel"),
+        ("bgt:waterdeel/water-7", "greppel"),
+    }
 
 
-def test_ext002_registreert_geen_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
-    """De laag volgt EXT-003; kruisingen met een duiker horen er bewust buiten."""
-    dataset = load_dataset(SCENARIO)
+def test_ext003_registreert_zijn_treffer(config: CheckConfig, bronnen: ExternalData) -> None:
+    """EXT-003 registreert elk gemeld waterdeel als treffer.
+
+    Dit is de enige weg waarlangs de laag `vlakken` nog aan watervlakken komt: EXT-002
+    droeg die registratie sinds issue #67 ook, en is met issue #83 vervallen. Valt deze
+    registratie weg, dan loopt de laag stil leeg terwijl de meldingen blijven staan.
+    """
+    dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
-    run = run_checks(context, ["EXT-002"])
+    run = run_checks(context, ["EXT-003"])
 
-    assert len(run.treffers) == 0
     assert run.findings
+    # Elke melding wijst een geregistreerde treffer aan, allemaal waterdelen.
+    aangewezen = {f.details["object2_uri"] for f in run.findings}
+    assert aangewezen == {t.sleutel for t in run.treffers}
+    assert all(t.bron == "bgt_water" for t in run.treffers)
 
 
 def test_ext003_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:
-    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2"]
+    assert labels(uitkomst("EXT-003", config, bronnen)) == ["2", "9", "9"]
+
+
+def test_kruisingscheck_telt_wat_binnen_de_zoekstraal_afviel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 7 (lozingspunt), 8 (raakt niet) en 10 (over de rand) zijn geen bevinding.
+
+    Ze vielen wel binnen de zoekstraal; de toelichting hoort ze te tellen, anders
+    leest stilte als "alles is een doorkruising of ligt ver van het water".
+    """
+    outcome = uitkomst("EXT-003", config, bronnen)
+    notitie = next(note for note in outcome.notes if "doorkruis" in note.lower())
+
+    assert "7 paren" in notitie
+    assert "4 doorkruisingen" in notitie
+    assert "1 raakt het waterdeel niet" in notitie
+    assert "1 eindigt erin (lozingspunt)" in notitie
+    assert "1 loopt over de rand" in notitie
+
+
+def test_ext003_meldt_doorkruising_en_houdt_buffer_m(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    bevinding = next(
+        f for f in uitkomst("EXT-003", config, bronnen).findings if f.object_label == "9"
+    )
+
+    assert bevinding.message.startswith("Doorkruist een BGT-waterdeel")
+    assert bevinding.details["buffer_m"] == config.drempels.ext_watergang_buffer_m
+
+
+@pytest.mark.parametrize(
+    ("lijn", "verwacht"),
+    [
+        # Erin door de westoever, eruit door de oostoever. Het eindpunt ligt voorbij
+        # x = 20 en dus niet op de oever: een eindpunt op de oever telt als erin
+        # (het geval hieronder), en zou deze lijn een lozingspunt maken.
+        (LineString([(0.0, 5.0), (25.0, 5.0)]), "doorkruising"),
+        # Eindigt midden in het water.
+        (LineString([(0.0, 5.0), (15.0, 5.0)]), "lozingspunt"),
+        # Eindigt precies op de oever: telt als erin.
+        (LineString([(0.0, 5.0), (10.0, 5.0)]), "lozingspunt"),
+        # Ligt ernaast.
+        (LineString([(0.0, 11.0), (20.0, 11.0)]), "raakt niet"),
+        # Raakt met een knik alleen het hoekpunt (10, 10) aan, van buiten.
+        (LineString([(0.0, 20.0), (10.0, 10.0), (0.0, 0.0)]), "raakt niet"),
+        # Loopt over de noordrand.
+        (LineString([(5.0, 10.0), (25.0, 10.0)]), "tangentieel"),
+        # Twee keer erin en eruit (k = 4): nog steeds een doorkruising.
+        (
+            LineString(
+                [(0.0, 5.0), (12.0, 5.0), (12.0, -5.0), (15.0, -5.0), (15.0, 5.0), (25.0, 5.0)]
+            ),
+            "doorkruising",
+        ),
+    ],
+)
+def test_verhouding_tussen_streng_en_waterdeel(lijn: LineString, verwacht: str) -> None:
+    from nlriochecker.checks.extern import _verhouding
+
+    assert _verhouding(lijn, box(10.0, 0.0, 20.0, 10.0)) == verwacht
+
+
+def test_een_streng_meldt_elk_doorkruist_waterdeel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """Streng 9 doorkruist twee greppels en levert twee bevindingen, elk met eigen waterdeel.
+
+    Dit is de bewaking tegen het terugkeren van de `break` na het eerste waterdeel per
+    streng: die beperking was in BO-17 nog geaccepteerd en is met BO-43 vervallen. Met
+    één kandidaat-waterdeel per streng zou het verschil onzichtbaar blijven.
+    """
+    dataset = load_dataset(SCENARIO, [])
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run = run_checks(context, ["EXT-003"])
+    negens = [finding for finding in run.findings if finding.object_label == "9"]
+
+    assert len(negens) == 2
+    assert {finding.details["object2_uri"] for finding in negens} == {
+        "bgt:waterdeel/water-5",
+        "bgt:waterdeel/water-7",
+    }
+    assert {treffer.sleutel for treffer in run.treffers} >= {
+        "bgt:waterdeel/water-5",
+        "bgt:waterdeel/water-7",
+    }
+
+
+def test_ext003_geeft_elke_doorkruising_een_eigen_melding_id(
+    config: CheckConfig, bronnen: ExternalData, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Twee doorkruisingen van één streng mogen niet op dezelfde melding-ID uitkomen.
+
+    Zonder tweede object krijgt `melding_id` voor beide bevindingen op streng 9 dezelfde
+    ingredienten en slaat het volgnummer-vangnet aan -- een ID die van de
+    verwerkingsvolgorde afhangt. Het doorkruiste waterdeel is dat tweede object.
+    """
+    dataset = load_dataset(SCENARIO, [])
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    with caplog.at_level(logging.WARNING, logger="nlriochecker.uitvoer.melding"):
+        run = run_checks(context, ["EXT-003"])
+        meldingen = bouw_meldingen(run, date.today())
+
+    negens = [melding for melding in meldingen if melding.object_label == "9"]
+
+    assert len(negens) == 2
+    assert len({melding.melding_id for melding in negens}) == 2
+    assert [record.message for record in caplog.records] == []

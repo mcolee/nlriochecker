@@ -9,17 +9,42 @@
 
 [klassen]
 put = ["Put"]
+# Issue #64: de putten met een verwijderbare deksel. De dekselchecks (putdiepte HGT-012,
+# putbodem HGT-015/016) toetsen hierop en niet op elke Put -- een gemaal of een kolk
+# draagt geen Putdekselniveau. Rioolput dekt Inspectieput, Lozingsput, Overstortput,
+# Valput en de rest via de ontologie.
+rioolput = ["Rioolput"]
 vrijvervalleiding = ["VrijvervalRioolleiding"]
+# Issue #82: de populatie van TOP-006, TOP-010 en TOP-011 -- de drie checks die twee
+# leidingen naast elkaar leggen. Beide partijen van een paar moeten hieronder vallen. Een
+# duiker hoort erbij (hij voert vrijverval water en ligt in hetzelfde vlak), een drain, een
+# aansluitleiding en een mechanische leiding niet: een kruising van vrijverval met
+# drukriolering of met een drain is geen gebrek. Alle drie hangen in de GWSW-ontologie
+# rechtstreeks onder Leiding en niet onder VrijvervalRioolleiding, dus zij zaten wel in de
+# rol `streng` en niet in `vrijvervalleiding`. Zie BO-69.
+nabijheidsleiding = ["VrijvervalRioolleiding", "Duiker"]
 # Voor TOP-001: elke leiding telt mee als aansluiting, ook persleidingen en drains.
 # Persleiding valt via MechanischeTransportleiding en Transportleiding onder Leiding.
 streng = ["Leiding"]
-# Mechanisch riool valt buiten scope (zie het checkregister). Deze lijst filtert
-# echter geen enkele check: dat mechanisch riool buiten de analyse blijft komt
-# doordat de checks op `vrijvervalleiding` selecteren en niet doordat deze klassen
-# hier staan. Haar enige lezer is `uitvoer/gpkg.py` via `selectie.mechanischeleidingen`,
-# en die bepaalt uitsluitend de kaartkleur: een mechanische streng blijft in de laag
-# `strengen` maar krijgt status `grijs` zolang er niets op staat, zodat "geen kleur"
-# daar niet als "getoetst en in orde" leest.
+# Mechanisch riool wordt zelf niet getoetst (zie het checkregister): geen enkele
+# NET-check toetst het mechanische riool inhoudelijk, want zij selecteren op
+# `vrijvervalleiding`. De checks op de bredere rol `streng` (`[klassen] streng =
+# ["Leiding"]`) zien het wél -- ADM-002/003/010 en TOP-001 onder meer; wat zij erop melden
+# houdt `[rapport] onderdruk_klassen` desgewenst uit de uitvoer. TOP-006, TOP-010 en
+# TOP-011 melden er sinds issue #82 niet meer op: zij draaien op `nabijheidsleiding`
+# hierboven, waar het mechanische riool buiten valt (BO-69). Deze lijst
+# heeft sinds issue #72 twee lezers, en de tweede stuurt wel degelijk uitkomsten.
+#  - `uitvoer/gpkg.py` (via `selectie.mechanischeleidingen`) bepaalt de kaartkleur: een
+#    mechanische streng blijft in de laag `strengen` maar krijgt status `grijs` zolang er
+#    niets op staat, zodat "geen kleur" daar niet als "getoetst en in orde" leest. Sinds
+#    issue #74 bepaalt dezelfde lijst daar ook de richtingspijl: een mechanische streng
+#    krijgt `richting_bob = onbekend` (grijze pijl), ook als zij wel een BOB-verval draagt.
+#    Dat verval blijft in `bob_verval_m` staan; alleen de pijl vervalt.
+#  - `checks/verbanden._bouw_bereikbaarheid` legt deze leidingen als ONGERICHTE kanten in
+#    de bereikbaarheidsgraaf, doorlopend via hulpstukken. Daarmee bepaalt deze lijst mee of
+#    NET-001 en NET-002 een vrijvervalstreng als afgevoerd zien: een streng die op een
+#    pompput eindigt bereikt het gemaal erachter via het persnet. Leeg laten schakelt dat
+#    uit en meldt de hele drukriolering weer als onbereikbaar. Zie BO-54.
 # De twee ontologische wortels in plaats van de losse bladen: `MechanischeRioolleiding`
 # dekt Drukleiding, Luchtpersleiding en Vacuumleiding; `MechanischeTransportleiding` dekt
 # Persleiding, Leidingsegment en Spoelleiding. Dat sluit het gat met de symbolentabel,
@@ -29,14 +54,31 @@ streng = ["Leiding"]
 # 147 en Drukleiding 25; nul Luchtpersleiding, Leidingsegment of Spoelleiding, dus geen
 # object verandert van categorie (issue #56).
 mechanisch = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
+# TOP-022 en TOP-023: de hulpstukken. Hulpstuk is de ontologische wortel van T_stuk,
+# Y_stuk, Kruisstuk, Mof, Afsluitstuk, Ontstoppingsstuk, Tubelure en de rest; welke
+# daarvan een aantal leidingen voorschrijft leest de check uit de ontologie
+# (functie hasValue VerbindenVanTwee/Drie/VierLeidingen), niet uit deze lijst.
+hulpstuk = ["Hulpstuk"]
+# ADM-010: loze leidingen (GWSW: "Leiding is buiten gebruik"). De wortelklasse
+# dekt ook GedammerdeLeiding, Uitlegger, VolgeschuimdeLeiding en VolgezandeLeiding; De
+# Wolden levert alleen instanties van LozeLeiding zelf (54).
+loze_leiding = ["LozeLeiding"]
 # NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
 # degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
 # ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden.
-# Gemaal en Pompunit staan erbij als erkend noodverband: een vrijvervalstreng die
-# op een drukrioleringspomp eindigt gaat daar het mechanische stelsel in. Zonder
-# die regel geldt heel de drukriolering van De Wolden als onbereikbaar. Het
+# Gemaal staat erbij als erkend noodverband zolang Overnamepunt op nul staat; het
 # noodverband en het criterium om het los te laten staan in BO-33.
-afvoer_eindpunt = ["Overnamepunt", "Gemaal", "Pompunit"]
+# Pompunit hoort hier NIET bij: een pompput is een overdrachtspunt naar de
+# drukriolering, niet het einde van de afvoer. Hij stond er tot issue #73 wel in,
+# omdat de graaf het persnet niet volgde en zonder hem heel de drukriolering als
+# onbereikbaar gold. Sinds issue #72 dragen de mechanische leidingen de
+# bereikbaarheidsgraaf (zie `mechanisch` hierboven), dus een streng die op een
+# pompput eindigt wordt op haar echte route beoordeeld. Zie BO-55.
+# LET OP -- deze lijst en `mechanisch` hierboven hangen samen: `Pompunit` mag hier
+# alleen ontbreken zolang `mechanisch` klassen noemt. Zonder persnet is een streng
+# die op een pompput eindigt nergens meer heen, en meldt NET-001 haar vals als
+# onbereikbaar. `ClassRoots` weigert die combinatie (BO-55).
+afvoer_eindpunt = ["Overnamepunt", "Gemaal"]
 # Twee soorten door elkaar: Lozingspunt en UitlaatPunt zijn Knooppunt-klassen en
 # staan op de orientatie, terwijl Lozingsput (een Rioolput) en Uitlaatconstructie
 # (een Bouwwerk) fysieke objecten zijn. De Wolden gebruikt alleen die laatste twee.
@@ -50,6 +92,24 @@ lozings_eindpunt = [
   "Lozingsput",
   "Uitlaatconstructie",
 ]
+# EXT-007: de lozingspunten waar volgens het GWSW oppervlaktewater naast hoort te liggen.
+# Enger dan lozings_eindpunt hierboven, en dat blijft zo: NET-001, NET-002 en NET-008
+# hebben die bredere lijst als netwerkeindpunt nodig. De drie wortels zijn geverifieerd in
+# de gebundelde ontologie: Uitlaatconstructie is "de constructie waar uitstroming van water
+# uit een leiding naar het oppervlaktewater mogelijk is" (met Nooduitlaat en Uitstroombak
+# eronder), UitlaatPunt is datzelfde als punt, en LozingspuntOppervlaktewater is de lozing
+# waarvan "de locatie zich in het oppervlaktewater bevindt". Twee klassen horen er
+# nadrukkelijk NIET bij: Lozingsput ("een put waarmee het afvalwater het rioolstelsel
+# verlaat naar, of ontvangt uit, een ander rioolstelsel") en de wortel Lozingspunt, want
+# daaronder hangt ook LozingspuntBodem ("de locatie bevindt zich in de bodem"). Zie BO-67.
+waterlozingspunt = ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlaktewater"]
+# EXT-009: de pompputten van de drukriolering. De GWSW-ontologie omschrijft `Pompunit`
+# als "pompput in een drukrioleringsstelsel" en hangt haar onder `Rioolput`; ze is dus
+# een deelverzameling van `put` hierboven. `Gemaal` hoort er niet bij -- dat is een
+# bouwwerk en het einde van de afvoer, geen aansluitpunt van een buurt, en het staat al
+# in `afvoer_eindpunt`. Staat er een pompunit naast een straat, dan zegt het ontbreken
+# van vrijverval daar niets over de datakwaliteit: die straat wordt niet beoordeeld.
+pompunit = ["Pompunit"]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]
@@ -163,6 +223,12 @@ dekking_tolerantie_m = 300.0
 bgt = "BGT.gpkg"
 bag_pand = "bag_pand_koekangerveld.gpkg"
 nwb_wegvakken = "nwb_wegvakken_koekangerveld.gpkg"
+# EXT-009: het TOP10NL-plaatsvlak met de bebouwde kom. Er is voor Koekangerveld geen
+# eigen TOP10NL-levering; dit bestand is uit het De Wolden-extract geknipt met
+# `scripts/knip_top10nl_koekangerveld.py`. De laagnaam staat er apart bij: anders dan
+# `bag_pand` en `nwb_wegvakken` is dit geen eenlaagsbestand.
+top10nl = "top10nl_plaats_vlak_koekangerveld.gpkg"
+top10nl_komlagen = ["plaats_vlak"]
 studiegebied = "cbs_buurt_koekangerveld_studiegebied.gpkg"
 ahn_dtm = "ahn5_dtm_koekangerveld.tif"
 # Welke BGT-lagen welke rol vervullen. De namen komen uit de aangeleverde export;
@@ -174,8 +240,16 @@ bgt_pandlagen = ["pand"]
 # telt elk type mee (waterloop, greppel/droge sloot, watervlakte, zee); daar wordt niet
 # op gefilterd. Zie BO-24 in de beslislog.
 bgt_waterlagen = ["waterdeel"]
+# Geen check leest deze rol meer: EXT-005 en EXT-006 zijn met issue #95 vervallen bij
+# gebrek aan een bruikbare deksellaag (BO-64 en BO-65). De sleutel blijft staan -- hem
+# weghalen raakt het configuratiecontract -- en de laag wordt nog wel geladen en op
+# dekking getoetst.
 bgt_putdeksellagen = ["put"]
 bgt_overige_bouwwerklagen = ["overigbouwwerk", "gebouwinstallatie", "kunstwerkdeel_vlak"]
+# EXT-009: de wegdelen, voor het aandeel onverhard wegdek langs een straat. De verharding
+# staat in `plus_fysiek_voorkomen` (zand, grind, gravel, puin, ...); het historiefilter
+# van `_alleen_actueel` geldt hier net als bij de andere BGT-lagen.
+bgt_wegdeellagen = ["wegdeel"]
 
 [drempels]
 # Elke drempel draagt zijn check-ID en herkomst: een getal uit het checkregister,
@@ -189,9 +263,11 @@ snapping_tolerantie_m = 0.10
 # checkregister: "bijv. 0,30 m".
 dubbele_put_tolerantie_m = 0.30
 # TOP-006: hoe ver twee strengen mogen afwijken en hoe lang ze moeten samenvallen
-# om als dubbel ingetekend te gelden. Projectkeuze, geen externe bron.
-overlap_tolerantie_m = 0.05
-overlap_minimale_lengte_m = 1.0
+# om als dubbel ingetekend te gelden. Projectkeuze, geen externe bron. 2 cm over 2 m
+# vangt het echte duplicaat; twee buizen die legitiem naast elkaar liggen vallen
+# erbuiten en blijven zichtbaar via TOP-010 en TOP-013. Zie BO-70.
+overlap_tolerantie_m = 0.02
+overlap_minimale_lengte_m = 2.0
 # TOP-007: onder deze lengte geldt een streng als nul-lengte. Projectkeuze, geen
 # externe bron.
 nul_lengte_m = 0.01
@@ -206,7 +282,9 @@ rd_x_max = 300_000.0
 rd_y_min = 300_000.0
 rd_y_max = 630_000.0
 # TOP-010: extra marge bovenop de halve diameter van beide strengen. Projectkeuze,
-# geen externe bron.
+# geen externe bron. Blijft 0,0 (bekrachtigd 28-08): de marge discrimineert niet --
+# de gemelde overlaps zijn diep, geen schampgevallen -- en of zo'n kruising een echt
+# conflict is beslist de hoogte (HGT-004/009/018), niet deze marge. Zie BO-70.
 diameterbuffer_marge_m = 0.0
 # TOP-013 en TOP-014: aantallen waarboven het onaannemelijk wordt. Uit het
 # checkregister: "meer dan twee parallelle strengen" en "meer dan vier
@@ -241,10 +319,12 @@ begindatum_minimum = 1870
 begindatum_vulwaarde_aandeel = 0.20
 # ATTR-015: onder zoveel gedateerde objecten zegt zo'n aandeel niets.
 begindatum_vulwaarde_minimum_objecten = 30
-# ATTR-008: aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
+# Aannemelijk bereik voor de strenglengte. Bron: het GWSW-datatype
 # `Dt_LengteLeiding` declareert 1-75 m (owl:withRestrictions). GWSW is leidend, dus
 # beide grenzen volgen de ontologie -- niet langer de projectkeuze 200 m, die
-# strengen goedkeurde die de SHACL-nulmeting afkeurt (issue #35).
+# strengen goedkeurde die de SHACL-nulmeting afkeurt (issue #35). Geen check leest
+# deze twee drempels meer: ATTR-008 is met issue #90 geschrapt, want de
+# nulmetingvorm `LengteLeiding_val` toetst exact dit bereik (BO-61).
 minimale_strenglengte_m = 1.0
 maximale_strenglengte_m = 75.0
 # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.
@@ -261,18 +341,25 @@ rondheid_tolerantie_mm = 0.0
 # goed getoetst. Zie BO-39.
 wandruwheid_schalen = [1.0, 10.0]
 
-# HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN. Uit het
-# checkregister: "meer dan 5 cm" (waarschuwing) en "meer dan 25 cm" (fout).
-ahn_afwijking_waarschuwing_m = 0.05
+# HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN. Waarschuwing
+# vanaf 10 cm en fout vanaf 25 cm, beide inclusief: HGT-001 dekt [0,10 - 0,25) en
+# HGT-002 [0,25 - oneindig), vergeleken op millimeters afgerond. Het checkregister v0.9
+# zegt "meer dan 5 cm"; 5 cm ligt binnen de onzekerheid van de AHN-inwinning zelf. De
+# afwijking is vastgelegd in BO-44.
+ahn_afwijking_waarschuwing_m = 0.10
 ahn_afwijking_fout_m = 0.25
-# HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. Uit het
-# checkregister: "meer dan 3 m eronder".
-bob_maximale_diepte_m = 3.0
-# HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng. Het
-# checkregister noemt "onder drempel" en "boven drempel" zonder getal;
-# projectkeuze, geen externe bron.
+# HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. Het checkregister
+# zegt "meer dan 3 m eronder"; dat is de aanlegdiepte die het PvE Functionele eisen
+# vrijverval riolering van Rotterdam voor NIEUW gebied stelt. In bestaand gebied ligt
+# riool legitiem dieper (bergings- en transportriolen) en een landelijke maximumnorm
+# bestaat niet, dus 4,0 m = die ontwerpnorm plus marge. Zie BO-68.
+bob_maximale_diepte_m = 4.0
+# tegenverhang_licht_m is de vlak-band van NET-009 (onder dit |verval| zegt de BOB niets
+# over de richting); tegenverhang_fors_m is de forsgrens van HGT-006. Beide in meter over
+# de streng. Het checkregister noemt "onder drempel" en "boven drempel" zonder getal;
+# projectkeuze, geen externe bron. HGT-005 (licht) verviel in NET-009 (issue #80).
 tegenverhang_licht_m = 0.01
-tegenverhang_fors_m = 0.05
+tegenverhang_fors_m = 0.10
 # HGT-007: het minimale afschot staat als diameterstaffel in [[verhang_staffel]]
 # hierboven, met de RIONED-citaten. Geen scalaire drempel meer.
 # HGT-008: steiler dan een op zoveel is verdacht. Uit het checkregister: "steiler
@@ -333,20 +420,64 @@ afronding_minimum_waarnemingen = 30
 # afstanden als "X m" open; projectkeuze, geen externe bron.
 ext_pand_buffer_m = 1.0
 ext_watergang_buffer_m = 1.0
+# Geen check leest deze afstand meer: EXT-005 en EXT-006 zijn met issue #95 vervallen
+# (BO-64 en BO-65). De sleutel blijft staan -- hem weghalen raakt het
+# configuratiecontract -- en `ext_zoekafstand_max_m` telt hem nog mee.
 ext_putdeksel_afstand_m = 2.0
 ext_lozingspunt_water_afstand_m = 10.0
 ext_perceel_buffer_m = 1.0
 
-# #25: bufferafstand om de strengen van een stelsel, voor de cartografische laag
-# `stelsels` in de GeoPackage. Projectkeuze, geen externe bron: 10 m buffert elke
-# strenglijn tot een lint van 20 m breed, zodat de strengen van een stelsel langs
-# een straat samenvloeien tot één vlak zonder een langgerekt stelsel op te blazen.
-stelselvlak_buffer_m = 10.0
+# EXT-009 (issue #104): straten in de bebouwde kom zonder vrijvervalriolering. Alle elf
+# waarden komen uit de POC op De Wolden en Hoogeveen; het checkregister noemt de check
+# maar geen getal. Geen ervan telt mee in `ext_zoekafstand_max_m`: die verruimt het
+# bereik waarbinnen een EXT-check in een externe *laag* kijkt, en dat doet EXT-009
+# hoogstens `ext_wegvak_wegdek_buffer_m` (3 m) ver -- de 25 m en 15 m hieronder zijn
+# zoekafstanden in de GWSW-data. Zie BO-80.
+#
+# Halve breedte van het straatvlak: de voronoi-cel wordt op deze buffer om de NWB-lijn
+# geknipt, met een platte kap zodat het vlak bij de kruising ophoudt.
+ext_wegvak_buffer_m = 25.0
+# De strook waarin een persleiding als "langs deze straat" telt.
+ext_wegvak_corridor_m = 15.0
+# Korter dan dit is geen straat maar een stukje kruisingsgeometrie.
+ext_wegvak_minimale_lengte_m = 25.0
+# Om de hoeveel meter de wegvakken verdicht worden voordat de voronoi eroverheen gaat.
+ext_wegvak_verdichting_m = 10.0
+# De dragende maat: vrijvervalstreng in de eigen voronoi-cel gedeeld door de
+# straatlengte. Daaronder heet de straat leeg. Geijkt op de validatieset van 485
+# handmatig beoordeelde straten met `scripts/ijk_ext009.py`; zie BO-81.
+ext_wegvak_streng_in_cel = 0.30
+# Drukriolering-indicatie: een pompunit binnen deze afstand van de straat, of persleiding
+# langs de straat over meer dan dit aandeel van haar lengte. Zo'n straat wordt niet
+# beoordeeld -- daar hoeft geen vrijverval te liggen -- maar alleen in het onzekere
+# middengebied: ligt er nul meter vrijverval in haar eigen cel, dan is zij meetbaar leeg
+# en blijft de melding staan. Zie BO-81.
+ext_wegvak_pomp_afstand_m = 15.0
+ext_wegvak_persleiding_aandeel = 0.3
+# Boven dit aandeel onverhard wegdek valt de straat buiten scope.
+ext_wegvak_onverhard_aandeel = 0.5
+# De strook om de NWB-lijn waarin het BGT-wegdek gemeten wordt: het wegdek zelf en niet
+# de berm ernaast.
+ext_wegvak_wegdek_buffer_m = 3.0
+# De NWB-wegbeheerdersoort van een gemeentelijke weg (`WEGBEHSRT`).
+ext_wegvak_wegbeheerder = "G"
+# De NWB-baansubsoorten (`BST_CODE`) die geen straat zijn: paden, parkeerplaatsen en
+# op- en afritten. Daar hoort geen riool onder te liggen.
+ext_wegvak_uitgesloten_bst = ["FP", "VP", "VZ", "OPR", "AFR", "PC", "PKP", "PKB", "PR", "PP", "PST"]
+# De BGT-waarden van `plus_fysiek_voorkomen` die als onverhard tellen.
+ext_wegvak_onverhard_wegdek = ["zand", "grind", "gravel", "puin", "schelpen", "boomschors", "half verhard", "onverhard"]
+
+# #75: bufferafstand om de strengen van een gemengd deelstelsel, voor de cartografische
+# RVZ-006-vlakken in de laag `vlakken` van de GeoPackage (#98). Projectkeuze, geen externe
+# bron:
+# 10 m buffert elke strenglijn tot een lint van 20 m breed, zodat de strengen van een
+# deelstelsel langs een straat samenvloeien tot één vlak zonder het op te blazen.
+gemengd_zonder_overstort_buffer_m = 10.0
 
 [netwerk]
 # Hoe de afvoerrichting van een vrijvervalstreng bepaald wordt.
 #   administratief - de van-naar-richting uit het GWSW-model (standaard; dat is wat
-#                    het register bedoelt, en NET-003 toetst of die richting klopt)
+#                    het register bedoelt, en NET-009 toetst of die richting klopt)
 #   bob            - afgeleid uit het bodemverloop, met terugval op de
 #                    administratieve richting bij ontbrekende of gelijke BOB's
 richting = "administratief"
@@ -402,8 +533,22 @@ max_bevindingen_per_check = 0
 # Boven dit aandeel van de bekeken populatie heet een meldingtype systemisch: het
 # zegt dan meer over de export als geheel dan over de losse objecten.
 systemisch_drempel = 0.80
+# En vanaf hoeveel bekeken objecten dat aandeel iets mag betekenen. Onder dit aantal is
+# de ratio geen uitspraak over de export maar een breuk van kleine getallen: 26 van de 26
+# gemengde strengen in een buurt is geen structureel verschijnsel, en de vlag zou dat
+# gebrek van de kaart en uit de popup halen. Zie BO-59.
+systemisch_minimum_bekeken = 100
 # Versie van het checkregister waaraan deze run getoetst is.
 register_versie = "v0.9"
+# Meldingen die de uitvoer niet halen (issue #65): wortelklassen van het hoofdobject
+# (subklassen via de ontologie) en check-ID's. Een uitvoerkeuze, geen toetskeuze: de
+# checks draaien ongewijzigd, het rapport telt wat er wegviel. Standaard leeg; De Wolden
+# zet hier het mechanische riool. In `onderdruk_checks` horen alleen ID's uit het
+# checkregister; een nulmetingsvorm (`NULMETING-...`) of een datasetsignaal (`SIG-...`)
+# staat niet in het register en wordt geweigerd -- die onderdruk je via de klasse van
+# het object. Zie BO-49.
+onderdruk_klassen = []
+onderdruk_checks = []
 
 # Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
 # draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de

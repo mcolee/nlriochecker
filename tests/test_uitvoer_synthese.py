@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from helpers_melding import melding
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
 from nlriochecker.uitvoer.synthese import rode_draad
 
@@ -25,7 +26,7 @@ def _config() -> CheckConfig:
 
 def _run(bestand: str, config: CheckConfig | None = None) -> CheckRun:
     """Draait alle checks op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=config or _config())
     return run_checks(context)
 
@@ -45,7 +46,7 @@ def test_omgekeerde_registratie_wordt_als_gezamenlijke_oorzaak_benoemd() -> None
     """Stijgt de bodem bij veel strengen in de afvoerrichting, dan is dat een oorzaak.
 
     De fixture heeft een streng die administratief de verkeerde kant op staat; dat
-    verklaart tegelijk de NET-003-, NET-001- en HGT-006-bevinding.
+    verklaart tegelijk de NET-009-, NET-001- en HGT-006-bevinding.
     """
     tekst = _tekst("net003_tegen_de_richting.ttl")
 
@@ -67,7 +68,7 @@ def test_object_met_meldingen_uit_meerdere_checks_wordt_apart_benoemd() -> None:
     tekst = _tekst("net003_tegen_de_richting.ttl")
 
     assert "HGT-006" in tekst
-    assert "NET-003" in tekst
+    assert "NET-009" in tekst
 
 
 def test_gedeeld_deelstelsel_tussen_net_en_rvz_wordt_benoemd() -> None:

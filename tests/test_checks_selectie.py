@@ -8,7 +8,7 @@ de eindpunten en de bergbezinkvoorzieningen), en `vrijvervalrioolleidingen` binn
 `leidingen`.
 
 Twee datasets, elk om een eigen reden. `selectie_rollen.ttl` bevat precies een
-object per rol en dekt ze dus alle veertien; die fixture staat in de repository en
+object per rol en dekt ze dus alle zeventien; die fixture staat in de repository en
 is er altijd. Het Juinen-voorbeeld staat in `data/` -- dat ontbreekt in een schone
 kloon -- en dient voor de verhoudingen van een echte export: daar is een selectie
 groot genoeg dat een verwisseling van twee rollen in de aantallen opvalt.
@@ -20,6 +20,7 @@ import inspect
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import selectie
@@ -32,7 +33,6 @@ from nlriochecker.checks.selectie import (
     putten,
     vrijvervalrioolleidingen,
 )
-from nlriochecker.dataset import GwswDataset, load_dataset
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -40,7 +40,7 @@ TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 @pytest.fixture(scope="module")
 def rollenset() -> GwswDataset:
     """De fixture met precies een object per rol."""
-    return load_dataset(TTL_DIR / "selectie_rollen.ttl")
+    return load_dataset(TTL_DIR / "selectie_rollen.ttl", [])
 
 
 def context_van(dataset: GwswDataset) -> CheckContext:
@@ -48,18 +48,40 @@ def context_van(dataset: GwswDataset) -> CheckContext:
     return CheckContext(dataset=dataset, config=load_check_config())
 
 
-# De aantallen per rol op de rollenfixture: 7 knopen en 6 verbindingen. Alle
-# veertien rollen komen erin voor; dat bewaakt `test_elke_rol_komt_erin_voor`.
+# De aantallen per rol op de rollenfixture: 7 knopen en 7 verbindingen. Alle
+# zeventien rollen komen erin voor; dat bewaakt `test_elke_rol_komt_erin_voor`.
 ROLLENSET_AANTALLEN = {
-    "netwerkknopen": 7,
-    "putten": 5,
+    "netwerkknopen": 8,
+    "putten": 6,
+    # Alle zes de putten in de fixture zijn een Rioolput-subklasse (inspectie-, lozings-,
+    # overstort-, loze en valput, plus de pompunit van issue #104); een gemaal of uitlaat
+    # zit er niet bij. Issue #64.
+    "rioolputten": 6,
+    # De pompunit: een Rioolput, en dus een deelverzameling van `putten` hierboven. EXT-009
+    # leest deze rol als drukriolering-indicatie (issue #104).
+    "pompunits": 1,
     "lozingspunten": 2,
+    # Alleen de uitlaatconstructie: de lozingsput hoort bij de bredere rol hierboven maar
+    # loost volgens het GWSW naar een ander rioolstelsel en niet op open water (BO-67).
+    "waterlozingspunten": 1,
     "overstortputten": 1,
     "bergbezinkvoorzieningen": 1,
     "valconstructies": 1,
-    "functieloze_knopen": 1,
-    "leidingen": 5,
+    # Twee: de loze put en het T-stuk. Een T_stuk is een Verbindingsstuk, en dat staat
+    # in `functieloze_knoop` in beide TOML's -- een verbindingsstuk knoopt leidingen aan
+    # elkaar zonder zelf een functie te hebben. Dat gold al voor De Wolden en Hoogeveen;
+    # het wordt hier alleen zichtbaar nu de fixture een hulpstuk draagt (issue #60).
+    "functieloze_knopen": 2,
+    "hulpstukken": 1,
+    # Zeven: L1 t/m L4, de persleiding P1, de loze leiding Loos2 -- die laatste is een
+    # gwsw:Leiding en telt dus mee (issue #62) -- en de duiker Duiker1 (issue #82).
+    "leidingen": 7,
+    "lozeleidingen": 1,
     "vrijvervalrioolleidingen": 4,
+    # Vijf: de vier vrijvervalleidingen plus de duiker. Precies het verschil dat deze
+    # rol bestaansrecht geeft; zonder de duiker zou hij niet van `vrijvervalrioolleidingen`
+    # te onderscheiden zijn (issue #82).
+    "nabijheidsleidingen": 5,
     "overstortleidingen": 1,
     "bergbezinkleidingen": 1,
     "vuilwaterleidingen": 1,
@@ -80,16 +102,36 @@ JUINEN_AANTALLEN = {
 }
 
 
+def test_rol_velden_dekt_elke_rol() -> None:
+    """`_ROL_VELDEN` (voor de uitvoer) noemt elke rol en geen andere."""
+    from nlriochecker.checks.selectie import _ROL_VELDEN
+
+    assert set(_ROL_VELDEN) == set(_ROLLEN)
+
+
+def test_klassen_van_rol_leest_de_config() -> None:
+    """`klassen_van_rol` levert de wortelklassen uit `[klassen]` per rol."""
+    from nlriochecker.checks.selectie import klassen_van_rol
+
+    klassen = load_check_config().klassen
+    assert klassen_van_rol("rioolputten", klassen) == ["Rioolput"]
+    assert klassen_van_rol("putten", klassen) == ["Put"]
+
+
 def test_rollenlijst_is_volledig() -> None:
     """`_ROLLEN` noemt elke publieke selectie van de module, en niets anders.
 
     Zonder deze test is `_ROLLEN` een tweede plek om aan te denken: een vijftiende
     selectie die er niet in belandt, blijft ongetoetst zonder dat iets rood wordt.
     """
+    # `klassen_van_rol` is een opzoekfunctie voor de uitvoer, geen selectie (issue #64).
+    geen_selectie = {"klassen_van_rol"}
     publiek = {
         naam
         for naam, functie in inspect.getmembers(selectie, inspect.isfunction)
-        if not naam.startswith("_") and functie.__module__ == selectie.__name__
+        if not naam.startswith("_")
+        and functie.__module__ == selectie.__name__
+        and naam not in geen_selectie
     }
     assert set(_ROLLEN) == publiek
 
@@ -139,7 +181,7 @@ def test_putten_zit_echt_binnen_netwerkknopen(rollenset: GwswDataset) -> None:
 
 
 def test_vrijverval_zit_echt_binnen_leidingen(rollenset: GwswDataset) -> None:
-    """Een persleiding is wel een `gwsw:Leiding` maar geen vrijvervalrioolleiding."""
+    """Persleiding, loze leiding en duiker zijn wel `gwsw:Leiding`, geen vrijvervalrioolleiding."""
     context = context_van(rollenset)
     vrijverval = {conduit.uri for conduit in vrijvervalrioolleidingen(context)}
     alle = {conduit.uri for conduit in leidingen(context)}
@@ -147,7 +189,9 @@ def test_vrijverval_zit_echt_binnen_leidingen(rollenset: GwswDataset) -> None:
     buiten = {conduit.label for conduit in leidingen(context)} - {
         conduit.label for conduit in vrijvervalrioolleidingen(context)
     }
-    assert buiten == {"P1"}
+    # Loos2 valt er sinds issue #62 ook buiten: LozeLeiding hangt onder Leiding. Duiker1
+    # ook, en die hoort sinds issue #82 juist wel bij `nabijheidsleidingen`.
+    assert buiten == {"P1", "Loos2", "Duiker1"}
 
 
 def test_subklassen_tellen_mee(rollenset: GwswDataset) -> None:

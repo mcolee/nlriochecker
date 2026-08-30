@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import load_study_area
 from nlriochecker.uitvoer.identiteit import melding_id
-from nlriochecker.uitvoer.melding import _is_systemisch, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    BRON_DATASET,
+    BRON_NULMETING,
+    GEEN_ONDERDRUKKING,
+    Melding,
+    _is_systemisch,
+    bouw_meldingen,
+    bouw_meldingenstroom,
+)
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -28,7 +38,7 @@ def _config() -> CheckConfig:
 
 def _run(bestand: str, *check_ids: str) -> CheckRun:
     """Draait checks op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=_config())
     return run_checks(context, list(check_ids) or None)
 
@@ -168,11 +178,14 @@ def test_check_boven_de_drempel_heet_systemisch() -> None:
     """De drempel is configureerbaar; hier verlaagd om het gedrag te tonen.
 
     NET-001 slaat op de fixture op 1 van de 3 strengen aan. Met de standaarddrempel
-    van 80% is dat geen systemische melding, met 10% wel.
+    van 80% is dat geen systemische melding, met 10% wel. De minimumpopulatie van
+    BO-59 staat hier op 1: drie bekeken strengen halen de productiewaarde nooit, en
+    dan valt er geen ratio te tonen.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     config = _config()
     config.rapport.systemisch_drempel = 0.1
+    config.rapport.systemisch_minimum_bekeken = 1
     context = CheckContext(dataset=dataset, config=config)
     run = run_checks(context, ["NET-001"])
 
@@ -180,6 +193,26 @@ def test_check_boven_de_drempel_heet_systemisch() -> None:
 
     assert meldingen
     assert all(melding.systemisch for melding in meldingen)
+
+
+def test_een_te_kleine_populatie_is_nooit_systemisch() -> None:
+    """Onder de minimumpopulatie zegt de ratio niets (BO-59).
+
+    NET-001 slaat op deze fixture op 1 van de 3 strengen aan. Met de drempel op 10%
+    haalt die ratio de grens ruim, maar drie bekeken objecten dragen geen uitspraak
+    over de export als geheel; zo'n check hoort gewoon per object gemeld te worden.
+    Pas vanaf `systemisch_minimum_bekeken` telt de ratio mee.
+    """
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
+    config = _config()
+    config.rapport.systemisch_drempel = 0.1
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+    assert run.outcomes[0].examined < config.rapport.systemisch_minimum_bekeken
+
+    assert all(not melding.systemisch for melding in bouw_meldingen(run, RUNDATUM))
+
+    config.rapport.systemisch_minimum_bekeken = 1
+    assert all(melding.systemisch for melding in bouw_meldingen(run, RUNDATUM))
 
 
 def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
@@ -190,9 +223,10 @@ def test_systemisch_hangt_niet_af_van_de_afbakening() -> None:
     "systemisch" iets anders betekenen naargelang er een gebied is opgegeven -- en
     daar hangen zowel de kaartstijl als de tellingen op de featurelagen aan.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     config = _config()
     config.rapport.systemisch_drempel = 0.1
+    config.rapport.systemisch_minimum_bekeken = 1
     run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
     assert all(melding.systemisch for melding in bouw_meldingen(run, RUNDATUM))
 
@@ -228,7 +262,7 @@ def _nulbevinding(**overschrijf: object) -> Nulbevinding:
 
 def _run_met_nulbevindingen(bestand: str, *bevindingen: Nulbevinding) -> CheckRun:
     """Een run zonder eigen checkbevindingen, met alleen nulmetingbevindingen."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=_config())
     run = run_checks(context, [])
     return replace(run, nulbevindingen=tuple(bevindingen))
@@ -313,3 +347,142 @@ def test_prioriteit_volgt_dezelfde_regel_als_bij_een_eigen_check() -> None:
     (melding,) = _uit_nulmeting(bouw_meldingen(run, RUNDATUM))
 
     assert melding.prioriteit == 3
+
+
+# Issue #65: onderdrukking per klasse en per check, in `bouw_meldingenstroom` en nergens
+# anders. De fixture: vrijvervalstreng L1 kruist persleiding L2 en duiker L3. TOP-011
+# meldt sinds issue #82 alleen het duikerpaar -- een persleiding valt buiten die
+# populatie -- dus een keer, met L1 als hoofdobject en L3 als tweede object; daarnaast
+# levert deze kleine fixture SIG-nulklassemeldingen zonder hoofdobject, die hier buiten
+# beschouwing blijven (`_zonder_signalen`) behalve waar juist bewezen wordt dat ze blijven
+# staan.
+PERSLEIDING = "http://example.org/toets#L2"
+DUIKER = "http://example.org/toets#L3"
+VRIJVERVAL = "http://example.org/toets#L1"
+
+
+def _run_onderdrukt(
+    klassen: Sequence[str] = (), checks: Sequence[str] = (), *bevindingen: Nulbevinding
+) -> CheckRun:
+    """TOP-011 op de kruisingsfixture, met de twee lijsten uit `[rapport]` gezet."""
+    config = _config()
+    config.rapport.onderdruk_klassen = list(klassen)
+    config.rapport.onderdruk_checks = list(checks)
+    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl", [])
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
+    return replace(run, nulbevindingen=tuple(bevindingen))
+
+
+def _zonder_signalen(meldingen: list[Melding]) -> list[Melding]:
+    """De meldingen die niet uit de datasetsignalen komen (issue #22)."""
+    return [melding for melding in meldingen if melding.bron != BRON_DATASET]
+
+
+def test_zonder_lijsten_verandert_er_niets() -> None:
+    stroom = bouw_meldingenstroom(_run_onderdrukt(), RUNDATUM)
+
+    assert [m.object_uri for m in _zonder_signalen(stroom.meldingen)] == [VRIJVERVAL]
+    assert stroom.onderdrukking == GEEN_ONDERDRUKKING
+    assert not stroom.onderdrukking.actief
+    assert bouw_meldingen(_run_onderdrukt(), RUNDATUM) == stroom.meldingen
+
+
+def test_onderdrukking_per_klasse_haalt_het_hoofdobject_weg_en_laat_het_tweede_object_staan() -> (
+    None
+):
+    """De duiker verliest haar nulmetingmelding; de kruisingsmelding op de
+    vrijvervalstreng, die de duiker als object2 noemt, blijft.
+
+    De onderdrukte klasse is die van het tweede object, want alleen dan bewijst de test
+    iets: viel de melding op object2 weg, dan zou zij hier verdwijnen.
+    """
+    nul = _nulbevinding(object_uri=DUIKER, object_label="3", objecttype="Duiker")
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Duiker"], [], nul), RUNDATUM)
+
+    over = _zonder_signalen(stroom.meldingen)
+    assert [m.object_uri for m in over] == [VRIJVERVAL]
+    assert over[0].object2_uri == DUIKER
+    # Een: TOP-011 meldt het paar een keer, met de vrijvervalstreng als hoofdobject, dus
+    # alleen de nulmetingmelding op de duiker valt hier weg. Ze staat in beide
+    # tellingen: onder haar wortel en onder haar check-ID.
+    assert stroom.onderdrukking.per_klasse == {"Duiker": 1}
+    assert stroom.onderdrukking.per_check == {"NULMETING-Put_HoogtePut_card": 1}
+    assert stroom.onderdrukking.totaal == 1
+    assert stroom.onderdrukking.actief
+    assert stroom.onderdrukking.klassen == ("Duiker",)
+
+
+def test_onderdrukking_per_check_gaat_voor_en_telt_een_melding_maar_een_keer() -> None:
+    """Een melding die op check én klasse zou wegvallen telt niet mee in `per_klasse`.
+
+    `Leiding` en niet `MechanischeTransportleiding`, want alleen onder die wortel valt de
+    TOP-011-melding op de vrijvervalstreng ook op klasse weg -- pas dan is er iets om
+    voorrang over te geven.
+    """
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], ["TOP-011"]), RUNDATUM)
+
+    assert _zonder_signalen(stroom.meldingen) == []
+    assert stroom.onderdrukking.per_check == {"TOP-011": 1}
+    assert stroom.onderdrukking.per_klasse == {}
+    assert stroom.onderdrukking.totaal == 1
+
+
+def test_de_eerste_treffende_wortel_uit_de_lijst_krijgt_de_telling() -> None:
+    """De volgorde van de lijst beslist: `Leiding` staat vooraan en telt de persleiding.
+
+    Beide wortels dekken L2; zonder die regel zou een melding onder twee wortels kunnen
+    vallen en zou de som van `per_klasse` hoger zijn dan het aantal weggevallen meldingen.
+    """
+    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
+    stroom = bouw_meldingenstroom(
+        _run_onderdrukt(["Leiding", "MechanischeTransportleiding"], [], nul), RUNDATUM
+    )
+
+    assert stroom.onderdrukking.per_klasse == {"Leiding": 2}
+    assert stroom.onderdrukking.totaal == 2
+
+
+def test_een_klassetreffer_telt_in_beide_tellingen_maar_een_keer_in_het_totaal() -> None:
+    """De twee tellingen beantwoorden verschillende vragen en zijn geen partitie.
+
+    `per_check` is het verschil met de kolom Bevindingen -- ook een check waarvan alle
+    bevindingen op klasse wegvielen hoort er met zijn aantal in te staan, want anders
+    leest hij als "0 bevindingen" met "per check: geen" ernaast. `per_klasse` zegt onder
+    welke wortel dat gebeurde. `totaal` telt alleen `per_check`, dus elke melding een
+    keer.
+    """
+    nul = _nulbevinding(object_uri=PERSLEIDING, object_label="2", objecttype="Persleiding")
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], [], nul), RUNDATUM)
+
+    assert stroom.onderdrukking.per_check == {
+        "TOP-011": 1,
+        "NULMETING-Put_HoogtePut_card": 1,
+    }
+    assert stroom.onderdrukking.per_klasse == {"Leiding": 2}
+    assert stroom.onderdrukking.totaal == 2
+    assert len(_zonder_signalen(stroom.meldingen)) == 0
+
+
+def test_een_melding_zonder_object_valt_nooit_op_klasse_weg() -> None:
+    """Een onherleide nulmelding en de datasetsignalen hebben geen hoofdobject, dus geen
+    klasse; alleen de TOP-011-melding op de vrijvervalstreng valt op `Leiding` weg."""
+    los = _nulbevinding(object_uri="", object_label="", objecttype="", herleid=False)
+    zonder = bouw_meldingenstroom(_run_onderdrukt([], [], los), RUNDATUM)
+    stroom = bouw_meldingenstroom(_run_onderdrukt(["Leiding"], [], los), RUNDATUM)
+
+    assert [m.bron for m in _zonder_signalen(stroom.meldingen)] == [BRON_NULMETING]
+    assert len(stroom.meldingen) == len(zonder.meldingen) - 1
+    assert stroom.onderdrukking.per_klasse == {"Leiding": 1}
+    assert stroom.onderdrukking.per_check == {"TOP-011": 1}
+
+
+def test_onderdrukking_raakt_examined_en_systemisch_niet() -> None:
+    """Een uitvoerkeuze, geen toetskeuze: de check zelf ziet de lijsten niet."""
+    met = _run_onderdrukt(["MechanischeTransportleiding"], [])
+    zonder = _run_onderdrukt()
+
+    assert [o.examined for o in met.outcomes] == [o.examined for o in zonder.outcomes]
+    assert [len(o.findings) for o in met.outcomes] == [len(o.findings) for o in zonder.outcomes]
+    assert _is_systemisch(met.outcomes[0], met.config) == _is_systemisch(
+        zonder.outcomes[0], zonder.config
+    )

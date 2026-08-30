@@ -7,26 +7,39 @@ met `sqlite3` terug, zodat lees- en schrijfkant elkaar in de gaten houden.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import xml.etree.ElementTree as ET
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import box
 
 from gpkghelper import schrijf_vlakken
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, load_check_config
-from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.dataset import load_dataset
+from nlriochecker.checks import CheckContext, CheckRun, Severity, run_checks
 from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik
+from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import _lees_geopackage, load_study_area
-from nlriochecker.uitvoer.gpkg import GEOPACKAGE_STAPPEN, RD_NEW, schrijf_geopackage
-from nlriochecker.uitvoer.melding import bouw_meldingen
+from nlriochecker.uitvoer.gpkg import (
+    FEATURELAGEN,
+    GEOPACKAGE_STAPPEN,
+    RD_NEW,
+    REDEN_MECHANISCH,
+    REDEN_ONDERDRUKT,
+    VLAK_CHECKS,
+    VLAK_SOORT_GEMENGD,
+    schrijf_geopackage,
+)
+from nlriochecker.uitvoer.melding import bouw_meldingen, bouw_meldingenstroom
+from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
@@ -35,15 +48,22 @@ VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 
 
 def _config() -> CheckConfig:
-    """De standaardconfig, met het RD-bereik verruimd tot de fixturecoordinaten."""
+    """De standaardconfig, met het RD-bereik verruimd tot de fixturecoordinaten.
+
+    De minimumpopulatie van BO-59 staat op 1. De fixtures tellen een handvol objecten
+    en halen de productiewaarde van 100 nooit; zonder deze verlaging vouwt niets samen
+    en is het gedrag rond systemische meldingen (status, popup, vlakkenlaag) hier niet
+    te tonen.
+    """
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
+    config.rapport.systemisch_minimum_bekeken = 1
     return config
 
 
 def _run(bestand: str, *check_ids: str) -> CheckRun:
     """Draait checks op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=_config())
     return run_checks(context, list(check_ids) or None)
 
@@ -161,6 +181,35 @@ def test_overzicht_checks_toont_ook_de_checks_zonder_bevinding(tmp_path: Path) -
     assert aantal == len(run.outcomes)
 
 
+def test_overzicht_checks_labelt_waarover_bekeken_geteld_is(tmp_path: Path) -> None:
+    """`percentage_populatie` deelt door `bekeken`; zonder label is dat onvergelijkbaar.
+
+    ADM-002 telt de volledige export, TOP-013 de analyseset (hier gelijk, want er is
+    geen studiegebied) en ATTR-014 kenmerkinstanties. `populatie` staat daarnaast en is
+    de declaratie van de check, geen noemer: RVZ-011 noemt zijn kenmerken en ADM-007,
+    die niets declareert, blijft leeg -- "de hele export" naast `percentage_populatie`
+    zou juist het misverstand terugbrengen. Zie issue #77 en BO-58.
+    """
+    run = _run("top013_parallel.ttl", "ADM-002", "ADM-007", "ATTR-014", "RVZ-011", "TOP-013")
+    pad = _schrijf(run, tmp_path)
+
+    rijen = dict(
+        (check_id, (scope, populatie))
+        for check_id, scope, populatie in _rijen(
+            pad, "select check_id, bekeken_scope, populatie from overzicht_checks"
+        )
+    )
+
+    assert rijen["TOP-013"] == ("analyseset", "leidingen, netwerkknopen, vrijvervalrioolleidingen")
+    assert rijen["ADM-002"] == ("volledige_export", "leidingen, netwerkknopen")
+    assert rijen["ATTR-014"] == ("attribuut_instanties", "alle kenmerken")
+    assert rijen["RVZ-011"] == (
+        "analyseset",
+        "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau",
+    )
+    assert rijen["ADM-007"] == ("analyseset", "")
+
+
 def test_runmetadata_maakt_het_bestand_herleidbaar(tmp_path: Path) -> None:
     run = _run("schoon.ttl")
     pad = _schrijf(run, tmp_path)
@@ -185,13 +234,7 @@ def test_stijlen_staan_in_het_bestand(tmp_path: Path) -> None:
         pad, "select f_table_name, styleQML, useAsDefault from layer_styles order by f_table_name"
     )
 
-    assert [naam for naam, _, _ in stijlen] == [
-        "bouwwerken",
-        "putten",
-        "stelsels",
-        "strengen",
-        "waterdelen_zonder_zinker",
-    ]
+    assert [naam for naam, _, _ in stijlen] == ["putten", "strengen", "vlakken"]
     for _, qml, standaard in stijlen:
         assert standaard == 1
         ET.fromstring(qml)
@@ -260,7 +303,7 @@ def test_zonder_analyseset_blijven_de_kolommen_leeg(tmp_path: Path) -> None:
 
 
 def test_de_analyseset_omvang_staat_in_de_runmetadata(tmp_path: Path) -> None:
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = _config()
     analyseset = bouw_analyseset(dataset, area, config)
@@ -453,6 +496,36 @@ def test_featurelagen_dragen_het_stelseltype(tmp_path: Path) -> None:
     assert putten["A"] == "gemengd"
 
 
+def test_featurelagen_dragen_het_begindatumjaar(tmp_path: Path) -> None:
+    """Het aanlegjaar als kolom om op te filteren; leeg als het object er geen draagt.
+
+    `hgt_schoon.ttl` heeft één streng met begindatum 1980-01-01 en twee putten zonder
+    begindatum (issue #61).
+    """
+    pad = _schrijf(_run("hgt_schoon.ttl"), tmp_path)
+
+    strengen = dict(_rijen(pad, "select label, begindatum_jaar from strengen"))
+    putten = dict(_rijen(pad, "select label, begindatum_jaar from putten"))
+
+    assert strengen == {"1": 1980}
+    assert putten == {"A": None, "B": None}
+
+
+def test_put_zonder_begindatum_kleurt_rood_door_attr018(tmp_path: Path) -> None:
+    """Issue #61: een object zonder aanlegjaar was groen op de kaart, en groen betekent
+    daar 'beoordeeld en niets gevonden'. ATTR-018 hoort het rood te maken."""
+    pad = _schrijf(_run("attr018_zonder_begindatum.ttl"), tmp_path)
+
+    putten = {
+        label: (status, checks_f)
+        for label, status, checks_f in _rijen(pad, "select label, status, checks_f from putten")
+    }
+
+    assert putten["A"][0] == "rood"
+    assert "ATTR-018" in putten["A"][1]
+    assert "ATTR-018" not in putten["B"][1]
+
+
 def test_strengen_dragen_de_bob_richting(tmp_path: Path) -> None:
     pad = _schrijf(_run("hgt_schoon.ttl"), tmp_path)
 
@@ -499,6 +572,48 @@ def test_onbepaalbare_tekenrichting_geeft_onbekend_geen_administratief_terugvalt
     assert verval is None
 
 
+def test_persleiding_met_bob_krijgt_geen_vrijvervalrichting(tmp_path: Path) -> None:
+    """Issue #74: een gepompte leiding draagt geen betrouwbare vrijverval-BOB.
+
+    Beide strengen in de fixture dragen hetzelfde verval (8,00 naar 7,50, dalend langs
+    de getekende lijn). De vrijvervalstreng hoort daar `mee` van te krijgen; de
+    persleiding hoort grijs te blijven, want een pijl zou daar een fysiek onjuiste
+    stroomrichting tekenen.
+
+    Alleen de pijl vervalt. `bob_verval_m` is een gemeten waarde en geen bewering over
+    de stroomrichting, dus die blijft op de persleiding gewoon staan -- anders was zij
+    niet meer te onderscheiden van een mechanische leiding zonder BOB.
+    """
+    pad = _schrijf(_run("richting_persleiding_met_bob.ttl"), tmp_path)
+
+    strengen = {
+        label: (richting, verval)
+        for label, richting, verval in _rijen(
+            pad, "select label, richting_bob, bob_verval_m from strengen"
+        )
+    }
+
+    assert strengen["1"] == ("mee", pytest.approx(0.50))
+    assert strengen["p"] == ("onbekend", pytest.approx(0.50))
+
+
+def test_popup_van_een_persleiding_noemt_waarom_er_geen_richting_staat(tmp_path: Path) -> None:
+    """Grijs zonder reden leest als "niet te bepalen"; hier is het een eigenschap van
+    de leiding, en de popup hoort dat te zeggen.
+
+    De regel spreekt van "mechanische leiding" en niet van "persleiding": de rol dekt
+    zes klassen, en op een Vacuumleiding zou "persleiding" de objecttyperegel erboven
+    tegenspreken.
+    """
+    pad = _schrijf(_run("richting_persleiding_met_bob.ttl"), tmp_path)
+
+    popups = dict(_rijen(pad, "select label, popup_html from strengen"))
+
+    assert "mechanische leiding — geen vrijvervalrichting" in popups["p"]
+    assert "BOB-richting niet te bepalen" not in popups["p"]
+    assert "BOB-verval loopt met de getekende lijn mee" in popups["1"]
+
+
 def test_runmetadata_noemt_de_cfk_set_en_of_die_volledig_is(tmp_path: Path) -> None:
     """De CFK-set hoort bij de run, dus in gwsw_run en niet op elke melding."""
     run = replace(_run("schoon.ttl"), meetbereik=Meetbereik.van(VEREIST, ["Hyd", "MdsPlan"]))
@@ -540,10 +655,14 @@ def _ext_bronnen() -> ExternalData:
 
 
 def _ext_run() -> CheckRun:
-    """Een run met de EXT-checks op de scenariofixture."""
-    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl")
+    """Een run met precies de checks die een vlak kunnen aanwijzen.
+
+    De lijst komt uit `VLAK_CHECKS` en niet uit een tweede opsomming: valt er een check
+    weg of komt er een bij, dan draait deze run mee in plaats van stil achter te blijven.
+    """
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl", [])
     context = CheckContext(dataset=dataset, config=_config(), bronnen=_ext_bronnen())
-    return run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
+    return run_checks(context, list(VLAK_CHECKS))
 
 
 def _laagrijen(pad: Path, laag: str) -> list[dict]:
@@ -563,66 +682,83 @@ def _laagrijen(pad: Path, laag: str) -> list[dict]:
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_bouwwerkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) -> None:
-    """De kerntest: niets erbij, niets eraf."""
+def test_vlakkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) -> None:
+    """De kerntest: niets erbij, niets eraf. Eén laag voor alle checks uit VLAK_CHECKS."""
     run = _ext_run()
     meldingen = bouw_meldingen(run, RUNDATUM)
     pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
 
-    verwacht = {m.object2_uri for m in meldingen if m.check_id == "EXT-001"}
+    verwacht = {m.object2_uri for m in meldingen if m.check_id in VLAK_CHECKS and m.object2_uri}
 
-    assert {rij["id"] for rij in _laagrijen(pad, "bouwwerken")} == verwacht
-
-
-@pytest.mark.skipif(
-    not (GIS_DIR / "ext" / "ahn.tif").exists(),
-    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
-)
-def test_bouwwerk_wordt_ontdubbeld_met_de_sterkste_relatie(tmp_path: Path) -> None:
-    """Vier objecten raken hetzelfde pand: een rij, vier meldingen, binnen wint."""
-    run = _ext_run()
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
-
-    rijen = _laagrijen(pad, "bouwwerken")
-
-    assert len(rijen) == 1
-    assert rijen[0]["id"] == "bgt:pand/pand-1"
-    assert rijen[0]["bron"] == "bgt_pand"
-    assert rijen[0]["bronbestand"] == "bgt.gpkg"
-    assert rijen[0]["label"] == "pand pand-1"
-    assert rijen[0]["relatie"] == "binnen"
-    assert rijen[0]["afstand_min_m"] == 0.0
-    assert rijen[0]["aantal_meldingen"] == 4
-    assert rijen[0]["check_ids"] == "EXT-001"
+    assert {rij["id"] for rij in _laagrijen(pad, "vlakken")} == verwacht
 
 
 @pytest.mark.skipif(
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_waterdelenlaag_volgt_ext003_en_niet_ext002(tmp_path: Path) -> None:
-    """Streng 3 kruist water-2 met een duiker; dat waterdeel hoort er niet in."""
+def test_pandvlak_wordt_ontdubbeld_met_de_sterkste_relatie(tmp_path: Path) -> None:
+    """Vier objecten raken hetzelfde pand: één rij, vier meldingen, binnen wint."""
     run = _ext_run()
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
-    rijen = _laagrijen(pad, "waterdelen_zonder_zinker")
+    panden = [rij for rij in _laagrijen(pad, "vlakken") if rij["soort"] == "pand"]
 
-    assert [rij["id"] for rij in rijen] == ["bgt:waterdeel/water-1"]
-    assert rijen[0]["watertype"] == "waterloop"
-    assert rijen[0]["aantal_meldingen"] == 1
-    assert rijen[0]["check_ids"] == "EXT-003"
-    assert rijen[0]["buffer_m"] == _config().drempels.ext_watergang_buffer_m
+    assert len(panden) == 1
+    assert panden[0]["id"] == "bgt:pand/pand-1"
+    assert panden[0]["soort"] == "pand"
+    assert panden[0]["bron"] == "bgt_pand"
+    assert panden[0]["bronbestand"] == "bgt.gpkg"
+    assert panden[0]["label"] == "pand pand-1"
+    assert panden[0]["relatie"] == "binnen"
+    assert panden[0]["afstand_min_m"] == 0.0
+    assert panden[0]["aantal_meldingen"] == 4
+    assert panden[0]["check_ids"] == "EXT-001"
 
 
-def test_lege_lagen_bestaan_en_zijn_geregistreerd(tmp_path: Path) -> None:
-    """Een run zonder EXT-treffers heeft beide lagen, leeg, met stijl en registratie."""
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_watervlakken_blijven_bestaan_en_hangen_aan_ext003(tmp_path: Path) -> None:
+    """De vlakkenlaag mag niet leeglopen nu EXT-002 vervallen is (issue #83).
+
+    EXT-003 registreert het doorkruiste waterdeel zelf, dus elke doorkruising die hij
+    meldt houdt haar vlak: water-1 (streng 2) en water-5/7 (de twee greppels van streng
+    9). Wat wél verdwijnt is water-2, het waterdeel dat alleen EXT-002 zag -- een
+    doorkruising door de als zinker geregistreerde streng 3, die EXT-003 overslaat.
+    """
+    run = _ext_run()
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    water = {rij["id"]: rij for rij in _laagrijen(pad, "vlakken") if rij["soort"] == "water"}
+
+    assert set(water) == {
+        "bgt:waterdeel/water-1",
+        "bgt:waterdeel/water-5",
+        "bgt:waterdeel/water-7",
+    }
+    assert {rij["check_ids"] for rij in water.values()} == {"EXT-003"}
+    # Water draagt geen relatie of afstand -- die gelden alleen voor pand en bouwwerk.
+    assert water["bgt:waterdeel/water-1"]["relatie"] == ""
+    assert water["bgt:waterdeel/water-1"]["afstand_min_m"] is None
+
+
+def test_lege_vlakkenlaag_bestaat_en_is_geregistreerd(tmp_path: Path) -> None:
+    """Een run zonder EXT-treffers heeft de laag `vlakken`, met stijl en registratie.
+
+    Er staat dan geen extern vlak in: die volgen de EXT-meldingen. Een deelstelselvlak van
+    RVZ-006 kan er wél in staan -- dat is sinds issue #98 dezelfde laag, maar een eigen
+    soort uit een eigen bron.
+    """
     pad = _schrijf(_run("schoon.ttl"), tmp_path)
 
-    for laag in ("bouwwerken", "waterdelen_zonder_zinker"):
-        assert _rijen(pad, f'select count(*) from "{laag}"')[0][0] == 0
-        geregistreerd = _rijen(pad, "select count(*) from gpkg_contents where table_name = ?", laag)
-        gestyled = _rijen(pad, "select count(*) from layer_styles where f_table_name = ?", laag)
-        assert (geregistreerd[0][0], gestyled[0][0]) == (1, 1)
+    assert _rijen(pad, 'select count(*) from "vlakken" where soort <> ?', VLAK_SOORT_GEMENGD) == [
+        (0,)
+    ]
+    geregistreerd = _rijen(pad, "select count(*) from gpkg_contents where table_name = 'vlakken'")
+    gestyled = _rijen(pad, "select count(*) from layer_styles where f_table_name = 'vlakken'")
+    assert (geregistreerd[0][0], gestyled[0][0]) == (1, 1)
 
 
 def _bronnen_met_pand(
@@ -654,7 +790,7 @@ def _bronnen_met_pand(
 
 def _run_met_bronnen(bronnen: ExternalData, *check_ids: str) -> CheckRun:
     """Draait checks op de EXT-scenariofixture met eigen bronnen."""
-    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl")
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl", [])
     context = CheckContext(dataset=dataset, config=_config(), bronnen=bronnen)
     return run_checks(context, list(check_ids))
 
@@ -667,9 +803,10 @@ def test_nabij_geval_komt_in_de_laag(tmp_path: Path) -> None:
     run = _run_met_bronnen(bronnen, "EXT-001")
 
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
-    rijen = _laagrijen(pad, "bouwwerken")
+    rijen = _laagrijen(pad, "vlakken")
 
     assert [rij["id"] for rij in rijen] == ["bgt:pand/p-nabij"]
+    assert rijen[0]["soort"] == "pand"
     assert rijen[0]["relatie"] == "nabij"
     assert rijen[0]["aantal_meldingen"] == 2
     assert rijen[0]["afstand_min_m"] == 0.5
@@ -685,7 +822,7 @@ def test_bron_zonder_id_levert_een_geo_sleutel(tmp_path: Path) -> None:
     run = _run_met_bronnen(bronnen, "EXT-001")
 
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
-    rijen = _laagrijen(pad, "bouwwerken")
+    rijen = _laagrijen(pad, "vlakken")
 
     assert rijen[0]["id"].startswith("geo:")
     assert any("geo:" in note for note in run.outcomes[0].notes)
@@ -711,28 +848,64 @@ def test_geo_sleutel_is_stabiel_over_runs(tmp_path: Path) -> None:
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_runmetadata_telt_de_trefferlagen_mee(tmp_path: Path) -> None:
-    """De aantallen per laag horen ook in gwsw_run te staan, net als de andere lagen."""
+def test_runmetadata_telt_de_vlakkenlaag_mee(tmp_path: Path) -> None:
+    """Het aantal vlakken hoort ook in gwsw_run te staan, net als de andere lagen."""
     run = _ext_run()
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
-    rij = _rijen(pad, "select n_bouwwerken, n_waterdelen from gwsw_run")[0]
+    (aantal,) = _rijen(pad, "select n_vlakken from gwsw_run")[0]
 
-    assert rij == (1, 1)
+    # Vier vlakken: één pand van EXT-001 plus de drie waterdelen die EXT-003 meldt
+    # (water-1/5/7). Water-2 hing aan het vervallen EXT-002 (issue #83).
+    assert aantal == 4
+    assert aantal == len(_laagrijen(pad, "vlakken"))
 
 
 @pytest.mark.skipif(
     not (GIS_DIR / "ext" / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
 )
-def test_waterdeel_label_noemt_type_en_identificatie(tmp_path: Path) -> None:
-    """`watertype` is om op te filteren, `label` is om iets in terug te vinden."""
+def test_de_vlakkenlaag_draagt_beide_bronnen_naast_elkaar(tmp_path: Path) -> None:
+    """De kern van issue #98: externe vlakken en RVZ-006-deelstelsels in één laag.
+
+    Elke soort houdt haar eigen kolommen. Een extern vlak draagt geen deelstelselomvang en
+    geen voorgebakken popup (die stelt de maptip uit de kolommen samen); een deelstelsel
+    draagt geen externe bron. `gwsw_run` telt de laag in haar geheel plus het deel dat een
+    deelstelsel is; het aantal externe vlakken is het verschil.
+    """
+    dataset = load_dataset(TTL_DIR / "ext_scenario.ttl", [])
+    context = CheckContext(dataset=dataset, config=_config(), bronnen=_ext_bronnen())
+    run = run_checks(context, [*VLAK_CHECKS, "RVZ-006"])
+
+    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+
+    rijen = _laagrijen(pad, "vlakken")
+    deelstelsels = [rij for rij in rijen if rij["soort"] == VLAK_SOORT_GEMENGD]
+    extern = [rij for rij in rijen if rij["soort"] != VLAK_SOORT_GEMENGD]
+
+    assert deelstelsels and extern
+    assert {rij["soort"] for rij in extern} == {"pand", "water"}
+    assert all(rij["popup_html"] == "" and rij["n_strengen"] is None for rij in extern)
+    assert all(rij["popup_html"] and rij["n_strengen"] for rij in deelstelsels)
+    assert all(rij["bron"] == "" and rij["check_ids"] == "RVZ-006" for rij in deelstelsels)
+    assert _rijen(pad, "select n_vlakken, n_gemengd_zonder_overstort from gwsw_run") == [
+        (len(rijen), len(deelstelsels))
+    ]
+
+
+@pytest.mark.skipif(
+    not (GIS_DIR / "ext" / "ahn.tif").exists(),
+    reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",
+)
+def test_watervlak_subtype_noemt_type_en_label_de_identificatie(tmp_path: Path) -> None:
+    """`subtype` is om op te filteren, `label` is om iets in terug te vinden."""
     run = _ext_run()
     pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
-    rij = _laagrijen(pad, "waterdelen_zonder_zinker")[0]
+    rij = next(r for r in _laagrijen(pad, "vlakken") if r["id"] == "bgt:waterdeel/water-1")
 
-    assert rij["watertype"] == "waterloop"
+    assert rij["soort"] == "water"
+    assert rij["subtype"] == "waterloop"
     assert rij["label"] == "waterloop water-1"
 
 
@@ -829,7 +1002,7 @@ class TestStatusEnPopup:
         )
 
         met = _schrijf(_run("schoon.ttl"), tmp_path / "met")
-        zonder = load_dataset(kaal)
+        zonder = load_dataset(kaal, [])
         assert zonder.klassenhierarchie_bekend is False
         pad = _schrijf(
             run_checks(CheckContext(dataset=zonder, config=_config())), tmp_path / "zonder"
@@ -917,7 +1090,7 @@ class TestStatusEnPopup:
             Path(__file__).parent / "fixtures" / "gis" / "buurt_noord.gpkg"
         )
         runs = toets_gebieden(
-            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl"),
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
             gebieden,
             _config(),
             meetbereik=Meetbereik.niet_gemeten(()),
@@ -984,100 +1157,389 @@ def test_afvoerpad_zonder_lijn_geeft_stappen_zonder_meters(tmp_path: Path) -> No
     assert (eindpunt, stappen, meters) == ("G", 1, None)
 
 
-def test_stelsels_laag_is_een_multipolygon_in_gpkg_contents(tmp_path: Path) -> None:
-    """De cartografische stelsellaag staat geregistreerd, anders vindt QGIS haar niet."""
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+def test_de_stelsellaag_bestaat_niet_meer(tmp_path: Path) -> None:
+    """Issue #75: de laag groepeerde strengen via de GWSW-stelselregistratie.
 
-    ((soort,),) = _rijen(
-        pad, "select geometry_type_name from gpkg_geometry_columns where table_name = 'stelsels'"
-    )
-    assert soort == "MULTIPOLYGON"
-    contents = {naam for (naam,) in _rijen(pad, "select table_name from gpkg_contents")}
-    assert "stelsels" in contents
-
-
-def test_stelsels_laag_slaat_de_put_bucket_over(tmp_path: Path) -> None:
-    """Alleen stelsels met strengen krijgen een vlak; de hemelwaterbucket valt weg."""
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
-
-    labels = {label for (label,) in _rijen(pad, "select label from stelsels")}
-
-    assert labels == {"vuilwater-1", "gemengd-1"}
-
-
-def test_stelsels_dragen_type_afvoer_en_omvang(tmp_path: Path) -> None:
-    """Type, bereikt_eindpunt en de tellingen per stelsel.
-
-    Het vuilwaterstelsel bereikt het gemaal (twee strengen van 50 m, samen 100 m);
-    het gemengde stelsel heeft geen afvoerroute (een streng van 50 m).
+    Die groepering is niet betrouwbaar, en de wel/geen-afvoerroute die zij toonde is
+    een netwerk-eigenschap. De laag is daarom weg; de `stelsel`-kolom op `putten` en
+    `strengen` blijft (dat is een labeling, geen vlak).
     """
     pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
 
-    rijen = {
-        label: (stelseltype, bereikt, n_strengen, lengte)
-        for label, stelseltype, bereikt, n_strengen, lengte in _rijen(
-            pad,
-            "select label, stelseltype, bereikt_eindpunt, n_strengen, strenglengte_m from stelsels",
-        )
+    contents = {naam for (naam,) in _rijen(pad, "select table_name from gpkg_contents")}
+    assert "stelsels" not in contents
+    kolommen = {rij[1] for rij in _rijen(pad, "pragma table_info(strengen)")}
+    assert "stelsel" in kolommen
+
+
+def test_de_geopackage_draagt_precies_drie_objectlagen(tmp_path: Path) -> None:
+    """Issue #98: punt, lijn, vlak -- en geen vierde laag ernaast.
+
+    De RVZ-006-deelstelselvlakken staan sinds dit issue in `vlakken`, herkenbaar aan hun
+    eigen soort-waarde. De fixture levert er een op, dus deze test zou werkelijk falen op
+    een vierde featurelaag; de tabellen zonder geometrie staan er los bij.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    soorten = dict(_rijen(pad, "select table_name, data_type from gpkg_contents"))
+
+    assert FEATURELAGEN == ("putten", "strengen", "vlakken")
+    assert {naam for naam, soort in soorten.items() if soort == "features"} == set(FEATURELAGEN)
+    assert set(soorten) == {
+        *FEATURELAGEN,
+        "meldingen",
+        "overzicht_checks",
+        "gwsw_run",
+        "layer_styles",
     }
-    assert rijen["vuilwater-1"] == ("Vuilwaterstelsel", 1, 2, 100.0)
-    assert rijen["gemengd-1"] == ("GemengdStelsel", 0, 1, 50.0)
+    assert _rijen(pad, "select count(*) from vlakken where soort = ?", VLAK_SOORT_GEMENGD) == [(1,)]
 
 
-def test_stelsels_tellen_de_putten_aan_de_strengeinden(tmp_path: Path) -> None:
-    """`n_putten` telt de distinct netwerkknopen aan de eindpunten van de strengen."""
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+def test_de_vlakkenlaag_is_een_multipolygon(tmp_path: Path) -> None:
+    """De laag staat als MULTIPOLYGON geregistreerd, anders vindt QGIS haar niet."""
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    putten = dict(_rijen(pad, "select label, n_putten from stelsels"))
+    ((soort,),) = _rijen(
+        pad,
+        "select geometry_type_name from gpkg_geometry_columns where table_name = 'vlakken'",
+    )
+    assert soort == "MULTIPOLYGON"
 
-    assert putten["vuilwater-1"] == 3  # PutA, PutB en het gemaal
-    assert putten["gemengd-1"] == 2  # PutC en PutD
+
+def test_gemengd_zonder_overstort_geeft_een_vlak_per_deelstelsel(tmp_path: Path) -> None:
+    """De twee RVZ-006-bevindingen van hetzelfde deel leveren samen een vlak op.
+
+    Het vlak omvat de hele component (drie knopen, twee strengen van 50 m) en telt de
+    meldingen die erop landden.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    rijen = _rijen(
+        pad,
+        "select id, label, n_knopen, n_strengen, strenglengte_m, aantal_meldingen, check_ids "
+        "from vlakken where soort = ?",
+        VLAK_SOORT_GEMENGD,
+    )
+
+    assert len(rijen) == 1
+    cluster, label, n_knopen, n_strengen, lengte, n_meldingen, check_ids = rijen[0]
+    # De sleutel staat in `id`, net als bij een extern vlak: het is de `cluster_id` van de
+    # meldingen, dus de meldingentabel is erop te koppelen.
+    assert cluster.startswith("ds-")
+    assert label == cluster
+    assert (n_knopen, n_strengen, lengte, n_meldingen, check_ids) == (3, 2, 100.0, 2, "RVZ-006")
 
 
-def test_stelsels_dragen_een_leesbaar_vlak(tmp_path: Path) -> None:
-    """De geometrie is een leesbare MULTIPOLYGON om de strengen heen."""
+def test_deelstelselvlak_telt_de_strengen_en_knopen_van_de_graaf(tmp_path: Path) -> None:
+    """Het vlak dekt het hele deel, ook waar het over een T-stuk doorloopt (issue #105).
+
+    De fixture heeft drie gemengde strengen over twee T-stukken; de middelste hangt met
+    beide einden aan een hulpstuk en staat dus in geen enkele put-index. Zou de schrijver
+    de strengen daar opzoeken, dan tekende hij een vlak om twee van de drie strengen -- en
+    `n_knopen` telde de twee doorgeefknopen mee, terwijl de meldingen van twee knopen
+    spreken.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_over_hulpstukken.ttl", "RVZ-006"), tmp_path)
+
+    rijen = _rijen(
+        pad,
+        "select n_knopen, n_strengen, strenglengte_m, aantal_meldingen from vlakken "
+        "where soort = ?",
+        VLAK_SOORT_GEMENGD,
+    )
+
+    assert rijen == [(2, 3, 150.0, 3)]
+
+
+def test_deelstelselvlak_zet_het_aandeel_gemengd_op_de_feitenregel(tmp_path: Path) -> None:
+    """De popup zegt hoeveel van de strengen gemengd zijn, niet alleen hoeveel er gemeld zijn.
+
+    "2 gemengde strengen gemeld" liet in het midden of dat het hele deelstelsel was of een
+    handvol verkeerd getypeerde strengen in een hemelwaterstelsel -- precies het verschil
+    dat de auteur per vlak zelf moest uitzoeken (issue #106). Hier zijn beide strengen
+    gemengd; het vlak heeft verder geen aanwijzing, dus er komt geen derde feitenregel bij.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    ((popup,),) = _rijen(pad, "select popup_html from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
+
+    assert "3 knopen, 2 strengen, 100 m · 2 van 2 strengen gemengd, 2 gemeld</div>" in popup
+
+
+def test_deelstelselvlak_toont_de_aanwijzingen_van_de_melding(tmp_path: Path) -> None:
+    """De aanwijzingen staan als derde feitenregel in de popup (issue #106).
+
+    Ze komen uit de eerste melding van het cluster -- ze zijn per deelstelsel gelijk -- en
+    niet uit een eigen afleiding: dan zou het vlak iets anders kunnen zeggen dan de melding
+    ernaast. `Finding.details` bereikt deze schrijver niet, dus de boodschap is de weg.
+    """
+    pad = _schrijf(_run("rvz006_aanwijzing_persleiding_en_lozingspunt.ttl", "RVZ-006"), tmp_path)
+
+    ((popup,),) = _rijen(pad, "select popup_html from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
+
+    assert "4 van 4 strengen gemengd, 4 gemeld" in popup
+    assert "persleiding p vertrekt uit A; geen afvoereindpunt (BO-82)" in popup
+    assert "… en 1 meer" in popup
+
+
+def test_een_deelstelselvlak_laat_de_kolommen_van_een_extern_vlak_leeg(tmp_path: Path) -> None:
+    """Elke soort vult wat zij kent; de rest blijft leeg, zoals `relatie` bij water.
+
+    Een deelstelsel komt niet uit een externe bron maar uit de graaf van deze run, dus
+    `subtype`, `bron`, `bronbestand`, `relatie` en `afstand_min_m` horen er leeg te zijn.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    ((subtype, bron, bronbestand, relatie, afstand),) = _rijen(
+        pad,
+        "select subtype, bron, bronbestand, relatie, afstand_min_m from vlakken where soort = ?",
+        VLAK_SOORT_GEMENGD,
+    )
+
+    assert (subtype, bron, bronbestand, relatie, afstand) == ("", "", "", "", None)
+
+
+def test_gemengd_zonder_overstort_draagt_een_leesbaar_vlak(tmp_path: Path) -> None:
+    """De geometrie is een leesbare MULTIPOLYGON om de strengen van de component."""
     from shapely import wkb
 
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
 
-    ((blob,),) = _rijen(pad, "select geom from stelsels where label = 'gemengd-1'")
+    ((blob,),) = _rijen(pad, "select geom from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
     vorm = wkb.loads(bytes(blob)[8:])  # de GPKG-kop (magic, versie, vlaggen, srs) overslaan
     assert vorm.geom_type == "MultiPolygon"
     assert not vorm.is_empty
+    # Twee strengen van 50 m met 10 m buffer: een lint van ruim 100 x 20 m.
+    assert vorm.bounds == pytest.approx((990.0, 1990.0, 1110.0, 2010.0), abs=0.5)
 
 
-def test_runmetadata_telt_de_stelsels(tmp_path: Path) -> None:
-    """`n_stelsels` maakt expliciet hoeveel stelsels een vlak kregen (put-buckets niet)."""
-    pad = _schrijf(_run("stelsels_registratie.ttl"), tmp_path)
+def test_gemengd_vlak_zwijgt_niet_over_systemisch_genoemde_meldingen(tmp_path: Path) -> None:
+    """Een deelstelselvlak is per constructie een gebrek (BO-59).
 
-    ((aantal,),) = _rijen(pad, "select n_stelsels from gwsw_run")
-
-    assert aantal == 2
-
-
-def test_stelselmelding_uit_de_nulmeting_landt_op_de_stelsellaag(tmp_path: Path) -> None:
-    """De bonus van #25: een SHACL-overtreding op een stelsel komt op zijn vlak.
-
-    De focusnode `vw_geb_1` is geen knoop of streng maar een geregistreerd stelsel; de
-    join koppelt de overtreding aan de stelsel-URI, en zo verschijnt ze op de kaart via
-    het stelselvlak in plaats van nergens op uit te komen.
+    Zou het zijn status en zijn popup uit de systemisch-gefilterde meldingen afleiden,
+    dan kreeg het "geen eigen gebrek" te lezen zodra RVZ-006 op een klein gebied de
+    populatieratio haalt -- terwijl de rij alleen bestaat omdat die check aansloeg.
+    De fixture meldt op beide gemengde strengen (2 van 2), dus de vlag staat aan.
     """
-    from nlriochecker.meting import laad_nulmeting
-    from nlriochecker.nulbevinding import bouw_nulbevindingen
+    run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+    meldingen = bouw_meldingen(run, RUNDATUM)
+    rvz = [melding for melding in meldingen if melding.check_id == "RVZ-006"]
+    assert rvz and all(melding.systemisch for melding in rvz)
 
-    shacl = Path(__file__).parent / "fixtures" / "shacl"
-    rapporten = [shacl / "join_mdsplan.csv", shacl / "join_mdsproj.csv"]
-    nulmeting = laad_nulmeting(rapporten, VEREIST[1:])
-    basis = _run("nulmeting_join.ttl")
-    nulbevindingen = bouw_nulbevindingen(nulmeting, basis.dataset, 0.80)
-    run = replace(
-        basis, nulbevindingen=nulbevindingen, meetbereik=Meetbereik.van(VEREIST, VEREIST[1:])
+    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+
+    ((popup,),) = _rijen(pad, "select popup_html from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
+    assert "RVZ-006" in popup
+    assert "s-rood" in popup
+    assert "geen eigen gebrek" not in popup
+
+
+def test_gemengd_zonder_overstort_blijft_leeg_zonder_bevinding(tmp_path: Path) -> None:
+    """Zonder RVZ-006-melding komt er geen deelstelselvlak; het volgt de uitslag."""
+    pad = _schrijf(_run("rvz_schoon.ttl", "RVZ-006"), tmp_path)
+
+    assert _rijen(pad, "select count(*) from vlakken") == [(0,)]
+
+
+def test_runmetadata_telt_de_gemengde_deelstelsels(tmp_path: Path) -> None:
+    """De runtabel houdt de tellingen, ook nu de vlakken in `vlakken` staan (issue #98).
+
+    `n_vlakken` telt de hele laag en `n_gemengd_zonder_overstort` hoeveel daarvan een
+    gemengd deelstelsel is; hier is dat hetzelfde vlak, want deze fixture heeft geen
+    externe treffers.
+    """
+    pad = _schrijf(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), tmp_path)
+
+    rij = _rijen(
+        pad, "select n_vlakken, n_gemengd_zonder_overstort, n_gemengd_zonder_vlak from gwsw_run"
     )
+
+    assert rij == [(1, 1, 0)]
+
+
+def test_gemengd_deelstelsel_zonder_geometrie_wordt_geteld(tmp_path: Path) -> None:
+    """Een deelstelsel dat niet te tekenen is, verdwijnt niet stilzwijgend.
+
+    De fixture meldt RVZ-006 op een gemengde streng zonder bruikbare lijn: er valt geen
+    vlak omheen te tekenen, maar "dit deelstelsel bestaat niet" en "we konden het niet
+    tekenen" horen in het bestand uit elkaar te houden zijn. Er komt geen rij en
+    `n_gemengd_zonder_vlak` telt het geval.
+    """
+    run = _run("rvz006_gemengd_zonder_geometrie.ttl", "RVZ-006")
+    assert run.count(Severity.ERROR) == 1  # de melding is er wel
 
     pad = _schrijf(run, tmp_path)
 
-    ((n_meldingen, popup),) = _rijen(
-        pad, "select n_meldingen, popup_html from stelsels where label = 'vw-1'"
+    assert _rijen(pad, "select count(*) from vlakken") == [(0,)]
+    rij = _rijen(pad, "select n_gemengd_zonder_overstort, n_gemengd_zonder_vlak from gwsw_run")
+    assert rij == [(0, 1)]
+
+
+def test_onbekend_deelstelsel_id_faalt_luid(tmp_path: Path) -> None:
+    """Een `cluster_id` die de graaf niet kent is een interne tegenspraak, geen datageval.
+
+    De check en deze schrijver lezen dezelfde `deelstelsel_ids` van dezelfde context, dus
+    zo'n ID kan alleen ontstaan als die afspraak breekt. De laag zou dan stil kleiner zijn
+    dan de uitslag -- precies wat `_trefferrijen` bij de externe vlakken afvangt.
+    """
+    run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+    meldingen = [
+        replace(melding, cluster_id="ds-bestaat-niet") if melding.check_id == "RVZ-006" else melding
+        for melding in bouw_meldingen(run, RUNDATUM)
+    ]
+
+    with pytest.raises(PipelineError, match="ds-bestaat-niet"):
+        schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+
+
+# Issue #65: onderdrukking uit `[rapport]`. De fixture: vrijvervalstreng L1 (GemengdRiool)
+# kruist persleiding L2 (Persleiding) en duiker L3 (Duiker). TOP-011 meldt sinds issue #82
+# alleen het duikerpaar -- een persleiding valt buiten die populatie -- dus een keer, met
+# L1 als hoofdobject en L3 als tweede object; de nulbevinding hieronder geeft L2 een eigen
+# melding, zodat er iets te onderdrukken valt.
+def _run_onderdrukt(klassen: Sequence[str], checks: Sequence[str] = ()) -> CheckRun:
+    """TOP-011 op de kruisingsfixture, met de twee lijsten uit `[rapport]` gezet."""
+    config = _config()
+    config.rapport.onderdruk_klassen = list(klassen)
+    config.rapport.onderdruk_checks = list(checks)
+    dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl", [])
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
+    return replace(run, nulbevindingen=(_nulbevinding_op_de_persleiding(),))
+
+
+def _nulbevinding_op_de_persleiding() -> Nulbevinding:
+    """Een nulmetingmelding op L2, het enige gebrek dat de persleiding zelf draagt."""
+    return Nulbevinding(
+        check_id="NULMETING-Put_HoogtePut_card",
+        vorm="Put_HoogtePut_card",
+        focus_node="L2",
+        ernst="F",
+        object_uri="http://example.org/toets#L2",
+        object_label="2",
+        objecttype="Persleiding",
+        boodschap="aantal voorkomens wijkt af (exact=1)",
+        waarde="te weinig voorkomens",
+        cfk=("MdsPlan",),
+        systemisch=False,
+        herleid=True,
     )
-    assert n_meldingen >= 1
-    assert "Vuilwaterstelsel_Lozingspunt_card" in popup
+
+
+def _strengen_uit_de_stroom(run: CheckRun, map_: Path) -> dict[str, dict]:
+    """Schrijft de uitvoer uit de echte meldingenstroom en leest de laag `strengen`."""
+    uitvoer = schrijf_uitvoer(run, map_, RUNDATUM, met_json=False)
+    assert uitvoer.geopackage is not None
+    return {rij["feature_id"]: rij for rij in _laagrijen(uitvoer.geopackage, "strengen")}
+
+
+def test_een_onderdrukte_persleiding_is_grijs_met_de_reden(tmp_path: Path) -> None:
+    """Alle meldingen weg -> grijs; en de reden is de onderdrukking, niet 'mechanisch'."""
+    rijen = _strengen_uit_de_stroom(_run_onderdrukt(["MechanischeTransportleiding"]), tmp_path)
+
+    assert rijen["L2"]["status"] == "grijs"
+    assert REDEN_ONDERDRUKT in rijen["L2"]["popup_html"]
+    assert REDEN_MECHANISCH not in rijen["L2"]["popup_html"]
+    assert rijen["L1"]["status"] != "grijs"
+    assert REDEN_ONDERDRUKT not in rijen["L1"]["popup_html"]
+
+
+def test_een_niet_mechanische_onderdrukte_klasse_leest_grijs_en_niet_groen(
+    tmp_path: Path,
+) -> None:
+    """Grijs met de onderdrukkingsreden; groen zou 'beoordeeld en niets gevonden' beweren."""
+    rijen = _strengen_uit_de_stroom(_run_onderdrukt(["GemengdRiool"]), tmp_path)
+
+    assert rijen["L1"]["status"] == "grijs"
+    assert REDEN_ONDERDRUKT in rijen["L1"]["popup_html"]
+    # L2 is niet onderdrukt en blijft grijs om de oude reden: mechanisch riool.
+    assert rijen["L2"]["status"] == "rood"
+    assert REDEN_MECHANISCH in rijen["L2"]["popup_html"]
+
+
+def test_gwsw_run_draagt_de_lijsten_en_de_telling(tmp_path: Path) -> None:
+    """De keuze hoort bij de run, dus in `gwsw_run` en niet op elke melding."""
+    uitvoer = schrijf_uitvoer(
+        _run_onderdrukt(["MechanischeTransportleiding"]), tmp_path, RUNDATUM, met_json=False
+    )
+
+    assert uitvoer.geopackage is not None
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("MechanischeTransportleiding", "", 1)]
+
+
+def test_gwsw_run_zonder_onderdrukking_telt_nul(tmp_path: Path) -> None:
+    """Zonder lijsten blijft de tabel zeggen dat er niets weggehouden is."""
+    uitvoer = schrijf_uitvoer(_run_onderdrukt([]), tmp_path, RUNDATUM, met_json=False)
+
+    assert uitvoer.geopackage is not None
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("", "", 0)]
+
+
+def test_gwsw_run_draagt_ook_de_onderdrukte_checks(tmp_path: Path) -> None:
+    """De tweede lijst loopt door dezelfde stroom; hier vallen beide soorten weg."""
+    uitvoer = schrijf_uitvoer(
+        _run_onderdrukt(["MechanischeTransportleiding"], ["TOP-011"]),
+        tmp_path,
+        RUNDATUM,
+        met_json=False,
+    )
+
+    assert uitvoer.geopackage is not None
+    # TOP-011 op de vrijvervalstreng valt op check weg, de nulmelding op de persleiding
+    # op klasse: samen twee.
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("MechanischeTransportleiding", "TOP-011", 2)]
+
+
+def test_een_klasse_zonder_objecten_onderdrukt_niets_maar_wordt_wel_verantwoord(
+    tmp_path: Path,
+) -> None:
+    """Actief met nul weggevallen meldingen: de keuze staat er, de uitslag is nul.
+
+    De fixture kent geen enkel `Rioolgemaal`. Alle drie de uitvoervormen die de telling
+    dragen horen dan hetzelfde te zeggen; zwijgen zou de keuze onzichtbaar maken.
+    """
+    uitvoer = schrijf_uitvoer(_run_onderdrukt(["Rioolgemaal"]), tmp_path, RUNDATUM)
+
+    assert uitvoer.geopackage is not None and uitvoer.json is not None
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    assert "**0 meldingen onderdrukt**" in uitvoer.markdown.read_text(encoding="utf-8")
+    assert document["onderdrukt"] == {"klassen": ["Rioolgemaal"], "checks": [], "meldingen": 0}
+    assert _rijen(
+        uitvoer.geopackage,
+        "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run",
+    ) == [("Rioolgemaal", "", 0)]
+
+
+def test_de_grijze_objecten_en_de_telling_komen_uit_dezelfde_onderdrukking(
+    tmp_path: Path,
+) -> None:
+    """Eén bron voor beide, en dat is het argument -- niet de config van de run.
+
+    Zou de laag de klassenlijst uit `run.config` lezen, dan levert een beller die de
+    stroom zelf samenstelt een bestand op waarin objecten grijs staan met een reden die
+    `gwsw_run` niet noemt.
+    """
+    run = _run_onderdrukt(["MechanischeTransportleiding"])
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    zonder = schrijf_geopackage(run, stroom.meldingen, tmp_path / "zonder", RUNDATUM)
+    met = schrijf_geopackage(
+        run, stroom.meldingen, tmp_path / "met", RUNDATUM, onderdrukking=stroom.onderdrukking
+    )
+
+    kolommen = "select onderdruk_klassen, onderdruk_checks, meldingen_onderdrukt from gwsw_run"
+    popups_zonder = {rij["feature_id"]: rij["popup_html"] for rij in _laagrijen(zonder, "strengen")}
+    popups_met = {rij["feature_id"]: rij["popup_html"] for rij in _laagrijen(met, "strengen")}
+
+    assert _rijen(zonder, kolommen) == [("", "", 0)]
+    assert all(REDEN_ONDERDRUKT not in popup for popup in popups_zonder.values())
+    assert _rijen(met, kolommen) == [("MechanischeTransportleiding", "", 1)]
+    assert REDEN_ONDERDRUKT in popups_met["L2"]

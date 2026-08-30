@@ -4,12 +4,16 @@ Markdown, CSV en GeoPackage lezen alle drie uit deze lijst. Dat is geen afspraak
 maar een eigenschap van de code: er is geen pad waarlangs een schrijver zelf nog
 een `Finding` interpreteert, dus kunnen de drie uitvoervormen niet uit elkaar
 lopen.
+
+Hier zit ook de onderdrukking uit `[rapport]` (`onderdruk_klassen`,
+`onderdruk_checks`): `bouw_meldingenstroom` filtert en telt als laatste stap, zodat
+wat wegvalt geen enkele schrijver bereikt. Zie BO-49.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from shapely.geometry import Point
@@ -19,7 +23,7 @@ from nlriochecker.checks import CheckOutcome, CheckRun, Dimension, Finding, Seve
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.uitvoer.identiteit import kort, melding_id
 from nlriochecker.uitvoer.locatie import foutlocatie, objectlocatie
-from nlriochecker.uitvoer.omvang import klassen_op_nul
+from nlriochecker.uitvoer.omvang import klassen_op_nul, koppelingsherstel
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +31,16 @@ BRON_REGISTER = "register"
 # De tweede bron naast het register: de GWSW SHACL-nulmeting. Zie `nulbevinding.py`.
 BRON_NULMETING = "nulmeting"
 # De derde bron: een signaal over de dataset zelf, geen gebrek aan een los object. Nu
-# alleen de nul-bewaking van issue #22: een klasse waar een check op leunt maar die
-# nul keer voorkomt. Systemisch, ernst W, zonder object -- telt dus niet mee in de
-# GeoPackage-status (BO-29).
+# de nul-bewaking van issue #22 (een klasse waar een check op leunt maar die nul keer
+# voorkomt) en het koppelingsherstel van issue #60. Systemisch, ernst W, zonder object
+# -- telt dus niet mee in de GeoPackage-status (BO-29).
 BRON_DATASET = "dataset"
 # De check-ID van die nul-bewaking. Geen checkregister-ID: dit is geen check maar een
 # datasetsignaal. `categorie_van` maakt er de categorie `SIG` van.
 CHECK_NULKLASSE = "SIG-nulklasse"
+# Het tweede datasetsignaal: de fantoomkoppeling naar hulpstukken die de lader op
+# naamstam hersteld heeft (issue #60). Zelfde vorm als de nul-bewaking.
+CHECK_HULPSTUKKOPPELING = "SIG-hulpstukkoppeling"
 
 # De dimensietag van elke nulmetingmelding. Een SHACL-nulmeting toetst of de dataset
 # aan een conformiteitsklasse voldoet, en dat is voor elke vorm dezelfde vraag; een
@@ -85,13 +92,135 @@ class Melding:
     # meerdere CFK-rapporten en levert een melding op; tellingen per CFK tellen hem
     # bij elke genoemde klasse mee.
     cfk: tuple[str, ...] = ()
+    # De technische brontekst achter `boodschap` (issue #101). Bij een nulmetingmelding
+    # is `boodschap` de leesbare zin uit de vertaaltabel en draagt dit veld de
+    # SHACL-tekst van de GWSW-server; bij een eigen check of een datasetsignaal is het
+    # leeg, want die schrijven hun boodschap zelf en er is geen tweede formulering.
+    # Alleen de archieven (CSV, JSON, meldingentabel) dragen beide; de mensgerichte
+    # views -- rapport en popup -- tonen alleen de zin.
+    boodschap_technisch: str = ""
+
+
+@dataclass(frozen=True)
+class Onderdrukking:
+    """Wat er op grond van `[rapport]` uit de meldingenstroom is gehouden.
+
+    `klassen` en `checks` zijn de twee lijsten uit de projectconfiguratie. Een melding
+    valt hooguit een keer weg: eerst op check-ID, dan op de klasse van het hoofdobject,
+    in de volgorde van de lijst.
+
+    De twee tellingen beantwoorden verschillende vragen en zijn daarom geen partitie.
+    `per_check` telt **elke** weggevallen melding onder haar check-ID, ongeacht of ze op
+    check of op klasse wegviel: dat is wat een lezer naast de kolom Bevindingen nodig
+    heeft, want die daalt met alles wat wegviel. Zonder die regel las een check waarvan
+    alle bevindingen op klasse wegvielen als "0 bevindingen" met "per check: geen" in de
+    verantwoording (TOP-007 op De Wolden: 7 → 0). `per_klasse` telt alleen het deel dat
+    op klasse wegviel, per wortel. Optellen doe je dus over `per_check` -- zie `totaal`.
+
+    Een uitvoerkeuze, geen toetskeuze: de checks, `examined` en de systemisch-bepaling
+    zien deze lijsten niet.
+    """
+
+    # Bevroren maar niet hashbaar: de twee tellingen zijn dicts. Vergelijken (`==`) kan
+    # wel, en dat is alles wat de uitvoer ervan vraagt.
+    klassen: tuple[str, ...] = ()
+    checks: tuple[str, ...] = ()
+    per_check: dict[str, int] = field(default_factory=dict)
+    per_klasse: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def actief(self) -> bool:
+        """Of de projectconfiguratie iets onderdrukt -- ook als er nul meldingen wegvielen."""
+        return bool(self.klassen or self.checks)
+
+    @property
+    def totaal(self) -> int:
+        """Hoeveel meldingen er in totaal wegvielen.
+
+        Alleen over `per_check`: elke weggevallen melding draagt een check-ID en staat
+        daar dus precies een keer in. `per_klasse` erbij optellen zou het deel dat op
+        klasse wegviel dubbel tellen.
+        """
+        return sum(self.per_check.values())
+
+
+GEEN_ONDERDRUKKING = Onderdrukking()
+
+
+@dataclass(frozen=True)
+class Meldingenstroom:
+    """De meldingen die de schrijvers krijgen, plus wat er vóór hen uit is gehouden."""
+
+    meldingen: list[Melding]
+    onderdrukking: Onderdrukking
+
+
+def bouw_meldingenstroom(run: CheckRun, run_datum: date) -> Meldingenstroom:
+    """Zet alle bevindingen van een run om in meldingen en past de onderdrukking toe.
+
+    De enige plek waar bevindingen naar uitvoer vertaald worden, en de enige plek waar
+    `[rapport] onderdruk_klassen` en `onderdruk_checks` gelezen worden: wat hier wegvalt
+    bereikt geen enkele schrijver. Zie BO-49.
+    """
+    return _onderdruk(_alle_meldingen(run, run_datum), run)
 
 
 def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
-    """Zet alle bevindingen van een run om in meldingen.
+    """Alleen de meldingen, voor wie de telling van de onderdrukking niet nodig heeft."""
+    return bouw_meldingenstroom(run, run_datum).meldingen
 
-    De enige plek waar bevindingen naar uitvoer vertaald worden.
+
+def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
+    """Houdt de meldingen uit de stroom die `[rapport]` onderdrukt, en telt ze.
+
+    Eerst op check-ID, dan op de klasse van het hoofdobject (`object_uri`, niet
+    `object2_uri`) in de volgorde van de lijst; een melding valt hooguit een keer weg.
+    Een melding zonder hoofdobject heeft geen klasse en valt dus nooit op klasse weg.
+
+    Wat op klasse wegvalt telt in beide tellingen mee: onder haar wortel in `per_klasse`
+    en onder haar check-ID in `per_check`. Zie `Onderdrukking` voor de reden.
     """
+    rapport = run.config.rapport
+    checks = set(rapport.onderdruk_checks)
+    per_check: dict[str, int] = {}
+    per_klasse: dict[str, int] = {}
+    over: list[Melding] = []
+    for melding in meldingen:
+        op_check = melding.check_id in checks
+        klasse = (
+            None
+            if op_check
+            else _onderdrukte_klasse(run, melding.object_uri, rapport.onderdruk_klassen)
+        )
+        if not op_check and klasse is None:
+            over.append(melding)
+            continue
+        per_check[melding.check_id] = per_check.get(melding.check_id, 0) + 1
+        if klasse is not None:
+            per_klasse[klasse] = per_klasse.get(klasse, 0) + 1
+    return Meldingenstroom(
+        over,
+        Onderdrukking(
+            tuple(rapport.onderdruk_klassen), tuple(rapport.onderdruk_checks), per_check, per_klasse
+        ),
+    )
+
+
+def _onderdrukte_klasse(run: CheckRun, object_uri: str, klassen: list[str]) -> str | None:
+    """De eerste wortel uit de lijst waar het object onder valt, of None.
+
+    `is_a` is de smalle variant: hij kent alleen knopen en strengen, dus een onderdeel
+    dat via `hasPart` onder een put hangt -- een overstortdrempel, een
+    ledigingsvoorziening -- valt er nooit onder. De onderdrukking werkt daarmee op
+    knopen en strengen, en dat is precies waar de kaart en de checks over gaan.
+    """
+    if not object_uri:
+        return None
+    return next((wortel for wortel in klassen if run.dataset.is_a(object_uri, wortel)), None)
+
+
+def _alle_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
+    """De drie bronnen samengesteld, vóór de onderdrukking."""
     config = run.config
     scope = SCOPE_BINNEN if run.study_area is not None else SCOPE_GEEN_GEBIED
     gebied = run.study_area.gebied if run.study_area is not None else ""
@@ -148,48 +277,95 @@ def _signaalmeldingen(
     scope: str,
     gebruikte_ids: set[str],
 ) -> list[Melding]:
-    """Een systemische waarschuwing per klasse die op nul staat terwijl een check ervan afhangt.
+    """Een systemische waarschuwing per datasetsignaal.
 
     Geen gebrek aan een object maar een signaal over de export: geen object-URI, geen
     plek op de kaart, en systemisch, zodat het de GeoPackage-status niet raakt (BO-29).
     Zonder gebied, net als een nulmetingbevinding die nergens op uitkwam: het is aan
-    geen enkel studiegebied toe te wijzen. Zie issue #22.
+    geen enkel studiegebied toe te wijzen. Twee soorten, elk met een eigen dimensie: een
+    klasse of rol op nul waar een check op leunt is een gat in de aanlevering
+    (Compleetheid, issue #22); een `hasConnection` naar een URI die niet bestaat is een
+    innerlijke tegenspraak in de export (Consistentie, issue #60).
     """
-    meldingen = []
-    for signaal in klassen_op_nul(run):
-        kenmerk = _uniek_id(
-            CHECK_NULKLASSE, "", "", {"klasse": signaal.label}, signaal.label, gebruikte_ids
+    meldingen = [
+        _signaalmelding(
+            run,
+            run_datum,
+            scope,
+            gebruikte_ids,
+            CHECK_NULKLASSE,
+            Dimension.COMPLETENESS,
+            {"klasse": signaal.label},
+            signaal.label,
+            signaal.boodschap,
+            "0",
         )
-        gebruikte_ids.add(kenmerk)
+        for signaal in klassen_op_nul(run)
+    ]
+    herstel = koppelingsherstel(run)
+    if herstel is not None:
         meldingen.append(
-            Melding(
-                melding_id=kenmerk,
-                check_id=CHECK_NULKLASSE,
-                categorie=categorie_van(CHECK_NULKLASSE),
-                bron=BRON_DATASET,
-                ernst=Severity.WARNING.value,
-                dimensie=Dimension.COMPLETENESS.value,
-                object_uri="",
-                object_id="",
-                object_label=signaal.label,
-                object2_uri="",
-                object2_id="",
-                object2_label="",
-                boodschap=signaal.boodschap,
-                waarde="0",
-                drempel="",
-                typering_betrouwbaar=True,
-                cluster_id="",
-                scope=scope,
-                gebied="",
-                prioriteit=3,
-                systemisch=True,
-                foutlocatie=None,
-                run_datum=run_datum.isoformat(),
-                dataset=run.dataset.source.name,
+            _signaalmelding(
+                run,
+                run_datum,
+                scope,
+                gebruikte_ids,
+                CHECK_HULPSTUKKOPPELING,
+                Dimension.CONSISTENCY,
+                {"signaal": "hulpstukkoppeling"},
+                "hulpstukkoppeling",
+                herstel.boodschap,
+                str(herstel.koppelingen),
             )
         )
     return meldingen
+
+
+def _signaalmelding(
+    run: CheckRun,
+    run_datum: date,
+    scope: str,
+    gebruikte_ids: set[str],
+    check_id: str,
+    dimensie: Dimension,
+    onderscheid: dict[str, str],
+    label: str,
+    boodschap: str,
+    waarde: str,
+) -> Melding:
+    """Eén datasetsignaal als melding; registreert zijn ID in `gebruikte_ids`.
+
+    De dimensie komt van de aanroeper: de twee signalen delen de vorm, niet de vraag
+    die zij stellen.
+    """
+    kenmerk = _uniek_id(check_id, "", "", onderscheid, label, gebruikte_ids)
+    gebruikte_ids.add(kenmerk)
+    return Melding(
+        melding_id=kenmerk,
+        check_id=check_id,
+        categorie=categorie_van(check_id),
+        bron=BRON_DATASET,
+        ernst=Severity.WARNING.value,
+        dimensie=dimensie.value,
+        object_uri="",
+        object_id="",
+        object_label=label,
+        object2_uri="",
+        object2_id="",
+        object2_label="",
+        boodschap=boodschap,
+        waarde=waarde,
+        drempel="",
+        typering_betrouwbaar=True,
+        cluster_id="",
+        scope=scope,
+        gebied="",
+        prioriteit=3,
+        systemisch=True,
+        foutlocatie=None,
+        run_datum=run_datum.isoformat(),
+        dataset=run.dataset.source.name,
+    )
 
 
 def _nulmeldingen(
@@ -208,7 +384,9 @@ def _nulmeldingen(
     De onderscheidende sleutels zijn de focusnode en de boodschap. De object-URI
     volstaat niet: twee eindpunten van dezelfde streng herleiden naar diezelfde
     streng. De boodschap zit erin omdat hij ook de ontdubbelsleutel is; herformuleert
-    de GWSW-server hem, dan verschuiven de melding-ID's van die vorm eenmalig.
+    de GWSW-server hem, dan verschuiven de melding-ID's van die vorm eenmalig. Dat is
+    de *technische* boodschap en niet de leesbare zin (issue #101): zou de ID aan de
+    zin hangen, dan verschoof elke nulmeting-ID zodra de vertaaltabel bijgewerkt werd.
 
     Een bevinding die nergens op uitkwam draagt geen gebied: hij is aan geen enkel
     studiegebied toe te wijzen. Hem het gebied van de run geven zou beweren dat hij
@@ -239,7 +417,11 @@ def _nulmeldingen(
                 object2_uri="",
                 object2_id="",
                 object2_label="",
-                boodschap=bevinding.boodschap,
+                # De leesbare zin voorop; de SHACL-tekst blijft er als eigen veld naast
+                # staan (issue #101). De terugval op `boodschap` dekt een vorm zonder
+                # vertaling en een met de hand gebouwde bevinding.
+                boodschap=bevinding.leesbaar or bevinding.boodschap,
+                boodschap_technisch=bevinding.boodschap,
                 waarde=bevinding.waarde,
                 drempel="",
                 typering_betrouwbaar=bevinding.typering_betrouwbaar,
@@ -336,9 +518,15 @@ def _is_systemisch(outcome: CheckOutcome, config: CheckConfig) -> bool:
     dataset. Zonder die correctie zou een tot een buurt afgebakende run de vlag
     nooit meer laten aanslaan en zou "systemisch" iets anders betekenen naargelang
     er een studiegebied is opgegeven.
+
+    Onder `systemisch_minimum_bekeken` bekeken objecten geldt de ratio niet: op een
+    handvol objecten is 26 van de 26 geen uitspraak over de export maar een breuk van
+    kleine getallen, en de vlag zou een echt gebrek van de kaart en uit de popup halen.
+    Een check die zichzelf systemisch noemt (`Finding.systemisch`) staat hier los van
+    en blijft ongemoeid. Zie BO-59.
     """
     gevonden = len(outcome.findings) + outcome.weggelaten
-    if not outcome.examined or not gevonden:
+    if outcome.examined < config.rapport.systemisch_minimum_bekeken or not gevonden:
         return False
     return gevonden / outcome.examined > config.rapport.systemisch_drempel
 

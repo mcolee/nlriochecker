@@ -20,11 +20,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import pandas as pd
+from gwsw_orox_helpers.dataset import GwswDataset
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
+from nlriochecker.checks.base import REGISTRY
+from nlriochecker.checks.selectie import klassen_van_rol, putten
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.dataset import GwswDataset
+from nlriochecker.taal import getal, vorm
 
 KOLOMMEN = ["Objecttype", "Stelsel", "Aantal", "Lengte (m)"]
 
@@ -140,6 +143,24 @@ def _leeg(geometrie: object) -> bool:
     return geometrie is None or geometrie.is_empty  # type: ignore[attr-defined]
 
 
+def putten_in_beeld(run: CheckRun) -> frozenset[str]:
+    """De putten waar dit rapport over gaat: de rol `putten`, afgebakend tot de kern.
+
+    De noemer van het aanlegjaar-aandeel in de rapportkop (issue #91). Het is dezelfde
+    selectie waarop ATTR-018 draaide -- `selectie.putten` op de context van de run, dus
+    uit haar cache -- want een eigen doorloop over de dataset zou op een dag een ander
+    getal geven dan de check die de teller levert.
+
+    Met een studiegebied blijft alleen de kern over. De meldingen in dit rapport zijn
+    daartoe afgebakend, en een noemer over de volledige export zou het aandeel in een
+    kleine buurt naar nul drukken -- anders dan de klassentelling hierboven, die niet
+    tegen een teller wordt afgezet.
+    """
+    binnen = run.objecten_binnen()
+    uris = {node.uri for node in putten(run.context)}
+    return frozenset(uris if binnen is None else uris & binnen)
+
+
 @dataclass(frozen=True)
 class _Rol:
     """Een klassenlijst waar een check op leunt, en hoe hij geteld en bewaakt wordt.
@@ -151,35 +172,86 @@ class _Rol:
     een valse nul melden.
 
     `per_klasse` kiest het niveau van de nul-bewaking. Bij het afvoereindpunt draagt
-    elke klasse een eigen betekenis -- `Gemaal` en `Pompunit` zijn het noodverband,
+    elke klasse een eigen betekenis -- `Gemaal` is het noodverband,
     `Overnamepunt` het echte overdrachtspunt (BO-33) -- dus daar telt elke lege klasse
     als een signaal. De andere rollen bevatten alternatieve schrijfwijzen van dezelfde
     rol (een export gebruikt `Lozingsput` OF `Lozingspunt`, niet allebei); daar zou een
     signaal per klasse elke ongebruikte schrijfwijze als gebrek melden. Zij waarschuwen
     daarom pas als de hele rol leeg is.
+
+    `checks` zijn de check-ID's die op deze rol leunen; de nul-melding noemt ze (het gat
+    uit issue #22, nu generiek). Voor een gedeclareerde rol komen ze uit de registry,
+    voor de twee speciale bewakingen is het de canonieke check (NET-001, NET-007).
     """
 
     label: str
     klassen: tuple[str, ...]
     via_onderdeel: bool
+    checks: tuple[str, ...]
     per_klasse: bool = False
 
 
-def _rollen(config: CheckConfig) -> list[_Rol]:
-    """De klassenlijsten uit `checks.toml` waar de zwaarste checks van afhangen.
+# Rollen die een check wél declareert maar die géén toetspopulatie zijn: hij leest ze als
+# *indicator* om objecten juist buiten zijn oordeel te houden. Nul instanties betekent daar
+# niet "deze check heeft niets te beoordelen" maar "deze uitzondering gaat nooit af", en de
+# check werkt verder volledig. `pompunits` is het enige geval: EXT-009 gebruikt de pompput
+# om een straat met drukriolering niet te beoordelen, en een gemeente zonder drukriolering
+# krijgt anders een systemische waarschuwing die het omgekeerde beweert van wat er aan de
+# hand is. Zij vallen alleen buiten de nul-bewaking; in de rollentelling van het rapport
+# blijven ze gewoon staan, want daar is nul een feit en geen oordeel. Zie BO-80 en BO-52.
+INDICATORROLLEN = frozenset({"pompunits"})
 
-    Geen eigen configlijst: precies de bestaande rollen, zodat een klasse die iemand
-    later aan een lijst toevoegt vanzelf in de telling en de nul-bewaking verschijnt.
+
+def _gedeclareerde_rollen() -> dict[str, tuple[str, ...]]:
+    """Per gedeclareerde rol de check-ID's die haar in `check.rollen` noemen.
+
+    De bron voor de rollentelling en de nul-bewaking (issue #71): precies de rollen waar
+    een geregistreerde check op leunt, met de checks erbij zodat de nul-melding ze kan
+    noemen. Gesorteerd voor een stabiele uitvoer.
+    """
+    per_rol: defaultdict[str, list[str]] = defaultdict(list)
+    for check in REGISTRY.values():
+        for rol in check.rollen:
+            per_rol[rol].append(check.id)
+    return {rol: tuple(sorted(ids)) for rol, ids in per_rol.items()}
+
+
+def _rollen(config: CheckConfig) -> list[_Rol]:
+    """De rollen waar de checks op leunen: hun declaraties plus twee vaste bewakingen.
+
+    Sinds issue #71 leidt deze lijst de rollen af uit wat de geregistreerde checks in
+    `check.rollen` declareren (via `selectie.klassen_van_rol` naar hun klassen), zodat de
+    telling en de nul-bewaking niet meer op een handlijst leunen. Twee bewakingen drukken
+    geen `selectie._ROLLEN`-rol uit en blijven daarom expliciet (BO-52):
+
+    - het **afvoereindpunt** (`Overnamepunt`, `Gemaal`) wordt per klasse
+      bewaakt, want elke klasse draagt een eigen betekenis -- noodverband versus echt
+      overdrachtspunt (BO-33) -- en er is geen rol `afvoer_eindpunt`;
+    - de **overstortdrempel** is een `Overstortdrempel`-onderdeel zonder eigen geometrie
+      dat via `subjects_of_class` geteld wordt (NET-007), niet via `of_class`, en heeft
+      evenmin een rol.
+
+    Een gedeclareerde rol zonder geconfigureerde klassen (een project mag
+    `functieloze_knoop` leeg laten) valt weg: zonder verwachte populatie is er niets op
+    nul te melden.
     """
     klassen = config.klassen
-    return [
-        _Rol("afvoereindpunt", tuple(klassen.afvoer_eindpunt), False, per_klasse=True),
-        _Rol("lozingseindpunt", tuple(klassen.lozings_eindpunt), False),
-        _Rol("bergbezinkvoorziening", tuple(klassen.bergbezinkvoorziening), False),
-        _Rol("overstortdrempel", tuple(klassen.drempel), True),
-        _Rol("infiltratieleiding", tuple(klassen.infiltratie), False),
-        _Rol("mechanische leiding", tuple(klassen.mechanisch), False),
+    speciaal = [
+        _Rol(
+            "afvoereindpunt",
+            tuple(klassen.afvoer_eindpunt),
+            False,
+            ("NET-001",),
+            per_klasse=True,
+        ),
+        _Rol("overstortdrempel", tuple(klassen.drempel), True, ("NET-007",)),
     ]
+    gedeclareerd = [
+        _Rol(rol, tuple(rolklassen), False, checks)
+        for rol, checks in sorted(_gedeclareerde_rollen().items())
+        if (rolklassen := klassen_van_rol(rol, klassen))
+    ]
+    return speciaal + gedeclareerd
 
 
 def _aantal_klasse(dataset: GwswDataset, klasse: str, via_onderdeel: bool) -> int:
@@ -225,7 +297,7 @@ def eindpunttelling(run: CheckRun) -> pd.DataFrame:
     """Een rij per afvoereindpuntklasse, met hoeveel instanties de check ervan ziet.
 
     Het is de betrouwbaarheidsregel voor NET-001: zolang `Overnamepunt` op nul staat,
-    leunt de bereikbaarheid op het noodverband `Gemaal`/`Pompunit` (BO-33). Zodra hij
+    leunt de bereikbaarheid op het noodverband `Gemaal` (BO-33). Zodra hij
     een getal boven nul toont, kan dat noodverband weg. Zie issue #22.
     """
     config = run.config
@@ -257,29 +329,74 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
     nul is nul en vraagt geen drempel. Zonder klassenhierarchie herkent `of_class` geen
     klassen -- dan zou elke telling nul zijn en elke waarschuwing vals -- dus dan valt er
     niets te bewaken; het rapport draagt daarvoor al zijn eigen voorbehoud (issue #33).
+
+    De rollen in `INDICATORROLLEN` blijven erbuiten: daar zegt nul niet dat een check niets
+    te beoordelen heeft maar dat een uitzondering nooit afgaat.
     """
     dataset = run.dataset
     if not dataset.klassenhierarchie_bekend:
         return []
     signalen: list[NulSignaal] = []
     for rol in _rollen(run.config):
+        if rol.label in INDICATORROLLEN:
+            continue
         if rol.per_klasse:
             signalen += [
-                NulSignaal(
-                    klasse,
-                    f"Geen enkele {klasse} in de export, terwijl de afvoereindpuntrol "
-                    "(NET-001) erop leunt. Wat op deze klasse toetst, heeft niets te beoordelen.",
-                )
+                NulSignaal(klasse, _per_klasse_boodschap(klasse, rol))
                 for klasse in rol.klassen
                 if _aantal_klasse(dataset, klasse, rol.via_onderdeel) == 0
             ]
         elif _aantal_rol(dataset, rol) == 0:
-            signalen.append(
-                NulSignaal(
-                    rol.label,
-                    f"Geen enkel object in de rol {rol.label} ({', '.join(rol.klassen)}) in de "
-                    "export, terwijl een check erop leunt. Wat op deze rol toetst, heeft niets "
-                    "te beoordelen.",
-                )
-            )
+            signalen.append(NulSignaal(rol.label, _rol_boodschap(rol)))
     return signalen
+
+
+def _rol_boodschap(rol: _Rol) -> str:
+    """De nul-melding voor een hele lege rol, met de checks die erop leunen."""
+    checks = ", ".join(rol.checks)
+    return (
+        f"Geen enkel object in de rol {rol.label} ({', '.join(rol.klassen)}) in de "
+        f"export, terwijl {checks} erop {vorm(len(rol.checks), 'leunt', 'leunen')}. "
+        "Wat op deze rol toetst, heeft niets te beoordelen."
+    )
+
+
+def _per_klasse_boodschap(klasse: str, rol: _Rol) -> str:
+    """De nul-melding voor een lege afvoereindpuntklasse, met de check die erop leunt."""
+    checks = ", ".join(rol.checks)
+    return (
+        f"Geen enkele {klasse} in de export, terwijl {checks} op de rol {rol.label} "
+        f"{vorm(len(rol.checks), 'leunt', 'leunen')} (BO-33). Wat op deze klasse toetst, "
+        "heeft niets te beoordelen."
+    )
+
+
+@dataclass(frozen=True)
+class HerstelSignaal:
+    """Het datasetsignaal over de herstelde fantoomkoppelingen (issue #60)."""
+
+    koppelingen: int
+    hulpstukken: int
+    boodschap: str
+
+
+def koppelingsherstel(run: CheckRun) -> HerstelSignaal | None:
+    """Het signaal over de fantoomkoppeling, of None als de lader niets hoefde te herstellen.
+
+    Herstel dat je niet meldt is stille interpretatie: de export koppelt leidingeinden
+    aan een `<hulpstuk>_put`-URI die niet bestaat, en de lader raadt de knoop op
+    naamstam. Dat het rapport dat zegt, houdt de aanlevering aanwijsbaar.
+    """
+    herstel = run.dataset.koppelingsherstel
+    if not herstel.koppelingen:
+        return None
+    return HerstelSignaal(
+        herstel.koppelingen,
+        herstel.hulpstukken,
+        f"De export koppelt {getal(herstel.koppelingen, 'leidingeind', 'leidingeinden')} aan "
+        "een `<hulpstuk>_put`-URI die niet bestaat, waar de Hulpstukorientatie van "
+        f"{getal(herstel.hulpstukken, 'hulpstuk', 'hulpstukken')} anders heet. De lader heeft "
+        "die koppelingen op naamstam hersteld zodat de hulpstukchecks TOP-022 en TOP-023 ze "
+        "zien; een hulpstuk is geen netwerkknoop, dus de netwerkchecks veranderen er niet "
+        "door. De aanlevering zelf is daar niet op verbeterd.",
+    )

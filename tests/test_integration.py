@@ -10,16 +10,19 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
+from gwsw_orox_helpers.dataset import load_dataset
 
 from gpkghelper import schrijf_buurten, schrijf_buurtenraster
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
-from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, run_checks
+from nlriochecker.checks.extern import bronrollen_met_check
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import Verdict, assess_coverage
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
+from nlriochecker.nulmeting_teksten import vertaald, vormteksten
 from nlriochecker.reporting import write_check_report, write_reports
 from nlriochecker.studiegebied import load_studiegebieden, load_study_area
 from nlriochecker.toetsloop import toets_gebieden
@@ -31,14 +34,24 @@ OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
 ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
 GIS_DIR = DATA_DIR / "gis_koekangerveld"
 
+# Elke `load_dataset` hieronder draagt `fallback_encoding=FALLBACK_ENCODING`, net als de
+# pijplijn zelf: de echte export is geen UTF-8 (vijf CP850-bytes in straatnamen, zie
+# `test_checks_op_dewoldenhoogeveen_met_typeringspoort`). De lader heeft sinds
+# gwsw-orox-helpers geen terugvalcodering meer als default -- welke codering een afwijkend
+# bestand draagt, weet alleen de afnemer -- dus zonder dit argument valt de run om.
 OROX_DEWOLDENHOOGEVEEN = OROX_DIR / "dewoldenhoogeveen_orox.ttl"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
 ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Mds.ttl"
-ONTOLOGIE_TOTAAL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
+# De totaal-ontologie reist mee met gwsw-orox-helpers; het deelmodel Mds niet.
+ONTOLOGIE_TOTAAL = gebundelde_ontologie()
 STUDIEGEBIED = GIS_DIR / "cbs_buurt_koekangerveld_studiegebied.gpkg"
 
 SHACL_PADEN = sorted(SHACL_DIR.glob("*.csv"))
 RUNDATUM = date(2026, 8, 18)
+
+# Zoveel unieke SHACL-vormen (kolom `Source`) dragen de drie rapporten samen; gemeten
+# 28-08-2026. De vertaaltabel van issue #101 dekt er precies evenveel.
+VORMEN_DE_WOLDEN = 43
 
 pytestmark = pytest.mark.integratie
 
@@ -91,6 +104,25 @@ def test_bekende_kerncijfers(meting) -> None:
     assert {analyse.per_cfk[cfk].warning_count for cfk in meting.cfks} == {18946}
 
 
+def test_elke_shacl_vorm_heeft_een_leesbare_zin(meting) -> None:
+    """De drifttest van issue #101: 43 vormen in de rapporten, 43 vastgestelde teksten.
+
+    De vertaaltabel is met de hand vastgesteld en kan dus achterlopen op wat de
+    GWSW-server oplevert. Een vorm zonder tekst valt in de uitvoer terug op de
+    technische SHACL-boodschap -- geen verlies, maar wel het jargon dat #101 juist
+    wegneemt. Deze test vangt het zodra het gebeurt.
+
+    Andersom telt ook: staat er een tekst voor een vorm die de rapporten niet kennen,
+    dan is de tabel gaan drijven ten opzichte van de meting. Dat is geen fout in de
+    uitvoer, maar het is wel het moment om te kijken of de naam nog klopt.
+    """
+    vormen = {vorm for cfk in meting.cfks for vorm in meting.report(cfk).findings["Source"]}
+
+    assert len(vormen) == VORMEN_DE_WOLDEN
+    assert sorted(vorm for vorm in vormen if not vertaald(vorm)) == []
+    assert sorted(set(vormteksten()) - vormen) == []
+
+
 def test_te_globale_klassen_per_cfk(meting) -> None:
     assert meting.report("Hyd").too_generic_classes == ["Rioolstelsel"]
     assert meting.report("MdsPlan").too_generic_classes == [
@@ -124,7 +156,7 @@ def test_samenvatting_schrijven(meting, tmp_path: Path) -> None:
     reason="het OroX-voorbeeld of de ontologie staat niet in data/",
 )
 def test_alle_checks_draaien_op_het_voorbeeld(tmp_path: Path) -> None:
-    dataset = load_dataset(VOORBEELD_TTL, [ONTOLOGIE_TTL])
+    dataset = load_dataset(VOORBEELD_TTL, [ONTOLOGIE_TTL], fallback_encoding=FALLBACK_ENCODING)
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context)
     markdown_path, csv_path = write_check_report(run, tmp_path)
@@ -140,7 +172,9 @@ def test_alle_checks_draaien_op_het_voorbeeld(tmp_path: Path) -> None:
     reason="de De Wolden en Hoogeveen-OroX staat niet in data/",
 )
 def test_checks_op_dewoldenhoogeveen_met_typeringspoort(meting, tmp_path: Path) -> None:
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     analyse = analyze(meting, dataset)
 
     onbetrouwbaar = set()
@@ -175,7 +209,9 @@ def test_attr014_op_dewoldenhoogeveen_meldt_alleen_wibonthema() -> None:
     te breed staat. De aantallen (23.440 objecten, 18.363 met de vulwaarde 0) komen
     rechtstreeks uit de audit in het issue.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(dataset=dataset, config=load_check_config())
     outcome = run_checks(context, ["ATTR-014"]).outcomes[0]
 
@@ -203,7 +239,9 @@ def test_attr017_op_dewoldenhoogeveen_meldt_de_pe_leidingen() -> None:
     duizenden, dan is de schaallezing misgegaan. De 49 Polypropyleen-leidingen en de
     1.362 zonder materiaal blijven ongetoetst en staan in de toelichting.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(dataset=dataset, config=load_check_config())
     outcome = run_checks(context, ["ATTR-017"]).outcomes[0]
 
@@ -221,7 +259,9 @@ def test_attr017_op_dewoldenhoogeveen_meldt_de_pe_leidingen() -> None:
 )
 def test_studiegebied_koekangerveld(tmp_path: Path) -> None:
     """De afbakening moet aanzienlijk minder bevindingen opleveren, en dat melden."""
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(dataset=dataset, config=load_check_config())
     volledig = run_checks(context)
 
@@ -240,6 +280,11 @@ def test_studiegebied_koekangerveld(tmp_path: Path) -> None:
 
 
 AHN_TIF = GIS_DIR / "ahn5_dtm_koekangerveld.tif"
+# Anders dan de rest van `data/gis_koekangerveld/` is dit bestand geen onderdeel van de
+# levering: er is voor dit gebied geen TOP10NL-extract, en het wordt geknipt uit dat van De
+# Wolden met `scripts/knip_top10nl_koekangerveld.py`. Wie de aangeleverde data heeft maar
+# die stap niet draaide, hoort deze test te zien overslaan en niet te zien falen.
+TOP10NL_GPKG = GIS_DIR / "top10nl_plaats_vlak_koekangerveld.gpkg"
 
 
 def _koekangerveld_bronnen():
@@ -251,7 +296,11 @@ def _koekangerveld_bronnen():
 
 
 @pytest.mark.skipif(
-    not AHN_TIF.exists(), reason="de externe bronnen staan niet in data/gis_koekangerveld/"
+    not (AHN_TIF.exists() and TOP10NL_GPKG.exists()),
+    reason=(
+        "de externe bronnen staan niet in data/gis_koekangerveld/ (het TOP10NL-plaatsvlak "
+        "komt uit scripts/knip_top10nl_koekangerveld.py)"
+    ),
 )
 def test_externe_bronnen_van_koekangerveld() -> None:
     """Legt de inventarisatie uit docs/gis-inventarisatie.md vast."""
@@ -259,18 +308,30 @@ def test_externe_bronnen_van_koekangerveld() -> None:
 
     assert bronnen.extent is not None
     assert bronnen.extent.area / 10_000 == pytest.approx(43.2, abs=0.5)
+    # De aantallen zijn die van de *actuele* objectversies; de lagen in `BGT.gpkg`
+    # dragen hun registratiehistorie mee en die valt bij het inlezen af (issue #58).
+    # De tabel in docs/gis-inventarisatie.md telt de rijen in het bestand zelf en
+    # staat daarom hoger. De BAG- en NWB-bestanden dragen geen historievelden.
     assert {rol: len(laag) for rol, laag in bronnen.layers.items()} == {
-        "bgt_pand": 199,
+        "bgt_pand": 138,
         # Alleen `waterdeel`; `ondersteunendwaterdeel` (94 oevers) valt buiten scope.
-        "bgt_water": 233,
-        "bgt_bouwwerk": 52,
+        "bgt_water": 120,
+        "bgt_bouwwerk": 41,
+        # De drie lagen van EXT-009 (issue #104). Het TOP10NL-plaatsvlak is uit het De
+        # Wolden-extract geknipt met `scripts/knip_top10nl_koekangerveld.py`: er is voor
+        # dit gebied geen eigen levering, en Koekangerveld is er de enige woonkern in.
+        "bgt_wegdeel": 124,
+        "top10nl_kom": 1,
         "bag_pand": 166,
         "nwb_wegvak": 13,
     }
-    # De BGT-laag `put` bestaat wel maar is leeg; EXT-005 en EXT-006 worden daarom
-    # overgeslagen in plaats van elke put als dekselloos te melden.
+    # De BGT-laag `put` bestaat wel maar is leeg, dus de rol blijft onvervuld. Geen
+    # check leest hem meer sinds EXT-005 en EXT-006 vervielen (issue #95), en daarom
+    # noemt het rapport hem niet als overgeslagen bron -- `missing` blijft wel het
+    # volledige laadverslag, dat `toets` op de opdrachtregel toont (BO-64).
     assert bronnen.layer("bgt_putdeksel") is None
     assert any("bgt_putdeksel" in ontbreekt for ontbreekt in bronnen.missing)
+    assert "bgt_putdeksel" not in bronrollen_met_check()
     # Alles staat al in RD New; er is niets geherprojecteerd.
     assert all(laag.reprojected_from is None for laag in bronnen.layers.values())
     assert bronnen.raster is not None
@@ -289,11 +350,13 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     overgrote deel van de objecten hoort daarom de status *buiten studiegebied* te
     krijgen en geen uitslag.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
-    ids = ["EXT-001", "EXT-002", "EXT-003", "EXT-007", "HGT-001", "HGT-002", "HGT-003"]
+    ids = ["EXT-001", "EXT-003", "EXT-007", "HGT-001", "HGT-002", "HGT-003"]
     run = run_checks(context, ids)
     per_check = {outcome.check_id: outcome for outcome in run.outcomes}
 
@@ -303,16 +366,75 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
     assert per_check["EXT-001"].examined == 69
     assert per_check["HGT-001"].examined == 40
     for outcome in run.outcomes:
-        if outcome.check_id.startswith("HGT") or outcome.check_id in {"EXT-001", "EXT-002"}:
+        if outcome.check_id.startswith("HGT") or outcome.check_id in {"EXT-001", "EXT-003"}:
             assert any("Buiten studiegebied" in note for note in outcome.notes)
 
-    # Geen enkele put wijkt meer dan 25 cm van het AHN5 af, 15 wel meer dan 5 cm.
+    # Geen enkele put wijkt 25 cm of meer van het AHN5 af, 7 wel 10 cm of meer (issue #63).
     assert len(per_check["HGT-002"].findings) == 0
-    assert len(per_check["HGT-001"].findings) == 15
+    assert len(per_check["HGT-001"].findings) == 7
 
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")
     assert "Buiten studiegebied" in tekst
+
+
+DEWOLDEN_GIS = DATA_DIR / "gis_dewoldenhoogeveen"
+NWB_DEWOLDEN = DEWOLDEN_GIS / "NWB_wegvakken_DeWoldenHoogeveen.gpkg"
+PROJECTCONFIG = Path(__file__).resolve().parents[1] / "configs" / "dewoldenhoogeveen.toml"
+
+
+@pytest.mark.zwaar
+@pytest.mark.skipif(
+    not (OROX_DEWOLDENHOOGEVEEN.exists() and NWB_DEWOLDEN.exists()),
+    reason="de De Wolden en Hoogeveen-OroX of de NWB-wegvakken staan niet in data/",
+)
+def test_ext009_op_de_volle_gemeente() -> None:
+    """EXT-009 op alle 9787 NWB-wegvakken, met de geijkte drempel (issue #104, BO-81).
+
+    De baseline van 29-08-2026, gemeten met `scripts/ijk_ext009.py` en daar onderbouwd:
+    4116 kandidaten, 500 rood, 3593 groen, 23 grijs. Een run die hiervan afwijkt vraagt om
+    een verklaring en niet om een nieuw getal -- dat is de hoofdregel uit `CLAUDE.md`, en
+    deze check heeft er extra reden toe: hij leunt op een geijkte drempel, en een
+    verschuiving daarin is aan de aantallen te zien vóór iemand de fouttabel opnieuw draait.
+
+    Alleen de drie lagen die de check leest; de panden, waterdelen en het AHN kosten
+    minuten en veranderen niets aan deze uitslag.
+    """
+    from nlriochecker.checks.wegvakken import STATUS_GRIJS, STATUS_GROEN, STATUS_ROOD, beoordeel
+    from nlriochecker.externedata import load_external_data
+
+    config = load_check_config(PROJECTCONFIG)
+    bronnen = load_external_data(
+        config.bronnen.model_copy(
+            update={
+                "map": ".",
+                "bag_pand": None,
+                "ahn_dtm": None,
+                "bgt_pandlagen": [],
+                "bgt_waterlagen": [],
+                "bgt_putdeksellagen": [],
+                "bgt_overige_bouwwerklagen": [],
+            }
+        ),
+        DEWOLDEN_GIS,
+    )
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    uitslag = beoordeel(context)
+
+    assert len(uitslag) == 4116
+    assert uitslag.wegvakken_totaal == 9787
+    assert (
+        uitslag.aantal(STATUS_ROOD),
+        uitslag.aantal(STATUS_GROEN),
+        uitslag.aantal(STATUS_GRIJS),
+    ) == (500, 3593, 23)
+    # Elk beoordeeld wegvak draagt een tekenbaar straatvlak; de laag `vlakken` toont er
+    # dus evenveel als de check bekeek.
+    assert all(not oordeel.vlak.is_empty for oordeel in uitslag.oordelen)
 
 
 @pytest.mark.zwaar
@@ -322,7 +444,9 @@ def test_ext_checks_op_koekangerveld(tmp_path: Path) -> None:
 )
 def test_afbakening_op_koekangerveld_verandert_de_bevindingen_niet() -> None:
     """De contextschil mag de uitkomst op de kern niet veranderen, alleen sneller maken."""
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     config = load_check_config()
     area = load_study_area(STUDIEGEBIED)
     ids = ["NET-001", "NET-002", "NET-004", "TOP-001", "TOP-005"]
@@ -355,7 +479,9 @@ def test_twee_buurten_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     de oostelijke helft, elk als eigen feature. Per helft moeten de meldingen
     gelijk zijn aan die van een losse run op alleen die helft.
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     config = load_check_config()
     ids = ["NET-001", "TOP-001", "TOP-005"]
     west, oost = _helften(load_study_area(STUDIEGEBIED).geometry)
@@ -403,7 +529,9 @@ def test_schaal_tachtig_buurten(tmp_path: Path) -> None:
     Dat is de meting waarop het uitstel van de lokaal/contextueel-optimalisatie
     wacht (zie de beslislog).
     """
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     bestand = schrijf_buurtenraster(
         tmp_path / "tachtig.gpkg", 80, load_study_area(STUDIEGEBIED).geometry.bounds
     )
@@ -460,11 +588,13 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     from nlriochecker.uitvoer.gpkg import schrijf_geopackage
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    dataset = load_dataset(OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL])
+    dataset = load_dataset(
+        OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
+    )
     context = CheckContext(
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
-    run = run_checks(context, ["EXT-001", "EXT-002", "EXT-003"])
+    run = run_checks(context, ["EXT-001", "EXT-003"])
     meldingen = bouw_meldingen(run, RUNDATUM)
 
     pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
@@ -472,14 +602,17 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
     try:
         geschreven = {
-            laag: {rij[0] for rij in verbinding.execute(f'select id from "{laag}"')}
-            for laag in ("bouwwerken", "waterdelen_zonder_zinker")
+            rij[0]: rij[1] for rij in verbinding.execute('select id, soort from "vlakken"')
         }
     finally:
         verbinding.close()
 
-    for laag, check_id in (("bouwwerken", "EXT-001"), ("waterdelen_zonder_zinker", "EXT-003")):
-        verwacht = {m.object2_uri for m in meldingen if m.check_id == check_id and m.object2_uri}
-        assert geschreven[laag] == verwacht
-        assert all(sleutel.startswith(("bgt:", "bag:")) for sleutel in geschreven[laag])
-    assert geschreven["bouwwerken"]
+    # Eén laag `vlakken` (issue #67): exact de verzameling treffers waar EXT-001 en
+    # EXT-003 samen naar wijzen, niets erbij en niets eraf.
+    verwacht = {
+        m.object2_uri for m in meldingen if m.check_id in ("EXT-001", "EXT-003") and m.object2_uri
+    }
+    assert set(geschreven) == verwacht
+    assert all(sleutel.startswith(("bgt:", "bag:")) for sleutel in geschreven)
+    assert set(geschreven.values()) <= {"pand", "bouwwerk", "water"}
+    assert geschreven

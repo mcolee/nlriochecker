@@ -24,11 +24,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from gwsw_orox_helpers.cache import CacheUitslag, laad_met_cache
+from gwsw_orox_helpers.dataset import GwswDataset, markeer_vulwaarden
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
+
 from nlriochecker.analysis import analyze
-from nlriochecker.cache import CacheUitslag, laad_met_cache
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import FALLBACK_ENCODING, CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckRun, Severity
-from nlriochecker.dataset import GwswDataset, markeer_vulwaarden
 from nlriochecker.errors import OpdrachtError
 from nlriochecker.externedata import Dekkingseis, ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik, kies_cfk, laad_nulmeting
@@ -38,14 +40,13 @@ from nlriochecker.studiegebied import RdGrenzen, Studiegebieden, load_studiegebi
 from nlriochecker.taal import getal, vorm
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
 from nlriochecker.uitvoer.schrijver import UitvoerPerGebied, schrijf_uitvoer_gebieden
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 @dataclass(frozen=True)
 class Toetsopdracht:
     """Wat er getoetst moet worden: de paden en de keuzes van de gebruiker.
 
-    De vlaggen staan bevestigend (`met_geopackage`, niet `geen_gpkg`), zodat ze
+    De vlaggen staan bevestigend (`met_geopackage`, niet zijn ontkenning), zodat ze
     aansluiten op `schrijf_uitvoer_gebieden` en niet als dubbele ontkenning lezen
     zodra je ze programmatisch zet.
     """
@@ -62,9 +63,10 @@ class Toetsopdracht:
     plausibiliteit: Path | None = None
     bronnen: Path | None = None
     cfk: tuple[str, ...] = ()
-    # Bewust doorgaan zonder klassenhierarchie. Zonder ontologie en zonder deze vlag
-    # weigert `voer_toets_uit`; zie `_eis_ontologie`.
+    # Bewust doorgaan zonder klassenhierarchie. Zonder deze vlag en zonder eigen
+    # ontologie geldt de gebundelde GWSW-ontologie 1.6; zie `_ontologiekeuze`.
     geen_ontologie: bool = False
+    met_csv: bool = True
     met_geopackage: bool = True
     met_json: bool = True
     gebruik_cache: bool = True
@@ -199,7 +201,6 @@ def voer_toets_uit(
     niet pas daarna te melden dat de run zinloos was. De dekkingspoort op de bronnen
     hangt alleen van die bronnen af en hoort om dezelfde reden vooraan.
     """
-    _eis_ontologie(opdracht)
     config = load_check_config(opdracht.projectconfig)
     kies_cfk(opdracht.cfk, config.nulmeting.vereiste_cfk)
     gebieden = _studiegebieden(opdracht, config)
@@ -207,9 +208,10 @@ def voer_toets_uit(
 
     dataset, cache = laad_met_cache(
         opdracht.dataset_pad,
-        list(opdracht.ontologieen),
+        _ontologiekeuze(opdracht),
         opdracht.cachemap,
         opdracht.gebruik_cache,
+        fallback_encoding=FALLBACK_ENCODING,
         voortgang=voortgang,
     )
     dataset = markeer_vulwaarden(
@@ -244,6 +246,7 @@ def voer_toets_uit(
     uitvoer = schrijf_uitvoer_gebieden(
         runs,
         opdracht.uitvoermap,
+        met_csv=opdracht.met_csv,
         met_geopackage=opdracht.met_geopackage,
         met_json=opdracht.met_json,
         voortgang=voortgang,
@@ -264,35 +267,26 @@ def voer_toets_uit(
     )
 
 
-def _eis_ontologie(opdracht: Toetsopdracht) -> None:
-    """Weigert een toets zonder klassenhierarchie, tenzij de gebruiker erom vraagt.
+def _ontologiekeuze(opdracht: Toetsopdracht) -> list[Path] | None:
+    """Welke ontologie de lader krijgt: eigen paden, geen, of de gebundelde.
 
-    Zonder ontologie kent de lader de subklassen van Knooppunt en Verbinding niet, en
-    de OroX-export typeert geen enkel object op wortelniveau: `Inspectieput` staat er
-    wel, `Put` niet. `putten()` en `leidingen()` leveren dan een lege verzameling en de
-    checks draaien over een onvolledige selectie -- op De Wolden en Hoogeveen zien 62 van de 89
-    checks er nul, en de achttien die via `netwerkknopen` gaan er 1.874 van de 23.485,
-    want die selectie somt naast de wortels ook klassen op die de export wel
-    rechtstreeks typeert. Hun uitkomst draagt dan geen oordeel, terwijl het rapport dat
-    niet zei.
-    Stilte leest als "alles gecontroleerd", dus dit hoort een fout te zijn en geen
-    stille overslag -- hetzelfde besluit als bij een ontbrekende conformiteitsklasse
-    (BO-7).
+    Drie toestanden, en ze zijn niet uitwisselbaar. Opgegeven paden gaan voor: wie ze
+    noemt wil precies die klassenhierarchie. `None` laat gwsw-orox-helpers de
+    gebundelde GWSW-ontologie 1.6 nemen -- de standaardweg sinds de leeslaag die
+    ontologie zelf meelevert; daarvoor moest de gebruiker haar aanwijzen en weigerde
+    deze module de run zonder.
 
-    Deze toets staat voor het laden, naast die op de keuzes en de bronnen: laden kost
-    op De Wolden en Hoogeveen ruim drie minuten en circa 3 GB, en deze weigering is gratis.
+    Een lege lijst is de bewuste ontsnappingsvlag `--geen-ontologie`. Dan kent de
+    lader de subklassen van Knooppunt en Verbinding niet en typeert de OroX-export
+    niets op wortelniveau: `Inspectieput` staat er wel, `Put` niet. `putten()` en
+    `leidingen()` leveren dan een lege verzameling en de checks draaien over een
+    onvolledige selectie -- op De Wolden en Hoogeveen zien 62 van de 89 checks er nul.
+    Hun uitkomst draagt geen oordeel, en het rapport zegt dat: het voorbehoud hangt
+    aan `klassenhierarchie_bekend` en niet aan de vlag (issue #33).
     """
-    if opdracht.ontologieen or opdracht.geen_ontologie:
-        return
-    raise OpdrachtError(
-        "Geen ontologie opgegeven. Zonder de GWSW-klassenhierarchie herkent de lader "
-        "knopen en strengen alleen aan hun geometrie en typeert de OroX-export niets "
-        "op wortelniveau; de checks draaien dan wel, maar over een onvolledige "
-        "selectie, en hun uitkomst draagt geen oordeel. Geef "
-        "--ontologie data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl mee, of kies "
-        "bewust voor zo'n run met --geen-ontologie; dan draagt het rapport het "
-        "voorbehoud."
-    )
+    if opdracht.ontologieen:
+        return list(opdracht.ontologieen)
+    return [] if opdracht.geen_ontologie else None
 
 
 def _studiegebieden(opdracht: Toetsopdracht, config: CheckConfig) -> Studiegebieden | None:

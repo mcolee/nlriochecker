@@ -23,10 +23,16 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from nlriochecker import __version__
+
+if TYPE_CHECKING:
+    # Alleen voor de annotatie: deze module is de onderste laag van de uitvoer en hoeft
+    # de meldingenstroom niet te kennen om een envelop te schrijven.
+    from nlriochecker.uitvoer.melding import Onderdrukking
 
 # De pakketnaam uit de modulenaam zelf, om hem niet naast `pyproject.toml` een
 # tweede keer op te schrijven -- dezelfde reden waarom het versienummer uit de
@@ -41,7 +47,13 @@ VELD_GEREEDSCHAP = "gereedschap"
 # De versie van het JSON-contract, los van het versienummer van deze package. Een
 # afnemer pint hierop, niet op de packageversie: de checks mogen veranderen zonder
 # dat het formaat dat doet. Zie `docs/json-schema.md` voor de versioneringsregel.
-SCHEMA_VERSIE = "1.1"
+#
+# 1.2 (issue #101): elke melding draagt `boodschap_technisch`, en bij een
+# nulmetingmelding is `boodschap` voortaan de leesbare Nederlandse zin in plaats van de
+# SHACL-tekst. Dat merkt een bestaande afnemer, dus het telt als wijziging en niet als
+# optionele toevoeging -- vandaar de stap, terwijl `markering`, `onderdrukt` en `checks`
+# binnen `1.1` bijkwamen.
+SCHEMA_VERSIE = "1.2"
 
 
 def gereedschap() -> str:
@@ -112,14 +124,17 @@ def schrijf_json(
     markering: str | None = None,
     gebied: str | None = None,
     gebieden: list[str] | None = None,
+    onderdrukking: Onderdrukking | None = None,
+    checks: list[dict[str, object]] | None = None,
 ) -> Path:
     """Schrijft de meldingenstroom als JSON, met een envelop die de run beschrijft.
 
     Bedoeld als stabiel contract voor een afnemer die er mutatievoorstellen uit
     afleidt. De meldingen komen kant-en-klaar binnen via `meldingen_json`; deze
-    functie interpreteert geen enkel veld, precies zoals `schrijf_csv` een
+    functie interpreteert er geen enkel veld van, precies zoals `schrijf_csv` een
     kant-en-klare tabel krijgt. Zo kan de JSON niet uit de pas lopen met de andere
-    drie uitvoervormen.
+    drie uitvoervormen. De enveloppewaarden leest hij wel -- ze komen als losse
+    argumenten binnen en worden hier tot velden gemaakt.
 
     De sortering op `melding_id` maakt twee runs op dezelfde data diffbaar; zonder
     haar is elke trendvergelijking tussen twee bestanden ruis. Zie
@@ -146,6 +161,19 @@ def schrijf_json(
     beide velden, zodat zo'n bestand byte-voor-byte blijft zoals het was; een afnemer
     die de velden leest, moet ze dus als optioneel behandelen (zie
     `docs/json-schema.md`).
+
+    `onderdrukt` zegt wat `[rapport]` uit de meldingenstroom hield: de twee lijsten en
+    hoeveel meldingen erdoor wegvielen (BO-49). Ook dit veld is optioneel en additief --
+    het staat er alleen als de projectconfiguratie iets onderdrukt, zodat een run zonder
+    lijsten byte-voor-byte blijft zoals hij was en `SCHEMA_VERSIE` niet omhoog hoeft.
+
+    `checks` draagt per check wat hij bekeken heeft: hoeveel, waarover dat geteld is en
+    welke populatie hij declareert (issue #77). Hij komt kant-en-klaar
+    binnen via `bevindingen.checks_json`; ook hier interpreteert deze functie niets.
+    Optioneel en additief om dezelfde reden als `onderdrukt`, en om die reden ook niet
+    hernummerd; de totaalsynthese over meerdere gebieden laat hem weg, want `bekeken` is
+    daar per gebied gemeten en een som of een eerste gebied zou een dekking beweren die
+    niemand gemeten heeft.
     """
     document: dict[str, object] = {
         "schema_versie": SCHEMA_VERSIE,
@@ -163,8 +191,16 @@ def schrijf_json(
         "volledig": volledig,
         "typeringspoort_toegepast": typeringspoort_toegepast,
     }
+    if onderdrukking is not None and onderdrukking.actief:
+        document["onderdrukt"] = {
+            "klassen": list(onderdrukking.klassen),
+            "checks": list(onderdrukking.checks),
+            "meldingen": onderdrukking.totaal,
+        }
     if markering:
         document["markering"] = markering
+    if checks is not None:
+        document["checks"] = checks
     document |= {
         "aantal_meldingen": len(meldingen),
         "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),

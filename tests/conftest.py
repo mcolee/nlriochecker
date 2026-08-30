@@ -6,24 +6,33 @@ import os
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
-from nlriochecker.dataset import GwswDataset, load_dataset
+from nlriochecker.checkconfig import FALLBACK_ENCODING
 
 # Een schone kloon heeft `data/` niet: die map staat buiten versiebeheer omdat de
 # OroX-export en de GIS-bronnen gigabytes beslaan. De tests die erop leunen slaan
 # dan over, en de run blijft groen terwijl er nauwelijks iets getoetst is. Zet deze
 # variabele (CI doet dat) om een ondergrens aan het aantal geslaagde tests te eisen.
 MINIMUM_ENV = "NLRIOCHECKER_MIN_GESLAAGD"
-# De ondergrens hierboven meet "geslaagd", en dat getal kruipt met de suite mee omhoog:
-# hij is nu twee keer met de hand nagetrokken nadat hij was opgehouden te bijten. Wat
-# hij wil vangen is stille overslag, en dat is een bovengrens op "overgeslagen" -- die
-# beweegt niet mee met suitegroei. De twee vullen elkaar aan: de ondergrens vangt tests
-# die helemaal niet meer verzameld worden, de bovengrens tests die wel verzameld worden
-# maar niet draaien. Zie het commentaar bij de variabelen in .github/workflows/toets.yml.
-MAXIMUM_OVERGESLAGEN_ENV = "NLRIOCHECKER_MAX_OVERGESLAGEN"
+# De ondergrens hierboven meet "geslaagd" en kruipt met de suite mee omhoog. Wat de poort
+# wil vangen is stille overslag: een fixture die niet meekomt, een generator die niet
+# gedraaid is, een tool die op de runner ontbreekt. Een telgrens op "overgeslagen"
+# (`NLRIOCHECKER_MAX_OVERGESLAGEN`, tot 2026-08-25) ving dat, maar telde ook de bedoelde,
+# datagebonden overslagen mee -- het Juinen-voorbeeld, de OroX-export en de SHACL-rapporten
+# staan niet op de runner -- en klapte daardoor twee keer op legitieme testgroei. Daarom
+# classificeert de poort nu op *reden*: een overslag is verwacht als zijn reden zegt waar
+# hij vandaan komt. Al het andere is met deze vlag gezet een harde fout, zonder getal om
+# te herijken (BO-48).
+STRIKT_ENV = "NLRIOCHECKER_STRIKTE_OVERSLAG"
+# Wat een reden verwacht maakt: `data/` (echte data die op de runner ontbreekt -- elke
+# datagebonden skip hoort die map te noemen) of een BO-nummer (een bewuste uitzondering
+# met besluit, zoals BO-40 in test_gwsw_vocabulaire.py).
+VERWACHTE_REDENEN = ("data/", "BO-")
 # Een `pytest.skip(allow_module_level=True)` viel tussen wal en schip (issue #52): die
-# telt als één overslag hoeveel tests de module ook draagt, dus laat de bovengrens
-# hierboven een hele weggevallen module lopen en zou de ondergrens op een zeer krappe,
+# telt als één overslag hoeveel tests de module ook draagt, dus liet de vervallen
+# telgrens een hele weggevallen module lopen en zou de ondergrens op een zeer krappe,
 # brosse waarde moeten staan om hem te vangen. Deze derde grens telt uitsluitend de
 # modulewijde overslagen, hangt niet aan de omvang van de suite en veroudert dus niet
 # mee. Modulewijde overslagen zijn in `stats["skipped"]` te herkennen: ze komen als
@@ -35,27 +44,26 @@ TTL_DIR = FIXTURE_DIR / "ttl"
 SHACL_DIR = FIXTURE_DIR / "shacl"
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
-ONTOLOGIE_DIR = DATA_DIR / "gwsw_ontologieen"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
-# De deelmodellen Mds en Hyd zijn filters op het totaalmodel; alleen de
-# totaal-ontologie kent alle Knooppunt- en Verbinding-klassen.
-ONTOLOGIE_TTL = ONTOLOGIE_DIR / "Ontologie_GWSW_Totaal.ttl"
 
 
 @pytest.fixture(scope="session")
-def ontologie() -> list[Path]:
-    """De GWSW-totaalontologie, voor de klassenhierarchie."""
-    if not ONTOLOGIE_TTL.exists():
-        pytest.skip("de GWSW-ontologie staat niet in data/")
-    return [ONTOLOGIE_TTL]
+def ontologie() -> Path:
+    """De GWSW-totaalontologie, voor de klassenhierarchie; altijd aanwezig.
+
+    Zij reist als package-resource mee met `gwsw-orox-helpers`; de deelmodellen Mds en
+    Hyd zijn filters op dit totaalmodel en kennen niet alle Knooppunt- en
+    Verbinding-klassen.
+    """
+    return gebundelde_ontologie()
 
 
 @pytest.fixture(scope="session")
-def juinen(ontologie: list[Path]) -> GwswDataset:
+def juinen(ontologie: Path) -> GwswDataset:
     """Het meegeleverde Juinen-voorbeeld als schone referentiedataset."""
     if not VOORBEELD_TTL.exists():
         pytest.skip("het OroX-voorbeeldbestand staat niet in data/")
-    return load_dataset(VOORBEELD_TTL, ontologie)
+    return load_dataset(VOORBEELD_TTL, [ontologie], fallback_encoding=FALLBACK_ENCODING)
 
 
 @pytest.fixture
@@ -140,6 +148,41 @@ def _modulewijde_overslagen(overgeslagen: list[object]) -> int:
     return sum(1 for rapport in overgeslagen if isinstance(rapport, pytest.CollectReport))
 
 
+def _reden(rapport: object) -> str:
+    """De overslagreden uit een rapport.
+
+    pytest zet hem bij een overslag in `longrepr` als `(pad, regel, "Skipped: <reden>")`;
+    het voorvoegsel gaat eraf zodat de classificatie op de reden zelf werkt.
+    """
+    longrepr = getattr(rapport, "longrepr", None)
+    if isinstance(longrepr, tuple) and len(longrepr) == 3:
+        return str(longrepr[2]).removeprefix("Skipped: ")
+    return str(longrepr or "")
+
+
+def _onverwachte_overslagen(overgeslagen: list[object]) -> list[tuple[str, str]]:
+    """De test-overslagen waarvan de reden niet zegt dat ze verwacht zijn, als (nodeid, reden).
+
+    Alleen `TestReport`s: een modulewijde overslag is een `CollectReport` en hoort bij de
+    modulegrens. Verwacht is een reden die een merk uit `VERWACHTE_REDENEN` draagt.
+    """
+    return [
+        (rapport.nodeid, _reden(rapport))
+        for rapport in overgeslagen
+        if isinstance(rapport, pytest.TestReport)
+        and not any(merk in _reden(rapport) for merk in VERWACHTE_REDENEN)
+    ]
+
+
+def _strikt() -> bool:
+    """Of de strikte overslagcontrole aanstaat.
+
+    Niet gezet of leeg is uit, en "0" ook. Een kale `os.environ.get` zou "0" als aan
+    lezen, zodat een run die de vlag bewust uitzet hem juist ingeschakeld kreeg.
+    """
+    return os.environ.get(STRIKT_ENV, "") not in ("", "0")
+
+
 def _grens(naam: str, rapporteur: pytest.TerminalReporter) -> int | None:
     """De waarde van een grensvariabele, of None als hij niet gezet of onleesbaar is."""
     waarde = os.environ.get(naam)
@@ -161,9 +204,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
     De ondergrens ligt op wat een schone kloon haalt; hij vangt dus geen ontbrekende
     `data/` op -- die haalt de grens ruim -- maar wel het wegvallen van meer dan dat.
-    De bovengrens op de overslagen doet het omgekeerde: hij hangt niet aan de omvang van
-    de suite maar aan het aantal bekende skips, en blijft daarmee bijten terwijl de
-    suite doorgroeit.
+    De strikte overslagcontrole doet het omgekeerde: zij hangt niet aan een aantal maar
+    aan de reden van elke overslag, en veroudert dus niet met de suite mee.
     """
     if session.config.option.collectonly:
         return
@@ -177,7 +219,6 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     overgeslagen = len(overgeslagen_rapporten)
     modulewijd = _modulewijde_overslagen(overgeslagen_rapporten)
     minimum = _grens(MINIMUM_ENV, rapporteur)
-    maximum = _grens(MAXIMUM_OVERGESLAGEN_ENV, rapporteur)
     maximum_module = _grens(MAXIMUM_MODULE_OVERGESLAGEN_ENV, rapporteur)
 
     gezakt = False
@@ -188,13 +229,19 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             red=True,
         )
         gezakt = True
-    if maximum is not None and overgeslagen > maximum:
-        rapporteur.write_line(
-            f"{MAXIMUM_OVERGESLAGEN_ENV}={maximum}, maar er sloegen er {overgeslagen} over "
-            f"({geslaagd} geslaagd). Draai met -rs om te zien welke erbij gekomen zijn.",
-            red=True,
-        )
-        gezakt = True
+    if _strikt():
+        onverwacht = _onverwachte_overslagen(overgeslagen_rapporten)
+        if onverwacht:
+            rapporteur.write_line(
+                f"{STRIKT_ENV} staat aan, maar {len(onverwacht)} overslagen hebben een reden "
+                "die niet zegt dat ze verwacht zijn. Noem `data/` in de reden als de test echte "
+                "data nodig heeft, of het BO-nummer van de bewuste uitzondering; is het geen van "
+                "beide, dan is er een fixture, generator of tool weggevallen:",
+                red=True,
+            )
+            for nodeid, reden in onverwacht:
+                rapporteur.write_line(f"  {nodeid}: {reden or '(geen reden opgegeven)'}", red=True)
+            gezakt = True
     if maximum_module is not None and modulewijd > maximum_module:
         rapporteur.write_line(
             f"{MAXIMUM_MODULE_OVERGESLAGEN_ENV}={maximum_module}, maar er haakten er "

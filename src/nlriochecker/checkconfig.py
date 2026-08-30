@@ -17,10 +17,23 @@ from pydantic import (
     model_validator,
 )
 
-from nlriochecker.dataset import VULWAARDE_KENMERKEN
 from nlriochecker.errors import ConfigError
 
 DEFAULT_CHECK_CONFIG_NAME = "checks.toml"
+
+# De kenmerken waarop `markeer_vulwaarden` werkt: precies de vier velden die zij
+# inspecteert (KLASSE_MAAIVELDHOOGTE, KLASSE_PUTDEKSELNIVEAU, KLASSE_BOB_BEGIN en
+# KLASSE_BOB_EIND). Een andere naam in `[vulwaarden] hoogte_kenmerken` -- een tikfout,
+# of een kenmerk dat de pijplijn niet inleest -- zou stil niets doen terwijl ATTR-013
+# meldt dat de regel is toegepast; `VulwaardeOptions` hieronder weigert hem daarom.
+# De lijst hoort bij de afnemer: `gwsw_orox_helpers.markeer_vulwaarden` neemt de
+# kenmerken als parameter en kent deze keuze niet.
+VULWAARDE_KENMERKEN: frozenset[str] = frozenset(
+    {"Maaiveldhoogte", "Putdekselniveau", "BobBeginpuntLeiding", "BobEindpuntLeiding"}
+)
+
+# De Wolden-export: cp850-vervuiling in de aanlevering; zie de spec van gwsw-orox-helpers.
+FALLBACK_ENCODING = "cp850"
 
 
 class ClassRoots(BaseModel):
@@ -29,16 +42,46 @@ class ClassRoots(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     put: list[str] = Field(min_length=1)
+    # Issue #64: de putten met een verwijderbare deksel (`gwsw:Rioolput`). Enger dan
+    # `put`: de dekselchecks (putdiepte, putbodem) horen hier, niet op elke Put en niet op
+    # een gemaal. De ontologie definieert Rioolput als "een put met een verwijderbare
+    # deksel"; alleen daaraan hangen `Putdekselniveau` en de putdiepte betekenis.
+    rioolput: list[str] = Field(default_factory=lambda: ["Rioolput"])
     vrijvervalleiding: list[str] = Field(min_length=1)
+    # TOP-006, TOP-010 en TOP-011: de leidingen waarvan de onderlinge ligging getoetst
+    # wordt. Ruimer dan `vrijvervalleiding` (een duiker hoort erbij) en enger dan `streng`
+    # (drains, mechanische leidingen en aansluitleidingen horen er niet bij). De grens
+    # komt uit de ontologie en niet uit een projectkeuze, dus een gevulde default -- zoals
+    # bij `rioolput` en `waterlozingspunt`. Zie issue #82 en BO-69.
+    nabijheidsleiding: list[str] = Field(
+        default_factory=lambda: ["VrijvervalRioolleiding", "Duiker"]
+    )
     # TOP-001 vraagt of er *enige* streng aansluit, niet of er een vrijvervalstreng
     # aansluit; een put aan een persleiding is niet losliggend.
     streng: list[str] = Field(default_factory=lambda: ["Leiding"])
     # Mechanisch riool: buiten scope voor de checks, wel zichtbaar in de GIS-uitvoer.
     mechanisch: list[str] = Field(default_factory=list)
+    # TOP-022 en TOP-023: hulpstukken (T-stuk, kruisstuk, mof, afsluitstuk, ...). Een
+    # hulpstuk is een knoop maar geen put; het verwachte aantal leidingen komt uit de
+    # functierestrictie in de ontologie, niet uit deze lijst.
+    hulpstuk: list[str] = Field(default_factory=list)
     # NET-001 en NET-002 vragen elk om een ander soort eindpunt; een vuilwaterstreng
     # die alleen een uitlaat bereikt is niet in orde.
     afvoer_eindpunt: list[str] = Field(default_factory=list)
     lozings_eindpunt: list[str] = Field(default_factory=list)
+    # EXT-007: de lozingspunten die volgens de GWSW-ontologie op oppervlaktewater lozen.
+    # Enger dan `lozings_eindpunt`, en met opzet: die bredere lijst blijft het
+    # netwerkeindpunt van NET-001/002/008. De drie wortels komen uit de ontologie, niet uit
+    # een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`. Zie BO-67.
+    waterlozingspunt: list[str] = Field(
+        default_factory=lambda: ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlaktewater"]
+    )
+    # EXT-009: de pompputten van de drukriolering. `Pompunit` is in de GWSW-ontologie een
+    # `Rioolput` ("pompput in een drukrioleringsstelsel"), dus een echte deelverzameling
+    # van `put`; `Gemaal` hoort er niet bij, want dat is een bouwwerk en het einde van de
+    # afvoer in plaats van een buurtaansluiting. De wortel komt uit de ontologie en niet
+    # uit een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`.
+    pompunit: list[str] = Field(default_factory=lambda: ["Pompunit"])
     vuilwater: list[str] = Field(default_factory=list)
     hemelwater: list[str] = Field(default_factory=list)
     infiltratie: list[str] = Field(default_factory=list)
@@ -49,6 +92,10 @@ class ClassRoots(BaseModel):
     # De status zelf komt uit Begindatum en Einddatum; deze lijst is voor
     # datasets die er een eigen klasse voor gebruiken.
     vervallen: list[str] = Field(default_factory=list)
+    # ADM-010: leidingen die buiten gebruik zijn maar nog in de ondergrond
+    # liggen. LozeLeiding hangt onder Leiding, niet onder VrijvervalRioolleiding, en
+    # dekt GedammerdeLeiding, Uitlegger, VolgeschuimdeLeiding en VolgezandeLeiding.
+    loze_leiding: list[str] = Field(default_factory=list)
     # RVZ: hoe overstorten en bergbezinkvoorzieningen in de export verschijnen.
     overstortput: list[str] = Field(default_factory=list)
     overstortleiding: list[str] = Field(default_factory=list)
@@ -65,6 +112,39 @@ class ClassRoots(BaseModel):
     kritiek: list[str] = Field(default_factory=list)
     # NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen.
     stelseltypen: dict[str, list[str]] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _pompunit_heeft_een_uitweg(self) -> Self:
+        """Zonder persnet mag `Pompunit` niet uit `afvoer_eindpunt` verdwijnen (BO-55).
+
+        Een pompput is een overdrachtspunt naar de drukriolering: de streng die erop
+        eindigt voert af langs het persnet naar het gemaal erachter.
+        `checks/verbanden._bouw_bereikbaarheid` legt die route alleen als `mechanisch`
+        klassen noemt, en `afbakening._componentstructuur` neemt hem alleen dan in de
+        contextschil op. Is die lijst leeg terwijl `Pompunit` geen eindpunt meer is, dan
+        meldt NET-001 elke vrijvervalstreng die op een pompput uitkomt als
+        onbereikbaar -- op De Wolden en Hoogeveen 645 valse bevindingen. Precies daarom
+        wachtte issue #73 op #72.
+
+        Deze poort hoort hier en niet bij de nul-bewaking: `load_check_config` valideert
+        een projectbestand op zichzelf en legt het niet over `checks.toml` heen, dus een
+        weggelaten `mechanisch` levert een lege lijst op, en een rol zonder klassen valt
+        uit de rollentelling weg (BO-52) in plaats van een signaal te geven.
+
+        Een lege `afvoer_eindpunt` valt erbuiten: dan is er in het geheel geen
+        afvoereindpunt en is de uitkomst van NET-001 meteen zichtbaar iets anders. Dat is
+        een eigen toestand, geen pompput zonder uitweg.
+        """
+        if self.afvoer_eindpunt and not self.mechanisch and "Pompunit" not in self.afvoer_eindpunt:
+            raise ValueError(
+                "[klassen] afvoer_eindpunt noemt geen 'Pompunit' terwijl [klassen] "
+                "mechanisch leeg is. Een pompput is dan geen afvoereindpunt en er is geen "
+                "persnet om achterlangs een gemaal te bereiken, zodat NET-001 elke "
+                "vrijvervalstreng op een pompput als onbereikbaar meldt. Noem de "
+                "mechanische leidingklassen in 'mechanisch' (aanbevolen), of houd "
+                "'Pompunit' in 'afvoer_eindpunt' zoals voor issue #73. Zie BO-55."
+            )
+        return self
 
     @property
     def netwerkknopen(self) -> list[str]:
@@ -123,8 +203,10 @@ class CheckThresholds(BaseModel):
     dubbele_put_tolerantie_m: float = Field(default=0.30, gt=0.0)
 
     # TOP-006: hoeveel twee strengen mogen afwijken en hoe lang ze moeten samenvallen.
-    overlap_tolerantie_m: float = Field(default=0.05, gt=0.0)
-    overlap_minimale_lengte_m: float = Field(default=1.0, gt=0.0)
+    # 2 cm over 2 m vangt het echte duplicaat; legitiem parallelle buizen vallen erbuiten
+    # en blijven zichtbaar via TOP-010 en TOP-013. Zie BO-70.
+    overlap_tolerantie_m: float = Field(default=0.02, gt=0.0)
+    overlap_minimale_lengte_m: float = Field(default=2.0, gt=0.0)
     # TOP-007: onder deze lengte geldt een streng als nul-lengte.
     nul_lengte_m: float = Field(default=0.01, gt=0.0)
     # TOP-008: hoe ver de hartlijn van de rechte put-putverbinding mag afwijken.
@@ -134,7 +216,9 @@ class CheckThresholds(BaseModel):
     rd_x_max: float = 300_000.0
     rd_y_min: float = 300_000.0
     rd_y_max: float = 630_000.0
-    # TOP-010: extra marge bovenop de halve diameter van beide strengen.
+    # TOP-010: extra marge bovenop de halve diameter van beide strengen. Blijft 0,0:
+    # de marge discrimineert niet, het plausibel/terecht-onderscheid zit in de hoogte.
+    # Zie BO-70.
     diameterbuffer_marge_m: float = Field(default=0.0, ge=0.0)
     # TOP-013 en TOP-014: aantallen waarboven het onaannemelijk wordt.
     parallelle_strengen_maximum: int = Field(default=2, ge=1)
@@ -164,8 +248,10 @@ class CheckThresholds(BaseModel):
     # ATTR-015: onder zoveel gedateerde objecten zegt een aandeel niets; dan zwijgt
     # de detector.
     begindatum_vulwaarde_minimum_objecten: int = Field(default=30, ge=1)
-    # ATTR-008: aannemelijk bereik voor de strenglengte; de grenzen volgen het
-    # GWSW-datatype Dt_LengteLeiding (1-75 m). Zie checks.toml en issue #35.
+    # Aannemelijk bereik voor de strenglengte; de grenzen volgen het GWSW-datatype
+    # Dt_LengteLeiding (1-75 m). Zie checks.toml en issue #35. Geen check leest ze
+    # meer: ATTR-008 is met issue #90 geschrapt omdat de nulmetingvorm
+    # LengteLeiding_val exact dit bereik toetst (BO-61).
     minimale_strenglengte_m: float = Field(default=1.0, gt=0.0)
     maximale_strenglengte_m: float = Field(default=75.0, gt=0.0)
     # ATTR-009: toegestane afwijking tussen geometrische en administratieve lengte.
@@ -188,13 +274,17 @@ class CheckThresholds(BaseModel):
         return schalen
 
     # HGT-001 en HGT-002: afwijking van het maaiveld ten opzichte van het AHN.
-    ahn_afwijking_waarschuwing_m: float = Field(default=0.05, gt=0.0)
+    ahn_afwijking_waarschuwing_m: float = Field(default=0.10, gt=0.0)
     ahn_afwijking_fout_m: float = Field(default=0.25, gt=0.0)
-    # HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen.
-    bob_maximale_diepte_m: float = Field(default=3.0, gt=0.0)
-    # HGT-005 en HGT-006: tegenverhang licht en fors, in meter over de streng.
+    # HGT-003: hoe diep een BOB onder het AHN-maaiveld mag liggen. 4,0 m = de
+    # ontwerpnorm voor nieuw gebied (3,0 m, PvE Rotterdam) plus marge voor bestaand
+    # gebied; een landelijke maximumnorm bestaat niet. Zie BO-68.
+    bob_maximale_diepte_m: float = Field(default=4.0, gt=0.0)
+    # tegenverhang_licht_m is de vlak-band van NET-009: onder dit |verval| zegt de BOB
+    # niets over de richting. tegenverhang_fors_m is de forsgrens van HGT-006 (issue #80:
+    # van 0,05 naar 0,10 m). Beide in meter over de streng.
     tegenverhang_licht_m: float = Field(default=0.01, gt=0.0)
-    tegenverhang_fors_m: float = Field(default=0.05, gt=0.0)
+    tegenverhang_fors_m: float = Field(default=0.10, gt=0.0)
     # HGT-008: steiler dan een op zoveel is verdacht.
     extreem_verhang_een_op: float = Field(default=50.0, gt=0.0)
     # HGT-009 en HGT-016: BOB-sprong waarboven een valconstructie verwacht wordt.
@@ -235,13 +325,83 @@ class CheckThresholds(BaseModel):
     # EXT-checks: bufferafstanden tot de externe bronnen.
     ext_pand_buffer_m: float = Field(default=1.0, ge=0.0)
     ext_watergang_buffer_m: float = Field(default=1.0, ge=0.0)
+    # Geen check leest deze afstand meer: EXT-005 en EXT-006 zijn met issue #95
+    # vervallen (BO-64 en BO-65). De sleutel blijft staan, en `ext_zoekafstand_max_m`
+    # telt hem nog mee.
     ext_putdeksel_afstand_m: float = Field(default=2.0, gt=0.0)
     ext_lozingspunt_water_afstand_m: float = Field(default=10.0, gt=0.0)
     ext_perceel_buffer_m: float = Field(default=1.0, ge=0.0)
 
-    # #25: bufferafstand om de strengen van een stelsel voor de cartografische
-    # stelsellaag in de GeoPackage. Geen check-drempel; alleen de kaartlaag leest hem.
-    stelselvlak_buffer_m: float = Field(default=10.0, gt=0.0)
+    # EXT-009 (issue #104): straten in de bebouwde kom zonder vrijvervalriolering. Alle
+    # elf waarden komen uit de POC op De Wolden en Hoogeveen; `ext_wegvak_streng_in_cel`
+    # is de dragende maat en is op de validatieset van 485 handmatig beoordeelde straten
+    # geijkt (BO-81). Geen ervan telt mee in `ext_zoekafstand_max_m`: die drempel verruimt
+    # het bereik waarbinnen de EXT-checks in een externe laag kijken, en EXT-009 kijkt daar
+    # hoogstens `ext_wegvak_wegdek_buffer_m` (3 m) ver in -- ruim onder de bestaande 10 m.
+    # De 25 m en 15 m eromheen zijn zoekafstanden in de GWSW-data, niet in een bron.
+    #
+    # Halve breedte van het straatvlak: de voronoi-cel wordt op deze buffer om de
+    # NWB-lijn geknipt (platte kap, zodat het vlak bij de kruising ophoudt).
+    ext_wegvak_buffer_m: float = Field(default=25.0, gt=0.0)
+    # De strook waarin een persleiding als "langs deze straat" telt.
+    ext_wegvak_corridor_m: float = Field(default=15.0, gt=0.0)
+    # Korter dan dit is geen straat maar een stukje kruisingsgeometrie.
+    ext_wegvak_minimale_lengte_m: float = Field(default=25.0, gt=0.0)
+    # Om de hoeveel meter de wegvakken verdicht worden voordat de voronoi eroverheen gaat.
+    ext_wegvak_verdichting_m: float = Field(default=10.0, gt=0.0)
+    # De dragende maat: strenglengte in de eigen voronoi-cel gedeeld door de straatlengte.
+    # Daaronder heet de straat leeg. Geijkt op de validatieset; zie BO-81.
+    ext_wegvak_streng_in_cel: float = Field(default=0.30, gt=0.0)
+    # Drukriolering-indicatie: een pompunit binnen deze afstand van de straat, of
+    # persleiding langs de straat over meer dan dit aandeel van haar lengte. Zij zondert
+    # alleen het onzekere middengebied uit -- een straat met nul meter vrijverval in haar
+    # eigen cel blijft een bevinding; zie `classificeer` en BO-81.
+    ext_wegvak_pomp_afstand_m: float = Field(default=15.0, gt=0.0)
+    ext_wegvak_persleiding_aandeel: float = Field(default=0.3, gt=0.0, le=1.0)
+    # Boven dit aandeel onverhard wegdek valt de straat buiten scope: het model is voor
+    # vrijverval-kernstraten gemaakt.
+    ext_wegvak_onverhard_aandeel: float = Field(default=0.5, gt=0.0, le=1.0)
+    # De strook om de NWB-lijn waarin het BGT-wegdek gemeten wordt.
+    ext_wegvak_wegdek_buffer_m: float = Field(default=3.0, gt=0.0)
+    # De NWB-wegbeheerdersoort van een gemeentelijke weg (`WEGBEHSRT`). Alleen die
+    # straten horen bij de gemeentelijke riolering.
+    ext_wegvak_wegbeheerder: str = "G"
+    # De NWB-baansubsoorten (`BST_CODE`) die geen straat zijn: paden, parkeerplaatsen,
+    # op- en afritten. Daar hoort geen riool onder te liggen.
+    ext_wegvak_uitgesloten_bst: list[str] = Field(
+        default_factory=lambda: [
+            "FP",
+            "VP",
+            "VZ",
+            "OPR",
+            "AFR",
+            "PC",
+            "PKP",
+            "PKB",
+            "PR",
+            "PP",
+            "PST",
+        ]
+    )
+    # De BGT-waarden van `plus_fysiek_voorkomen` die als onverhard tellen.
+    ext_wegvak_onverhard_wegdek: list[str] = Field(
+        default_factory=lambda: [
+            "zand",
+            "grind",
+            "gravel",
+            "puin",
+            "schelpen",
+            "boomschors",
+            "half verhard",
+            "onverhard",
+        ]
+    )
+
+    # #75: bufferafstand om de strengen van een gemengd deelstelsel, voor de
+    # cartografische RVZ-006-vlakken in de laag `vlakken` van de GeoPackage (#98). Geen
+    # check-drempel; alleen de kaartlaag leest hem. De sleutel houdt zijn naam: hij staat
+    # in elke projectconfig en `extra="forbid"` weigert een onbekende.
+    gemengd_zonder_overstort_buffer_m: float = Field(default=10.0, gt=0.0)
 
     @property
     def ext_zoekafstand_max_m(self) -> float:
@@ -267,7 +427,7 @@ class NetworkOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # 'administratief' volgt de van-naar-richting uit het GWSW-model, zoals het
-    # register bedoelt; NET-003 toetst juist of die richting klopt. 'bob' leidt de
+    # register bedoelt; NET-009 toetst juist of die richting klopt. 'bob' leidt de
     # richting af uit het bodemverloop en valt terug op de administratieve richting
     # als een BOB ontbreekt of beide gelijk zijn.
     richting: Literal["administratief", "bob"] = "administratief"
@@ -406,11 +566,20 @@ class ExternalSources(BaseModel):
     bgt: str | None = None
     bag_pand: str | None = None
     nwb_wegvakken: str | None = None
+    # EXT-009: het TOP10NL-plaatsvlak met de bebouwde kom. Anders dan `bag_pand` en
+    # `nwb_wegvakken` is dit geen eenlaagsbestand -- het De Wolden-extract draagt er twee
+    # -- dus de rol noemt haar laagnaam apart, zoals de BGT-rollen dat doen.
+    top10nl: str | None = None
+    top10nl_komlagen: list[str] = Field(default_factory=list)
     studiegebied: str | None = None
     ahn_dtm: str | None = None
     # Welke BGT-lagen welke rol vervullen; per aangeleverde export in te vullen.
     bgt_pandlagen: list[str] = Field(default_factory=list)
     bgt_waterlagen: list[str] = Field(default_factory=list)
+    # EXT-009: de BGT-wegdelen, voor het aandeel onverhard wegdek langs een straat.
+    bgt_wegdeellagen: list[str] = Field(default_factory=list)
+    # Geen check leest deze rol meer sinds EXT-005 en EXT-006 met issue #95 vervielen
+    # (BO-64 en BO-65); de sleutel blijft staan en de laag wordt nog wel geladen.
     bgt_putdeksellagen: list[str] = Field(default_factory=list)
     bgt_overige_bouwwerklagen: list[str] = Field(default_factory=list)
 
@@ -428,8 +597,34 @@ class ReportOptions(BaseModel):
     max_bevindingen_per_check: int = Field(default=0, ge=0)
     # Boven welk aandeel van de bekeken populatie een meldingtype systemisch heet.
     systemisch_drempel: float = Field(default=0.80, gt=0.0, le=1.0)
+    # En vanaf hoeveel bekeken objecten dat aandeel iets mag betekenen. Onder dit
+    # aantal is een ratio geen uitspraak over de export maar een toevallige breuk van
+    # kleine getallen; zie BO-59.
+    systemisch_minimum_bekeken: int = Field(default=100, ge=1)
     # Versie van het checkregister, voor de metadata in de GIS-uitvoer.
     register_versie: str = "v0.9"
+    # Issue #65: meldingen die de uitvoer niet haalt. Wortelklassen (subklassen via de
+    # ontologie) van het hoofdobject, en check-ID's. Een uitvoerkeuze: de checks draaien
+    # ongewijzigd, `bouw_meldingenstroom` filtert en telt. De CSV draagt de lijsten niet,
+    # om dezelfde reden als de CFK-set; zie BO-49.
+    onderdruk_klassen: list[str] = Field(default_factory=list)
+    onderdruk_checks: list[str] = Field(default_factory=list)
+
+    @field_validator("onderdruk_checks")
+    @classmethod
+    def _bekende_check_ids(cls, check_ids: list[str]) -> list[str]:
+        """Weigert een check-ID dat het register niet kent; dat zou stil niets onderdrukken."""
+        # Lazy: `checks/base.py` importeert deze module, dus een import op moduleniveau
+        # is een kringimport. Bij het valideren is het register allang geladen.
+        from nlriochecker.checks import REGISTRY
+
+        onbekend = [check_id for check_id in check_ids if check_id not in REGISTRY]
+        if onbekend:
+            raise ValueError(
+                f"onderdruk_checks kent {', '.join(onbekend)} niet; bekende checks: "
+                f"{', '.join(sorted(REGISTRY))}"
+            )
+        return check_ids
 
 
 class CheckConfig(BaseModel):

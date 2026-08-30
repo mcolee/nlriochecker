@@ -22,6 +22,7 @@ from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
 
 from nlriochecker.errors import PipelineError
+from nlriochecker.taal import getal
 
 RD_NEW = 28992
 
@@ -71,6 +72,26 @@ class VectorLayer:
     def _attributen(self, positie: int) -> dict[str, object]:
         """De attributen van een feature, of een lege dict."""
         return self.attributes[positie] if positie < len(self.attributes) else {}
+
+    def kolom(self, naam: str) -> list[object]:
+        """De waarden van een kolom, hoofdletterongevoelig, per feature.
+
+        De kolomnamen van eenzelfde bron verschillen per extract: het NWB-bestand van De
+        Wolden en Hoogeveen schrijft `WEGBEHSRT` en `STT_NAAM`, dat van Koekangerveld
+        `wegbehsrt` en `stt_naam`. Twee codepaden zouden op een dag uit elkaar lopen; deze
+        ene lezing is de plek waar dat verschil verdwijnt. Een kolom die niet bestaat
+        levert `None` per feature op, net als een lege waarde.
+
+        De naam wordt een keer opgezocht en daarna per rij rechtstreeks gelezen. Elke rij
+        langs elke kolomnaam laten lopen kostte op de NWB-laag van De Wolden en Hoogeveen
+        (9787 rijen, 60 kolommen) 0,15 s per aanroep.
+        """
+        gezocht = naam.casefold()
+        eerste = self.attributes[0] if self.attributes else {}
+        sleutel = next((kolom for kolom in eerste if kolom.casefold() == gezocht), None)
+        if sleutel is None:
+            return [None] * len(self.attributes)
+        return [rij.get(sleutel) for rij in self.attributes]
 
 
 @dataclass(frozen=True)
@@ -142,7 +163,33 @@ ROLLEN = {
     "bgt_water": "bgt_waterlagen",
     "bgt_putdeksel": "bgt_putdeksellagen",
     "bgt_bouwwerk": "bgt_overige_bouwwerklagen",
+    "bgt_wegdeel": "bgt_wegdeellagen",
 }
+
+# De rollen die per definitie geen gebiedsdekkend extract zijn en daarom buiten de
+# dekkingspoort vallen (`_toets_dekking`, BO-19 en BO-80). Een bebouwde kom is een
+# deelgebied van het bereik: het TOP10NL-plaatsvlak houdt op waar het buitengebied
+# begint, en dat is precies de bedoeling. De poort zou daar altijd afgaan, en een
+# ruimere `dekking_tolerantie_m` zou de poort dan ook voor de andere bronnen opheffen.
+# Wat EXT-009 hiermee kwijtraakt staat in zijn toelichting: een wegvak zonder komvlak
+# is geen kandidaat, en het rapport telt hoeveel wegvakken dat waren.
+ZONDER_DEKKINGSEIS = frozenset({"top10nl_kom"})
+
+# De twee bronnen die geen vectorrol zijn maar wel in `missing` kunnen belanden. Ze
+# staan hier als naam, zodat de checks kunnen declareren dat ze erop leunen zonder de
+# tekst over te tikken.
+ROL_STUDIEGEBIED = "studiegebied"
+ROL_RASTER = "ahn_dtm"
+
+
+def rol_van(ontbrekend: str) -> str:
+    """De rol uit een regel van `ExternalData.missing`.
+
+    Elke regel begint met de rolnaam; wat er tussen haakjes achter staat is de uitleg
+    waarom er geen bruikbare laag is. Het rapport leest de rol terug om te bepalen of
+    er een check op leunt.
+    """
+    return ontbrekend.split(" ", 1)[0]
 
 
 def load_external_data(
@@ -181,6 +228,12 @@ def load_external_data(
         if laag is not None:
             lagen[rol] = laag
 
+    kom = _lees_rol(
+        map_pad, bronnen.top10nl, "top10nl_kom", bronnen.top10nl_komlagen, ontbrekend, notities
+    )
+    if kom is not None:
+        lagen["top10nl_kom"] = kom
+
     raster = _lees_raster(map_pad, bronnen.ahn_dtm, ontbrekend, notities)
 
     data = ExternalData(
@@ -216,6 +269,9 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
     buiten het bereik telt mee voor een object er net binnen. Het raster krijgt geen
     marge: bemonsteren is puntsgewijs.
 
+    De rollen in `ZONDER_DEKKINGSEIS` blijven erbuiten: die zijn per definitie een
+    deelgebied van het bereik, en daar zou de poort altijd afgaan (BO-80).
+
     Wat deze poort *niet* kan: bbox-dekking is noodzakelijk maar niet voldoende. Een
     gat midden in het extract valt er niet mee op, en een tekort op een dunne laag
     betekent "hier staan geen features", niet per se "extract afgeknipt". De
@@ -227,13 +283,15 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
     bereik = data.extent.bounds
     tekorten: list[str] = []
     for rol, laag in sorted(data.layers.items()):
+        if rol in ZONDER_DEKKINGSEIS:
+            continue
         omhullende = _omhullende(laag.geometries)
         if omhullende is None:
             continue
         tekorten += _tekortregel(rol, laag.source.name, omhullende, bereik, eis.marge_m, eis)
     if data.raster is not None:
         tekorten += _tekortregel(
-            "ahn_dtm", data.raster.source.name, data.raster.bounds, bereik, 0.0, eis
+            ROL_RASTER, data.raster.source.name, data.raster.bounds, bereik, 0.0, eis
         )
 
     if tekorten:
@@ -246,7 +304,7 @@ def _toets_dekking(data: ExternalData, eis: Dekkingseis) -> None:
             "de andere bronnen op.\n"
             "Is een bron niet te klein maar ongeschikt -- bevat hij iets "
             "anders dan zijn naam suggereert -- zet hem dan uit "
-            "(`bgt_putdeksellagen = []`, of laat `bag_pand` weg); de bijbehorende checks "
+            "(`bgt_waterlagen = []`, of laat `bag_pand` weg); de bijbehorende checks "
             "slaan dan over met uitleg in het rapport, wat een eerlijker antwoord is dan "
             "een uitslag op een verkeerde bron.\n" + "\n".join(tekorten)
         )
@@ -316,12 +374,12 @@ def _lees_studiegebied(
     from nlriochecker.studiegebied import load_study_area
 
     if bestand is None:
-        ontbrekend.append("studiegebied")
+        ontbrekend.append(ROL_STUDIEGEBIED)
         return None, None, ""
 
     pad = map_pad / bestand
     if not pad.exists():
-        ontbrekend.append(f"studiegebied ({pad})")
+        ontbrekend.append(f"{ROL_STUDIEGEBIED} ({pad})")
         return None, None, ""
 
     try:
@@ -462,6 +520,8 @@ def _lees_laag(pad: Path, laag: str, notities: list[str]):
             f"EPSG:{RD_NEW} geherprojecteerd."
         )
 
+    frame = _alleen_actueel(frame, pad, laag, notities)
+
     kolommen = [kolom for kolom in frame.columns if kolom != frame.geometry.name]
     rijen = [
         (geometrie, {kolom: rij[kolom] for kolom in kolommen})
@@ -470,16 +530,47 @@ def _lees_laag(pad: Path, laag: str, notities: list[str]):
     return rijen, f"EPSG:{RD_NEW}", herprojectie
 
 
+HISTORIEVELDEN = ("eind_registratie", "termination_date")
+
+
+def _alleen_actueel(frame, pad: Path, laag: str, notities: list[str]):
+    """Houdt van een BGT-laag alleen de actuele objectversies over.
+
+    Elk BGT-object draagt zijn registratiegeschiedenis mee: de levende versie heeft
+    `eind_registratie` leeg, elke afgesloten oudere versie heeft die kolom gevuld;
+    `termination_date` houdt daarnaast een officieel beëindigd object buiten. Zonder
+    dit filter draaien alle ruimtelijke toetsen over de hele stapel versies -- op De
+    Wolden is meer dan de helft van de waterdelen oude historie (issue #58, BO-43).
+
+    Alleen de aanwezige historievelden tellen; een laag zonder die velden (een los
+    studiegebied, een waterschapsbestand) gaat ongewijzigd door. Wat afvalt komt als
+    notitie in het rapport: stilte zou lezen als "alles meegenomen".
+    """
+    aanwezig = [veld for veld in HISTORIEVELDEN if veld in frame.columns]
+    if not aanwezig:
+        return frame
+    actueel = frame[aanwezig].isna().all(axis=1)
+    verlopen = int((~actueel).sum())
+    frame = frame[actueel]
+    notities.append(
+        f"`{pad.name}` laag {laag!r}: "
+        f"{getal(verlopen, 'verlopen objectversie', 'verlopen objectversies')} overgeslagen "
+        f"({' of '.join(aanwezig)} gevuld); "
+        f"{getal(len(frame), 'actuele feature', 'actuele features')} gelezen."
+    )
+    return frame
+
+
 def _lees_raster(
     map_pad: Path, bestand: str | None, ontbrekend: list[str], notities: list[str]
 ) -> RasterSampler | None:
     """Opent het hoogteraster en bewaakt het coordinaatstelsel."""
     if bestand is None:
-        ontbrekend.append("ahn_dtm")
+        ontbrekend.append(ROL_RASTER)
         return None
     pad = map_pad / bestand
     if not pad.exists():
-        ontbrekend.append(f"ahn_dtm ({pad})")
+        ontbrekend.append(f"{ROL_RASTER} ({pad})")
         return None
 
     import rasterio

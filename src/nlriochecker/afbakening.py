@@ -1,10 +1,11 @@
 """De analyseset: welke objecten met een studiegebied door de checks gaan.
 
 Analyseer de kern plus een contextschil, rapporteer de kern. De schil is precies zo
-groot dat de netwerkchecks hun antwoord houden: de samenhangende vrijvervalcomponent
-waar de kern in ligt, plus een buffer voor de checks die naar nabijheid kijken zonder
-netwerkverband. Zonder die schil zou een streng die het gebied uit loopt als
-doodlopend gelden en zouden NET-001 en NET-002 valse bevindingen geven.
+groot dat de netwerkchecks hun antwoord houden: de samenhangende component waar de
+kern in ligt -- vrijverval EN persnet, want de bereikbaarheid loopt sinds issue #72
+door het mechanische riool (BO-54, BO-56) -- plus een buffer voor de checks die naar
+nabijheid kijken zonder netwerkverband. Zonder die schil zou een streng die het gebied
+uit loopt als doodlopend gelden en zouden NET-001 en NET-002 valse bevindingen geven.
 """
 
 from __future__ import annotations
@@ -13,11 +14,11 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 import networkx as nx
+from gwsw_orox_helpers.dataset import GwswDataset
 from shapely import STRtree
 from shapely.geometry.base import BaseGeometry
 
 from nlriochecker.checkconfig import CheckConfig
-from nlriochecker.dataset import GwswDataset
 from nlriochecker.studiegebied import StudyArea
 
 
@@ -267,9 +268,14 @@ def _componentstructuur(
     component een kern raakt doet dat. Daarom wordt hij bij een run over meerdere
     gebieden een keer gebouwd.
 
-    Bewust alleen over de vrijvervalleidingen: mechanische leidingen verbinden
-    deelgebieden onderling en zouden de schil tot de hele gemeente laten uitdijen,
-    terwijl de NET-checks ze niet volgen.
+    De mechanische leidingen liggen er sinds issue #73 in, naast de vrijvervalleidingen.
+    Ze stonden er bewust niet in zolang de NET-checks ze niet volgden, maar sinds issue
+    #72 loopt de bereikbaarheid van NET-001 en NET-002 door het persnet (BO-54) en telt
+    een pompput zelf niet meer als eindpunt (BO-55). Bakende de schil zich dan nog op
+    het zuivere vrijverval af, dan viel het gemaal achter de persleiding erbuiten en
+    meldde een gebiedsrun strengen die de gemeentebrede run niet meldt -- op De Wolden
+    en Hoogeveen 17 van de 88 buurten. Dat botst met de gelijkwaardigheidseis van BO-12;
+    zie BO-56 voor de meting en de prijs (analyseset 1,7x).
 
     De graaf dient alleen om de samenhang tussen knopen vast te stellen; welke
     strengen erbij horen, wordt er los van bijgehouden. Twee evenwijdige strengen
@@ -278,13 +284,18 @@ def _componentstructuur(
     twee stilzwijgend uit de analyseset laten vallen -- parallelle strengen zijn in
     dit domein normaal (zie TOP-013).
 
-    Een streng waarvan een van beide uiteinden niet naar een netwerkknoop herleidt,
-    slaat deze functie over: hij komt in geen enkele component terecht en kan dus
-    nooit via de component in de schil belanden, ook niet als zijn wel herleidbare
+    Een VRIJVERVALstreng waarvan een van beide uiteinden niet naar een netwerkknoop
+    herleidt, slaat deze functie over: hij komt in geen enkele component terecht en kan
+    dus nooit via de component in de schil belanden, ook niet als zijn wel herleidbare
     kant in een geraakte component ligt. Dat is hetzelfde antwoord dat de
     netwerkchecks zelf geven -- `_bouw_netwerk` in `checks/verbanden.py` zet zulke
     strengen apart in `unconnected` en houdt ze buiten de graaf -- maar mag niet
-    stilzwijgend gebeuren; het aantal gaat terug naar de aanroeper.
+    stilzwijgend gebeuren; het aantal gaat terug naar de aanroeper. Een mechanische
+    leiding valt daar juist terug op de rauwe koppeling, precies zoals
+    `_bouw_bereikbaarheid` dat doet: het persnet komt samen op hulpstukken
+    die nergens naartoe klimmen, en zonder die terugval hakt elke T de route in stukken.
+    Zulke leidingen tellen niet mee in `zonder_netwerkverband`; dat getal gaat over de
+    vrijvervalstrengen die het rapport noemt.
     """
     wortels = config.klassen.netwerkknopen
     graaf = nx.Graph()
@@ -299,6 +310,18 @@ def _componentstructuur(
             eind = dataset.resolve_network_node(conduit.end_node, wortels)
             if begin is None or eind is None:
                 zonder_netwerkverband += 1
+                continue
+            graaf.add_edge(begin, eind)
+            strengen.append((uri, begin))
+
+    for wortel in config.klassen.mechanisch:
+        for uri in dataset.of_class(wortel):
+            conduit = dataset.conduits.get(uri)
+            if conduit is None:
+                continue
+            begin = dataset.resolve_network_node(conduit.start_node, wortels) or conduit.start_node
+            eind = dataset.resolve_network_node(conduit.end_node, wortels) or conduit.end_node
+            if begin is None or eind is None:
                 continue
             graaf.add_edge(begin, eind)
             strengen.append((uri, begin))

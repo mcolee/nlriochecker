@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
@@ -17,7 +18,6 @@ from nlriochecker.checks import CheckContext, run_checks
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import assess_coverage
-from nlriochecker.dataset import load_dataset
 from nlriochecker.errors import PipelineError, StudyAreaError
 from nlriochecker.meting import laad_nulmeting
 from nlriochecker.reporting import (
@@ -75,7 +75,7 @@ def test_samenvatting_noemt_een_onbeoordeelbare_verbindingsklasse(
     """
     hyd, mdsplan, mdsproj = shacl_drieluik
     aangepast = meting_met_verbindingsklasse(mdsplan, tmp_path / "verbinding.csv")
-    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"))
+    dataset = load_dataset(dataset_met_verbindingsklasse(tmp_path / "verbinding.ttl"), [])
     meting = laad_nulmeting([hyd, aangepast, mdsproj], VEREIST)
 
     markdown_path, _ = write_reports(analyze(meting, dataset), tmp_path / "uitvoer")
@@ -135,7 +135,7 @@ def test_uitvoer_overschrijft_nooit_de_invoer(shacl_drieluik: list[Path], tmp_pa
 
 
 def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
-    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context, ["TOP-001"])
     assert len(run.findings) == 1
@@ -166,7 +166,7 @@ def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
 
 
 def test_checkrapport_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     gebied = load_study_area(
         Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
     )
@@ -202,7 +202,7 @@ def test_checkrapport_noemt_ook_een_via_config_aangewezen_check(tmp_path: Path) 
     """De opsomming moet ADM-002 (klasse-attribuut) en een via de config aangewezen
     check allebei noemen, gesorteerd, in plaats van alleen "ADM-002" hard te coderen.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     gebied = load_study_area(
         Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
     )
@@ -227,7 +227,7 @@ def test_checkrapport_noemt_ook_een_via_config_aangewezen_check(tmp_path: Path) 
 
 def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path: Path) -> None:
     """Zonder studiegebied is er geen analyseset en dus geen regel erover."""
-    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context, ["TOP-001"])
 
@@ -239,7 +239,7 @@ def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path:
 
 def test_checkrapport_meldt_strengen_zonder_netwerkverband(tmp_path: Path) -> None:
     """Wat de afbakening niet kon meewegen, hoort net zo goed in het rapport."""
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     gebied = load_study_area(
         Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
     )
@@ -268,7 +268,7 @@ def test_studiegebied_zonder_enig_object_faalt_hard() -> None:
     is een verkeerde laagkeuze of een verkeerd gebied, en dat hoort te knallen in
     plaats van als schone data te lezen.
     """
-    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl")
+    dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context, ["TOP-001"])
 
@@ -288,7 +288,7 @@ def _fixtureconfig():
 
 def _checkrun(bestand: str, *check_ids: str, config=None):
     """Draait checks op een TTL-fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=config or _fixtureconfig())
     return run_checks(context, list(check_ids) or None)
 
@@ -360,14 +360,33 @@ def test_rapport_toont_standaard_alle_bevindingen(tmp_path: Path) -> None:
 
 
 def test_afkap_is_configureerbaar_en_wordt_gemeld(tmp_path: Path) -> None:
+    # NET-001 op deze fixture: 4 bevindingen op 6 bekeken strengen, dus onder de
+    # systemischdrempel en daarmee een check die nog een tabel per object krijgt.
+    # TOP-013 sloeg op zijn eigen fixture op alle drie de strengen aan en wordt sinds
+    # issue #76 als een generieke regel getoond, zonder tabel om af te kappen.
     config = _fixtureconfig()
     config.rapport.max_bevindingen_per_check = 1
-    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
+    run = _checkrun("net004_parallelle_strengen.ttl", "NET-001", config=config)
 
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")
 
-    assert "2 bevindingen niet getoond" in tekst
+    assert "3 bevindingen niet getoond" in tekst
+
+
+def test_de_afkapmelding_wijst_niet_naar_een_uitgezette_csv(tmp_path: Path) -> None:
+    """Juist de weggelaten bevindingen mogen niet naar een ontbrekend bestand wijzen."""
+    config = _fixtureconfig()
+    config.rapport.max_bevindingen_per_check = 1
+    run = _checkrun("net004_parallelle_strengen.ttl", "NET-001", config=config)
+
+    markdown_path, csv_path = write_check_report(run, tmp_path, met_csv=False)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert csv_path is None
+    assert "3 bevindingen niet getoond" in tekst
+    assert "bevindingen.csv" not in tekst
+    assert "de CSV is met `--uitvoer` uitgezet" in tekst
 
 
 def test_rapport_opent_met_de_rode_draad(tmp_path: Path) -> None:
@@ -425,7 +444,11 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     """
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    # Drie bekeken strengen halen de minimumpopulatie van BO-59 nooit; die staat hier
+    # op 1, want deze test toont juist de generieke regel van een systemische check.
+    config = _fixtureconfig()
+    config.rapport.systemisch_minimum_bekeken = 1
+    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
     # Alleen de checkmeldingen; de datasetsignalen (bron "dataset", issue #22) staan
     # los van wat deze test over het volgen van de meegegeven stroom aantoont.
     volledig = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
@@ -436,7 +459,10 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     )
     tekst = markdown_path.read_text(encoding="utf-8")
 
-    assert "Bevindingen (2)" in tekst
+    # TOP-013 slaat op deze fixture op alle drie de strengen aan en is dus systemisch;
+    # sinds issue #76 staat zo'n check als generieke regel in het rapport. Het aantal
+    # komt nog steeds uit de meegegeven stroom en niet uit `run.outcomes`.
+    assert "Systemisch: 2 bevindingen op" in tekst
     assert "| TOP-013 |" in tekst and "| 2 |" in tekst
     assert len(pd.read_csv(csv_path, sep=";", encoding="utf-8")) == 2
 
@@ -452,7 +478,11 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
 
     from nlriochecker.uitvoer.melding import bouw_meldingen
 
-    run = _checkrun("top013_parallel.ttl", "TOP-013")
+    # Drie bekeken strengen halen de minimumpopulatie van BO-59 nooit; die staat hier
+    # op 1, want deze test toont juist de generieke regel van een systemische check.
+    config = _fixtureconfig()
+    config.rapport.systemisch_minimum_bekeken = 1
+    run = _checkrun("top013_parallel.ttl", "TOP-013", config=config)
     # Alleen de checkmeldingen: de datasetsignalen hebben zelf geen plek op de kaart en
     # zouden de telling die deze test afdwingt vertroebelen.
     meldingen = [m for m in bouw_meldingen(run, date(2026, 8, 16)) if m.bron == "register"]
@@ -463,6 +493,16 @@ def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> No
 
     assert "1 melding heeft geen plek op de kaart" in tekst
     assert "TOP-013" in tekst
+    assert "in de CSV" in tekst
+
+    # Zonder CSV mag die alinea er niet naar verwijzen (issue #66).
+    markdown_path, _ = write_check_report(
+        run, tmp_path / "zonder", date(2026, 8, 16), meldingen=zonder, met_csv=False
+    )
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "1 melding heeft geen plek op de kaart" in tekst
+    assert "in de CSV" not in tekst
 
 
 def test_rapport_zwijgt_als_elke_melding_een_plek_heeft(tmp_path: Path) -> None:

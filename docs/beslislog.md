@@ -306,8 +306,9 @@ EPSG:28992 omgezet en dat wordt vastgelegd. Een raster met een ander CRS levert 
 fout op met het verzoek het in RD aan te leveren.
 
 **Waarom.** Een raster herprojecteren betekent resamplen: de hoogtewaarden
-verschuiven en worden geïnterpoleerd. HGT-001 en HGT-002 toetsen op 5 en 25 cm; een
-resample-artefact van enkele centimeters zou de uitkomst bepalen. Beter weigeren dan
+verschuiven en worden geïnterpoleerd. HGT-001 en HGT-002 toetsen op 5 en 25 cm --
+inmiddels op 10 en 25 cm, achterhaald door [[BO-44]] -- en een resample-artefact van
+enkele centimeters zou de uitkomst bepalen. Beter weigeren dan
 stilzwijgend nauwkeurigheid verliezen.
 
 ### BC-5 Een bron zonder CRS wordt geweigerd
@@ -855,6 +856,10 @@ alleen het sterkste (en het eerste) is de voor de hand liggende volgende stap. H
 staat niet gepland; wie hem oppakt, moet weten dat de meldingaantallen erdoor
 veranderen en dat elke trendvergelijking over die grens heen breekt.
 
+**Achterhaald (deels).** De `break`-na-eerste-waterdeel voor de watergangkruisingen is
+door [[BO-43]] opgepakt: `_WatergangKruising.kruisingen()` loopt voortaan alle
+kandidaat-waterdelen per streng langs. De EXT-001-beperking (sterkste bouwwerk) blijft.
+
 ### BO-18 De sleutel van een extern object, met een geometriehash als terugval
 
 **Wat.** `object2_uri` van een EXT-melding is `bgt:pand/<id>`, `bag:pand/<id>`,
@@ -926,8 +931,9 @@ gebouwd: het zou een tweede drempelbegrip introduceren voor precies één bron, 
 bestaande tolerantie het geval al afvangt. Wie het alsnog wil, heeft aan de celgrootte
 uit `RasterSampler` genoeg.
 
-**Gevolg voor de meldingidentiteit.** Nu EXT-001 en EXT-003 hun `object2_uri` vullen,
-verschuift hun `melding_id` eenmalig -- die hash bevat dat veld. Een trendvergelijking
+**Gevolg voor de meldingidentiteit.** Nu EXT-001 en EXT-003 -- en sinds [[BO-43]]
+(#59) ook EXT-002 -- hun `object2_uri` vullen, verschuift hun `melding_id` eenmalig --
+die hash bevat dat veld. Een trendvergelijking
 over die grens heen laat de meldingen als opgelost plus nieuw zien. Dat staat in het
 wijzigingslog en in `docs/json-schema.md`; het alternatief (het veld buiten de hash
 houden) zou twee meldingen over verschillende panden dezelfde identiteit geven.
@@ -1856,7 +1862,7 @@ meetbare criterium uit deze BO is daarmee ook het besliscriterium. RVZ-006 (issu
 op deze ongewijzigde lijst voort.
 
 **Hoe is vastgesteld dat er niets verschoof.** Niet met een gerichte run: `afvoer_eindpunt`
-gaat behalve in NET-001 ook op in `KlassenConfig.netwerkknopen`, en die rol draagt de hele
+gaat behalve in NET-001 ook op in `ClassRoots.netwerkknopen`, en die rol draagt de hele
 netwerkgraaf. Daarom een volle `toets` op De Wolden (`--dataset dewolden_orox.ttl
 --ontologie Ontologie_GWSW_Totaal.ttl`, zonder `--shacl`, `--bronnen` en `--studiegebied`),
 vóór en na. Uitkomst: 35.370 meldingen over 48 checks, geen enkele check beweegt, en de
@@ -1896,10 +1902,19 @@ objecten -- 13 `rdf:type gwsw:Infiltratiestelsel` (naast 57 `Vuilwaterstelsel`, 
 `GemengdStelsel`, 48 `Hemelwaterstelsel` en 4 `Drainagestelsel`), en die dertien dragen samen
 687 `hasPart`-leden, waaronder **alle** 340 `Infiltratieriool`-instanties en geen enkel
 infiltratieriool daarbuiten. De graafafleiding en de `hasPart`-boom wijzen hier dus dezelfde
-strengen aan. Dat NET-007 op alle 340 uitkomt heeft trouwens een derde oorzaak:
+strengen aan. Dat NET-007 destijds op alle 340 uitkwam had trouwens een derde oorzaak:
 `[klassen] drempel = ["Overstortdrempel"]`, en die klasse heeft in De Wolden nul instanties en
-in de ontologie geen subklassen, dus de drempelverzameling is leeg en elk infiltratieriool
-wordt onvoorwaardelijk gemeld. Dat is een bevinding op zichzelf en ligt buiten deze BO.
+in de ontologie geen subklassen, dus de drempelverzameling was leeg en elk infiltratieriool
+werd onvoorwaardelijk gemeld. Dat is een bevinding op zichzelf en ligt buiten deze BO.
+
+**Nagekomen 2026-08-28 (issue #96): dat aantal van 340 is achterhaald.** Issue #42 heeft de
+overstortput zelf (`Overstortput`, `Stuwput`) als overstortvoorziening laten meetellen, zodat
+de drempelverzameling niet meer leeg is. NET-007 meldt op De Wolden en Hoogeveen sindsdien
+**156 van de 340** infiltratieriolen; de overige 184 liggen in een deel met een overstortput.
+`Overstortdrempel` telt er nog altijd nul instanties (datasetsignaal `SIG-nulklasse`). Gemeten
+in de checkaudit van 27-08 (`docs/checks-audit-2026-08.md`, rij NET-007). Aan het besluit
+hierboven verandert dit niets: de populatie is nog steeds dezelfde 340 infiltratieriolen en
+beide lezingen wijzen ze allebei aan -- alleen het aantal bevindingen is veranderd.
 
 De reden om te wachten is dus een engine-feit en geen datavraag: **de engine leest de
 stelselboom nergens.** Overgaan betekent NET-007 zijn graafanalyse laten inruilen voor een
@@ -2295,3 +2310,2428 @@ byte-/inhoudsgelijk aan die van vóór de omzetting, koud én warm.
 **Cache-invalidatie.** `graaf.py` telt mee in de cachesleutel, naast `dataset.py`,
 `geometry.py` en `ontologie.py`: een wijziging aan de termconversie of de volgordegarantie
 is net zo goed een andere lader en dus een andere sleutel.
+
+### BO-43 Een watergangkruising is een echte doorkruising van een actueel BGT-waterdeel, zonder drempels
+
+**Wat.** De twee kruisingschecks op BGT-waterdelen (EXT-002, EXT-003) melden voortaan
+alleen een *echte doorkruising*. Per (vrijvervalstreng `L`, BGT-waterdeel-polygoon `W`):
+doorkruising ⟺ `L` snijdt `W` én beide eindpunten van `L` liggen buiten `W` (`e=0`) én
+`L` kruist de rand van `W` minstens twee keer (`k≥2`). EXT-002 meldt die doorkruisingen,
+EXT-003 de doorkruisingen waarvan de streng geen kruisingsconstructie (`Zinker`/`Duiker`)
+is. Een leiding die alleen binnen de buffer ligt maar `W` niet snijdt (raakt niet), of
+die in `W` eíndigt (lozingspunt, `e≥1`), is geen bevinding. De BGT-invoer wordt vooraf
+op de actuele versie gefilterd (`eind_registratie` én `termination_date` leeg);
+vervallen waterdelen tellen niet mee. Uitgewerkt in issues #58 (invoerfilter) en #59
+(meetkunde).
+
+**Waarom.** De oude toets was `distance ≤ ext_watergang_buffer_m` (1,0 m) — nabijheid,
+geen doorkruising. Handmatig geclassificeerd op de laatste volledige De Wolden-run (638
+gemelde waterdelen): 181 raakten de leiding niet eens, 155 waren lozingspunten, 58 waren
+vervallen BGT-versies; slechts 234 waren echte doorkruisingen. De check meldde er 638 waar
+er 234 terecht zijn. Een zinker is bovendien een vrijvervalbegrip: mechanisch riool
+(pers/druk/vacuüm) gaat onder druk zonder zinker onderdoor, dus die populatie hoort er niet
+in — de engine selecteert al op `VrijvervalRioolleiding` (`Infiltratieriool` en
+`Overstortleiding` blíjven erin; die zijn vrijverval).
+
+**Geen drempels.** Tien handmatig gelabelde grensgevallen (doorsnijding 0,30–0,50 m,
+allemaal "goed") wezen uit dat een minimum-doorsnijding echte doorkruisingen van smalle
+greppels wegfiltert, en dat een oevertolerantie overbodig is zodra "moet écht snijden" de
+eis is. `e=0 ∧ k≥2` draagt de hele beslissing; `ext_watergang_buffer_m` blijft alleen de
+zoekstraal voor kandidaten.
+
+**Alternatieven.** Een oevertolerantie/straddle-correctie voor leidingen die door bronoffset
+net náást het waterdeel liggen (verworpen: geen offset-correctie — raakt de leiding het
+waterdeel niet, dan valt het eruit). Een minimum-doorsnijding tegen hoek-aantikkingen
+(verworpen: filtert smalle-greppel-doorkruisingen weg, gemeten). Historie per check afhandelen
+(verworpen: het actualiteitsfilter hoort in het BGT-leespad, zodat álle EXT-checks schone
+invoer krijgen — #58).
+
+**Herziening van [[BO-17]].** De daar bewust geaccepteerde `break`-na-eerste-waterdeel in
+`_WatergangKruising.kruisingen()` vervalt: de nieuwe toets loopt alle kandidaat-waterdelen per
+streng langs en geeft elke echte doorkruising terug. De EXT-001-beperking (alleen het sterkste
+bouwwerk) uit BO-17 blijft staan.
+
+**Gemeten uitkomst (2026-08-24).** EXT-002 en EXT-003 melden op De Wolden 319 doorkruisingen op
+281 strengen, over 302 unieke waterdelen. Binnen de zoekstraal lagen 924 (streng, waterdeel)-paren:
+319 doorkruisingen, 362 die het waterdeel niet raken, 243 lozingspunten en 0 tangentiële gevallen.
+244 strengen kruisen één waterdeel, 36 er twee en 1 er drie. De vergelijking met de 234 handmatig
+gevalideerde doorkruisingen hierboven gaat niet op: door de `break` droeg de oude run precies één
+waterdeel per streng, dus die handmatige ronde beoordeelde een steekproef van één per streng en
+nooit de volledige parenpopulatie. Van de 302 waterdelen zaten er 226 in de oude 638 (waarvan er
+234 handmatig als doorkruising waren gelabeld) en 76 kwamen door de `break` nooit bovendrijven.
+Alle 281 strengen stonden al in de oude run: geen enkele streng is nieuw. Dat de oude verzameling
+volgordeafhankelijk was, bleek ook uit de tussenrun met alleen #58: die wisselde 70 waterdelen in
+en 119 uit de 638. Het restverschil van 8 (226 tegen 234) is niet verklaard; de waarschijnlijkste
+oorzaak is dat een eindpunt precies op de oever als "erin" telt en het paar dus lozingspunt wordt.
+Dat is een bewuste, behoudende afwijking van de letterlijke eis "beide eindpunten buiten `W`":
+liever een doorkruising missen dan er een melden die er geen is.
+
+### BO-44 HGT-001 waarschuwt vanaf 10 cm AHN-afwijking (inclusief); de banden zijn halfopen en op de millimeter
+
+**Wat.** `ahn_afwijking_waarschuwing_m` gaat van 0,05 naar 0,10 m; `ahn_afwijking_fout_m` blijft
+0,25 m. De vergelijking wordt halfopen: HGT-001 meldt `[0,10 – 0,25)`, HGT-002 `[0,25 – ∞)`, zodat
+een object nooit beide meldingen krijgt. De afwijking wordt op millimeters afgerond voordat hij
+met de drempels vergeleken wordt; dat afgeronde getal is ook wat de melding toont
+(`afwijking_m`). Beide checks noemen de gehanteerde drempel in hun toelichting. Uitgewerkt in
+issue #63.
+
+**Waarom.** Het checkregister v0.9 zegt "meer dan 5 cm", maar 5 cm ligt binnen de onzekerheid van
+de AHN-inwinning zelf: een afwijking van die orde zegt niets over de beheerdata, daar staat
+meetruis naast meetruis. Gemeten op de volledige run van 2026-08-24 lag de mediane HGT-001-afwijking
+op 0,098 m; de nieuwe drempel ligt dus vrijwel op de mediaan en de helft van de 5811 waarschuwingen
+valt weg. De afronding op millimeters is geen cosmetiek: `10,10 − 10,00` is in floating point
+`0,0999…`, en zonder afronding zou een put met precies 0,100 m afwijking onder de inclusieve
+ondergrens doorglippen terwijl de melding "0,100 m" zou tonen.
+
+**Afwijking van het checkregister.** Dit is een bewuste afwijking van de registertekst; de
+registerregels van HGT-001 en HGT-002 zijn bijgewerkt en verwijzen hierheen.
+
+**Openstaand punt voor de auteur.** Draagt deze drempel een externe onderbouwing — een specificatie
+die de systematische en stochastische fout van het AHN kwantificeert — of is het een projectkeuze
+zonder externe bron? Hier is niets ingevuld en geen specificatiegetal verzonnen; `checks.toml`
+gebruikt bij andere drempels de formulering "projectkeuze, geen externe bron".
+
+**Alternatieven.** Alleen de ondergrens inclusief maken (verworpen: een object met precies 0,25 m
+krijgt dan HGT-001 én HGT-002). Onafgerond vergelijken (verworpen: de grenstest "0,100 m meldt" is
+dan onhaalbaar en band en getoond getal kunnen tegenspreken). Een lichtere categorie voor 5–10 cm
+(verworpen: die afwijkingen zeggen niets, dus ze horen niet in de uitvoer).
+
+**Gemeten uitkomst (2026-08-24).** Volledige toets op De Wolden na de wijziging: HGT-001 5811 →
+2847 meldingen (kleinste afwijking 0,100 m, grootste 0,249 m), HGT-002 2128 → 2132 (kleinste
+0,250 m, grootste 11,150 m). Geen enkel object staat in beide checks. De vier meldingen die op
+0,250 m afronden stonden in de baseline nog in HGT-001 en staan nu in HGT-002, dat daarmee tien
+meldingen op precies 0,250 m draagt; de 44 die op 0,100 m afronden staan in HGT-001. De getallen
+zijn gelijk aan wat de baselinerun op afgeronde afwijkingen voorspelde, dus de nieuwe band is de
+enige oorzaak van het verschil.
+
+### BO-45 Een ontbrekende begindatum is een fout per object (ATTR-018), niet een notitieregel
+
+**Wat.** ATTR-018 (F, Compleetheid) meldt per vrijvervalrioolleiding en per put dat `Begindatum`
+ontbreekt. Populatie en `examined` zijn die van ATTR-007 (`vrijvervalrioolleidingen` plus
+`putten`); mechanisch riool en andere niet-vrijvervalleidingen vallen erbuiten en worden in de
+toelichting geteld. De GeoPackage-lagen `putten` en `strengen` krijgen de kolom `begindatum_jaar`
+(integer, leeg zonder datum). De tweede notitieregel van ATTR-007, die het gat over de hele
+meetset telde, vervalt. Uitgewerkt in issue #61.
+
+**Waarom.** `notes()` gaat per ontwerp alleen naar het Markdown-rapport; een object zonder
+aanlegjaar had dus geen spoor in de JSON, de CSV of de GeoPackage en kleurde groen -- "beoordeeld
+en niets gevonden". Zonder aanlegjaar is er geen vervangingsplanning, geen levensduurberekening en
+geen ATTR-003; dat is een gebrek in de aanlevering en geen signaal, vandaar F. Het jaar en niet de
+datum in de kolom, omdat de rest van de code met het jaartal werkt (`Conduit.begindatum_jaar`).
+
+**Gevolg dat je moet kennen.** Op De Wolden en Hoogeveen zijn het ongeveer 9274 bevindingen
+(24,2% van 38361; putten 9063 van 20758, strengen 211 van 17603). Dat haalt de systemische
+drempel (80%) niet, dus elke bevinding staat los in de CSV en op de kaart; het Markdown-rapport
+groeit navenant (`max_bevindingen_per_check = 0`). Afkappen is een keuze voor de auteur, niet
+voor de implementatie.
+
+**Alternatieven.** Alleen de kolom (verworpen: een kolom kleurt niets en komt niet in de CSV of
+JSON). Een systemische melding in plaats van per object (verworpen: het aandeel ligt onder de
+drempel en het gat is per object te herstellen). `Einddatum` erbij (verworpen: dat is ADM-006, en
+geen enkel object draagt er een).
+
+**Gemeten uitkomst (2026-08-24).** Volledige toets op De Wolden en Hoogeveen: ATTR-018 meldt 9274
+objecten (211 strengen, 9063 putten), niet systemisch -- precies de verwachting. Buiten de toets
+vallen 5837 van de 23440 leidingen, waarvan 1703 zonder begindatum. Het Markdown-rapport groeit van
+53479 naar 62763 regels (6,7 → 7,5 MB) ten opzichte van dezelfde run zonder ATTR-018; dat is de
+enige verandering, want de bevindingentelling per check verschilt verder nergens. (Tegenover de
+0.3.0-meting van 24 augustus, 57526 regels en 7,2 MB, is de groei kleiner omdat BO-44 daar 2964
+HGT-001-meldingen liet vervallen.) In de GeoPackage staan 11534 lege `begindatum_jaar` op `putten`
+en 1914 op `strengen`. Die twee lagen dragen de hele meetset en niet de ATTR-018-populatie: op
+`strengen` komen de 1703 leidingen buiten de toets erbij (1703 + 211 = 1914) en op `putten` 2471
+knopen die geen put zijn (2471 + 9063 = 11534). Samen 13448 van de 46925 objecten -- exact het
+getal dat de vervallen meetsetregel van ATTR-007 gaf.
+
+### BO-46 De lader herstelt de fantoomkoppeling naar hulpstukken en meldt dat; TOP-022/TOP-023 tellen richtingen tegen de GWSW-functie
+
+**Wat.** (1) Wijst geen enkel `hasConnection`-doel van een leidingeinde naar een bekende
+orientatie, dan strip de lader de staart `_put` en neemt hij de stam als knoop -- alleen als
+die stam een knoop met een `Hulpstukorientatie` is. Het aantal herstelde koppelingen en
+hulpstukken staat op `GwswDataset.koppelingsherstel` en gaat als datasetsignaal
+`SIG-hulpstukkoppeling` (W, systemisch, zonder object) de meldingenstroom in. (2) TOP-022 (F)
+en TOP-023 (W) vergelijken per hulpstuk het aantal richtingen -- verschillende buurknopen plus
+losse einden -- met het aantal dat de `gwsw:functie`-restrictie op zijn klasse voorschrijft
+(`VerbindenVanTwee/Drie/VierLeidingen` → 2/3/4). De klasse→functie-koppeling komt uit de
+ontologie (`GwswDataset.functie_per_klasse`, overgeerfd naar subklassen); alleen de vertaling
+van woord naar getal staat in code. Uitgewerkt in issue #60.
+
+**Waarom.** De BrutIS-export koppelt élk leidingeinde op een hulpstuk aan `<hulpstuk>_put`, een
+URI die nergens een type of aspect draagt; de orientatie heet `<hulpstuk>_put<n>`. Gemeten:
+1122 hulpstukken, 1122 fantoom-URI's, 3024 koppelingen, 3024 strengeinden zonder knoop, 859
+strengen met beide einden los, 0 T-stukken met een herkende aansluiting. De nulmeting meldt
+hetzelfde (`Knooppunt_Netwerk_conn` 1123×, `EindpuntLeiding_Knooppunt_card` 1846×,
+`BeginpuntLeiding_Knooppunt_card` 1178×). Zonder herstel meet een T-stukcheck niets; met een
+stil herstel zou het rapport het gebrek in de aanlevering verzwijgen. Richtingen in plaats van
+strengen: in Alteveer ligt elke vacuümrichting dubbel (108 knoopparen met meer dan een streng
+ertussen, 266 strengen -- nagemeten en juist), en per streng geteld zouden 17 hulpstukken een
+ander getal krijgen. Nagemeten valt dat uiteen: negen daarvan (zes strengen, drie richtingen)
+zouden ten onrechte melden, de andere acht melden terecht maar met het verkeerde aantal (zes
+strengen bij vier of vijf richtingen).
+
+**Twee ID's, niet een.** Het issue nam een ID met F voor te weinig en W voor te veel aan. De
+engine en het register kennen per check precies een ernst (`Check.severity`;
+`test_ernst_en_dimensie_volgen_het_register`). Daarom TOP-022 voor te weinig (F: er ontbreekt
+een leiding, of het is geen T-stuk) en TOP-023 voor te veel (W: waarschijnlijk de verkeerde
+klasse).
+
+**Alternatieven.** Ruimer herstellen op naam (verworpen: gokken in een kritiek pad). Het
+verwachte aantal in `checks.toml` (verworpen: het staat in de ontologie en zou een tweede
+waarheid worden). Een losse streng zonder eind niet meetellen (verworpen: die leiding hangt
+wel degelijk aan het hulpstuk; dat haar andere eind los is, is een TOP-002/003-zaak).
+
+**Gemeten uitkomst (2026-08-25).** Na het herstel: 3024 koppelingen naar 1122 hulpstukken
+hersteld (1054 T_stuk, 58 Afsluitstuk, 10 Ontstoppingsstuk), strengeinden zonder knoop
+3024 → 0 over 2165 strengen, strengen met beide einden los 859 → 0, T-stukken met minstens
+een aansluiting 0 → 1054. TOP-022 meldt 224 T-stukken (94 met een richting, 130 met twee),
+TOP-023 37 (36 met vier, 1 met vijf); de verdeling over alle 1054 telbare hulpstukken is
+1: 94, 2: 130, 3: 793, 4: 36, 5: 1 -- precies de tabel uit issue #60. Losse einden komen
+niet voor: alle 3024 herstelde einden hangen aan een hulpstuk. 68 hulpstukken vielen buiten
+de toets (58 Afsluitstuk, 10 Ontstoppingsstuk), geteld in de toelichting van beide checks.
+Verschuivingen in de andere checks: **geen enkele**. Alleen de drie nieuwe regels kwamen erbij
+(TOP-022 +224, TOP-023 +37, SIG-hulpstukkoppeling +1; 167255 → 167517 bevindingen). Dat is
+geen toeval en geen fout: de bestaande checks navigeren via `verbonden_knopen` →
+`resolve_network_node`, en een hulpstuk is geen netwerkknoop en klimt via `hasPart` ook niet
+naar een put -- van de 3024 herstelde einden herleidt er 0 tot een netwerkknoop. De 2165
+strengen kregen hun knoop dus terug voor de hulpstuktelling, niet voor de netwerkgraaf.
+Daarmee is ook de opmerking uit de review van taak 2 bevestigd: TOP-019 (0 bevindingen voor
+en na) krijgt de T-stukken niet als kandidaat. `len(dataset.conduits)` en
+`len(leidingen(context))` zijn op deze dataset allebei 23440; het verschil dat de docstring
+van `_bouw_hulpstuktelling` noemt (25 om 19) is een eigenschap van het Juinen-voorbeeld, niet
+van De Wolden. Onverklaard: niets. Vergelijkingsrun: `uitvoer/issue61/bevindingen.csv`
+(2026-08-24 23:42, vóór a975d8d) tegen `uitvoer/issue60/bevindingen.csv`.
+
+### BO-47 Loze leidingen in ketens: ADM-010 voor een keten aan actief riool, ADM-011 voor dode data
+
+**Wat.** Loze leidingen (`LozeLeiding` en subklassen, rol `[klassen] loze_leiding`) die via een
+knoop aan elkaar hangen vormen een keten. Per keten, in de administratieve begin→eindrichting:
+`inkomend` zijn de niet-loze leidingen die eindigen in een beginknoop van de keten, `uitgaand`
+de niet-loze leidingen die beginnen in een eindknoop. ADM-010 (F) meldt *doorgaand* (beide),
+*aanvoer* (alleen inkomend) en *afvoer* (alleen uitgaand); ADM-011 (W) meldt *losgekoppeld*
+(geen van beide). Melding per loze streng, keten in `cluster_id`, het transitieve aantal actieve
+strengen bovenstrooms als detail `bovenstrooms` (zonder invloed op de ernst). Uitgewerkt in
+issue #62.
+
+**Waarom.** Een `LozeLeiding` is buiten gebruik; er kan per definitie geen actief riool op
+afwateren. In De Wolden en Hoogeveen gebeurt dat in 19 van de 33 ketens, waarvan 3 doorgaand.
+Geen enkele check zag het: `LozeLeiding` hangt onder `Leiding` en niet onder
+`VrijvervalRioolleiding`, dus alle checks op `klassen.vrijvervalleiding` slaan haar over; de
+nulmeting noemt loze leidingen 37 keer, alleen voor attribuutgebreken. Per streng melden en niet
+per keten, zodat elke streng op de kaart kleurt; het keten-ID houdt ze in het rapport bij elkaar.
+
+**Twee ID's, niet een.** Het issue nam ADM-010 met F én W aan; de engine en het register kennen
+per check een ernst (`Check.severity`, `test_ernst_en_dimensie_volgen_het_register`). Vandaar
+ADM-011 voor de losgekoppelde keten.
+
+**Richting.** Altijd de administratieve richting, ongeacht `[netwerk] richting`: dat is de bron
+die NET-003 toetst, en een verkeerd gerichte administratie is dáár een bevinding. Ook
+`losgekoppeld` is dus richtingsgebaseerd -- een actieve streng die dezelfde put verlaat als de
+loze streng sluit in de afvoerrichting niet aan -- en daarom noemt het detail `rakend` de actieve
+strengen die een ketenknoop wél raken, tegen de richting in of ernaast; de meldingstekst claimt
+niet meer dan de afvoerrichting.
+
+**Alternatieven.** Melden per keten (verworpen: dan kleurt maar een streng). ADM-006 uitbreiden
+(verworpen: die gaat over `Einddatum`/`Begindatum`, dit over de klasse; en ADM-006 vindt hier
+niets, want geen enkel object draagt een `Einddatum`). De ernst laten afhangen van het aantal
+strengen bovenstrooms (verworpen: het aantal is een sorteersleutel, geen norm).
+
+**Gemeten uitkomst (2026-08-25).** Volledige toets op De Wolden en Hoogeveen: 54 loze leidingen
+in 33 ketens -- doorgaand 3/8, aanvoer 11/16, afvoer 5/14, losgekoppeld 14/16 (ketens/strengen);
+ADM-010 38 meldingen, ADM-011 16. Dat is precies de tabel uit het issue: het koppelingsherstel
+van #60 heeft hier niets verschoven. Het Koekangerveld-controlegeval (`ID0500-Kv1X0002-1`,
+`Kv1X0002-Kv1G0014-1`) is doorgaand met `ID6391-ID0500-1` als aanvoer en
+`Kv1G0014-Kv1G0012-1`/`Kv1G0014-Kv1G0016-1` als afvoer. Grootste ketens naar actief riool
+bovenstrooms: `Zu1G0932-Zu1X0006-1` 253 (doorgaand), `Wi1G0282-Wi1X0002-1` 126,
+`An2G0048-An2X0002-1` 58, `Ru1G0138-Ru1X0004-1` 46 en `Ru1G0142-Ru1X0002-1` 41 (die vier
+aanvoer).
+
+**Niet alle buren zijn vrijverval.** Van de 36 aansluitende strengen bij ADM-010 zijn er 32
+vrijverval, 2 duiker en 2 persleiding. Dat hoort zo: de check leest `selectie.leidingen`
+(rol `[klassen] streng = ["Leiding"]`), dus "actief riool" is elke niet-loze `gwsw:Leiding`, en
+`Duiker` hangt in de ontologie rechtstreeks onder `Leiding` -- niet onder
+`VrijvervalRioolleiding`. Het raakt 3 van de 19 ADM-010-ketens, goed voor 6 van de 38 meldingen:
+`loos-Ru1X0010-Ru1U0066-1` (afvoer, op de duikers `Ru1U0066-Ru1U0064-1` en
+`Ru1U0066-Ru1U0068-1`), `loos-ID6480-RuBP0338-1` (afvoer, op persleiding `RuBP0338-ID4028-1`) en
+`loos-Wi1G0680-Wi1X0010-1` (aanvoer, vanaf persleiding `ID7234-Wi1G0680-1`). Bij de overige 16
+ADM-010-ketens is elke buur vrijverval.
+
+**Het detail `rakend` op deze dataset.** Niet leeg bij 12 van de 19 ADM-010-ketens (24 van de 38
+meldingen), en leeg bij alle 14 losgekoppelde ketens. De zin over een rakende actieve streng
+staat alleen in de ADM-011-tekst -- daar was ze nodig -- en komt op De Wolden en Hoogeveen dus
+in geen enkele melding voor; alleen de fixture dekt haar. Voor ADM-010 blijft `rakend` een
+detailveld zonder eigen zin, want daar zegt de tekst al welke strengen aansluiten.
+
+### BO-48 De CI-poort classificeert overslagen op reden; de telgrens vervalt
+
+**Wat.** `NLRIOCHECKER_MAX_OVERGESLAGEN` (een bovengrens op het aantal overgeslagen tests)
+vervalt. Met `NLRIOCHECKER_STRIKTE_OVERSLAG` gezet (CI, en `scripts/runnerpoort.py`) laat
+`tests/conftest.py` de run vallen op elke test-overslag waarvan de reden geen `data/` en geen
+`BO-` noemt, met nodeid en reden in de uitvoer. `NLRIOCHECKER_MIN_GESLAAGD` en
+`NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN` blijven. `scripts/runnerpoort.py` draait de poort lokaal
+in de runner-conditie en leest grenzen en pytest-regel uit de workflow.
+
+**Waarom.** De telgrens telde ook de bedoelde overslagen mee -- 57 van de 58 op de runner zijn
+tests die de ontologie, het Juinen-voorbeeld, de SHACL-rapporten of de externe bronnen nodig
+hebben, en die staan daar niet -- en klapte daardoor twee keer in twee dagen op legitieme groei
+(24-08: 51 → grens 57; 25-08: 59 → grens 65). Wat hij moest vangen is een fixture die niet
+meekomt, een generator die niet gedraaid is of een tool die ontbreekt: overslagen met een
+ándere reden. Op reden classificeren vangt precies die, zonder getal dat met de suite mee
+moet, en is strenger dan de oude marge van zes.
+
+**Conventie die dit oplegt.** Een skip-reden zegt waar hij vandaan komt: "… staat niet in
+data/" voor echte data, het BO-nummer voor een bewuste uitzondering. Een reden die geen van
+beide draagt is op CI rood -- ook als de overslag terecht was; dan is de reden fout, niet de
+poort.
+
+**Alternatieven.** De telgrens blijven herijken (verworpen: twee keer in twee dagen, en elke
+herijking is handwerk dat de volgende sessie herhaalt). Een aparte lijst verwachte tests
+(verworpen: dubbele administratie die achterloopt). Alleen de lokale runnerpoort (verworpen:
+vangt de fout vóór de push, maar de grens zelf blijft verkeerd).
+
+### BO-49 Meldingen onderdrukken per klasse en per check is een uitvoerkeuze, op één plek, met telling
+
+**Wat.** `[rapport]` krijgt `onderdruk_klassen` (GWSW-wortelklassen; subklassen via de ontologie) en
+`onderdruk_checks` (check-ID's), beide standaard leeg. `bouw_meldingenstroom` houdt ná het samenstellen
+van de drie bronnen elke melding uit de stroom waarvan het check-ID op de tweede lijst staat of waarvan
+het hoofdobject (`object_uri`, niet `object2_uri`) onder een klasse van de eerste valt. Hij telt twee
+dingen die geen partitie zijn: `per_check` telt élke weggevallen melding onder haar check-ID -- ook wat op
+klasse wegviel, want dat is precies het verschil met de kolom Bevindingen van die check -- en `per_klasse`
+alleen het deel dat op klasse wegviel. Het totaal is dus de som over `per_check`. Rapport
+(verantwoording), `totaal/synthese.md`, `gwsw_run` (`onderdruk_klassen`, `onderdruk_checks`,
+`meldingen_onderdrukt`) en de JSON-envelop (`onderdrukt`, optioneel) dragen de telling; de CSV niet. Elk
+object van een onderdrukte klasse wordt grijs met de reden "klasse onderdrukt in de projectconfiguratie;
+meldingen erop komen niet in de uitvoer" -- ook een object waarop niets gevonden was, want de reden hoort
+bij de klasse -- en die reden gaat vóór "mechanisch". Een onbekend check-ID faalt bij het laden; alleen
+register-ID's zijn toegestaan, een nulmetingsvorm of datasetsignaal onderdruk je via de klasse. De Wolden
+onderdrukt `MechanischeRioolleiding` en `MechanischeTransportleiding`, dezelfde wortels als
+`[klassen] mechanisch`. Uitgewerkt in issue #65.
+
+**Waarom.** Het checkregister rekent mechanisch riool buiten scope, maar TOP-010, TOP-011 en de
+SHACL-nulmeting melden er toch op (Koekangerveld: 17 van de 20 mechanische strengen gekleurd). De
+kaartregel van BO-29 -- grijs wint niet van een gebrek -- is juist en blijft; wat weg moet is de melding
+zelf, vóór hij een schrijver bereikt, anders lopen de vier uitvoervormen uit elkaar. Daarom één plek
+(`bouw_meldingenstroom`) en geen filter per schrijver. Het is een uitvoerkeuze en geen toetskeuze:
+`examined` en de systemisch-bepaling veranderen niet, anders zou een onderdrukte klasse de noemer van
+een andere check verschuiven. De telling staat erbij omdat stilte leest als "alles gecontroleerd".
+
+**Alternatieven.** Een CLI-vlag (verworpen: de keuze is projectgebonden en hoort reproduceerbaar in de
+TOML). De checks zelf op `[klassen] mechanisch` laten filteren (verworpen: dan verdwijnt ook de
+kruisingsmelding op de vrijvervalstreng, en de nulmeting filtert niet). Een kolom in de CSV (verworpen:
+dezelfde reden als bij de CFK-set, BO-7). Het JSON-veld altijd schrijven (verworpen: een run zonder
+lijsten blijft byte-voor-byte gelijk, zoals bij `markering`).
+
+**Gemeten uitkomst (2026-08-25).** Volledige toets op De Wolden en Hoogeveen met de projectconfig: 10.345
+meldingen onderdrukt van de 167.571 (1.832 uit het register, 8.513 uit de nulmeting, nul uit de
+dataset-laag), per klasse MechanischeTransportleiding 9.917 en MechanischeRioolleiding 428. De grootste
+posten zijn nulmetingsvormen op de leiding zelf -- LengteLeiding_val 1.955, EindpuntLeiding_Knooppunt_card
+1.672, HoogteLeiding_val 1.193, BreedteLeiding_val 1.193, BeginpuntLeiding_Knooppunt_card 1.030 -- en van de
+eigen checks ATTR-017 962, TOP-010 367 en TOP-011 365. Dat zijn de getallen die de verantwoording achter
+"per check" zet: die telling loopt over álle weggevallen meldingen, ook die op klasse wegvielen -- anders
+zou een check waarvan alle bevindingen wegvielen (TOP-007, 7 → 0) er met "geen" naast staan.
+`n_mechanisch` blijft 3.720 en de kolom Bekeken
+(`examined`, 23.440) en de systemisch-bepaling per check veranderen niet: het is een uitvoerkeuze; de kolom
+Bevindingen in het rapport daalt per check met wat wegviel (TOP-010 2.551 → 2.184, TOP-011 2.237 → 1.872,
+TOP-006 197 → 81, TOP-007 7 → 0). In de laag `strengen` gingen 3.652 strengen van gekleurd (2.719 rood, 933
+oranje) naar grijs met de reden "klasse onderdrukt"; de overige 68 mechanische strengen waren al grijs
+(en dragen die reden nu ook, want hij hoort bij de klasse en niet bij weggevallen meldingen),
+en de laag `putten` verandert niet. Koekangerveld: van 17 gekleurde mechanische strengen (13 rood, 4 oranje)
+naar 0, alle 20 grijs, 48 meldingen onderdrukt.
+
+### BO-50 Eén vlakkenlaag `vlakken` voor de externe objecten, met de soort als kolom
+
+**Wat.** De GeoPackage draagt de externe objecten waarnaar de EXT-meldingen verwijzen in één laag
+`vlakken` (MULTIPOLYGON) in plaats van de aparte lagen `bouwwerken` (EXT-001) en
+`waterdelen_zonder_zinker` (EXT-003) (issue #67). De kolom `soort` (`pand`, `bouwwerk`, `water`) scheidt de
+categorieën en volgt op één plek uit `Treffer.bron`; `subtype` draagt het BGT-type, `relatie` en
+`afstand_min_m` gelden alleen voor pand en bouwwerk (leeg bij water), en `check_ids` somt de checks op die
+naar het vlak wijzen. De vroegere `buffer_m` vervalt -- runmetadata, staat in `gwsw_run`, waar `n_vlakken`
+de laag telt. Er komt één stijl `vlakken.qml`, rule-based op `soort` met drie regels. EXT-002 registreert
+voortaan zijn treffer onder dezelfde sleutel als EXT-003 (`bouw_sleutel(VOORVOEGSEL["bgt_water"], …)`),
+zodat een waterdeel dat beide checks raken één rij met beide check-ID's krijgt en een waterdeel dat alleen
+EXT-002 ziet -- een echte doorkruising door een geregistreerde zinker -- toch een vlak krijgt.
+
+**Waarom.** Net als bij `putten` en `strengen`: één laag per geometriesoort, met de opmaak per categorie in
+de laag, is eenvoudiger te koppelen en te stijlen dan drie parallelle lagen met eigen kolommen en QML. De
+doorkruiste waterdelen van EXT-002 stonden sinds issue #59 wel als `object2` in de melding maar nergens op
+de kaart, omdat de oude waterdelenlaag alleen EXT-003 volgde; met de merge en de EXT-002-registratie krijgen
+ze eindelijk een vlak. De strikte aansluiting op het trefferregister (BO-18) blijft: de schrijver bevraagt
+geen bron, dus laag en uitslag lopen niet uit elkaar.
+
+**Alternatieven.** De twee lagen houden en een derde toevoegen voor EXT-002 (verworpen: nog meer parallelle
+lagen, terwijl de geometriesoort dezelfde is). De volledige bronvlakken als achtergrond meeschrijven
+(verworpen: BO-18 -- 81.661 actuele panden zouden de GeoPackage opblazen zonder dat een melding ernaar
+wijst). `stelsels` mee in `vlakken` trekken (verworpen: dat zijn GWSW-objecten, geen externe bron).
+
+**Contractbreuk.** De lagen `bouwwerken` en `waterdelen_zonder_zinker` en de kolommen `n_bouwwerken`/
+`n_waterdelen` in `gwsw_run` bestaan niet meer; QGIS-projecten die erop wezen moeten opnieuw gekoppeld
+worden aan `vlakken`.
+
+### BO-51 Elke check declareert `rollen` en `kenmerken`; putdiepte/putbodem toetsen op `Rioolput`
+
+**Wat.** Elke geregistreerde check declareert twee `ClassVar`s (issue #64): `rollen` (namen uit
+`selectie._ROLLEN` -- de populatie die hij langsloopt) en `kenmerken` (GWSW-kenmerknamen zoals de code ze
+aan `aspect`/`number`/`reference`/`date` geeft, of een `config:<pad>`-verwijzing voor ATTR-013, of `*` voor
+ATTR-014). `register()` weigert een check zonder beide; ze reizen mee op `CheckOutcome` en voeden de
+rapportregel "Toetst ⟨klassen⟩ op ⟨kenmerken⟩" en de dekkingsmatrix. Twee drifttests bewaken ze: een
+AST-sweep tegen de feitelijke code (`checkdeclaratie_analyse.py`) en een tweede tegen de ontologie, die
+leunt op twee nieuwe indexblokken `aspecten_van`/`onderdelen_van` (per klasse de directe
+`hasAspect`/`hasPart`-doelen, beide richtingen gevouwen omdat het GWSW `isAspectOf`/`isPartOf` als inverse
+declareert). Een nieuwe rol `rioolputten` (`gwsw:Rioolput`) vervangt `netwerkknopen` in HGT-012 (putdiepte)
+en HGT-015 (putbodem); in HGT-004, HGT-016 en HGT-017 wordt alleen de deksel-/bodemtak tot de rioolputten
+beperkt, terwijl de bovenkanttak (met terugval op maaiveld) breed blijft.
+
+**Waarom.** Tot nu toe stond nergens over welke GWSW-begrippen een check ging, en het was voor geen enkele
+check nagelopen. De putdiepte (deksel minus bodem) en het daaruit afgeleide bodemniveau hangen aan een put
+mét een deksel; een gemaal of uitlaat draagt geen `HoogtePut` en geen `Putdekselniveau`. `Rioolput` is in de
+ontologie letterlijk "een put met een verwijderbare deksel", en dat is de klassegrens die deze twee checks
+horen te trekken.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`).** `netwerkknopen` telt 22.363 objecten,
+`rioolputten` 20.756: het verschil van 1.607 is 893 Rioolgemaal, 712 Uitlaatconstructie, 1 Kolk en 1
+Drainageput -- klassen zonder deksel en zonder `HoogtePut`. Het aantal bevindingen van HGT-012 en HGT-015
+verandert *niet* (0 vóór, 0 na): deze export bevat geen enkele `HoogtePut`, dus beide checks sloegen elk
+object al over. Wat verandert is `examined` (van 22.363 naar 20.756) en de noemer van hun toelichting: die
+telde 1.607 gemalen en uitlaten mee die het kenmerk structureel nooit konden dragen, en las daarmee als een
+bredere toets dan hij was.
+
+**Grens van de ontologietest.** De toets is een ondergrens, geen uitputtende lijst: de declaratie is plat
+(welke rollen, welke kenmerken -- niet welk kenmerk op welke rol), dus een smalle mede-gedeclareerde rol kan
+een kenmerk afdekken en de vlag onderdrukken. Het geval dat dit blootlegde was `(HGT-016, HoogtePut)`; met
+de reparatie hierboven toetst HGT-016 de bodem op `rioolputten` en is die blinde vlek nu leeg, al blijft ze
+theoretisch bestaan. Een sluitende oplossing (kenmerken per rol) is bewust uitgesteld. Het indexblok leest naast
+`owl:onClass` ook `owl:someValuesFrom`/`owl:allValuesFrom`, zodat een forward-only binding als
+`Deksel hasAspect MateriaalDeksel` niet ontbreekt.
+
+**Grens (populatie).** De auteur koos (na de tabel in de sluitcomment) om HGT-004, HGT-016 en HGT-017 hun
+deksel-/bodemtak tot `rioolputten` te laten beperken, en HGT-001/002/011/018 en BTR-006 *ongewijzigd* te
+laten: die vallen terug op de maaiveldhoogte, en die terugval is zinvol voor elk object -- restrictie tot
+`rioolputten` zou de maaiveld-vs-AHN/z-toets op gemalen en uitlaten laten vervallen. Die vijf staan met reden
+op de uitzonderingslijst van de ontologietest. `Maaiveldhoogte` hangt via `hasConnection` aan de `Maaiveldorientatie`
+en is daarom vanaf geen klasse bereikbaar in de index (die alleen `hasAspect`/`hasPart` volgt); die staat als
+globale uitzondering. De nul-bewaking uit `omvang.py` is bewust niet op de declaraties omgebouwd: de
+handlijst dekt via `via_onderdeel`/`per_klasse` gevallen (overstortdrempel, afvoereindpunt) die de rolnamen
+niet uitdrukken, en dat omzetten raakt een goed geteste uitvoerlaag. De auteur koos dit als los vervolg,
+buiten #64.
+
+### BO-52 De nul-bewaking leidt haar rollen uit de checkdeclaraties af; twee bewakingen blijven expliciet
+
+**Wat.** `omvang._rollen` (de bron voor de rollentelling en de `SIG-nulklasse`-bewaking) was een handlijst
+van zes rollen. Sinds issue #71 verzamelt hij de rollen die de geregistreerde checks in `check.rollen`
+declareren (`_gedeclareerde_rollen()` over de `REGISTRY`), lost ze via `selectie.klassen_van_rol` op naar hun
+`[klassen]`-wortels en telt via `of_class`. De nul-melding noemt voortaan de check-ID's die op de lege rol
+leunen -- het gat uit issue #22, nu generiek. `klassen_op_nul` en `klassentelling` lezen dezelfde lijst, dus
+de "Per rol"-tabel en de nul-signalen kunnen niet meer uiteenlopen.
+
+**Waarom expliciet, niet één bron.** Twee bewakingen drukken geen `selectie._ROLLEN`-rol uit en zijn niet
+via `klassen_van_rol` bereikbaar; ze blijven daarom als aparte regels vóór de afgeleide lijst staan:
+- het **afvoereindpunt** (`Overnamepunt`, `Gemaal`, `Pompunit`) wordt *per klasse* bewaakt, want elke klasse
+  draagt een eigen betekenis -- noodverband (`Gemaal`/`Pompunit`) versus echt overdrachtspunt
+  (`Overnamepunt`), BO-33 -- en er is geen rol `afvoer_eindpunt`;
+- de **overstortdrempel** is een `Overstortdrempel`-onderdeel zonder eigen geometrie dat via
+  `subjects_of_class` geteld wordt (NET-007 leest hem zo), niet via `of_class`, en heeft evenmin een rol.
+Ze in dezelfde bron vatten zou een neprol of een tweede `_ROL_VELDEN`-ingang zonder selectiefunctie vergen
+en `test_checks_selectie` breken. De check-attributie van deze twee is de canonieke check (NET-001 resp.
+NET-007), niet een uitputtende afleiding zoals bij de gedeclareerde rollen; dat volstaat en houdt de melding
+kort.
+
+**Gevolg voor het rapport.** De "Per rol"-tabel gaat van 6 naar 19 rijen en gebruikt de `_ROLLEN`-rolnamen
+(`putten`, `leidingen`, `lozingspunten`, ...) in plaats van zes zelfgekozen labels; `lozingseindpunt` heet
+nu `lozingspunten`, en `mechanische leiding` verdwijnt omdat geen check die rol declareert (mechanisch riool
+valt buiten het checkregister). Een gedeclareerde rol zonder geconfigureerde klassen (een project mag
+`functieloze_knoop` leeg laten) valt weg: zonder verwachte populatie is er niets op nul te melden.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`).** Vóór #71 stonden drie signalen op
+nul: `Overnamepunt` (afvoereindpunt per klasse), `bergbezinkvoorziening` en `overstortdrempel`. Ná #71 zijn
+het er vijf: `Overnamepunt`, `overstortdrempel`, `bergbezinkvoorzieningen` (dezelfde rol, nu onder haar
+`_ROLLEN`-naam), plus twee *nieuwe* signalen die de oude handlijst niet dekte -- `oppervlaktewaterobjecten`
+(0 in de export, RVZ-004 leunt erop) en `valconstructies` (0, HGT-009 en HGT-016 leunen erop). Beide zijn
+terecht: staat de rol op nul terwijl een check erop toetst, dan heeft die check niets te beoordelen en hoort
+dat in het rapport. De telling zelf sluit aan op BO-51: `netwerkknopen` 22.363, `rioolputten` 20.756,
+`putten` 20.758.
+
+### BO-53 Een lozingspunt is een geldig vuilwater-eindpunt voor NET-001
+
+**Wat.** NET-001 (vuilwater/gemengd zonder afvoerpad) accepteerde alleen de rol
+`afvoer_eindpunt` (`Overnamepunt`, `Gemaal`, `Pompunit`). Sinds issue #72 telt daarnaast
+`lozings_eindpunt` (`Lozingspunt`, `UitlaatPunt`, `Lozingsput`, `Uitlaatconstructie`) mee; de
+eindpuntverzameling van de check is de vereniging van beide rollen. Titel, `doel`-tekst, de
+NET-001-regel in het checkregister en de dekkingsmatrix zijn meegegaan.
+
+**Waarom.** Vuilwater loost in Nederland niet meer rechtstreeks op oppervlaktewater. Komt een
+vuilwater- of gemengde streng op een lozingspunt uit, dan is dat per definitie het punt waar het
+water het stelsel verlaat -- of dat nu een overstort, een uitlaatconstructie of een
+overdrachtspunt naar de zuivering is. Er valt dus geen echt gebrek mee te maskeren, terwijl het
+omgekeerde wel gebeurde: elke streng achter zo'n uitlaat werd als "zonder afvoerpad" gemeld.
+
+**Wat het intrekt.** De oude regel stond als test vast (`test_lozingspunt_telt_niet_als_afvoerpad_voor_vuilwater`)
+met de redenering "NET-001 vraagt een gemaal of overnamepunt, NET-002 een lozingspunt; met een
+gedeelde eindpuntlijst zou de gemengde streng ten onrechte goedgekeurd worden". Die redenering
+gold de scheiding tussen de twee checks, niet het domein. De scheiding blijft: NET-002 accepteert
+géén gemaal, alleen een lozingspunt. Alleen NET-001 is verruimd, niet symmetrisch.
+
+**Meting (De Wolden en Hoogeveen, door de echte pijplijn).** Samen met BO-54 gaat NET-001 van
+9062 naar 7978 bevindingen; Koekangerveld van 24 naar 7. Zie de meting bij BO-54.
+
+### BO-54 Het mechanische riool telt als ongerichte connectiviteit, doorlopend via hulpstukken
+
+**Wat.** `checks/verbanden.py` kent sinds issue #72 naast de gerichte vrijvervalgraaf
+(`_Netwerk.graph`) een tweede laag: `_bereikbaarheid(context)`, dezelfde graaf plus de mechanische
+leidingen (rol `mechanischeleidingen`, `[klassen] mechanisch`) als kanten in beide richtingen.
+Alleen de bereikbaarheidsvraag leest die laag -- `_bereikbaar_vanaf` (NET-001/NET-002),
+`_eindpunten` en de notities eromheen. Kringlopen (NET-004), stelseltypen (NET-005/006) en de
+afvoerpadanalyse (`afvoerpaden`, `afvoerpad_van_streng`) blijven op het zuivere vrijverval: dat
+zijn vrijverval-begrippen, en ongerichte kanten zouden er onzin van maken -- elke persleiding zou
+in NET-004 als kringloop van twee knopen verschijnen.
+
+**Waarom ongericht.** Een persleiding is pompgestuurd; haar administratieve van-naar-richting
+zegt niets over de stroomrichting en wordt elders ook niet vertrouwd (de grijze persleiding-pijlen
+in de GIS-uitvoer). Voor de vraag of het water ergens uitkomt telt alleen de connectiviteit.
+
+**Waarom via de rauwe koppeling.** `resolve_network_node` klimt via `hasPart` naar een put. Het
+persnet komt samen op hulpstukken (`T_stuk`, `Hulpstukorientatie`) en die klimmen nergens naartoe,
+dus zo'n knoop resolvet naar `None`: 1914 van de 3720 mechanische leidingen (51%) hebben geen twee
+oplosbare knopen. Elke T zou het persnet in stukken hakken en het gemaal erachter onbereikbaar
+laten. De kant valt daarom terug op de rauwe `Conduit.start_node`/`end_node`, zodat het hulpstuk
+een doorgeefknoop wordt. `resolve_network_node` zelf blijft ongemoeid: die voedt de puttellingen en
+de ADM-checks, en globaal wijzigen is een te groot risico-oppervlak.
+
+**Aanname nagemeten.** Alle 939 niet-oplosbare tussenknopen in het persnet van De Wolden en
+Hoogeveen zijn hulpstukken; er is er geen enkele die dat niet is. De terugval raakt dus precies de
+hulpstukken en niets anders.
+
+**Gevolg voor de declaraties.** Wie de laag opvraagt leest daarmee de rol
+`mechanischeleidingen`, en de AST-sweep van BO-51 ziet dat. Dat zijn NET-001, NET-002 en NET-008;
+die drie declareren de rol. De overige NET-checks blijven op het zuivere vrijverval en declareren
+hem niet.
+
+Dat de laag lui is (een eigen `context.cached("bereikbaarheid", ...)` in plaats van een veld op
+`_Netwerk`) is precies daarvoor: bouwde `_bouw_netwerk` hem eager op, dan las elke check die de
+graaf aanraakt het persnet en moest hij het declareren -- ook NET-004, dat er per se buiten moet
+blijven. Tot de eindreview van #72--#77 stond het zo, en toen beweerden alle negen NET-checks in
+rapport, `overzicht_checks.populatie` en JSON dat zij over mechanische leidingen gingen. Onwaar, en
+in tegenspraak met deze BO zelf; de luie laag herstelt dat zonder de AST-sweep te omzeilen. De
+uitkomsten van de checks veranderen er niet van: NET-001 blijft op 8467, NET-002 op 3031 (De Wolden
+en Hoogeveen, na #73).
+
+Dit trekt de opmerking in BO-52 in dat "`mechanische leiding` verdwijnt omdat geen check die rol
+declareert": de rol staat weer in de rollentelling en in de `SIG-nulklasse`-bewaking, nu met drie
+leunende checks. Voor een dataset zonder mechanisch riool levert dat een nul-signaal op; dat is de
+bedoelde betekenis van die bewaking (een populatie waar checks op leunen komt niet voor), niet een
+gebrek in de aanlevering.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`, door de echte pijplijn met
+`markeer_vulwaarden` vóór de checks).** NET-001 gaat van **9062** naar **7978** bevindingen op
+17451 onderzochte strengen; binnen Koekangerveld van **24** naar **7**. Het onderbouwende issue
+voorspelde 8467/7 voor #72 én #73 samen (Pompunit uit `afvoer_eindpunt`); dit issue alleen laat
+Pompunit als eindpunt staan en komt daarmee onder die grens uit, zoals verwacht. De zeven die in
+Koekangerveld overblijven horen echt zonder route te zijn. Onderbouwing en de causale trace:
+`scripts/analyse_afvoer_pompunit.py`.
+
+**Ook NET-002, en dat is gewogen.** `_bereikbaar_vanaf` is gedeeld, dus het persnet telt ook voor
+de hemelwatercheck mee: NET-002 gaat van **3054** naar **3031** (Koekangerveld 0 → 0, geen enkele
+nieuwe bevinding in beide checks -- de wijziging kan alleen bereikbaarheid toevoegen). Alle 23
+weggevallen bevindingen liggen in drie deelstelsels, gebruiken minstens één mechanische kant en
+komen op een `Lozingsput` uit; 21 van de 23 lopen daarbij uitsluitend mét de geregistreerde
+richting mee, dus de ongerichtheid is er geen tweede versoepeling bovenop. Het typische geval is
+een hemelwaterstelsel dat op een `Rioolgemaal` afwatert waarvan de drukleiding op de lozingsput
+uitkomt (bv. `364786-319522-1`: negen vrijvervalstappen naar gemaal `ElBP0184`, dan drukleiding
+`ElBP0184-El1G0124-1` naar lozingsput `El1G0124`). Dat is precies wat NET-002 vraagt -- een pad
+naar een lozingspunt -- en dat het laatste stuk gepompt is maakt het niet minder waar. De
+domeinredenering van BO-53 speelt hier niet mee: NET-002 vroeg altijd al om een lozingspunt, alleen
+de route ernaartoe verandert. Vastgelegd in
+`tests/test_checks_netwerk.py::test_hemelwater_door_het_persnet_geldt_ook_als_afgevoerd`.
+
+### BO-55 `Pompunit` is geen afvoereindpunt; het noodverband uit BO-33 krimpt tot `Gemaal`
+
+**Wat.** `[klassen] afvoer_eindpunt` is `["Overnamepunt", "Gemaal"]` geworden, in
+`src/nlriochecker/checks.toml` en in `configs/dewoldenhoogeveen.toml`. Deze ene lijst voedt
+NET-001 (`_eindpunten` in `checks/verbanden.py`) en RVZ-006 (`_afvoereindpunten` in
+`checks/randvoorzieningen.py`), dus beide erven de correctie. Dit verfijnt BO-33; het draait
+hem niet terug, want `Gemaal` blijft er om precies dezelfde reden in staan (nul
+`Overnamepunt` in deze aanlevering) en met hetzelfde loslaatcriterium.
+
+**Waarom ontologisch.** `gwsw:Pompunit` is een `Rioolput` in het mechanische stelsel, geen
+`Gemaal` (dat is een `Bouwwerk`) en geen `Overnamepunt` (een `Aansluitpunt`, met de
+NEN 3300-definitie van overdracht). Een pompput is een **overdrachtspunt naar de
+drukriolering**, niet het einde van de afvoer. Dat einde is een gemaal of overnamepunt --
+of, sinds BO-53, een lozingspunt.
+
+**Waarom nu pas.** BO-33 zette `Pompunit` er bewust in als noodverband: de graaf traverseerde
+het mechanische riool niet, dus zonder pompput-als-eindpunt gold heel de drukriolering als
+onbereikbaar (+645 vuilwater/gemengd-strengen op De Wolden en Hoogeveen, waarvan 3 in
+Koekangerveld; `scripts/analyse_afvoer_pompunit.py`). Dat waren valse positieven: het water
+werd wel afgevoerd, wij konden het alleen niet traceren. Issue #72 heft die reden op (BO-54:
+mechanische connectiviteit door hulpstukken; BO-53: het lozingspunt telt mee), en pas daarna
+mag `Pompunit` eruit.
+
+**Meting (De Wolden en Hoogeveen, `configs/dewoldenhoogeveen.toml`, door de echte pijplijn met
+`markeer_vulwaarden` vóór de checks).** NET-001 gaat van **7978** naar **8467** bevindingen op
+17451 onderzochte strengen; Koekangerveld blijft op **7**. Dat is exact wat het onderbouwende
+issue voorspelde voor #72 + #73 samen (rij `(c'+L)` van `scripts/analyse_afvoer_pompunit.py`).
+NET-002 blijft **3031**: die check leest `lozings_eindpunt`, niet `afvoer_eindpunt`. RVZ-006
+gaat van **98** naar **99**; de ene nieuwe bevinding is deelstelsel `ds-Ko2G0002` (35 knopen,
+gemengd, wel een overstort maar als enig eindpunt een pompunit). Negen bestaande
+RVZ-006-boodschappen wijzigen alleen van tekst.
+
+**Voorwaarde, en die wordt afgedwongen.** Dit besluit klopt alleen zolang de route achter de
+pompput traceerbaar is, en dat is precies zolang `[klassen] mechanisch` klassen noemt:
+`_bouw_bereikbaarheid` legt de kanten alleen dan, en `_componentstructuur` neemt de
+route alleen dan in de contextschil op (BO-56). `load_check_config` valideert een projectbestand
+**op zichzelf** en legt het niet over `checks.toml` heen, dus een projectconfig die deze nieuwe
+`afvoer_eindpunt` overneemt maar `mechanisch` weglaat, krijgt een lege lijst en belandt stil in
+de +645-toestand van BO-33. De nul-bewaking vangt dat niet: een gedeclareerde rol zonder
+klassen valt juist uit de rollentelling weg (BO-52), dus er komt geen `SIG-nulklasse`. Daarom
+weigert `ClassRoots._pompunit_heeft_een_uitweg` de combinatie "`afvoer_eindpunt` niet leeg,
+zonder `Pompunit`" met "`mechanisch` leeg", met een foutmelding die beide sleutels en dit
+BO-nummer noemt. Een lege `afvoer_eindpunt` valt er bewust buiten: dan is er in het geheel geen
+afvoereindpunt, een eigen en meteen zichtbare toestand waar de minimale testconfigs op leunen.
+De twee controlehelften die het persnet juist uitzetten om te bewijzen dat de route erdoorheen
+loopt, maken `mechanisch` daarom ná de validatie leeg (`_zonder_persnet` in
+`tests/test_checks_netwerk.py`); de poort bewaakt wat iemand als projectconfig opschrijft.
+
+**Teksten die meeveranderden.** De deelreden van RVZ-006 (`_rvz006_gebrek`) luidt "zonder
+afvoereindpunt (gemaal of overnamepunt)", net als de RVZ-006-regel van het checkregister; de
+rapportregel onder de eindpunttelling noemt alleen `Gemaal` nog als noodverband. De
+NET-001-regel van het register was door #72 al bijgewerkt naar "gemaal, overnamepunt of
+lozingspunt". Vastgelegd in `tests/test_checkconfig.py::test_afvoereindpunt_is_overnamepunt_en_gemaal`,
+`tests/test_checks_netwerk.py::test_pompunit_zonder_persnet_is_geen_afvoereindpunt` en
+`tests/test_checks_blok_a.py::test_rvz006_telt_een_pompunit_niet_als_afvoereindpunt`.
+
+### BO-56 De contextschil loopt door het persnet, anders houdt de gelijkwaardigheid niet
+
+**Wat.** `_componentstructuur` in `afbakening.py` legt naast de vrijvervalleidingen ook de
+mechanische leidingen (`[klassen] mechanisch`) als kanten in de componentgraaf, met dezelfde
+terugval op de rauwe koppeling als `_bouw_bereikbaarheid` (BO-54). De contextschil
+van een studiegebied is daardoor de samenhangende component over vrijverval **én** persnet.
+
+**Waarom.** BO-12 eist gelijkwaardigheid: de meldingen van een gebied zijn gelijk aan die van
+een losse run over dat gebied, en aan een gemeentebrede run beperkt tot dat gebied. Sinds
+issue #72 loopt de bereikbaarheid van NET-001/NET-002 door het persnet en sinds BO-55 is een
+pompput zelf geen eindpunt meer. Bakende de schil zich dan nog op het zuivere vrijverval af,
+dan viel het gemaal achter de persleiding buiten de analyseset en meldde een gebiedsrun
+strengen die de gemeentebrede run niet meldt. Het commentaar dat de mechanische leidingen hier
+bewust buiten hield ("de NET-checks volgen ze niet") was met #72 onwaar geworden.
+
+**Meting (88 CBS-buurten van De Wolden en Hoogeveen, per buurt de gebiedsrun tegen de
+gemeentebrede run beperkt tot dezelfde kern).** Met de oude schil weken **17** buurten af op
+NET-001, alle met méér bevindingen in de gebiedsrun en geen enkele met minder; met deze
+wijziging zijn het er **0**. De afwijking bestond al vóór dit issue -- met `Pompunit` nog als
+eindpunt weken er 7 af, een gevolg van #72 dat het #72-verslag als openstaand punt naar dit
+issue doorschoof. Op een bredere steekproef van 8 buurten over alle 99 checks: 12 afwijkende
+checks (NET-001 in alle acht, plus TOP-001, TOP-006, TOP-011, TOP-023) vóór, 1 erna. Het meetscript staat als
+`scripts/analyse_contextschil_persnet.py` in de repo.
+
+**De prijs, en waarom hij aanvaardbaar is.** De analysesets van de 88 buurten samen groeien van
+303.570 naar 518.101 objecten (1,7x); de grootste gaat naar 15.739 van de 46.925 objecten in de
+export. Dat is de vrees uit het oude commentaar -- "de schil dijt uit tot de hele gemeente" --
+in gemeten vorm: een derde van de export in het zwaarste geval, geen geheel. De schil wordt
+bovendien nooit kern, dus wat erbij komt kan geen bevinding in het gebied opleveren; het kan
+alleen valse bevindingen wegnemen.
+
+**Wat er niet mee opgelost is.** Eén afwijking blijft staan: TOP-023 (hulpstuk met te veel
+leidingen) in de buurt "Verspreide huizen Koekange". Die bestond vóór deze wijziging ook al en
+gaat niet over de bereikbaarheid maar over de leidingtelling rond een hulpstuk op de
+gebiedsrand. Niet in dit issue aangepakt; hij hoort in een eigen issue thuis.
+
+### BO-57 De laag `stelsels` vervalt; RVZ-006 meldt per gemengde streng en krijgt een eigen vlak
+
+**Wat.** Drie samenhangende besluiten uit issue #75, allemaal op dezelfde polygooncode.
+
+1. De cartografische laag `stelsels` verdwijnt uit de GeoPackage, met haar stijl `stelsels.qml`,
+   de module `uitvoer/stelsels.py` en de kolom `n_stelsels` in `gwsw_run`. De kolom `stelsel` op
+   `putten` en `strengen` (`uitvoer/omvang.stelseltypen`) blijft: dat is een labeling per object en
+   geen vlak.
+2. RVZ-006 meldt per **gemengde streng** (`GemengdRiool` en subklassen, via `[klassen] stelseltypen`)
+   van het falende deelstelsel, in plaats van één bevinding op `sorted(deel)[0]`. Alle bevindingen
+   van hetzelfde deel dragen dezelfde `cluster_id`, dezelfde die NET-001 en NET-002 gebruiken. Het
+   zwaartepunt als foutlocatie vervalt: de melding zit op haar eigen streng. `examined` telt sindsdien
+   de gemengde strengen en niet meer de netwerkdelen.
+3. Daarvoor in de plaats komt de laag **`gemengd_zonder_overstort`** (MULTIPOLYGON, met eigen QML): een
+   vlak per gemengd deelstelsel waarop RVZ-006 aansloeg, als buffer om de vrijvervalstrengen van de
+   hele component. De buffer heet daarom `gemengd_zonder_overstort_buffer_m` (10 m, ongewijzigd) en
+   `gwsw_run` telt de laag in `n_gemengd_zonder_overstort`.
+
+**Wat de laag garandeert.** Zij kan niet groter zijn dan de uitslag, want haar rijen komen uit de
+meldingen. Kleiner kan zij worden om twee redenen, en die krijgen bewust een verschillende
+behandeling. Een `cluster_id` die de graaf van de run niet kent is een **interne tegenspraak** --
+check en schrijver lezen dezelfde `deelstelsel_ids` van dezelfde context -- en faalt luid met een
+`PipelineError`, dezelfde lijn die `_vul_trefferlaag` volgt bij een melding die naar een
+niet-geregistreerde treffer wijst. Een deelstelsel waarvan geen enkele streng een bruikbare lijn
+draagt is wél een datatoestand: er valt niets te tekenen. Dat levert geen rij op maar wordt geteld
+in de kolom `n_gemengd_zonder_vlak` van `gwsw_run`, naast `n_gemengd_zonder_overstort`. Zonder die
+telling kan een lezer "dit deelstelsel bestaat niet" niet onderscheiden van "we konden het niet
+tekenen" -- en dat is precies de stilte die dit project niet toestaat. Op De Wolden komt het geval
+vandaag niet voor (99 van de 99 gemelde deelstelsels krijgen een vlak); juist daarom zou het zonder
+telling onopgemerkt blijven zodra het wél gebeurt.
+
+**Waarom.** De stelsellaag groepeerde strengen via de GWSW-stelselregistratie, en de auteur heeft
+vastgesteld dat die groepering niet betrouwbaar is. Wat de laag liet zien -- wel of geen afvoerroute --
+is bovendien een eigenschap van het **netwerk** (`afvoerpad_van_streng`) en niet van de
+stelselhiërarchie; die hiërarchie wordt door geen enkele check gebruikt. Een kaartlaag die op een
+onbetrouwbare groepering een netwerkfeit tekent, wijst de lezer de verkeerde kant op.
+
+RVZ-006 hing aan de lexicografisch eerste knoop van een deelstelsel. Er ís geen GWSW-object "gemengd
+stelsel" -- gemengd volgt uit het leidingtype -- dus die knoop was een willekeurige drager, en op de
+kaart moest een zwaartepunt goedmaken dat het gebrek niet bij die ene put zat. NET-001 lost hetzelfde
+probleem (een subsysteem dat iets mist) al per streng op; RVZ-006 doet dat nu ook, en het vlak toont
+waar het deelstelsel ligt. Dat vlak komt uit de **meldingen van deze uitvoer** en niet uit de graaf
+alleen -- dezelfde strikte aansluiting als bij de trefferlaag (BO-18/BO-50), zodat laag en uitslag niet
+uit elkaar kunnen lopen na afbakening of onderdrukking.
+
+**Meting (De Wolden en Hoogeveen, `scripts/analyse_rvz006_per_streng.py`, `b9d6060` tegen `7000b5e`).**
+
+| | vóór | ná |
+|---|---|---|
+| RVZ-006 gemeentebreed | 99 bevindingen op 99 deelstelsels (794 onderzocht) | **1062** op **99** deelstelsels (7784 onderzocht) |
+| RVZ-006 Koekangerveld (gebiedsrun) | 2 op 2 deelstelsels (10 onderzocht) | **26** op **2** deelstelsels (26 onderzocht) |
+| nulmeting zonder kaartobject | 578 (11 + 567) | 578 (11 + 567) |
+
+Het aantal falende deelstelsels staat stil -- de selectie verandert niet, alleen de korrel. De 1062 is
+dus geen nieuwe uitslag maar dezelfde uitslag per streng: gemiddeld 10,7 gemengde strengen per falend
+deel, tegen 9,8 over alle 794 delen.
+
+**De nulmetingjoin mag niet stil vallen.** Een SHACL-overtreding waarvan de focusnode een geregistreerd
+stelsel is (`vw_geb_1` c.s.) landde sinds #25 op de stelsellaag. Zonder die laag komt zij nergens meer
+op de kaart, en stilte leest als "alles gecontroleerd". De melding houdt haar stelsel als `object_uri`
+-- zodat CSV, JSON en meldingentabel blijven zeggen waarover zij gaat -- en het rapport telt haar samen
+met de klassenaam-overtredingen in één regel "geen kaartobject", met de opsplitsing in dezelfde zin. Op
+De Wolden gaat het om 567 van de 578; die 567 waren dus precies de inhoud van de vervallen laag.
+
+**Alternatieven.** De stelsellaag laten staan en alleen RVZ-006 verfijnen (verworpen: de laag tekent een
+netwerkfeit op een onbetrouwbare groepering, en twee vlakkenlagen over hetzelfde net verwarren). Het
+nieuwe vlak uit de graaf opbouwen in plaats van uit de meldingen (verworpen: dan kan de laag na
+afbakening of onderdrukking meer tonen dan de uitslag). De stelseloverduidingen als eigen laag houden
+(verworpen: één rij per stelsel zonder betrouwbare geometrie is precies wat hier vervalt). De
+`stelsel`-kolom op `putten`/`strengen` meenemen in de opruiming (verworpen: die labeling komt uit
+`stelseltypen` en niet uit de registratieboom, en niemand heeft haar ter discussie gesteld).
+
+**Contractbreuk.** De laag `stelsels` en de kolom `n_stelsels` in `gwsw_run` bestaan niet meer;
+QGIS-projecten die erop wezen moeten opnieuw gekoppeld worden. De drempel `stelselvlak_buffer_m` heet
+`gemengd_zonder_overstort_buffer_m` -- een projectconfig met de oude naam wordt geweigerd
+(`extra="forbid"`). RVZ-006 levert op dezelfde data meer meldingen dan voorheen; een vergelijking met
+een meetmoment van vóór deze wijziging telt appels en peren, en `vergelijk` zegt dat niet.
+
+### BO-58 `bekeken` draagt een scopelabel met drie waarden en de getelde populatie
+
+**Wat.** Elke `CheckOutcome` draagt naast `examined` twee duidingen (issue #77):
+
+- `bekeken_scope` (`checks.base.Scope`), met **precies drie** waarden:
+  `analyseset`, `volledige_export` en `attribuut_instanties`;
+- `populatie`, de populatie die de check **declareert** -- zijn rollen als leesbare
+  opsomming; zonder rollen zijn kenmerken (`alle kenmerken` voor `*`); zonder beide leeg.
+
+Ze staan in de checktabel van het Markdown-rapport (kolommen Bekeken scope en
+Gaat over, met een voetnoot eronder), in de detailregel en de generieke systemische regel onder elke check, in
+`overzicht_checks` van de GeoPackage (`bekeken_scope`, `populatie`) en in het optionele
+enveloppeveld `checks` van `bevindingen.json`. **Niet** in de meldingen-CSV: bekeken
+hoort bij de check en niet bij de rij, dezelfde scheiding als bij de CFK-set (BO-7).
+`totaal/bevindingen.json` draagt het veld evenmin -- `bekeken` is per gebied gemeten.
+
+**De taxonomie.** Het getal varieert langs twee onafhankelijke assen. De eerste is de
+dataset die `run_checks` de check geeft: de analyseset (kern plus contextschil) of de
+volledige export, afhankelijk van `Check.volledig_bereik` en
+`[studiegebied] volledige_dataset_checks`. De tweede is wat `examined()` op die dataset
+telt: objecten van een rol, of instanties van een kenmerk. De tweede as wint, want telt
+een check geen objecten dan zegt "volledige export" niets over zijn noemer: ATTR-014
+heeft `volledig_bereik` én telt instanties, en heet daarom `attribuut_instanties`.
+
+**Onderstreping in plaats van een koppelteken.** Issue #77 schreef die derde waarde
+letterlijk als `attribuut-instanties`. De uitgebrachte waarde is
+`attribuut_instanties`, met een onderstreping: zij staat in hetzelfde veld als
+`volledige_export`, en één van de drie waarden een ander scheidingsteken geven maakt
+elke afnemer die op de string vergelijkt afhankelijk van welke waarde hij toevallig
+tegenkomt. Het koppelteken had geen andere grond dan de schrijfwijze in het issue. De
+correctie is bij de eindreview van #72--#77 gemaakt, vóór de eerste uitgave waarin het
+veld voorkomt, dus er is geen afnemer die de oude spelling gezien heeft en de
+JSON-schemaversie hoeft er niet voor omhoog.
+
+Welke checks instanties tellen is niet uit de code af te leiden en staat daarom als
+`Check.telt_instanties` op de klasse, bewaakt door
+`test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd`. Het zijn er twee: **ATTR-014**
+(elke kenmerkinstantie met een property-restrictie) en **BTR-006** (elke hoogtewaarde:
+twee BOB's per streng, deksel en maaiveld per knoop).
+
+`analyseset` betekent niet "minder gezien": zonder studiegebied valt de analyseset samen
+met de volledige export. Het onderscheid zegt dat deze check met de afbakening meebeweegt
+en `volledige_export` niet.
+
+**`populatie` is geen noemer, en wordt nergens als noemer gepresenteerd.** De declaratie
+is de vereniging van wat `run()`, `examined()` en `notes()` aanraken -- dat is wat de
+AST-sweep van issue #64 verzamelt -- en dus structureel een bovengrens op wat `examined`
+telt. ATTR-018 declareert ook `leidingen`, omdat zijn toelichting die telt, terwijl
+`examined` alleen vrijvervalstrengen plus putten telt. Een machinale koppeling tussen
+`examined()` en de rollen bestaat niet.
+
+Daarom staat de populatie in elke uitvoervorm los van het getal, achter **"gaat over"**:
+`119 bekeken (analyseset; gaat over: leidingen, putten, vrijvervalrioolleidingen)`. De
+kolom in de checktabel heet **Gaat over** en niet Populatie, en onder de tabel staat een
+voetnoot die het herhaalt. Een eerdere opzet zette de populatie achter een dubbele punt
+direct achter de telling; dat leest als de noemer en is precies het misverstand dat dit
+besluit wegneemt.
+
+Om diezelfde reden **geen terugval op "de hele export"** als een check geen rollen
+declareert. Die formulering hoort bij de regel "Toetst ...", waar zij zegt dat de check
+niet tot een rol beperkt is; achter een telling zou zij beweren dat de hele export de
+noemer was. RVZ-011 (telt de drempels die aan een put hangen) en ADM-007 (telt de putten
+van de geconfigureerde puttypen) zijn precies de gevallen waar dat misging. RVZ-011 valt
+nu terug op zijn kenmerken (`Drempelbreedte, Drempelniveau, Maaiveldhoogte,
+Putdekselniveau`), ATTR-014 op `alle kenmerken`, en ADM-007 -- die geen van beide
+declareert -- krijgt niets: dan zwijgt de uitvoer erover in plaats van iets te beweren.
+
+**Nagekomen 2026-08-28 (issue #96): "de hele export" is ook uit de regel "Toetst ..."
+verdwenen waar zij niet klopte.** Aan het veld `populatie` verandert niets -- de terugval
+hierboven blijft weg -- maar de zin "die formulering hoort bij de regel 'Toetst ...'" gold
+voor élke rolloze check, en dat was voor RVZ-011 en ADM-007 precies dezelfde overdrijving
+een regel lager: beide bekeken een smalle deelpopulatie. Zij noemen die nu zelf via
+`Check.populatie_omschrijving` (klassevariabele, overgenomen op `CheckOutcome`), en
+`_toetst_regel` zet die tekst op de plaats van de klassen: "de overstortdrempels die aan
+een put hangen" respectievelijk "de putten van de geconfigureerde puttypen
+(`[[puttyperegels]]`)". "De hele export" blijft over voor ATTR-014, die werkelijk niet tot
+een populatie beperkt is. Het veld is leeg bij elke check mét rollen;
+`test_alleen_een_check_zonder_rol_omschrijft_zijn_populatie` houdt die lijst op ADM-007 en
+RVZ-011.
+
+**Waarom.** Eén kolom `bekeken` mengde 95, 45.803 en 459.108 zonder dat er iets bij stond,
+en `percentage_populatie` in de GeoPackage deelt door precies dat ongelabelde getal --
+de percentages waren daardoor onderling onvergelijkbaar. Het is nadrukkelijk een
+labelprobleem en geen rekenfout: HGT-011 (bekeken 79 op Koekangerveld) en RVZ-002
+(bekeken 0) tellen verschillende rollen -- `netwerkknopen` tegenover `overstortputten`
+-- en géén van beide telt de klasse `Overstortdrempel`, want dat is een `Wand`-onderdeel
+en geen knoop. De getallen gelijktrekken zou de fout zijn.
+
+**Meting (`scripts/analyse_scope_per_check.py`, `36d2a2f`).** Alle 99 checks, twee runs
+op `dewoldenhoogeveen_orox.ttl` met `configs/dewoldenhoogeveen.toml`:
+
+| scope | aantal checks | voorbeeld | bekeken (gemeentebreed) | bekeken (Koekangerveld) |
+|---|---:|---|---:|---:|
+| `analyseset` | 95 | HGT-011 (`netwerkknopen`) | 22.363 | 79 |
+| `volledige_export` | 2 | ADM-002 (`leidingen, netwerkknopen`) | 45.803 | 45.803 |
+| `attribuut_instanties` | 2 | ATTR-014 (`alle kenmerken`) | 459.108 | 459.108 |
+
+De andere twee: ATTR-015 (`volledige_export`, 29.087 gedateerde objecten) en BTR-006
+(`attribuut_instanties`, 57.569 hoogtewaarden gemeentebreed, 161 op Koekangerveld).
+ATTR-018 op Koekangerveld leest nu als "36 bevindingen op 119 bekeken (analyseset; gaat
+over: leidingen, putten, vrijvervalrioolleidingen)". Let op het verschil met de 39 putten uit
+`scripts/analyse_begindatum.py`: dat script telt de **kern**, terwijl `bekeken` de
+analyseset telt -- kern plus contextschil, hier 78 putten plus 41 vrijvervalstrengen. Het
+jaartalgat zelf is geen bug (3 van 39 Koekangerveldse putten dragen een `Begindatum`,
+gemeentebreed 11.695 van 20.758, `aspect-zonder-datum` overal 0); deze duiding maakt het
+alleen leesbaar.
+
+**Alternatieven.** Twee waarden in plaats van drie en de instantietellers onder
+`volledige_export` scharen (verworpen: dan staat 459.108 als "objecten" naast 45.803).
+De scope uit `examined()` afleiden in plaats van hem te declareren (verworpen: er is niets
+in de code dat objecten van instanties onderscheidt; een heuristiek zou stil verkeerd
+kunnen labelen). Het veld `scope` noemen (verworpen: `Melding.scope` draagt in hetzelfde
+JSON-bestand al een andere betekenis -- `binnen_studiegebied` of `geen_studiegebied`).
+De noemers gelijktrekken (verworpen: het is een labelprobleem, zie hierboven). Het label
+ook in de meldingen-CSV zetten (verworpen: zie BO-7). De populatie weglaten nu zij geen
+noemer is (verworpen: zonder haar zegt een rij alleen nog "43 bekeken (analyseset)" en is
+niet te zien waar de check over gaat; achter "gaat over" is zij precies wat zij is). Voor
+een check zonder rollen én zonder kenmerken iets verzinnen -- "alle objecten", "de hele
+export" (verworpen: dat is de fout die dit besluit wegneemt; zwijgen is hier eerlijk, en de
+regel "Toetst ..." eronder zegt al dat de check niet tot een rol beperkt is).
+
+**Contractbreuk.** Geen. `checks` is een optioneel, additief enveloppeveld en
+`schema_versie` blijft daarom `1.1`, conform de versioneringsregel in
+`docs/json-schema.md`. `overzicht_checks` krijgt er twee kolommen bij; bestaande
+kolommen blijven ongewijzigd, en een lezer die op naam selecteert merkt er niets van.
+De checktabel in het Markdown-rapport is twee kolommen breder.
+
+### BO-59 De systemisch-vlag geldt pas vanaf 100 bekeken objecten
+
+**Besluit.** `melding._is_systemisch` toetst de populatieratio (`bevindingen / bekeken >
+systemisch_drempel`) alleen nog boven een minimumpopulatie: `[rapport]
+systemisch_minimum_bekeken`, standaard **100** bekeken objecten. Daaronder is een uitslag
+nooit systemisch, hoe hoog de ratio ook is. De vlag die een check zelf zet
+(`Finding.systemisch`, ATTR-014/ATTR-015) staat hier los van en verandert niet; de
+nulmeting heeft haar eigen bepaling per (vorm, objecttype) en blijft ook ongemoeid.
+
+**Waarom een minimum.** De vlag is een uitspraak over de export als geheel: "dit gebrek
+onderscheidt dit object niet van zijn buren, dus zet het niet even zwaar op de kaart". Die
+uitspraak leunt op een populatie die groot genoeg is om er iets over te zeggen. Op een klein
+gebied is zij onwaar en schadelijk. Issue #75 maakte `examined` van RVZ-006 de gemengde
+strengen; op Koekangerveld zijn dat er 26 en slaat de check op alle 26 aan (ratio 1,00). De
+vouwing van issue #76 haalde die meldingen daarna uit de kaartpopup en uit de tabel per
+object, en het `gemengd_zonder_overstort`-vlak kreeg via `bepaal_status` de status *groen*,
+met de tekst "geen eigen gebrek" -- terwijl elk vlak in die laag per constructie een
+gebrek is. Een echt gebrek in een klein gebied verdween zo uit precies de views waarvoor het
+bedoeld was. Hetzelfde geldt voor elke gebiedsrun: hoe kleiner het gebied, hoe eerder een
+check "systemisch" heet.
+
+**Waarom 100.** Een ronde ondergrens, ruim boven het bereik waarin de breuk toevallig hoog
+uitvalt en ruim onder de populaties waar de vlag voor bedoeld is. Gemeten op De Wolden en
+Hoogeveen (`configs/dewoldenhoogeveen.toml`, door de echte pijplijn) zijn er precies twee
+uitslagen boven de ratiodrempel: RVZ-002 en RVZ-003, allebei 245 van 245 -- die blijven dus
+systemisch, zoals bedoeld, want dat *is* een structureel verschijnsel over de hele export.
+ATTR-014 blijft systemisch omdat de check dat zelf declareert. Aan de andere kant valt
+RVZ-006 op Koekangerveld (26 van 26) er nu buiten en staat weer gewoon op de kaart. Er is
+geen uitslag met een populatie tussen 26 en 245 die boven de drempel uitkomt, dus elke
+waarde in dat bereik levert vandaag dezelfde uitkomst; 100 is de ronde waarde in het midden
+en houdt marge naar beide kanten.
+
+**Wat de auteur kan bijstellen.** `systemisch_minimum_bekeken` staat in `[rapport]` van
+`src/nlriochecker/checks.toml` en `configs/dewoldenhoogeveen.toml`, naast
+`systemisch_drempel`. Op 1 zetten geeft het gedrag van vóór dit besluit terug (de
+fixturetests doen dat, want fixtures tellen een handvol objecten). Hoger zetten maakt de
+vlag zeldzamer; hij mag niet op 0, want een ratio over nul bekeken objecten bestaat niet.
+
+**Alternatieven.** De ratio afhankelijk maken van de gebiedsgrootte (verworpen: dan
+betekent "systemisch" opnieuw iets anders naargelang er een studiegebied is, precies wat de
+correctie in BO-28 wegnam). Alleen de vlakkenlaag repareren en de vlag laten staan
+(verworpen: dat is de helft -- de gemelde strengen zelf lezen dan nog steeds "geen eigen
+gebrek" in hun popup; die kant is los daarvan wél gerepareerd, zie hieronder). RVZ-006
+uitzonderen (verworpen: het is geen eigenschap van die check maar van kleine populaties,
+en de volgende check met een smalle populatie loopt er weer in).
+
+**Tweede helft: het vlak leidt zijn status niet meer af uit gefilterde meldingen.**
+`gpkg._gemengd_rij` gaf de meldingen van het deelstelsel aan `bepaal_status` en
+`popup_html`, die allebei systemische meldingen wegfilteren. Een rij in de laag
+`gemengd_zonder_overstort` bestaat echter alleen omdat RVZ-006 op dat deelstelsel aansloeg;
+er is daar geen "geen eigen gebrek"-toestand. De rij bepaalt haar status daarom nu uit de
+ernst van haar eigen meldingen en toont ze in de popup, ook als zij systemisch heten. Dat is
+geen uitzondering op BO-29: die regel gaat over objecten waarvan de systemische meldingen
+één van vele soorten zijn, terwijl dit vlak niets anders draagt dan de bevinding die hem
+liet bestaan.
+
+### BO-60 ADM-011 vervalt: een losgekoppelde loze leiding is de gewenste eindtoestand
+
+**Wat.** ADM-011 (W, Consistentie) vervalt. De check meldde per loze streng dat haar keten in
+de administratieve afvoerrichting nergens op het actieve riool aansluit -- geval
+`losgekoppeld` -- en noemde dat dode data. Het ID wordt niet hergebruikt; het register zet
+ADM-011 in de tabel *Vervallen checks* naast EXT-008, niet in *Geschrapte checks*, want de
+nulmeting dekt hem niet: er kijkt niets meer naar en dat is precies de bedoeling. ADM-010 (F)
+blijft ongewijzigd, inclusief zijn gevallen (`doorgaand`, `aanvoer`, `afvoer`), zijn
+detailvelden en zijn ketenbouw.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit (PRE-2,
+`docs/checks-audit-2026-08.md`). Bij de handmatige steekproef op `ID8364-ID8365-1` schreef hij:
+"dit is geen fout, maar dit is hoe het hoort te zijn: een loze leiding moet geen bovenstrooms
+in gebruik zijnde riolen hebben, want dan is hij niet loos." Een `LozeLeiding` is buiten
+gebruik gesteld; dat zij netjes van het actieve net is losgekoppeld is het eindbeeld waar het
+beheer naartoe werkt. De check meldde dus de gewenste toestand als gebrek, en er is geen
+handelingsperspectief: er valt niets te herstellen. Het omgekeerde geval -- actief riool dat
+wel op een loze keten aansluit -- is het echte gebrek en dat meldt ADM-010 al volledig.
+
+**Wat er in de engine blijft staan.** De ketenbouw (`_bouw_loze_ketens`), het geval
+`losgekoppeld` en de telling ervan in de verantwoording van ADM-010. Die verantwoording blijft
+melden hoeveel ketens en strengen er per geval zijn, dus "14 losgekoppeld (16 strengen)" staat
+nog gewoon in het rapport -- als feit over de dataset, niet als bevinding. Wat wel weg is: de
+meldingstekst voor `losgekoppeld` en de zin die daarin de actieve strengen noemde die een
+ketenknoop wel raken maar niet in de afvoerrichting aansluiten. Het detail `rakend` zelf blijft
+op de ADM-010-meldingen staan; het is daar een gemeten feit en het weghalen zou de uitvoer van
+ADM-010 veranderen, en die blijft ongemoeid.
+
+**Verwacht effect op De Wolden en Hoogeveen.** De 16 ADM-011-waarschuwingen (14 losgekoppelde
+ketens) verdwijnen; de 38 ADM-010-fouten blijven ongewijzigd ten opzichte van
+`uitvoer/audit_27082026`. De hermeting hoort bij blok A van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De conditie omkeren, zodat een loze leiding *met* bovenstrooms actief riool
+gemeld wordt (verworpen: dat is letterlijk ADM-010 en zou het ID een tweede betekenis geven,
+terwijl `vergelijk` meetmomenten op check-ID naast elkaar zet). De ernst verlagen naar een
+notitie (verworpen: een melding zonder handelingsperspectief hoort niet in de bevindingen,
+ongeacht haar gewicht; de telling in de verantwoording van ADM-010 dekt de informatiebehoefte
+al). Het ID hergebruiken voor een andere loze-leidingcheck (verworpen: harde regel, vervallen
+ID's worden nooit hergebruikt).
+
+### BO-61 ATTR-008 geschrapt: de nulmeting toetst exact hetzelfde lengtebereik
+
+**Wat.** ATTR-008 (W, Plausibiliteit, "Strenglengte korter dan X m of langer dan X m") vervalt
+uit de engine. Anders dan ADM-011 (BO-60) gaat hij niet naar de tabel *Vervallen checks* maar
+naar *Geschrapte checks*: de nulmeting dekt hem aantoonbaar, dus hij krijgt -- zoals voorwaarde
+3 van de schrapronde eist -- een sentinel in `src/nlriochecker/dekking.toml`, met
+`LengteLeiding_val` als bewijsvorm in alle drie de conformiteitsklassen. Dat is letterlijk
+dezelfde sentinel als die van ATTR-011. Het ID ATTR-008 wordt niet hergebruikt.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, ATTR-sectie en waarneming 4). De drempels van ATTR-008 zijn
+met issue #35 op de grenzen van het GWSW-datatype `Dt_LengteLeiding` gezet (1-75 m), omdat GWSW
+leidend is. Precies dat bereik toetst de SHACL-vorm `LengteLeiding_val`. Gemeten op De Wolden en
+Hoogeveen (audit 27-08): alle 443 ATTR-008-objecten staan óók in `LengteLeiding_val`. De
+overlap is niet gedeeltelijk maar volledig, en de vorm is bovendien breder -- zij telt er 932,
+want zij ziet ook drains, duikers en aansluitleidingen, en daar bovenop 1.955 meldingen op
+mechanisch riool die de projectconfiguratie onderdrukt. De check voegde dus niets toe: elk
+gemeld object werd twee keer gemeld, één keer door de nulmeting en één keer door ons.
+
+**Wat er blijft staan.** ATTR-009 (geometrische lengte tegen administratieve lengte) blijft
+ongewijzigd: die vergelijkt twee bronnen met elkaar in plaats van één waarde met een bereik, en
+de nulmeting kent de hartlijn niet. ATTR-005 verwees in zijn `notes()` naar ATTR-008 als de
+plek waar lengtewaarden getoetst worden; die zin noemt nu `LengteLeiding_val`. Ook de twee
+drempels `minimale_strenglengte_m` en `maximale_strenglengte_m` blijven in alle drie de
+configbestanden staan, met een regel erbij dat geen check ze meer leest. Ze weghalen is een
+losse beslissing en geen gevolg van deze: `CheckThresholds` staat op `extra="forbid"`, dus een
+bestaande projectconfiguratie die de sleutels draagt zou na verwijdering niet meer laden. Dat
+is een wijziging aan het configuratiecontract, en die hoort een eigen besluit te zijn -- niet
+een bijvangst van een schrapping. Zolang de sleutels er staan houdt
+`test_maximale_strenglengte_volgt_de_ontologie` hun waarde op de ontologiegrens.
+
+**Verwacht effect op De Wolden en Hoogeveen.** De 443 ATTR-008-waarschuwingen verdwijnen uit de
+bevindingen; de gevallen zelf blijven zichtbaar in het nulmetingblok van het rapport, onder de
+vorm `LengteLeiding_val`. Er gaat dus geen signaal verloren, alleen een dubbeling. De hermeting
+hoort bij blok A van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De drempels losmaken van het datatype en er een plausibiliteitsband van
+maken die stríkt binnen 1-75 m ligt, zodat de check wél iets toevoegt (verworpen door de
+auteur: dat is een projectkeuze zonder bron, terwijl GWSW hier een expliciet bereik declareert;
+een band die strenger is dan de ontologie zou strengen afkeuren die het model goedkeurt).
+ATTR-008 als *vervallen* boeken zoals ADM-011 (verworpen: dat zou zeggen dat er niets meer naar
+kijkt, en dat is aantoonbaar onwaar -- de nulmeting kijkt ernaar, en dan is de sentinel de
+manier om die dekking te blijven bewaken). Het ID hergebruiken voor een andere lengtecheck
+(verworpen: harde regel, vervallen ID's worden nooit hergebruikt).
+
+### BO-62 BTR-002 vervalt voor nu: de inwinningswijze staat niet op de BOB's
+
+**Wat.** BTR-002 (W, Traceerbaarheid, "Kritieke kenmerken ingewonnen via schatting, plan of
+ontwerp in plaats van meting") vervalt uit de engine en gaat in het register naar de tabel
+*Vervallen checks*, niet naar *Geschrapte checks*: de nulmeting toetst de inwinningswijze
+nergens, dus er kijkt na dit besluit niets meer naar. Het skelet en zijn `reden` verdwijnen
+mee. Het ID wordt niet hergebruikt.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, BTR-sectie). De check kan op deze aanlevering geen uitslag
+geven: de wijze staat op 537 van de 46.880 BOB's en op 10.050 van de 22.363 maaiveldhoogten,
+en zij hangt bovendien aan de puntgeometrie in plaats van aan het kenmerk. De audit bood één
+tussenstap aan -- de check alleen op de maaiveldhoogte bouwen, waar 6.455 van de 10.050
+gevulde waarden expliciet niet-gemeten zijn (`AHN2` of `NietAchterhaald`) -- en de auteur
+heeft die afgewezen: dat versmalt de check ten opzichte van het register, dat over álle
+kritieke kenmerken gaat.
+
+**Waarom "voor nu", en waarom geen sentinel.** Het besluit hangt aan de bron en niet aan het
+begrip. Levert een volgende export `WijzeVanInwinning` op de BOB's zelf, dan is deze toets
+weer zinvol; hij keert dan terug onder een nieuw ID, want vervallen ID's worden nooit
+hergebruikt. Een dekking-sentinel in `dekking.toml` hoort hier niet: die is het bewijs dat de
+nulmeting een geschrapte check dekt (voorwaarde 3 van de schrapronde), en dat is hier
+aantoonbaar niet zo. De vindplaats van het besluit is dit BO plus de registerregel.
+
+**Wat er blijft staan.** BTR-001 (dezelfde metagegevens, vanaf de kant van het ontbreken),
+BTR-003 en BTR-004 blijven skelet; BTR-006 blijft gebouwd. De kanttekening bij HGT-001 en
+HGT-002 leest de inwinningswijze gewoon door: `[inwinning] uit_hoogtemodel` en
+`[inwinning] onbekend` blijven ongewijzigd in de configuratie en worden door die twee checks
+gelezen. Er raakt dus geen configuratiesleutel wees.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel met de markering *vereist
+inwinningsmetagegevens* verdwijnt uit het rapport. Er verdwijnt geen enkele melding: de check
+stond op nul. De hermeting hoort bij blok A van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De tussenstap op alleen de maaiveldhoogte bouwen (verworpen door de auteur,
+zie hierboven). Het skelet laten staan omdat het zichtbaar maakt wat er ontbreekt (verworpen:
+dat argument geldt nog voor BTR-001, dat precies over het ontbreken van de metagegevens gaat;
+een tweede skelet op dezelfde lege bron voegt daar niets aan toe).
+
+### BO-63 BTR-005 vervalt voor nu: inspectiegegevens noch risicowegingsbron bestaan
+
+**Wat.** BTR-005 (W, Actualiteit, "Toestands- of inspectiegegevens ouder dan drempel, gewogen
+naar risicoligging") vervalt uit de engine en gaat in het register naar de tabel *Vervallen
+checks*. Het skelet en zijn `reden` verdwijnen mee. Het ID wordt niet hergebruikt.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, BTR-sectie), die BTR-005 de laagste prioriteit van de vijf
+skeletten gaf en hem als enige BTR-kandidaat om te laten vervallen aanwees. Hij vraagt twee
+dingen die er geen van beide zijn: inspectie- of toestandsgegevens in de GWSW-export, en een
+bron voor de risicoligging (spoor, dijk, wegfunctie). Die weging is bovendien geen
+GWSW-begrip; zij vraagt externe bronnen die buiten de EXT-scope van deze fase vallen. Er is
+ook geen drempel voor geconfigureerd, dus er raakt geen configuratiesleutel wees.
+
+**Waarom "voor nu", en waarom geen sentinel.** Zoals BO-62: het besluit hangt aan de twee
+ontbrekende bronnen. Komen er inspectiedata én een risicowegingsbron, dan keert de toets
+terug onder een nieuw ID. Een sentinel in `dekking.toml` hoort hier niet -- de nulmeting kent
+geen inspectiegegevens en dekt hem dus niet.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel verdwijnt uit het
+rapport; er verdwijnt geen melding, want de check stond op nul. `docs/nwb-voorstel.md` noemde
+BTR-005 als de sterkste kandidaat om de NWB-wegvakken aan op te hangen, met als aanbeveling
+"bouw hier nu niets mee"; dat spoor loopt niet meer via déze check. De NWB-laag zelf verandert
+niet: zij wordt geladen en door geen enkele check gelezen, precies zoals daarvoor.
+
+**Alternatieven.** Alleen de leeftijdshelft bouwen, zonder risicoweging (verworpen: er zijn
+ook geen inspectiedata, dus er valt geen leeftijd te meten -- dit is niet één ontbrekende
+bron maar twee). Het skelet laten staan (verworpen op dezelfde grond als BO-62).
+
+### BO-64 EXT-005 vervalt voor nu: er is geen bruikbare putdeksellaag
+
+**Wat.** EXT-005 (W, Compleetheid, "Put zonder BGT-putdeksel binnen X m") vervalt uit de
+engine en gaat in het register naar de tabel *Vervallen checks*. Het ID wordt niet
+hergebruikt. Anders dan bij BTR-002 en BTR-005 gaat het hier niet om een skelet maar om een
+volledig gebouwde check: de code verdwijnt, met haar tests.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, EXT-sectie). De aangeleverde BGT-laag `put` is geen
+putdekselbron: zij telt 843 objecten, waarvan 595 van ProRail en 72 van de twee gemeenten
+samen, tegenover ruim 23.000 GWSW-putten. Dat is spoorinfrastructuur. `configs/dewoldenhoogeveen.toml`
+zette de rol daarom al leeg (`bgt_putdeksellagen = []`), zodat de check netjes oversloeg met
+"laag niet aanwezig in aangeleverde data". De audit stelde als aanleveringsvraag of er een
+gemeentelijke deksellaag bestaat die het gebied wél dekt; het antwoord van de auteur is nee,
+en die komt er ook niet.
+
+**Waarom "voor nu", en waarom geen sentinel.** Het besluit hangt aan de bron. Komt er alsnog
+een deksellaag die het studiegebied dekt, dan is deze toets weer zinvol en keert hij terug
+onder een nieuw ID. Een sentinel in `dekking.toml` hoort hier niet: de nulmeting kent geen
+BGT en dekt deze check niet -- er kijkt na dit besluit niets meer naar, en dat is precies wat
+de tabel *Vervallen checks* zegt.
+
+**Wat er blijft staan, en waarom.** De bron-rol `bgt_putdeksel` blijft in
+`externedata.ROLLEN`, en de sleutels `bgt_putdeksellagen` en `ext_putdeksel_afstand_m` blijven
+in alle drie de configbestanden staan, elk met een regel dat geen check ze meer leest. Dezelfde
+redenering als in BO-61: `CheckThresholds` en `ExternalSources` staan op `extra="forbid"`, dus een
+bestaande projectconfiguratie die de sleutels draagt zou na verwijdering niet meer laden. Dat
+is een wijziging aan het configuratiecontract en hoort een eigen besluit te zijn, geen bijvangst
+van een schrapping. Twee gevolgen die je moet kennen zolang ze er staan: een aangeleverde
+`put`-laag wordt nog steeds geladen én op dekking getoetst, dus een te klein extract van een
+laag die niemand meer leest kan de harde dekkingspoort raken; en `ext_zoekafstand_max_m` telt
+`ext_putdeksel_afstand_m` (2,0 m) nog mee in de marge van diezelfde poort -- zonder gevolg,
+want `ext_lozingspunt_water_afstand_m` (10,0 m) is groter. De voorbeeldsleutel in de melding
+van de dekkingspoort noemt daarom niet langer `bgt_putdeksellagen` maar `bgt_waterlagen`, een
+laag die nog wel checks bedient.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel verdwijnt uit het
+rapport; er verdwijnt geen melding, want de check sloeg over. De hermeting hoort bij blok A van
+de auditregie, niet bij dit besluit.
+
+**Alternatieven.** De check laten staan zodat de overslag zichtbaar blijft (verworpen: de
+overslag was luid en correct, maar zij herhaalt per run een aanleveringsvraag die inmiddels
+beantwoord is -- het antwoord staat nu hier in plaats van in elk rapport). De `put`-laag toch
+als deksellaag gebruiken (verworpen: 595 van de 843 objecten zijn ProRail; dat zou 23.000
+putten als dekselloos melden en dat is een uitspraak over de bron, niet over de beheerdata).
+
+### BO-65 EXT-006 vervalt voor nu, met EXT-005 mee
+
+**Wat.** EXT-006 (W, Compleetheid, "BGT-putdeksel zonder put in de beheerdata") vervalt uit de
+engine en gaat in het register naar de tabel *Vervallen checks*. Het ID wordt niet hergebruikt.
+Een eigen BO en niet een alinea in BO-64, omdat elk vervallen ID zijn eigen vindplaats hoort te
+hebben -- maar de grond is dezelfde en dit BO is er de spiegelzijde van.
+
+**Waarom.** Zoals BO-64: EXT-006 is dezelfde vraag van de andere kant (elk BGT-deksel zonder
+GWSW-put binnen 2,0 m), leest dezelfde rol `bgt_putdeksel`, en staat of valt dus met dezelfde
+ontbrekende bron. De auditregel zei het al met zoveel woorden: "de twee staan of vallen met
+dezelfde bron".
+
+**Wat er met hem verdwijnt.** EXT-006 was de enige check die een bevinding op een object buiten
+de GWSW-dataset legde: de bevinding hing aan het BGT-deksel en droeg zijn RD-coordinaat zelf
+(`Finding.location`), zodat zij bij de afbakening tot een studiegebied niet wegviel. Die weg
+blijft in de uitvoer bestaan (`uitvoer/locatie.foutlocatie` en de kolommen `x`/`y` van de
+meldingentabel) en wordt door `tests/test_uitvoer_locatie.py` bewaakt, maar er is nu geen check
+meer die hem vult. Dat is bewust: de mechaniek weghalen zou een tweede, veel bredere ingreep in
+de uitvoer zijn, en de eerstvolgende check op een externe bron heeft hem weer nodig.
+
+**Verwacht effect op De Wolden en Hoogeveen.** Eén "bekeken 0"-regel verdwijnt uit het rapport;
+er verdwijnt geen melding.
+
+**Alternatieven.** EXT-006 laten staan en alleen EXT-005 laten vervallen (verworpen: dan zou de
+helft van een spiegelpaar blijven draaien op een bron die er niet is, en zou het rapport
+suggereren dat de dekselvergelijking nog ergens gebeurt).
+
+### BO-66 EXT-002 vervalt: de kale watergangkruising draagt geen handelingsperspectief
+
+**Wat.** EXT-002 (W, Plausibiliteit, "Kruising met watergang (waterschaps- of BGT-data)")
+vervalt uit de engine en gaat in het register naar de tabel *Vervallen checks*, op de eerste
+grond die die tabel noemt: niet relevant voor deze opdracht. Het ID wordt niet hergebruikt.
+EXT-003 blijft ongewijzigd en is voortaan de enige watergangmelding.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, PRE-4). Een streng die een watergang kruist is op zichzelf
+geen gebrek -- dat gebeurt overal -- en er valt niets aan te herstellen. Het gebrek is dat zo'n
+kruising niet als zinker geregistreerd staat, en dat meldt EXT-003. De meting maakt dat hard:
+op De Wolden en Hoogeveen melden de twee exact dezelfde 281 strengen en dezelfde 319
+doorkruisingen (audit 27-08, gemeten met `scripts/checkaudit_meting.py`), omdat de export geen
+enkele als zinker geregistreerde streng bevat. Elke gemelde kruising kwam dus twee keer in de
+bevindingen, één keer zonder en één keer met handelingsperspectief. De steekproef vroeg om
+precies die samenvoeging: "Kunnen we dit niet combineren met de andere watergang check?"
+
+**Waarom geen sentinel, en geen datalaag.** Geen sentinel in `dekking.toml`: de nulmeting kent
+de BGT niet en dekt deze check niet, dus er kijkt na dit besluit niets meer naar de kale
+kruising -- en dat is de bedoeling. De audit stelde als alternatief voor EXT-002 te laten
+voortleven als GeoPackage-datalaag met alle doorkruisingen; de auteur heeft dat verworpen ("niet
+relevant"). Er komt dus geen vervangende laag en geen vervangende telling: wat er blijft is de
+telling in de toelichting van EXT-003, die elke doorkruising binnen de zoekstraal noemt,
+inclusief die van een geregistreerde zinker.
+
+**Wat er in de engine blijft staan.** De hele kruisingsdetectie: `_verhouding` met het
+doorkruisingscriterium van BO-43, `_zoek_kruisingen`, de gedeelde cache-ingang
+`ext:watergangkruisingen` en de basisklasse `_WatergangKruising` met haar populatie,
+`buiten_populatie()` (de duikertelling van BO-25) en haar afvaltellingen. EXT-003 hangt daar als
+enige nog onder; de basis is niet in de check gevouwen omdat zij de populatie, de toets en de
+tellingen bij elkaar houdt en dit besluit alleen over de melding gaat. Eén regel is van EXT-002
+naar EXT-003 verhuisd in plaats van weggevallen: "Waterschapsdata is niet aangeleverd; alleen de
+BGT-waterdelen zijn gebruikt." Zonder die verhuizing zou het rapport niet meer zeggen op welke
+waterbron getoetst is, terwijl het register die tweede bron expliciet toestaat.
+
+**Gevolg voor de laag `vlakken` in de GeoPackage.** De watervlakken blijven bestaan en komen nu
+uitsluitend van EXT-003, dat zijn doorkruiste waterdeel zelf als treffer registreert. `VLAK_CHECKS`
+in `uitvoer/gpkg.py` gaat van drie naar twee ID's; de structuur van de laag (kolommen, `soort`,
+`gwsw_run.n_vlakken`) verandert niet. Wat wél verdwijnt is het vlak dat alleen EXT-002 aanwees:
+een doorkruising door een als zinker geregistreerde streng kreeg sinds issue #67 een vlak met
+`check_ids = "EXT-002"`, en dat vlak hoort bij een melding die niet meer bestaat -- de laag toont
+per constructie exact de externe objecten waarnaar de meldingen van díé uitvoer verwijzen. Op De
+Wolden en Hoogeveen kost dat nul vlakken, want er is geen enkele zinker. `check_ids` op een
+watervlak leest voortaan altijd `EXT-003`.
+
+**Verwacht effect op De Wolden en Hoogeveen.** De 319 EXT-002-waarschuwingen (281 strengen)
+verdwijnen; EXT-003 blijft op 319 waarschuwingen en 281 strengen. Er gaat geen signaal verloren,
+alleen een dubbeling. De hermeting hoort bij blok B van de auditregie, niet bij dit besluit.
+
+**Alternatieven.** EXT-002 laten voortleven als GeoPackage-datalaag (het PRE-4-voorstel uit de
+audit; verworpen door de auteur). EXT-003 laten vervallen en EXT-002 houden (verworpen: dan
+blijft juist de melding zonder handelingsperspectief over). De twee samenvoegen tot één check
+onder een nieuw ID (verworpen: EXT-003 is al precies die check, en een nieuw ID zou een
+trendvergelijking op check-ID breken zonder dat er iets aan de uitslag verandert). Het ID
+EXT-002 hergebruiken (verworpen: harde regel, vervallen ID's worden nooit hergebruikt).
+
+### BO-67 EXT-007 toetst alleen de lozingspunten die op oppervlaktewater lozen
+
+**Wat.** De populatie van EXT-007 ("Lozingspunt zonder watergang binnen X m") is niet langer de
+brede rol `lozingspunten` maar de nieuwe, engere rol `waterlozingspunten`: precies de klassen
+waarvan de GWSW-ontologie zegt dat zij op oppervlaktewater lozen. De lijst staat als
+`[klassen] waterlozingspunt` in beide configbestanden en als default in `ClassRoots`, niet in de
+code van de check. De brede rol `lozingspunten` (`[klassen] lozings_eindpunt`) blijft ongewijzigd:
+NET-001, NET-002 en NET-008 hebben haar als netwerkeindpunt nodig, en daar telt elke uitweg uit
+het stelsel mee. ID, titel, ernst, dimensie en de drempel `ext_lozingspunt_water_afstand_m`
+blijven zoals ze waren.
+
+**De lijst, en het bewijs per klasse** (gebundelde ontologie uit `gwsw-orox-helpers`,
+`Ontologie_GWSW_Totaal.ttl`; elke regel nagezocht):
+
+| Klasse | In de lijst | Definitie in de ontologie |
+|---|---|---|
+| `Uitlaatconstructie` | ja | "De constructie waar uitstroming van water uit een leiding naar het oppervlaktewater mogelijk is." Een `Bouwwerk`; `Nooduitlaat` en `Uitstroombak` hangen eronder en komen via de subklasse-afsluiting mee |
+| `UitlaatPunt` | ja | "Het punt waar uitstroming van water uit een leiding naar het oppervlaktewater mogelijk is." Een `Aansluitpunt` en dus een `Knooppunt`: hij staat op de orientatie, niet op het object |
+| `LozingspuntOppervlaktewater` | ja | "Locatie van de lozing bevindt zich in het oppervlaktewater." Subklasse van `Lozingspunt` |
+| `Lozingsput` | **nee** | "Een put waarop een rioolleiding is aangesloten waarmee het afvalwater het rioolstelsel verlaat naar, of ontvangt uit, een **ander rioolstelsel**." Een `Rioolput`; daar hoort per definitie geen open water te liggen |
+| `Lozingspunt` (de wortel) | **nee** | "Een knooppunt in een stelsel waar het afvalwater het stelsel verlaat of binnenkomt" -- de ontologie splitst hem zelf in `LozingspuntOppervlaktewater` en `LozingspuntBodem`, dus de wortel zegt niet waarop geloosd wordt. Hem opnemen zou `LozingspuntBodem` ("locatie van de lozing bevindt zich in de bodem") meenemen |
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, EXT-007), met de opdracht GWSW-conform te blijven. De steekproef
+wees het aan: "je hebt uitlaten/uitstroompunten waarbij je hemelwater OF overstortwater op een
+oppervlaktewaterlichaam brengt. En je hebt locaties waar afvalwater, vaak uit mechanisch riool,
+wordt geloosd op een gemengd stelsel in een kern." De meting bevestigt de omvang: van de 71
+meldingen op De Wolden en Hoogeveen stonden er 32 op een `Lozingsput` (58% van de 55
+lozingsputten) tegenover 39 op een `Uitlaatconstructie` (5% van de 712). Bij een lozingsput is
+"geen watergang binnen 10 m" geen gebrek maar de verwachte toestand, en een melding zonder
+handelingsperspectief kost de andere 39 hun geloofwaardigheid.
+
+**Waarom een eigen rol en niet een filter in de check.** De klassenlijst hoort in de
+configuratie (harde regel: geen hardgecodeerde drempels of klassenlijsten), en zodra hij daar
+staat is een rolfunctie in `checks/selectie.py` de bestaande weg om hem te lezen -- met de
+cachesleutel, de rollentelling in het rapport, de nul-bewaking (`SIG-nulklasse`) en de
+dekkingsmatrix die daaraan vastzitten. EXT-007 declareert daarom `rollen = ("lozingspunten",
+"waterlozingspunten")`: de smalle rol is zijn populatie, de brede leest hij alleen in `notes()`,
+om te tellen hoeveel lozingspunten buiten de check vallen. Dat is precies wat de declaratie
+belooft -- de vereniging van wat `run()`, `examined()` en `notes()` aanraken, een bovengrens en
+geen noemer (BO-58).
+
+**Wat het rapport erover zegt.** Twee regels in de toelichting van EXT-007: welke klassen
+meetellen (met de configsleutel erbij) en hoeveel lozingspunten uit de bredere rol buiten de
+check vielen, met de reden. Stilte zou hier lezen als "alle lozingspunten zijn getoetst".
+
+**Verwacht effect op De Wolden en Hoogeveen.** 71 → 39 waarschuwingen; de bekeken populatie
+zakt van 767 naar 712. `UitlaatPunt` en `LozingspuntOppervlaktewater` hebben in deze aanlevering
+nul instanties -- dat is een gat in de aanlevering en geen reden om ze uit de lijst te laten
+(de klassen bestaan in de ontologie, en dat is wat de lijst uitdrukt). De rol als geheel staat
+niet op nul, dus er komt geen `SIG-nulklasse`-signaal bij. De hermeting hoort bij blok B van de
+auditregie, niet bij dit besluit.
+
+**Niet besloten, en dus niet gedaan.** De omgekeerde toets uit de audit -- een `Lozingsput` die
+wél in het water ligt is verdacht -- blijft buiten dit besluit. Zij vraagt een eigen check-ID en
+een eigen afweging.
+
+**Alternatieven.** Een filter in `run()` op `dataset.is_a` met een klassenlijst in de code
+(verworpen: hardgecodeerde klassenlijst, en de rollentelling en nul-bewaking zouden de smalle
+populatie niet zien). De rol `lozingspunten` zelf versmallen (verworpen: NET-001/002/008 melden
+dan elke vuilwaterstreng die op een lozingsput eindigt als onbereikbaar). `Lozingspunt` als
+wortel opnemen (verworpen: `LozingspuntBodem` hangt eronder). EXT-007 helemaal laten vervallen
+(verworpen: de 39 meldingen op uitlaatconstructies zijn wél een signaal).
+
+### BO-68 HGT-003: de maximale diepteligging gaat van 3,0 naar 4,0 m
+
+**Wat.** De drempel `bob_maximale_diepte_m` gaat van 3,0 naar **4,0 m**: hoe diep een BOB onder
+het AHN-maaiveld mag liggen voordat HGT-003 dat onaannemelijk noemt. De waarde staat op de drie
+gebruikelijke plekken (default in `CheckThresholds`, `src/nlriochecker/checks.toml` en
+`configs/dewoldenhoogeveen.toml`) en nergens anders. De tweede tak van de check -- een BOB bóven
+het AHN-maaiveld -- verandert niet: die is altijd fout en kent geen drempel. ID, ernst (F) en
+dimensie (Plausibiliteit) blijven zoals ze waren.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08, uit de checkaudit
+(`docs/checks-audit-2026-08.md`, HGT-003; het diepteligging-punt van #69). De 3,0 m kwam uit het
+checkregister v0.9 ("meer dan 3 m eronder") en droeg geen externe bron. De research van 28-08
+levert er wel een: het *PvE Functionele eisen vrijverval riolering* van de gemeente Rotterdam
+(https://www.rotterdam.nl/media/2019) stelt de maximale aanlegdiepte -- BOB ten opzichte van
+maaiveld -- in **nieuw** gebied op 3,0 m. Een landelijke máximumnorm bestaat niet; de Leidraad
+Riolering normeert de mínimale gronddekking, niet de maximale diepte. In bestaand gebied ligt
+riool legitiem dieper (bergings- en transportriolen), en de check draait op bestaand gebied. 4,0 m
+is daarom die ontwerpnorm plus marge: onder de 4 m is een diepe ligging normaal, erboven is zij
+het bekijken waard.
+
+**Wat de meting zegt** (audit 27-08, `scripts/checkaudit_meting.py`, De Wolden en Hoogeveen).
+HGT-003 gaf 1.090 fouten: 48 "BOB boven het AHN-maaiveld" en 1.042 "dieper dan 3 m". De verdeling
+van die diepte: minimum 3,00 m, mediaan 3,37 m, p90 4,12 m, p99 7,84 m, maximum 11,75 m. Boven
+4 m blijven er 123 over, boven 5 m 19 en boven 6 m 18. De mediaan van de huidige uitslag is dus
+gewone rioleringsdiepte, en juist daar is het handelingsperspectief het zwakst: bij 3 tot 4 m valt
+er meestal niets te herstellen. De steekproef zei hetzelfde in andere woorden
+(`Ho6H0716-Ho6H0720-1`: "goed, met dezelfde opmerking over diepteligging").
+
+**Waarom 4 en niet 5.** De audit stelde 5 m voor, als projectkeuze zonder externe bron (19
+meldingen). De auteur koos 4 m: daarmee hangt de drempel aan een gepubliceerde ontwerpnorm in
+plaats van aan de vorm van deze ene dataset, en blijft de band 4-5 m zichtbaar. Dat kost 104
+meldingen meer dan de 5 m-variant.
+
+**Waarom de titel neutraal wordt.** De titel luidde "BOB-sanity ten opzichte van AHN (boven
+maaiveld, meer dan 3 m eronder)" en droeg de drempel dus als getal, terwijl de drempel
+configureerbaar is (harde regel). Hij wordt "BOB-sanity ten opzichte van AHN (boven maaiveld of
+onaannemelijk diep eronder)". Dat is geen cosmetiek: `Check.title` voedt de checkkop in het
+Markdown-rapport, de kolom Omschrijving in de CSV en de laag `overzicht_checks` in de
+GeoPackage, dus een verouderd getal daar leest als de gehanteerde grens. Een drifttest
+(`test_hgt003_noemt_de_drempel_niet_als_getal_in_zijn_titel`) houdt hem vast.
+
+**Correctie d.d. 2026-08-28** (blok B-review). Twee dingen stonden hierboven onjuist. (1) De
+dekkingsmatrix rendert niet `Check.title` maar de titel uit het checkregister
+(`scripts/dekkingsmatrix.py`, `entry.title`); een neutrale checktitel raakt die dus niet, en de
+matrix bleef "meer dan 3 m eronder" tonen. (2) Het register bleef daardoor ook niet ongewijzigd:
+de registerregel is nu geannoteerd volgens het huispatroon van HGT-001/BO-44 -- "meer dan 4,0 m
+eronder; v0.9 zei 'meer dan 3 m'; afwijking in BO-68" -- en de matrix is geregenereerd. Het
+versienummer van het register verandert daar niet van; de annotatie zegt juist dat dit een
+gedocumenteerde afwijking van v0.9 is. Daarbij is ook de omissie hersteld dat het rapport de
+gehanteerde grens nergens meer noemde: `notes()` van HGT-003 meldt hem voortaan uit de config,
+in dezelfde vorm als HGT-001/002 ("Gemeld vanaf ...").
+
+**Verwacht effect op De Wolden en Hoogeveen.** De dieptemeldingen gaan van 1.042 naar ~123; de 48
+bovenmaaiveld-meldingen blijven staan, dus het totaal van HGT-003 gaat van 1.090 naar ~171. De
+bekeken populatie (22.138, analyseset) verandert niet. De hermeting hoort bij blok B van de
+auditregie, niet bij dit besluit.
+
+**Hoe de fixture de grens vasthoudt.** Streng 2 in `ext_scenario.ttl` draagt sinds dit besluit
+twee BOB's die precies om de drempel heen liggen, op het vlakke raster van 10,00 m NAP: het
+beginpunt op 6,50 (3,50 m diep, stil) en het eindpunt op 5,50 (4,50 m diep, meldt). Zonder die
+stille kant zou een latere verschuiving van de drempel geen enkele test raken.
+
+**Alternatieven.** De drempel op 5 m (het auditvoorstel; verworpen door de auteur, zie hierboven).
+Hem op 3 m laten met de registerherkomst erbij (verworpen: 1.042 meldingen waarvan de mediaan
+gewone rioleringsdiepte is, kosten de rest van de check haar geloofwaardigheid). Een tweede
+check-ID voor de bovenmaaiveld-helft, zodat die een eigen ernst kan krijgen (verworpen: botst met
+"één ernst per ID" uit het richtingscluster, #79 §3). De diepte per stelseltype of per
+leidingklasse differentiëren (verworpen: de meting onderbouwt dat niet, en het maakt van één
+drempel een staffel die niemand kan navertellen).
+
+### BO-69 TOP-006, TOP-010 en TOP-011 toetsen alleen vrijverval tegen vrijverval of duiker
+
+**Wat.** De drie checks die twee leidingen naast elkaar leggen -- TOP-006 (overlap over lengte),
+TOP-010 (buisbuffer op de diameter) en TOP-011 (hartlijnkruising) -- draaien niet langer op de
+brede rol `leidingen` maar op een nieuwe, engere rol `nabijheidsleidingen`. **Beide** partijen van
+een paar moeten erin zitten. De klassen staan als `[klassen] nabijheidsleiding` in beide
+configbestanden en als default in `ClassRoots`, niet in de code:
+`VrijvervalRioolleiding` en `Duiker`. Buiten de populatie vallen daarmee de drains, het
+mechanische riool en de aansluitleidingen. ID's, ernst en dimensie van de drie checks blijven
+ongewijzigd; `notes()` van alle drie verantwoordt voortaan hoeveel leidingen buiten de scope
+vielen.
+
+**Waarom.** Besluit van de auteur op het beslisdocument van 28-08 (PRE-3 plus vervolgvraag V3),
+uit de checkaudit (`docs/checks-audit-2026-08.md`, TOP-011 is daar als enige met 🟠 scope-bug
+gemarkeerd). De aanleiding is de steekproefbeoordeling van `Ho6V0440-Ho6V0436-1`: *"Let op:
+kruising vrijverval riool met mechanisch riool is geen probleem. Deze check zou alleen kruisingen
+van vrijverval leidingen moeten checken (en duikers, exclusief drains)."* Een persleiding ligt
+onder een straat nu eenmaal dwars door het vrijvervalnet heen, en een drain evengoed; die
+kruising is geen datakwaliteitsgebrek maar de normale ondergrond. Wat de check bedoelt te vinden
+-- twee buizen die elkaar in de weg liggen -- geldt alleen tussen leidingen die in hetzelfde vlak
+vrijverval water voeren.
+
+**Waarom de duiker er wél bij hoort en de aansluitleiding niet.** `Duiker` is in het GWSW "een
+leiding die oppervlaktewater-elementen verbindt": vrijverval, in hetzelfde vlak, en een
+doorkruising ervan is een echt conflict. `Aansluitleiding` ("een leiding voor de aanvoer van
+afvalwater", de kolk- en perceelaansluiting) voert óók vrijverval water, en een letterlijke lezing
+van PRE-3 zou haar dus binnen laten; de auteur heeft haar op 28-08 expliciet buiten de toets
+gehouden. Reden: een aansluitleiding loopt per definitie van de gevel of de kolk dwars naar het
+hoofdriool en kruist daarbij routinematig andere leidingen; die kruisingen dragen geen
+handelingsperspectief. Dat is een bewuste afwijking van de letterlijke PRE-3-tekst en staat
+daarom hier.
+
+**Wat de ontologie zegt** (gebundelde GWSW-ontologie, geverifieerd 28-08). `VrijvervalRioolleiding`
+hangt onder `Rioolleiding` onder `Leiding`. `Duiker`, `Drain` én `Aansluitleiding` hangen alle
+drie **rechtstreeks** onder `Leiding` en niet onder `VrijvervalRioolleiding`. De grens van deze rol
+volgt dus geen enkele tak van de hierarchie -- ze is een opsomming, en daarom een rol met een
+eigen `[klassen]`-lijst en geen bestaande selectie. `gwsw:Aansluitleiding` draagt in de ontologie
+het Engelse label "Drain (EN)"; dat is een labelkwestie en zegt niets over de klassenhierarchie.
+
+**Wat de meting zegt** (audit 27-08, `scripts/checkaudit_meting.py`, De Wolden en Hoogeveen).
+TOP-006 gaf 81 fouten, waarvan 36 vrijverval x vrijverval, 30 mechanisch x vrijverval en 15 met
+een drain, duiker of loze leiding erin. TOP-010 gaf 2.184 fouten: 1.189 vrijverval x vrijverval,
+414 met een drain, 204 met een duiker, 171 met een mechanische leiding en 302 met een
+aansluitleiding. TOP-011 gaf 1.872 waarschuwingen: 1.024 vrijverval x vrijverval, 390 met een
+drain, 170 met een duiker, 170 met een mechanische leiding en 211 met een aansluitleiding. Met
+alleen de drains en het persnet eruit blijven er 39, 1.359 en 1.161 over; met de aansluitleidingen
+er ook uit verliest TOP-010 er nog 302 en TOP-011 er nog 149. De hermeting op de volle dataset
+hoort bij de blokregie, niet bij dit besluit.
+
+**Waarom een eigen index en niet een filter op `_Topologie`.** `_Topologie.lined` draagt élke
+leiding met geometrie, en dat moet zo blijven: TOP-021 vraagt of er *enige* streng langs een put
+doorloopt, en TOP-001 of er *enige* streng op aansluit. De drie nabijheidschecks krijgen daarom
+een eigen structuur `_Nabijheid` (leidingen, STRtree, uiteinden, plus de telling van wat erbuiten
+viel) die zelf over de leidingenrol loopt. Dat is bewust geen goedkopere afgeleide van
+`_Topologie`: zou `_Nabijheid` die aanroepen, dan zou de AST-drifttest van issue #64 de rollen
+`netwerkknopen` en `vrijvervalrioolleidingen` aan TOP-006 en TOP-011 blijven toeschrijven,
+terwijl die twee checks er sinds dit besluit niets meer mee doen. De prijs is één extra pas over
+de leidingen om hun uiteinden te bepalen.
+
+**Waarom `notes()` telt wat erbuiten viel.** Stilte leest als "alles gecontroleerd" (de regel uit
+`CLAUDE.md`). Een versmalde populatie die nergens genoemd wordt maakt van een daling in de
+bevindingen een onzichtbare keuze. De toelichting noemt de klassen uit de configuratie en het
+aantal leidingen dat erbuiten viel, zodat rapport en GeoPackage de versmalling dragen.
+
+**Correctie in de fixtures.** De gedeelde prelude van `scripts/maak_ttl_fixtures.py` verklaarde
+`gwsw:Drain` als subklasse van `gwsw:VrijvervalRioolleiding`. Dat is onjuist -- de ontologie hangt
+hem onder `Leiding` -- en het zou de nieuwe populatiegrens in elke fixture wegpoetsen. De prelude
+volgt nu de ontologie en draagt ook `gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding`. Geen
+enkele bestaande fixture had een `Drain`-instantie, dus geen enkele uitslag verandert erdoor.
+
+**Alternatieven.** De rol beperken tot `vrijvervalrioolleidingen` (verworpen: een duiker is
+vrijverval en een doorkruising ervan is een echt conflict; de auteur noemt hem expliciet).
+`Aansluitleiding` erbij (verworpen door de auteur; zie hierboven -- het kost 302 respectievelijk
+149 meldingen zonder handelingsperspectief). Alleen het hoofdobject beperken en de tegenpartij vrij
+laten (verworpen: dan blijft precies de gemelde kruising vrijverval x persleiding staan, alleen
+met het andere object voorop). De uitkomst laten staan en op `[rapport] onderdruk_klassen`
+leunen (verworpen: onderdrukking werkt op het hoofdobject en niet op `object2_uri`, dus een
+kruising met een persleiding als tegenpartij blijft er hoe dan ook staan -- en het zou een
+scope-fout tot een uitvoerinstelling maken).
+
+### BO-70 TOP-006 gaat naar 0,02 m over 2,0 m; de TOP-010-marge blijft 0,0 m
+
+**Wat.** Twee drempels van de nabijheidschecks, in één besluit omdat ze dezelfde vraag stellen
+(hoe dicht is te dicht) en de gevoeligheidsmeting ze naast elkaar legde. `overlap_tolerantie_m`
+gaat van 0,05 naar **0,02 m** en `overlap_minimale_lengte_m` van 1,0 naar **2,0 m** (TOP-006).
+`diameterbuffer_marge_m` blijft **0,0 m** (TOP-010) -- geen wijziging, maar expliciet bekrachtigd,
+zodat de vraag niet elke audit terugkomt. ID's, ernst, dimensie en populatie van beide checks
+blijven ongewijzigd; alleen de getallen in de drie configplekken verschuiven.
+
+**Waarom.** Besluit van de auteur op 28-08 (checkaudit-vervolgvraag V5, aangehouden bij het
+beslisdocument van 28-08 en daarna apart gemeten; issue #100). De aanleiding is de
+steekproefbeoordeling bij TOP-006: dezelfde soort melding werd twee keer terecht genoemd
+(`Kv1G0018-Kv1G0020-1`, `ID5694-ID5693-1`: *"lijkt niet plausibel, dus terecht dat ze naar voren
+komen"*) en één keer plausibel (`Ho8H1118-Ho8H1120-1`: *"Is plausibel, dus geen fout"*). Twee
+buizen die over lengte binnen 5 cm van elkaar blijven zijn niet per se dubbel ingetekend -- dat is
+binnen de inwinnauwkeurigheid ook gewoon twee buizen naast elkaar in dezelfde sleuf. Wat de check
+bedoelt te vinden is het duplicaat: dezelfde buis twee keer in de dataset. Op 2 cm over 2 m blijft
+daar alleen dat van over; wie de bredere nabijheid wil zien houdt TOP-010 (buisbuffer op de
+diameter) en TOP-013 (parallelle strengen tussen hetzelfde putpaar), die dezelfde ligging met een
+andere maat meten.
+
+**Wat de meting zegt** (28-08, `scripts/meet_v5_gevoeligheid.py`, De Wolden en Hoogeveen,
+populatie ná #82: 18.213 strengen vrijverval + duiker, zelfde paarlogica als de checks).
+
+- **TOP-006 -- de drempels sturen wél.** 0,05 m over 1,0 m (huidig) geeft **39** meldingen;
+  0,02 m over 2,0 m geeft **13**.
+- **TOP-010 -- de marge discrimineert niet.** −0,10 m geeft 1.325, 0,0 m geeft 1.359 en +0,10 m
+  geeft 1.401: over 20 cm marge beweegt de uitslag 6%. De overlapdiepte van de huidige meldingen
+  verklaart waarom -- mediaan 0,31 m, p90 0,63 m, max 1,60 m. Dat zijn diepe 2D-overlaps
+  (kruisingen op verschillende diepte), geen schampgevallen die net binnen of net buiten een marge
+  vallen. Een marge verleggen haalt dus geen groep meldingen weg; het verschuift alleen de staart.
+
+**Waarom de TOP-010-marge dan niet weg of juist ruimer.** Omdat de vraag die de marge zou moeten
+beantwoorden -- ligt hier een echt conflict -- niet in het platte vlak beantwoord kan worden. Twee
+buizen die elkaar in 2D kruisen liggen meestal gewoon op verschillende diepte, en dat onderscheid
+zit in de hoogte: HGT-004 (BOB-conflict tussen kruisende strengen), HGT-009 en HGT-018. TOP-010
+levert de kandidaten, de HGT-checks vellen het oordeel. Een marge is dan een knop die aan de
+verkeerde kant van de vraag zit; 0,0 m ("de buizen raken elkaar") is de enige waarde die zonder
+hoogte een uitspraak is.
+
+**Verwacht effect op De Wolden en Hoogeveen.** TOP-006 van 39 (ná #82) naar ~13; TOP-010
+ongewijzigd op 1.359. De hermeting op de volle dataset hoort bij de blokregie, niet bij dit
+besluit.
+
+**Hoe het vastligt.** De twee getallen staan op de drie gebruikelijke plekken -- de default in
+`CheckThresholds`, `src/nlriochecker/checks.toml` en `configs/dewoldenhoogeveen.toml` -- en de
+configdrifttest houdt ze gelijk. De fixture `top006_drempels.ttl` legt drie paren naast elkaar die
+alleen in afstand en samenvallengte verschillen: 3 m op 1 cm (meldt), 1,5 m op 1 cm (onder de
+minimumlengte) en 10 m op 4 cm (buiten de tolerantie). De laatste twee meldden onder 0,05 m / 1,0 m
+nog wel, dus de test valt als iemand één van beide drempels terugdraait zonder dit besluit te
+herzien.
+
+**Alternatieven.** Alleen de tolerantie verlagen en de minimumlengte op 1,0 m laten (verworpen: dan
+blijft precies het geval staan waar de steekproef "plausibel" op zei -- twee buizen die elkaar bij
+een bocht over ruim een meter naderen; de auteur heeft beide knoppen in één beweging gezet). Naar
+5 of 10 m minimumlengte (verworpen: een duplicaat van een korte streng tussen twee putten is even
+echt als een lange, en die zouden dan wegvallen; de meting is op die staffel niet gedraaid, dus er
+is ook geen getal dat het zou dragen). De tolerantie aan de inwinnauwkeurigheid koppelen als
+configureerbare afgeleide (verworpen: de dataset draagt die nauwkeurigheid niet per streng, dus dat
+zou een tweede drempel zijn die zich als een meting voordoet). De TOP-010-marge op −0,05 m zetten
+om de schampgevallen weg te nemen (verworpen: die schampgevallen bestaan niet -- de mediane overlap
+is 0,31 m -- dus het kost meldingen zonder dat iemand kan navertellen waarom juist die).
+
+### BO-71 Het compartimentduplicaat (`c<n>`-postfix) wordt vóór de topologiechecks samengevoegd
+
+**Wat.** Een knoop waarvan het label op een `c<n>`-postfix na gelijk is aan dat van een andere
+knoop, én die daar binnen `[drempels] dubbele_put_tolerantie_m` (0,30 m) van af ligt, is voor de
+topologiechecks hetzelfde fysieke object. `_bouw_topologie` in `checks/topologie.py` houdt er één
+van over; de rest valt uit de puttenindex. Beide eisen tellen: alleen op de naam matchen zou twee
+echte putten samenvoegen die toevallig zo heten, en alleen op de ligging matchen is precies wat
+TOP-005 al meldt. **Het origineel wint** -- de knoop wiens label géén postfix draagt; is die er
+niet, dan de laagste postfix, en bij gelijke stand de laagste URI, zodat de uitkomst niet van de
+leesvolgorde afhangt. Een knoop zónder postfix wordt nooit weggenomen: twee gelijknamige putten
+zonder postfix blijven een gewone dubbele put.
+
+**Waarom.** De Kikker/BrutIS-export schrijft een gecompartimenteerde put per compartiment uit, elk
+als een eigen `Inspectieput`/`Overstortput`/`Stuwput`/`Rioolgemaal`/`Pompunit` op precies dezelfde
+coördinaat, met het putlabel plus (met spaties uitgevuld) `c1`, `c2`, ... Dat is een
+exportartefact, geen tweede put in de grond. De putchecks zien er wél twee: de strengeinden snappen
+op de dichtstbijzijnde knoop en dat kan er maar één zijn, dus de andere heet losliggend (TOP-001),
+het paar heet een dubbele put (TOP-005) en soms ligt de overgebleven knoop naast een doorlopende
+streng (TOP-021). Het oordeel van de auteur bij de steekproef: *"Dit komt niet omdat er geen streng
+nabij ligt ... maar omdat hij niet is aangesloten."* Zie de checkaudit (#79 §3, **PRE-7**), het
+besluit van 28-08 en issue #85.
+
+**Wat de meting zegt** (28-08, tekstscan op `data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl`, geen
+toetsrun). 189 knoopslabels dragen een `c<n>`-postfix, in **98** groepen: 96 keer `c1`, 92 keer
+`c2`, 1 keer `c3`. De postfix staat er altijd met minstens één spatie ervoor; geen enkel
+strenglabel matcht het patroon. Binnen een groep is de onderlinge afstand **0,000 m** -- alle 92
+meetbare groepen vallen exact samen, dus de tolerantie van 0,30 m is hier ruim en niet krap. In
+slechts **3** van de 98 groepen bestaat er ook een knoop met het kale basislabel; in de overige 95
+is `c1` het oudste dat er is. Dezelfde regel over dezelfde export levert **94** samengevoegde
+knopen, en dat sluit aan bij de audit: 93 van de 102 TOP-001-meldingen en 92 van de 112
+TOP-005-meldingen dragen deze postfix.
+
+**Reikwijdte -- welke checks de samengevoegde populatie zien.** Rechtstreeks: de checks die de
+puttenindex `_Topologie.nodes` aflopen, en dat zijn er zeven -- **TOP-001** (losliggende put),
+**TOP-005** (dubbele put), **TOP-009** (RD-bereik), **TOP-014** (aansluitende strengen),
+**TOP-015** (multipart), **TOP-016** (ongeldige geometrie) en **TOP-021** (put naast een
+doorlopende streng). Indirect, via de snapping die op de STRtree over diezelfde lijst draait:
+**TOP-002** en **TOP-003**. Alle negen verantwoorden het in hun `notes()`; stilte zou lezen als
+"alles gecontroleerd".
+
+**Wat de samenvoeging níét doet, en wat zij kán kosten.** Zij haalt de knoop uit de populatie en
+rekent niets van het duplicaat bij het origineel op. Een gebrek dat alléén op het duplicaat stond
+-- een multipart-geometrie (TOP-015), een ongeldige geometrie (TOP-016) -- wordt daarna dus
+nergens meer gemeld, en TOP-014 telt de strengen van beide knopen niet bij elkaar op (drie plus
+drie blijft twee keer drie). De toelichting zegt dat met zoveel woorden ("wat alleen op zo'n
+duplicaat staat is hier niet getoetst") en belooft nadrukkelijk niet dat het gebrek op het
+origineel opduikt.
+
+Het strengeinde dat op een weggenomen duplicaat uitkwam snapt op de knoop die overbleef, maar
+alleen als die binnen `snapping_tolerantie_m` (0,10 m) ligt -- en de samenvoeging zelf gebruikt de
+ruimere `dubbele_put_tolerantie_m` (0,30 m). **Tussen die twee maten in kan een strengeinde zijn
+aansluiting verliezen en levert de dedup dus een nieuwe TOP-002- of TOP-003-melding op.** Op De
+Wolden en Hoogeveen gebeurt dat niet: alle 98 groepen vallen op 0,000 m samen, ruim binnen de
+snapping-tolerantie. Maar de claim geldt alleen binnen die tolerantie, en daarom dragen TOP-002 en
+TOP-003 de toelichting en noemt die beide drempels. De fixture
+`top003_dedup_buiten_snapping.ttl` legt het venster vast (duplicaat op 0,20 m). Dat de twee
+toleranties aan elkaar gekoppeld zouden moeten worden -- één maat in plaats van twee -- is een
+open auteursvraag en bewust níét in dit besluit meegenomen. **TOP-004** blijft hoe dan ook buiten
+schot: die leest de administratieve koppeling via `resolve_network_node` en niet de puttenindex.
+
+Wat de dedup **niet** raakt, en met opzet: de netwerkgraaf in `checks/verbanden.py` en alles wat
+daarop leunt (`verbonden_knopen`, dus TOP-013/014-telling, TOP-019, alle NET-checks), de
+administratieve koppeling via `resolve_network_node` (TOP-004, TOP-012), de afbakening in
+`afbakening.py`, en de uitvoer: het duplicaat blijft gewoon een object in de laag `putten` van de
+GeoPackage. Dit is een analysestap vóór de topologiechecks, geen wijziging aan de dataset. De
+leeslaag `gwsw-orox-helpers` blijft ongemoeid -- een wijziging dáár is een release plus een
+`uv lock` (Harde regel), en de dedup is bovendien een projectinterpretatie en geen leesfeit.
+
+**Randgeval dat bewust conservatief uitpakt.** Ligt het origineel verder dan de tolerantie van zijn
+postfixdragers, dan wordt er in die groep niets samengevoegd -- ook niet als de postfixdragers
+onderling wél samenvallen. Dat kost hooguit een melding die blijft staan (de veilige kant); een
+clusterende variant zou code toevoegen voor een geval dat in deze export nul keer voorkomt.
+
+**Hoe het vastligt.** `_COMPARTIMENT_POSTFIX`, `_basislabel` en `_dedupliceer` in
+`checks/topologie.py`; de telling reist mee als `_Topologie.samengevoegd` en `_dedupnotitie` maakt
+er de toelichtingsregel van, die de negen checks delen. De fixture
+`top005_compartimentduplicaat.ttl` zet vier groepen naast
+elkaar die alleen in het beslissende kenmerk verschillen: `K0001  c1`/`c2` op 0,10 m (samenvoegen),
+`M0003` met `M0003  c1` op 0,10 m waarbij de leiding aan de postfixdrager hangt (het origineel wint
+én de leiding snapt erop), `V0002  c1`/`c2` op 0,50 m (buiten de tolerantie, blijft staan) en twee
+putten `DUB` zonder postfix (blijft een dubbele put). De drempel is de bestaande
+`dubbele_put_tolerantie_m`; er komt geen nieuwe knop bij.
+
+**Verwacht effect op De Wolden en Hoogeveen.** TOP-001 **102 → ~9**, TOP-005 **112 → ~20**,
+TOP-021 **5 → ~3**. De hermeting hoort bij de blokregie, niet bij dit besluit.
+
+**Alternatieven.** De dedup in de leeslaag leggen (verworpen: Harde regel, en het is een
+interpretatie van één leverancier zijn export en geen leesfeit -- `gwsw-orox-helpers` moet de
+export teruggeven zoals hij is). Het patroon configureerbaar maken als regex (verworpen: niet
+gevraagd, en een verkeerd ingestelde regex zou stil echte putten samenvoegen; de tolerantie is de
+knop die er al is). Een eigen aan/uit-schakelaar (verworpen: op een export zonder dit artefact
+matcht de regel nul keer en kost zij niets). Samenvoegen op ligging alleen, zonder de naam
+(verworpen: dat is TOP-005 zelf uitzetten). De duplicaten ook uit de netwerkgraaf en de uitvoer
+halen (verworpen voor nu: dat raakt de NET-checks, de afbakening en de GIS-lagen, en het issue
+vraagt de kleinste ingreep die TOP-001/005/021 dedupliceert).
+
+### BO-72 Een hulpstuk met een telbare GWSW-functie is voor TOP-002/003 een geldig strengeinde
+
+**Wat.** TOP-002 en TOP-003 tellen per vrijvervalstreng hoeveel uiteinden binnen
+`[drempels] snapping_tolerantie_m` (0,10 m) op een geldig eindobject vallen -- nul is TOP-002,
+precies één is TOP-003. Geldig is voortaan niet alleen een netwerkknoop (put, afvoer- en
+lozingseindpunt, bergbezinkvoorziening) maar ook een **hulpstuk met een telbare GWSW-functie**:
+de klasse draagt een `functie`-restrictie met een aantal leidingen erin
+(`VerbindenVanTweeLeidingen` 2, `VerbindenVanDrieLeidingen` 3, `VerbindenVanVierLeidingen` 4).
+Geverifieerd in de gebundelde ontologie: `Mof` draagt de eerste, `T_stuk` en `Y_stuk` de tweede,
+`Kruisstuk` de derde; alle vier hangen onder `Verbindingsstuk` → `Hulpstuk`. Een `Afsluitstuk`
+(`AfsluitenVanLeidingen`) en een `Ontstoppingsstuk` dragen wél een functie maar geen aantal en
+tellen dus **niet** als eind.
+
+**Waarom.** Een `Hulpstuk` valt in het GWSW onder `Constructieonderdeel` en niet onder `Put`, dus
+de rol `netwerkknopen` bevat het niet en een streng die op een T-stuk eindigt heeft daar
+geometrisch "geen put". Dat is wat de twee checks meldden, en het is niet wat zij bedoelen te
+meten: de vraag is of de streng ergens op uitkomt. Het oordeel van de auteur bij de steekproef is
+eenduidig -- *"Streng ligt tussen 2 T-stukken. Is voor deze analyse goed."*, *"Ligt tussen een
+t-stuk en inspectieput. Voor deze analyse is dat goed"* -- en de audit meet dat het geen
+uitzondering is: **45 van de 56** TOP-002-meldingen hebben beide einden aan een hulpstuk en
+**107 van de 109** TOP-003-meldingen één (checkaudit 27-08, §rode draad 2). Wat overblijft zijn
+de echte snapmissers: ~11 respectievelijk ~2.
+
+**Het gebrek verdwijnt niet.** Dat een T-stuk maar twee van zijn drie leidingen verbindt blijft
+zichtbaar via **TOP-022** (224 F op 1.054 telbare hulpstukken), vanaf de hulpstukkant en met het
+handelingsperspectief dat daarbij hoort ("ontbrekende leiding registreren, of het hulpstuk een
+klasse geven die bij het werkelijke aantal past"). TOP-002/003 gaan over de streng en TOP-022 over
+het hulpstuk; ze meldden tot nu toe dezelfde situatie twee keer vanaf twee kanten, en de
+strengkant was de minst bruikbare van de twee.
+
+**Waarom precies de telbare functie als grens.** Dat is de grens die `_bouw_hulpstuktelling` voor
+TOP-022/TOP-023 al hanteert (`_functie_met_aantal`, tabel `AANTAL_PER_FUNCTIE`), en de nieuwe index
+leest letterlijk diezelfde populatie (`_hulpstuktelling().telbaar`) in plaats van een tweede
+klassenlijst aan te leggen. Twee lijsten zouden stil uit elkaar lopen zodra er een klasse bijkomt.
+Bijkomend argument: een hulpstuk dat volgens de ontologie leidingen verbindt ís een knooppunt in
+het net; een afsluitstuk is dat niet, en een streng die daarop doodloopt hoort gemeld te worden.
+
+**Randgeval dat bewust blijft melden.** Een streng die op een `Afsluitstuk` of `Ontstoppingsstuk`
+eindigt houdt zijn TOP-002/003-melding (op De Wolden en Hoogeveen 58 respectievelijk 10 zulke
+hulpstukken, waarvan de audit niet meet hoeveel strengen erop uitkomen). Dat is de veilige kant:
+de ontologie zegt van die klassen niet dat zij leidingen verbinden, dus er is geen grond om ze als
+netwerkeind te lezen.
+
+**Hoe het vastligt.** `_Eindhulpstukken`, `_eindhulpstukken` en `_bouw_eindhulpstukken` in
+`checks/topologie.py`, gelezen door `_StrengPutAansluiting.run`; de index is een STRtree over de
+telbare hulpstukken met een punt en staat in dezelfde contextcache als de andere
+topologiestructuren. Beide checks declareren de rol `hulpstukken` erbij en verantwoorden de regel
+in hun `notes()` -- stilte zou lezen als "elk eind is aan een put getoetst". De meldingstekst noemt
+het hulpstuk nu ook expliciet. Fixture `top002_streng_op_hulpstuk.ttl`: streng 1 tussen put en
+T-stuk en streng 2 tussen twee T-stukken (beide goed), streng 3 met een afsluitstuk als tweede eind
+(TOP-003) en streng 4 los in het veld (TOP-002); dezelfde fixture toont dat TOP-022 de twee
+T-stukken onverkort meldt.
+
+**Verhouding tot BO-71.** De `c<n>`-deduplicatie van issue #85 werkt op de puttenindex
+`_Topologie.nodes`, en de snapping van TOP-002/003 leest diezelfde gededupliceerde lijst. De
+hulpstukindex staat daarnaast en raakt hem niet: een hulpstuk is geen netwerkknoop en komt in de
+dedup dus niet voor. De twee ingrepen werken op dezelfde strengeinden zonder elkaar te overlappen.
+
+**Verwacht effect op De Wolden en Hoogeveen.** TOP-002 **56 → ~11**, TOP-003 **109 → ~2**. TOP-022
+verandert niet. De hermeting hoort bij de blokregie, niet bij dit besluit.
+
+**Alternatieven.** Het hulpstuk aan de rol `netwerkknopen` toevoegen (verworpen: dat raakt elke
+check die die rol leest -- TOP-001 zou elk hulpstuk zonder streng als losliggende put melden, de
+netwerkgraaf zou van vorm veranderen, en het is bovendien in strijd met de GWSW-hiërarchie, waar
+een `Hulpstuk` geen `Put` is). Elk hulpstuk als eind laten tellen, ongeacht functie (verworpen: dan
+verdwijnt ook de melding op een streng die op een afsluitstuk doodloopt, en dat is een echt gebrek).
+De ernst van TOP-002/003 verlagen naar W in plaats van de populatie aan te passen (verworpen: het
+gebrek is niet minder ernstig, het was er domweg niet -- een streng tussen twee T-stukken is
+aangesloten). TOP-002/003 laten vervallen omdat TOP-022 hetzelfde meldt (verworpen: de ~11 en ~2
+echte snapmissers zijn precies wat deze twee checks moeten vinden, en die ziet TOP-022 niet).
+
+### BO-73 De GeoPackage draagt drie objectlagen; de RVZ-006-vlakken gaan op in `vlakken`
+
+**Wat.** De uitvoer-GeoPackage heeft precies drie featurelagen, een per geometrievorm:
+`putten` (POINT), `strengen` (LINESTRING) en `vlakken` (MULTIPOLYGON). De vierde laag
+`gemengd_zonder_overstort` uit BO-57 vervalt; haar rijen staan sinds issue #98 in `vlakken`
+met `soort = gemengd_deelstelsel`, naast de drie externe soorten `pand`, `bouwwerk` en
+`water` (BO-50). Besluit van de auteur, 28-08.
+
+**Wat er mee verhuist, ongewijzigd.** Alles wat die vlakken bijzonder maakte hangt aan de
+rij en niet aan de laag, dus het verhuist zonder uitzondering:
+
+* De **popup** blijft voorgebakken in de kolom `popup_html` en blijft de enige die
+  systemische meldingen wél toont en zijn status niet uit `bepaal_status` haalt: zo'n rij
+  bestaat alleen omdat RVZ-006 aansloeg en is per constructie een gebrek (BO-59). De
+  externe vlakken laten die kolom leeg en houden hun maptip die de tekst uit de kolommen
+  samenstelt; QGIS kent één maptip per laag, dus die keuze zit nu in de expressie.
+* De **omvangkolommen** `n_knopen`, `n_strengen` en `strenglengte_m` staan op de laag en
+  blijven leeg bij een extern vlak -- dezelfde afspraak waarmee `relatie` en
+  `afstand_min_m` al alleen voor pand en bouwwerk golden.
+* De **harde fout** bij een `cluster_id` die de graaf van de run niet kent blijft een
+  `PipelineError`: check en schrijver lezen dezelfde `deelstelsel_ids` van dezelfde
+  context, dus dat is een interne tegenspraak en geen datatoestand.
+* De **tellingen** in `gwsw_run` blijven allebei bestaan: `n_gemengd_zonder_overstort`
+  telt de geschreven deelstelselvlakken en `n_gemengd_zonder_vlak` de gemelde deelstelsels
+  waarvan geen enkele streng een bruikbare lijn draagt. Zonder die tweede blijft "dit
+  deelstelsel bestaat niet" niet te onderscheiden van "we konden het niet tekenen".
+
+Twee dingen veranderen wél van plaats. De sleutel staat in de kolom `id` in plaats van in
+een eigen kolom `cluster_id` -- dezelfde kolom waarin een extern vlak zijn sleutel draagt,
+en nog steeds de waarde waarop de meldingentabel te koppelen is. En het aantal meldingen
+staat in `aantal_meldingen` in plaats van in `n_meldingen`: dat is bij beide soorten
+hetzelfde begrip (hoeveel meldingen wijzen naar deze rij), en twee kolommen met dezelfde
+betekenis in één laag is precies de verwarring die dit besluit opheft. `n_vlakken` telt
+sindsdien de hele laag, zoals `n_strengen` de strengenlaag telt; het aantal externe vlakken
+is het verschil met `n_gemengd_zonder_overstort`.
+
+**Waarom.** De GeoPackage kent drie geometrievormen, en een lezer die hem opent hoort drie
+lagen te zien in plaats van te moeten uitzoeken waarom er twee vlaklagen zijn. De vierde
+laag ontstond in #75 omdat de RVZ-006-vlakken een andere popupregel volgden dan de externe
+vlakken -- maar dat verschil zit in de rij (een deelstelsel is per constructie een gebrek,
+een pand niet) en niet in de geometrie. De kolom `soort` deed dat onderscheid in `vlakken`
+al voor drie categorieën uit twee bronbestanden; een vierde erbij kost één regel in de QML
+en één waarde in de kolom. Andersom kost een eigen laag een eigen stijl, een eigen
+registratie, een eigen voortgangsstap en een eigen plek in elke laaglijst.
+
+**Kaartbeeld.** Ongewijzigd: de vier stijlregels van `vlakken.qml` zijn de drie bestaande
+plus het vlaksymbool dat `gemengd_zonder_overstort.qml` droeg, met dezelfde kleuren. De
+deelstelsels worden als eerste weggeschreven, want de rijvolgorde is in QGIS ook de
+tekenvolgorde en het grote vlak hoort onder de panden te liggen, niet erover.
+
+**Verwacht effect (De Wolden en Hoogeveen).** `vlakken` telt 614 + 99 = 713 rijen,
+`gemengd_zonder_overstort` bestaat niet meer als laag, `n_vlakken` gaat van 614 naar 713 en
+`n_gemengd_zonder_overstort` blijft 99. De regisseur hermeet na het blok.
+
+**Alternatieven.** De laag laten staan (verworpen: het is het besluit van de auteur, en de
+grond eronder -- een verschil in popupregel -- hangt aan de rij en niet aan de laag). De
+deelstelselkolommen in een aparte attribuuttabel zetten en `vlakken` smal houden (verworpen:
+dan moet elke lezer joinen voor de omvang van een vlak dat hij aanklikt, terwijl het bestand
+juist bewust zelfvoorzienend is). De popup van de externe vlakken ook voorbakken zodat de
+maptip één expressie wordt (verworpen: dat verandert iets wat niemand ter discussie stelde,
+en het zou de status- en meldingssemantiek van `popup_html` opdringen aan een rij die geen
+van beide heeft). `cluster_id` als eigen kolom naast `id` houden (verworpen: twee kolommen
+met dezelfde waarde, en de koppeling op `id` werkt precies zo).
+
+**Contractbreuk.** De laag `gemengd_zonder_overstort` en haar stijl bestaan niet meer;
+QGIS-projecten die erop wezen moeten de laag `vlakken` met een filter op `soort` gebruiken.
+Haar kolommen `cluster_id` en `n_meldingen` heten daar `id` en `aantal_meldingen`.
+`n_vlakken` in `gwsw_run` telt sinds deze wijziging ook de deelstelsels: een trendlijn over
+deze grens heen telt appels en peren, en `vergelijk` zegt dat niet.
+
+### BO-74 De nulmeting krijgt een vaste vertaaltabel van SHACL-vorm naar Nederlandse zin
+
+**Wat.** Elke overtreding uit de GWSW SHACL-nulmeting draagt naast de tekst van de server
+een vaste, beschrijvende Nederlandse zin: `Put_HoogtePut_card` wordt "Put zonder (of met
+meer dan één) geregistreerde puthoogte" in plaats van "Subject Put, path hasAspect, object
+HoogtePut - aantal voorkomens wijkt af (exact=1)". De 43 teksten -- precies de vormen die
+de drie De Wolden-rapporten kennen -- zijn door de auteur vastgesteld en ongewijzigd
+akkoord bevonden (issue #101, comment 28-08). Ze staan als package-resource in
+`src/nlriochecker/nulmeting_teksten.toml` en worden niet zonder besluit van de auteur
+gewijzigd.
+
+**Waar de zin landt.** De mensgerichte views tonen alleen de zin: het Markdown-rapport (ook
+de kolom Omschrijving in de tabel per SHACL-vorm) en de GeoPackage-popup. De drie archieven
+dragen beide teksten: de CSV in `Melding` plus de nieuwe kolom `MeldingTechnisch`, de JSON
+in `boodschap` plus het nieuwe veld `boodschap_technisch`, en de meldingentabel van de
+GeoPackage in `boodschap` plus de nieuwe kolom `boodschap_technisch`. De meldingentabel
+doet mee omdat zij een archief is naast de CSV en de JSON; alleen de popup is een
+mensgerichte view.
+
+**De tekstkeuze staat in `nulbevinding.py`.** Dat is de enige plek waar `Source`, `Message`
+en `Value` bijeen staan, en waar de vier uitvoervormen hun tekst uit dezelfde bron krijgen.
+De schrijvers in `uitvoer/` kiezen niets: zouden zij zelf de tabel raadplegen, dan kunnen
+rapport en CSV uit elkaar lopen, en dat is precies wat de eenschrijversregel verbiedt.
+
+**Grenzen komen uit de rij, nooit uit de code.** De sjabloonvelden `{min}`, `{max}` en
+`{n}` worden per melding ingevuld: `{min}` en `{max}` uit de grens die de kolom `Message`
+achteraan tussen haakjes noemt (`waarde wijkt af (min=63,max=4000)`), `{n}` uit het getal
+waarmee de kolom `Value` opent. Een conformiteitsklasse mag een andere grens stellen -- de
+ontdubbeling in `nulbevinding.py` houdt zulke meldingen daarom al uit elkaar op de
+boodschap -- en een in de tabel of in `checks.toml` opgeschreven getal zou dan de verkeerde
+noemen. Is een veld niet uit de rij te halen, dan vervalt de haakjesgroep eromheen en
+blijft de zin zonder ingevulde grens staan; er wordt niets verzonnen. Acht van de 43
+teksten dragen een sjabloonveld, alle acht `{min}`/`{max}` op een `_val`-vorm; `{n}` wordt
+door geen van de vastgestelde teksten gebruikt, omdat de auteur "nul of meer dan één" in
+één zin opvangt ("Put zonder (of met meer dan één) ...").
+
+Het meldingveld `drempel` blijft leeg bij een nulmetingmelding, zoals `docs/json-schema.md`
+al zei. Dat de zin dezelfde grens invult verandert daar niets aan: de grens staat als tekst
+in de zin en niet als waarde in een eigen veld, en een tweede uitlevering ervan zou een
+tweede contract zijn dat naast de brontekst moet blijven kloppen.
+
+**Het melding-ID hangt aan de technische tekst.** `boodschap` op `Nulbevinding` blijft de
+SHACL-tekst; hij is de ontdubbelsleutel en gaat mee in `melding_id`. Zou het ID aan de
+leesbare zin hangen, dan verschoof elke nulmeting-ID zodra de vertaaltabel bijgewerkt werd,
+en las een trendvergelijking dat als tienduizenden opgeloste plus tienduizenden nieuwe
+meldingen.
+
+**Vangnet en drift.** Een vorm zonder tekst valt terug op de technische boodschap -- de
+melding verdwijnt nooit -- en het Markdown-rapport telt in de verantwoording hoeveel
+meldingen dat waren en om welke vormen het ging. De regel blijft weg zodra alles vertaald
+is. Twee tests bewaken de tabel: `tests/test_nulmeting_teksten.py` telt de 43 en toetst het
+invullen en de terugval zonder invoerdata, en
+`tests/test_integration.py::test_elke_shacl_vorm_heeft_een_leesbare_zin` houdt de tabel
+tegen de echte rapporten in `data/shacl_nulmeting/` -- in beide richtingen, dus ook een
+tekst voor een vorm die niet meer voorkomt valt op. Die rapporten staan niet onder
+versiebeheer (te groot), dus die test slaat over waar `data/` leeg is; de telling van 43
+staat daarom óók in de eerste test, die overal draait.
+
+**Waarom.** Het rapport is voor de beheerder die met de bevindingen aan de slag moet. De
+SHACL-tekst beschrijft de geschonden vorm correct en is voor die lezer onbruikbaar; op De
+Wolden staat hij op 105.963 van de meldingen, dus het is niet een randgeval maar het
+grootste deel van het rapport. Een tabel is de goedkoopste vorm die klopt: de zin is per
+vorm hetzelfde, hij hoeft niet uit de tekst afgeleid te worden, en de auteur kan hem
+vaststellen zonder dat er code aan te pas komt.
+
+**Alternatieven.** De zin uit de SHACL-tekst afleiden met regels ("Subject X, path hasPart,
+object Y" → "X zonder Y") (verworpen: dat leest de brontekst een tweede keer en levert
+Nederlands dat per vorm net niet klopt -- "Stuwput zonder Compartiment" waar "Stuwput met
+minder dan twee compartimenten" hoort). De technische tekst helemaal vervangen (verworpen:
+de melding is dan niet meer naar het SHACL-rapport te herleiden, en het melding-ID zou aan
+een tekst hangen die wij zelf schrijven). De zin ook in de meldingentabel weglaten en alleen
+in de popup zetten (verworpen: de drie archieven horen dezelfde gegevens te dragen). De
+tabel in `checks.toml` zetten (verworpen: dat is de projectconfiguratie met drempels die een
+project mag overschrijven, en deze teksten zijn juist vast).
+
+**Contractbreuk.** `schema_versie` van `bevindingen.json` gaat van `1.1` naar `1.2`. Een
+afnemer die `boodschap` van een nulmetingmelding las krijgt daar voortaan de Nederlandse
+zin; de oude tekst staat in `boodschap_technisch`. De CSV krijgt de kolom
+`MeldingTechnisch` achteraan (vóór `Gereedschap`) en de meldingentabel van de GeoPackage de
+kolom `boodschap_technisch` achteraan. Melding-ID's verschuiven niet. Dezelfde
+versiestap dekt de GeoPackage-herindeling van issue #98 (BO-73): het contract kent één
+nummer per blok wijzigingen, geen nummer per issue.
+
+### BO-75 ATTR-001 krijgt een uitzondering per constructietype; de drainageleiding houdt de GWSW-waardegrens
+
+**Wat.** Het diameterbereik van ATTR-001 hangt sinds issue #86 niet uitsluitend aan het
+leidingmateriaal. Draagt een streng een constructietype dat in de nieuwe tabel
+`[[constructietype_diameter]]` van `plausibiliteit.toml` staat, dan gaat dat bereik voor
+het materiaalbereik. Drie klassen staan er: `Drain`, `DIT_riool` en `DT_riool`, alle drie
+op 50-4000 mm. De boodschap noemt welk van de twee bereiken gold ("... dat bij
+constructietype DT_riool hoort"); de details van de bevinding veranderen niet, want een
+veld erbij is een wijziging van het uitvoercontract en de boodschap draagt het al.
+
+**De research, en wat zij wel en niet oplevert.** Het issue vraagt eerst om de gangbare
+diameterrange voor drainageleidingen.
+
+* *Ondergrens, gevonden.* De handelsmaatreeks voor drainagebuis loopt van 50 tot 200 mm
+  (50, 60, 80, 100, 125, 160, 200 -- leveranciersassortiment Pipelife/Wavin, nagezien via
+  `drainagebuizen.nl/drainage-afsluitkap/` en `irritech.nl/drainagebuis/`, augustus 2026),
+  met 80 mm als meest toegepaste maat en 250 mm als grootste bijzondere maat
+  (stalbeluchting). RIONED noemt in *Kostenkengetallen drainage* (`riool.net/drainage`) 80
+  of 100 mm voor een drainageleiding die bij rioolvervanging wordt aangelegd. Die
+  RIONED-zin komt uit het zoekresultaat van die pagina; `riool.net` gaf de fetcher zelf een
+  404, dus zij is niet uit de pagina zelf geciteerd. De laagste geleverde maat is 50 mm, en
+  dat is de ondergrens geworden.
+* *Bovengrens, niet gevonden.* Geen bron geeft een gangbare bovengrens die zowel een
+  drainagebuis als een DIT- of DT-riool dekt. Die laatste twee zijn volgens de ontologie
+  *rioolleidingen* met doorlatende wanden ("inzameling en transport van grondwater en
+  hemelwater") en dus op rioolmaat; een plafond van 250 mm zou daar vals alarm geven. De
+  bovengrens volgt daarom de GWSW-waardegrens: `Dt_BreedteLeiding` en `Dt_HoogteLeiding`
+  declareren beide 63-4000 mm (geverifieerd in de gebundelde ontologie). Daarboven keurt de
+  nulmeting de waarde zelf al af. De lacune staat hiermee in de tabel in plaats van dat er
+  een getal verzonnen is.
+
+Beide grenzen dragen `bron = "ervaringsregel"`: de reeks komt uit een fabrikantmaattabel,
+en dat is precies waarvoor die bak in `plausibiliteit.toml` bestaat (issue #20). GWSW blijft
+leidend voor de vraag wélke klassen bestaan; de externe bronnen leveren alleen het bereik.
+
+**Welke klassen "drain" zijn, is tegen de ontologie geverifieerd.** `Drain` ("een leiding
+met doorlatende wanden bestemd voor het op peil houden van het grondwater") hangt
+rechtstreeks onder `Leiding`, net als `Duiker` en `Aansluitleiding`. `DIT_riool`
+(altLabel "Drainage infiltratie transportriool") en `DT_riool` (altLabel "Drainage
+transportriool") hangen onder `VrijvervalRioolleiding`.
+
+**Gevolg dat je moet kennen: op De Wolden verandert er niets.** ATTR-001 draait op de rol
+`vrijvervalrioolleidingen`, en `Drain` valt daarbuiten -- de export telt 1.216 `Drain` en
+610 `Duiker`, en geen van beide heeft deze check ooit gezien. Van de twee klassen die er
+wél in vallen levert De Wolden er nul (`DIT_riool` 0, `DT_riool` 0; geteld in de TTL). De
+uitslag van ATTR-001 blijft dus 13 bevindingen. Dat is niet wat het issue verwachtte, en
+het klopt met wat de audit al vaststelde: het steekproefgeval `Ve1D0002-Ve1D0004-1` staat
+in de export als `Hemelwaterriool` en niet als `Drain`, dus het is een
+data-classificatiepunt en geen checkfout. De uitzondering repareert de check voor een
+drainageleiding die wél als zodanig geregistreerd is; zij kan een verkeerd geclassificeerde
+leiding niet herkennen en hoort dat ook niet te doen.
+
+`notes()` maakt dat zichtbaar in plaats van het te verzwijgen: het rapport telt hoeveel
+strengen tegen hun constructietype getoetst zijn (op De Wolden 0 van de 17.603) en zegt
+erbij dat `Drain` en `Duiker` buiten deze check vallen. Ook de kolom Buiten bereik van de
+verdelingstabel telt sindsdien tegen het bereik waarop een streng feitelijk getoetst is,
+zodat die kolom niet meer kan tellen dan de check meldt.
+
+**Waarom `Duiker` geen regel krijgt.** Geen bron voor een gangbaar duikerbereik, en een
+duiker valt net als een drain buiten de rol waarop ATTR-001 draait. Een regel zou dus een
+verzonnen drempel zijn zonder werking. `Drain` staat er wel, hoewel de klasse vandaag
+buiten de populatie valt: zij ís de klasse waar het issue over gaat, `[klassen]
+vrijvervalleiding` is projectconfiguratie die een project mag verbreden, en een tabel die
+de twee -riool-klassen wel noemt en de drain zelf niet zou de lezer op het verkeerde been
+zetten.
+
+**Alternatieven.** De rol van ATTR-001 verbreden zodat `Drain` er wél in valt (verworpen:
+dat is 1.216 leidingen nieuw in beeld en levert juist méér bevindingen -- het omgekeerde
+van wat het issue vraagt, en het raakt elke andere check op die rol niet). De uitzondering
+aan het BRUTIS-constructietype ophangen in plaats van aan de GWSW-klasse (verworpen: OroX/
+GWSW is leidend en die twee divergeren aantoonbaar, zie #79 §4). De drainageklassen
+helemaal overslaan in plaats van ze een eigen bereik te geven (verworpen, maar zwakker dan
+het eerst leek -- zie hieronder).
+
+**Wat deze regel wél en niet toevoegt, eerlijk geteld.** De bedoelde werking is
+*onderdrukking*: de valse meldingen op een gangbare drainagemaat (Ø65 tegen de
+PVC-ondergrens van 100 mm) verdwijnen, en dat is precies wat het issue vraagt. De
+toegevoegde *detectie* is vrijwel nul, en dat hoort hier te staan. De nulmetingvorm
+`BreedteLeiding_val` toetst het GWSW-waardebereik 63-4000 mm en vuurt aantoonbaar ook op
+een drain: `data/shacl_nulmeting/gwsw_shacl_report_conformiteit_Hyd.csv` regel 7506 meldt
+`Zu1D0096-Zu1D0094-1` (`type=Drain`) met breedte 60 als Warning. Het vuurvenster van deze
+regel (< 50 of > 4000 mm) ligt dus strikt bínnen dat nulmetingsvenster (< 63 of > 4000 mm);
+met een nulmeting erbij meldt ATTR-001 op een drainageleiding niets wat daar niet al staat.
+De regel is alleen het enige bezwaar in een `toets` zonder `--shacl` -- dan is er geen
+nulmeting als vangnet.
+
+De twee grenzen zijn daarbij niet symmetrisch, en dat is bedoeld. De bovengrens is exact de
+GWSW-grens (4000 mm), dus daarboven melden regel en nulmeting hetzelfde. De ondergrens van
+50 mm ligt 13 mm *onder* de GWSW-ondergrens van 63: een drain van 55 mm levert hier geen
+ATTR-001-bevinding op, maar wel een `BreedteLeiding_val`-melding uit de nulmeting. Dat gat
+is de prijs van de keuze om de ondergrens de handelsmaatreeks te laten volgen in plaats van
+het registratiebereik -- de tabel zegt wat een drainagemaat ís, en of zo'n maat in GWSW
+geregistreerd mag worden is een andere vraag met een eigen melding.
+
+### BO-76 Het richtingscluster gaat op in NET-009; NET-003, TOP-020 en HGT-005 vervallen, de forsgrens naar 0,10 m
+
+**Wat.** Vier checks maten elk half hetzelfde verschijnsel -- de afvoerrichting van een
+streng -- en droegen samen 85% van de deel C-meldingen (audit 27-08, PRE-1). Per issue #80
+is de afvoerrichting één integrale check geworden:
+
+* **NET-009 is dé richtingscheck.** De administratieve van-naar-richting is de referentie;
+  zodra de tekenrichting van de lijn óf de BOB de andere kant op wijst is er een **W**
+  (was F). Wijzen administratie, tekenrichting én BOB dezelfde kant op, dan is de streng
+  goed. De melding noemt alle drie de waarden. De ongerichte-graaf "harde waarheid" uit een
+  bereikbaar lozingspunt is geprobeerd maar weer weggelaten -- zie het aparte kopje
+  hieronder.
+* **NET-003 (BOB stijgt in de van-naar-richting) vervalt** en gaat op in NET-009: de
+  BOB-tegen-richting is daar een deelgeval. Gemeten staan alle 3.651 NET-003-objecten óók
+  in de 3.656 van NET-009 (audit 27-08), dus er gaat geen signaal verloren.
+* **TOP-020 (tekenrichting tegen de administratie) vervalt** eveneens in NET-009 -- een
+  verzwaring ten opzichte van het oorspronkelijke PRE-1-voorstel (versmallen tot het
+  cosmetische signaal): de auteur koos ervoor het geheel te laten opgaan. De omgekeerde
+  tekenrichting is nu een deelgeval.
+* **HGT-005 (licht tegenverhang, 1-5 cm) vervalt.** In vlak Nederland is een
+  centimeterstijging inwinnauwkeurigheid zonder handelingsperspectief; 1.284 van de 1.285
+  HGT-005-objecten komen ook uit NET-009. De richting meldt NET-009.
+* **HGT-006 (fors tegenverhang) blijft F**, maar de forsgrens `tegenverhang_fors_m` gaat
+  van 0,05 naar **0,10 m** (V8, akkoord auteur): op De Wolden ligt 68% van wat "fors" heet
+  onder tien centimeter, en dat is net zo goed inwinnauwkeurigheid als de licht-band.
+  Zonder deze verschuiving zou het bezwaar tegen HGT-005 ongewijzigd naar HGT-006
+  doorschuiven.
+
+De vervallen ID's worden niet hergebruikt (harde regel); ze staan in de tabel Vervallen
+checks van het register.
+
+**Wat het samenspel met HGT-006 is.** "Alle andere gevallen W" geldt ook waar NET-003
+vroeger een F gaf; het F-niveau blijft bestaan als de aparte, disjuncte HGT-006-check op
+fors tegenverhang. Een streng met stijgende BOB krijgt dus een W van NET-009 (de richting)
+en, als de stijging boven 0,10 m ligt, daarnaast een F van HGT-006 (de forse hoogtefout).
+
+**Firing-regel, precies.** De administratie is de referentie (altijd "mee"). Er is
+tegenspraak zodra de geometrie óf de BOB stellig de andere kant op wijst ("tegen"). Een
+vlak of onbekend signaal doet geen uitspraak en telt niet als tegenspraak. Dat is exact het
+oude NET-009-gedrag; de audit mat dat NET-003 (3.651) er een strikte deelverzameling van is
+en TOP-020 (6) eveneens, dus NET-009 = 3.656 meldingen, nu als W in plaats van F.
+
+**De harde waarheid: geprobeerd en verworpen.** Issue #80 vroeg om een ongerichte graaf die
+vanaf een bereikbaar lozingspunt de werkelijke afvoerrichting vastlegt, als referentie
+waartegen de drie signalen gelegd worden -- zodat ook een administratie die zelf omgekeerd
+staat, terwijl geometrie en BOB haar volgen, aangewezen wordt. Die versie is gebouwd en op
+De Wolden gemeten (hermeting 28-08). Uitkomst: NET-009 sprong van 3.656 naar **6.478**, en
+alle 2.822 extra meldingen zaten op strengen die *intern kloppen* (administratie, geometrie
+én BOB dezelfde kant op) -- onder meer strengen met een **dalende BOB**, die dus fysiek die
+kant op afvoeren. Oorzaak: het persnet maakt de ongerichte graaf één groot samenhangend
+geheel (BO-54), waardoor het *topologisch dichtstbijzijnde* lozingspunt vaak niet de
+werkelijke uitstroom van die streng is; de heuristiek keert dan een correct geregistreerde
+streng om. Drie eensgezinde signalen wegen zwaarder dan die gok, en de issue-hoofdregel
+zegt zelf "zijn alle drie gelijk, dan is het goed". Besluit auteur (28-08, in antwoord op de
+voorgelegde tweesprong): **de harde waarheid helemaal weglaten.** NET-009 leest de drie
+signalen zoals hierboven; er is geen lozingspunt-machinerie in de check. De alternatieven
+(waarheid als beslissende referentie; waarheid alleen als duiding in de melding) zijn
+verworpen. Zie [#80](https://github.com/mcolee/nlriochecker/issues/80) en de checkaudit
+(`docs/checks-audit-2026-08.md`, PRE-1).
+
+### BO-77 Kringloop versus bewust vermaasd net: NET-004 wordt richting-bewust
+
+**Wat.** NET-004 (cirkels in het vrijvervalnetwerk) zocht kringlopen op de administratieve
+graaf. Per issue #102 zoekt hij ze op de **betrouwbare richting** -- de strengen die NET-009
+niet tegenspreekt (de richtingsbron uit #80/BO-76: geen herbruikbare afvoerrichting, wél een
+per-streng oordeel). Drie gevolgen, elk een domeinregel:
+
+* **Een kring die alleen administratief bestaat, is geen kringloop.** Leunt de kring op een
+  streng die omgekeerd geregistreerd staat (BOB of geometrie spreekt de administratie tegen),
+  dan valt hij met de betrouwbare richting uiteen en meldt NET-004 niets. NET-009 draagt dat
+  richtingssignaal al; twee checks op hetzelfde verschijnsel is dubbeltelling.
+* **Een BOB-consistente ring die vlak ligt, is bewust vermaasd net.** In vlak Nederland is een
+  ring zonder hoogtesprong een legitieme vermazing (twee wegen naar dezelfde uitstroom), geen
+  fout. NET-004 dempt hem en telt hem in de toelichting.
+* **Een ring die alleen via een BOB-sprong omhoog in een put sluit, hoort bij HGT-009.** Water
+  klimt niet; zo'n sprong is een hoogtefout, niet een topologische kringloop. NET-004 laat hem
+  aan HGT-009 en telt hem apart.
+
+Blijft over als **echte** NET-004-melding: een kring die op de betrouwbare richting overeind
+blijft en waarvan de BOB geen uitsluitsel geeft (een been zonder bruikbare BOB) -- een
+topologische lus die niet als vermaasd net of putsprong te verklaren is.
+
+**Meting (De Wolden en Hoogeveen, V19, 2026-08-28, `scripts/meet_v19_kringlopen.py`).** Van de
+17 auditmeldingen bevatten 14 minstens één been tegen het BOB-verval in (vallen uiteen op de
+betrouwbare richting) en sluiten de overige 3 (Ho5G0680, Zu1V0012, Rw1G0314) via een BOB-sprong
+omhoog in een put (+0,35 / +2,7 / +0,43 m). Richtgetal 17 -> 0; hermeet.
+
+Zie [#102](https://github.com/mcolee/nlriochecker/issues/102) en BO-76.
+
+### BO-78 RVZ-003 gaat op in RVZ-002; het ID vervalt
+
+**Wat.** RVZ-002 (overstort zonder drempelniveau) en RVZ-003 (overstort zonder
+drempelbreedte) waren twee checks met dezelfde populatie (`overstortputten`), dezelfde
+ernst (W), dezelfde dimensie (Compleetheid) en dezelfde herstelhandeling (het
+drempelonderdeel met niveau én breedte registreren). Ze zijn samengevoegd tot één check:
+RVZ-002 meldt voortaan in **één melding per put** welke van {`Drempelniveau`,
+`Drempelbreedte`} ontbreekt. RVZ-003 vervalt; het ID wordt nooit hergebruikt
+(`tests/test_checks_registry.py::test_vervallen_ids_worden_nooit_hergebruikt`).
+
+**Waarom.** Op De Wolden + Hoogeveen meldden de twee checks exact dezelfde 245 putten
+(checkaudit 27-08): de export draagt geen enkel `Overstortdrempel`-object, dus beide maten
+ontbreken altijd samen. Twee ID's leverden zo 490 waarschuwingen voor 245 putten -- een
+dubbeltelling voor één gebrek. Eén check die de ontbrekende maten opsomt houdt de telling
+eerlijk (245) en verliest geen informatie: de tekst en het detailveld `ontbrekende_maten`
+noemen per put welke maat mist.
+
+**Waarom niet één maat weggooien.** Beide maten zijn een eigen registratiegebrek; een put
+kan de ene wél en de andere níét hebben (de fixtures `rvz002_drempel_zonder_niveau` en
+`rvz003_drempel_zonder_breedte` tonen precies dat). De check moet dus per maat kunnen
+melden, alleen niet als twee losse ID's.
+
+**De bewuste overlap met de nulmeting blijft (BO-26).** De SHACL-vorm
+`Overstortput_Overstortdrempel_card` toetst alleen of de put een drempel *heeft*, dekt de
+27 `Stuwput` niet, en `toets` moet ook zonder `--shacl` iets zien. De samengevoegde
+`notes()` benoemt dat.
+
+**Hermeting.** 245 meldingen in plaats van 490; inhoud gelijk.
+
+Zie [#87](https://github.com/mcolee/nlriochecker/issues/87), BO-26 en
+`docs/checks-audit-2026-08.md`.
+
+### BO-79 De derde uitvoertoestand: "niet beoordeeld" naast rood en groen
+
+**Wat.** EXT-009 kent drie uitkomsten waar elke andere check er twee heeft. Naast *geen
+riolering* (rood, een W-melding) en *wel riolering* (groen, stil) is er **niet beoordeeld**
+(grijs): een straat met overwegend onverhard wegdek, of een straat met een
+drukriolering-indicatie. De laag `vlakken` van de GeoPackage krijgt daarvoor een vijfde
+`soort` (`wegvak`) en een nieuwe kolom `status` met dezelfde waarden als de objectlagen;
+`vlakken.qml` geeft de soort drie regels, een per status.
+
+**Waarom een derde toestand.** Zonder haar zou de kaart twee ongelijke dingen op één hoop
+gooien. Een zandweg in de kom zonder riool is geen datakwaliteitsprobleem maar een straat
+waar het model niet over gaat; hem rood kleuren levert een vals alarm dat de lezer niet
+kan wegredeneren, en hem groen kleuren beweert dat er riolering ligt. Grijs zegt precies
+wat er aan de hand is, en de popup noemt de reden -- grijs zonder reden leest als "in
+orde". Dezelfde redenering als bij het mechanische riool in de objectlagen (BO-29): grijs
+betekent daar "niet beoordeeld én niets gevonden".
+
+**Waarom groen en grijs een vlak krijgen zonder melding.** Voor elke andere soort in
+`vlakken` geldt de regel "een vlak bestaat alleen als er een melding naar wijst" (BO-50,
+BO-57): de laag kan dan niet meer tonen dan de uitslag. Hier is die regel juist verkeerd,
+want de winst van deze check zit in het verschil tussen "hier is gekeken en er ligt
+riolering" en "hier is niet gekeken", en beide dragen per definitie geen melding. Een
+kaart met alleen rode straten laat de lezer raden of de rest bekeken is.
+
+**Hoe de laag toch aan de uitslag vast blijft zitten.** Drie afspraken samen.
+(1) De check legt zijn volledige oordeel in een register op de context
+(`checks/treffers.Wegvakregister`, dezelfde vorm als het trefferregister van BO-50); de
+schrijver bevraagt de NWB-laag nooit zelf, dus laag en uitslag kunnen niet uit elkaar
+lopen. (2) **Rood blijft strikt aan de meldingen hangen**: een wegvak dat het register
+rood noemt maar waarvoor déze uitvoer geen EXT-009-melding draagt -- na de afbakening tot
+een studiegebied, of na `[rapport] onderdruk_checks` -- krijgt geen rij. Anders zou de
+kaart een gebrek tonen dat in geen enkele andere uitvoervorm staat. (3) Het register wordt
+in `beperk_tot_studiegebied` op het **middelpunt** van het wegvak afgebakend, precies zoals
+`hoort_erbij` een bevinding met een eigen locatie afbakent; zo vallen de rode melding en
+het groene vlak van dezelfde straat nooit aan verschillende kanten van de gebiedsgrens.
+
+**Wat het rapport erover zegt.** De toelichting van de check telt drie dingen die anders
+stil zouden blijven: hoeveel wegvakken buiten de kandidaatselectie vielen en waarom,
+hoeveel straten groen zijn (bekeken en in orde), en hoeveel grijs, per reden. Stilte leest
+als "alles gecontroleerd", en een lijst rode straten zonder noemer zegt niets.
+
+**Wat er niet bijkomt.** Geen vijfde statuswaarde: rood, oranje, groen en grijs blijven de
+enige vier, en een wegvak gebruikt er drie van (oranje hoort bij een object met alleen
+waarschuwingen naast andere gebreken, en dat begrip bestaat hier niet). Geen extra kolommen
+voor de gemeten waarden: die staan als feiten in `popup_html`, want de lezer heeft ze nodig
+om het oordeel te begrijpen en niet om erop te filteren. `gwsw_run` telt de rijen wel apart
+in `n_wegvakken`, anders is het aantal externe vlakken niet meer uit `n_vlakken` af te
+leiden.
+
+Zie [#104](https://github.com/mcolee/nlriochecker/issues/104), BO-29, BO-50 en BO-73.
+
+### BO-80 De externe-bron-afhankelijkheid van EXT-009: NWB, TOP10NL en BGT-wegdeel
+
+**Wat.** EXT-009 leunt op drie externe lagen die het project tot nu toe niet las:
+
+- **`nwb_wegvak`** -- de NWB-wegvakken (hartlijnen kruispunt-tot-kruispunt). De laag werd
+  al geladen maar door geen enkele check gelezen; sinds deze check hoort zij bij
+  `bronrollen_met_check()` en meldt het rapport haar ontbreken als een overgeslagen check.
+  `configs/dewoldenhoogeveen.toml` zei "niet aangeleverd voor dit gebied"; dat klopte niet
+  meer (`NWB_wegvakken_DeWoldenHoogeveen.gpkg`, laag `geclipt`, 9787 wegvakken) en is
+  rechtgezet.
+- **`top10nl_kom`** -- het TOP10NL-plaatsvlak met `bebouwdekom`. Nieuwe rol met een eigen
+  laagveld (`top10nl` plus `top10nl_komlagen`), naar het patroon van de BGT-rollen: het De
+  Wolden-extract draagt twee lagen (`output` 27, `plaats_vlak` 117), dus `enige_laag`
+  volstaat er niet en gokken welke bedoeld is levert stille onzin op.
+- **`bgt_wegdeel`** -- de BGT-wegdelen, voor het aandeel onverhard wegdek. Gewone
+  BGT-rol met `bgt_wegdeellagen`; het historiefilter van `_alleen_actueel` geldt (144.008
+  objectversies, 62.108 actueel).
+
+**Kolomnamen verschillen per extract.** De Wolden schrijft `WEGBEHSRT`, `BST_CODE`,
+`WVK_ID` en `STT_NAAM`, Koekangerveld dezelfde velden in kleine letters. De lezing gaat
+daarom hoofdletterongevoelig via één helper (`VectorLayer.kolom`) en niet via twee
+codepaden -- die zouden op een dag uit elkaar lopen, en het verschil is een eigenschap van
+de levering en niet van het gegeven.
+
+**De dekkingspoort (BO-19) krijgt een uitzondering, en precies één.** `top10nl_kom` valt
+erbuiten (`externedata.ZONDER_DEKKINGSEIS`): een bebouwde kom is per definitie een
+deelgebied van het bereik -- het plaatsvlak houdt op waar het buitengebied begint, en dat
+is de bedoeling. De poort zou daar altijd afgaan, en de enige uitweg (`dekking_tolerantie_m`
+verhogen) heft haar ook voor de andere bronnen op. `bgt_wegdeel` blijft er wél onder: die
+laag komt uit hetzelfde BGT-extract als pand en waterdeel en hoort dezelfde buitenmaat te
+hebben, dus een tekort daar is wél een signaal. Wat de uitzondering kost is beperkt en
+zichtbaar: een wegvak zonder komvlak is geen kandidaat, en de toelichting van de check telt
+hoeveel wegvakken daarom afvielen.
+
+**`ext_zoekafstand_max_m` verandert niet.** Die drempel verruimt het bereik waarbinnen een
+EXT-check in een externe *laag* kijkt. EXT-009 kijkt daar hoogstens
+`ext_wegvak_wegdek_buffer_m` (3 m) ver in, ruim onder de bestaande 10 m; de 25 m van het
+straatvlak en de 15 m van de corridor zijn zoekafstanden in de GWSW-data en horen er dus
+niet bij.
+
+**Aan/uit zonder eigen schakelaar.** De spec vroeg om een schakelbare check. Die is er, en
+zonder een extra sleutel: ontbreekt een van de drie rollen, dan slaat de check over met de
+standaardmelding "laag niet aanwezig in aangeleverde data". Een project dat EXT-009 niet
+wil laat `nwb_wegvakken` of `top10nl` weg. Een tweede schakelaar naast dat gedrag zou twee
+plekken maken waar dezelfde vraag beantwoord wordt.
+
+**Vierde bron: het GWSW zelf.** De pompunits en persleidingen komen niet uit een extern
+bestand maar uit de dataset, via de rollen `pompunits` (nieuw, `[klassen] pompunit =
+["Pompunit"]`) en `mechanischeleidingen`. `Pompunit` is in de gebundelde ontologie een
+`owl:Class`, subklasse van `Rioolput`, omschreven als "pompput in een
+drukrioleringsstelsel" -- geverifieerd, GWSW is leidend. `Gemaal` hoort er niet bij: dat is
+een bouwwerk en het einde van de afvoer, en het staat al in `afvoer_eindpunt`.
+
+**`pompunits` valt buiten de nul-bewaking; dat is een nieuw soort rol.** De nul-signalering
+van issue #22/#71 leidt haar populatie af uit `check.rollen`, dus elke nieuwe rol komt er
+vanzelf in. Voor `pompunits` is dat verkeerd: EXT-009 *toetst* geen pompunits, hij leest ze
+als **indicator** om een straat juist búíten zijn oordeel te houden. Nul pompunits -- een
+gemeente zonder drukriolering -- betekent dan niet "deze check heeft niets te beoordelen"
+(de standaardtekst van `SIG-nulklasse`) maar "deze uitzondering gaat nooit af"; de check
+werkt verder volledig. Zo'n rol staat daarom in `uitvoer/omvang.INDICATORROLLEN` en blijft
+buiten `klassen_op_nul`. Alleen buiten de bewaking: in de rollentelling van het rapport
+blijft zij gewoon staan, want daar is nul een feit en geen oordeel. Dit is de derde
+uitzondering op de generieke bewaking, naast de twee van BO-52 (het afvoereindpunt per
+klasse, de overstortdrempel via `subjects_of_class`), en de eerste die over de *aard* van
+de rol gaat in plaats van over de manier van tellen.
+
+Zie [#104](https://github.com/mcolee/nlriochecker/issues/104), BO-19 en BO-52.
+
+### BO-81 EXT-009 is een deterministische regel en geen model; de ijking van de drempel
+
+**Wat.** De classificatie van EXT-009 is een regel van vier stappen op vier gemeten
+waarden, geen getraind model. Er komt geen scikit-learn in de repository, geen
+trainingsstap en geen modelbestand.
+
+**Waarom niet het model.** De POC van issue #104 trainde een gradient-boosting-model op 485
+handmatig beoordeelde straten; dat haalde daar 27 fouten op 479 beoordeelde straten (94,4%).
+De deterministische regel haalt op dezelfde set 32 op 478 (93,3%) -- vijf straten slechter,
+op een populatie van 4116. Dat verschil weegt niet op tegen wat de regel oplevert: zij is in
+één alinea uit te leggen aan een beheerder, zij verandert niet als iemand de dataset opnieuw
+laadt, zij heeft geen trainingsstap die met de data mee moet reizen, en zij voegt geen zware
+afhankelijkheid toe (BO-3 vraagt een licentie- en noodzaakafweging per dependency). Het
+issue verwachtte gelijkspel (26 om 26); de gemeten uitkomst is dat niet, en dat staat hier
+in plaats van de verwachting.
+
+**De regel.** In deze volgorde, en de volgorde doet ertoe:
+
+1. `aandeel_onverhard > ext_wegvak_onverhard_aandeel` -> **grijs**, reden onverhard.
+2. een put in de eigen voronoi-cel, of `streng_in_cel >= ext_wegvak_streng_in_cel` ->
+   **groen**. De putregel is de lus- en hoefijzeruitzondering: ligt de put ín de cel, dan
+   loopt het riool door de as van de straat en zegt de afstand tot de lijn niets meer.
+3. anders, in het **onzekere middengebied**, met een pompunit binnen
+   `ext_wegvak_pomp_afstand_m` of persleiding langs meer dan
+   `ext_wegvak_persleiding_aandeel` van de straat -> **grijs**, reden drukriolering. Twee
+   grenzen aan die uitzondering. Zij geldt ná stap 2 en niet ervoor: een straat waar wél
+   genoeg vrijverval ligt hoeft niet uitgezonderd te worden, ook niet als er toevallig een
+   pompunit naast staat. En zij geldt alleen waar er *iets* in de eigen cel ligt
+   (`streng_in_cel > 0`): een straat met nul meter vrijvervalstreng is niet onzeker, die is
+   meetbaar leeg.
+4. anders -> **rood**, een waarschuwing.
+
+**Het onzekere middengebied is gemeten, niet gegokt.** De POC bepaalde het met de modelkans
+(`0,2 < p < 0,8`); zonder model bestaat die maat niet. De eerste invulling -- "elke straat
+die anders rood zou worden en drukriolering-indicatie heeft" -- bleek te grof: van de 34
+gelabelde straten die daardoor grijs werden waren er **31 handmatig als terecht gemeld
+beoordeeld**, dus 31 echte gaten verdwenen uit beeld. Met de tweede grens
+(`streng_in_cel > 0`) zijn dat er 4, gaat de beoordeelde set van 451 naar 478 straten en
+blijft het aantal fouten gelijk (32). Gemeentebreed: 500 rood, 3593 groen, 23 grijs, tegen
+455/3593/68 zonder die grens. De drie varianten naast elkaar, op dezelfde meting:
+
+| grijs-regel | rood | groen | grijs | beoordeeld | fouten | juist | lege straten grijs |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| druk & niet-bediend | 455 | 3593 | 68 | 451 | 32 | 92,9% | 31 |
+| **druk & niet-bediend & streng > 0** | **500** | **3593** | **23** | **478** | **32** | **93,3%** | **4** |
+| geen drukuitzondering | 512 | 3593 | 11 | 479 | 32 | 93,3% | 3 |
+
+De middelste is uitgeleverd: zij haalt dezelfde nauwkeurigheid als de derde en houdt de
+uitzondering die de spec vraagt.
+
+**Nog een afwijking van de POC, bewust.** De POC mat de persleiding met een extra
+eindpunttoets (beide uiteinden binnen 20 m van de straat); dat is een zesde drempel die de
+spec niet noemt, en de vlakke kap van de corridor begrenst de meting al tot de eigen
+straatlengte.
+
+**De ijking.** `scripts/ijk_ext009.py` meet de fouttabel per kandidaat-drempel op de
+beoordeelde gelabelde straten. Twee soorten fout, en ze wegen niet gelijk: een *vals-rood*
+(bediende straat als leeg gemeld) is hinderlijk maar meteen zichtbaar op de kaart, een
+*gemiste* (lege straat blijft groen) verdwijnt uit beeld -- en dat is precies het gat dat
+deze check moet vinden. Gekozen is daarom de drempel met de minste fouten waarbij vals-rood
+minstens zo groot is als gemist.
+
+De tabel hoort hier en niet in een verslag of een issue-comment: zonder de validatieset --
+die buiten de repository blijft -- is dit de enige plek waar de drempel te verantwoorden is,
+en BO-43 beschrijft precies wat er gebeurt met een meting die alleen in een verslag leeft.
+Gemeten op De Wolden en Hoogeveen, 29-08-2026, met de hierboven beschreven regel (dus mét de
+grens `streng_in_cel > 0`), 9787 wegvakken, 4116 kandidaten, 485 labels:
+
+| drempel | beoordeeld | vals-rood | gemist | fouten | juist |
+|---:|---:|---:|---:|---:|---:|
+| 0,05 | 478 | 10 | 25 | 35 | 92,7% |
+| 0,10 | 478 | 12 | 23 | 35 | 92,7% |
+| 0,15 | 478 | 14 | 18 | 32 | 93,3% |
+| 0,20 | 478 | 14 | 16 | 30 | 93,7% |
+| 0,25 | 478 | 14 | 15 | 29 | 93,9% |
+| **0,30** | **478** | **17** | **15** | **32** | **93,3%** |
+| 0,35 | 478 | 18 | 15 | 33 | 93,1% |
+| 0,40 | 478 | 18 | 15 | 33 | 93,1% |
+| 0,50 | 477 | 21 | 14 | 35 | 92,7% |
+| 0,60 | 477 | 30 | 14 | 44 | 90,8% |
+| 0,75 | 477 | 63 | 14 | 77 | 83,9% |
+
+0,25 heeft de minste fouten (29) maar de verkeerde foutrichting: 14 vals-rood tegen 15
+gemist. 0,30 is de eerste rij die de richting haalt (17 tegen 15) en heeft daar de minste
+fouten van. Dat kost drie straten nauwkeurigheid en levert de veilige kant op. Van de 485
+gelabelde straten blijven er bij 0,30 zeven onbeoordeeld (vier leeg, drie bediend).
+Gemeentebreed: **500 rood, 3593 groen, 23 grijs** (12 door drukriolering, 11 door onverhard
+wegdek). De waarde zelf staat in `[drempels] ext_wegvak_streng_in_cel` van beide
+configbestanden.
+
+**Wat de ijking niet is.** De validatieset zijn 485 straten uit één gemeente, met de hand
+beoordeeld; zij hoort bij deze dataset en staat daarom in `uitvoer/` en niet in de
+repository. Het ijkscript slaat over als zij er niet is, met een melding. Een andere
+gemeente hoort de drempel opnieuw te ijken -- daarom is hij een drempel en geen constante.
+
+Zie [#104](https://github.com/mcolee/nlriochecker/issues/104), BO-3 en BO-43.
+
+### BO-82 Voor RVZ-006 is een persleiding of een lozingspunt geen afvoereindpunt
+
+**Wat.** RVZ-006 eist van een gemengd deelstelsel een externe overstort of BBB én een
+afvoereindpunt, en beide moeten via het vrijverval bereikbaar zijn, binnen het
+deelstelsel zoals `netwerkdelen` het afbakent. Een persleiding die uit het deelstelsel
+vertrekt telt niet als afvoereindpunt, ook niet als er achter het persnet een gemaal
+ligt; een lozingspunt (`Lozingsput`, `Uitlaatconstructie`) evenmin. `afvoer_eindpunt`
+blijft `Gemaal` en `Overnamepunt`, en de check blijft op het zuivere vrijverval
+(`_stelseldelen`) rekenen en niet op de bereikbaarheidsgraaf die NET-001 leest (BO-54).
+
+**Waarom.** Een overstort zit niet ná een persleiding. Het gemengde vrijverval moet zijn
+overschot kwijt kunnen vóór het water in het persnet verdwijnt; een gemaal achter het
+persnet zegt niets over de randvoorziening van het deelstelsel ervoor. Besluit van de
+auteur bij de review van alle 99 RVZ-006-vlakken op De Wolden en Hoogeveen (29-08-2026):
+*"een overstort zit niet ná een persleiding. Dus voor deze analyse zijn lozingsputten of
+persleidingen GEEN geldig afvoereindpunt. Dat moet echt een overstort zijn, bereikbaar via
+een vrijverval riool."*
+
+**Wat het betekent voor de cijfers.** Van de 99 gemelde deelstelsels
+(`uitvoer/29082027-02`) hebben er 18 een persleiding als enige uitgang en 27 een
+lozingspunt zonder gemaal of overnamepunt; die meldingen zijn terecht en blijven staan.
+De melding hoort wél te zeggen wáár het water dan heen gaat, zodat de lezer het gebrek
+begrijpt; dat is [#106](https://github.com/mcolee/nlriochecker/issues/106). Het
+verschil met NET-001 -- die het persnet wél doorloopt -- is bedoeld: NET-001 vraagt of het
+water ergens uitkomt, RVZ-006 of het deelstelsel zijn eigen randvoorziening heeft.
+
+Zie [#106](https://github.com/mcolee/nlriochecker/issues/106), BO-54 en BO-55.
+
+### BO-83 Een hulpstuk met een telbare GWSW-functie is een doorgeefknoop in de vrijvervalgraaf
+
+**Wat.** De vrijvervalgraaf (`_bouw_netwerk` en `_bouw_netwerkdelen` in
+`checks/verbanden.py`) leidt de knopen van een streng af met `_doorgeefknopen`: de
+herleide put, en waar die ontbreekt de rauwe `Conduit.start_node`/`end_node` zolang die
+op een hulpstuk met een telbare GWSW-functie wijst -- `Mof`, `T_stuk`, `Y_stuk`,
+`Kruisstuk`. Een `Afsluitstuk` of `Ontstoppingsstuk` draagt een functie zonder aantal en
+blijft een breuk. Het is precies de populatie van BO-72, en zij staat sinds dit besluit
+op één plek: `checks/hulpstukken.py` (`AANTAL_PER_FUNCTIE`, `_functie_met_aantal`), een
+module die alleen `base` en `selectie` leest zodat `verbanden` en `topologie` haar
+allebei kunnen importeren.
+
+Wat níét verandert: `verbonden_knopen` blijft de putten geven -- TOP, HGT en ATTR lezen
+putkenmerken, en een hulpstuk hoort daar niet bij -- en `_bouw_bereikbaarheid` houdt zijn
+eigen, ruimere terugval op élk rauw eindpunt (BO-54). Dat verschil is bedoeld: het
+persnet draagt alleen connectiviteit en wordt inhoudelijk niet getoetst, terwijl een
+vrijvervalknoop de plek is waar een NET-check zijn oordeel op hangt. Of de telbare grens
+ook voor het persnet hetzelfde net oplevert, is niet gemeten.
+
+**Wie de graaf leest, leest hem helemaal.** Elke afleiding die op de graaf leunt gebruikt
+`_doorgeefknopen` en niet meer de putherleiding: `_ZonderAfvoerpad._bouw_onbereikbaar`
+(anders geldt een streng die op een T-stuk begint onvoorwaardelijk als onbereikbaar),
+`afvoerpad_van_streng` (anders draagt zo'n streng geen uitstroompunt en geen padlengte in
+de GeoPackage terwijl NET-001 haar bereikbaar noemt) en `strengen_per_knoop`, de index
+waarmee RVZ-006 en het deelstelselvlak de strengen van een deel opzoeken. Die laatste is
+er omdat `aansluitingen` op de herleide put indexeert: een streng die met béide einden aan
+een telbaar hulpstuk hangt staat daar in het geheel niet in, terwijl zij wel als kant in
+het deelstelsel ligt (op De Wolden en Hoogeveen enkele tientallen). `aansluitingen` zelf
+blijft ongemoeid -- dat is en blijft de put-index van TOP, HGT en ATTR.
+
+**Tellen doe je in putten.** De verzamelingen dragen het hulpstuk (`netwerkdelen`,
+`_Netwerk.graph`, `deelstelsel_ids`), de tellingen niet: waar knopen geteld worden --
+de drempel `klein_deelstelsel_knopen`, de zinnen "een deelstelsel van N knopen", het
+detailveld `knopen_in_deelstelsel`, `examined()` van NET-006 en NET-008, en `n_knopen`
+van het deelstelselvlak -- betekent "knoop" een beheerobject uit de rol `netwerkknopen`,
+en gaat het doorgeefhulpstuk eraf via de ene helper `verbanden.putknopen`. Een hulpstuk
+krijgt immers nooit een bevinding; het meetellen zou een noemer opleveren met objecten
+die niet beoordeeld worden, en een T-stukrijk deelstelsel eerder over een configdrempel
+duwen.
+
+**Waarom.** Een `Hulpstuk` is in het GWSW geen `Put` en klimt via `hasPart` niet naar een
+put, dus `resolve_network_node` gaf er `None` voor en de graaf liet elke streng vallen
+die op een T-stuk eindigt -- terwijl diezelfde streng er in werkelijkheid aan vastzit en
+de leeslaag die koppeling zelfs herstelde (`SIG-hulpstukkoppeling`, issue #60). Op De
+Wolden en Hoogeveen vielen daardoor 152 vrijvervalstrengen buiten de netwerkanalyse; hun
+197 losse einden liggen álle op een telbaar hulpstuk, er is geen tweede oorzaak. Zij
+kregen geen bevinding maar ook geen oordeel, en het net eromheen viel in stukken uiteen:
+drie gemengde deelstelsels golden als "zonder overstort en zonder afvoereindpunt" terwijl
+ze een T-stuk verderop allebei hebben. Het persnet had die terugval sinds BO-54 al, om
+exact dezelfde reden.
+
+**Wat het betekent voor de cijfers.** Gemeten met `scripts/meet_hulpstukgraaf.py` op De
+Wolden en Hoogeveen; de kolom "vóór" komt uit `uitvoer/29082027-02/bevindingen.csv`.
+
+| Meting | vóór | ná |
+|---|---:|---:|
+| strengen buiten de netwerkanalyse | 152 | **0** |
+| netwerkdelen | 794 | **733** |
+| RVZ-006 | 1062 op 99 deelstelsels | **1058 op 96** |
+| NET-001 | 8467 | **8499** |
+| NET-002 | 3031 | **3046** |
+| NET-006 | 329 | **332** |
+| NET-009 | 3656 | **3667** |
+
+De graaf telt 17603 strengen en 17514 knopen, waarvan er 135 een doorgeefhulpstuk zijn;
+`examined()` van NET-006 en NET-008 telt daarom 17379 beoordeelde knopen. Van de
+vrijvervalstrengen hangen er 45 met béide einden aan een telbaar hulpstuk -- zij zijn de
+reden dat `strengen_per_knoop` bestaat -- en geen van die 45 is gemengd, zodat RVZ-006 er
+geen melding bij krijgt: met de put-index en met de graaf-index meldt de check precies
+dezelfde 1058 strengen. Ook NET-008 blijft op 11: geen enkel deelstelsel valt door de
+aftrek van de doorgeefknopen aan de andere kant van `klein_deelstelsel_knopen`. Beide
+correcties veranderen dus geen enkel totaal op déze dataset; ze bepalen wat er gebeurt
+zodra er wél een gemengde streng tussen twee T-stukken ligt, en wat er in de melding staat.
+
+RVZ-006 verliest precies de drie vlakken die de auteur bij de review van 29-08 als vals
+aanwees (`ds-Fo1G0080`, `ds-Wi1G0416`, `ds-Zu1G0510`) en er komt niets voor terug. De
+overige verschillen zijn strengen die nu voor het eerst beoordeeld worden: NET-001 +32 en
+NET-002 +15 zonder afvoerpad, NET-009 +11 met tegenstrijdige richtingssignalen, en NET-006
++3 knopen waar door die strengen twee stelseltypen samenkomen. NET-004, NET-005, NET-007
+en NET-008 blijven gelijk. Of elk van die nieuwe bevindingen terecht is, is niet per stuk
+nagelopen. De deelstelsel-ID's (`ds-...`) verschuiven waar `min(deel)` nu een hulpstuk-URI
+is; die namen zijn per run deterministisch maar niet stabiel over codewijzigingen heen
+(BO-57).
+
+**Waarom de meting in issue #105 hogere getallen noemde.** De monkeypatch waarmee dat
+issue de verwachting bepaalde (8543 en 3049) raakte alleen de twee graafbouwers en liet
+`_ZonderAfvoerpad._bouw_onbereikbaar` staan. Die leidde het beginpunt van een streng nog
+met `resolve_network_node` af, en dat geeft `None` voor een streng die op een T-stuk
+begint: `None not in bereikt` is altijd waar, dus zulke strengen werden onvoorwaardelijk
+gemeld. Nagemeten met beide varianten naast elkaar: zonder die correctie 8543 en 3049,
+mét 8499 en 3046 -- de voorspelling bevatte 44 + 3 vals-positieven. `_bouw_onbereikbaar`
+gebruikt daarom dezelfde afleiding als de graaf zelf.
+
+Zie [#105](https://github.com/mcolee/nlriochecker/issues/105), BO-53, BO-54, BO-57 en
+BO-72.
+
+### BO-84 RVZ-006 benoemt de aanwijzingen bij het gebrek, zonder de uitslag te veranderen
+
+**Wat.** De RVZ-006-melding draagt achter het gebrek een tweede zin met korte feiten:
+`Aanwijzingen: <feit>; <feit>; ...`. Vijf soorten, in vaste volgorde en met vaste
+bewoording (`_rvz006_aanwijzingen` in `checks/randvoorzieningen.py`):
+
+| Aanwijzing | Wat zij zegt | De Wolden en Hoogeveen |
+|---|---|---:|
+| `{n} van {m} strengen gemengd` | altijd; een telling, geen oordeel | 96 (13 met n < m/2) |
+| `knoop X valt samen met Y van ds-… (0.00 m)` | een knoop binnen `snapping_tolerantie_m` van een knoop van een ander deel | 8 |
+| `knoop X ligt op streng Y van ds-… (0.00 m)` | een knoop binnen die tolerantie op een vrijvervalstreng van een ander deel | 14 |
+| `persleiding X vertrekt uit Y; geen afvoereindpunt (BO-82)` | alleen zonder afvoereindpunt | 18 |
+| `lozingspunt X aanwezig; geen afvoereindpunt (BO-82)` | alleen zonder afvoereindpunt | 27 |
+| (geen van deze, het kale gebrek) | | 50 |
+
+Per soort noemt de melding er hooguit drie, op URI-volgorde, gevolgd door "… en N meer";
+zo blijft zij leesbaar en geeft zij bij twee runs op dezelfde data dezelfde tekst. De
+diagnose wordt een keer per deelstelsel gerekend: elke gemengde streng ervan draagt
+dezelfde zin. Het vlak in de GeoPackage leest ze uit de eerste melding van zijn cluster
+terug (`aanwijzingen_van`), want `Finding.details` bereikt de meldingenstroom niet.
+
+**Waarom.** De analyse van RVZ-006 klopte, maar de melding zei niet waardóór een
+deelstelsel los lag of onvolledig was; bij de review van alle 99 vlakken (29-08-2026) moest
+de auteur dat per vlak zelf uitzoeken. De vijf feiten hierboven kon de check al zien. Ze
+zijn bewust een *verklaring* en geen extra eis: de afbakening (`netwerkdelen`), de twee
+eisen (overstort/BBB én afvoereindpunt) en dus het aantal meldingen blijven gelijk --
+gemeten: 1058 meldingen op 96 deelstelsels, vóór en na. Een persleiding of een lozingspunt
+blijft géén afvoereindpunt (BO-82); de aanwijzing zegt alleen waar het water dan wél heen
+gaat, en herhaalt daarbij de regel, zodat de lezer de melding niet voor een fout van de
+check houdt. Er komt geen drempel bij: de enige grens is `snapping_tolerantie_m`, dezelfde
+die de topologiechecks hanteren.
+
+De persleiding- en lozingspuntaanwijzing blijven weg zodra het deel wél een afvoereindpunt
+heeft. Dan mist het alleen zijn overstort, en dat verklaren zij niet.
+
+**Wat het betekent voor de cijfers.** Gemeten met `scripts/meet_rvz006_aanwijzingen.py`.
+Het meetscript in issue #106 telde de persleiding *zonder* die voorwaarde en kwam daardoor
+op 45 in plaats van 18 deelstelsels; de 27 delen met zowel een persleiding als een
+afvoereindpunt vallen hier onder het kale gebrek, dat daarmee op 50 uitkomt in plaats van
+de 24 uit dat script. De tabel in de issue-body (13 / 8 / 14 / 18 / 27) is wél precies
+gereproduceerd -- zij is met de hand per vlak samengesteld en hanteert dezelfde voorwaarde
+als de code.
+
+**Wat de check nu meer leest.** De diagnose maakt RVZ-006 breder in zijn declaratie:
+`lozingspunten`, `mechanischeleidingen` en `netwerkknopen` komen erbij (plus
+`config:drempels.snapping_tolerantie_m` als kenmerk). Het persnet leest hij uitdrukkelijk
+niet als kant in een graaf -- dat zou het gebrek laten verdwijnen in plaats van het te
+verklaren -- maar alleen om te kunnen zeggen waar het water heen gaat.
+
+Zie [#106](https://github.com/mcolee/nlriochecker/issues/106), BO-82 en BO-83.
+
+### BO-85 De laag `vlakken` krijgt één stijlregel per check, en tekent groen en grijs niet
+
+**Wat.** De standaardstijl van de laag `vlakken` (`uitvoer/stijlen/vlakken.qml`) draagt
+precies één regel per check die vlakken in die laag zet, met de checkcode voorop in de vorm
+`CODE - omschrijving` (spatie, koppelteken, spatie):
+
+| Label | Filter |
+|---|---|
+| `EXT-001 - Pand of bouwwerk (BGT/BAG)` | `"soort" IN ('pand', 'bouwwerk')` |
+| `EXT-003 - Waterdeel (BGT)` | `"soort" = 'water'` |
+| `RVZ-006 - Gemengd stelsel zonder overstort` | `"soort" = 'gemengd_deelstelsel'` |
+| `EXT-009 - Mogelijk ontbrekend riool` | `"soort" = 'wegvak' AND "status" = 'rood'` |
+
+Pand en bouwwerk delen sinds deze beslissing één regel en één kleur (de pand-omlijning
+`178,24,43`); de oranje bouwwerkkleur vervalt. De kolom `soort` blijft de twee wél
+onderscheiden (`VLAK_SOORT` in `gpkg.py`): alleen de stijl voegt ze samen, de data niet.
+
+**Waarom.** De legenda hoort te lezen als de checklijst. Zeven regels voor vier checks
+lieten de lezer zelf uitzoeken welke regel bij welke check hoorde; drie ervan noemden hun
+check alleen tussen haakjes achteraan, en pand en bouwwerk noemden hem helemaal niet. Met
+de code voorop staat naast elk vlak op de kaart welke controle erover gaat, en is de
+legenda tegen het checkregister te leggen.
+
+De omschrijving achter de code is niet de `title` van de check en wordt daar ook niet uit
+afgeleid: de auteur heeft deze vier zelf gekozen. Een checktitel is een zin voor een
+rapport ("Straat in de bebouwde kom zonder vrijvervalriolering") en staat als zodanig in
+`overzicht_checks` en in de checktabel; een legendaregel moet in een smalle lagenboom
+passen en zegt wat je op de kaart ziet ("Mogelijk ontbrekend riool"). De code bindt de
+twee aan elkaar, en dat is genoeg.
+
+**Groen en grijs krijgen geen regel, en dat wijkt af van BO-79.** BO-79 schreef: "een kaart
+met alleen rode straten laat de lezer raden of de rest bekeken is", en gaf de soort daarom
+drie regels, een per `status`. Bij de review van 29-08-2026 bleek de prijs daarvan op de
+kaart zelf: op De Wolden en Hoogeveen draagt de laag 99 deelstelselvlakken en 4116
+wegvakken, waarvan 500 rood, 3593 groen en 23 grijs. De groene laag legt zich over vrijwel
+de hele bebouwde kom en overstemt alles wat de kaart moet tonen, de 500 rode straten
+inbegrepen. De auteur besluit daarom: **de rijen blijven, de standaardstijl toont ze niet.**
+
+Dat is een afwijking van de *stijl* uit BO-79 en niet van de *kern* ervan. Die kern is dat
+groen en grijs als rij bestaan, zodat "gekeken, er ligt riolering" en "niet beoordeeld" na
+te gaan zijn; dat blijft ongewijzigd, in de attributentabel, in een eigen filter, in de
+popup en in `n_wegvakken` van `gwsw_run`. Wie de groene straten wil zien, zet in QGIS zelf
+een regel of een filter -- een handeling van seconden, waar het omgekeerde (elke keer
+duizenden vlakken wegklikken) dat niet is. Ook het rapport blijft ze tellen: de toelichting
+van EXT-009 noemt hoeveel straten groen zijn en hoeveel grijs, per reden.
+
+Ze krijgen geen *uitgeschakelde* regel (`checkstate="0"`) maar helemaal geen regel: "één
+regel per check" is letterlijk genomen, en een uitgeschakelde regel zet de status weer als
+tweede ordening naast de check in de legenda. Wil de auteur ze later met een vinkje kunnen
+aanzetten, dan is dat een nieuwe beslissing.
+
+**Wat hier niet verandert.** De GeoPackage zelf: dezelfde rijen, dezelfde kolommen
+(`soort`, `status`, `check_ids`, `popup_html`), dezelfde `gwsw_run` met `n_wegvakken` en
+`n_gemengd_zonder_overstort`. En de objectlagen `putten` en `strengen`: die zijn objecttype
+x status en kennen geen regel per check, dus de naamgeving hierboven geldt voor `vlakken`.
+
+Zie [#107](https://github.com/mcolee/nlriochecker/issues/107), BO-73 en BO-79.

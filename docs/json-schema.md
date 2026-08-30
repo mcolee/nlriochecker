@@ -10,7 +10,7 @@ nog te bouwen package die er mutatievoorstellen voor Kikker of BrutIS uit afleid
 Wie de bevindingen met het oog leest heeft `bevindingen.md`; wie ze in Excel of QGIS
 wil heeft `bevindingen.csv`.
 
-Uitzetten kan met `--geen-json`, symmetrisch met `--geen-gpkg`.
+Uitzetten kan door `json` weg te laten uit `--uitvoer` (`toets --uitvoer csv --uitvoer gpkg`).
 
 ## Waarom alleen `toets`
 
@@ -46,13 +46,21 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 
 ```json
 {
-  "schema_versie": "1.1",
+  "schema_versie": "1.2",
   "gereedschap": "nlriochecker 0.2.0",
   "run_datum": "2026-08-18",
   "dataset": "hgt004_bob_boven_deksel.ttl",
   "cfk_set": ["Hyd"],
   "volledig": false,
   "typeringspoort_toegepast": true,
+  "checks": [
+    {
+      "check_id": "TOP-009",
+      "bekeken": 42,
+      "bekeken_scope": "analyseset",
+      "populatie": "leidingen, netwerkknopen, vrijvervalrioolleidingen"
+    }
+  ],
   "aantal_meldingen": 1,
   "meldingen": [
     {
@@ -80,7 +88,8 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
       "foutlocatie": [1025.0, 2000.0],
       "run_datum": "2026-08-18",
       "dataset": "hgt004_bob_boven_deksel.ttl",
-      "cfk": []
+      "cfk": [],
+      "boodschap_technisch": ""
     }
   ]
 }
@@ -99,7 +108,9 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `cfk_set` | array van string | De conformiteitsklassen waarop getoetst is, gesorteerd. Leeg als er geen nulmeting is meegegeven. |
 | `volledig` | boolean | Waar als `cfk_set` gelijk is aan de volledige set uit `checks.toml`. Onwaar bij een deelset én bij een run zonder nulmeting. |
 | `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
+| `onderdrukt` | object | *Optioneel.* Wat `[rapport]` in de projectconfiguratie uit de stroom hield: `klassen` (array van string, de wortelklassen), `checks` (array van string, de check-ID's) en `meldingen` (integer, hoeveel meldingen wegvielen). Het veld ontbreekt als beide lijsten leeg zijn. In `totaal/bevindingen.json` is `meldingen` de som over de gebieden, niet ontdubbeld -- net als de kolom Meldingen in de synthese. De CSV draagt de lijsten niet: de keuze hoort bij de run, niet bij de melding. |
 | `markering` | string | *Optioneel.* De runbrede voorbehouden van deze run als een tekst voor een lezer, dezelfde die boven het Markdown-rapport staat en in de kolom `markering` van `gwsw_run`. Twee voorbehouden worden twee alinea's, gescheiden door een lege regel. Het veld ontbreekt als er niets voor te behouden valt. |
+| `checks` | array van object | *Optioneel.* Een rij per uitgevoerde check met wat hij bekeken heeft: het aantal, waarover dat geteld is en welke populatie hij declareert. Gesorteerd op `check_id`. Zie [Over `checks`](#over-checks). Ontbreekt in `totaal/bevindingen.json`. |
 | `aantal_meldingen` | integer | Het aantal elementen in `meldingen`. Redundant, maar zo kan een afnemer een afgekapt bestand herkennen. |
 | `meldingen` | array van object | De meldingen, gesorteerd op `melding_id`. |
 
@@ -127,6 +138,67 @@ legt. Het kwam erbij zonder de schemaversie te verhogen, net als `gebied` en `ge
 wie het niet kent, leest het bestand zoals voorheen. De CSV draagt het bewust niet -- een
 voorbehoud hoort bij de run en niet bij elke rij.
 
+### Over `onderdrukt`
+
+`[rapport] onderdruk_klassen` en `onderdruk_checks` houden meldingen uit de stroom vóór
+enige uitvoervorm ze ziet; dit veld zegt welke lijsten dat waren en hoeveel meldingen
+erdoor wegvielen. `checks` bevat alleen ID's uit het checkregister: een nulmetingsvorm
+(`NULMETING-...`) of een datasetsignaal (`SIG-...`) staat er niet in en wordt bij het
+laden geweigerd -- die onderdruk je via de klasse van het object.
+
+De onderdrukte meldingen worden nergens bewaard -- niet in dit bestand, niet in de CSV,
+niet in de GeoPackage. Wie ze wil zien, draait de toets opnieuw zonder de twee lijsten.
+De uitsplitsing per check en per klasse staat alleen in het Markdown-rapport; hier staat
+het totaal, waarin elke weggevallen melding een keer telt.
+
+Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering`:
+wie het niet kent leest het bestand zoals voorheen.
+
+### Over `checks`
+
+Elke rij beschrijft één uitgevoerde check en zegt waar zijn getal "bekeken" over gaat.
+Zonder die duiding is `bekeken` een kaal getal met drie onvergelijkbare noemers, en dan
+zijn ook de percentages die erop delen (`percentage_populatie` in de GeoPackage)
+onderling niet te vergelijken. Zie BO-58 in [docs/beslislog.md](beslislog.md).
+
+| Veld | Type | Betekenis |
+|---|---|---|
+| `check_id` | string | Check-ID uit het checkregister; hetzelfde ID als op de meldingen. |
+| `bekeken` | integer | Hoeveel deze check bekeken heeft. Wat de eenheid is, zegt `bekeken_scope`. |
+| `bekeken_scope` | string | Waarover geteld is: `analyseset`, `volledige_export` of `attribuut_instanties`. |
+| `populatie` | string | De populatie die de check *declareert* — waar hij over gaat, **niet** de noemer van `bekeken`. Zijn rollen komma-gescheiden; declareert hij er geen, dan zijn kenmerken (`alle kenmerken` voor `*`); declareert hij geen van beide, dan een lege string. |
+
+De drie waarden van `bekeken_scope`:
+
+- **`analyseset`** — geteld over de dataset die de check meekreeg: met een studiegebied
+  de kern plus de contextschil, zonder studiegebied de volledige export. Dit is de
+  gewone waarde; ze zegt dat het getal met de afbakening meebeweegt.
+- **`volledige_export`** — de check gaat over de hele populatie (`Check.volledig_bereik`
+  of `[studiegebied] volledige_dataset_checks`) en telt daarom altijd de volledige
+  export, ook met een studiegebied. ADM-002 (dubbele identificaties) is er een.
+- **`attribuut_instanties`** — het getal telt geen objecten maar instanties van een
+  kenmerk: ATTR-014 elke kenmerkinstantie met een property-restrictie, BTR-006 elke
+  hoogtewaarde. Op De Wolden staat 459.108 tegenover 45.803 objecten; die twee getallen
+  naast elkaar leggen heeft geen betekenis.
+
+**`populatie` is geen noemer.** Het is de declaratie van de check: de vereniging van wat
+zijn code aanraakt, en daarmee structureel een bovengrens op wat `bekeken` telt. ATTR-018
+declareert ook `leidingen` omdat zijn toelichting die telt, terwijl `bekeken` alleen
+vrijvervalstrengen plus putten telt. Reken er dus niet mee; het aantal staat in `bekeken`
+en de eenheid ervan in `bekeken_scope`. Een check die niets declareert (ADM-007) krijgt
+een lege string -- geen omschrijving van de hele export, want dat zou wél als noemer lezen.
+
+`totaal/bevindingen.json` draagt het veld niet: `bekeken` is per gebied gemeten, een som
+zou objecten op een gebiedsgrens dubbel tellen en het eerste gebied nemen zou een dekking
+beweren die niemand gemeten heeft. De meldingen-CSV draagt het ook niet -- bekeken hoort
+bij de check en niet bij de rij, dezelfde scheiding als bij `cfk_set`. In de GeoPackage
+staan dezelfde twee waarden in `overzicht_checks` (`bekeken_scope`, `populatie`), en in
+het Markdown-rapport in de kolommen Bekeken scope en Gaat over van de checktabel, met een
+voetnoot eronder die dezelfde waarschuwing draagt.
+
+Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering` en
+`onderdrukt`.
+
 ### Over `gebied` en `gebieden`
 
 Beide velden zijn optioneel en kwamen erbij zonder de schemaversie te verhogen: een
@@ -147,8 +219,9 @@ studiegebiedbestand dat de run meekreeg.
 
 De meeste checks laten deze twee leeg. Ze zijn gevuld bij een melding die twee objecten
 tegen elkaar afzet: de TOP-checks (twee GWSW-objecten, dus twee dataset-URI's) en sinds
-deze versie EXT-001 en EXT-003, die een extern object aanwijzen. Dat is een
-achterwaarts verenigbare toevoeging: de velden bestonden al.
+deze versie EXT-001 en EXT-003, die een extern object aanwijzen -- bij EXT-003 het
+doorkruiste BGT-waterdeel. Dat is een achterwaarts verenigbare toevoeging: de velden
+bestonden al.
 
 De URI's van externe objecten volgen een vaste conventie:
 
@@ -167,10 +240,11 @@ Zo'n sleutel is stabiel over runs op hetzelfde bestand, maar verandert zodra de
 geometrie in de bron wijzigt.
 
 Let op bij het vergelijken van meetmomenten: `melding_id` is een hash over onder meer
-`object2_uri`. Doordat EXT-001 en EXT-003 dat veld sinds deze versie vullen, hebben hun
-meldingen een ander ID dan in de vorige versie, en verschijnen ze in een diff eenmalig
-als opgelost plus nieuw. Een `geo:`-sleutel verschuift bovendien mee zodra de geometrie
-in de bron wijzigt.
+`object2_uri`. Doordat EXT-001 en EXT-003 dat veld sinds deze versie vullen,
+hebben hun meldingen een ander ID dan in de vorige versie, en verschijnen ze in een
+diff eenmalig als opgelost plus nieuw. Een `geo:`-sleutel verschuift bovendien mee
+zodra de geometrie in de bron wijzigt. De meldingen van EXT-002 verdwijnen in deze
+versie helemaal: die check is vervallen (BO-66).
 
 Sinds deze versie verschuiven er nog drie dingen, alle drie zonder dat `schema_versie`
 verandert -- de vorm van het contract blijft gelijk, alleen de meldingen die het draagt
@@ -190,8 +264,18 @@ bewegen:
   in [docs/beslislog.md](beslislog.md) voor de tabel per check.
 
 De geometrie van het externe object zit **niet** in de JSON -- die zou als WKB in het
-contract belanden. Wie hem wil, vindt het object in de GeoPackage: de lagen
-`bouwwerken` en `waterdelen_zonder_zinker` dragen dezelfde sleutel in hun kolom `id`.
+contract belanden. Wie hem wil, vindt het object in de GeoPackage: de laag `vlakken`
+draagt dezelfde sleutel in haar kolom `id` (issue #67). De kolom `soort` (`pand`,
+`bouwwerk`, `water`) scheidt de categorieën die vroeger in de aparte lagen `bouwwerken`
+en `waterdelen_zonder_zinker` stonden; `check_ids` somt de checks op die naar het vlak
+wijzen. Sinds issue #98 draagt diezelfde laag ook de gemengde deelstelsels van RVZ-006
+(`soort = gemengd_deelstelsel`, voorheen de eigen laag `gemengd_zonder_overstort`); hun
+`id` is geen externe sleutel maar de `cluster_id` van de melding.
+
+Een watervlak draagt sinds issue #83 altijd `check_ids = "EXT-003"`: EXT-002 is vervallen
+(BO-66) en EXT-003 registreert zijn doorkruiste waterdeel zelf. Een doorkruising door een
+als zinker geregistreerde streng is geen bevinding en levert dus ook geen rij in `vlakken`
+meer; tot #83 deed zij dat wel, via EXT-002.
 
 ### Meldingen uit de nulmeting
 
@@ -214,14 +298,28 @@ Wat je van zo'n melding moet weten:
   `foutlocatie` en een leeg `gebied`, want hij is aan geen enkel studiegebied toe
   te wijzen. Bij een run over meerdere gebieden staat hij daarom in de JSON van elk
   gebied.
-- **`drempel` is altijd leeg.** De SHACL-rapporten noemen de drempel binnen de
-  boodschap (`waarde wijkt af (min=1,max=75)`) en niet in een eigen kolom; hem eruit
-  peuteren zou een tweede lezing van dezelfde tekst zijn.
-- **`melding_id` hangt aan de boodschap.** De onderscheidende sleutels zijn de
-  focusnode en de boodschap: twee eindpunten van dezelfde streng herleiden naar
-  diezelfde streng, dus de object-URI onderscheidt ze niet. Herformuleert de
+- **`boodschap` is de leesbare zin, `boodschap_technisch` de SHACL-tekst.** Sinds
+  `1.2` (issue #101) draagt elke nulmetingmelding een vaste Nederlandse omschrijving
+  bij haar SHACL-vorm: *"Put zonder (of met meer dan één) geregistreerde puthoogte"*
+  in plaats van *"Subject Put, path hasAspect, object HoogtePut - aantal voorkomens
+  wijkt af (exact=1)"*. De tabel met die teksten reist als package-resource mee
+  (`nulmeting_teksten.toml`); zij dekt de 43 vormen die de De Wolden-rapporten kennen.
+  Een vorm zonder tekst valt terug op de technische boodschap -- dan zijn de twee
+  velden gelijk -- en het Markdown-rapport telt hoeveel meldingen dat waren. De
+  grenzen in zo'n zin (`(63–4000 mm)`) komen uit de meldingsrij zelf en niet uit een
+  vastgelegde waarde, dus een conformiteitsklasse met een andere grens levert een
+  andere zin.
+- **`drempel` is altijd leeg**, ook sinds `1.2`. De SHACL-rapporten noemen de drempel
+  binnen de boodschap (`waarde wijkt af (min=1,max=75)`) en niet in een eigen kolom;
+  hem als eigen veld uitleveren zou een tweede contract zijn dat naast de brontekst
+  moet blijven kloppen. Dat de leesbare zin diezelfde grens invult verandert daar
+  niets aan: die grens staat als tekst in `boodschap`, niet als waarde in `drempel`.
+- **`melding_id` hangt aan de technische boodschap.** De onderscheidende sleutels zijn
+  de focusnode en `boodschap_technisch`: twee eindpunten van dezelfde streng herleiden
+  naar diezelfde streng, dus de object-URI onderscheidt ze niet. Herformuleert de
   GWSW-server een boodschap, dan verschuiven de ID's van die vorm eenmalig en leest
-  een trendvergelijking ze als opgelost plus nieuw.
+  een trendvergelijking ze als opgelost plus nieuw. Een gewijzigde *leesbare* zin doet
+  dat niet: de vertaaltabel raakt geen enkel melding-ID.
 - **`systemisch`** wordt per (vorm, objecttype) bepaald, met als noemer het aantal
   instanties van dat type in de dataset. Zonder objecttype in het rapport of zonder
   instanties van dat type is er geen noemer en is de melding niet systemisch.
@@ -229,10 +327,14 @@ Wat je van zo'n melding moet weten:
 ### Datasetsignalen
 
 Naast het register en de nulmeting draagt de stroom een derde bron: signalen over de
-dataset zelf, te herkennen aan `bron: "dataset"` en `categorie: "SIG"`. Nu is er één
-soort, de nul-bewaking van issue #22: een klasse of rol waar een check op leunt maar
-die nul keer voorkomt in de export. Hun `check_id` is `SIG-nulklasse`, hun `dimensie`
-`Compleetheid`, hun `ernst` altijd `W`.
+dataset zelf, te herkennen aan `bron: "dataset"` en `categorie: "SIG"`. Er zijn twee
+soorten: de nul-bewaking van issue #22 (een klasse of rol waar een check op leunt maar
+die nul keer voorkomt; `check_id` `SIG-nulklasse`, `waarde` `"0"`) en het
+koppelingsherstel van issue #60 (de lader heeft `hasConnection`-doelen
+`<hulpstuk>_put` op naamstam naar het hulpstuk herleid; `check_id`
+`SIG-hulpstukkoppeling`, `waarde` het aantal herstelde koppelingen). De nul-bewaking
+draagt `dimensie` `Compleetheid`, het koppelingsherstel `Consistentie`; hun `ernst` is
+altijd `W`.
 
 Wat je van zo'n melding moet weten:
 
@@ -243,7 +345,7 @@ Wat je van zo'n melding moet weten:
   van de GeoPackage (BO-29) en verschijnt niet in `overzicht_checks`; hij hoort bij de
   omvangtabel van het rapport, niet bij de per-check-boekhouding.
 - **`object_label`** draagt de aanduiding: een klassenaam (`Overnamepunt`) bij het
-  afvoereindpunt, een rolnaam (`lozingseindpunt`) bij de andere rollen.
+  afvoereindpunt, een rolnaam (`lozingspunten`) bij de andere rollen.
 - **Alleen met klassenhierarchie.** Zonder ontologie herkent de lader geen klassen en
   worden er geen datasetsignalen geschreven; het rapport draagt daarvoor al zijn
   voorbehoud.
@@ -282,7 +384,7 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 | `object2_uri` | string | Het tweede betrokken object, bij checks die een paar beoordelen (een kruising, een koppeling). Leeg als de check maar één object aanwijst. |
 | `object2_id` | string | Het URI-fragment van `object2_uri`. |
 | `object2_label` | string | Leesbare aanduiding van het tweede object. |
-| `boodschap` | string | De bevinding in woorden, zoals ook in het Markdown-rapport en de CSV. |
+| `boodschap` | string | De bevinding in woorden, zoals ook in het Markdown-rapport en de CSV. Bij een melding uit de nulmeting is dit sinds `1.2` de vastgestelde Nederlandse zin bij de SHACL-vorm, niet meer de tekst van de GWSW-server; die staat in `boodschap_technisch`. |
 | `waarde` | string | De aangetroffen waarde, als de check er een noemt. Tekst, niet getal: de eenheid en de opmaak horen bij de boodschap. |
 | `drempel` | string | De drempel waartegen `waarde` is afgezet, als die er is. |
 | `typering_betrouwbaar` | boolean | Onwaar als de nulmeting dit object te globaal getypeerd noemt. De melding blijft staan, maar is niet betrouwbaar te duiden. |
@@ -295,6 +397,7 @@ tekstwaarde is een lege string, niet `null`. De enige uitzondering is
 | `run_datum` | string | Gelijk aan het enveloppeveld. |
 | `dataset` | string | Gelijk aan het enveloppeveld. |
 | `cfk` | array van string | De conformiteitsklassen die deze overtreding noemen, gesorteerd. Leeg (`[]`) bij een melding uit de eigen check-engine: die toetst niet tegen een conformiteitsklasse. Zie [Meldingen uit de nulmeting](#meldingen-uit-de-nulmeting). |
+| `boodschap_technisch` | string | De brontekst achter `boodschap`. Bij een melding uit de nulmeting de `Message`-kolom van het SHACL-rapport (`Subject Put, path hasAspect, object HoogtePut - aantal voorkomens wijkt af (exact=1)`); leeg bij een eigen check en bij een datasetsignaal, want die schrijven hun boodschap zelf en er is geen tweede formulering. Kwam er in `1.2` bij (issue #101). |
 
 ### Waarom `run_datum` en `dataset` dubbel staan
 
@@ -323,11 +426,20 @@ dat doet.
 Het tweede nummer telt op bij een achterwaarts verenigbare *wijziging* die een bestaande
 afnemer merkt -- niet bij een puur optioneel, additief veld. Zo'n veld laat een afnemer die
 het niet kent het bestand lezen zoals voorheen; het valt daarom onder de lijst hieronder en
-verhoogt de versie niet. Het nummer staat op `1.1`: die stap van `1.0` viel samen met het
-veld `cfk`, maar de latere velden `gebied`, `gebieden` en `markering` -- alle optioneel en
+verhoogt de versie niet. De stap van `1.0` naar `1.1` viel samen met het
+veld `cfk`, maar de latere velden `gebied`, `gebieden`, `markering`, `onderdrukt` en `checks` -- alle optioneel en
 additief -- kwamen er binnen `1.1` bij, zonder verhoging. Pin daarom op het **hoofdnummer**
-(`schema_versie.split(".")[0] == "1"`), niet op de volledige string: `1.1` duidt niet één
-vaste enveloppevorm aan.
+(`schema_versie.split(".")[0] == "1"`), niet op de volledige string: één tweede nummer
+duidt niet één vaste enveloppevorm aan.
+
+Het nummer staat op `1.2`. Die stap is er voor issue #101: elke melding draagt sindsdien
+`boodschap_technisch`, en bij een nulmetingmelding is `boodschap` de leesbare zin geworden
+in plaats van de SHACL-tekst. Dat laatste is een gewijzigde `boodschap`-tekst en dus
+toegestaan binnen het hoofdnummer, maar een bestaande afnemer merkt het -- vandaar de
+verhoging, waar `markering` en `onderdrukt` er als optionele toevoeging binnen `1.1` bij
+mochten. Dezelfde stap dekt de GeoPackage-herindeling van issue #98: die laat de JSON
+ongemoeid op de verwijzingen na, en het contract kent één nummer per blok wijzigingen, geen
+nummer per issue.
 
 **Binnen een hoofdversie mag:**
 

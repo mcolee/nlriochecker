@@ -13,11 +13,12 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from gwsw_orox_helpers.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
 
 from nlriochecker.checkconfig import CheckConfig, VerhangStap, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
+from nlriochecker.checks.administratief import LozeLeidingAanActiefRiool, _LozeKeten
 from nlriochecker.checks.verbanden import deelstelsel_ids
-from nlriochecker.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
 from nlriochecker.plausibiliteit import load_plausibility
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -33,7 +34,7 @@ def fixtureconfig() -> CheckConfig:
 def context_voor(bestand: str, config: CheckConfig) -> CheckContext:
     """Laadt een fixture zoals `toetsrun` dat doet: met de vulwaarde-leesregel erop."""
     dataset = markeer_vulwaarden(
-        load_dataset(TTL_DIR / bestand),
+        load_dataset(TTL_DIR / bestand, []),
         config.vulwaarden.hoogte_kenmerken,
         config.vulwaarden.hoogte_band_m,
     )
@@ -58,6 +59,10 @@ def ids_van(groep: str) -> list[str]:
 
 DEFECTEN = [
     ("attr001_diameter_bij_materiaal.ttl", "ATTR-001", ["1"]),
+    # Issue #86: het constructietype gaat voor het materiaal. DT (Ø65 PVC) valt binnen het
+    # drainagebereik en meldt niet meer; HW (hemelwaterriool, dezelfde maat en hetzelfde
+    # materiaal) wel, en DIT (Ø45) valt onder het drainagebereik zelf.
+    ("attr001_constructietype_drainage.ttl", "ATTR-001", ["DIT", "HW"]),
     ("attr002_kleine_diameter.ttl", "ATTR-002", ["1"]),
     # De ondergrens is nu stelselafhankelijk (issue #20): G (gemengd, Ø220) valt onder
     # 250 mm, V (vuilwater, Ø220) blijft boven 200 mm en is geen bevinding.
@@ -70,8 +75,12 @@ DEFECTEN = [
     # Alleen put A (rond, 800x1000) telt; put B (rond, 800x800) en put C (rechthoekig,
     # 800x1000) blijven stil -- de drie verificatiegevallen uit issue #39 in een fixture.
     ("attr016_ronde_put_ongelijk.ttl", "ATTR-016", ["A"]),
+    # Dezelfde conditie, de andere soort erbinnen: put A is rond met lengte 0 (issue #92).
+    ("attr016_ronde_put_lengte_nul.ttl", "ATTR-016", ["A"]),
     ("attr007_toekomstig_jaar.ttl", "ATTR-007", ["1"]),
-    ("attr008_lange_streng.ttl", "ATTR-008", ["1"]),
+    # ATTR-018: alleen de vrijvervalstreng en de put zonder begindatum; persleiding 3
+    # valt buiten de populatie.
+    ("attr018_zonder_begindatum.ttl", "ATTR-018", ["1", "A"]),
     ("attr009_lengte_wijkt_af.ttl", "ATTR-009", ["1"]),
     ("attr010_materiaal_put.ttl", "ATTR-010", ["1"]),
     ("attr012_metselwerk_rond.ttl", "ATTR-012", ["1"]),
@@ -85,7 +94,6 @@ DEFECTEN = [
     # data, waardoor streng 1 (beton 30) en streng 3 (PE 4) wel bij hun materiaal passen.
     ("attr017_wandruwheid_pe_betonwaarde.ttl", "ATTR-017", ["2"]),
     ("hgt004_bob_boven_deksel.ttl", "HGT-004", ["1"]),
-    ("hgt005_tegenverhang_licht.ttl", "HGT-005", ["1"]),
     ("hgt006_tegenverhang_fors.ttl", "HGT-006", ["1"]),
     ("hgt007_te_weinig_verhang.ttl", "HGT-007", ["1"]),
     ("hgt008_extreem_verhang.ttl", "HGT-008", ["1"]),
@@ -100,13 +108,17 @@ DEFECTEN = [
     ("hgt017_z_wijkt_af.ttl", "HGT-017", ["1", "1"]),
     ("hgt018_buiskruin_boven_maaiveld.ttl", "HGT-018", ["1"]),
     ("rvz001_losse_overstort.ttl", "RVZ-001", ["O"]),
+    # Issue #84: de enige aangesloten streng is loos; die telt niet als aansluiting.
+    ("rvz001_overstort_aan_loze_leiding.ttl", "RVZ-001", ["O"]),
     ("rvz002_drempel_zonder_niveau.ttl", "RVZ-002", ["O"]),
     ("rvz002_overstort_zonder_drempel.ttl", "RVZ-002", ["O"]),
-    ("rvz003_drempel_zonder_breedte.ttl", "RVZ-003", ["O"]),
-    ("rvz002_overstort_zonder_drempel.ttl", "RVZ-003", ["O"]),
+    # RVZ-003 is opgegaan in RVZ-002 (#87): een put met alleen niveau, dus zonder
+    # breedte, valt nu ook onder RVZ-002.
+    ("rvz003_drempel_zonder_breedte.ttl", "RVZ-002", ["O"]),
     ("rvz004_overstort_zonder_water.ttl", "RVZ-004", ["O"]),
     ("rvz005_overstort_op_hemelwater.ttl", "RVZ-005", ["O"]),
-    ("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006", ["A"]),
+    # Sinds #75 per gemengde streng: het deelstelsel telt er twee.
+    ("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006", ["1", "2"]),
     ("rvz007_bbb_zonder_berging.ttl", "RVZ-007", ["BBB"]),
     ("rvz008_bbb_zonder_lediging.ttl", "RVZ-008", ["BBB"]),
     ("rvz009_bbb_zonder_nooduitlaat.ttl", "RVZ-009", ["BBB"]),
@@ -117,6 +129,10 @@ DEFECTEN = [
     ("adm007_overstort_zonder_functie.ttl", "ADM-007", ["O"]),
     ("adm008_losse_compartimenten.ttl", "ADM-008", ["B"]),
     ("adm009_leiding_aan_put.ttl", "ADM-009", ["1"]),
+    # ADM-010 meldt per loze streng; de twee strengen van de doorgaande keten allebei.
+    ("adm010_loze_keten_doorgaand.ttl", "ADM-010", ["X1", "X2"]),
+    ("adm010_loze_keten_aanvoer.ttl", "ADM-010", ["X1"]),
+    ("adm010_loze_keten_afvoer.ttl", "ADM-010", ["X1"]),
     ("btr006_afgeronde_bobs.ttl", "BTR-006", ["b0"]),
 ]
 
@@ -131,12 +147,13 @@ def test_defect_wordt_gevonden(bestand: str, check_id: str, verwacht: list[str])
 def test_elk_defect_heeft_een_eigen_fixture() -> None:
     # Bewaakt dat er geen check-ID stilzwijgend zonder fixture blijft. HGT-001 t/m
     # HGT-003 en de EXT-checks hebben externe bronnen nodig en staan in blok C;
-    # BTR-001 t/m BTR-005 zijn skeletten. ADM-003 heeft geen defectfixture maar wel
-    # een eigen test, want zonder projectpatroon is er geen defect te bouwen.
+    # BTR-001, BTR-003 en BTR-004 zijn skeletten. ADM-003 heeft geen defectfixture maar wel
+    # een eigen test, want zonder projectpatroon is er geen defect te bouwen. HGT-005 verviel
+    # per issue #80 in NET-009 en telt dus niet meer mee.
     gedekt = {check_id for _, check_id, _ in DEFECTEN} | {"ADM-003"}
     verwacht = {
         *ids_van("ATTR"),
-        *[f"HGT-{nummer:03d}" for nummer in range(4, 19)],
+        *[f"HGT-{nummer:03d}" for nummer in range(4, 19) if nummer != 5],
         *ids_van("RVZ"),
         *ids_van("ADM"),
         "BTR-006",
@@ -172,6 +189,35 @@ def test_attr001_bereikcorrecties_uit_issue20() -> None:
     tabel buiten hun bereik; onder de gecorrigeerde tabel passen ze er alle vier in.
     """
     assert labels(uitkomst("attr001_diameterbesluit.ttl", "ATTR-001")) == []
+
+
+def test_attr001_constructietype_gaat_voor_het_materiaal() -> None:
+    """Issue #86: een drainageleiding wordt tegen haar eigen bereik gehouden.
+
+    DT (Ø65 PVC) valt binnen het drainagebereik en is geen bevinding meer, terwijl het
+    hemelwaterriool HW van dezelfde maat en hetzelfde materiaal er wel een blijft: de
+    uitzondering hangt aan het constructietype en niet aan de maat. DIT (Ø45) laat zien
+    dat het drainagebereik zelf ook een ondergrens heeft.
+    """
+    outcome = uitkomst("attr001_constructietype_drainage.ttl", "ATTR-001")
+
+    assert labels(outcome) == ["DIT", "HW"]
+    per_label = {bevinding.object_label: bevinding for bevinding in outcome.findings}
+    assert "het bereik 50-4000 mm dat bij constructietype DIT_riool" in per_label["DIT"].message
+    assert "het bereik 100-800 mm dat bij materiaal PVC" in per_label["HW"].message
+
+    telling = [note for note in outcome.notes if "constructietype getoetst" in note]
+    assert len(telling) == 1, outcome.notes
+    assert "2 van de 3 strengen" in telling[0]
+    # `Drain` staat wel in de tabel maar hangt onder `Leiding`; de zin daarover wordt uit
+    # de configuratie afgeleid en noemt dus precies die klasse en niet DIT_riool/DT_riool.
+    assert "Drain valt in deze configuratie buiten de getoetste populatie" in telling[0]
+
+    # De kolom Buiten bereik telt per streng tegen haar eigen anker: alle drie de PVC-
+    # strengen staan in de rij, maar DT (Ø65, drainagebereik) telt er niet in mee.
+    verdeling = [note for note in outcome.notes if "| Materiaal |" in note]
+    assert len(verdeling) == 1, outcome.notes
+    assert "| PVC | 3 | 2 | 45 | 65 |" in verdeling[0]
 
 
 def test_attr002_ondergrens_per_stelseltype() -> None:
@@ -266,7 +312,7 @@ def test_attr013_noemt_twee_kenmerken_elk_met_hun_eigen_waarde() -> None:
     tegenhanger -- dus die situatie wordt hier op de geladen dataset nagebootst.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl")
+    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl", [])
     put = next(node for node in ruw.nodes.values() if node.label == "C")
     nodes = dict(ruw.nodes)
     nodes[put.uri] = replace(
@@ -322,7 +368,7 @@ def test_attr013_telt_de_vulwaarden_buiten_haar_populatie() -> None:
     nagebootst: streng 1 en put A krijgen een klasse buiten de populatie.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl")
+    ruw = load_dataset(TTL_DIR / "attr013_vulwaarde_hoogte.ttl", [])
     streng = next(conduit for conduit in ruw.conduits.values() if conduit.label == "1")
     put = next(node for node in ruw.nodes.values() if node.label == "A")
     conduits = dict(ruw.conduits)
@@ -450,6 +496,25 @@ def test_attr016_noemt_de_vorm_en_de_twee_maten() -> None:
     assert bevinding.severity.value == "F"
 
 
+def test_attr016_scheidt_een_niet_geregistreerde_maat_van_een_tegenspraak() -> None:
+    """Binnen dezelfde conditie zijn er twee soorten, en die krijgen elk hun eigen tekst.
+
+    Een maat van 0 mm is geen meting maar een niet-geregistreerde maat -- een gat in de
+    aanlevering, dat de nulmeting meestal al als `LengtePut_val` meldt. Twee echte maar
+    ongelijke maten zijn de tegenspraak tussen vorm en maten, en dat is de eigen waarde
+    van deze check (issue #92).
+    """
+    nul = uitkomst("attr016_ronde_put_lengte_nul.ttl", "ATTR-016").findings[0]
+    tegenspraak = uitkomst("attr016_ronde_put_ongelijk.ttl", "ATTR-016").findings[0]
+
+    assert "lengte 0 mm" in nul.message
+    assert "de lengte is niet geregistreerd" in nul.message
+    assert nul.details["breedte_mm"] == pytest.approx(800)
+    assert nul.details["lengte_mm"] == pytest.approx(0)
+    assert "een ronde put heeft een diameter" in tegenspraak.message
+    assert "niet geregistreerd" not in tegenspraak.message
+
+
 def test_attr016_verantwoordt_de_ronde_putten_zonder_maat() -> None:
     """Een ronde put zonder breedte of lengte is niet te toetsen; dat hoort in de toelichting.
 
@@ -457,7 +522,7 @@ def test_attr016_verantwoordt_de_ronde_putten_zonder_maat() -> None:
     hier van zijn lengte ontdaan, zodat de verantwoordingsregel zichtbaar wordt.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr016_ronde_put_ongelijk.ttl")
+    ruw = load_dataset(TTL_DIR / "attr016_ronde_put_ongelijk.ttl", [])
     put = next(node for node in ruw.nodes.values() if node.label == "A")
     nodes = dict(ruw.nodes)
     nodes[put.uri] = replace(put, aspects=tuple(a for a in put.aspects if a.kind != "LengtePut"))
@@ -505,7 +570,7 @@ def test_attr017_verantwoordt_de_ongetoetste_leidingen() -> None:
     in de toelichting te staan; de PE-30-streng blijft de enige bevinding.
     """
     config = fixtureconfig()
-    ruw = load_dataset(TTL_DIR / "attr017_wandruwheid_pe_betonwaarde.ttl")
+    ruw = load_dataset(TTL_DIR / "attr017_wandruwheid_pe_betonwaarde.ttl", [])
     conduits = dict(ruw.conduits)
     streng3 = next(c for c in ruw.conduits.values() if c.label == "3")
     conduits[streng3.uri] = replace(
@@ -550,10 +615,9 @@ def test_hgt004_meldt_dat_het_gwsw_geen_putbodemniveau_kent() -> None:
     assert any("Putbodemniveau" in note for note in outcome.notes)
 
 
-def test_hgt005_en_hgt006_sluiten_elkaar_uit() -> None:
-    # Licht tegenverhang mag niet ook als fors gelden, en omgekeerd.
-    assert uitkomst("hgt005_tegenverhang_licht.ttl", "HGT-006").findings == []
-    assert uitkomst("hgt006_tegenverhang_fors.ttl", "HGT-005").findings == []
+def test_hgt006_zwijgt_onder_de_forsgrens_van_tien_centimeter() -> None:
+    # 0,08 m stijging ligt onder de forsgrens van 0,10 m (issue #80): geen forse bevinding.
+    assert uitkomst("hgt006_net_onder_de_forsgrens.ttl", "HGT-006").findings == []
 
 
 def test_hgt011_zwijgt_zonder_drempelobjecten() -> None:
@@ -577,14 +641,22 @@ def test_rvz004_zwijgt_zonder_oppervlaktewater() -> None:
     assert any("geen enkel `Oppervlaktewater`-object" in note for note in outcome.notes)
 
 
-def test_rvz002_zwijgt_bij_een_drempel_met_niveau() -> None:
-    assert labels(uitkomst("rvz003_drempel_zonder_breedte.ttl", "RVZ-002")) == []
+def test_rvz002_zwijgt_bij_een_volledige_drempel() -> None:
+    # Een drempel met zowel niveau als breedte laat RVZ-002 zwijgen; ontbreekt er
+    # een van de twee, dan meldt de check (zie de teksttest hieronder).
+    assert labels(uitkomst("rvz_schoon.ttl", "RVZ-002")) == []
 
 
 def test_rvz002_verantwoordt_de_putten_zonder_drempel() -> None:
     outcome = uitkomst("rvz002_overstort_zonder_drempel.ttl", "RVZ-002")
 
     assert outcome.examined == 1
+    # Eén melding per put, die beide ontbrekende maten opsomt (#87).
+    assert [bevinding.message for bevinding in outcome.findings] == [
+        "Deze overstortput heeft geen enkel `Overstortdrempel`-onderdeel, en dus geen "
+        "drempelniveau (`Drempelniveau`) en geen drempelbreedte (`Drempelbreedte`)."
+    ]
+    assert outcome.findings[0].details["ontbrekende_maten"] == ["Drempelniveau", "Drempelbreedte"]
     assert any("zonder enig `Overstortdrempel`-onderdeel" in note for note in outcome.notes), (
         outcome.notes
     )
@@ -592,36 +664,52 @@ def test_rvz002_verantwoordt_de_putten_zonder_drempel() -> None:
 
 
 @pytest.mark.parametrize(
-    ("bestand", "check_id", "boodschap"),
+    ("bestand", "boodschap", "ontbrekend"),
     [
         (
             "rvz002_drempel_zonder_niveau.ttl",
-            "RVZ-002",
             "De enige overstortdrempel van deze put heeft geen drempelniveau "
             "(`Drempelniveau`) geregistreerd.",
+            ["Drempelniveau"],
         ),
         (
             "rvz003_drempel_zonder_breedte.ttl",
-            "RVZ-003",
             "De enige overstortdrempel van deze put heeft geen drempelbreedte "
             "(`Drempelbreedte`) geregistreerd.",
+            ["Drempelbreedte"],
         ),
     ],
 )
-def test_overstort_met_drempel_zonder_waarde_meldt_lopend_nederlands(
-    bestand: str, check_id: str, boodschap: str
+def test_rvz002_meldt_welke_maat_ontbreekt(
+    bestand: str, boodschap: str, ontbrekend: list[str]
 ) -> None:
-    """De tak 'wel een drempel, geen waarde' had geen test op haar tekst.
+    """RVZ-002 zegt in één melding per put welke drempelmaat ontbreekt (#87).
 
-    Bij een enkele drempel liep de zin fout ("Geen van de 1 overstortdrempels"), en het
-    voltooid deelwoord stond ervoor, waar het bij de breedte niet klopte ("een
-    geregistreerd drempelbreedte"). De toelichting noemt nu het bereik zoals de andere
-    notities in deze module dat doen.
+    RVZ-003 is hierin opgegaan: een put met alleen niveau (dus zonder breedte) en een
+    put met alleen breedte (dus zonder niveau) leveren allebei precies één melding met
+    de juiste maat in de tekst en in de details.
     """
-    outcome = uitkomst(bestand, check_id)
+    outcome = uitkomst(bestand, "RVZ-002")
 
     assert [bevinding.message for bevinding in outcome.findings] == [boodschap]
+    assert outcome.findings[0].details["ontbrekende_maten"] == ontbrekend
     assert outcome.notes == ["Bekeken: 1 overstortput in deze dataset (Overstortput, Stuwput)."]
+
+
+def test_rvz002_meldt_over_meerdere_drempels_van_een_put() -> None:
+    """Een put met meer dan één drempel krijgt de 'een X of een Y'-formulering (#87).
+
+    De tak leest positief ("Geen van de N ... heeft een X") om een dubbele ontkenning te
+    vermijden; op De Wolden komt hij niet voor (nul drempelobjecten), dus alleen deze
+    fixture bewaakt hem.
+    """
+    outcome = uitkomst("rvz002_twee_drempels_zonder_breedte.ttl", "RVZ-002")
+
+    assert [bevinding.message for bevinding in outcome.findings] == [
+        "Geen van de 2 overstortdrempels van deze put heeft een drempelbreedte "
+        "(`Drempelbreedte`) geregistreerd."
+    ]
+    assert outcome.findings[0].details["ontbrekende_maten"] == ["Drempelbreedte"]
 
 
 def test_rvz011_meldt_de_waking() -> None:
@@ -670,7 +758,7 @@ def test_btr006_zwijgt_bij_te_weinig_waarnemingen() -> None:
     assert outcome.findings == []
 
 
-@pytest.mark.parametrize("check_id", ["BTR-001", "BTR-002", "BTR-003", "BTR-004", "BTR-005"])
+@pytest.mark.parametrize("check_id", ["BTR-001", "BTR-003", "BTR-004"])
 def test_btr_skeletten_melden_hun_markering(check_id: str) -> None:
     outcome = uitkomst("attr_schoon.ttl", check_id)
 
@@ -679,46 +767,48 @@ def test_btr_skeletten_melden_hun_markering(check_id: str) -> None:
     assert any("vereist inwinningsmetagegevens" in note for note in outcome.notes)
 
 
+def test_rvz006_meldt_per_gemengde_streng() -> None:
+    """Sinds issue #75 hangt de bevinding aan de gemengde strengen, niet aan een knoop.
+
+    Het gebrek zit in het deelstelsel als geheel, maar een deelstelsel is geen
+    GWSW-object; de dragers zijn de gemengde strengen ervan. Beide strengen van de
+    fixture krijgen een eigen bevinding.
+    """
+    outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+
+    assert labels(outcome) == ["1", "2"]
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl", [])
+    assert all(bevinding.object_uri in dataset.conduits for bevinding in outcome.findings)
+
+
 def test_rvz006_draagt_hetzelfde_deelstelsel_id_als_de_net_checks() -> None:
     """RVZ-006 en NET-001 melden over hetzelfde deelstelsel.
 
     Alleen met een gedeeld ID is in rapport en GIS te zien dat het om hetzelfde
-    stuk net gaat; anders lijkt het twee losse gebreken.
+    stuk net gaat; anders lijken twee gemengde strengen twee losse gebreken.
     """
-    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl", [])
     context = CheckContext(dataset=dataset, config=fixtureconfig())
     ids = deelstelsel_ids(context)
 
     outcome = run_checks(context, ["RVZ-006"]).outcomes[0]
 
-    bevinding = outcome.findings[0]
-    assert bevinding.details["cluster_id"] == ids[bevinding.object_uri]
+    clusters = {bevinding.details["cluster_id"] for bevinding in outcome.findings}
+    assert len(outcome.findings) == 2
+    assert len(clusters) == 1
+    assert clusters <= set(ids.values())
 
 
-def test_rvz006_zet_het_zwaartepunt_van_het_deelstelsel_als_foutlocatie() -> None:
-    """Het gebrek zit in het deelstelsel, niet in de knoop waar de melding aan hangt.
+def test_rvz006_zet_geen_eigen_foutlocatie_meer() -> None:
+    """De melding zit op de streng zelf, dus de gewone objectlocatie volstaat.
 
-    Op de kaart hoort de melding daarom midden in dat deel te staan.
+    Het zwaartepunt van het deelstelsel was er om een melding op een willekeurige
+    knoop midden in het deel te zetten; per streng is dat niet meer nodig en zou het
+    de melding juist van haar eigen streng wegtrekken.
     """
-    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl")
-    context = CheckContext(dataset=dataset, config=fixtureconfig())
-    ids = deelstelsel_ids(context)
+    outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
 
-    bevinding = run_checks(context, ["RVZ-006"]).outcomes[0].findings[0]
-
-    cluster = ids[bevinding.object_uri]
-    punten = [
-        dataset.nodes[uri].point
-        for uri, deel in ids.items()
-        if deel == cluster and dataset.nodes.get(uri) is not None
-        if dataset.nodes[uri].point is not None
-    ]
-    verwacht_x = sum(punt.x for punt in punten) / len(punten)
-    verwacht_y = sum(punt.y for punt in punten) / len(punten)
-    x, y = bevinding.details["foutlocatie"]
-
-    assert x == pytest.approx(verwacht_x)
-    assert y == pytest.approx(verwacht_y)
+    assert all("foutlocatie" not in bevinding.details for bevinding in outcome.findings)
 
 
 def test_rvz006_zonder_afvoereindpunt_noemt_alleen_die_reden() -> None:
@@ -730,7 +820,7 @@ def test_rvz006_zonder_afvoereindpunt_noemt_alleen_die_reden() -> None:
 
     assert len(outcome.findings) == 1
     boodschap = outcome.findings[0].message
-    assert "zonder afvoereindpunt (gemaal, pompunit of overnamepunt)" in boodschap
+    assert "zonder afvoereindpunt (gemaal of overnamepunt)" in boodschap
     assert "externe overstort" not in boodschap
 
 
@@ -738,10 +828,148 @@ def test_rvz006_zonder_beide_noemt_beide_redenen() -> None:
     """Een gemengd deel zonder overstort en zonder afvoereindpunt noemt beide redenen."""
     outcome = uitkomst("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
 
-    assert len(outcome.findings) == 1
-    boodschap = outcome.findings[0].message
-    assert "zonder enige externe overstort of bergbezinkvoorziening" in boodschap
-    assert "en zonder afvoereindpunt (gemaal, pompunit of overnamepunt)" in boodschap
+    assert len(outcome.findings) == 2
+    for bevinding in outcome.findings:
+        assert "zonder enige externe overstort of bergbezinkvoorziening" in bevinding.message
+        assert "en zonder afvoereindpunt (gemaal of overnamepunt)" in bevinding.message
+
+
+def test_rvz006_telt_een_pompunit_niet_als_afvoereindpunt() -> None:
+    """Een pompput is een overdrachtspunt naar de drukriolering, geen eindpunt (BO-55).
+
+    RVZ-006 leest dezelfde lijst `afvoer_eindpunt` als NET-001, dus het gemengde
+    deelstelsel dat alleen op een pompunit uitkomt mist nog steeds zijn eindpunt.
+    De melding noemt precies die ene reden: de overstort is er wel.
+    """
+    outcome = uitkomst("rvz006_gemengd_alleen_pompunit.ttl", "RVZ-006")
+
+    assert labels(outcome) == ["1", "2"]
+    for bevinding in outcome.findings:
+        assert "zonder afvoereindpunt (gemaal of overnamepunt)" in bevinding.message
+        assert "externe overstort" not in bevinding.message
+
+
+def test_rvz006_zwijgt_als_het_deelstelsel_door_een_t_stuk_doorloopt() -> None:
+    """Een T-stuk knipt het deelstelsel niet meer in tweeën (issue #105, BO-83).
+
+    De gemengde strengen '1' en '2' hangen aan T-stuk T1 en komen via overstortput O bij
+    het gemaal uit. Zolang het T-stuk geen knoop was, hield put A een eigen deelstelsel
+    over -- zonder overstort en zonder afvoereindpunt -- en meldde RVZ-006 daarop. Dat
+    was een vals vlak: op De Wolden en Hoogeveen drie stuks.
+    """
+    assert labels(uitkomst("net_hulpstuk_doorgeefknoop.ttl", "RVZ-006")) == []
+
+
+def test_rvz006_meldt_nog_steeds_achter_een_afsluitstuk() -> None:
+    """Een afsluitstuk draagt geen functie met een aantal en geeft dus niet door (BO-72).
+
+    De keten is verder gelijk aan die van de vorige test; alleen het T-stuk is een
+    `Afsluitstuk`. Put A houdt daarmee zijn eigen deelstelsel, en de melding erop blijft.
+    """
+    assert labels(uitkomst("net_hulpstuk_afsluitstuk.ttl", "RVZ-006")) == ["1"]
+
+
+def test_rvz006_telt_de_strengen_en_knopen_van_het_deel_als_de_graaf() -> None:
+    """Wat de graaf verbindt telt de check mee, en wat zij doorgeeft telt zij niet (BO-83).
+
+    Twee kanten van dezelfde lijn, op een deelstelsel dat over twee T-stukken doorloopt:
+
+    * streng '2' hangt met béide einden aan een hulpstuk. Zij ligt als kant in het
+      deelstelsel, maar staat in geen enkele put-index; wie de strengen van een deel bij
+      `aansluitingen` opzoekt mist haar en meldt haar niet.
+    * de twee T-stukken zijn doorgeefknopen en geen beoordeeld object. Het deel telt dus
+      twee knopen -- put A en put B -- en dat is het getal dat in de melding en in
+      `knopen_in_deelstelsel` hoort te staan.
+    """
+    outcome = uitkomst("rvz006_gemengd_over_hulpstukken.ttl", "RVZ-006")
+
+    assert labels(outcome) == ["1", "2", "3"]
+    for bevinding in outcome.findings:
+        assert "gemengd deelstelsel van 2 knopen" in bevinding.message
+        assert bevinding.details["knopen_in_deelstelsel"] == 2
+        assert bevinding.details["gemengde_strengen"] == 3
+
+
+def _aanwijzingen(bestand: str) -> str:
+    """De aanwijzingen uit de eerste RVZ-006-melding van een fixture (issue #106)."""
+    outcome = uitkomst(bestand, "RVZ-006")
+    assert outcome.findings, f"{bestand}: RVZ-006 meldt niets"
+    boodschappen = {bevinding.message for bevinding in outcome.findings}
+    # De diagnose is per deelstelsel: elke streng van hetzelfde deel draagt dezelfde zin.
+    assert len(boodschappen) == 1
+    return boodschappen.pop().partition("Aanwijzingen: ")[2]
+
+
+def test_rvz006_noemt_het_aandeel_gemengde_strengen() -> None:
+    """Het kale geval draagt alleen de telling, en die is een feit en geen oordeel.
+
+    De fixture is een hemelwaterdeelstelsel met een enkele gemengd getypeerde streng --
+    op De Wolden en Hoogeveen dertien van de gemelde deelstelsels. De melding zegt niet
+    "overwegend hemelwater" (waar die grens ligt is niet aan de check) maar telt: 1 van 3.
+    """
+    assert _aanwijzingen("rvz006_aanwijzing_aandeel_gemengd.ttl") == "1 van 3 strengen gemengd."
+
+
+def test_rvz006_noemt_een_knoop_die_met_een_ander_deel_samenvalt() -> None:
+    """Twee putten op dezelfde coordinaat: zo exporteert BrutIS een gecompartimenteerde put.
+
+    Het deelstelsel lijkt los te liggen, maar zijn put valt binnen de snapping-tolerantie
+    samen met een put van het andere deel. De aanwijzing noemt beide labels, het
+    deelstelsel-ID van de buur en de gemeten afstand.
+
+    Een deelstelsel kan meer dan één aanwijzing dragen, en dit geval draagt er twee: de
+    streng die uit de samenvallende put vertrekt begint per definitie op diezelfde
+    coordinaat, dus put B ligt er ook op. Beide feiten staan er, in vaste volgorde.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_samenvallende_knoop.ttl")
+
+    assert aanwijzingen == (
+        "1 van 1 strengen gemengd; "
+        "knoop B valt samen met B c2 van ds-B c2 (0.00 m); "
+        "knoop B ligt op streng 2 van ds-B c2 (0.00 m)."
+    )
+
+
+def test_rvz006_noemt_een_knoop_op_een_streng_van_een_ander_deel() -> None:
+    """Een put getekend op een leiding die daar niet gesplitst is.
+
+    De twee delen raken elkaar op de kaart maar niet in de graaf; de afstand (0,05 m)
+    staat erbij, zodat de lezer ziet hoe dicht het scheelt.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_knoop_op_streng.ttl")
+
+    assert aanwijzingen == "1 van 1 strengen gemengd; knoop B ligt op streng 2 van ds-C (0.05 m)."
+
+
+def test_rvz006_noemt_de_persleiding_en_de_lozingspunten() -> None:
+    """Waar het water heen gaat zonder afvoereindpunt (BO-82).
+
+    Een persleiding of een lozingspunt telt niet als afvoereindpunt -- een overstort zit
+    niet ná een persleiding -- maar de lezer hoort te zien waar het water dan wél heen
+    gaat. De vierde lozingsput staat er niet bij naam bij: bij meer dan drie treffers van
+    een soort volgt "… en N meer", zodat de melding leesbaar blijft.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_persleiding_en_lozingspunt.ttl")
+
+    assert aanwijzingen == (
+        "4 van 4 strengen gemengd; "
+        "persleiding p vertrekt uit A; geen afvoereindpunt (BO-82); "
+        "lozingspunt L1 aanwezig; geen afvoereindpunt (BO-82); "
+        "lozingspunt L2 aanwezig; geen afvoereindpunt (BO-82); "
+        "lozingspunt L3 aanwezig; geen afvoereindpunt (BO-82); "
+        "… en 1 meer."
+    )
+
+
+def test_rvz006_zwijgt_over_de_uitgangen_zodra_er_een_afvoereindpunt_is() -> None:
+    """Met een gemaal in het deel zeggen de persleiding en de lozingsput niets over het gebrek.
+
+    Het deelstelsel mist alleen zijn overstort; dat er ook een persleiding uit vertrekt en
+    dat er een lozingsput in ligt verklaart dat niet, dus die aanwijzingen blijven weg.
+    """
+    aanwijzingen = _aanwijzingen("rvz006_aanwijzing_met_afvoereindpunt.ttl")
+
+    assert aanwijzingen == "2 van 2 strengen gemengd."
 
 
 def test_rvz006_met_overstort_en_afvoereindpunt_zwijgt() -> None:
@@ -760,7 +988,7 @@ def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
     en de onbetrouwbare objecten; die zijn alle drie gebiedsonafhankelijk, dus mag
     hij over gebieden heen gedeeld worden.
     """
-    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    dataset = load_dataset(TTL_DIR / "schoon.ttl", [])
     config = load_check_config()
     gedeeld = CheckContext(
         dataset=dataset, config=config, volledige_dataset=dataset
@@ -785,7 +1013,7 @@ def test_gedeelde_volledige_context_wordt_hergebruikt() -> None:
 
 def test_de_run_draagt_het_trefferregister_van_zijn_context() -> None:
     """De GeoPackage-schrijver joint de meldingen later op dit register."""
-    dataset = load_dataset(TTL_DIR / "schoon.ttl")
+    dataset = load_dataset(TTL_DIR / "schoon.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
 
     run = run_checks(context, ["TOP-001"])
@@ -887,8 +1115,9 @@ def test_attr015_zwijgt_zonder_piek() -> None:
 def test_attr015_zwijgt_bij_te_weinig_gedateerde_objecten() -> None:
     """Onder het minimum zegt een aandeel niets; de detector zwijgt met een toelichting.
 
-    `attr_schoon.ttl` draagt maar een gedateerd object; zonder deze ondergrens zou dat
-    ene jaar 100% halen en vals aanslaan.
+    `attr_schoon.ttl` draagt drie gedateerde objecten, alle drie uit 1980 (de putten
+    kregen hun begindatum met ATTR-018, issue #61); zonder deze ondergrens zou dat ene
+    jaar 100% halen en vals aanslaan.
     """
     outcome = uitkomst("attr_schoon.ttl", "ATTR-015")
 
@@ -899,17 +1128,42 @@ def test_attr015_zwijgt_bij_te_weinig_gedateerde_objecten() -> None:
 
 
 def test_attr007_verantwoordt_de_objecten_zonder_begindatum() -> None:
-    """De putten zonder begindatum en het bredere dekkingsgat horen in de toelichting.
+    """De putten zonder begindatum horen in de toelichting; de meetsettelling niet meer.
 
     De fixture heeft twee putten zonder begindatum en een streng met een (te toekomstige)
-    datum; zonder deze toelichting leest ATTR-007 als "alle aanlegdatums gecontroleerd".
+    datum. De tweede regel van voorheen ("In deze meetset hebben … geen begindatum")
+    telde wat ATTR-018 nu per object meldt; twee plekken die hetzelfde zeggen lopen
+    uit elkaar (issue #61).
     """
     outcome = uitkomst("attr007_toekomstig_jaar.ttl", "ATTR-007")
 
     assert any("2 van de 2 putten in deze toets" in note for note in outcome.notes), outcome.notes
-    assert any("meetset" in note and "geen begindatum" in note for note in outcome.notes), (
-        outcome.notes
-    )
+    assert not any("meetset" in note for note in outcome.notes), outcome.notes
+
+
+def test_attr018_meldt_per_object_en_benoemt_de_soort() -> None:
+    """Streng 1 en put A missen de begindatum; de melding zegt welke soort object het is."""
+    outcome = uitkomst("attr018_zonder_begindatum.ttl", "ATTR-018")
+
+    per_label = {f.object_label: f for f in outcome.findings}
+    assert set(per_label) == {"1", "A"}
+    assert per_label["1"].details["objectsoort"] == "streng"
+    assert per_label["A"].details["objectsoort"] == "put"
+    assert all("begindatum" in f.message.lower() for f in outcome.findings)
+    # Twee vrijvervalstrengen plus vier putten; de persleiding telt niet mee.
+    assert outcome.examined == 6
+
+
+def test_attr018_verantwoordt_de_leidingen_buiten_de_populatie() -> None:
+    """De persleiding zonder begindatum is geen bevinding, maar hoort wel geteld te zijn."""
+    outcome = uitkomst("attr018_zonder_begindatum.ttl", "ATTR-018")
+
+    assert any(
+        "1 van de 3 leidingen" in note
+        and "geen vrijvervalrioolleiding" in note
+        and "1 zonder" in note
+        for note in outcome.notes
+    ), outcome.notes
 
 
 def test_attr014_zwijgt_bij_de_juiste_property() -> None:
@@ -932,3 +1186,71 @@ def test_attr014_meldt_ook_de_omgekeerde_richting() -> None:
         bevinding.message == "LengteLeiding gebruikt hasReference in plaats van hasValue op "
         "1 objecten."
     )
+
+
+def test_adm010_doorgaande_keten_draagt_keten_buren_en_omvang() -> None:
+    """Beide loze strengen delen een keten-ID en noemen de aansluitende actieve strengen."""
+    outcome = uitkomst("adm010_loze_keten_doorgaand.ttl", "ADM-010")
+
+    per_label = {f.object_label: f for f in outcome.findings}
+    assert set(per_label) == {"X1", "X2"}
+    assert per_label["X1"].details["cluster_id"] == per_label["X2"].details["cluster_id"]
+    assert per_label["X1"].details["cluster_id"].startswith("loos-")
+    for bevinding in per_label.values():
+        assert bevinding.details["geval"] == "doorgaand"
+        assert bevinding.details["keten_strengen"] == 2
+        assert bevinding.details["inkomend"] == "1"
+        assert bevinding.details["uitgaand"] == "3"
+        # Streng 1 en streng 0 liggen transitief bovenstrooms.
+        assert bevinding.details["bovenstrooms"] == 2
+        assert "1" in bevinding.message and "3" in bevinding.message
+    assert outcome.examined == 2
+
+
+@pytest.mark.parametrize(
+    ("bestand", "geval"),
+    [
+        ("adm010_loze_keten_aanvoer.ttl", "aanvoer"),
+        ("adm010_loze_keten_afvoer.ttl", "afvoer"),
+    ],
+)
+def test_adm010_benoemt_het_geval(bestand: str, geval: str) -> None:
+    outcome = uitkomst(bestand, "ADM-010")
+
+    assert [f.details["geval"] for f in outcome.findings] == [geval]
+
+
+def test_adm010_noemt_de_actieve_streng_die_de_keten_alleen_raakt() -> None:
+    """Streng 9 verlaat dezelfde put B, maar sluit in de afvoerrichting niet aan (issue #62)."""
+    outcome = uitkomst("adm010_loze_keten_rakend.ttl", "ADM-010")
+
+    assert labels(outcome) == ["X1"]
+    bevinding = outcome.findings[0]
+    assert bevinding.details["geval"] == "aanvoer"
+    assert bevinding.details["inkomend"] == "1"
+    assert bevinding.details["rakend"] == "9"
+
+
+def test_adm010_weigert_een_geval_zonder_meldingstekst() -> None:
+    """Wie `losgekoppeld` weer aan `gevallen` toevoegt krijgt een fout, geen afvoertekst."""
+    keten = _LozeKeten("loos-X1", (), (), (), (), 0)
+    assert keten.geval == "losgekoppeld"
+
+    with pytest.raises(ValueError, match="losgekoppeld"):
+        LozeLeidingAanActiefRiool._boodschap(keten)
+
+
+def test_adm010_telt_de_losgekoppelde_keten_wel_maar_meldt_hem_niet() -> None:
+    """De losgekoppelde keten hoort in de verantwoording, niet in de bevindingen (issue #81)."""
+    outcome = uitkomst("adm010_loze_keten_losgekoppeld.ttl", "ADM-010")
+
+    assert labels(outcome) == []
+    assert any("1 losgekoppeld (1 streng)" in note for note in outcome.notes), outcome.notes
+
+
+def test_adm010_verantwoordt_de_ketens_per_geval() -> None:
+    outcome = uitkomst("adm010_loze_keten_doorgaand.ttl", "ADM-010")
+
+    assert any(
+        "2 loze leidingen in 1 keten" in note and "1 doorgaand" in note for note in outcome.notes
+    ), outcome.notes

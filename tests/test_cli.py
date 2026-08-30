@@ -354,7 +354,7 @@ def test_toets_weigert_een_studiegebied_zonder_objecten(tmp_path: Path) -> None:
     assert not (tmp_path / "uitvoer").exists()
 
 
-def test_geen_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:
+def test_uitvoer_zonder_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:
     uitvoer = tmp_path / "uitvoer"
     resultaat = CliRunner().invoke(
         main,
@@ -365,7 +365,10 @@ def test_geen_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:
             str(TTL_DIR / "top001_losliggende_put.ttl"),
             "--check",
             "TOP-001",
-            "--geen-gpkg",
+            "--uitvoer",
+            "csv",
+            "--uitvoer",
+            "json",
             "--output",
             str(uitvoer),
         ],
@@ -374,6 +377,141 @@ def test_geen_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:
     assert resultaat.exit_code == 0, resultaat.output
     assert list(uitvoer.glob("*.gpkg")) == []
     assert (uitvoer / FILE_CHECKS_CSV).exists()
+    assert (uitvoer / FILE_CHECKS_JSON).exists()
+
+
+def test_zonder_uitvoer_optie_komen_alle_vier_de_bestanden(tmp_path: Path) -> None:
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--geen-ontologie",
+            "--dataset",
+            str(TTL_DIR / "top001_losliggende_put.ttl"),
+            "--check",
+            "TOP-001",
+            "--geen-cache",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert (uitvoer / FILE_CHECKS_MARKDOWN).exists()
+    assert (uitvoer / FILE_CHECKS_CSV).exists()
+    assert (uitvoer / FILE_CHECKS_JSON).exists()
+    assert len(list(uitvoer.glob("*.gpkg"))) == 1
+
+
+def test_uitvoer_csv_schrijft_alleen_rapport_en_csv(tmp_path: Path) -> None:
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--geen-ontologie",
+            "--dataset",
+            str(TTL_DIR / "top001_losliggende_put.ttl"),
+            "--check",
+            "TOP-001",
+            "--geen-cache",
+            "--uitvoer",
+            "csv",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert sorted(pad.name for pad in uitvoer.iterdir()) == [FILE_CHECKS_CSV, FILE_CHECKS_MARKDOWN]
+    assert "Geschreven:" in resultaat.output
+    assert FILE_CHECKS_JSON not in resultaat.output
+
+
+def test_uitvoer_json_en_gpkg_laat_de_csv_weg_maar_niet_het_rapport(tmp_path: Path) -> None:
+    """Het rapport draagt de markering en het voorbehoud; dat is nooit uit te zetten."""
+    uitvoer = tmp_path / "uitvoer"
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--geen-ontologie",
+            "--dataset",
+            str(TTL_DIR / "top001_losliggende_put.ttl"),
+            "--check",
+            "TOP-001",
+            "--geen-cache",
+            "--uitvoer",
+            "json",
+            "--uitvoer",
+            "gpkg",
+            "--output",
+            str(uitvoer),
+        ],
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert not (uitvoer / FILE_CHECKS_CSV).exists()
+    assert (uitvoer / FILE_CHECKS_MARKDOWN).exists()
+    assert (uitvoer / FILE_CHECKS_JSON).exists()
+    assert len(list(uitvoer.glob("*.gpkg"))) == 1
+
+
+def test_rapport_verwijst_niet_naar_een_uitgezette_csv(tmp_path: Path) -> None:
+    """Een verwijzing naar een bestand dat er niet is, is een onwaarheid (issue #66)."""
+    uitvoer = tmp_path / "uitvoer"
+    argumenten = [
+        "toets",
+        "--geen-ontologie",
+        "--dataset",
+        str(TTL_DIR / "top001_losliggende_put.ttl"),
+        "--check",
+        "TOP-001",
+        "--geen-cache",
+        "--output",
+        str(uitvoer),
+    ]
+
+    zonder = CliRunner().invoke(main, [*argumenten, "--uitvoer", "json"])
+    assert zonder.exit_code == 0, zonder.output
+    rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert f"staan in `{FILE_CHECKS_CSV}`" not in rapport
+    assert "De CSV is met `--uitvoer` uitgezet" in rapport
+
+    met = CliRunner().invoke(main, argumenten)
+    assert met.exit_code == 0, met.output
+    rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`." in rapport
+    assert "uitgezet" not in rapport
+
+
+def test_de_oude_vlaggen_bestaan_niet_meer(tmp_path: Path) -> None:
+    """Geen alias en geen overgangsperiode (issue #66)."""
+    for vlag in ("--geen-gpkg", "--geen-json"):
+        resultaat = CliRunner().invoke(
+            main,
+            ["toets", "--dataset", str(TTL_DIR / "schoon.ttl"), vlag, "--output", str(tmp_path)],
+        )
+        assert resultaat.exit_code == 2
+        assert "No such option" in resultaat.output
+
+
+def test_uitvoer_weigert_een_onbekende_vorm(tmp_path: Path) -> None:
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--uitvoer",
+            "xlsx",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert resultaat.exit_code == 2
+    assert "xlsx" in resultaat.output
 
 
 def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
@@ -425,7 +563,10 @@ def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
         kop = f"## {check_id} — "
         assert kop in tekst
         staart = tekst.split(kop, 1)[1]
-        assert f"Bevindingen ({aantal})" in staart.split("\n## ", 1)[0]
+        blok = staart.split("\n## ", 1)[0]
+        # Een systemische check draagt geen tabel per object maar een generieke regel
+        # met hetzelfde aantal (issue #76); beide vormen tellen dus mee.
+        assert f"Bevindingen ({aantal})" in blok or f"Systemisch: {aantal} bevinding" in blok
 
 
 def test_cfk_met_onbekende_waarde_somt_de_toegestane_op(
@@ -577,8 +718,8 @@ def test_cfk_zonder_shacl_meldt_dat_de_vlag_niets_doet(tmp_path: Path) -> None:
     assert "--cfk doet niets zonder --shacl" in resultaat.output
 
 
-def test_toets_met_geen_json_laat_het_bestand_weg(tmp_path: Path) -> None:
-    """De vlag doet wat hij zegt."""
+def test_uitvoer_zonder_json_laat_het_bestand_weg(tmp_path: Path) -> None:
+    """De optie doet wat ze zegt."""
     uitvoer = tmp_path / "uitvoer"
     resultaat = CliRunner().invoke(
         main,
@@ -588,7 +729,10 @@ def test_toets_met_geen_json_laat_het_bestand_weg(tmp_path: Path) -> None:
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
             "--geen-cache",
-            "--geen-json",
+            "--uitvoer",
+            "csv",
+            "--uitvoer",
+            "gpkg",
             "--output",
             str(uitvoer),
         ],
@@ -799,8 +943,8 @@ def test_toets_met_ontologie_gebruikt_de_klassenhierarchie(tmp_path: Path) -> No
     ontologie de *enige* bron van de hierarchie is. Dat de bare dataset toch twee
     knooppunten en een streng oplevert -- in plaats van nul -- bewijst dat de
     hierarchie uit `--ontologie` daadwerkelijk gebruikt is, niet enkel geaccepteerd.
-    Zou de doorgifte breken, dan weigert `_eis_ontologie` de run (geen ontologie,
-    geen `--geen-ontologie`) en valt de exitcode op 1.
+    Zou de doorgifte breken, dan valt de run terug op de gebundelde ontologie en
+    noemt het rapport die in plaats van `schoon.ttl`.
     """
     bron = (TTL_DIR / "schoon.ttl").read_text(encoding="utf-8").splitlines()
     kaal = tmp_path / "kaal.ttl"
@@ -822,7 +966,8 @@ def test_toets_met_ontologie_gebruikt_de_klassenhierarchie(tmp_path: Path) -> No
             "TOP-001",
             "--output",
             str(uitvoer),
-            "--geen-gpkg",
+            "--uitvoer",
+            "csv",
         ],
     )
 
@@ -833,24 +978,36 @@ def test_toets_met_ontologie_gebruikt_de_klassenhierarchie(tmp_path: Path) -> No
     assert "geen ontologie geladen" not in rapport
 
 
-def test_toets_zonder_ontologie_faalt(tmp_path: Path) -> None:
-    """De standaardweg: geen --ontologie en geen --geen-ontologie is een fout.
+def test_toets_zonder_ontologie_draait_op_de_gebundelde(tmp_path: Path) -> None:
+    """De standaardweg over de opdrachtregel: geen vlag is geen fout meer.
 
-    Click mag hem niet zelf afvangen met `required=True`: dan verdwijnt de
-    ontsnappingsvlag en krijgt de gebruiker clicks eigen melding in plaats van een
-    die uitlegt wat er misgaat.
+    Tot de leeslaag haar eigen ontologie meebracht was dit een weigering met
+    exitcode 1 -- `--ontologie` was verplicht en `--geen-ontologie` de enige
+    ontsnapping. Nu levert dezelfde aanroep een geslaagde run op de gebundelde
+    GWSW-ontologie, en het rapport noemt haar bij naam in plaats van een
+    voorbehoud te dragen.
     """
+    uitvoer = tmp_path / "uitvoer"
+
     resultaat = CliRunner().invoke(
         main,
         [
             "toets",
             "--dataset",
             str(TTL_DIR / "schoon.ttl"),
+            "--check",
+            "TOP-001",
             "--output",
-            str(tmp_path / "uitvoer"),
+            str(uitvoer),
+            "--uitvoer",
+            "csv",
+            # Geen cache: anders laat deze test een sleutel achter in
+            # ~/.cache/gwsw-orox-helpers, buiten tmp_path.
+            "--geen-cache",
         ],
     )
 
-    assert resultaat.exit_code == 1
-    assert "--geen-ontologie" in resultaat.output
-    assert not (tmp_path / "uitvoer").exists()
+    assert resultaat.exit_code == 0, resultaat.output
+    rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
+    assert "Klassenhierarchie uit `Ontologie_GWSW_Totaal.ttl`." in rapport
+    assert "geen ontologie geladen" not in rapport

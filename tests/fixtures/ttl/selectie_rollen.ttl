@@ -31,10 +31,31 @@ gwsw:Bergbezinkbassin rdfs:subClassOf gwsw:Bouwwerk .
 gwsw:Valput rdfs:subClassOf gwsw:Rioolput .
 gwsw:Duiker rdfs:subClassOf gwsw:Leiding .
 gwsw:Zinker rdfs:subClassOf gwsw:VrijvervalRioolleiding .
-gwsw:Drain rdfs:subClassOf gwsw:VrijvervalRioolleiding .
+# Drain en Aansluitleiding hangen in de GWSW-ontologie rechtstreeks onder Leiding en
+# niet onder VrijvervalRioolleiding (geverifieerd in de gebundelde ontologie); de
+# prelude zei dat van Drain tot issue #82 verkeerd.
+gwsw:Drain rdfs:subClassOf gwsw:Leiding .
+gwsw:Aansluitleiding rdfs:subClassOf gwsw:Leiding .
 gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 
 # DEFECT: geen -- deze fixture dekt de klassenselecties, niet een gebrek
+
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+# Hulpstukken, met de functierestrictie uit de GWSW-ontologie (issue #60).
+gwsw:Hulpstukorientatie rdfs:subClassOf gwsw:Knooppunt .
+gwsw:Verbindingsstuk rdfs:subClassOf gwsw:Hulpstuk ,
+    [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:VerbindenVanLeidingen ] .
+gwsw:Afsluitstuk rdfs:subClassOf gwsw:Hulpstuk ,
+    [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:AfsluitenVanLeidingen ] .
+gwsw:T_stuk rdfs:subClassOf gwsw:Verbindingsstuk ,
+    [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:VerbindenVanDrieLeidingen ] .
+gwsw:T_stuk_Speciaal rdfs:subClassOf gwsw:T_stuk .
+gwsw:Kruisstuk rdfs:subClassOf gwsw:Verbindingsstuk ,
+    [ a owl:Restriction ; owl:onProperty gwsw:functie ; owl:hasValue gwsw:VerbindenVanVierLeidingen ] .
+
+gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .
+
+gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .
 
 # Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude kent haar niet.
 gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
@@ -44,6 +65,11 @@ gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 :Put1_ori rdf:type gwsw:Putorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1000.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:Pomp1 rdf:type gwsw:Pompunit ; rdfs:label "Pomp1" ;
+    gwsw:hasAspect :Pomp1_ori .
+:Pomp1_ori rdf:type gwsw:Putorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1400.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 :Lozing1 rdf:type gwsw:Lozingsput ; rdfs:label "Lozing1" ;
     gwsw:hasAspect :Lozing1_ori .
 :Lozing1_ori rdf:type gwsw:Putorientatie ;
@@ -74,6 +100,11 @@ gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 :Bbb1_ori rdf:type gwsw:Bouwwerkorientatie ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1150.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+:Tstuk1 rdf:type gwsw:T_stuk ; rdfs:label "Tstuk1" ;
+    gwsw:hasAspect :Tstuk1_ori .
+:Tstuk1_ori rdf:type gwsw:Hulpstukorientatie ;
+    gwsw:hasAspect [ rdf:type gwsw:Punt ;
+        gwsw:hasValue "<gml:Point xmlns:gml=\"http://www.opengis.net/gml\"><gml:pos>1350.0 2000.0</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
 :L1 rdf:type gwsw:GemengdRiool ; rdfs:label "L1" ;
     gwsw:hasAspect :L1_ori .
 :L1_ori rdf:type gwsw:Leidingorientatie ;
@@ -123,6 +154,23 @@ gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 :P1_b rdf:type gwsw:BeginpuntLeiding .
 :P1_e rdf:type gwsw:EindpuntLeiding .
 :P1_b gwsw:hasConnection :Val1_ori .
+:Loos2 rdf:type gwsw:LozeLeiding ; rdfs:label "Loos2" ;
+    gwsw:hasAspect :Loos2_ori .
+:Loos2_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :Loos2_b , :Loos2_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1300.0 2000.0 1300.0 2050.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:Loos2_b rdf:type gwsw:BeginpuntLeiding .
+:Loos2_e rdf:type gwsw:EindpuntLeiding .
+:Loos2_b gwsw:hasConnection :Loos1_ori .
+:Duiker1 rdf:type gwsw:Duiker ; rdfs:label "Duiker1" ;
+    gwsw:hasAspect :Duiker1_ori .
+:Duiker1_ori rdf:type gwsw:Leidingorientatie ;
+    gwsw:hasPart :Duiker1_b , :Duiker1_e ;
+    gwsw:hasAspect [ rdf:type gwsw:Lijn ;
+        gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2200.0 1050.0 2200.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
+:Duiker1_b rdf:type gwsw:BeginpuntLeiding .
+:Duiker1_e rdf:type gwsw:EindpuntLeiding .
 :Sloot1 rdf:type gwsw:Sloot ; rdfs:label "Sloot1" ;
     gwsw:hasAspect :Sloot1_ori .
 :Sloot1_ori rdf:type gwsw:Leidingorientatie ;

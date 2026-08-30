@@ -6,13 +6,32 @@ Gebruik de `gh` CLI voor alle bewerkingen.
 ## Conventies
 
 - **Issue aanmaken**: `gh issue create --title "..." --body "..."`. Gebruik een heredoc voor een meerregelige body.
-- **Issue lezen**: `gh issue view <nummer> --comments`, reacties filteren met `jq` en de labels erbij ophalen.
+- **Issue lezen**: `gh issue view <nummer> --comments` werkt weer sinds gh 2.98 (de projectCards-deprecation die dit op gh 2.45 brak, is verholpen). Voor een script blijft de `--json`-vorm handig: `gh issue view <nummer> --json title,body,labels,comments --jq '{title, body, labels: [.labels[].name], comments: [.comments[].body]}'`. Filteren kan met `--jq` of met de losse `jq`-CLI (staat nu geïnstalleerd).
 - **Issues lijsten**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`, met de passende `--label`- en `--state`-filters.
 - **Reageren op een issue**: `gh issue comment <nummer> --body "..."`
 - **Labels toevoegen of verwijderen**: `gh issue edit <nummer> --add-label "..."` / `--remove-label "..."`
 - **Sluiten**: `gh issue close <nummer> --comment "..."`
 
 Het repo volgt uit `git remote -v`; `gh` leidt dat vanzelf af binnen een kloon.
+
+## Huisstijl van een issue
+
+Een `ready-for-agent`-issue is zelf de specificatie; de agent leest niets anders vooraf. Vaste
+opbouw, in deze volgorde (zie #62 en #63 als voorbeeld):
+
+1. **Het probleem** met gemeten getallen op De Wolden, en wat het níét is (de aangrenzende
+   check of het mechanisme dat er lijkt op maar iets anders doet).
+2. **Wat er verandert**, met bestand:regel voor elke plek, en de keuzes die al gemaakt zijn.
+3. **Verwacht effect op De Wolden** — het getal dat de agent na afloop moet meten.
+4. **Waar het overal staat** — een tabel over code, config, tests, docs, `CHANGELOG.md` en een
+   BO-nummer in `docs/beslislog.md` als er een domeinregel verschuift.
+5. **Verificatie** — de fixture-test, de poort, de meting, en de reviewzwaarte
+   (`CLAUDE.md`, Werkwijze).
+6. **Aannames** die niet met de auteur zijn afgestemd; de agent corrigeert ze in een comment.
+
+Getallen in een issue komen uit een run of uit `CHANGELOG.md`/`docs/beslislog.md`, nooit uit
+het geheugen; een aanname over een vrij check-ID controleer je in de check-module
+(`id = "…"`), want die nummers zijn vaak al bezet.
 
 ## Pull requests als triagekanaal
 
@@ -32,7 +51,7 @@ Maak een GitHub-issue aan.
 
 ## Als een skill zegt "haal het bijbehorende ticket op"
 
-Draai `gh issue view <nummer> --comments`.
+Draai `gh issue view <nummer> --comments` (of de `--json`-vorm hierboven voor scripting); sinds gh 2.98 werkt `--comments` weer, zie boven.
 
 ## Wayfinder-operaties
 

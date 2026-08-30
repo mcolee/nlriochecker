@@ -1,5 +1,8 @@
 # Project: nlriochecker
 
+Lees vóór je code aanraakt `manifesto.md` in de repo-root (lokaal, git-ignored): het
+draagt de missie, de prioriteiten bij botsende doelen en wat we nadrukkelijk niet doen.
+
 ## Doel
 Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen:
 1. Inlezen en analyseren van de GWSW-nulmeting, aangeleverd als SHACL-validatierapporten (apps.gwsw.nl/item_validate_shacl).
@@ -89,28 +92,40 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   Afwijken mag alleen als de auteur dat expliciet en onderbouwd heeft gedaan, en dan staat
   de afwijking als BO-nummer in `docs/beslislog.md` -- niet als commentaar in een
   configbestand.
-  Voordat je beweert dat een klasse of property niet bestaat, grep je
-  `data/gwsw_ontologieen/Ontologie_GWSW_Totaal.ttl`. Let op inconsistent hoofdlettergebruik:
+  Voordat je beweert dat een klasse of property niet bestaat, grep je de gebundelde
+  ontologie. Haar pad geeft dit commando:
+  `uv run python -c "from gwsw_orox_helpers.bronnen import gebundelde_ontologie as g; print(g())"`
+  Let op inconsistent hoofdlettergebruik:
   een regex als `[A-Za-z]*Stelsel` mist `Vuilwaterstelsel` met kleine s. Scheid twee vragen
   die makkelijk door elkaar lopen: "bestaat de klasse in de ontologie" en "komen er
   instanties voor in deze dataset" hebben verschillende antwoorden en vragen om
   tegengestelde ingrepen -- een ontbrekende klasse is een gat in ons model, ontbrekende
   instanties zijn een gat in de aanlevering. Zie de correctie op issue #11
   (`Overnamepunt` en `VerbeterdGescheidenStelsel` bestaan wél; De Wolden levert er nul).
-- **Leidende GWSW-versie: 1.6**, uit `Ontologie_GWSW_Totaal.ttl` (`owl:versionInfo` op regel
-  10: *"Deelmodel Totaal, filter op CoFs BAS DMO EN HYD LDR MDS NLCS PLI RRB TOP, versie=1.6
-  (2025-11-18T14:53:33)"*). Dat is het enige bestand dat de code laadt; `Mds` en `Hyd` komen
-  alleen in een integratietest voor en dragen geen versienummer maar een conversiedatum van
-  **20210920** -- ruim vier jaar ouder. Wees daarom voorzichtig met de uitspraak dat een
-  klasse "alleen in de totaal-ontologie" zit: dat kan net zo goed ouderdom van de
-  deelmodellen zijn als een modelleerkeuze.
-  Upgraden is handwerk van de auteur: hij levert nieuwe ontologiebestanden en dan trekt het
-  pakket bij. Bouw geen automatische versiecontrole tegen data.gwsw.nl. Werk deze regel bij
-  zodra de bestanden vervangen zijn -- de versie hier is de enige plek waar hij staat.
-  Draai daarbij ook `uv run python scripts/maak_gwsw_index.py`: dat schrijft de getrackte
-  afgeleide `data/gwsw-vocabulaire-index.json` opnieuw, waarmee de vocabulairetest ook op
-  CI draait (BO-32). Vergeet je het, dan valt `test_index_volgt_de_ontologie`; werk je de
-  index bij zonder deze regel, dan valt `test_indexversie_staat_in_claude_md`.
+- **De GWSW-ontologie komt uit `gwsw-orox-helpers`.** De ontologie en de vocabulaire-index
+  reizen als package-resource mee (`gwsw_orox_helpers.bronnen.gebundelde_ontologie()` en
+  `vocabulaire_index_pad()`); ze staan niet meer in `data/` en er is hier geen generator
+  meer voor. Welke GWSW-versie leidend is staat dáár, in de `CLAUDE.md` van die package --
+  dit is niet de plek waar dat nummer opnieuw wordt opgeschreven. Upgraden loopt dus over
+  een release van die package plus een `uv lock` hier; bouw geen automatische
+  versiecontrole tegen data.gwsw.nl. `Mds` en `Hyd` komen alleen in een integratietest voor
+  (uit `data/gwsw_ontologieen/`, niet getrackt) en dragen geen versienummer maar een
+  conversiedatum van **20210920** -- jaren ouder dan het totaalmodel. Wees daarom
+  voorzichtig met de uitspraak dat een klasse "alleen in de totaal-ontologie" zit: dat kan
+  net zo goed ouderdom van de deelmodellen zijn als een modelleerkeuze. De index draagt
+  naast `termen` en `subklasse_van` ook `aspecten_van` en `onderdelen_van` (per klasse de
+  directe `hasAspect`/`hasPart`-doelen, beide richtingen gevouwen); daarop leunt de
+  drifttest die elke checkdeclaratie (`rollen`, `kenmerken`) tegen de ontologie houdt
+  (`tests/test_checkdeclaraties_ontologie.py`). De drifttests die index en ontologie aan
+  elkaar en aan het versienummer binden (BO-32) draaien in de package-repo.
+- **Elke check declareert `rollen` en `kenmerken`** (issue #64, BO-51). Een nieuwe of
+  gewijzigde check moet zeggen over welke GWSW-populatie hij gaat (`rollen`, namen uit
+  `selectie._ROLLEN`) en welke kenmerken hij leest (`kenmerken`, GWSW-namen, of
+  `config:<pad>`/`*`); `register()` weigert een check zonder beide. Twee drifttests bewaken
+  het: `test_declaratie_volgt_de_code` (AST-sweep) en `test_declaratie_past_bij_de_ontologie`.
+  Verander je wat een check selecteert of leest, werk dan de declaratie bij -- de AST-sweep
+  valt anders. De dekselchecks putdiepte/putbodem (HGT-012/015) toetsen op de rol
+  `rioolputten` (`gwsw:Rioolput`), niet op elke `netwerkknoop`.
 - Standaard wordt de dataset aan ALLE conformiteitsklassen (CFK's) getoetst: Hyd,
   MdsPlan EN MdsProj. Ontbreekt er een, dan faalt de pijplijn met een duidelijke
   foutmelding. Een deelset kan alleen via de expliciete CLI-optie `--cfk`; zonder die
@@ -119,7 +134,9 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   JSON-envelop. NIET in de CSV: de CFK-set hoort bij de run en niet bij de melding, dus
   hij wordt geen kolom op elke rij. Gevolg dat je moet kennen: twee `bevindingen.csv`
   uit een volle en een deelrun zijn aan het bestand zelf niet te onderscheiden; lees ze
-  naast het rapport of de JSON. Een
+  naast het rapport of de JSON. Hetzelfde geldt voor de onderdrukking uit `[rapport]`
+  (issue #65): een CSV met en zonder `onderdruk_klassen`/`onderdruk_checks` ziet er
+  hetzelfde uit; de telling staat in het rapport, in `gwsw_run` en in de JSON. Een
   rapport voor een niet-gekozen CFK is een fout, geen stille overslag, en `vergelijk`
   weigert twee meetmomenten met ongelijke sets. Een `toets` zonder `--shacl` is een
   eigen toestand ("niet gemeten"), los van volledig en van deelset. De drie toestanden
@@ -132,16 +149,25 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - Ernstniveaus: F = fout, W = waarschuwing. Elke check heeft een dimensietag (Consistentie, Compleetheid, Plausibiliteit, Actualiteit, Traceerbaarheid, Precisie, Nauwkeurigheid, Compliance; de enum `Dimension` is de bron). In de SHACL-rapporten komt de ernst uit de kolom Severity: Violation = F, Warning = W.
 
 ### Techniek
-- **`toets` eist `--ontologie`.** De export draagt nul `rdfs:subClassOf` en typeert niets
-  op wortelniveau (`Inspectieput` wel, `Put` niet), dus zonder klassenhierarchie draaien
-  de checks over een onvolledige selectie en draagt hun uitkomst geen oordeel, terwijl
-  het rapport dat nergens zei. `voer_toets_uit` weigert
-  zo'n run vóór het laden; `--geen-ontologie` is de bewuste ontsnappingsvlag en levert
-  een rapport dat het voorbehoud in de kop draagt en de eigen checks op `–` zet in plaats
-  van op een vinkje. De testfixtures declareren hun eigen hierarchie inline: die draaien
-  legitiem met `--geen-ontologie` en houden hun oordeel, want het voorbehoud hangt aan
-  `GwswDataset.klassenhierarchie_bekend` en niet aan de vraag of er een ontologiebestand
-  meekwam. Zie issue #33.
+- **Functionaliteit hier mag `gwsw-orox-helpers` niet breken.** Deze repo gebruikt de
+  leeslaag uitsluitend via haar publieke API: geen monkeypatches of overrides op
+  internals, geen afhankelijkheid van privégedrag, en geen wijziging hier die een
+  bestaande aanroep van die package een andere betekenis geeft. Is er echt een
+  leeslaagwijziging nodig, dan loopt die via een release van die package plus een
+  `uv lock` hier — nooit via een omweg in deze repo.
+- **`toets` draait nooit zonder klassenhierarchie, tenzij je dat expliciet vraagt.** De
+  export draagt nul `rdfs:subClassOf` en typeert niets op wortelniveau (`Inspectieput`
+  wel, `Put` niet), dus zonder hierarchie draaien de checks over een onvolledige selectie
+  en draagt hun uitkomst geen oordeel, terwijl het rapport dat nergens zei. Er zijn drie
+  toestanden, en ze zijn niet uitwisselbaar (`_ontologiekeuze` in `toetsrun.py` is de
+  enige plek waar ze uit elkaar gehaald worden): `--ontologie <pad>` gaat voor -- wie een
+  pad noemt wil precies die hierarchie; géén vlag geeft de gebundelde GWSW-ontologie uit
+  `gwsw-orox-helpers`, en dat is de standaardweg; `--geen-ontologie` is de bewuste
+  ontsnappingsvlag en levert een rapport dat het voorbehoud in de kop draagt en de eigen
+  checks op `–` zet in plaats van op een vinkje. De testfixtures declareren hun eigen
+  hierarchie inline: die draaien legitiem met `--geen-ontologie` en houden hun oordeel,
+  want het voorbehoud hangt aan `GwswDataset.klassenhierarchie_bekend` en niet aan de
+  vraag of er een ontologiebestand meekwam. Zie issue #33.
 - **Eén uitvoerschrijver.** Alle vier uitvoervormen (Markdown, CSV, GeoPackage, JSON)
   komen uit dezelfde meldingenstroom (`uitvoer/melding.py`) en dragen hun herkomst uit
   `uitvoer/herkomst.py` -- de enige schrijver in `src/`. Roep nooit zelf `to_csv`,
@@ -161,9 +187,14 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - Maak expliciet gebruik van de superpowers en dev-skills skills.
 - Python 3.12+, src-layout (src/nlriochecker/), pyproject.toml, beheer met uv.
 - Afhankelijkheden minimaal houden: pandas, click, pydantic, rdflib, shapely, networkx,
-  plus geopandas en rasterio voor de EXT-checks op de externe bronnen (`externedata.py`).
-  Voeg er niets aan toe zonder noodzaak; een nieuwe dep moet permissief of
-  EUPL-verenigbaar zijn (BO-3) en hoort in de beslislog.
+  plus geopandas en rasterio voor de EXT-checks op de externe bronnen (`externedata.py`),
+  en `gwsw-orox-helpers` (MIT) voor de leeslaag. Voeg er niets aan toe zonder noodzaak;
+  een nieuwe dep moet permissief of EUPL-verenigbaar zijn (BO-3) en hoort in de beslislog.
+- **De leeslaag is een eigen package.** Het inlezen van OroX/TTL, de graaf, de geometrie,
+  de ontologie, de cache en het voortgangsprotocol leven in `gwsw-orox-helpers`
+  (`gwsw_orox_helpers.dataset`, `.graaf`, `.geometry`, `.ontologie`, `.cache`,
+  `.voortgang`, `.bronnen`), niet in `src/nlriochecker/`. Een wijziging daaraan is een
+  release van die package plus een `uv lock` hier -- niet een patch in deze repo.
 - De licentie is EUPL-1.2 (copyleft, en 'toegang tot de wezenlijke functionaliteit'
   telt als verspreiding). Nieuwe afhankelijkheden mogen permissief of EUPL-verenigbaar
   zijn; zie de Appendix van `LICENSE` en BO-3 in de beslislog.
@@ -184,10 +215,14 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   observatie in de rondeverslagen. Zie BO-38.
 - CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
 - Werk op `dev`, niet op `main`. Elke wijziging gaat naar `dev`; `main` draagt alleen
-  uitgebrachte, getagde versies. Pas als de auteur zegt dat het een nieuwe versie is,
-  merge je `dev` in `main` en draai je daar `scripts/uitgave.py` -- in die volgorde,
-  want het script eist `main` (`TAKVOORWAARDE`) en breekt af op elke andere tak. Zet
-  `dev` daarna weer gelijk aan `main`, anders mist hij de bumpcommit.
+  uitgebrachte, getagde versies. `main` is GitHub-beschermd: PR verplicht en
+  `enforce_admins`, dus een rechtstreekse push naar `main` wordt geweigerd, ook van de
+  eigenaar. Pas als de auteur zegt dat het een nieuwe versie is, draai je op `dev`
+  `scripts/uitgave.py` (het eist `dev`, `TAKVOORWAARDE`, en breekt af op elke andere tak):
+  dat bumpt, toetst, schuift het wijzigingslog en commit+tagt `Versie X.Y.Z` op `dev`.
+  Daarna land je die op `main` via een **merge-commit-PR** (geen squash/rebase, anders
+  hangt de tag naast `main`) en zet je `dev` weer gelijk aan `main`. De volledige flow
+  staat in `docs/versionering.md`.
 - Eén sessie = één issue, en het issue is de enige plek waar de voortgang staat. Eindig je
   een issue niet af, zet dan een comment met de echte toestand: wat gecommit is en wat de
   poort nog mist. Beweer nooit "klaar/gepusht" als het dat niet is, en laat geen half
@@ -195,14 +230,19 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   (of doet werk over dat al gedaan was). Zie `docs/agents/issue-tracker.md`.
 - Kleine stappen; na elke werkende stap een commit. De **mechanische poort** --
   `uv run ruff check` en `uv run ruff format`, `uv run mypy`, `uv run pytest` (zonder
-  `zwaar`) -- draait bij elke commit die `src/**.py` raakt. Kies daarbovenop de review
+  `zwaar`) -- draait bij elke commit die `src/**.py` raakt. Vóór een push die tests
+  toevoegt die echte data laden: `uv run python scripts/runnerpoort.py` -- dezelfde poort
+  in de conditie van de CI-runner (alleen getrackte `data/`, geen PyQGIS, strikte
+  overslagbewaking). Kies daarbovenop de review
   naar het **risico** van de wijziging, niet naar de omvang:
   - **Docs/config** (geen `src/**.py`, bv. deze regel): geen poort en geen review, alleen
-    de drifttests die de wijziging raakt (bv. `test_indexversie_staat_in_claude_md`).
+    de drifttests die de wijziging raakt (bv.
+    `test_de_dekkingsondergrens_is_overal_hetzelfde_getal`, die deze CLAUDE.md aan de
+    dekkingsgrens van de CI en de uitgavepoort bindt).
   - **Klein** (code buiten de kritieke paden, geen nieuwe feature): `/code-review` --
     `low` bij een triviale one-liner, anders `medium`.
   - **Substantieel** (een nieuwe check/feature, óf de wijziging raakt een kritiek pad:
-    `checks/`, de engine `dataset.py`/`geometry.py`/de graf, de meldingenstroom
+    `checks/`, de aansluiting op de leeslaag uit `gwsw-orox-helpers`, de meldingenstroom
     `uitvoer/`, of de ontologie): `/superpowers:requesting-code-review`; verwerk de
     uitkomsten en draai de poort daarna opnieuw.
   - **Altijd Substantieel**, ongeacht je inschatting: vlak vóór een merge naar `main` of
@@ -211,11 +251,14 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   Pas na een groene gate committen, met een duidelijke boodschap.
 - Elke noemenswaardige wijziging krijgt een regel onder `## [Unreleased]` in
   `CHANGELOG.md`. `scripts/uitgave.py` weigert een uitgave met een lege sectie.
-- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_9.md en de ontologie in data/gwsw_ontologieen/; verzin geen eigen interpretaties.
+- Bij twijfel over domeinlogica: raadpleeg eerst data/checkregister-gwsw-nulmeting-v0_9.md en de gebundelde ontologie uit `gwsw-orox-helpers`; verzin geen eigen interpretaties.
 - Geloof onwaarschijnlijke uitkomsten niet. Duizenden bevindingen op een dataset wijzen meestal op een modelleerfout in de engine, niet op duizenden gebreken; zoek de oorzaak voordat je het cijfer rapporteert.
 - Wat een check NIET heeft bekeken hoort in het rapport: objecten buiten de graaf, weggelaten bevindingen, ontbrekende typeringspoort. Stilte leest als "alles gecontroleerd".
 
 ## Naslag
+- **`docs/gebruik.md`** is de gebruiksaanwijzing voor de vier subcommando's: opties,
+  uitvoerbestanden en wat er in de GeoPackage staat. Raak je gedrag aan dat een gebruiker
+  ziet (een CLI-optie, een uitvoervorm, een laag of kolom), werk dan die tekst bij.
 - **`docs/architectuur.md`** draagt de geverifieerde feiten en de engine/uitvoer-interna.
   Lees het vóór je aan het betreffende deel werkt:
   - invoerbestanden lezen of parsen: SHACL-CSV-kolommen, OroX-grafmodel (knoop is een
@@ -231,6 +274,8 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   die je nooit met de hand bewerkt, en het drempelrecept over vijf gekoppelde plekken. Lees
   het vóór je zelf een telling of een scratch-script tegen de dataset schrijft -- het
   bespaart de ~1,5-min/3-GB herlaadronde op een verkeerde gok.
+- **`docs/agents/afk-regie.md`** is het sjabloon voor een onbewaakte regiesessie die een reeks
+  issues met Opus-subagents afwerkt (lus per issue, één poort, review-timing, slotrun).
 - Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
   `gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
   niemand een openstaand punt in twee toestanden aantreft.

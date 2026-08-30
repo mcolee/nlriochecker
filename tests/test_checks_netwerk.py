@@ -6,12 +6,17 @@ from pathlib import Path
 
 import networkx as nx
 import pytest
+from gwsw_orox_helpers.dataset import GWSW, load_dataset
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, CheckOutcome, run_checks
 from nlriochecker.checks.netwerk import KringloopInNetwerk
-from nlriochecker.checks.verbanden import _netwerk, deelstelsel_ids, verbonden_knopen
-from nlriochecker.dataset import GWSW, load_dataset
+from nlriochecker.checks.verbanden import (
+    _netwerk,
+    deelstelsel_ids,
+    netwerkdelen,
+    verbonden_knopen,
+)
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 NET_IDS = ["NET-001", "NET-002", "NET-004", "NET-007"]
@@ -19,14 +24,14 @@ NET_IDS = ["NET-001", "NET-002", "NET-004", "NET-007"]
 
 def _outcome(bestand: str, check_id: str, config: CheckConfig | None = None) -> CheckOutcome:
     """Draait een enkele check op een fixture."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=config or load_check_config())
     return run_checks(context, [check_id]).outcomes[0]
 
 
-def _labels(bestand: str, check_id: str) -> list[str]:
+def _labels(bestand: str, check_id: str, config: CheckConfig | None = None) -> list[str]:
     """De labels van de gevonden objecten."""
-    return sorted(finding.object_label for finding in _outcome(bestand, check_id).findings)
+    return sorted(finding.object_label for finding in _outcome(bestand, check_id, config).findings)
 
 
 @pytest.mark.parametrize("check_id", NET_IDS)
@@ -53,7 +58,7 @@ def test_net001_accepteert_een_overnamepunt_op_de_orientatie(tmp_path: Path) -> 
     lijst hierboven ook groen zijn als de klasse nooit werd opgezocht.
     """
     bestand = "net001_overnamepunt.ttl"
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
 
     # De klasse wordt op de orientatie van put B gevonden, niet op put B zelf.
     knoop = dataset.nodes["http://example.org/toets#PutB"]
@@ -83,7 +88,7 @@ def test_losse_overnamepuntorientatie_verdwijnt_uit_de_netwerkanalyse() -> None:
     netwerkanalyse valt: geen herleidbare put aan beide zijden. Alleen de notitie
     van de check telt haar nog.
     """
-    dataset = load_dataset(TTL_DIR / "net001_overnamepunt.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_overnamepunt.ttl", [])
     assert "http://example.org/toets#LosOvp_ori" not in dataset.nodes
 
     outcome = _outcome("net001_overnamepunt.ttl", "NET-001")
@@ -100,6 +105,45 @@ def test_net002_vindt_hemelwater_zonder_lozingspunt() -> None:
 def test_net002_raakt_de_gemengde_strengen_niet() -> None:
     # De gemengde strengen vallen onder NET-001, niet onder NET-002.
     assert _labels("net001_geen_afvoerpad.ttl", "NET-002") == []
+
+
+def test_net001_noemt_het_stelseltype_van_de_streng() -> None:
+    """Het verschil met NET-002 hoort uit de melding zelf te lezen te zijn (issue #93).
+
+    NET-001 gaat over twee stelseltypen tegelijk (`Vuilwaterriool` plus `GemengdRiool`);
+    de melding noemt daarom het type van DEZE streng en niet de rol waarop de check
+    selecteert. Twee fixtures, twee typen -- anders zou een vaste tekst ook groen zijn.
+    """
+    gemengd = _outcome("net001_geen_afvoerpad.ttl", "NET-001").findings[0]
+    vuilwater = _outcome("net001_pompunit_zonder_persnet.ttl", "NET-001").findings[0]
+
+    assert gemengd.message == (
+        "Streng van stelseltype 'gemengd' zonder afvoerpad naar een gemaal, "
+        "overnamepunt of lozingspunt."
+    )
+    assert gemengd.details["stelseltype"] == "gemengd"
+    assert vuilwater.message.startswith(
+        "Streng van stelseltype 'vuilwater' zonder afvoerpad naar een gemaal, "
+        "overnamepunt of lozingspunt."
+    )
+    assert vuilwater.details["stelseltype"] == "vuilwater"
+
+
+def test_net002_noemt_hemelwater_en_zoekt_alleen_een_lozingspunt() -> None:
+    """Dezelfde verheldering voor NET-002, met het eindpunt dat de check echt zoekt.
+
+    NET-002 leest alleen de rol `lozings_eindpunt`; `Overnamepunt` staat in
+    `afvoer_eindpunt` en is voor deze check nooit een bestemming geweest. De tekst
+    noemde hem toch, en beloofde daarmee meer dan de check meet.
+    """
+    bevinding = _outcome("net002_hemelwater_zonder_lozingspunt.ttl", "NET-002").findings[0]
+
+    assert bevinding.message == (
+        "Streng van stelseltype 'hemelwater' zonder afvoerpad naar een lozingspunt. "
+        "De graaf bevat geen enkel bereikbaar eindpunt van dit soort, dus geldt dit "
+        "voor elke streng."
+    )
+    assert bevinding.details["stelseltype"] == "hemelwater"
 
 
 def test_net004_vindt_de_kringloop() -> None:
@@ -141,7 +185,7 @@ def test_net004_noemt_dezelfde_streng_ongeacht_de_invoervolgorde(bestand: str) -
     """Twee parallelle strengen op de kring: de melding hangt aan een streng die echt op
     de kant kring[0] -> kring[1] ligt, en aan dezelfde streng ongeacht de volgorde waarin
     de export ze declareert. Anders verschuift de melding-ID tussen twee exports."""
-    dataset = load_dataset(TTL_DIR / bestand)
+    dataset = load_dataset(TTL_DIR / bestand, [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     bevindingen = run_checks(context, ["NET-004"]).outcomes[0].findings
 
@@ -152,6 +196,38 @@ def test_net004_noemt_dezelfde_streng_ongeacht_de_invoervolgorde(bestand: str) -
     assert (dataset.nodes[begin].label, dataset.nodes[eind].label) == ("C", "D")
     # De kleinste URI van de parallelle set, in beide declaratievolgordes.
     assert bevindingen[0].object_label == "5"
+
+
+def test_net004_dempt_een_lus_die_alleen_administratief_bestaat() -> None:
+    """Een kring die op een omgekeerd geregistreerde streng leunt is geen echte lus (issue #102).
+
+    Streng 7 (E->C) stijgt in de BOB; NET-009 spreekt haar tegen, dus haar richting is
+    onbetrouwbaar. Met de betrouwbare richting valt de kring uiteen en NET-004 zwijgt --
+    NET-009 draagt dit signaal al.
+    """
+    outcome = _outcome("net004_lus_door_richtingsfout.ttl", "NET-004")
+
+    assert outcome.findings == []
+
+
+def test_net004_dempt_een_vermaasde_ring() -> None:
+    """Een vlakke, BOB-consistente ring zonder putsprong is bewust vermaasd net (issue #102).
+
+    In vlak Nederland is zo'n ring legitiem en geen fout; NET-004 dempt hem en telt hem in
+    de toelichting.
+    """
+    outcome = _outcome("net004_vermaasde_ring.ttl", "NET-004")
+
+    assert outcome.findings == []
+    assert any("vermaasd" in note for note in outcome.notes)
+
+
+def test_net004_dempt_een_ring_die_via_een_putsprong_sluit() -> None:
+    """Een ring die per been daalt maar via een BOB-sprong omhoog sluit is HGT-009 (issue #102)."""
+    outcome = _outcome("net004_ring_met_putsprong.ttl", "NET-004")
+
+    assert outcome.findings == []
+    assert any("HGT-009" in note for note in outcome.notes)
 
 
 def test_net007_vindt_it_zonder_drempel() -> None:
@@ -210,16 +286,241 @@ def test_eindpuntklassen_komen_uit_de_config(tmp_path: Path) -> None:
     assert any("buiten de netwerkanalyse" in notitie for notitie in gevonden.notes)
 
 
-def test_lozingspunt_telt_niet_als_afvoerpad_voor_vuilwater() -> None:
-    """Een gemengde streng die alleen een lozingsput bereikt is niet in orde.
+def test_lozingspunt_telt_als_afvoerpad_voor_vuilwater(tmp_path: Path) -> None:
+    """Een gemengde streng die een lozingsput bereikt is in orde (BO-53).
 
-    NET-001 vraagt een gemaal of overnamepunt, NET-002 een lozingspunt. Met een
-    gedeelde eindpuntlijst zou de gemengde streng ten onrechte goedgekeurd worden.
+    Vuilwater loost in Nederland niet meer rechtstreeks op oppervlaktewater, dus een
+    lozingspunt is per definitie een geldig afvoereindpunt; er valt geen echt gebrek
+    mee te maskeren. De tweede helft is de controle: haal de lozingsput uit
+    `lozings_eindpunt` en streng "1" wordt wel gemeld, zodat de lege lijst hierboven
+    niet ook groen zou zijn als de klasse nooit werd opgezocht.
     """
     bestand = "net001_alleen_lozingspunt.ttl"
 
-    assert _labels(bestand, "NET-001") == ["1"]
+    assert _labels(bestand, "NET-001") == []
     assert _labels(bestand, "NET-002") == []
+
+    zonder_lozing = _testconfig(
+        tmp_path,
+        "zonder_lozing",
+        "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "mechanisch = ['MechanischeRioolleiding']\n"
+        "afvoer_eindpunt = ['Gemaal']\nlozings_eindpunt = []\nvuilwater = ['GemengdRiool']\n",
+    )
+    assert _labels(bestand, "NET-001", zonder_lozing) == ["1"]
+
+
+# De drukrioleringsketen laat Pompunit buiten `afvoer_eindpunt`, net als de
+# meegeleverde config sinds BO-55: was de pompput zelf al een eindpunt, dan bewees de
+# fixture niets over de route erachter.
+_DRUKRIOLERING_KLASSEN = (
+    "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+    "mechanisch = ['MechanischeRioolleiding']\nafvoer_eindpunt = ['Gemaal']\n"
+    "lozings_eindpunt = ['Lozingsput']\nvuilwater = ['Vuilwaterriool']\n"
+)
+
+
+def test_drukriolering_bereikt_het_gemaal_door_het_hulpstuk(tmp_path: Path) -> None:
+    """Het persnet telt als connectiviteit, ook waar het op een T-stuk samenkomt (BO-54).
+
+    Het T-stuk klimt via hasPart niet naar een put, dus `resolve_network_node` geeft er
+    None voor; zonder terugval op de rauwe koppeling versplintert elke T het persnet en
+    blijft het gemaal erachter onbereikbaar. De controle draait dezelfde fixture met een
+    lege `mechanisch`-lijst: dan is er geen route en wordt streng "1" wel gemeld.
+
+    De fixture pint meteen aanname 1 van issue #72 vast: de laatste drukleiding staat
+    administratief van het gemaal naar het T-stuk geregistreerd. Een persleiding is
+    pompgestuurd en die richting zegt niets, dus de mechanische kant hoort ongericht te
+    zijn. Zou hij alleen in de geregistreerde richting gelegd worden, dan is er geen
+    kant naar het gemaal toe en valt deze test om.
+    """
+    bestand = "net001_drukriolering_gemaal.ttl"
+    config = _testconfig(tmp_path, "druk_gemaal", _DRUKRIOLERING_KLASSEN)
+    dataset = load_dataset(TTL_DIR / bestand, [])
+
+    assert (
+        dataset.resolve_network_node("http://example.org/toets#T1", config.klassen.netwerkknopen)
+        is None
+    )
+    # De route loopt tegen de registratie van 'd2' in: gemaal -> T-stuk staat er, en de
+    # bereikbaarheid moet de andere kant op.
+    d2 = next(streng for streng in dataset.conduits.values() if streng.label == "d2")
+    assert (d2.start_node, d2.end_node) == (
+        "http://example.org/toets#Gem",
+        "http://example.org/toets#T1",
+    )
+
+    assert _labels(bestand, "NET-001", config) == []
+
+    assert _labels(bestand, "NET-001", _zonder_persnet(config)) == ["1"]
+
+
+def test_drukriolering_die_op_een_lozingsput_uitkomt_is_afgevoerd(tmp_path: Path) -> None:
+    """Dezelfde keten, maar het persnet loost op een lozingsput in plaats van een gemaal.
+
+    De twee wijzigingen van issue #72 samen: het persnet is doorlopend (BO-54) en het
+    lozingspunt aan het eind telt als vuilwater-eindpunt (BO-53).
+    """
+    bestand = "net001_drukriolering_lozingsput.ttl"
+    config = _testconfig(tmp_path, "druk_lozing", _DRUKRIOLERING_KLASSEN)
+
+    assert _labels(bestand, "NET-001", config) == []
+
+    zonder_lozing = _testconfig(
+        tmp_path, "druk_zonder_lozing", _DRUKRIOLERING_KLASSEN.replace("['Lozingsput']", "[]")
+    )
+    assert _labels(bestand, "NET-001", zonder_lozing) == ["1"]
+
+
+def test_hemelwater_door_het_persnet_geldt_ook_als_afgevoerd(tmp_path: Path) -> None:
+    """De bereikbaarheidsgraaf is gedeeld, dus NET-002 volgt het persnet ook (BO-54).
+
+    Dit is een bewust gevolg en geen bijvangst: `_bereikbaar_vanaf` is dezelfde functie
+    voor beide bereikbaarheidschecks, en een hemelwaterstreng die op een pompput eindigt
+    voert langs het persnet af. De domeinredenering van BO-53 (een lozingspunt is een
+    geldig VUILWATER-eindpunt) speelt hier niet mee: NET-002 vroeg altijd al om een
+    lozingspunt. Wat verandert is alleen de route ernaartoe. De controlehelft laat zien
+    dat de route echt door het persnet loopt.
+    """
+    bestand = "net002_drukriolering_lozingsput.ttl"
+    klassen = _DRUKRIOLERING_KLASSEN + "hemelwater = ['Hemelwaterriool']\n"
+    config = _testconfig(tmp_path, "net002_druk", klassen)
+
+    assert _labels(bestand, "NET-002", config) == []
+
+    assert _labels(bestand, "NET-002", _zonder_persnet(config)) == ["1"]
+
+
+def test_pompunit_zonder_persnet_is_geen_afvoereindpunt(tmp_path: Path) -> None:
+    """Een pompput is een overdrachtspunt naar de drukriolering, geen eindpunt (BO-55).
+
+    Draait bewust op de MEEGELEVERDE config: het is de lijst `afvoer_eindpunt` in
+    `checks.toml` die hier bewezen wordt, niet een testlijst. Zonder persleiding
+    achter de pompunit komt streng "1" nergens uit en hoort ze gemeld te worden.
+
+    De controlehelft zet `Pompunit` terug in `afvoer_eindpunt`: dan zwijgt de check
+    weer. Zonder die helft zou de melding hierboven ook groen zijn als de streng om
+    een heel andere reden buiten de graaf viel.
+    """
+    bestand = "net001_pompunit_zonder_persnet.ttl"
+
+    assert _labels(bestand, "NET-001") == ["1"]
+
+    met_pompunit = _testconfig(
+        tmp_path,
+        "met_pompunit",
+        "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "afvoer_eindpunt = ['Gemaal', 'Pompunit']\nvuilwater = ['Vuilwaterriool']\n",
+    )
+    assert _labels(bestand, "NET-001", met_pompunit) == []
+
+
+# De vrijvervalketen door een hulpstuk, zonder pompunit en zonder persnet: het T-stuk
+# is hier de enige schakel tussen put A en de rest. `mechanisch` staat er alleen omdat
+# `ClassRoots._pompunit_heeft_een_uitweg` een geschreven config zonder persnet weigert.
+_HULPSTUKKETEN_KLASSEN = (
+    "put = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+    "mechanisch = ['MechanischeRioolleiding']\nafvoer_eindpunt = ['Gemaal']\n"
+    "vuilwater = ['GemengdRiool']\n"
+)
+
+
+def test_netwerkdelen_lopen_door_een_telbaar_hulpstuk() -> None:
+    """Een T-stuk is een doorgeefknoop in de vrijvervalgraaf (issue #105, BO-83).
+
+    Een `Hulpstuk` is geen `Put`, dus `resolve_network_node` geeft er None voor en de
+    graaf liet de streng erop vallen. Het net zit er in werkelijkheid wel aan vast --
+    de leeslaag herstelde die koppeling zelfs (`SIG-hulpstukkoppeling`) -- dus valt de
+    vrijvervalgraaf sinds dit issue terug op de rauwe koppeling zolang die op een
+    hulpstuk met een telbare GWSW-functie wijst. Put A, T-stuk T1, overstortput O en het
+    gemaal horen daarmee in een deelstelsel, met een gedeeld ID.
+    """
+    dataset = load_dataset(TTL_DIR / "net_hulpstuk_doorgeefknoop.ttl", [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    delen = netwerkdelen(context)
+
+    assert len(delen) == 1
+    assert "http://example.org/toets#T1" in delen[0]
+    assert len(set(deelstelsel_ids(context).values())) == 1
+
+
+def test_net001_bereikt_het_gemaal_door_het_telbare_hulpstuk(tmp_path: Path) -> None:
+    """De strengen aan het T-stuk doen weer mee aan de netwerkanalyse (issue #105).
+
+    Ze vielen er niet uit met een bevinding maar zonder oordeel: "geen herleidbare put
+    aan beide zijden", alleen zichtbaar in de notitie. De controlehelft haalt `hulpstuk`
+    uit de config: dan is het T-stuk geen doorgeefknoop meer en vallen dezelfde twee
+    strengen weer buiten de analyse.
+    """
+    bestand = "net_hulpstuk_doorgeefknoop.ttl"
+
+    outcome = _outcome(bestand, "NET-001")
+
+    assert outcome.findings == []
+    assert not any("buiten de netwerkanalyse" in notitie for notitie in outcome.notes)
+
+    zonder_hulpstuk = _testconfig(
+        tmp_path, "zonder_hulpstuk", _HULPSTUKKETEN_KLASSEN + "hulpstuk = []\n"
+    )
+    andere = _outcome(bestand, "NET-001", zonder_hulpstuk)
+    notitie = next(n for n in andere.notes if "buiten de netwerkanalyse" in n)
+    assert notitie.startswith("2 vrijvervalstrengen")
+
+
+def test_de_knooptellingen_laten_de_doorgeefknopen_buiten_beschouwing() -> None:
+    """Een "knoop" in een melding, een drempel of `examined` is een beoordeeld object.
+
+    De graaf draagt het hulpstuk wél als knoop -- daar geeft het door -- maar geen enkele
+    NET-check beoordeelt het. Zou het meetellen, dan telde `examined` objecten die nooit
+    een bevinding kunnen krijgen en zou de drempel `klein_deelstelsel_knopen` bij een
+    T-stukrijk net eerder overlopen. De fixture heeft vier graafknopen waarvan er een een
+    T-stuk is (issue #105, BO-83).
+    """
+    dataset = load_dataset(TTL_DIR / "net_hulpstuk_doorgeefknoop.ttl", [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    assert _netwerk(context).graph.number_of_nodes() == 4
+
+    for check_id in ("NET-006", "NET-008"):
+        assert run_checks(context, [check_id]).outcomes[0].examined == 3
+
+
+def test_een_afsluitstuk_blijft_een_breuk_in_de_vrijvervalgraaf() -> None:
+    """Alleen een hulpstuk met een telbare functie geeft door; een afsluitstuk niet.
+
+    Dezelfde grens als BO-72 voor TOP-002/TOP-003 trekt: `Afsluitstuk` draagt de functie
+    `AfsluitenVanLeidingen`, en die schrijft geen aantal leidingen voor. De keten valt
+    hier dus wel uiteen, en dat hoort in de notitie te staan.
+    """
+    dataset = load_dataset(TTL_DIR / "net_hulpstuk_afsluitstuk.ttl", [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+
+    assert len(netwerkdelen(context)) == 2
+
+    outcome = _outcome("net_hulpstuk_afsluitstuk.ttl", "NET-001")
+    assert any("buiten de netwerkanalyse" in notitie for notitie in outcome.notes)
+
+
+def _zonder_persnet(config: CheckConfig) -> CheckConfig:
+    """Dezelfde config met het persnet uitgezet, voor de controlehelften.
+
+    Bewust niet als TOML: `ClassRoots._pompunit_heeft_een_uitweg` weigert sinds BO-55
+    een geschreven config die `mechanisch` leeg laat terwijl `Pompunit` geen eindpunt is
+    -- dat is de valse-positieventoestand van BO-33. Die poort bewaakt wat iemand als
+    projectconfig opschrijft; hier wordt de lijst na de validatie leeggemaakt om te tonen
+    dat de route echt door het persnet loopt en niet ergens anders vandaan komt.
+    """
+    zonder = config.model_copy(deep=True)
+    zonder.klassen.mechanisch = []
+    return zonder
+
+
+def _testconfig(tmp_path: Path, naam: str, klassen: str) -> CheckConfig:
+    """Een projectconfig met alleen de klassen die de test nodig heeft."""
+    pad = tmp_path / f"{naam}.toml"
+    pad.write_text(f"[klassen]\n{klassen}[nulmeting]\nvereiste_cfk = ['Hyd']\n", encoding="utf-8")
+    return load_check_config(pad)
 
 
 def test_notitie_meldt_strengen_die_tegen_de_bob_in_lopen(tmp_path: Path) -> None:
@@ -235,7 +536,7 @@ def test_notitie_meldt_strengen_die_tegen_de_bob_in_lopen(tmp_path: Path) -> Non
     pad = tmp_path / "bob.ttl"
     pad.write_text(bron, encoding="utf-8")
 
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     outcome = run_checks(context, ["NET-001"]).outcomes[0]
 
@@ -252,8 +553,13 @@ def test_notitie_telt_doodlopende_eindknopen() -> None:
     outcome = _outcome("net001_geen_afvoerpad.ttl", "NET-001")
 
     notitie = next(n for n in outcome.notes if "watert af op" in n)
-    assert "loopt dood" in notitie
-    assert "Inspectieput" in notitie
+    assert "de overige 1 loopt dood" in notitie
+    # De soortnaam is het beheerobject en niet zijn orientatie: het GWSW hangt de
+    # topologische rol aan een orientatie-aspect, en `types_of()` voegt die aspecttypen
+    # bewust bij de objecttypen. Alfabetisch sorteren liet "Putorientatie" winnen van
+    # "Inspectieput", waardoor de toelichting aspecten leek te tellen in plaats van putten.
+    assert "Inspectieput 1" in notitie
+    assert "orientatie" not in notitie
 
 
 def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> None:
@@ -270,6 +576,7 @@ def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> Non
     op_bob = tmp_path / "bob.toml"
     op_bob.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+        "mechanisch = ['MechanischeRioolleiding']\n"
         "afvoer_eindpunt = ['Gemaal']\nvuilwater = ['GemengdRiool']\n"
         "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
         "[netwerk]\nrichting = 'bob'\n",
@@ -284,29 +591,25 @@ def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> Non
 
 def _labels_op(pad: Path, check_id: str, config: CheckConfig | None) -> list[str]:
     """Draait een check op een pad buiten de fixturemap."""
-    dataset = load_dataset(pad)
+    dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=config or load_check_config())
     outcome = run_checks(context, [check_id]).outcomes[0]
     return sorted(finding.object_label for finding in outcome.findings)
 
 
-def test_eindknoopverdeling_noemt_het_beheerobject_niet_zijn_orientatie() -> None:
-    """De soortnaam van een eindknoop hoort het beheerobject te zijn.
+def test_uitlaatconstructie_is_geen_doodlopende_eindknoop_voor_vuilwater() -> None:
+    """Een gemengde streng die op een uitlaatconstructie eindigt loopt niet dood (BO-53).
 
-    Het GWSW hangt de topologische rol aan een orientatie-aspect, en `types_of()`
-    voegt die aspecttypen bewust bij de objecttypen (Lozingspunt en UitlaatPunt
-    staan er immers op). Alfabetisch sorteren liet daardoor "Bouwwerkorientatie"
-    winnen van "Uitlaatconstructie" en "Putorientatie" van "Rioolput", waardoor de
-    toelichting aspecten leek te tellen in plaats van bouwwerken.
+    Tot issue #72 was dit de fixture waarop NET-001 een doodlopende Bouwwerk-eindknoop
+    telde. Nu het lozingspunt als geldig vuilwater-eindpunt geldt, is die uitlaat een
+    uitstroompunt en blijft er geen doodlopende eindknoop over. Dat de soortnaam in de
+    verdeling het beheerobject is en niet zijn orientatie, bewaakt
+    `test_beheerobjecttype_negeert_de_orientatie` op deze fixture.
     """
     outcome = _outcome("net001_bouwwerk_eindknoop.ttl", "NET-001")
 
-    verdeling = next(note for note in outcome.notes if "dood" in note)
-    assert "Uitlaatconstructie 1" in verdeling
-    assert "orientatie" not in verdeling
-    # En meteen de getalcongruentie: een eindknoop is er een, geen "1 eindknopen".
-    assert "1 eindknoop;" in verdeling
-    assert "de overige 1 loopt dood" in verdeling
+    assert outcome.findings == []
+    assert not any("loopt dood" in note for note in outcome.notes)
 
 
 def test_orientatie_aspecten_zijn_geen_knoop_in_de_netwerkgraaf() -> None:
@@ -316,7 +619,7 @@ def test_orientatie_aspecten_zijn_geen_knoop_in_de_netwerkgraaf() -> None:
     Deze test legt dat vast, zodat een latere wijziging in `_read_nodes()` niet
     stilzwijgend aspecten de graaf in laat lopen.
     """
-    dataset = load_dataset(TTL_DIR / "net001_bouwwerk_eindknoop.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_bouwwerk_eindknoop.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
 
     graaf = _netwerk(context).graph
@@ -333,7 +636,7 @@ def test_deelstelsel_ids_delen_een_id_binnen_hetzelfde_netwerkdeel() -> None:
 
     De fixture heeft twee losse delen: A-B-G rond het gemaal, en C-D daarbuiten.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
 
     ids = deelstelsel_ids(context)
@@ -349,7 +652,7 @@ def test_net001_draagt_het_deelstelsel_id_van_zijn_streng() -> None:
 
     Zonder ID op de bevinding is dat verband alleen uit de kaart af te leiden.
     """
-    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl")
+    dataset = load_dataset(TTL_DIR / "net001_geen_afvoerpad.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     ids = deelstelsel_ids(context)
     verwacht = next(cluster for uri, cluster in ids.items() if dataset.nodes[uri].label == "C")

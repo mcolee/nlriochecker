@@ -412,7 +412,11 @@ def test_geschreven_bestand_is_met_gdal_te_lezen(tmp_path: Path) -> None:
     tabel = pyogrio.read_dataframe(doel, layer=steekproef.LAAG_LOCATIES)
     assert tabel.crs.to_epsg() == 28992
     assert set(tabel["objectlaag"]) == {"putten", "strengen"}
-    assert list(tabel["oordeel"]) == ["", ""]
+    assert list(tabel[steekproef.KOLOM_FEEDBACK]) == ["", ""]
+    # De kolommen van de objectlaag uit de run komen mee; een naam die al een
+    # meldingveld is krijgt het voorvoegsel `obj_` in plaats van te verdringen.
+    assert list(tabel["obj_objecttype"]) == list(tabel["objecttype"])
+    assert list(tabel["obj_gwsw_uri"]) == list(tabel["gwsw_uri"])
 
 
 def test_dekking_telt_de_lagen_sluitend(tmp_path: Path) -> None:
@@ -476,3 +480,154 @@ def test_dekking_telt_de_lagen_sluitend(tmp_path: Path) -> None:
 
     assert (getrokken, zonder_locatie, zonder_object) == (2, 0, 1)
     assert getrokken == tellingen[steekproef.LAAG_PUTTEN] + zonder_object
+
+
+def _run_met_drie_checks(tmp_path: Path) -> Path:
+    """Een run met TOP-001 (4 op putten1), ADM-002 (2 op putten1) en NET-003 (1 op strengen1)."""
+
+    def rij(melding_id: str, check_id: str, uri: str, x: float) -> tuple:
+        return (
+            melding_id,
+            check_id,
+            check_id.split("-")[0],
+            "F",
+            "Consistentie",
+            "boodschap",
+            "",
+            "",
+            0,
+            uri.split("#")[1],
+            "Label",
+            "",
+            uri,
+            "",
+            "",
+            1,
+            x,
+            526000.0,
+            "2026-08-20",
+            "register",
+        )
+
+    meldingen = [
+        rij(f"TOP-001-{i}", "TOP-001", "http://x#putten1", 220000.0 + i * 2000.0) for i in range(4)
+    ]
+    meldingen += [
+        rij(f"ADM-002-{i}", "ADM-002", "http://x#putten1", 230000.0 + i * 2000.0) for i in range(2)
+    ]
+    meldingen += [rij("NET-003-0", "NET-003", "http://x#strengen1", 240000.0)]
+    checks = [
+        ("TOP-001", "Put", "register", "F", "TOP", "Consistentie", 4, 100, ""),
+        ("ADM-002", "Adm", "register", "F", "ADM", "Consistentie", 2, 100, ""),
+        ("NET-003", "Streng", "register", "F", "NET", "Plausibiliteit", 1, 100, ""),
+    ]
+    return _bron_geopackage(tmp_path / "run.gpkg", meldingen, checks)
+
+
+def test_verdeel_houdt_een_check_heel_en_volgt_het_register() -> None:
+    """ADM komt na TOP en vóór NET; een check gaat nooit over twee bestanden."""
+    getrokken = {
+        "NET-003": [_melding("n", "NET-003", 1.0, 1.0)],
+        "TOP-001": [_melding(f"t{i}", "TOP-001", 1.0, 1.0) for i in range(4)],
+        "ADM-002": [_melding(f"a{i}", "ADM-002", 1.0, 1.0) for i in range(2)],
+        "HGT-001": [],
+    }
+    assert steekproef.verdeel(getrokken, 5) == [["TOP-001"], ["ADM-002", "NET-003"]]
+    assert steekproef.verdeel(getrokken, None) == [["TOP-001", "ADM-002", "HGT-001", "NET-003"]]
+    with pytest.raises(ValueError, match="meer dan --per-bestand"):
+        steekproef.verdeel(getrokken, 3)
+
+
+def test_per_bestand_schrijft_genummerde_bestanden_met_volledige_dekking(tmp_path: Path) -> None:
+    """Elk bestand draagt zijn eigen checks, en de dekkingstabel zegt waar elke check staat."""
+    bron = _run_met_drie_checks(tmp_path)
+    doel = tmp_path / "steekproef.gpkg"
+
+    tellingen = steekproef.schrijf_steekproef(bron, doel, 10, "seed", 1000.0, per_bestand=5)
+
+    assert tellingen["bestanden"] == 2
+    assert tellingen[steekproef.LAAG_LOCATIES] == 7
+    assert not doel.exists()
+    eerste, tweede = steekproef.bestandsnamen(doel, 2)
+    assert (eerste.name, tweede.name) == ("steekproef_01.gpkg", "steekproef_02.gpkg")
+
+    def inhoud(pad: Path) -> tuple[set[str], dict[str, int], str]:
+        verbinding = sqlite3.connect(pad)
+        ids = {r[0] for r in verbinding.execute(f"select check_id from {steekproef.LAAG_LOCATIES}")}
+        dekking = dict(
+            verbinding.execute(f"select check_id, bestand from {steekproef.TABEL_DEKKING}")
+        )
+        (bestand,) = verbinding.execute(f"select bestand from {steekproef.TABEL_RUN}").fetchone()
+        verbinding.close()
+        return ids, dekking, bestand
+
+    assert inhoud(eerste) == (
+        {"TOP-001"},
+        {"TOP-001": 1, "ADM-002": 0, "NET-003": 0},
+        "1 van 2",
+    )
+    assert inhoud(tweede) == (
+        {"ADM-002", "NET-003"},
+        {"TOP-001": 0, "ADM-002": 1, "NET-003": 1},
+        "2 van 2",
+    )
+
+
+def test_buurten_beperken_de_trekking_tot_hun_vlak(tmp_path: Path) -> None:
+    """Alleen meldingen met een foutlocatie in de buurt tellen mee; de rest telt de dekking."""
+    gpd = pytest.importorskip("geopandas")
+    from shapely.geometry import box
+
+    buurten = tmp_path / "buurten.gpkg"
+    gpd.GeoDataFrame(
+        {steekproef.BUURT_NAAMKOLOM: ["Koekangerveld", "Elders"]},
+        geometry=[box(219900, 525900, 220100, 526100), box(300000, 600000, 300100, 600100)],
+        crs="EPSG:28992",
+    ).to_file(buurten)
+    bron = _run_met_drie_checks(tmp_path)
+    doel = tmp_path / "steekproef.gpkg"
+
+    tellingen = steekproef.schrijf_steekproef(
+        bron, doel, 10, "seed", 1000.0, buurten=(buurten, ["Koekangerveld"])
+    )
+
+    assert tellingen[steekproef.LAAG_LOCATIES] == 1
+    verbinding = sqlite3.connect(doel)
+    dekking = {
+        r[0]: r[1:]
+        for r in verbinding.execute(
+            f"select check_id, aantal_meldingen, in_gebied, getrokken, reden "
+            f"from {steekproef.TABEL_DEKKING}"
+        )
+    }
+    (namen,) = verbinding.execute(f"select buurten from {steekproef.TABEL_RUN}").fetchone()
+    verbinding.close()
+    assert dekking["TOP-001"] == (4, 1, 1, "")
+    assert dekking["ADM-002"] == (2, 0, 0, "geen bevindingen in de gekozen buurten (2 erbuiten)")
+    assert namen == "Koekangerveld"
+
+    with pytest.raises(ValueError, match="onbekende buurt"):
+        steekproef.schrijf_steekproef(
+            bron, doel, 10, "seed", 1000.0, buurten=(buurten, ["Koekange"])
+        )
+
+
+def test_alleen_checks_beperkt_steekproef_en_dekking(tmp_path: Path) -> None:
+    """`--check` laat alleen de genoemde checks over, ook in de dekkingstabel."""
+    bron = _run_met_drie_checks(tmp_path)
+    doel = tmp_path / "steekproef.gpkg"
+
+    steekproef.schrijf_steekproef(
+        bron, doel, 10, "seed", 1000.0, alleen_checks=["ADM-002", "NET-003"]
+    )
+
+    verbinding = sqlite3.connect(doel)
+    ids = {r[0] for r in verbinding.execute(f"select check_id from {steekproef.LAAG_LOCATIES}")}
+    dekking = {r[0] for r in verbinding.execute(f"select check_id from {steekproef.TABEL_DEKKING}")}
+    (checks,) = verbinding.execute(f"select checks from {steekproef.TABEL_RUN}").fetchone()
+    verbinding.close()
+    assert ids == dekking == {"ADM-002", "NET-003"}
+    assert checks == "ADM-002, NET-003"
+
+    with pytest.raises(ValueError, match="onbekende check"):
+        steekproef.schrijf_steekproef(bron, doel, 10, "seed", 1000.0, alleen_checks=["XYZ-1"])

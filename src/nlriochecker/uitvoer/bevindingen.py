@@ -18,14 +18,28 @@ from pathlib import Path
 import pandas as pd
 
 from nlriochecker.checks import CheckRun, Severity
+from nlriochecker.checks.extern import bronrollen_met_check
+from nlriochecker.checks.selectie import klassen_van_rol
+from nlriochecker.externedata import rol_van
+from nlriochecker.nulbevinding import CHECK_VOORVOEGSEL
+from nlriochecker.nulmeting_teksten import vertaald
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
-from nlriochecker.uitvoer.melding import BRON_DATASET, BRON_NULMETING, Melding, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    BRON_DATASET,
+    BRON_NULMETING,
+    GEEN_ONDERDRUKKING,
+    Melding,
+    Onderdrukking,
+    bouw_meldingenstroom,
+)
 from nlriochecker.uitvoer.omvang import (
     eindpunttelling,
     klassen_op_nul,
     klassentelling,
+    koppelingsherstel,
     omvangtabel,
+    putten_in_beeld,
     zonder_geometrie,
 )
 from nlriochecker.uitvoer.samenvatting import (
@@ -44,6 +58,12 @@ FILE_CHECKS_JSON = "bevindingen.json"
 
 # Zoveel deelstelsel-ID's noemt de clusterduiding er hooguit bij naam.
 MAX_CLUSTERS_IN_DUIDING = 5
+
+# De check waarvan het aandeel bij de datakarakteristieken komt te staan (issue #91).
+# Eén ID en geen configuratie: dit is geen instelbare drempel maar de vaststelling dat
+# een ontbrekend aanlegjaar op tienduizenden putten één gebrek in de aanlevering is en
+# geen tienduizenden losse gebreken. De meldingen per object blijven volledig staan.
+CHECK_AANLEGJAAR = "ATTR-018"
 
 # De kolommen van het archief. De eerste negen stonden er al en houden hun naam en
 # plaats; hernoemen zou bestaande verwerking breken zonder dat er iets tegenover
@@ -78,6 +98,11 @@ CSV_KOLOMMEN = [
     "ObjectURI",
     "Object2URI",
     "CFK",
+    # De technische SHACL-tekst naast de leesbare zin in `Melding` (issue #101).
+    # Achteraan, net als `CFK`: bestaande kolommen houden hun plaats, zodat een lezer
+    # die op positie werkt niet omvalt. Leeg bij een eigen check en bij een
+    # datasetsignaal.
+    "MeldingTechnisch",
 ]
 
 # Veld → kolom(men): de afbeelding die `meldingen_tabel` hieronder rij voor rij
@@ -109,6 +134,7 @@ CSV_VELD_NAAR_KOLOM: dict[str, tuple[str, ...]] = {
     "run_datum": ("RunDatum",),
     "dataset": ("Dataset",),
     "cfk": ("CFK",),
+    "boodschap_technisch": ("MeldingTechnisch",),
 }
 
 
@@ -118,8 +144,15 @@ def write_check_report(
     run_datum: date | None = None,
     meldingen: list[Melding] | None = None,
     notities: Sequence[str] = (),
-) -> tuple[Path, Path]:
+    *,
+    met_csv: bool = True,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+) -> tuple[Path, Path | None]:
     """Schrijft de bevindingen van de check-engine als Markdown en CSV.
+
+    Het Markdown-rapport komt er altijd: het draagt de markering en het voorbehoud,
+    en zonder rapport zou een run zijn eigen beperkingen nergens zeggen. De CSV komt
+    op verzoek; `met_csv=False` levert `None` in plaats van een pad.
 
     De beller mag de meldingenlijst meegeven; dan schrijven Markdown, CSV en de
     GeoPackage aantoonbaar dezelfde verzameling weg.
@@ -127,22 +160,33 @@ def write_check_report(
     `notities` zijn opmerkingen over de invoer die de run zelf niet kent, zoals de
     geometrieen die het studiegebiedbestand niet mocht bijdragen. Ze horen in het
     rapport: wat niet bekeken is, mag niet alleen in het logboek staan.
+
+    `onderdrukking` komt uit dezelfde stroom als de meldingen en gaat naar de
+    verantwoording: wat `[rapport]` wegliet staat in geen enkele uitvoervorm, en zwijgen
+    zou lezen als "alles gecontroleerd" (BO-49). Bouwt deze functie de meldingen zelf,
+    dan komt hij uit diezelfde stroom: het argument alleen honoreren zou een rapport
+    opleveren dat wél gefilterd is maar dat nergens zegt.
     """
     output_dir = prepare(output_dir)
     run_datum = run_datum or date.today()
     if meldingen is None:
-        meldingen = bouw_meldingen(run, run_datum)
+        stroom = bouw_meldingenstroom(run, run_datum)
+        meldingen = stroom.meldingen
+        onderdrukking = stroom.onderdrukking
 
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
         f"# {_titel(run)}",
-        _render_checks(run, meldingen, notities),
+        _render_checks(run, meldingen, notities, onderdrukking, met_csv=met_csv),
         run_datum,
         markering=markering(run),
     )
 
-    csv_path = Path(output_dir) / FILE_CHECKS_CSV
-    schrijf_csv(meldingen_tabel(meldingen), csv_path)
+    csv_path = (
+        schrijf_csv(meldingen_tabel(meldingen), Path(output_dir) / FILE_CHECKS_CSV)
+        if met_csv
+        else None
+    )
 
     return markdown_path, csv_path
 
@@ -175,6 +219,25 @@ def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
     return rijen
 
 
+def checks_json(run: CheckRun) -> list[dict[str, object]]:
+    """Wat elke check bekeken heeft, als JSON-klare rijen, gesorteerd op check-ID.
+
+    Wat `bekeken` telde staat niet in de meldingen: het hoort bij de check en niet bij
+    de rij, dezelfde scheiding waarom de CFK-set niet in de CSV staat. Zonder scope en
+    populatie is `bekeken` een kaal getal waarvan een afnemer niet weet waarover het
+    geteld is, en dan zijn ook de percentages die erop delen onvergelijkbaar (issue #77).
+    """
+    return [
+        {
+            "check_id": outcome.check_id,
+            "bekeken": outcome.examined,
+            "bekeken_scope": outcome.bekeken_scope.value,
+            "populatie": outcome.populatie,
+        }
+        for outcome in sorted(run.outcomes, key=lambda outcome: outcome.check_id)
+    ]
+
+
 def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
     """Zet de meldingen in de archieftabel."""
     rows = [
@@ -205,6 +268,7 @@ def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
             "ObjectURI": melding.object_uri,
             "Object2URI": melding.object2_uri,
             "CFK": ", ".join(melding.cfk),
+            "MeldingTechnisch": melding.boodschap_technisch,
         }
         for melding in meldingen
     ]
@@ -227,7 +291,12 @@ def _titel(run: CheckRun) -> str:
 
 
 def _render_checks(
-    run: CheckRun, meldingen: list[Melding], notities: Sequence[str] = ()
+    run: CheckRun,
+    meldingen: list[Melding],
+    notities: Sequence[str] = (),
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    *,
+    met_csv: bool = True,
 ) -> list[str]:
     """Stelt de romp van het bevindingenrapport samen; de kop komt uit `schrijf_markdown`.
 
@@ -235,6 +304,10 @@ def _render_checks(
     over gaat (de aantallen), dan of het voldoet (de managementsamenvatting en de rode
     draad), dan de verantwoording van wat er wel en niet bekeken is, en pas daarna het
     detail -- eerst de compliance van de GWSW-nulmeting, dan de eigen bevindingen.
+
+    `met_csv` zegt of de CSV ernaast geschreven wordt. Zonder haar mag het rapport er
+    niet naar verwijzen: dat zou de lezer naar een bestand sturen dat er niet is,
+    juist voor de bevindingen die het rapport zelf weglaat (issue #66).
     """
     lines = _omvang_section(run)
     lines += _samenvatting_section(run, meldingen)
@@ -242,13 +315,28 @@ def _render_checks(
     # bevindingen samen betekenen, en dat is precies wat een lezer na de vier regels
     # hierboven wil weten -- niet pas achter de tabellen.
     lines += rode_draad(run, meldingen)
-    lines += _verantwoording(run, meldingen, notities)
+    lines += _verantwoording(run, meldingen, notities, onderdrukking, met_csv=met_csv)
     lines += ["", "## Detailrapportage", ""]
     nulmeting = _detail_nulmeting(run, meldingen)
     lines += nulmeting
-    lines += _detail_eigen(run, meldingen, genummerd=bool(nulmeting))
-    lines += ["", f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."]
+    lines += _detail_eigen(run, meldingen, genummerd=bool(nulmeting), met_csv=met_csv)
+    lines += ["", _archiefzin(met_csv)]
     return lines
+
+
+def _archiefzin(met_csv: bool) -> str:
+    """Waar de lezer de volledige lijst vindt; zonder CSV verwijst hij daar niet naar.
+
+    De andere twee vormen staan onder voorbehoud: dit rapport weet niet of ze gevraagd
+    zijn, en beweren dat ze er zijn zou dezelfde fout zijn als naar een uitgezette CSV
+    wijzen.
+    """
+    if met_csv:
+        return f"Alle bevindingen staan in `{FILE_CHECKS_CSV}`."
+    return (
+        f"De CSV is met `--uitvoer` uitgezet; alle bevindingen staan in `{FILE_CHECKS_JSON}` "
+        "en in de GeoPackage, voor zover die gevraagd zijn."
+    )
 
 
 def _omvang_section(run: CheckRun) -> list[str]:
@@ -278,6 +366,13 @@ def _omvang_section(run: CheckRun) -> list[str]:
             "gerapporteerd.",
         ]
     regels += _afhankelijkheden_section(run)
+    herstel = koppelingsherstel(run)
+    if herstel is not None:
+        regels += [
+            "",
+            f"> **Herstelde hulpstukkoppelingen:** {herstel.boodschap} Het signaal staat als "
+            "systemische waarschuwing in de meldingenstroom.",
+        ]
     regels += [""]
     return regels
 
@@ -288,8 +383,8 @@ def _afhankelijkheden_section(run: CheckRun) -> list[str]:
     De omvangtabel erboven telt object- en stelseltype maar zwijgt over overstorten,
     gemalen, overnamepunten en bergbezinkvoorzieningen -- juist de objecten waar de
     netwerkchecks op leunen. Deze telling maakt zichtbaar of ze er zijn. De
-    afvoereindpuntregel apart, want zij is het criterium om het `Gemaal`/`Pompunit`-
-    noodverband van NET-001 los te laten (BO-33): zodra `Overnamepunt` boven nul komt.
+    afvoereindpuntregel apart, want zij is het criterium om het `Gemaal`-noodverband
+    van NET-001 los te laten (BO-33): zodra `Overnamepunt` boven nul komt.
 
     Zonder klassenhierarchie herkent `of_class` geen klassen; elke telling zou dan nul
     zijn. De sectie vervalt in dat geval -- het rapport draagt daarvoor al zijn
@@ -306,11 +401,18 @@ def _afhankelijkheden_section(run: CheckRun) -> list[str]:
             "",
         ]
     regels += table(klassentelling(run), "Per rol")
-    regels += [""]
+    regels += [
+        "",
+        "> Elke rij is een eigen rol waarop een of meer checks selecteren; de rollen "
+        "kunnen elkaar overlappen (`netwerkknopen` omvat onder meer de putten, "
+        "lozingspunten en bergbezinkvoorzieningen). De aantallen zijn niet bedoeld om "
+        "op te tellen.",
+        "",
+    ]
     regels += table(eindpunttelling(run), "Afvoereindpunten per klasse")
     regels += [
         "",
-        "> `Gemaal` en `Pompunit` staan als noodverband voor `Overnamepunt` in de "
+        "> `Gemaal` staat als noodverband voor `Overnamepunt` in de "
         "bereikbaarheidstoets (NET-001, BO-33). Toont `Overnamepunt` een getal boven "
         "nul, dan kan dat noodverband weg.",
     ]
@@ -350,7 +452,12 @@ def _samenvatting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
 
 
 def _verantwoording(
-    run: CheckRun, meldingen: list[Melding], notities: Sequence[str] = ()
+    run: CheckRun,
+    meldingen: list[Melding],
+    notities: Sequence[str] = (),
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    *,
+    met_csv: bool = True,
 ) -> list[str]:
     """Wat er bekeken is, wat niet, en waaronder de rest gelezen moet worden.
 
@@ -447,6 +554,8 @@ def _verantwoording(
                 "",
             ]
 
+    lines += _onderdrukking_section(onderdrukking)
+
     if run.analyseset is not None:
         stel = run.analyseset
         zin = (
@@ -473,7 +582,7 @@ def _verantwoording(
         lines += [""]
 
     lines += _bronnen_section(run)
-    lines += _karakteristiek_section(run)
+    lines += _karakteristiek_section(run, meldingen, met_csv=met_csv)
 
     if run.dataset.ontologies:
         namen = ", ".join(f"`{pad.name}`" for pad in run.dataset.ontologies)
@@ -504,8 +613,14 @@ def _verantwoording(
             "",
         ]
 
-    lines += _zonder_locatie(meldingen)
+    lines += _zonder_locatie(meldingen, met_csv=met_csv)
     lines += table(_check_summary(run, _per_check(meldingen)), "Samenvatting per check")
+    lines += [
+        "",
+        "_Bekeken scope zegt waarover Bekeken geteld is. Gaat over noemt de populatie die "
+        "de check zelf declareert (rollen en kenmerken); dat is niet noodzakelijk precies "
+        "de verzameling die geteld is -- het aantal staat in Bekeken._",
+    ]
 
     skeletten = [outcome for outcome in run.outcomes if outcome.skeleton]
     if skeletten:
@@ -518,6 +633,38 @@ def _verantwoording(
             "",
         ]
     return lines
+
+
+def _onderdrukking_section(onderdrukking: Onderdrukking) -> list[str]:
+    """Wat `[rapport]` uit de meldingenstroom hield, en waar het gebleven is.
+
+    De alinea staat er zodra de projectconfiguratie iets onderdrukt, ook als er nul
+    meldingen wegvielen: de keuze zelf hoort verantwoord te worden, en "nul" is daarvan
+    de uitslag. Zwijgen zou lezen als "alles gecontroleerd" (BO-49).
+
+    "Per check" telt alle weggevallen meldingen per check-ID -- precies het verschil met
+    de kolom Bevindingen in de tabel eronder, ook als ze op klasse wegvielen. "Per
+    klasse" telt het deel dat op klasse wegviel. De twee zijn dus geen partitie en
+    tellen niet bij elkaar op.
+    """
+    if not onderdrukking.actief:
+        return []
+    return [
+        f"**{getal(onderdrukking.totaal, 'melding onderdrukt', 'meldingen onderdrukt')}** op "
+        f"grond van `[rapport]` in de projectconfiguratie — per check: "
+        f"{_telling(onderdrukking.per_check)}; per klasse: "
+        f"{_telling(onderdrukking.per_klasse)}. Die meldingen staan in geen enkele "
+        "uitvoervorm; wie ze wil zien draait zonder `onderdruk_klassen` en "
+        "`onderdruk_checks`.",
+        "",
+    ]
+
+
+def _telling(aantallen: dict[str, int]) -> str:
+    """Een telling als `TOP-011 3, ATTR-001 2`, gesorteerd op sleutel; leeg is "geen"."""
+    if not aantallen:
+        return "geen"
+    return ", ".join(f"{sleutel} {aantallen[sleutel]}" for sleutel in sorted(aantallen))
 
 
 def _per_check(meldingen: list[Melding]) -> dict[str, list[Melding]]:
@@ -536,6 +683,12 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     een lezer hier nodig heeft is welke eis waar de mist in gaat, hoe vaak, en welke
     conformiteitsklassen hem stellen. De losse meldingen staan in `bevindingen.csv`
     en op de kaart.
+
+    De kolom Omschrijving draagt de leesbare zin bij de vorm (issue #101). Zij komt uit
+    de meldingen zelf en niet opnieuw uit de vertaaltabel: wat hier staat is dan per
+    constructie dezelfde tekst als in de CSV, de JSON en de popup. Dragen de meldingen
+    van een vorm meer dan een zin -- twee conformiteitsklassen met een andere grens --
+    dan staan ze er allebei.
     """
     uit_nulmeting = [melding for melding in meldingen if melding.bron == BRON_NULMETING]
     if not run.meetbereik.gemeten:
@@ -549,12 +702,13 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     for melding in uit_nulmeting:
         per_vorm[melding.check_id].append(melding)
 
-    rijen: list[tuple[str, str, int, int, str]] = []
+    rijen: list[tuple[str, str, str, int, int, str]] = []
     for check_id, groep in per_vorm.items():
         klassen = sorted({cfk for melding in groep for cfk in melding.cfk})
         rijen.append(
             (
                 check_id,
+                "; ".join(sorted({melding.boodschap for melding in groep})),
                 # De zwaarste ernst in de groep, niet die van de eerste melding: zouden
                 # twee CFK-rapporten het oneens zijn over de Severity van dezelfde vorm,
                 # dan hoort de tabel de zwaarste te noemen en niet de toevallig eerste.
@@ -564,22 +718,72 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
                 ", ".join(klassen),
             )
         )
-    kolommen = ["Vorm", "Ernst", "Overtredingen", "Systemisch", "Conformiteitsklassen"]
+    kolommen = [
+        "Vorm",
+        "Omschrijving",
+        "Ernst",
+        "Overtredingen",
+        "Systemisch",
+        "Conformiteitsklassen",
+    ]
     tabel = pd.DataFrame(
         # Fouten boven waarschuwingen, en binnen elk het zwaarste eerst; dat is de
         # volgorde waarin een lezer ze wil aflopen.
-        sorted(rijen, key=lambda rij: (rij[1] != "F", -rij[2], rij[0])),
+        sorted(rijen, key=lambda rij: (rij[2] != "F", -rij[3], rij[0])),
         columns=kolommen,
     )
     regels += table(tabel, f"Overtredingen per SHACL-vorm ({len(uit_nulmeting)})")
     return [*regels, ""]
 
 
-def _detail_eigen(run: CheckRun, meldingen: list[Melding], *, genummerd: bool) -> list[str]:
+def _kenmerk_labels(outcome, config) -> list[str]:
+    """De gedeclareerde kenmerken van een check als leesbare labels.
+
+    Een `config:<pad>`-verwijzing (ATTR-013) wordt naar de geconfigureerde lijst
+    opgelost, `*` (ATTR-014) naar "alle kenmerken".
+    """
+    labels: list[str] = []
+    for kenmerk in outcome.kenmerken:
+        if kenmerk == "*":
+            labels.append("alle kenmerken")
+        elif kenmerk.startswith("config:"):
+            waarde: object = config
+            for deel in kenmerk.removeprefix("config:").split("."):
+                waarde = getattr(waarde, deel, None)
+            if isinstance(waarde, list | tuple):
+                labels.extend(str(w) for w in waarde)
+        else:
+            labels.append(kenmerk)
+    return labels
+
+
+def _toetst_regel(outcome, config) -> str:
+    """De regel "Toetst <klassen> op <kenmerken>" onder een eigen check (issue #64).
+
+    Zonder rollen noemt de check zelf de deelpopulatie die hij bekeek
+    (`populatie_omschrijving`, issue #96); "de hele export" blijft over voor de check
+    die werkelijk niet tot een populatie beperkt is.
+    """
+    klassen = sorted({k for rol in outcome.rollen for k in klassen_van_rol(rol, config.klassen)})
+    klassen_txt = ", ".join(klassen) or outcome.populatie_omschrijving or "de hele export"
+    kenmerken = _kenmerk_labels(outcome, config)
+    if not kenmerken:
+        return f"Toetst {klassen_txt} (structuur en geometrie, geen kenmerk)."
+    return f"Toetst {klassen_txt} op {', '.join(kenmerken)}."
+
+
+def _detail_eigen(
+    run: CheckRun, meldingen: list[Melding], *, genummerd: bool, met_csv: bool = True
+) -> list[str]:
     """Het detail van de eigen checks, eerst de foutchecks dan de waarschuwingschecks.
 
     `genummerd` is onwaar als er geen nulmetingblok boven staat -- zonder `--shacl` is
     er geen blok 1, en dan is "2. Eigen checks" een verwijzing naar niets.
+
+    Systemische bevindingen staan niet in de tabel maar in een generieke regel eronder
+    (issue #76), net zoals het nulmetingblok per SHACL-vorm samenvat. De vlag zit op de
+    melding, dus de scheiding gaat per melding: een check waarvan maar een deel
+    systemisch is toont de rest gewoon per object.
     """
     per_check = _per_check(meldingen)
     kop = "### 2. Eigen checks" if genummerd else "### Eigen checks"
@@ -594,27 +798,91 @@ def _detail_eigen(run: CheckRun, meldingen: list[Melding], *, genummerd: bool) -
         regels += [
             f"Ernst {outcome.severity.value}, dimensie {outcome.dimension.value}. "
             f"{getal(len(eigen), 'bevinding', 'bevindingen')} op "
-            f"{outcome.examined} bekeken objecten."
+            f"{_bekeken_regel(outcome)}."
             f"{markering}",
         ]
+        regels += ["", f"_{_toetst_regel(outcome, run.config)}_"]
         for note in outcome.notes:
             regels += ["", f"> {note}"]
         regels += _clusterduiding(eigen)
         if not eigen:
             regels += ["", "_geen bevindingen_"]
             continue
-        regels += [""]
-        maximum = _maximum_per_check(run)
-        getoond = eigen if maximum == 0 else eigen[:maximum]
-        regels += table(_findings_frame(getoond), f"Bevindingen ({len(eigen)})")
-        weggelaten = len(eigen) - len(getoond)
-        if weggelaten:
-            regels += [
-                "",
-                f"_{getal(weggelaten, 'bevinding', 'bevindingen')} niet getoond; "
-                f"de volledige lijst staat in `{FILE_CHECKS_CSV}`._",
-            ]
+        systemisch = [melding for melding in eigen if melding.systemisch]
+        per_object = [melding for melding in eigen if not melding.systemisch]
+        if per_object:
+            regels += [""]
+            maximum = _maximum_per_check(run)
+            getoond = per_object if maximum == 0 else per_object[:maximum]
+            regels += table(_findings_frame(getoond), f"Bevindingen ({len(per_object)})")
+            weggelaten = len(per_object) - len(getoond)
+            if weggelaten:
+                regels += [
+                    "",
+                    f"_{getal(weggelaten, 'bevinding', 'bevindingen')} niet getoond; "
+                    f"{_volledige_lijst(met_csv)}._",
+                ]
+        if systemisch:
+            regels += _systemische_regel(
+                len(systemisch), outcome, alle=not per_object, met_csv=met_csv
+            )
     return regels
+
+
+def _bekeken_regel(outcome) -> str:
+    """Wat `bekeken` van deze check telde: het aantal en de scope, plus waar hij over gaat.
+
+    Eén formulering voor de detailregel en voor de generieke systemische regel
+    eronder. Het kale getal mengt drie noemers -- een rol op de analyseset, dezelfde
+    rol op de volledige export, en kenmerkinstanties -- en "bekeken objecten" was voor
+    de derde soort gewoon onwaar (issue #77).
+
+    De scope hoort bij het getal; de gedeclareerde populatie staat er los van, achter
+    "gaat over". Zij is een bovengrens en geen noemer (zie `CheckOutcome.populatie`),
+    en direct achter een telling zou zij als de noemer lezen. Een check die niets
+    declareert (ADM-007) krijgt de toevoeging niet.
+    """
+    kern = f"{outcome.examined} bekeken ({outcome.bekeken_scope.value}"
+    if not outcome.populatie:
+        return f"{kern})"
+    return f"{kern}; gaat over: {outcome.populatie})"
+
+
+def _volledige_lijst(met_csv: bool) -> str:
+    """Waar de volledige lijst staat, als deelzin; zonder CSV noemt hij haar niet.
+
+    Naar een met `--uitvoer` uitgezette CSV verwijzen stuurt de lezer naar een bestand
+    dat er niet is, juist voor de bevindingen die het rapport zelf weglaat (issue #66).
+    """
+    if met_csv:
+        return f"de volledige lijst staat in `{FILE_CHECKS_CSV}`"
+    return (
+        f"de CSV is met `--uitvoer` uitgezet, de volledige lijst staat in "
+        f"`{FILE_CHECKS_JSON}` of de GeoPackage, voor zover die gevraagd zijn"
+    )
+
+
+def _systemische_regel(aantal: int, outcome, *, alle: bool, met_csv: bool) -> list[str]:
+    """De generieke regel voor systemische bevindingen (issue #76).
+
+    Check, aantal en bekeken populatie, in de vorm die het nulmetingblok per SHACL-vorm
+    al gebruikt; de check zelf staat in de kop erboven. Een systemische bevinding is
+    dezelfde structurele kwestie op (vrijwel) elk object -- zelf gedeclareerd door de
+    check of afgeleid uit de populatieratio -- en per object opgesomd verdringt zij wat
+    dit object van zijn buren onderscheidt. `alle` is onwaar als er ook niet-systemische
+    bevindingen zijn; dan staat de regel onder hun tabel.
+
+    De rijen zelf blijven in de CSV, de JSON en de meldingentabel van de GeoPackage
+    staan: die zijn een archief, en het weglaten is een keuze van de weergave.
+    """
+    aanhef = "Systemisch" if alle else "Daarnaast systemisch"
+    return [
+        "",
+        f"_{aanhef}: {getal(aantal, 'bevinding', 'bevindingen')} op "
+        f"{_bekeken_regel(outcome)} -- dezelfde kwestie op vrijwel elk object, dus dit "
+        f"rapport toont {vorm(aantal, 'haar', 'ze')} niet per object; "
+        f"{_volledige_lijst(met_csv)}._",
+    ]
 
 
 def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
@@ -670,25 +938,26 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         and melding.foutlocatie is None
         and melding.object_uri not in stelsel_uris
     )
+    # Sinds issue #75 tekent de GeoPackage geen stelselvlakken meer, dus een overtreding
+    # op een geregistreerd stelsel komt net zomin op de kaart als een op een klassenaam.
+    # Ze staan daarom in een telling: ze laten wegvallen zou lezen als "alles bekeken".
+    zonder_kaartobject = zonder_object + op_stelsel
     regels += [
         "",
-        f"> **{getal(zonder_object, 'overtreding kwam', 'overtredingen kwamen')} "
-        f"nergens op uit** en {vorm(zonder_object, 'staat', 'staan')} dus niet op de "
-        "kaart: de focusnode is een klassenaam uit `CfkTypes_typ` en wijst geen object aan. "
-        "Ze staan wel in dit rapport en in de meldingentabel, met een leeg gebied -- ze "
-        "zijn aan geen enkel studiegebied toe te wijzen.",
-        "",
-        f"> **{getal(op_stelsel, 'overtreding staat', 'overtredingen staan')} op een "
-        f"stelsel** en {vorm(op_stelsel, 'verschijnt', 'verschijnen')} op de laag `stelsels` "
-        "in de GeoPackage (#25): de focusnode is een geregistreerd stelsel (#17), geen knoop "
-        "of streng. Ze dragen geen eigen punt en zijn aan geen studiegebied toe te wijzen "
-        "(BO-12).",
+        f"> **{getal(zonder_kaartobject, 'overtreding kreeg', 'overtredingen kregen')} "
+        f"geen kaartobject** en {vorm(zonder_kaartobject, 'staat', 'staan')} dus niet op de "
+        f"kaart: {zonder_object} met een klassenaam uit `CfkTypes_typ` als focusnode en "
+        f"{op_stelsel} op een geregistreerd stelsel (#17). Een klassenaam wijst geen object "
+        "aan, en een stelsel is geen knoop of streng -- sinds issue #75 tekent de GeoPackage "
+        "er ook geen vlak meer omheen. Ze staan wel in dit rapport en in de meldingentabel, "
+        "met een leeg gebied: ze zijn aan geen enkel studiegebied toe te wijzen (BO-12).",
         "",
         f"> **{getal(zonder_plek, 'overtreding staat', 'overtredingen staan')} op een "
         f"object zonder bruikbare geometrie** en {vorm(zonder_plek, 'kreeg', 'kregen')} "
         "daarom geen plek op de kaart.",
         "",
     ]
+    regels += _onvertaald_section(uit_nulmeting)
     if run.nulbevindingen_weggelaten:
         buiten = getal(run.nulbevindingen_weggelaten, "overtreding viel", "overtredingen vielen")
         regels += [
@@ -698,6 +967,38 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
             "",
         ]
     return regels
+
+
+def _onvertaald_section(uit_nulmeting: list[Melding]) -> list[str]:
+    """Hoeveel meldingen op de technische SHACL-tekst terugvielen, en van welke vormen.
+
+    De vertaaltabel (issue #101) dekt de 43 vormen die de De Wolden-rapporten kennen.
+    Een GWSW-server die een nieuwe vorm oplevert, of een andere gemeente met andere
+    stelseltypen, levert een vorm zonder tekst; die melding blijft staan met haar
+    technische boodschap. Zwijgen zou lezen als "alles is leesbaar gemaakt", terwijl de
+    lezer dan zonder verklaring een regel SHACL-jargon voor zich krijgt.
+
+    De regel blijft weg zodra elke vorm vertaald is: "0 meldingen van 0 onvertaalde
+    vormen" is geen verantwoording maar ruis in een sectie die juist zegt wat er
+    ontbreekt.
+    """
+    telling: dict[str, int] = defaultdict(int)
+    for melding in uit_nulmeting:
+        vormnaam = melding.check_id.removeprefix(f"{CHECK_VOORVOEGSEL}-")
+        if not vertaald(vormnaam):
+            telling[vormnaam] += 1
+    if not telling:
+        return []
+
+    meldingen = sum(telling.values())
+    namen = ", ".join(f"`{vormnaam}`" for vormnaam in sorted(telling))
+    return [
+        f"> **{getal(meldingen, 'melding draagt', 'meldingen dragen')} de technische "
+        f"SHACL-tekst**: {getal(len(telling), 'vorm heeft', 'vormen hebben')} nog geen "
+        f"vastgestelde Nederlandse omschrijving ({namen}). De overtreding zelf telt "
+        "gewoon mee; alleen de zin erbij is nog die van de GWSW-server.",
+        "",
+    ]
 
 
 def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
@@ -717,27 +1018,82 @@ def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
     return sorted(ids)
 
 
-def _karakteristiek_section(run: CheckRun) -> list[str]:
+def _karakteristiek_section(run: CheckRun, meldingen: list[Melding], *, met_csv: bool) -> list[str]:
     """Beschrijft eigenschappen van de dataset die de bevindingen kleuren.
 
     Geen bevindingen: datums die allemaal op 1 januari vallen en registraties die
     expliciet "niet achterhaald" zeggen, zijn niet per object te herstellen. Ze
     bepalen wel hoe de rest van dit rapport gelezen moet worden, en ze staan hier
     daarom als samenvattende regel in plaats van als duizenden meldingen.
+
+    Het ontbrekende aanlegjaar staat vooraan (issue #91): dat is wél per object gemeld,
+    maar het aandeel zegt iets anders dan de losse meldingen -- de kop hoort het te
+    benoemen, ook als er verder geen enkele karakteristiek is.
     """
+    aanlegjaar = _aanlegjaar_regel(run, meldingen, met_csv=met_csv)
+    tabellen = _karakteristiek_tabellen(run)
+    if not aanlegjaar and not tabellen:
+        return []
+    return ["**Datakarakteristieken**", "", *aanlegjaar, *tabellen]
+
+
+def _aanlegjaar_regel(run: CheckRun, meldingen: list[Melding], *, met_csv: bool) -> list[str]:
+    """Het aandeel putten zonder aanlegjaar, als eerste regel van de datakarakteristieken.
+
+    Teller en noemer komen uit wat er al is: de ATTR-018-meldingen van *deze* uitvoer --
+    dus na afbakening en na de onderdrukking uit `[rapport]` -- en de putpopulatie uit
+    `uitvoer.omvang`. Een eigen doorloop over de dataset zou een tweede waarheid naast
+    de check opleveren.
+
+    Meldt ATTR-018 niets, of staat er geen put in beeld, dan blijft de regel weg. "0%
+    van de putten zonder aanlegjaar" is geen karakteristiek van de aanlevering maar ruis
+    in een sectie die juist zegt waaronder de rest gelezen moet worden. Dat de teller
+    dan nul is dekt beide gevallen, en houdt de deling veilig.
+
+    De regel wijst naar het **archief** en niet naar dit rapport of de kaart. Dat er per
+    put een melding is blijft waar in elke toestand, maar waar die te zien is niet: komt
+    ATTR-018 boven de systemisch-drempel, dan vouwt `_detail_eigen` de tabel tot een
+    generieke regel (issue #76) en laat `objectkaart.popup_html` de meldingen weg
+    (BO-59), en `max_bevindingen_per_check` kapt de tabel sowieso af. `_volledige_lijst`
+    is de ene plek die weet waar de volledige lijst wél staat, inclusief het geval waarin
+    `--uitvoer` de CSV uitzette (issue #66); die tweede plek hier zelf formuleren zou op
+    een dag naar een bestand wijzen dat er niet is.
+    """
+    in_beeld = putten_in_beeld(run)
+    zonder = sum(
+        1
+        for melding in meldingen
+        if melding.check_id == CHECK_AANLEGJAAR and melding.object_uri in in_beeld
+    )
+    if not zonder:
+        return []
+    hier = " in dit gebied" if run.study_area is not None else ""
+    return [
+        f"**{100 * zonder / len(in_beeld):.1f}% van de putten{hier} draagt geen aanlegjaar** "
+        f"({zonder} van de {len(in_beeld)}) — een aanleveringssignaal: het aanlegjaar "
+        "ontbreekt stelselmatig, en dat is één gebrek in de aanlevering. "
+        f"{CHECK_AANLEGJAAR} meldt elk geval afzonderlijk, zodat de putten aanwijsbaar "
+        f"blijven: {_volledige_lijst(met_csv)}. Herstellen gaat via de aanlevering en niet "
+        "put voor put.",
+        "",
+    ]
+
+
+def _karakteristiek_tabellen(run: CheckRun) -> list[str]:
+    """De tellingen van `karakteristiek.py`: datumprecisie en inwinningsvulling."""
     karakteristiek = run.karakteristiek
     if karakteristiek is None or (not karakteristiek.datums and not karakteristiek.inwinning):
         return []
 
-    lines = ["**Datakarakteristieken**", ""]
+    lines: list[str] = []
     if run.study_area is not None:
         # De cijfers zijn over de hele dataset geteld, terwijl de bevindingen erboven
         # tot het studiegebied zijn afgebakend. Zonder deze regel leest de tabel als
         # een beschrijving van de afbakening.
         lines += [
-            f"> Geteld over de **volledige dataset**, niet over {run.study_area.name}: het "
-            "gaat om eigenschappen van de aangeleverde export, en die veranderen niet met "
-            "de afbakening van de rapportage.",
+            f"> De tabellen hieronder tellen over de **volledige dataset**, niet over "
+            f"{run.study_area.name}: het gaat om eigenschappen van de aangeleverde export, "
+            "en die veranderen niet met de afbakening van de rapportage.",
             "",
         ]
 
@@ -839,10 +1195,16 @@ def _bronnen_section(run: CheckRun) -> list[str]:
     regels += table(lagen, "Ingelezen lagen")
     if bronnen.raster is not None:
         regels += ["", f"Hoogteraster: `{bronnen.raster.source.name}` ({bronnen.raster.crs})."]
-    if bronnen.missing:
+    # Alleen de bronnen waar werkelijk een check op leunt: sinds EXT-005 en EXT-006
+    # vervielen leest niets meer `bgt_putdeksel`, en `nwb_wegvak` had nooit een lezer.
+    # Hun ontbreken slaat geen check over, dus deze zin zou er onwaar over zijn (BO-64).
+    # De laag zelf blijft geladen en op dekking getoetst, en de terugkoppeling van
+    # `toets` op de opdrachtregel somt nog steeds alles op wat er niet was.
+    gemist = [regel for regel in bronnen.missing if rol_van(regel) in bronrollen_met_check()]
+    if gemist:
         regels += [
             "",
-            "> **Niet aangeleverd of leeg:** " + "; ".join(bronnen.missing) + ". De checks "
+            "> **Niet aangeleverd of leeg:** " + "; ".join(gemist) + ". De checks "
             "die deze bronnen nodig hebben zijn overgeslagen; nul bevindingen betekent daar "
             "niet dat het in orde is.",
         ]
@@ -852,7 +1214,12 @@ def _bronnen_section(run: CheckRun) -> list[str]:
 
 
 def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.DataFrame:
-    """Een regel per check met de aantallen uit de meldingenstroom."""
+    """Een regel per check met de aantallen uit de meldingenstroom.
+
+    `Bekeken scope` staat naast `Bekeken` omdat dat getal anders drie onvergelijkbare
+    noemers in een kolom mengt (issue #77). `Gaat over` is geen noemer maar de
+    gedeclareerde populatie van de check; de voetnoot onder de tabel zegt dat erbij.
+    """
     return pd.DataFrame(
         [
             {
@@ -861,6 +1228,8 @@ def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.Dat
                 "Ernst": outcome.severity.value,
                 "Dimensie": outcome.dimension.value,
                 "Bekeken": outcome.examined,
+                "Bekeken scope": outcome.bekeken_scope.value,
+                "Gaat over": outcome.populatie,
                 "Bevindingen": len(per_check.get(outcome.check_id, [])),
                 "Typering onbetrouwbaar": sum(
                     1
@@ -877,6 +1246,8 @@ def _check_summary(run: CheckRun, per_check: dict[str, list[Melding]]) -> pd.Dat
             "Ernst",
             "Dimensie",
             "Bekeken",
+            "Bekeken scope",
+            "Gaat over",
             "Bevindingen",
             "Typering onbetrouwbaar",
             "Skelet",
@@ -927,7 +1298,7 @@ def _clusterduiding(meldingen: list[Melding]) -> list[str]:
     ]
 
 
-def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
+def _zonder_locatie(meldingen: list[Melding], *, met_csv: bool = True) -> list[str]:
     """Meldt hoeveel meldingen geen plek op de kaart kregen, en waarom.
 
     De GeoPackage telt ze in `gwsw_run`, maar wie alleen het rapport leest zou denken
@@ -954,13 +1325,20 @@ def _zonder_locatie(meldingen: list[Melding]) -> list[str]:
 
     objectloos = [melding for melding in zonder if not melding.object_uri]
     zonder_geometrie = [melding for melding in zonder if melding.object_uri]
+    # Zonder CSV mag die hier niet genoemd worden: dan verwijst het rapport naar een
+    # bestand dat `--uitvoer` heeft uitgezet (issue #66).
+    waar = (
+        f"Ze staan wel in de CSV, in `{FILE_CHECKS_JSON}` en in de meldingentabel van de "
+        "GeoPackage, die de kolommen `x` en `y` draagt"
+        if met_csv
+        else f"Ze staan wel in `{FILE_CHECKS_JSON}` en in de meldingentabel van de GeoPackage, "
+        "die de kolommen `x` en `y` draagt, voor zover die gevraagd zijn"
+    )
     regels = [
         f"> **{getal(len(zonder), 'melding heeft', 'meldingen hebben')} geen plek op de "
         f"kaart** gekregen. {_oorzaak(objectloos, 'wijst', 'wijzen')} geen object aan; "
         f"{_oorzaak(zonder_geometrie, 'staat', 'staan')} op een object zonder bruikbare "
-        f"geometrie. Ze staan wel in de CSV, in `{FILE_CHECKS_JSON}` en in de "
-        "meldingentabel van de GeoPackage, die de kolommen `x` en `y` draagt; alleen "
-        "kleuren ze geen object op de kaart.",
+        f"geometrie. {waar}; alleen kleuren ze geen object op de kaart.",
         "",
     ]
     return regels

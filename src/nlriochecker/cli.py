@@ -8,14 +8,15 @@ from pathlib import Path
 from typing import Any
 
 import click
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
+from gwsw_orox_helpers.errors import DatasetError
 
 from nlriochecker import __version__
 from nlriochecker.analysis import MetingAnalysis, analyze
-from nlriochecker.checkconfig import load_check_config
+from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import CoverageConfig, load_coverage_config
 from nlriochecker.coverage import assess_coverage, verify_register
-from nlriochecker.dataset import GwswDataset, load_dataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.meting import kies_cfk, laad_nulmeting
 from nlriochecker.register import Register, default_register_path, load_register
@@ -302,7 +303,11 @@ def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths,
     project = load_check_config(project_config_path)
     gekozen = kies_cfk(cfk_keuze, project.nulmeting.vereiste_cfk)
     nulmeting = laad_nulmeting(list(shacl_paths), gekozen, project.nulmeting.vereiste_cfk)
-    dataset = load_dataset(dataset_path, list(ontology_paths)) if dataset_path is not None else None
+    dataset = (
+        load_dataset(dataset_path, list(ontology_paths), fallback_encoding=FALLBACK_ENCODING)
+        if dataset_path is not None
+        else None
+    )
     return project, nulmeting, analyze(nulmeting, dataset), dataset
 
 
@@ -352,7 +357,7 @@ def analyze_command(
         # mankeert.
         coverage = assess_coverage(analyse, config, register)
         markdown_path, csv_path = write_reports(analyse, output_dir, coverage)
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     _echo_meting(analyse, dataset)
@@ -393,7 +398,7 @@ def coverage_command(
         verify_register(config, register, eisen=True)
         result = assess_coverage(analyse, config, register)
         markdown_path, csv_path = write_coverage_report(result, output_dir)
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     click.echo(
@@ -459,7 +464,7 @@ def compare_command(
         later = analyze(laad_nulmeting(list(later_paths), gekozen, volledig))
         comparison = compare_metingen(eerder, later, load_coverage_config(config_path))
         markdown_path, csv_path, objects_path = write_comparison_reports(comparison, output_dir)
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     click.echo(f"Dataset {comparison.dataset_file}")
@@ -493,7 +498,7 @@ def compare_command(
     "ontology_paths",
     multiple=True,
     type=RAPPORT_TYPE,
-    help="GWSW-ontologie (TTL) voor de klassenhierarchie; meermaals toegestaan.",
+    help="GWSW-ontologie (TTL); standaard de gebundelde versie 1.6; meermaals toegestaan.",
 )
 @click.option(
     "--geen-ontologie",
@@ -532,16 +537,16 @@ def compare_command(
     ),
 )
 @click.option(
-    "--geen-gpkg",
-    "geen_gpkg",
-    is_flag=True,
-    help="Sla de GeoPackage-export over; schrijf alleen het rapport en de CSV.",
-)
-@click.option(
-    "--geen-json",
-    "geen_json",
-    is_flag=True,
-    help="Sla de JSON-export over; schrijf alleen het rapport, de CSV en de GeoPackage.",
+    "--uitvoer",
+    "uitvoervormen",
+    multiple=True,
+    type=click.Choice(["csv", "json", "gpkg"]),
+    default=("csv", "json", "gpkg"),
+    show_default=True,
+    help=(
+        "Welke bijproducten naast het Markdown-rapport geschreven worden; meermaals "
+        "toegestaan. Het rapport wordt altijd geschreven."
+    ),
 )
 @click.option(
     "--geen-cache",
@@ -554,7 +559,7 @@ def compare_command(
     "cache_dir",
     default=None,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Waar de geparseerde dataset bewaard wordt; standaard ~/.cache/nlriochecker.",
+    help="Waar de geparseerde dataset bewaard wordt; standaard ~/.cache/gwsw-orox-helpers.",
 )
 @_output_option("Map waarin het bevindingenrapport wordt geschreven.")
 def check_command(
@@ -570,8 +575,7 @@ def check_command(
     bronnen_dir: Path | None,
     cfk_keuze: tuple[str, ...],
     gebied_keuze: tuple[str, ...],
-    geen_gpkg: bool,
-    geen_json: bool,
+    uitvoervormen: tuple[str, ...],
     geen_cache: bool,
     cache_dir: Path | None,
     output_dir: Path,
@@ -591,14 +595,15 @@ def check_command(
         bronnen=bronnen_dir,
         cfk=cfk_keuze,
         uitvoermap=output_dir,
-        met_geopackage=not geen_gpkg,
-        met_json=not geen_json,
+        met_csv="csv" in uitvoervormen,
+        met_geopackage="gpkg" in uitvoervormen,
+        met_json="json" in uitvoervormen,
         gebruik_cache=not geen_cache,
         cachemap=cache_dir,
     )
     try:
         uitslag = voer_toets_uit(opdracht, voortgang=_BalkVoortgang())
-    except PipelineError as error:
+    except (PipelineError, DatasetError) as error:
         raise _CliError(str(error)) from error
 
     for regel in uitslag.regels():

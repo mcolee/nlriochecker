@@ -11,7 +11,8 @@ sporen. Peildatum 2026-08-22; 26 open issues.
 3. **Karpathy-regels uit CLAUDE.md**: aannames expliciet, minimale code, chirurgisch,
    verifieerbaar doel vooraf.
 4. **Skillvolgorde per sessie:**
-   - lees het issue via `gh issue list --json` (nooit `gh issue view`, dat faalt);
+   - lees het issue via `gh issue view <n> --comments` (werkt sinds 25-08 weer; `gh issue
+     list --json` blijft het alternatief);
    - `superpowers:brainstorming` bij ontwerpruimte, `superpowers:systematic-debugging`
      bij een bug;
    - `superpowers:test-driven-development`: eerst de falende test;
@@ -96,6 +97,28 @@ Elk een eigen ontwerpstap (`superpowers:writing-plans`) binnen de sessie.
 - **#41** (ready-for-human): dekkingsanalyse omkeren.
 - **#32** (ready-for-human): klassenlijsten tegen de volledige ontologie.
 - **#47** (needs-info): zie tussenstap.
+
+### Blok F — uit de ideeënronde van 2026-08-25 (blokken A–E zijn af)
+
+Zeven issues, samen met de auteur uitgewerkt op 25-08; de teksten zijn zelf de specificatie.
+Blok F begint pas als blok A–E leeg is (dat is het geval sinds 25-08).
+
+| # | Issue | Waarom hier |
+|---|-------|-------------|
+| 24 | #64 | elke check declareert klassen en kenmerken, bewaakt tegen de ontologie, én een populatiecontrole over alle 99 checks; de audit (#68–#70) en de nul-bewaking bouwen erop |
+| 25 | #65 | onderdrukking van meldingen per klasse en per check (mechanisch riool grijs), met telling in rapport, `gwsw_run` en JSON |
+| 26 | #66 | `toets --uitvoer csv\|json\|gpkg` vervangt `--geen-gpkg`/`--geen-json` — klein, maar een CLI-contract |
+| 27 | #67 | één vlakkenlaag `vlakken` in plaats van `bouwwerken` en `waterdelen_zonder_zinker`; EXT-002 registreert zijn treffer |
+| 28 | #68 | checkaudit A (TOP, ADM) — de auteur in de lus, geen code |
+| 29 | #69 | checkaudit B (ATTR, HGT) — na A |
+| 30 | #70 | checkaudit C (NET, RVZ, BTR, EXT) — na B; sluit de audit af met een totaaloverzicht |
+
+**Geparkeerd** (geen issue): de OroX-lader, -schrijver en -clipper als eigen package
+(`gwsw-orox-helpers`). Raakt elke module; pas na de audit opnieuw bekijken.
+
+Voor de auditissues geldt een afwijking van regel 1: de sessie is niet AFK, de auteur beslist
+per check in de sessie zelf. Regel 2 blijft: de agent maakt geen issues aan; de
+vervolgvoorstellen staan in de sluitcomment en de auteur kiest.
 
 ## Onderbouwing van de volgorde
 

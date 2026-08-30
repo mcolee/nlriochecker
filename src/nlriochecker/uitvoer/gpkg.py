@@ -4,11 +4,14 @@ Geschreven met `sqlite3` en `shapely.wkb` — dezelfde route waarmee
 `studiegebied.py` een GeoPackage al *leest*, nu de schrijfkant. Dat scheelt een
 afhankelijkheid en houdt lees- en schrijfkant bij elkaar.
 
-Er zijn twee objectlagen -- `putten` en `strengen` -- met de gebreken *op* het object:
-de kolom `status` draagt de uitslag in vier waarden en `popup_html` de voorgebakken
-hoverpopup. Mechanisch riool staat tussen de strengen met status `grijs`, en met een
-studiegebied staat de contextschil er ook grijs bij: wat de checks wel zagen maar niet
-beoordeelden, hoort zichtbaar te zijn.
+Er zijn drie featurelagen, een per geometrievorm: `putten` (punt), `strengen` (lijn) en
+`vlakken` (vlak). De twee objectlagen dragen de gebreken *op* het object: de kolom
+`status` draagt de uitslag in vier waarden en `popup_html` de voorgebakken hoverpopup.
+Mechanisch riool staat tussen de strengen met status `grijs`, en met een studiegebied
+staat de contextschil er ook grijs bij: wat de checks wel zagen maar niet beoordeelden,
+hoort zichtbaar te zijn. `vlakken` draagt wat geen punt of lijn is: de externe objecten
+waarnaar een EXT-melding wijst en de gemengde deelstelsels van RVZ-006, uit elkaar te
+houden met de kolom `soort` (issue #98).
 
 Het bestand is bewust zelfvoorzienend: de featurelagen bevatten genoeg samenvatting
 om zonder join bruikbaar te zijn, de tabel `meldingen` draagt elke melding met haar
@@ -25,42 +28,52 @@ from __future__ import annotations
 import sqlite3
 import struct
 from collections import defaultdict
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from importlib import resources
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import Conduit, Node
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
 from shapely.geometry import MultiPolygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
+from nlriochecker.checks.randvoorzieningen import aanwijzingen_van
 from nlriochecker.checks.selectie import mechanischeleidingen
-from nlriochecker.checks.treffers import Treffer
+from nlriochecker.checks.treffers import Treffer, Wegvakoordeel
 from nlriochecker.checks.verbanden import (
     Afvoer,
     afvoerpad_van_streng,
     afvoerpaden,
-    verbonden_knopen,
+    deelstelsel_ids,
+    putknopen,
+    strengen_per_knoop,
 )
-from nlriochecker.dataset import Conduit, GwswDataset
 from nlriochecker.errors import PipelineError
 from nlriochecker.uitvoer.herkomst import PAKKET, VELD_GEREEDSCHAP, gereedschap
 from nlriochecker.uitvoer.identiteit import kort
-from nlriochecker.uitvoer.melding import BRON_NULMETING, BRON_REGISTER, Melding, categorie_van
+from nlriochecker.uitvoer.melding import (
+    BRON_NULMETING,
+    BRON_REGISTER,
+    GEEN_ONDERDRUKKING,
+    Melding,
+    Onderdrukking,
+    categorie_van,
+)
 from nlriochecker.uitvoer.objectkaart import (
+    STATUS_ORANJE,
+    STATUS_ROOD,
     Objectkop,
     bepaal_status,
     popup_html,
 )
 from nlriochecker.uitvoer.omvang import stelseltypen
-from nlriochecker.uitvoer.stelsels import Stelselvlak, lees_stelsels
 from nlriochecker.uitvoer.stijlen.symbolen import bouw_qml
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.uitvoer.voorbehoud import markering
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 # De GWSW-coordinaten staan in Rijksdriehoek; herprojecteren doen we niet.
 RD_NEW = 28992
@@ -78,9 +91,7 @@ RICHTING_ONBEKEND = "onbekend"
 FEATURELAGEN = (
     "putten",
     "strengen",
-    "bouwwerken",
-    "waterdelen_zonder_zinker",
-    "stelsels",
+    "vlakken",
 )
 
 # De relaties van EXT-001, van zwaar naar licht. De laag toont de sterkste over de
@@ -91,6 +102,14 @@ RELATIE_STERKTE = ("binnen", "kruist", "nabij")
 # "in orde", en dat is het niet.
 REDEN_MECHANISCH = "mechanisch riool, dat de meeste checks overslaan"
 REDEN_SCHIL = "ligt naast het studiegebied en niet erin"
+# De projectconfiguratie houdt de meldingen van deze klasse uit de stroom (BO-49). Niet
+# hetzelfde als "mechanisch": dat zegt dat de checks er grotendeels overheen lopen, dit
+# dat de uitkomst bewust niet gerapporteerd wordt -- ook op een klasse die wel getoetst is.
+# De reden is een eigenschap van de klasse en niet van dit object: hij staat er ook op een
+# object waarop niets gevonden was, en mag dus geen weggevallen meldingen suggereren.
+REDEN_ONDERDRUKT = (
+    "klasse onderdrukt in de projectconfiguratie; meldingen erop komen niet in de uitvoer"
+)
 # Deze reden geldt niet voor een object maar voor de hele run: zonder klassenhierarchie
 # heeft de lader knopen en strengen op geometrie herkend en draaiden de checks over een
 # onvolledige selectie. Groen zou hier "beoordeeld en niets gevonden" beweren, terwijl
@@ -98,13 +117,6 @@ REDEN_SCHIL = "ligt naast het studiegebied en niet erin"
 REDEN_GEEN_KLASSENHIERARCHIE = (
     "deze run kende de klassenhierarchie niet; de checks draaiden over een onvolledige selectie"
 )
-# Een stelsel wordt niet door de eigen checks getoetst -- die draaien op knopen en
-# strengen -- maar alleen door de SHACL-nulmeting. Zonder meting is het dus niet
-# beoordeeld, en groen zou "gemeten en in orde" beweren waar niets gemeten is.
-REDEN_GEEN_NULMETING = (
-    "geen SHACL-nulmeting gedraaid; een stelsel wordt alleen door de nulmeting beoordeeld"
-)
-
 RD_WKT = (
     'PROJCS["Amersfoort / RD New",GEOGCS["Amersfoort",DATUM["Amersfoort",'
     'SPHEROID["Bessel 1841",6377397.155,299.1528128]],PRIMEM["Greenwich",0],'
@@ -124,9 +136,7 @@ RD_WKT = (
 GEOPACKAGE_STAPPEN = (
     "putten",
     "strengen",
-    "bouwwerken",
-    "waterdelen_zonder_zinker",
-    "stelsels",
+    "vlakken",
     "meldingen",
     "overzicht_checks",
     "gwsw_run",
@@ -156,12 +166,24 @@ class _LaagTellingen:
     # Hoeveel van die lijnen mechanisch riool zijn; ze staan sinds issue #13 tussen de
     # strengen met status `grijs` in plaats van in een eigen laag.
     mechanisch: int
-    bouwwerken: int
-    waterdelen: int
-    # Het aantal stelsels dat een vlak kreeg: de geregistreerde stelsels met strengen.
-    # De put-buckets uit #17 (alleen putten, geen strengen) vallen weg en zitten hier
-    # dus niet in; `n_stelsels` in `gwsw_run` maakt dat expliciet.
-    stelsels: int
+    # Alle rijen in de laag `vlakken`: de externe vlakken (pand, bouwwerk, water) waarnaar
+    # een EXT-melding wijst plus de gemengde deelstelsels hieronder. Sinds issue #98 is dat
+    # één laag; `n_vlakken` telt haar dus in haar geheel en de regel hieronder zegt hoeveel
+    # daarvan deelstelsels zijn.
+    vlakken: int
+    # De gemengde deelstelsels waarop RVZ-006 aansloeg en die een vlak kregen (issue
+    # #75); sinds issue #98 rijen in `vlakken` met `soort = gemengd_deelstelsel` in plaats
+    # van een eigen laag.
+    gemengd_zonder_overstort: int
+    # De beoordeelde wegvakken van EXT-009 (issue #104), `soort = wegvak`. Ze staan in
+    # dezelfde laag; zonder deze telling zou het aantal externe vlakken niet meer uit
+    # `n_vlakken` af te leiden zijn.
+    wegvakken: int
+    # En de deelstelsels waarop RVZ-006 wél aansloeg maar die geen vlak konden krijgen,
+    # omdat geen enkele streng ervan een bruikbare lijn draagt. Ze staan in geen enkele
+    # rij van de laag; zonder deze telling zou "dit deelstelsel bestaat niet" niet van
+    # "we konden het niet tekenen" te onderscheiden zijn.
+    gemengd_zonder_vlak: int
 
 
 def schrijf_geopackage(
@@ -171,6 +193,7 @@ def schrijf_geopackage(
     run_datum: date,
     *,
     voortgang: Voortgang = NUL_VOORTGANG,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> Path:
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
 
@@ -178,6 +201,12 @@ def schrijf_geopackage(
     bevatten alleen objecten binnen of snijdend met het gebied. De checks draaiden
     op de kern plus de contextschil (ruim genoeg voor randeffectvrije netwerkchecks),
     dus wat hier buiten valt is bewust weggelaten, niet over het hoofd gezien.
+
+    `onderdrukking` komt uit de meldingenstroom en is de enige bron voor beide dingen
+    die zij hier bepaalt: welke objecten grijs worden met `REDEN_ONDERDRUKT` en wat
+    `gwsw_run` daarover meldt. De meldingen die `[rapport]` wegliet zitten niet in
+    `meldingen`, en zonder die telling zou het bestand niet zeggen dat er iets
+    weggelaten is (BO-49).
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)
@@ -192,12 +221,14 @@ def schrijf_geopackage(
     try:
         verbinding = sqlite3.connect(doel)
         _leg_fundament(verbinding)
-        tellingen = _schrijf_features(verbinding, run, meldingen, binnen, run_datum, voortgang)
+        tellingen = _schrijf_features(
+            verbinding, run, meldingen, binnen, run_datum, voortgang, onderdrukking
+        )
         _schrijf_meldingen(verbinding, meldingen)
         voortgang.stap(label="meldingen")
         _schrijf_overzicht(verbinding, run, meldingen)
         voortgang.stap(label="overzicht_checks")
-        _schrijf_runmetadata(verbinding, run, meldingen, run_datum, tellingen)
+        _schrijf_runmetadata(verbinding, run, meldingen, run_datum, tellingen, onderdrukking)
         voortgang.stap(label="gwsw_run")
         _schrijf_stijlen(verbinding)
         voortgang.stap(label="layer_styles")
@@ -367,6 +398,10 @@ def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple
     zonder bekende tekenrichting is er geen waarde die dat eerlijk uitdrukt. De rij
     krijgt dan `onbekend` met een lege waarde, net als bij een ontbrekend of nul
     BOB-verval.
+
+    Deze functie weet niets van mechanisch riool: dat de *pijl* daar wegvalt is een
+    besluit van de schrijver en staat op de enige plek waar de mechanische populatie
+    bekend is (`_schrijf_features`, issue #74). Het verval zelf blijft er wel staan.
     """
     verval = conduit.bob_verval
     if verval is None or verval == 0.0:
@@ -385,6 +420,10 @@ def _samenvatting_kolommen() -> list[_Kolom]:
         _Kolom("label", "text"),
         _Kolom("objecttype", "text"),
         _Kolom("stelsel", "text"),
+        # Het aanlegjaar uit `Begindatum`, om op te filteren; leeg als het object er
+        # geen draagt (ATTR-018 meldt dat dan). Het jaar en niet de datum, net als de
+        # rest van de code (`Conduit.begindatum_jaar`).
+        _Kolom("begindatum_jaar", "integer"),
         _Kolom("richting_bob", "text"),
         _Kolom("bob_verval_m", "real"),
         # Het benedenstroomse uitstroompunt dat dit object bereikt, met de padmaat
@@ -428,6 +467,22 @@ def _mechanische_uris(run: CheckRun) -> frozenset[str]:
     return frozenset(conduit.uri for conduit in mechanischeleidingen(run.context))
 
 
+def _onderdrukte_uris(run: CheckRun, klassen: tuple[str, ...]) -> frozenset[str]:
+    """De objecten waarvan `[rapport]` de meldingen uit de stroom houdt (BO-49).
+
+    De klassen komen uit de meegegeven `Onderdrukking` en niet uit `run.config`: dan
+    hebben de grijze objecten en de telling in `gwsw_run` dezelfde bron, en kan een
+    beller die de stroom zelf samenstelde geen bestand krijgen waarin objecten grijs
+    staan met een reden die de runtabel niet noemt.
+
+    Niet uit de meldingen: een object van een onderdrukte klasse hoort ook grijs te lezen
+    als er toevallig niets op stond. Anders zou de kaart bij het ene object "niet
+    gerapporteerd" en bij het andere "beoordeeld en in orde" zeggen op grond van
+    hetzelfde besluit.
+    """
+    return frozenset(uri for wortel in klassen for uri in run.dataset.of_class(wortel))
+
+
 def _schrijf_features(
     verbinding: sqlite3.Connection,
     run: CheckRun,
@@ -435,15 +490,16 @@ def _schrijf_features(
     binnen: frozenset[str] | None,
     run_datum: date,
     voortgang: Voortgang = NUL_VOORTGANG,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> _LaagTellingen:
-    """Schrijft de twee objectlagen plus de twee lagen met externe objecten.
+    """Schrijft de twee objectlagen plus de vlakkenlaag.
 
     Naast de beoordeelde objecten komt erin wat de checks wel zagen maar niet
     beoordeelden: mechanisch riool, dat volgens het checkregister buiten scope valt,
-    en de contextschil van een studiegebied. Beide krijgen status `grijs` met de reden
-    in hun popup. Ze weglaten zou de kaart bij de gebiedsgrens laten ophouden alsof
-    daar niets ligt, en een lege mechanische laag zou als "geen mechanisch riool
-    aanwezig" lezen.
+    de klassen uit `onderdrukking`, en de contextschil van een studiegebied. Alle drie
+    krijgen status `grijs` met de reden in hun popup. Ze weglaten zou de kaart bij de
+    gebiedsgrens laten ophouden alsof daar niets ligt, en een lege mechanische laag zou
+    als "geen mechanisch riool aanwezig" lezen.
 
     Kende de run de klassenhierarchie niet, dan geldt dat voor *elk* object: de checks
     hebben dan over een onvolledige selectie gedraaid en er valt niets te beoordelen.
@@ -472,7 +528,8 @@ def _schrijf_features(
         "strengen",
         "LINESTRING",
         kolommen,
-        "Verbindingen met de uitslag per object; mechanisch riool staat er grijs bij.",
+        "Verbindingen met de uitslag per object; mechanisch riool en een onderdrukte "
+        "klasse staan er grijs bij.",
     )
 
     per_object = _meldingen_per_object(meldingen)
@@ -480,6 +537,7 @@ def _schrijf_features(
     stelsels = stelseltypen(run)
     config = run.config
     mechanisch = _mechanische_uris(run)
+    onderdrukt = _onderdrukte_uris(run, onderdrukking.klassen)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
     # Het afvoerpad per knoop, uit `run.context`: de NET-checks hebben de graaf daar
@@ -505,14 +563,26 @@ def _schrijf_features(
             if geometrie is None or geometrie.is_empty:
                 continue
             grenzen.append(geometrie.bounds)
+            is_mechanisch = uri in mechanisch
             richting, verval = (
                 _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
             )
+            # Een mechanische leiding is pompgestuurd: het water loopt er niet met het
+            # bodemverval mee, dus een groene of rode pijl zou een stroomrichting tekenen
+            # die er fysiek niet is (issue #74). Alleen de pijl vervalt -- het verval zelf
+            # blijft in `bob_verval_m` staan, want dat is een gemeten waarde en geen
+            # bewering over de stroomrichting. De popupregel zegt waarom er geen pijl is;
+            # zonder die eigen tekst zou hij "niet te bepalen" beweren waar de leiding er
+            # domweg geen heeft.
+            if is_mechanisch:
+                richting, richting_woord = RICHTING_ONBEKEND, RICHTING_MECHANISCH
+            else:
+                richting_woord = richting
             afvoer_eindpunt, afvoer_meters, afvoer_stappen = _afvoer_velden(
                 run.context, afvoer_per_knoop, uri, object_
             )
-            reden = _reden_niet_beoordeeld(uri, binnen, mechanisch, geen_hierarchie)
-            if uri in mechanisch:
+            reden = _reden_niet_beoordeeld(uri, binnen, onderdrukt, mechanisch, geen_hierarchie)
+            if is_mechanisch:
                 mechanisch_geschreven += 1
             rijen.append(
                 (
@@ -523,13 +593,14 @@ def _schrijf_features(
                         object_,
                         per_object.get(uri, []),
                         metadata,
-                        stelsels.get(uri, ""),
-                        richting,
-                        verval,
-                        afvoer_eindpunt,
-                        afvoer_meters,
-                        afvoer_stappen,
-                        reden,
+                        stelsel=stelsels.get(uri, ""),
+                        richting_bob=richting,
+                        richting_woord=richting_woord,
+                        bob_verval_m=verval,
+                        afvoer_eindpunt=afvoer_eindpunt,
+                        afvoer_meters=afvoer_meters,
+                        afvoer_stappen=afvoer_stappen,
+                        reden=reden,
                     ),
                 )
             )
@@ -543,16 +614,18 @@ def _schrijf_features(
         tellingen[laag] = len(rijen)
         voortgang.stap(label=laag)
 
-    bouwwerken, waterdelen = _schrijf_treffers(verbinding, run, meldingen, config, voortgang)
-    stelsel_aantal = _schrijf_stelsels(verbinding, run, config, run.context, per_object, voortgang)
+    vlakken, gemengd, zonder_vlak, wegvakken = _schrijf_vlakken(
+        verbinding, run, config, meldingen, voortgang
+    )
 
     return _LaagTellingen(
         putten=tellingen["putten"],
         strengen=tellingen["strengen"],
         mechanisch=mechanisch_geschreven,
-        bouwwerken=bouwwerken,
-        waterdelen=waterdelen,
-        stelsels=stelsel_aantal,
+        vlakken=vlakken,
+        gemengd_zonder_overstort=gemengd,
+        gemengd_zonder_vlak=zonder_vlak,
+        wegvakken=wegvakken,
     )
 
 
@@ -583,10 +656,14 @@ def _afvoer_velden(
 def _reden_niet_beoordeeld(
     uri: str,
     binnen: frozenset[str] | None,
+    onderdrukt: frozenset[str],
     mechanisch: frozenset[str],
     geen_klassenhierarchie: bool = False,
 ) -> str:
     """Waarom dit object buiten de beoordeling viel, of leeg als het erbinnen lag.
+
+    Onderdrukking gaat vóór mechanisch: ook een niet-mechanische onderdrukte klasse hoort
+    grijs te lezen en niet groen; voor De Wolden vallen de twee samen.
 
     Mechanisch riool gaat voor de ring: het wordt door de meeste checks overgeslagen,
     ook binnen de kern, en dat is de scherpere reden om te noemen. De reden staat er
@@ -598,6 +675,8 @@ def _reden_niet_beoordeeld(
     dit ene object van zijn buren onderscheiden. Voor de status maakt de volgorde niet
     uit -- elke reden zet hem op grijs zolang er niets op het object staat.
     """
+    if uri in onderdrukt:
+        return REDEN_ONDERDRUKT
     if uri in mechanisch:
         return REDEN_MECHANISCH
     if binnen is not None and uri not in binnen:
@@ -607,10 +686,65 @@ def _reden_niet_beoordeeld(
     return ""
 
 
-def _bouwwerk_kolommen() -> list[_Kolom]:
-    """De kolommen van de laag `bouwwerken`."""
+# De EXT-checks die een extern vlak aanwijzen. Alleen hun meldingen worden op het
+# trefferregister gejoind; een andere check met een `object2_uri` (een SHACL-paar) wijst
+# geen extern object aan en hoort niet in deze laag.
+VLAK_CHECKS = ("EXT-001", "EXT-003")
+
+# De soort van een vlak volgt op één plek uit `Treffer.bron`: de rol waarmee de check hem
+# registreerde. Panden komen uit twee bronnen (BGT en BAG) maar zijn dezelfde soort.
+VLAK_SOORT = {
+    "bgt_pand": "pand",
+    "bag_pand": "pand",
+    "bgt_bouwwerk": "bouwwerk",
+    "bgt_water": "water",
+}
+
+# De vierde soort in de laag: een gemengd deelstelsel waarop RVZ-006 aansloeg (issue
+# #98). Die vlakken stonden tot dan in een eigen laag `gemengd_zonder_overstort`. Ze
+# komen niet uit een externe bron maar uit de graaf van de run, dus `subtype`, `bron`,
+# `bronbestand`, `relatie` en `afstand_min_m` blijven bij deze soort leeg -- net zoals
+# `relatie` en `afstand_min_m` dat bij water al deden.
+VLAK_SOORT_GEMENGD = "gemengd_deelstelsel"
+
+# De vijfde soort: een door EXT-009 beoordeeld wegvak (issue #104). De enige soort in
+# deze laag die ook zonder melding een rij krijgt -- juist het onderscheid tussen
+# "gekeken, er ligt riolering" (groen) en "niet gekeken" (grijs) moet na te gaan zijn.
+# De kolom `status` draagt dat, en zij is voor deze soort verplicht. Alle drie de
+# waarden krijgen een rij; de standaardstijl tekent er sinds BO-85 alleen de rode van,
+# zodat groen en grijs in de attributentabel, een filter en de popup te vinden blijven
+# maar de kaart niet overstemmen. Zie BO-79 en BO-85.
+VLAK_SOORT_WEGVAK = "wegvak"
+
+# De check waarvan de meldingen een wegvak rood maken. Rood is uitsluitend een wegvak
+# waarvoor in *deze* uitvoer een melding staat: na de afbakening tot een studiegebied en
+# na de onderdrukking uit `[rapport]`. Wat het register rood noemt maar wat de uitvoer
+# niet meer draagt, krijgt geen rij -- precies zoals een onderdrukte melding nergens
+# terechtkomt.
+CHECK_STRAAT_ZONDER_RIOLERING = "EXT-009"
+
+# Wat de popup van een wegvak als objecttype toont. Geen GWSW-klassenaam: een wegvak
+# komt uit het NWB en niet uit de dataset, en die naam hoort dat te zeggen.
+SOORT_WEGVAK = "wegvak (NWB)"
+
+# De grenzen van de geschreven geometrieen, waarmee `_zet_omhullende` de bounding box
+# van de laag vult.
+_Grenzen = list[tuple[float, float, float, float]]
+
+
+def _vlak_kolommen() -> list[_Kolom]:
+    """De kolommen van de laag `vlakken`.
+
+    Eén laag voor vier soorten vlakken: de drie externe (pand, bouwwerk, water) en het
+    gemengde deelstelsel van RVZ-006. Elke soort vult wat zij kent en laat de rest leeg:
+    `relatie` en `afstand_min_m` gelden alleen voor pand en bouwwerk (EXT-001), de vier
+    onderaan alleen voor een deelstelsel. `buffer_m` uit de oude waterdelenlaag vervalt --
+    dat is runmetadata en staat in `gwsw_run`.
+    """
     return [
         _Kolom("id", "text"),
+        _Kolom("soort", "text"),
+        _Kolom("subtype", "text"),
         _Kolom("bron", "text"),
         _Kolom("bronbestand", "text"),
         _Kolom("label", "text"),
@@ -618,30 +752,114 @@ def _bouwwerk_kolommen() -> list[_Kolom]:
         _Kolom("afstand_min_m", "real"),
         _Kolom("aantal_meldingen", "integer"),
         _Kolom("check_ids", "text"),
+        # De vier hieronder gelden alleen voor een gemengd deelstelsel (issue #75): de
+        # omvang van de component waar het vlak omheen ligt, en zijn voorgebakken popup.
+        # Alleen deze soort draagt zo'n popup: zij toont de meldingen zelf, ook de
+        # systemische, want een deelstelselvlak bestaat alleen omdat RVZ-006 aansloeg
+        # (BO-59). Voor de externe vlakken stelt de maptip uit `vlakken.qml` de tekst uit
+        # de kolommen hierboven samen.
+        _Kolom("n_knopen", "integer"),
+        _Kolom("n_strengen", "integer"),
+        _Kolom("strenglengte_m", "real"),
+        _Kolom("popup_html", "text"),
+        # De uitslag per wegvak (issue #104), in dezelfde drie van de vier waarden die de
+        # objectlagen kennen: rood, groen of grijs. Alleen `soort = wegvak` vult hem; de
+        # andere soorten laten hem leeg, want een geraakt pand of een gemeld deelstelsel
+        # draagt geen eigen oordeel -- daar zit de uitslag op het GWSW-object ernaast.
+        # Achteraan toegevoegd, zodat een lezer die op kolompositie werkt niet omvalt.
+        _Kolom("status", "text"),
     ]
 
 
-def _waterdeel_kolommen() -> list[_Kolom]:
-    """De kolommen van de laag `waterdelen_zonder_zinker`."""
-    return [
-        _Kolom("id", "text"),
-        _Kolom("watertype", "text"),
-        _Kolom("bronbestand", "text"),
-        _Kolom("label", "text"),
-        _Kolom("aantal_meldingen", "integer"),
-        _Kolom("check_ids", "text"),
-        _Kolom("buffer_m", "real"),
-    ]
-
-
-def _schrijf_treffers(
+def _schrijf_vlakken(
     verbinding: sqlite3.Connection,
     run: CheckRun,
-    meldingen: list[Melding],
     config: CheckConfig,
+    meldingen: list[Melding],
     voortgang: Voortgang,
-) -> tuple[int, int]:
-    """Schrijft de externe objecten waarnaar de EXT-meldingen verwijzen.
+) -> tuple[int, int, int, int]:
+    """Schrijft de laag `vlakken`: alles wat bij een melding hoort en geen punt of lijn is.
+
+    Drie soorten rijen uit drie bronnen in één laag: de externe objecten waarnaar een
+    EXT-melding wijst (`_trefferrijen`, issue #67), de gemengde deelstelsels waarop
+    RVZ-006 aansloeg (`_gemengde_deelstelselrijen`, issue #98) en de wegvakken die
+    EXT-009 beoordeelde (`_wegvakrijen`, issue #104). De kolom `soort` houdt ze uit
+    elkaar en de QGIS-stijl geeft elke check een eigen regel (BO-85).
+
+    De eerste twee volgen de meldingen van *deze* uitvoer, dus die kunnen niet meer tonen
+    dan de uitslag. De derde is de uitzondering en met opzet: een groen of grijs wegvak
+    draagt per definitie geen melding, en juist dat onderscheid moet na te gaan zijn. De
+    rijen komen daar uit het register op de run (`run.wegvakken`), dat op dezelfde
+    middelpunten tot het studiegebied is afgebakend als de meldingen. Ze staan in de
+    laag maar worden in de standaardstijl niet getekend; die heeft alleen een regel voor
+    het rode wegvak. Zie BO-79 en BO-85.
+
+    Geeft vier getallen terug: het aantal rijen in de laag, hoeveel daarvan een gemengd
+    deelstelsel zijn, hoeveel gemelde deelstelsels geen vlak konden krijgen, en hoeveel
+    rijen een beoordeeld wegvak zijn.
+    """
+    kolommen = _vlak_kolommen()
+    _maak_featurelaag(
+        verbinding,
+        "vlakken",
+        "MULTIPOLYGON",
+        kolommen,
+        "Vlakken bij de uitslag van deze run: externe objecten (BGT-panden, overige "
+        "bouwwerken en BGT-waterdelen), de gemengde deelstelsels van RVZ-006 en de door "
+        "EXT-009 beoordeelde wegvakken; de soort staat in de kolom `soort`. De "
+        "standaardstijl tekent per check een regel en toont van de wegvakken alleen de "
+        "rode; de groene en grijze staan wel in deze tabel (kolom `status`) maar niet op "
+        "de kaart (BO-85).",
+    )
+    gemengd, gemengd_grenzen, zonder_vlak = _gemengde_deelstelselrijen(run, config, meldingen)
+    treffers, treffer_grenzen = _trefferrijen(run, meldingen)
+    wegvakken, wegvak_grenzen = _wegvakrijen(run, meldingen)
+    # De grote vlakken voorop: de rijvolgorde is in QGIS ook de tekenvolgorde, en
+    # andersom zouden de deelstelsels en de straatvlakken de panden eronder overdekken.
+    rijen = gemengd + wegvakken + treffers
+    if rijen:
+        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
+        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
+        verbinding.executemany(
+            f'insert into "vlakken" (geom, {velden}) values ({plaatshouders})', rijen
+        )
+    _zet_omhullende(verbinding, "vlakken", gemengd_grenzen + wegvak_grenzen + treffer_grenzen)
+    voortgang.stap(label="vlakken")
+    return len(rijen), len(gemengd), zonder_vlak, len(wegvakken)
+
+
+def _vlak_subtype(treffer: Treffer) -> str:
+    """Het subtype van een vlak: voor water het BGT-type, anders de BGT-functie of het BGT-type.
+
+    Voor water leest de check het BGT-`type`-veld in `Treffer.label` (waterloop, greppel);
+    voor pand en bouwwerk staat het BGT-type in `Treffer.attributen` onder `type`. Panden
+    dragen die kolom vaak niet en krijgen dan een leeg subtype.
+    """
+    if treffer.bron == "bgt_water":
+        return treffer.label
+    return str(treffer.attributen.get("type") or "")
+
+
+def _vlak_label(treffer: Treffer) -> str:
+    """Een leesbaar label voor een vlak.
+
+    Voor water is dat het type plus de identificatie (`_waterdeel_aanduiding`); voor pand
+    en bouwwerk draagt `Treffer.label` de aanduiding die EXT-001 al maakte.
+    """
+    if treffer.bron == "bgt_water":
+        return _waterdeel_aanduiding(treffer)
+    return treffer.label
+
+
+def _trefferrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], _Grenzen]:
+    """De rijen voor de externe objecten waarnaar de EXT-meldingen verwijzen.
+
+    Pand, bouwwerk en water in dezelfde laag (issue #67); de soort staat in de kolom
+    `soort` en volgt uit `Treffer.bron`. Zouden twee checks naar hetzelfde vlak wijzen,
+    dan is dat één rij met beide check-ID's. De watervlakken komen sinds issue #83
+    uitsluitend van EXT-003, dat zijn doorkruiste waterdeel zelf registreert; een
+    doorkruising door een als zinker geregistreerde streng is geen bevinding en krijgt dus
+    ook geen vlak meer -- dat vlak hing aan het vervallen EXT-002 (BO-66).
 
     Strikte aansluiting: de rijen komen uit de meldingen van déze uitvoer, gejoind op
     het trefferregister van de run (`checks/treffers.py`). Deze schrijver bevraagt
@@ -650,92 +868,20 @@ def _schrijf_treffers(
     vanzelf: per gebied alleen de treffers van dat gebied, en een pand op de
     buurtgrens in beide bestanden.
 
-    Twee beperkingen erven mee uit de detectie en worden bewust niet gerepareerd:
-    EXT-001 meldt per object alleen het sterkste bouwwerk, en de watergangcheck stopt
-    na het eerste gevonden waterdeel per streng. Zie de beslislog.
-    """
-    _maak_featurelaag(
-        verbinding,
-        "bouwwerken",
-        "MULTIPOLYGON",
-        _bouwwerk_kolommen(),
-        "BGT- en BAG-bouwwerken waarnaar een EXT-001-melding verwijst.",
-    )
-    _maak_featurelaag(
-        verbinding,
-        "waterdelen_zonder_zinker",
-        "MULTIPOLYGON",
-        _waterdeel_kolommen(),
-        "BGT-waterdelen waarnaar een EXT-003-melding verwijst.",
-    )
-
-    aantal_bouwwerken = _vul_trefferlaag(
-        verbinding,
-        run,
-        "bouwwerken",
-        _bouwwerk_kolommen(),
-        _groepeer_op_treffer(meldingen, "EXT-001"),
-        lambda treffer, verwijzend: (
-            treffer.sleutel,
-            treffer.bron,
-            treffer.bronbestand,
-            treffer.label,
-            _sterkste_relatie(verwijzend),
-            _kleinste_afstand(run, treffer.sleutel, verwijzend),
-            len(verwijzend),
-            _check_ids(verwijzend),
-        ),
-    )
-    voortgang.stap(label="bouwwerken")
-
-    aantal_waterdelen = _vul_trefferlaag(
-        verbinding,
-        run,
-        "waterdelen_zonder_zinker",
-        _waterdeel_kolommen(),
-        _groepeer_op_treffer(meldingen, "EXT-003"),
-        lambda treffer, verwijzend: (
-            treffer.sleutel,
-            treffer.label,
-            treffer.bronbestand,
-            _waterdeel_aanduiding(treffer),
-            len(verwijzend),
-            _check_ids(verwijzend),
-            config.drempels.ext_watergang_buffer_m,
-        ),
-    )
-    voortgang.stap(label="waterdelen_zonder_zinker")
-    return aantal_bouwwerken, aantal_waterdelen
-
-
-def _groepeer_op_treffer(meldingen: list[Melding], check_id: str) -> dict[str, list[Melding]]:
-    """De meldingen van een check, gegroepeerd op het externe object dat ze aanwijzen."""
-    per_treffer: dict[str, list[Melding]] = defaultdict(list)
-    for melding in meldingen:
-        if melding.check_id == check_id and melding.object2_uri:
-            per_treffer[melding.object2_uri].append(melding)
-    return per_treffer
-
-
-def _vul_trefferlaag(
-    verbinding: sqlite3.Connection,
-    run: CheckRun,
-    laag: str,
-    kolommen: list[_Kolom],
-    per_treffer: dict[str, list[Melding]],
-    rij_van: Callable[[Treffer, list[Melding]], tuple[object, ...]],
-) -> int:
-    """Schrijft een trefferlaag en levert het aantal rijen terug.
-
     Een melding die een extern object aanwijst dat niet in het register staat, is een
     gebroken afspraak: de check heeft de verwijzing wel gezet maar de treffer niet
     geregistreerd, en dan zou de laag stil kleiner zijn dan de uitslag. Dat is precies
     de afwijking die dit ontwerp uitsluit, dus faalt het luid in plaats van de rij over
     te slaan.
+
+    Eén beperking erft mee uit de detectie en wordt bewust niet gerepareerd: EXT-001
+    meldt per object alleen het sterkste bouwwerk (BO-17). De watergangcheck geeft
+    sinds BO-43 elke echte doorkruising terug, ook meerdere per streng.
     """
+    per_treffer = _groepeer_op_treffer(meldingen, *VLAK_CHECKS)
     rijen = []
     ontbreekt: list[str] = []
-    grenzen: list[tuple[float, float, float, float]] = []
+    grenzen: _Grenzen = []
     for sleutel in sorted(per_treffer):
         treffer = run.treffers.get(sleutel)
         if treffer is None:
@@ -745,25 +891,61 @@ def _vul_trefferlaag(
             continue
         grenzen.append(treffer.geometrie.bounds)
         rijen.append(
-            (_blob(_als_multipolygon(treffer.geometrie)), *rij_van(treffer, per_treffer[sleutel]))
+            (
+                _blob(_als_multipolygon(treffer.geometrie)),
+                *_trefferrij(run, treffer, per_treffer[sleutel]),
+            )
         )
 
     if ontbreekt:
         raise PipelineError(
-            f"laag {laag!r}: {len(ontbreekt)} melding(en) verwijzen naar een extern object "
+            f"laag 'vlakken': {len(ontbreekt)} melding(en) verwijzen naar een extern object "
             f"dat niet in het trefferregister van deze run staat "
             f"({', '.join(sorted(ontbreekt)[:5])}). De laag zou stil kleiner zijn dan de "
             f"uitslag; controleer of de check zijn treffer registreert."
         )
+    return rijen, grenzen
 
-    if rijen:
-        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
-        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
-        verbinding.executemany(
-            f'insert into "{laag}" (geom, {velden}) values ({plaatshouders})', rijen
-        )
-    _zet_omhullende(verbinding, laag, grenzen)
-    return len(rijen)
+
+def _trefferrij(run: CheckRun, treffer: Treffer, verwijzend: list[Melding]) -> tuple[object, ...]:
+    """De attribuutvelden van een extern vlak, in kolomvolgorde.
+
+    De vier deelstelselkolommen blijven leeg: die gelden alleen voor een gemengd
+    deelstelsel, net zoals `relatie` en `afstand_min_m` alleen voor pand en bouwwerk
+    gelden. `status` blijft ook leeg: een geraakt pand draagt geen eigen oordeel -- dat
+    zit op het GWSW-object ernaast, in de laag `putten` of `strengen`.
+    """
+    return (
+        treffer.sleutel,
+        VLAK_SOORT[treffer.bron],
+        _vlak_subtype(treffer),
+        treffer.bron,
+        treffer.bronbestand,
+        _vlak_label(treffer),
+        _sterkste_relatie(verwijzend),
+        _kleinste_afstand(run, treffer.sleutel, verwijzend),
+        len(verwijzend),
+        _check_ids(verwijzend),
+        None,
+        None,
+        None,
+        "",
+        "",
+    )
+
+
+def _groepeer_op_treffer(meldingen: list[Melding], *check_ids: str) -> dict[str, list[Melding]]:
+    """De meldingen van de gegeven checks, gegroepeerd op het externe object dat ze aanwijzen.
+
+    Wijzen twee checks naar hetzelfde vlak, dan belanden ze in dezelfde groep en draagt
+    de rij beide check-ID's.
+    """
+    gekozen = set(check_ids)
+    per_treffer: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        if melding.check_id in gekozen and melding.object2_uri:
+            per_treffer[melding.object2_uri].append(melding)
+    return per_treffer
 
 
 def _sterkste_relatie(meldingen: list[Melding]) -> str:
@@ -797,8 +979,8 @@ def _kleinste_afstand(run: CheckRun, sleutel: str, meldingen: list[Melding]) -> 
 def _waterdeel_aanduiding(treffer: Treffer) -> str:
     """Een leesbare aanduiding van een waterdeel: het type plus zijn identificatie.
 
-    `watertype` draagt het type kaal, zodat je erop kunt filteren; deze kolom is voor
-    de lezer, en die heeft aan "waterloop" alleen niet genoeg om er een terug te
+    De kolom `subtype` draagt het type kaal, zodat je erop kunt filteren; dit label is
+    voor de lezer, en die heeft aan "waterloop" alleen niet genoeg om er een terug te
     vinden.
     """
     return f"{treffer.label} {treffer.sleutel.split('/')[-1]}".strip()
@@ -809,149 +991,309 @@ def _check_ids(meldingen: list[Melding]) -> str:
     return ", ".join(sorted({melding.check_id for melding in meldingen}))
 
 
-def _stelsel_kolommen() -> list[_Kolom]:
-    """De kolommen van de laag `stelsels`."""
-    return [
-        _Kolom("feature_id", "text"),
-        _Kolom("label", "text"),
-        _Kolom("stelseltype", "text"),
-        # 1 als ten minste een streng van het stelsel een afvoer- of lozingseindpunt
-        # bereikt (#18), anders 0. De symbologie toont standaard alleen de nullen.
-        _Kolom("bereikt_eindpunt", "integer"),
-        # De distinct netwerkknopen aan de eindpunten van de strengen. De registratie
-        # zet putten in aparte buckets (#17), dus dit is een afleiding uit de graaf,
-        # alleen als teller -- niet de bron van de geometrie.
-        _Kolom("n_putten", "integer"),
-        _Kolom("n_strengen", "integer"),
-        _Kolom("strenglengte_m", "real"),
-        # Het aantal SHACL-overtredingen waarvan de focusnode dit stelsel is (#17). Ze
-        # koppelen via `object_uri` aan de laag; de popup somt ze op.
-        _Kolom("n_meldingen", "integer"),
-        _Kolom("gwsw_uri", "text"),
-        _Kolom("popup_html", "text"),
-    ]
+# De check waarvan de bevindingen de deelstelselvlakken vullen. Eén soort, één check:
+# elke zo'n rij is een gemengd deelstelsel waarop RVZ-006 aansloeg.
+CHECK_GEMENGD_ZONDER_OVERSTORT = "RVZ-006"
+
+# Wat de popup boven de meldingenlijst als objecttype toont. Geen GWSW-klassenaam: een
+# gemengd deelstelsel is geen GWSW-object maar een afleiding uit de graaf, en die naam
+# hoort dat te zeggen in plaats van een klasse te suggereren die niet bestaat. De kolom
+# `soort` draagt dezelfde soort als filterbare waarde (`VLAK_SOORT_GEMENGD`).
+SOORT_GEMENGD_DEELSTELSEL = "gemengd deelstelsel"
 
 
-def _schrijf_stelsels(
-    verbinding: sqlite3.Connection,
+def _gemengde_deelstelselrijen(
     run: CheckRun,
     config: CheckConfig,
-    afvoercontext: CheckContext,
-    per_object: dict[str, list[Melding]],
-    voortgang: Voortgang,
-) -> int:
-    """Schrijft de cartografische laag `stelsels` en geeft het aantal rijen terug.
+    meldingen: list[Melding],
+) -> tuple[list[tuple], _Grenzen, int]:
+    """De rijen voor de gemengde deelstelsels; geeft ook de niet-tekenbare terug.
 
-    Een vlak per geregistreerd stelsel dat strengen draagt (#17, #25): de buffer om zijn
-    strengen, samengevoegd tot een MULTIPOLYGON. De put-buckets uit #17 hebben geen
-    strengen en levert `lees_stelsels` al niet op. De laag beslaat de hele dataset, niet
-    de kern van een studiegebied: een stelsel is aan geen enkel studiegebied toe te
-    wijzen (BO-12), net als de klassentelling in het rapport.
+    Een vlak per gemengd deelstelsel waarop RVZ-006 aansloeg (issue #75): de buffer om
+    de vrijvervalstrengen van de hele samenhangende component, samengevoegd tot een
+    MULTIPOLYGON. De bevindingen zelf hangen aan de gemengde strengen; dit vlak toont
+    waar dat deelstelsel ligt, want een deelstelsel is geen GWSW-object met een eigen
+    geometrie. Sinds issue #98 staan die vlakken in de laag `vlakken`, met
+    `soort = gemengd_deelstelsel`, in plaats van in een eigen vierde laag.
+
+    Strikte aansluiting, net als bij de treffers: de rijen komen uit de meldingen van
+    déze uitvoer, gegroepeerd op hun `cluster_id`. Er kunnen daardoor niet meer vlakken
+    zijn dan de uitslag -- na afbakening tot een studiegebied of na onderdrukking uit
+    `[rapport]` verdwijnen de vlakken mee met hun meldingen. De geometrie komt uit
+    `run.context`: dezelfde graaf waarop de check draaide. Met een studiegebied loopt zo'n
+    vlak door tot buiten de kern -- een deelstelsel houdt niet op bij de gebiedsgrens, en
+    de component is de eenheid waarover RVZ-006 oordeelt.
+
+    Wat er gegarandeerd is, en wat niet. Twee dingen kunnen er minder vlakken opleveren
+    dan er gemelde deelstelsels zijn, en ze worden verschillend behandeld:
+
+    * **Een `cluster_id` die de graaf niet kent** is geen datatoestand maar een interne
+      tegenspraak: de check en deze schrijver lezen dezelfde `deelstelsel_ids` van dezelfde
+      context. Dat faalt luid, precies zoals `_trefferrijen` doet bij een melding die
+      naar een niet-geregistreerde treffer wijst.
+    * **Een deelstelsel waarvan geen enkele streng een bruikbare lijn draagt** is wel een
+      datatoestand: er valt niets te tekenen. Zo'n deelstelsel levert geen rij op maar
+      wordt geteld en komt in `gwsw_run` als `n_gemengd_zonder_vlak` terecht, naast
+      `n_gemengd_zonder_overstort` dat de geschreven rijen telt. Zonder die telling zou
+      een lezer "dit deelstelsel bestaat niet" niet kunnen onderscheiden van "we konden
+      het niet tekenen". De meldingen zelf staan gewoon in de meldingentabel en op hun
+      eigen streng in de laag `strengen`.
     """
-    kolommen = _stelsel_kolommen()
-    _maak_featurelaag(
-        verbinding,
-        "stelsels",
-        "MULTIPOLYGON",
-        kolommen,
-        "Geregistreerde stelsels als vlak om hun strengen; standaard tonen alleen de "
-        "stelsels zonder afvoerroute.",
-    )
-    buffer_m = config.drempels.stelselvlak_buffer_m
-    gemeten = run.meetbereik.gemeten
+    per_cluster: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        if melding.check_id == CHECK_GEMENGD_ZONDER_OVERSTORT and melding.cluster_id:
+            per_cluster[melding.cluster_id].append(melding)
+
+    buffer_m = config.drempels.gemengd_zonder_overstort_buffer_m
+    knopen_per_cluster = _knopen_per_cluster(run)
+    onbekend = sorted(cluster for cluster in per_cluster if cluster not in knopen_per_cluster)
+    if onbekend:
+        raise PipelineError(
+            f"laag 'vlakken': {len(onbekend)} melding(en) dragen een "
+            f"deelstelsel-ID dat de graaf van deze run niet kent "
+            f"({', '.join(onbekend[:5])}). De laag zou stil kleiner zijn dan de uitslag; "
+            f"controleer of de check en deze schrijver dezelfde context lezen."
+        )
+
+    index = strengen_per_knoop(run.context)
     rijen = []
-    grenzen: list[tuple[float, float, float, float]] = []
-    for vlak in lees_stelsels(run.dataset):
-        geometrie = _stelsel_geometrie(run.dataset, vlak, buffer_m)
+    zonder_vlak = 0
+    grenzen: _Grenzen = []
+    for cluster in sorted(per_cluster):
+        knopen = knopen_per_cluster[cluster]
+        conduits = _strengen_van_cluster(index, knopen)
+        geometrie = _gemengd_geometrie(conduits, buffer_m)
         if geometrie is None or geometrie.is_empty:
+            zonder_vlak += 1
             continue
         grenzen.append(geometrie.bounds)
         rijen.append(
             (
                 _blob(_als_multipolygon(geometrie)),
-                *_stelsel_rij(run.dataset, afvoercontext, vlak, per_object, gemeten),
+                *_gemengd_rij(
+                    cluster, putknopen(run.context, knopen), conduits, per_cluster[cluster]
+                ),
             )
         )
-    if rijen:
-        plaatshouders = ", ".join("?" * (len(kolommen) + 1))
-        velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
-        verbinding.executemany(
-            f'insert into "stelsels" (geom, {velden}) values ({plaatshouders})', rijen
-        )
-    _zet_omhullende(verbinding, "stelsels", grenzen)
-    voortgang.stap(label="stelsels")
-    return len(rijen)
+    return rijen, grenzen, zonder_vlak
 
 
-def _stelsel_geometrie(
-    dataset: GwswDataset, vlak: Stelselvlak, buffer_m: float
-) -> BaseGeometry | None:
-    """De buffer om de strengen van een stelsel, samengevoegd tot een vlak.
+def _knopen_per_cluster(run: CheckRun) -> dict[str, frozenset[str]]:
+    """De knopen van elk vrijverval-deelstelsel, omgekeerd uit `deelstelsel_ids`."""
+    gevonden: dict[str, set[str]] = defaultdict(set)
+    for uri, cluster in deelstelsel_ids(run.context).items():
+        gevonden[cluster].add(uri)
+    return {cluster: frozenset(knopen) for cluster, knopen in gevonden.items()}
 
-    Bewust de strengen en niet de omhullende van alle leden: #17 vond dat een put en de
-    strengen waarop hij aansluit in verschillende stelselobjecten staan, dus de
-    omhullende zou de gemeentebrede put-buckets tot een vlek uitsmeren.
+
+def _strengen_van_cluster(index: dict[str, list[Conduit]], knopen: frozenset[str]) -> list[Conduit]:
+    """De vrijvervalstrengen die op de knopen van dit deelstelsel uitkomen, ontdubbeld.
+
+    Uit `strengen_per_knoop` en niet uit `aansluitingen`: die laatste indexeert op de
+    herleide put, en dan mist het vlak precies de strengen die tussen twee telbare
+    hulpstukken liggen -- ze horen bij het deel, maar staan in geen put-index (BO-83).
     """
+    gevonden: dict[str, Conduit] = {}
+    for knoop in sorted(knopen):
+        for conduit in index.get(knoop, []):
+            gevonden[conduit.uri] = conduit
+    return [gevonden[uri] for uri in sorted(gevonden)]
+
+
+def _gemengd_geometrie(conduits: list[Conduit], buffer_m: float) -> BaseGeometry | None:
+    """De buffer om de strengen van een deelstelsel, samengevoegd tot een vlak."""
     lijnen = [
         conduit.line
-        for uri in vlak.strengen
-        if (conduit := dataset.conduits.get(uri)) is not None
-        and conduit.line is not None
-        and not conduit.line.is_empty
+        for conduit in conduits
+        if conduit.line is not None and not conduit.line.is_empty
     ]
     if not lijnen:
         return None
     return unary_union([lijn.buffer(buffer_m) for lijn in lijnen])
 
 
-def _stelsel_rij(
-    dataset: GwswDataset,
-    afvoercontext: CheckContext,
-    vlak: Stelselvlak,
-    per_object: dict[str, list[Melding]],
-    gemeten: bool,
+def _gemengd_rij(
+    cluster: str,
+    putten: set[str],
+    conduits: list[Conduit],
+    meldingen: list[Melding],
 ) -> tuple[object, ...]:
-    """De attribuutvelden van een stelselvlak, in de volgorde van de kolommen.
+    """De attribuutvelden van een gemengd-deelstelselvlak, in kolomvolgorde.
 
-    De meldingen die op het stelsel landen zijn de SHACL-overtredingen waarvan de
-    focusnode dit stelsel is (#17): ze koppelen via `object_uri` aan `vlak.uri` en
-    verschijnen zo op de kaart. Zonder nulmeting is het stelsel niet beoordeeld -- de
-    eigen checks toetsen geen stelsel -- en staat de popup op grijs.
+    `putten` zijn de beoordeelde knopen van het deel: `n_knopen` en de popup tellen
+    hetzelfde getal als de melding, dus zonder de doorgeefhulpstukken (BO-83). De
+    geometrie eromheen komt wél van het hele deel.
+
+    De sleutel staat in `id`, net als bij een extern vlak: het is de `cluster_id` die
+    RVZ-006, NET-001 en NET-002 delen, dus de meldingentabel is erop te koppelen. De vijf
+    kolommen die alleen een extern object kent (`subtype`, `bron`, `bronbestand`,
+    `relatie`, `afstand_min_m`) blijven leeg -- een deelstelsel komt niet uit een externe
+    bron maar uit de graaf van deze run.
+
+    De status komt hier niet uit `bepaal_status` en de popup laat niets weg: zo'n rij
+    bestaat alleen omdat RVZ-006 op dit deelstelsel aansloeg, dus zij is per constructie
+    een gebrek. `bepaal_status` en `popup_html` filteren systemische meldingen weg --
+    terecht op een put of een streng, waar zij naast andere gebreken staan, maar hier zou
+    het vlak dan groen worden en "geen eigen gebrek" te lezen geven terwijl het alleen
+    bestaat door de meldingen die het weglaat. Dat gebeurde op Koekangerveld: 26 van de 26
+    gemengde strengen gemeld, dus systemisch. Zie BO-59.
+
+    Grijs komt hier niet voor -- er staat per definitie minstens één melding op.
+
+    De feitenregels dragen sinds issue #106 de aanwijzingen van de check: het aandeel
+    gemengde strengen naast het aantal gemelde, en de overige aanwijzingen op een eigen
+    regel. Ze komen uit de eerste melding van het cluster -- de aanwijzingen gelden voor
+    het deelstelsel, dus elke melding ervan draagt dezelfde zin -- en niet uit een eigen
+    afleiding hier: dan zou het vlak iets anders kunnen zeggen dan de melding ernaast.
     """
-    conduits = [dataset.conduits[uri] for uri in vlak.strengen if uri in dataset.conduits]
     strenglengte = sum(conduit.line.length for conduit in conduits if conduit.line is not None)
-    bereikt = any(afvoerpad_van_streng(afvoercontext, conduit) is not None for conduit in conduits)
-    putten: set[str] = set()
-    for conduit in conduits:
-        for knoop in verbonden_knopen(afvoercontext, conduit):
-            if knoop is not None:
-                putten.add(knoop)
-    meldingen = per_object.get(vlak.uri, [])
+    aandeel, overige = aanwijzingen_van(meldingen[0].boodschap)
     kop = Objectkop(
-        label=vlak.label,
-        objecttype=vlak.stelseltype,
-        status=bepaal_status(meldingen, geanalyseerd=gemeten),
-        feiten=_stelsel_feiten(len(vlak.strengen), strenglengte, bereikt),
-        reden="" if gemeten else REDEN_GEEN_NULMETING,
+        label=cluster,
+        objecttype=SOORT_GEMENGD_DEELSTELSEL,
+        status=STATUS_ROOD if any(m.ernst == "F" for m in meldingen) else STATUS_ORANJE,
+        feiten=(
+            f"{len(putten)} knopen, {len(conduits)} strengen, {strenglengte:.0f} m",
+            f"{aandeel}, {len(meldingen)} gemeld",
+            *([overige] if overige else []),
+        ),
+        reden="",
     )
     return (
-        vlak.feature_id,
-        vlak.label,
-        vlak.stelseltype,
-        int(bereikt),
-        len(putten),
-        len(vlak.strengen),
-        strenglengte,
+        cluster,
+        VLAK_SOORT_GEMENGD,
+        "",
+        "",
+        "",
+        cluster,
+        "",
+        None,
         len(meldingen),
-        vlak.uri,
-        popup_html(kop, meldingen),
+        _check_ids(meldingen),
+        len(putten),
+        len(conduits),
+        strenglengte,
+        popup_html(kop, meldingen, toon_systemisch=True),
+        # `status` blijft leeg: de kolom hoort bij de wegvakken van EXT-009. Zo'n
+        # deelstelselvlak draagt zijn oordeel in zijn popup en is per constructie een
+        # gebrek; een tweede kolom met dezelfde waarde zou twee bronnen maken.
+        "",
     )
 
 
-def _stelsel_feiten(n_strengen: int, strenglengte: float, bereikt: bool) -> tuple[str, ...]:
-    """De feitenregel in de stelselpopup: de omvang en of er een afvoereindpunt is."""
-    afvoer = "bereikt een afvoereindpunt" if bereikt else "geen afvoerroute"
-    return (f"{n_strengen} strengen, {strenglengte:.0f} m", afvoer)
+def _wegvakrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], _Grenzen]:
+    """De rijen voor de wegvakken die EXT-009 beoordeelde (issue #104).
+
+    De enige soort in deze laag die ook zonder melding een rij krijgt. Voor de andere
+    soorten geldt "een vlak bestaat alleen als een melding ernaar wijst"; hier is juist
+    het onderscheid tussen een straat waar riolering ligt (groen) en een straat die de
+    regel niet beoordeelt (grijs) wat na te gaan moet zijn, en beide dragen per definitie
+    geen melding. Dat is de derde uitvoertoestand van BO-79. Zij bestaan als rij, niet
+    als kaartvlak: de standaardstijl tekent sinds BO-85 alleen de rode wegvakken. Hier
+    verandert dat niets aan -- deze functie schrijft alle drie de statussen weg.
+
+    Rood blijft wél aan de meldingen hangen, en strikt: een wegvak dat het register rood
+    noemt maar waarvoor deze uitvoer geen EXT-009-melding draagt -- afgebakend tot een
+    studiegebied, of onderdrukt via `[rapport] onderdruk_checks` -- krijgt geen rij. Zou
+    hij die wel krijgen, dan toonde de kaart een gebrek dat in geen enkele andere
+    uitvoervorm staat.
+
+    Een melding die naar een wegvak wijst dat het register niet kent is, net als bij
+    `_trefferrijen`, een gebroken afspraak en geen datatoestand: check en schrijver lezen
+    hetzelfde register van dezelfde run.
+
+    Een wegvak waarvan het straatvlak leeg is levert geen rij op; dat is wél een
+    datatoestand (voronoi-cel volledig buiten de komgrens geknipt). Het verschil met de
+    `bekeken`-telling van de check maakt dat zichtbaar.
+    """
+    per_sleutel: dict[str, list[Melding]] = defaultdict(list)
+    for melding in meldingen:
+        if melding.check_id == CHECK_STRAAT_ZONDER_RIOLERING and melding.object_uri:
+            per_sleutel[melding.object_uri].append(melding)
+
+    onbekend = sorted(sleutel for sleutel in per_sleutel if run.wegvakken.get(sleutel) is None)
+    if onbekend:
+        raise PipelineError(
+            f"laag 'vlakken': {len(onbekend)} EXT-009-melding(en) wijzen naar een wegvak dat "
+            f"niet in het wegvakregister van deze run staat ({', '.join(onbekend[:5])}). De "
+            "laag zou stil kleiner zijn dan de uitslag; controleer of de check zijn oordeel "
+            "registreert."
+        )
+
+    rijen: list[tuple] = []
+    grenzen: _Grenzen = []
+    for oordeel in run.wegvakken:
+        eigen = per_sleutel.get(oordeel.sleutel, [])
+        if oordeel.status == STATUS_ROOD and not eigen:
+            continue
+        if oordeel.vlak is None or oordeel.vlak.is_empty:
+            continue
+        grenzen.append(oordeel.vlak.bounds)
+        rijen.append((_blob(_als_multipolygon(oordeel.vlak)), *_wegvakrij(oordeel, eigen)))
+    return rijen, grenzen
+
+
+def _wegvakrij(oordeel: Wegvakoordeel, meldingen: list[Melding]) -> tuple[object, ...]:
+    """De attribuutvelden van een wegvak, in kolomvolgorde.
+
+    `subtype` draagt de plaatsnaam uit het TOP10NL-komvlak: dat is de nadere aanduiding
+    binnen deze soort, zoals het BGT-type dat bij een waterdeel is. De vier
+    deelstelselkolommen blijven leeg.
+
+    De status komt uit het register en niet uit `bepaal_status`: een groen wegvak is
+    beoordeeld en in orde, en een grijs wegvak is bewust niet beoordeeld -- dat verschil
+    kent alleen de check. `bepaal_status` zou beide op "geen meldingen" gooien.
+    """
+    return (
+        oordeel.sleutel,
+        VLAK_SOORT_WEGVAK,
+        oordeel.plaats,
+        "nwb_wegvak",
+        oordeel.bronbestand,
+        oordeel.label,
+        "",
+        None,
+        len(meldingen),
+        CHECK_STRAAT_ZONDER_RIOLERING,
+        None,
+        None,
+        None,
+        popup_html(
+            Objectkop(
+                label=oordeel.label,
+                objecttype=SOORT_WEGVAK,
+                status=oordeel.status,
+                feiten=_wegvakfeiten(oordeel),
+                reden=oordeel.reden,
+            ),
+            meldingen,
+        ),
+        oordeel.status,
+    )
+
+
+def _wegvakfeiten(oordeel: Wegvakoordeel) -> tuple[str, ...]:
+    """De gemeten waarden achter het oordeel, voor de kopregel van de popup.
+
+    Ze staan in de popup en niet in eigen kolommen: het zijn er drie, ze gelden voor een
+    van de vijf soorten in deze laag, en de lezer heeft ze nodig om het oordeel te
+    begrijpen -- niet om erop te filteren.
+    """
+    feiten = [
+        f"Straatlengte: {oordeel.straatlengte_m:.0f} m",
+        f"Vrijverval in het straatvlak: {oordeel.streng_in_cel:.2f} maal de straatlengte",
+    ]
+    if oordeel.aandeel_onverhard is not None:
+        feiten.append(f"Onverhard wegdek: {oordeel.aandeel_onverhard:.0%}")
+    return tuple(feiten)
+
+
+def _begindatum_jaar(object_: object) -> int | None:
+    """Het jaartal van de begindatum, of None als het object er geen draagt."""
+    if not isinstance(object_, (Node, Conduit)):
+        return None
+    datum = object_.date("Begindatum")
+    return datum.year if datum is not None else None
 
 
 def _samenvatting(
@@ -960,8 +1302,10 @@ def _samenvatting(
     object_: object,
     eigen: list[Melding],
     metadata: tuple[str, str, str],
+    *,
     stelsel: str = "",
     richting_bob: str = "",
+    richting_woord: str = "",
     bob_verval_m: float | None = None,
     afvoer_eindpunt: str = "",
     afvoer_meters: float | None = None,
@@ -969,6 +1313,16 @@ def _samenvatting(
     reden: str = "",
 ) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen.
+
+    De staart is met opzet keyword-only: acht velden op een rij met door elkaar heen
+    str-, bool-, `float | None`- en `int | None`-gleuven laten zich positioneel
+    verwisselen zonder dat mypy iets zegt, en dan schrijft de rij stil de verkeerde
+    kolom.
+
+    `richting_bob` is wat er in de kolom komt; `richting_woord` de sleutel waaronder de
+    popup hem verwoordt. Op mechanisch riool lopen die twee uiteen (issue #74): de kolom
+    staat op `onbekend` zodat de grijze stijl hem pakt, maar de popupregel zegt dat zo'n
+    leiding geen vrijvervalrichting *heeft* in plaats van dat hij niet te bepalen was.
 
     `reden` is gevuld als dit object niet beoordeeld is; dan is de status grijs en
     noemt de popup waarom. De status volgt verder dezelfde regel als `ergste_ernst`:
@@ -992,7 +1346,7 @@ def _samenvatting(
         label=label,
         objecttype=objecttype,
         status=status,
-        feiten=_feiten(object_, stelsel, richting_bob),
+        feiten=_feiten(object_, stelsel, richting_woord),
         reden=reden,
     )
     return (
@@ -1000,6 +1354,7 @@ def _samenvatting(
         label,
         objecttype,
         stelsel,
+        _begindatum_jaar(object_),
         richting_bob,
         bob_verval_m,
         afvoer_eindpunt,
@@ -1021,16 +1376,27 @@ def _samenvatting(
     )
 
 
+# De sleutel waaronder een mechanische leiding haar popupregel krijgt. Geen waarde van
+# de kolom `richting_bob` -- die staat op zo'n leiding op `onbekend`, zodat de grijze
+# stijl hergebruikt wordt -- maar een vierde sleutel in de tabel hieronder, zodat de
+# popup twee dingen uit elkaar houdt die op de kaart dezelfde kleur hebben. De tekst
+# spreekt van "mechanische leiding" en niet van "persleiding": de rol
+# `mechanischeleidingen` dekt zes klassen, en op De Wolden en Hoogeveen zijn 172 van de
+# 3720 een Vacuumleiding of Drukleiding. Die zouden anders een popupregel krijgen die
+# hun eigen `objecttype`-regel een paar pixels hoger tegenspreekt.
+RICHTING_MECHANISCH = "mechanisch"
+
 # Hoe de kolom `richting_bob` in de popup gelezen wordt. De logica erachter blijft
 # ongewijzigd (`_richting_bob`); dit is alleen de verwoording.
 RICHTING_IN_WOORDEN = {
     RICHTING_MEE: "BOB-verval loopt met de getekende lijn mee",
     RICHTING_TEGEN: "BOB-verval loopt tegen de getekende lijn in",
     RICHTING_ONBEKEND: "BOB-richting niet te bepalen",
+    RICHTING_MECHANISCH: "mechanische leiding — geen vrijvervalrichting",
 }
 
 
-def _feiten(object_: object, stelsel: str, richting_bob: str) -> tuple[str, ...]:
+def _feiten(object_: object, stelsel: str, richting_woord: str) -> tuple[str, ...]:
     """De losse feiten die in de kopregel van de popup horen.
 
     Alleen bij een verbinding: stelsel, de getekende lengte en de BOB-richtingsregel.
@@ -1039,6 +1405,9 @@ def _feiten(object_: object, stelsel: str, richting_bob: str) -> tuple[str, ...]
     De lengte is die van de getekende lijn en niet het kenmerk `LengteLeiding`: de
     popup hoort te zeggen wat er op de kaart staat. Wijken de twee af, dan is dat een
     bevinding van ATTR-009 en die staat in de lijst eronder.
+
+    `richting_woord` is de sleutel in `RICHTING_IN_WOORDEN` en niet per se de waarde van
+    de kolom `richting_bob`: op mechanisch riool lopen die twee uiteen (issue #74).
     """
     if not isinstance(object_, Conduit):
         return ()
@@ -1047,8 +1416,8 @@ def _feiten(object_: object, stelsel: str, richting_bob: str) -> tuple[str, ...]
         feiten.append(f"Stelsel: {stelsel}")
     if object_.line is not None and not object_.line.is_empty:
         feiten.append(f"Lengte: {object_.line.length:.1f} m")
-    if richting_bob:
-        feiten.append(RICHTING_IN_WOORDEN.get(richting_bob, richting_bob))
+    if richting_woord:
+        feiten.append(RICHTING_IN_WOORDEN.get(richting_woord, richting_woord))
     return tuple(feiten)
 
 
@@ -1089,6 +1458,14 @@ OVERZICHT_KOLOMMEN = [
     _Kolom("aantal_meldingen", "integer"),
     _Kolom("bekeken", "integer"),
     _Kolom("percentage_populatie", "real"),
+    # Waarover `bekeken` geteld is (issue #77). Zonder die kolom mengt `bekeken` drie
+    # noemers -- een rol op de analyseset, dezelfde rol op de volledige export, en
+    # kenmerkinstanties -- en deelt `percentage_populatie` door een getal waarvan de
+    # lezer de eenheid niet kent. `populatie` staat daar los van: dat is de populatie
+    # die de check declareert (waar hij over gaat), en niet de noemer van `bekeken` --
+    # de declaratie is een bovengrens, zie `CheckOutcome.populatie`.
+    _Kolom("bekeken_scope", "text"),
+    _Kolom("populatie", "text"),
     _Kolom("systemisch", "integer"),
     _Kolom("aantal_gebieden", "integer"),
     _Kolom("skelet", "text"),
@@ -1132,6 +1509,11 @@ MELDING_KOLOMMEN = [
     # Achteraan, net als de kolom `CFK` in de CSV: bestaande kolommen houden hun
     # plaats, zodat een lezer die op positie werkt niet omvalt.
     _Kolom("cfk", "text"),
+    # De technische SHACL-tekst naast de leesbare zin in `boodschap` (issue #101). De
+    # meldingentabel is een archief, net als de CSV en de JSON, en die drie horen
+    # dezelfde gegevens te dragen; alleen de popup toont uitsluitend de zin. Leeg bij
+    # een eigen check en bij een datasetsignaal.
+    _Kolom("boodschap_technisch", "text"),
 ]
 
 # Veld → kolom(men): de afbeelding die `_melding_rij` hieronder maakt, hier expliciet
@@ -1164,6 +1546,7 @@ MELDING_VELD_NAAR_KOLOM: dict[str, tuple[str, ...]] = {
     "object2_uri": ("gwsw_uri_2",),
     "foutlocatie": ("x", "y"),
     "cfk": ("cfk",),
+    "boodschap_technisch": ("boodschap_technisch",),
     # Het tweede object staat in de tabel als `feature_id_2` en `gwsw_uri_2`; zijn
     # label heeft hier nooit een kolom gehad. Expliciet leeg, zodat de drifttest dit
     # als bekende weglating leest -- een nieuw veld zonder vermelding valt er wél op.
@@ -1225,6 +1608,7 @@ def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
         melding.foutlocatie.x if melding.foutlocatie is not None else None,
         melding.foutlocatie.y if melding.foutlocatie is not None else None,
         ", ".join(melding.cfk),
+        melding.boodschap_technisch,
     )
 
 
@@ -1293,6 +1677,8 @@ def _schrijf_overzicht(
             round(100 * len(per_check.get(outcome.check_id, [])) / outcome.examined, 2)
             if outcome.examined
             else None,
+            outcome.bekeken_scope.value,
+            outcome.populatie,
             int(outcome.check_id in systemisch),
             len({gebied for gebied in gebieden.get(outcome.check_id, set()) if gebied}),
             outcome.skeleton,
@@ -1305,8 +1691,8 @@ def _schrijf_overzicht(
             check_id,
             # Een SHACL-vorm draagt geen titel zoals een eigen check. De kolommen die
             # alleen een `CheckOutcome` kent -- de omschrijving, hoeveel objecten
-            # bekeken zijn, het skelet -- blijven daarom leeg; een gevulde waarde zou
-            # een dekking beweren die niemand gemeten heeft.
+            # bekeken zijn en waarover, het skelet -- blijven daarom leeg; een gevulde
+            # waarde zou een dekking beweren die niemand gemeten heeft.
             "",
             BRON_NULMETING,
             # De zwaarste ernst binnen de vorm, dezelfde regel als in het rapport
@@ -1322,6 +1708,8 @@ def _schrijf_overzicht(
             len(groep),
             None,
             None,
+            "",
+            "",
             int(check_id in systemisch),
             len({melding.gebied for melding in groep if melding.gebied}),
             "",
@@ -1342,6 +1730,7 @@ def _schrijf_runmetadata(
     meldingen: list[Melding],
     run_datum: date,
     tellingen: _LaagTellingen,
+    onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
 ) -> None:
     """Schrijft een enkele rij met alles wat het bestand herleidbaar maakt."""
     kolommen = [
@@ -1364,14 +1753,32 @@ def _schrijf_runmetadata(
         _Kolom("n_putten", "integer"),
         _Kolom("n_strengen", "integer"),
         _Kolom("n_mechanisch", "integer"),
-        _Kolom("n_bouwwerken", "integer"),
-        _Kolom("n_waterdelen", "integer"),
-        _Kolom("n_stelsels", "integer"),
+        # Alle rijen in de laag `vlakken`, de deelstelsels hieronder inbegrepen: sinds
+        # issue #98 is dat één laag, en `n_vlakken` telt haar zoals `n_strengen` de
+        # strengenlaag telt. Hoeveel daarvan een gemengd deelstelsel zijn staat eronder;
+        # het aantal externe vlakken is het verschil.
+        _Kolom("n_vlakken", "integer"),
+        _Kolom("n_gemengd_zonder_overstort", "integer"),
+        # De gemelde deelstelsels die geen vlak konden krijgen (issue #75): geen enkele
+        # streng ervan draagt een bruikbare lijn. Ze staan in geen rij van de laag, dus
+        # zonder deze kolom zou het bestand erover zwijgen.
+        _Kolom("n_gemengd_zonder_vlak", "integer"),
+        # De door EXT-009 beoordeelde wegvakken in de laag `vlakken` (issue #104). Zonder
+        # deze telling is het aantal externe vlakken niet meer uit `n_vlakken` af te
+        # leiden: dat is nu `n_vlakken` min de deelstelsels min de wegvakken.
+        _Kolom("n_wegvakken", "integer"),
         _Kolom("kern_objecten", "integer"),
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
         _Kolom("cfk_set", "text"),
         _Kolom("volledig", "integer"),
+        # Wat `[rapport]` uit de meldingenstroom hield (BO-49): de twee lijsten uit de
+        # projectconfiguratie en hoeveel meldingen erdoor wegvielen. Die meldingen staan
+        # in geen enkele tabel van dit bestand; zonder deze telling zou de kaart zwijgen
+        # over wat er weggelaten is.
+        _Kolom("onderdruk_klassen", "text"),
+        _Kolom("onderdruk_checks", "text"),
+        _Kolom("meldingen_onderdrukt", "integer"),
         # De runbrede voorbehouden als een tekst, samengesteld door
         # `uitvoer.voorbehoud`; leeg als er niets voor te behouden valt. Dezelfde
         # string die boven het Markdown-rapport staat en in de JSON-envelop.
@@ -1411,14 +1818,18 @@ def _schrijf_runmetadata(
             tellingen.putten,
             tellingen.strengen,
             tellingen.mechanisch,
-            tellingen.bouwwerken,
-            tellingen.waterdelen,
-            tellingen.stelsels,
+            tellingen.vlakken,
+            tellingen.gemengd_zonder_overstort,
+            tellingen.gemengd_zonder_vlak,
+            tellingen.wegvakken,
             len(stel.kern) if stel is not None else None,
             len(stel.schil) if stel is not None else None,
             stel.volledig_aantal if stel is not None else None,
             run.meetbereik.cfk_tekst,
             int(run.meetbereik.volledig),
+            ", ".join(onderdrukking.klassen),
+            ", ".join(onderdrukking.checks),
+            onderdrukking.totaal,
             markering(run) or "",
         ),
     )

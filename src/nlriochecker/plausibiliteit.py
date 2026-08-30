@@ -46,6 +46,24 @@ class MaterialDiameter(BaseModel):
     toelichting: str = ""
 
 
+class ConstructionTypeDiameter(BaseModel):
+    """ATTR-001: het aannemelijke diameterbereik per constructietype, in mm.
+
+    De uitzondering op `MaterialDiameter`: de maattabellen per materiaal zijn op
+    vrijvervalriool geschreven, en een drainageleiding is naar haar functie dunner.
+    `klasse` is een GWSW-klassenaam; haar subklassen tellen mee, net als bij de rollen
+    uit `[klassen]`. Zie issue #86 en BO-75.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    klasse: str
+    bron: Bron
+    minimum_mm: float | None = None
+    maximum_mm: float | None = None
+    toelichting: str = ""
+
+
 class MinimumDiameter(BaseModel):
     """ATTR-002: de gangbare ondergrens per stelseltype, in mm.
 
@@ -139,6 +157,7 @@ class PlausibilityTables(BaseModel):
 
     bron: str = ""
     materiaal_diameter: list[MaterialDiameter] = Field(default_factory=list)
+    constructietype_diameter: list[ConstructionTypeDiameter] = Field(default_factory=list)
     minimale_diameter: list[MinimumDiameter] = Field(default_factory=list)
     materiaal_wandruwheid: list[MaterialRoughness] = Field(default_factory=list)
     materiaal_begindatum: list[MaterialYear] = Field(default_factory=list)

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gwsw_orox_helpers.dataset import load_dataset
+
 from nlriochecker.afbakening import (
     _component,
     bouw_analyseset,
@@ -15,8 +17,7 @@ from nlriochecker.afbakening import (
     objecten_in_gebied,
 )
 from nlriochecker.checkconfig import load_check_config
-from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.dataset import load_dataset
+from nlriochecker.checks import CheckContext, Scope, run_checks
 from nlriochecker.studiegebied import load_study_area
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -31,7 +32,7 @@ def _labels(dataset, uris) -> set[str]:
 
 def _opzet():
     """De fixture, het gebied en de config."""
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -79,6 +80,38 @@ def test_zonder_schil_geeft_net001_een_valse_bevinding() -> None:
     assert met_schil.outcomes[0].findings == []
 
 
+def test_de_schil_haalt_de_route_door_het_persnet_erbij() -> None:
+    """De gelijkwaardigheidseis van BO-12 houdt ook als de route gepompt is (BO-56).
+
+    Sinds issue #72 loopt de bereikbaarheid van NET-001/NET-002 door het mechanische
+    riool, en sinds issue #73 is een pompput zelf geen eindpunt meer. Bakende de
+    contextschil zich alleen op de vrijvervalcomponent af, dan valt het gemaal achter
+    de persleiding buiten de analyseset en meldt een gebiedsrun een streng die de
+    gemeentebrede run niet meldt.
+
+    De fixture zet dat gemaal achter twee drukleidingen op 450 m van de kern, ver
+    buiten de contextbuffer van 50 m, zodat het alleen via de mechanische kanten mee
+    kan komen. De tweede helft is de controle: zonder schil slaat NET-001 wel aan.
+    """
+    dataset = load_dataset(TTL_DIR / "afbakening_persnet.ttl", [])
+    area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    assert {"G", "d2"} <= _labels(dataset, analyseset.schil)
+
+    alleen_kern = run_checks(
+        CheckContext(dataset=dataset.subset(analyseset.kern), config=config), ["NET-001"]
+    )
+    met_schil = run_checks(CheckContext(dataset=analyseset.dataset, config=config), ["NET-001"])
+    volledig = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+
+    assert alleen_kern.outcomes[0].findings, "zonder schil hoort NET-001 juist aan te slaan"
+    assert met_schil.outcomes[0].findings == volledig.outcomes[0].findings == []
+
+
 def test_de_buffer_haalt_ongekoppelde_buren_erbij() -> None:
     """TOP-005 en de EXT-checks kijken naar nabijheid zonder netwerkverband.
 
@@ -87,7 +120,7 @@ def test_de_buffer_haalt_ongekoppelde_buren_erbij() -> None:
     context_buffer_m = 60 (H ligt 5 meter buiten het gebied) hoort hij erbij, met
     context_buffer_m = 0 juist niet.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_buffer_los_object.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_buffer_los_object.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -111,7 +144,7 @@ def test_streng_via_compartiment_zonder_geometrie_houdt_haar_netwerkverband() ->
     `resolve_network_node` gaf op de uitgedunde dataset dan None terug in plaats
     van put A -- de streng zou ten onrechte als niet aangesloten tellen.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_compartiment_zonder_geometrie.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_compartiment_zonder_geometrie.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -140,7 +173,7 @@ def test_evenwijdige_strengen_vallen_geen_van_beide_buiten_de_schil() -> None:
     stilzwijgend buiten de analyseset, terwijl allebei in dezelfde component zitten
     als de kern (put A).
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_parallelle_strengen.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_parallelle_strengen.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -157,7 +190,7 @@ def test_streng_met_los_uiteinde_telt_mee_maar_verdwijnt_niet_ongemerkt() -> Non
     checks/netwerk.py, die hem in `unconnected` zet), maar het aantal moet
     zichtbaar blijven in plaats van stilzwijgend te verdwijnen.
     """
-    dataset = load_dataset(TTL_DIR / "afbakening_los_uiteinde.ttl")
+    dataset = load_dataset(TTL_DIR / "afbakening_los_uiteinde.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
@@ -230,6 +263,80 @@ def test_de_run_onthoudt_de_omvang_van_kern_en_schil() -> None:
     )
 
     assert run.analyseset is analyseset
+
+
+def test_de_uitslag_zegt_waarover_bekeken_geteld_is() -> None:
+    """`bekeken` mengt drie noemers; het label zegt per check welke (issue #77).
+
+    TOP-001 draait op de analyseset, ADM-002 op de volledige export, en ATTR-014
+    telt geen objecten maar kenmerkinstanties. Zonder label zijn hun getallen -- en
+    dus ook de percentages die erop delen -- onderling onvergelijkbaar.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    run = run_checks(
+        CheckContext(
+            dataset=analyseset.dataset,
+            config=config,
+            volledige_dataset=dataset,
+            analyseset=analyseset,
+        ),
+        ["ADM-002", "ATTR-014", "TOP-001"],
+    )
+    scope = {outcome.check_id: outcome.bekeken_scope for outcome in run.outcomes}
+
+    assert scope["TOP-001"] is Scope.ANALYSESET
+    assert scope["ADM-002"] is Scope.VOLLEDIGE_EXPORT
+    assert scope["ATTR-014"] is Scope.ATTRIBUUT_INSTANTIES
+
+
+def test_de_uitslag_noemt_de_gedeclareerde_populatie() -> None:
+    """Naast het scopelabel: waar de check over gaat (issue #77).
+
+    Geen noemer maar een declaratie. Zonder rollen zeggen de kenmerken waar de check
+    over gaat (RVZ-011 leest de drempelkenmerken, ATTR-014 alle kenmerken); declareert
+    hij geen van beide, dan valt er niets te noemen en blijft het leeg. Nadrukkelijk
+    geen terugval op "de hele export": achter een telling zou dat als de noemer lezen,
+    terwijl ADM-007 alleen de putten van de geconfigureerde puttypen telt.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    run = run_checks(
+        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
+        ["ADM-007", "ATTR-014", "RVZ-011", "TOP-001"],
+    )
+    populatie = {outcome.check_id: outcome.populatie for outcome in run.outcomes}
+
+    assert populatie["TOP-001"] == "leidingen, netwerkknopen, vrijvervalrioolleidingen"
+    assert populatie["ATTR-014"] == "alle kenmerken"
+    assert populatie["RVZ-011"] == (
+        "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau"
+    )
+    assert populatie["ADM-007"] == ""
+    assert "de hele export" not in set(populatie.values())
+
+
+def test_de_afbakening_houdt_de_declaratie_van_de_check_vast() -> None:
+    """Afbakenen tot de kern raakt de bevindingen, niet de herkomst van de uitslag.
+
+    De opsomming in `beperk_tot_studiegebied` vergat `rollen` en `kenmerken`, zodat
+    elk gebiedsrapport "Toetst de hele export" zei. Het scopelabel van issue #77 zou
+    langs dezelfde weg wegvallen.
+    """
+    dataset, area, config = _opzet()
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    run = run_checks(
+        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
+        ["TOP-001"],
+    )
+    beperkt = run.beperk_tot_studiegebied(area)
+
+    assert beperkt.outcomes[0].rollen == run.outcomes[0].rollen
+    assert beperkt.outcomes[0].kenmerken == run.outcomes[0].kenmerken
+    assert beperkt.outcomes[0].bekeken_scope is Scope.ANALYSESET
 
 
 def _uri_van(dataset, label: str) -> str:

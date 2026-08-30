@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import re
+from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import cast
 
+from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import nearest_points
@@ -19,6 +22,7 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
+from nlriochecker.checks.hulpstukken import _hulpstuktelling
 from nlriochecker.checks.meetkunde import (
     distinct_coords,
     duplicate_vertices,
@@ -32,11 +36,12 @@ from nlriochecker.checks.meetkunde import (
 from nlriochecker.checks.selectie import (
     functieloze_knopen,
     leidingen,
+    nabijheidsleidingen,
     netwerkknopen,
     vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import verbonden_knopen
-from nlriochecker.dataset import Conduit, Node
+from nlriochecker.taal import getal, vorm
 
 
 def _punt(node: Node) -> Point:
@@ -55,7 +60,7 @@ def _lijn(conduit: Conduit) -> LineString:
     Dezelfde belofte als `_punt`: `lined` bevat alleen strengen waarvan
     `endpoints(conduit.line)` iets opleverde, dus met een geometrie. Dat filter laat
     strikt genomen ook een andere lijnvormige geometrie dan `LineString` door (zie
-    `coords_of` in `dataset.py`); de cast is een runtime-noop en de gebruikte
+    `coords_of` in `checks/meetkunde.py`); de cast is een runtime-noop en de gebruikte
     bewerkingen -- afstand, kruising, snijpunt -- gelden voor elke shapely-geometrie.
     """
     return cast(LineString, conduit.line)
@@ -74,6 +79,9 @@ class _Topologie:
     # Per streng-URI de uiteinden, een keer bepaald bij het bouwen; voorheen
     # rekende elke check ze opnieuw uit, met verse Point-objecten per aanroep.
     eindpunten: dict[str, tuple[Point, Point] | None] = field(default_factory=dict)
+    # Hoeveel knopen als `c<n>`-duplicaat zijn samengevoegd en dus niet in `nodes`
+    # staan; `_dedupnotitie` verantwoordt ze. Zie `_dedupliceer` en BO-71.
+    samengevoegd: int = 0
 
     def endpoints_of(self, conduit: Conduit) -> tuple[Point, Point] | None:
         """Het begin- en eindpunt van de strenggeometrie, uit de gedeelde tabel.
@@ -113,6 +121,7 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
     # De selectie ontdubbelt al, dus hier blijft alleen het filter over dat bij deze
     # structuur hoort en niet bij de rol: een knoop zonder punt kan niet in de index.
     knopen = [node for node in netwerkknopen(context) if node.point is not None]
+    knopen, samengevoegd = _dedupliceer(knopen, context.config.drempels.dubbele_put_tolerantie_m)
     tree = STRtree([node.point for node in knopen]) if knopen else None
 
     alle = leidingen(context)
@@ -127,7 +136,91 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
         lined=met_lijn,
         line_tree=STRtree([conduit.line for conduit in met_lijn]) if met_lijn else None,
         eindpunten=eindpunten,
+        samengevoegd=samengevoegd,
     )
+
+
+# Het achtervoegsel waarmee de Kikker-export een gecompartimenteerde put per deel
+# uitschrijft: het putlabel, met spaties uitgevuld, plus `c1`, `c2`, ... De export van De
+# Wolden en Hoogeveen draagt 189 zulke labels in 98 groepen (c1 96x, c2 92x, c3 1x); de
+# spatie ervoor staat er altijd, maar hij is hier optioneel omdat de uitvulling een
+# opmaakkeuze van de leverancier is en niet het patroon zelf.
+_COMPARTIMENT_POSTFIX = re.compile(r"^(?P<basis>.*\S)\s*c(?P<nummer>\d+)$")
+
+
+def _basislabel(label: str) -> tuple[str, int] | None:
+    """De putnaam en het compartimentnummer achter een `c<n>`-label, of None."""
+    treffer = _COMPARTIMENT_POSTFIX.match(label.strip())
+    if treffer is None:
+        return None
+    return treffer["basis"].strip(), int(treffer["nummer"])
+
+
+def _dedupliceer(knopen: list[Node], tolerantie: float) -> tuple[list[Node], int]:
+    """Voegt de compartimentduplicaten van dezelfde put samen; het origineel wint.
+
+    Twee knopen zijn hetzelfde fysieke object wanneer hun labels op een `c<n>`-postfix
+    na gelijk zijn **en** hun punten binnen de dubbele-put-tolerantie samenvallen. Beide
+    eisen tellen: alleen op de naam matchen zou twee echte putten samenvoegen die
+    toevallig zo heten, en alleen op de ligging matchen is precies wat TOP-005 al meldt.
+    Zie BO-71 en issue #85.
+
+    Het origineel wint: de knoop wiens label géén postfix draagt, en is die er niet --
+    in de export van De Wolden en Hoogeveen 95 van de 98 groepen -- de laagste
+    postfix. Een knoop zonder postfix wordt nooit weggenomen; twee gelijknamige putten
+    zonder postfix blijven dus gewoon een dubbele put.
+    """
+    per_basis: defaultdict[str, list[tuple[int, Node]]] = defaultdict(list)
+    zonder_postfix: defaultdict[str, list[Node]] = defaultdict(list)
+    for node in knopen:
+        label = (node.label or "").strip()
+        gevonden = _basislabel(label)
+        if gevonden is None:
+            zonder_postfix[label].append(node)
+        else:
+            per_basis[gevonden[0]].append((gevonden[1], node))
+
+    duplicaten: set[str] = set()
+    for basis, leden in per_basis.items():
+        genummerd = sorted(leden, key=lambda paar: (paar[0], paar[1].uri))
+        originelen = sorted(zonder_postfix.get(basis, []), key=lambda node: node.uri)
+        winnaar = originelen[0] if originelen else genummerd[0][1]
+        for _, node in genummerd:
+            if node.uri != winnaar.uri and _punt(node).distance(_punt(winnaar)) <= tolerantie:
+                duplicaten.add(node.uri)
+
+    if not duplicaten:
+        return knopen, 0
+    return [node for node in knopen if node.uri not in duplicaten], len(duplicaten)
+
+
+def _dedupnotitie(context: CheckContext) -> list[str]:
+    """Verantwoordt de knopen die als compartimentduplicaat zijn samengevoegd.
+
+    Zegt precies wat de samenvoeging doet en wat zij niet doet. Zij haalt de knoop uit
+    de populatie -- ze rekent niets van het duplicaat bij het origineel op, dus wat
+    alleen op het duplicaat staat wordt hier niet meer beoordeeld -- en het strengeinde
+    dat erop uitkwam snapt alleen op het origineel als dat binnen de snapping-tolerantie
+    ligt. Die tweede zin is er niet voor de sier: `dubbele_put_tolerantie_m` is ruimer
+    dan `snapping_tolerantie_m`, dus tussen die twee maten in kan een strengeinde zijn
+    aansluiting verliezen. Zie BO-71.
+    """
+    aantal = _topologie(context).samengevoegd
+    if not aantal:
+        return []
+    drempels = context.config.drempels
+    return [
+        f"{getal(aantal, 'knoop', 'knopen')} {vorm(aantal, 'is', 'zijn')} vóór deze toets "
+        "samengevoegd met een gelijknamige knoop: de labels verschillen alleen in een "
+        "`c<n>`-postfix -- waarmee de bronexport een gecompartimenteerde put per deel "
+        f"uitschrijft -- en de punten liggen binnen {drempels.dubbele_put_tolerantie_m:g} m "
+        "van elkaar (`[drempels] dubbele_put_tolerantie_m`). Zij tellen hier niet als eigen "
+        "knoop, en wat alleen op zo'n duplicaat staat is hier dus niet getoetst. Een "
+        "strengeinde dat erop uitkwam snapt op de knoop die overbleef zolang die binnen "
+        f"{drempels.snapping_tolerantie_m:g} m ligt "
+        "(`[drempels] snapping_tolerantie_m`); ligt het duplicaat verder van het origineel "
+        "dan die maat, dan geldt dat eind hier als niet-aangesloten. Zie BO-71."
+    ]
 
 
 def _snapping(context: CheckContext) -> dict[str, tuple[Node | None, ...]]:
@@ -161,6 +254,51 @@ def _bouw_snapping(context: CheckContext) -> dict[str, tuple[Node | None, ...]]:
     return snapping
 
 
+@dataclass(frozen=True)
+class _Eindhulpstukken:
+    """De hulpstukken die als geldig strengeinde tellen, met een index erop.
+
+    Een `Hulpstuk` is in het GWSW geen `Put` en dus geen netwerkknoop, dus een streng
+    die op een T-stuk eindigt heeft geometrisch geen put aan die zijde. TOP-002 en
+    TOP-003 lazen dat als een gebrek; op De Wolden en Hoogeveen ging het bij 45 van de
+    56 respectievelijk 107 van de 109 meldingen om precies dat. Zie BO-72 en issue #89.
+    """
+
+    nodes: list[Node]
+    tree: STRtree | None
+
+    def raakt(self, punt: Point, tolerantie: float) -> bool:
+        """Of een van deze hulpstukken binnen de tolerantie van dit punt ligt."""
+        if self.tree is None:
+            return False
+        for index in self.tree.query(punt, predicate="dwithin", distance=tolerantie):
+            if _punt(self.nodes[int(index)]).distance(punt) <= tolerantie:
+                return True
+        return False
+
+
+def _eindhulpstukken(context: CheckContext) -> _Eindhulpstukken:
+    """De index met de hulpstukken die als eind tellen; een keer per context."""
+    return context.cached("topologie:eindhulpstukken", lambda: _bouw_eindhulpstukken(context))
+
+
+def _bouw_eindhulpstukken(context: CheckContext) -> _Eindhulpstukken:
+    """Indexeert de hulpstukken met een telbare GWSW-functie en een puntgeometrie.
+
+    Precies de populatie die TOP-022 en TOP-023 toetsen (`_hulpstuktelling().telbaar`),
+    en met opzet dezelfde lijst: "telbare functie" is de grens die daar al ligt, en een
+    tweede klassenlijst zou stil van die grens weglopen. Een hulpstuk waarvan de klasse
+    wel een functie draagt maar geen aantal (`Afsluitstuk`, `Ontstoppingsstuk`) telt dus
+    niet als eind.
+    """
+    knopen = [
+        aansluiting.node
+        for aansluiting in _hulpstuktelling(context).telbaar
+        if aansluiting.node.point is not None
+    ]
+    return _Eindhulpstukken(knopen, STRtree([node.point for node in knopen]) if knopen else None)
+
+
 def _midden(links: Point, rechts: Point) -> tuple[float, float]:
     """Het punt precies tussen twee punten in."""
     return ((links.x + rechts.x) / 2, (links.y + rechts.y) / 2)
@@ -187,7 +325,86 @@ def _representatief(geometrie: BaseGeometry | None) -> tuple[float, float] | Non
     return (punt.x, punt.y)
 
 
-def _buren(topologie: _Topologie, conduit: Conduit, marge: float):
+@dataclass(frozen=True)
+class _Nabijheid:
+    """De leidingen waarvan TOP-006, TOP-010 en TOP-011 de onderlinge ligging toetsen.
+
+    Een eigen index naast `_Topologie`, en met opzet: die laatste draagt élke leiding
+    met geometrie, want TOP-021 vraagt of er *enige* streng langs een put doorloopt.
+    Deze drie checks vragen iets anders -- liggen twee leidingen elkaar in de weg -- en
+    dat is alleen zinnig binnen de rol `nabijheidsleidingen`. Zie issue #82 en BO-69.
+    """
+
+    conduits: list[Conduit]
+    tree: STRtree | None
+    # Per streng-URI de uiteinden; alleen voor de strengen in `conduits`, dus altijd
+    # gevuld. TOP-010 gebruikt ze om een gedeeld uiteinde te herkennen.
+    eindpunten: dict[str, tuple[Point, Point]]
+    # Hoeveel leidingen buiten deze populatie vielen, en hoeveel er in totaal zijn;
+    # `notes()` verantwoordt de versmalling ermee. Invariant: `totaal - buiten` is de
+    # populatie, anders noemt die regel een ander getal dan er getoetst is.
+    buiten: int
+    totaal: int
+
+
+def _nabijheid(context: CheckContext) -> _Nabijheid:
+    """De nabijheidsindex, een keer per context gebouwd."""
+    return context.cached("topologie:nabijheid", lambda: _bouw_nabijheid(context))
+
+
+def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
+    """Bouwt de index over de leidingen waarvan de onderlinge ligging getoetst wordt.
+
+    De populatie is de rol `nabijheidsleidingen` zelf, en niet haar doorsnede met de
+    leidingenrol: `[klassen] streng` en `[klassen] nabijheidsleiding` zijn los
+    configureerbaar, en een duiker zou bij een versmalde `streng` anders stil uit de
+    populatie vallen. De leidingenrol wordt alleen geteld, voor de verantwoording in
+    `notes()`: hoeveel leidingen er buiten de versmalde populatie vielen.
+
+    Dat tellen gaat over de vereniging van de twee rollen, zodat `totaal - buiten` de
+    populatie blijft. Zou `totaal` alleen de leidingenrol tellen, dan zou een project
+    dat `streng` versmalt een verantwoordingsregel krijgen die een kleiner getal noemt
+    dan er getoetst is. Onder de standaardconfiguratie (`streng = ["Leiding"]`) valt de
+    populatie binnen de leidingenrol en verandert er niets.
+    """
+    binnen = nabijheidsleidingen(context)
+    in_populatie = {conduit.uri for conduit in binnen}
+    alle = leidingen(context)
+    totaal = len({conduit.uri for conduit in alle} | in_populatie)
+
+    conduits: list[Conduit] = []
+    eindpunten: dict[str, tuple[Point, Point]] = {}
+    for conduit in binnen:
+        uiteinden = endpoints(conduit.line)
+        if uiteinden is None:
+            continue
+        eindpunten[conduit.uri] = uiteinden
+        conduits.append(conduit)
+
+    return _Nabijheid(
+        conduits=conduits,
+        tree=STRtree([conduit.line for conduit in conduits]) if conduits else None,
+        eindpunten=eindpunten,
+        buiten=totaal - len(in_populatie),
+        totaal=totaal,
+    )
+
+
+def _nabijheidsnotitie(context: CheckContext) -> list[str]:
+    """Verantwoordt de versmalde populatie van TOP-006, TOP-010 en TOP-011."""
+    nabijheid = _nabijheid(context)
+    klassen = ", ".join(context.config.klassen.nabijheidsleiding) or "(geen)"
+    return [
+        f"Getoetst zijn alleen paren waarvan beide leidingen onder {klassen} vallen "
+        f"(`[klassen] nabijheidsleiding`). {nabijheid.buiten} van de "
+        f"{getal(nabijheid.totaal, 'leiding', 'leidingen')} "
+        f"{vorm(nabijheid.buiten, 'valt', 'vallen')} daarbuiten -- onder meer drains, "
+        "mechanische leidingen en aansluitleidingen -- en elk paar waarin zo'n leiding "
+        "voorkomt is niet beoordeeld."
+    ]
+
+
+def _buren(nabijheid: _Nabijheid, conduit: Conduit, marge: float):
     """De andere strengen die binnen de marge van deze streng liggen.
 
     `dwithin` toetst de echte afstand en is daarmee strenger dan de oude
@@ -195,10 +412,10 @@ def _buren(topologie: _Topologie, conduit: Conduit, marge: float):
     kandidaten alsnog zijn eigen exacte afstandstoets toe, dus de uitkomst
     verandert niet. Bij marge nul blijven alleen rakende of snijdende lijnen over.
     """
-    if topologie.line_tree is None or conduit.line is None:
+    if nabijheid.tree is None or conduit.line is None:
         return
-    for index in topologie.line_tree.query(conduit.line, predicate="dwithin", distance=marge):
-        ander = topologie.lined[int(index)]
+    for index in nabijheid.tree.query(conduit.line, predicate="dwithin", distance=marge):
+        ander = nabijheid.conduits[int(index)]
         if ander.uri != conduit.uri:
             yield ander
 
@@ -211,6 +428,8 @@ class LosliggendePut(Check):
     title = "Losliggende putten (geen enkele streng aangesloten)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt putten zonder strengeindpunt binnen de snapping-tolerantie.
@@ -241,27 +460,45 @@ class LosliggendePut(Check):
                     tolerantie_m=tolerantie,
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten met geometrie."""
         return len(_topologie(context).nodes)
 
 
 class _StrengPutAansluiting(Check):
-    """Gedeelde basis voor de checks op het aantal aangesloten putten per streng."""
+    """Gedeelde basis voor de checks op het aantal aangesloten eindobjecten per streng."""
 
     verwacht: int
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Telt per streng hoeveel uiteinden geometrisch op een put vallen."""
+        """Telt per streng hoeveel uiteinden op een geldig eindobject vallen.
+
+        Geldig is een put binnen de snapping-tolerantie, of -- sinds issue #89 -- een
+        hulpstuk met een telbare GWSW-functie op diezelfde afstand: een streng die
+        tussen twee T-stukken ligt is aangesloten, ook al is een `Hulpstuk` in het GWSW
+        geen `Put`. Mist zo'n hulpstuk zelf een leiding, dan is dat het gebrek dat
+        TOP-022 meldt; hier telt alleen of de streng ergens op uitkomt. Zie BO-72.
+        """
         topologie = _topologie(context)
         tolerantie = context.config.drempels.snapping_tolerantie_m
         snapping = _snapping(context)
+        eindhulpstukken = _eindhulpstukken(context)
 
         for conduit in topologie.conduits:
             treffers = snapping.get(conduit.uri)
-            if treffers is None:
+            uiteinden = topologie.endpoints_of(conduit)
+            if treffers is None or uiteinden is None:
                 continue
-            if sum(1 for node in treffers if node is not None) != self.verwacht:
+            geldig = sum(
+                1
+                for node, punt in zip(treffers, uiteinden, strict=True)
+                if node is not None or eindhulpstukken.raakt(punt, tolerantie)
+            )
+            if geldig != self.verwacht:
                 continue
             yield self.finding(
                 context,
@@ -274,6 +511,28 @@ class _StrengPutAansluiting(Check):
     def melding(self, tolerantie: float) -> str:
         """De tekst van de bevinding."""
         raise NotImplementedError
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samenvoeging en dat een hulpstuk als eind meetelt.
+
+        Deze twee checks lezen de puttenindex niet rechtstreeks, maar wel via de
+        snapping, en die draait op de STRtree over dezelfde -- ontdubbelde -- lijst. Valt
+        een duplicaat weg dat verder dan de snapping-tolerantie van het origineel lag,
+        dan verliest het strengeinde dat erop uitkwam zijn aansluiting en is het precies
+        deze check die dat meldt. Zie BO-71.
+        """
+        tolerantie = context.config.drempels.snapping_tolerantie_m
+        aantal = len(_eindhulpstukken(context).nodes)
+        return [
+            *_dedupnotitie(context),
+            f"Een strengeinde dat binnen {tolerantie:g} m op een hulpstuk met een telbare "
+            "GWSW-functie valt (T-stuk, kruisstuk, mof) telt hier als geldig eind: de streng "
+            f"komt ergens op uit. {getal(aantal, 'hulpstuk', 'hulpstukken')} met geometrie "
+            f"{vorm(aantal, 'telt', 'tellen')} zo mee. Of zo'n hulpstuk zelf het juiste aantal "
+            "leidingen verbindt is een andere vraag, en die stelt TOP-022. Een hulpstuk waarvan "
+            "de klasse geen aantal voorschrijft -- een afsluitstuk of ontstoppingsstuk -- telt "
+            "niet als eind. Zie BO-72.",
+        ]
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen met geometrie."""
@@ -289,11 +548,16 @@ class LosliggendeStreng(_StrengPutAansluiting):
     title = "Losliggende strengen (aan geen van beide zijden een put)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("hulpstukken", "leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     verwacht = 0
 
     def melding(self, tolerantie: float) -> str:
         """De tekst van de bevinding."""
-        return f"Geen van beide strengeinden ligt binnen {tolerantie:g} m van een put."
+        return (
+            f"Geen van beide strengeinden ligt binnen {tolerantie:g} m van een put of van "
+            "een hulpstuk met een telbare GWSW-functie."
+        )
 
 
 @register
@@ -304,11 +568,16 @@ class StrengMetEenPut(_StrengPutAansluiting):
     title = "Streng met slechts aan een zijde een put"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("hulpstukken", "leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
     verwacht = 1
 
     def melding(self, tolerantie: float) -> str:
         """De tekst van de bevinding."""
-        return f"Slechts een van beide strengeinden ligt binnen {tolerantie:g} m van een put."
+        return (
+            f"Slechts een van beide strengeinden ligt binnen {tolerantie:g} m van een put "
+            "of van een hulpstuk met een telbare GWSW-functie."
+        )
 
 
 @register
@@ -319,6 +588,8 @@ class NietGesneptStrengeinde(Check):
     title = "Strengeindpunt niet gesnapt op putlocatie (afstand > tolerantie)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de administratieve koppeling met de geometrische afstand."""
@@ -369,6 +640,8 @@ class DubbelePut(Check):
     title = "Dubbele putten: twee knopen binnen tolerantie"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt putparen die dichter bij elkaar liggen dan de tolerantie."""
@@ -404,6 +677,10 @@ class DubbelePut(Check):
                     foutlocatie=_midden(node.point, ander.point),
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten met geometrie."""
         return len(_topologie(context).nodes)
@@ -417,6 +694,8 @@ class StrengMetZelfdePut(Check):
     title = "Streng met dezelfde put aan begin- en eindpunt"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen waarvan beide uiteinden naar dezelfde put verwijzen."""
@@ -450,22 +729,25 @@ class OverlappendeStreng(Check):
     title = "Dubbel ingetekende of (deels) overlappende strengen"
     severity = Severity.ERROR
     dimension = Dimension.COMPLETENESS
+    rollen = ("leidingen", "nabijheidsleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengparen die over een aanzienlijke lengte samenvallen.
 
         Twee strengen die alleen in een put bij elkaar komen raken elkaar over een
         verwaarloosbare lengte; pas als ze over meer dan de minimumlengte binnen
-        elkaars tolerantie blijven liggen ze dubbel ingetekend.
+        elkaars tolerantie blijven liggen ze dubbel ingetekend. Beide strengen van
+        een paar moeten in de rol `nabijheidsleidingen` zitten (issue #82).
         """
-        topologie = _topologie(context)
+        nabijheid = _nabijheid(context)
         drempels = context.config.drempels
         tolerantie = drempels.overlap_tolerantie_m
         minimum = drempels.overlap_minimale_lengte_m
 
         gemeld: set[tuple[str, str]] = set()
-        for conduit in topologie.lined:
-            for ander in _buren(topologie, conduit, tolerantie):
+        for conduit in nabijheid.conduits:
+            for ander in _buren(nabijheid, conduit, tolerantie):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
                 if sleutel in gemeld:
                     continue
@@ -486,9 +768,13 @@ class OverlappendeStreng(Check):
                     foutlocatie=_dichtste_midden(conduit.line, ander.line),
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de leidingen die buiten de versmalde populatie vielen."""
+        return _nabijheidsnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen met bruikbare geometrie."""
-        return len(_topologie(context).lined)
+        """Het aantal getoetste leidingen met bruikbare geometrie."""
+        return len(_nabijheid(context).conduits)
 
 
 @register
@@ -499,6 +785,8 @@ class DegeneratieveGeometrie(Check):
     title = "Nul-lengte, zelfkruisende of anderszins degeneratieve geometrie"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen zonder bruikbare lijn.
@@ -552,6 +840,8 @@ class StrengNietRecht(Check):
     title = "Vrijvervalstreng niet recht van put tot put (bogen, knikpunten zonder put)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meet hoe ver de hartlijn van de rechte put-putverbinding afwijkt.
@@ -595,6 +885,8 @@ class BuitenRdBereik(Check):
     title = "Objecten buiten beheergebied of buiten valide RD-bereik, ontbrekende coordinaten"
     severity = Severity.ERROR
     dimension = Dimension.ACCURACY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elke knoop en streng op aanwezige, geldige RD-coordinaten."""
@@ -634,6 +926,7 @@ class BuitenRdBereik(Check):
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt welk deel van deze check niet uitgevoerd is."""
         return [
+            *_dedupnotitie(context),
             "Alleen het RD-bereik en het ontbreken van coordinaten zijn getoetst. Het "
             "beheergebied is niet getoetst: er is geen beheergebiedpolygoon aangeleverd. "
             "Het studiegebied Koekangerveld is daarvoor geen vervanging, want dat beslaat "
@@ -654,6 +947,8 @@ class StrengenRakenMetBuffer(Check):
     title = "Streng met buffer op basis van diameter kruist of raakt andere strengen"
     severity = Severity.ERROR
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "nabijheidsleidingen")
+    kenmerken = ("BreedteLeiding", "HoogteLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengparen waarvan de buizen elkaar in het platte vlak raken.
@@ -661,25 +956,26 @@ class StrengenRakenMetBuffer(Check):
         Strengen die een put delen raken elkaar per definitie; die vallen af. Wat
         overblijft zijn kruisingen en te dicht langs elkaar lopende buizen. De
         toets is tweedimensionaal: een kruising op verschillende diepte komt er ook
-        in voor. HGT-004 en HGT-009 kijken naar de hoogten.
+        in voor. HGT-004 en HGT-009 kijken naar de hoogten. Beide strengen van een
+        paar moeten in de rol `nabijheidsleidingen` zitten (issue #82).
         """
-        topologie = _topologie(context)
+        nabijheid = _nabijheid(context)
         marge = context.config.drempels.diameterbuffer_marge_m
         tolerantie = context.config.drempels.snapping_tolerantie_m
 
         stralen = {
             conduit.uri: half_diameter_m(conduit.breedte_mm, conduit.hoogte_mm)
-            for conduit in topologie.lined
+            for conduit in nabijheid.conduits
         }
-        knopen = {conduit.uri: verbonden_knopen(context, conduit) for conduit in topologie.lined}
+        knopen = {conduit.uri: verbonden_knopen(context, conduit) for conduit in nabijheid.conduits}
         # De grootste straal in de dataset bepaalt hoe ver een tegenpartij kan
         # liggen en toch nog binnen de gezamenlijke buffer vallen.
         grootste = max(stralen.values(), default=0.0)
 
         gemeld: set[tuple[str, str]] = set()
-        for conduit in topologie.lined:
+        for conduit in nabijheid.conduits:
             straal = stralen[conduit.uri]
-            for ander in _buren(topologie, conduit, straal + grootste + marge):
+            for ander in _buren(nabijheid, conduit, straal + grootste + marge):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
                 if sleutel in gemeld:
                     continue
@@ -689,7 +985,7 @@ class StrengenRakenMetBuffer(Check):
                     continue
                 if self._deelt_put(knopen[conduit.uri], knopen[ander.uri]):
                     continue
-                if self._deelt_uiteinde(topologie, conduit, ander, tolerantie):
+                if self._deelt_uiteinde(nabijheid, conduit, ander, tolerantie):
                     continue
                 gemeld.add(sleutel)
                 yield self.finding(
@@ -710,18 +1006,17 @@ class StrengenRakenMetBuffer(Check):
         return bool({uri for uri in links if uri} & {uri for uri in rechts if uri})
 
     def _deelt_uiteinde(
-        self, topologie: _Topologie, conduit: Conduit, ander: Conduit, tolerantie: float
+        self, nabijheid: _Nabijheid, conduit: Conduit, ander: Conduit, tolerantie: float
     ) -> bool:
         """Geeft aan of twee strengen geometrisch een uiteinde delen."""
-        eigen, andere = topologie.endpoints_of(conduit), topologie.endpoints_of(ander)
-        if eigen is None or andere is None:
-            return False
+        eigen, andere = nabijheid.eindpunten[conduit.uri], nabijheid.eindpunten[ander.uri]
         return any(links.distance(rechts) <= tolerantie for links in eigen for rechts in andere)
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt de tweedimensionale afbakening en de strengen zonder maatvoering."""
-        topologie = _topologie(context)
+        """Meldt de populatie, de tweedimensionale afbakening en de strengen zonder maat."""
+        nabijheid = _nabijheid(context)
         notities = [
+            *_nabijheidsnotitie(context),
             "Deze toets is tweedimensionaal. In een stedelijk stelsel kruisen leidingen "
             "elkaar routinematig op verschillende diepte; zo'n kruising is pas een gebrek "
             "als de buizen elkaar ook in hoogte raken. Gebruik HGT-004, HGT-009 en HGT-018 "
@@ -729,20 +1024,20 @@ class StrengenRakenMetBuffer(Check):
         ]
         zonder = sum(
             1
-            for conduit in topologie.lined
+            for conduit in nabijheid.conduits
             if half_diameter_m(conduit.breedte_mm, conduit.hoogte_mm) == 0.0
         )
         if zonder:
             notities.append(
-                f"{zonder} van de {len(topologie.lined)} strengen hebben geen bruikbare "
+                f"{zonder} van de {len(nabijheid.conduits)} strengen hebben geen bruikbare "
                 "breedte- of hoogtemaat; die krijgen buffer nul en komen alleen in beeld als "
                 "de tegenpartij dik genoeg is."
             )
         return notities
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen met bruikbare geometrie."""
-        return len(_topologie(context).lined)
+        """Het aantal getoetste leidingen met bruikbare geometrie."""
+        return len(_nabijheid(context).conduits)
 
 
 @register
@@ -753,19 +1048,22 @@ class Hartlijnkruising(Check):
     title = "Hartlijnkruisingen strengen onderling (zonder buffer)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "nabijheidsleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengparen waarvan de hartlijnen elkaar echt snijden.
 
         `crosses` is precies wat het register bedoelt: de binnenkanten snijden
         elkaar. Strengen die alleen in een gedeelde put samenkomen raken elkaar en
-        kruisen niet, en vallen dus vanzelf af.
+        kruisen niet, en vallen dus vanzelf af. Beide strengen van een paar moeten
+        in de rol `nabijheidsleidingen` zitten (issue #82).
         """
-        topologie = _topologie(context)
+        nabijheid = _nabijheid(context)
 
         gemeld: set[tuple[str, str]] = set()
-        for conduit in topologie.lined:
-            for ander in _buren(topologie, conduit, 0.0):
+        for conduit in nabijheid.conduits:
+            for ander in _buren(nabijheid, conduit, 0.0):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
                 if sleutel in gemeld or not _lijn(conduit).crosses(_lijn(ander)):
                     continue
@@ -782,17 +1080,18 @@ class Hartlijnkruising(Check):
                 )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt dat een kruising in het platte vlak nog geen conflict is."""
+        """Meldt de populatie en dat een kruising in het platte vlak nog geen conflict is."""
         return [
+            *_nabijheidsnotitie(context),
             "Een hartlijnkruising in het platte vlak is normaal: hemelwater en gemengd "
             "kruisen elkaar in vrijwel elke straat, op verschillende diepte. Deze check "
             "wijst de plaatsen aan waar dat gebeurt; of het een conflict is volgt uit de "
-            "hoogten (HGT-004, HGT-009, HGT-018), niet uit deze bevinding."
+            "hoogten (HGT-004, HGT-009, HGT-018), niet uit deze bevinding.",
         ]
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal strengen met bruikbare geometrie."""
-        return len(_topologie(context).lined)
+        """Het aantal getoetste leidingen met bruikbare geometrie."""
+        return len(_nabijheid(context).conduits)
 
 
 @register
@@ -803,6 +1102,8 @@ class ParallelleStrengen(Check):
     title = "Meer dan twee parallelle strengen tussen hetzelfde putpaar"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Telt de strengen per putpaar en meldt de paren boven het maximum."""
@@ -850,6 +1151,8 @@ class VeelAansluitendeStrengen(Check):
     title = "Meer dan vier aansluitende strengen op een put"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Telt per put hoeveel strengen erop aansluiten."""
@@ -875,6 +1178,10 @@ class VeelAansluitendeStrengen(Check):
                 maximum=maximum,
             )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten."""
         return len(_topologie(context).nodes)
@@ -888,6 +1195,8 @@ class MultipartGeometrie(Check):
     title = "Streng of put met multipart-geometrie (meerdere losse delen in een feature)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elk object waarvan de GML-literaal uit meerdere delen bestaat.
@@ -917,6 +1226,10 @@ class MultipartGeometrie(Check):
                     "deel is ingelezen.",
                 )
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen plus strengen."""
         topologie = _topologie(context)
@@ -931,6 +1244,8 @@ class OngeldigeGeometrie(Check):
     title = "Ongeldige geometrie volgens OGC Simple Features (ST_IsValid)"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke geometrie die shapely als ongeldig aanmerkt."""
@@ -949,14 +1264,15 @@ class OngeldigeGeometrie(Check):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt de objecten waarvan de geometrie al bij het inlezen strandde."""
+        notities = _dedupnotitie(context)
         aantal = len(context.dataset.geometry_errors)
-        if not aantal:
-            return []
-        return [
-            f"{aantal} objecten hebben een GML-literaal die niet te lezen was; die konden "
-            "hier niet op geldigheid getoetst worden en staan in de lijst met "
-            "geometriefouten van de dataset."
-        ]
+        if aantal:
+            notities.append(
+                f"{aantal} objecten hebben een GML-literaal die niet te lezen was; die konden "
+                "hier niet op geldigheid getoetst worden en staan in de lijst met "
+                "geometriefouten van de dataset."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen plus strengen."""
@@ -972,6 +1288,8 @@ class NietSimpeleGeometrie(Check):
     title = "Niet-simple geometrie (ST_IsSimple: spikes, herhaalde structuren)"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke lijn die zichzelf raakt of kruist."""
@@ -1007,6 +1325,8 @@ class DubbeleVertexOfSpike(Check):
     title = "Opeenvolgende dubbele vertices of spikes (hoek nabij 0 graden) in strenggeometrie"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt herhaalde punten en hoeken die vrijwel terugkeren over zichzelf."""
@@ -1059,6 +1379,8 @@ class PseudoKnoop(Check):
     title = "Pseudo-knoop: twee strengen gescheiden door een functieloze knoop"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("functieloze_knopen", "leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ("BreedteLeiding", "HoogteLeiding", "MateriaalLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt functieloze knopen met precies twee gelijk gekenmerkte strengen.
@@ -1078,9 +1400,16 @@ class PseudoKnoop(Check):
 
         aansluitend: dict[str, list[Conduit]] = {}
         for conduit in _topologie(context).all_conduits:
-            for uri in verbonden_knopen(context, conduit):
-                if uri in functieloos:
-                    aansluitend.setdefault(uri, []).append(conduit)
+            begin, eind = verbonden_knopen(context, conduit)
+            # Terugval op de rauwe koppeling, net als `_bouw_hulpstuktelling`: een
+            # hulpstuk is geen netwerkknoop en `resolve_network_node` geeft er dus None
+            # voor, terwijl het wel een functieloze knoop kan zijn (T-stuk,
+            # ontstoppingsstuk). Zonder terugval blijft deze index per constructie leeg.
+            # Ontdubbeld op knoop, net als in `_bouw_aansluitingen`: een streng met beide
+            # einden op dezelfde knoop is een streng en geen paar.
+            gevonden = (begin or conduit.start_node, eind or conduit.end_node)
+            for uri in dict.fromkeys(uri for uri in gevonden if uri in functieloos):
+                aansluitend.setdefault(uri, []).append(conduit)
 
         for uri, strengen in aansluitend.items():
             if len(strengen) != 2:
@@ -1129,44 +1458,9 @@ class PseudoKnoop(Check):
         return len(functieloze_knopen(context))
 
 
-@register
-class OmgekeerdeDigitalisatie(Check):
-    """TOP-020: de tekenrichting is tegengesteld aan de van-naar-richting."""
-
-    id = "TOP-020"
-    title = "Digitalisatierichting komt niet overeen met de administratieve van-naar-richting"
-    severity = Severity.WARNING
-    dimension = Dimension.CONSISTENCY
-
-    def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Vergelijkt het eerste lijnpunt met de administratieve beginput.
-
-        Alleen strengen waarvan beide putten bekend zijn en waarvan de putten
-        duidelijk uit elkaar liggen doen mee; anders is er niets te vergelijken.
-        """
-        dataset = context.dataset
-
-        for conduit in _topologie(context).conduits:
-            uitslag = dataset.richting_van_geometrie(conduit, context.config.klassen.netwerkknopen)
-            if uitslag is None:
-                continue
-            omgekeerd, begin, eind = uitslag
-            if not omgekeerd:
-                continue
-            yield self.finding(
-                context,
-                conduit.uri,
-                conduit.label,
-                f"De lijn begint bij put {eind.label!r} en eindigt bij {begin.label!r}, "
-                "terwijl de administratie het omgekeerd zegt.",
-                administratief_begin=begin.label,
-                administratief_eind=eind.label,
-            )
-
-    def examined(self, context: CheckContext) -> int:
-        """Het aantal vrijvervalstrengen met geometrie."""
-        topologie = _topologie(context)
-        return sum(1 for conduit in topologie.conduits if topologie.endpoints_of(conduit))
+# TOP-020 (digitalisatierichting tegen de van-naar-richting) is per issue #80 opgegaan in
+# NET-009 en vervallen; het ID wordt niet hergebruikt. De omgekeerde tekenrichting is nu
+# een deelgeval van de integrale richtingscheck (`checks/netwerk.py`).
 
 
 @register
@@ -1177,6 +1471,8 @@ class PutNaastDoorlopendeStreng(Check):
     title = "Put valt niet samen met enig strengeindpunt maar ligt wel naast of op een streng"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
+    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Verfijnt TOP-001: ligt de losliggende put toch op een streng?
@@ -1225,6 +1521,10 @@ class PutNaastDoorlopendeStreng(Check):
                 )
                 break
 
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de samengevoegde compartimentduplicaten."""
+        return _dedupnotitie(context)
+
     def examined(self, context: CheckContext) -> int:
         """Het aantal putten met geometrie."""
         return len(_topologie(context).nodes)
@@ -1236,3 +1536,90 @@ def _alle_geometrieen(topologie: _Topologie):
         yield node.uri, node.label, node.point
     for conduit in topologie.all_conduits:
         yield conduit.uri, conduit.label, conduit.line
+
+
+class _HulpstukAansluitingen(Check):
+    """Gedeelde basis voor TOP-022 (te weinig richtingen) en TOP-023 (te veel)."""
+
+    te_veel: bool
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Vergelijkt per hulpstuk het aantal richtingen met de GWSW-functie."""
+        dataset = context.dataset
+        for aansluiting in _hulpstuktelling(context).telbaar:
+            if aansluiting.richtingen == aansluiting.verwacht:
+                continue
+            if (aansluiting.richtingen > aansluiting.verwacht) != self.te_veel:
+                continue
+            buren = ", ".join(
+                (dataset.nodes[uri].label or uri) if uri in dataset.nodes else uri
+                for uri in aansluiting.buren
+            )
+            los = (
+                f", plus {getal(aansluiting.losse_einden, 'streng', 'strengen')} met een los eind"
+                if aansluiting.losse_einden
+                else ""
+            )
+            soort = dataset.beheerobjecttype(aansluiting.node.uri) or "Hulpstuk"
+            yield self.finding(
+                context,
+                aansluiting.node.uri,
+                aansluiting.node.label,
+                f"{soort} verbindt {getal(aansluiting.richtingen, 'richting', 'richtingen')} "
+                f"({buren or 'geen buurknoop'}{los}) waar de GWSW-functie "
+                f"{aansluiting.functie} er {aansluiting.verwacht} voorschrijft.",
+                verwacht=aansluiting.verwacht,
+                aangesloten=aansluiting.richtingen,
+                losse_einden=aansluiting.losse_einden,
+                functie=aansluiting.functie,
+                buren=buren,
+                strengen=", ".join(aansluiting.strengen),
+            )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Verantwoordt de hulpstukken waarvan de klasse geen aantal voorschrijft."""
+        buiten = _hulpstuktelling(context).buiten_per_klasse
+        if not buiten:
+            return []
+        aantal = sum(buiten.values())
+        delen = ", ".join(f"{hoeveel} {klasse}" for klasse, hoeveel in sorted(buiten.items()))
+        # Het voorbeeld alleen als er werkelijk een afsluitstuk tussen zit; anders zou
+        # het gaan uitleggen wat er niet staat.
+        voorbeeld = (
+            " Een afsluitstuk met een leiding is precies goed." if "Afsluitstuk" in buiten else ""
+        )
+        return [
+            f"{getal(aantal, 'hulpstuk', 'hulpstukken')} {vorm(aantal, 'valt', 'vallen')} "
+            f"buiten deze toets omdat {vorm(aantal, 'zijn', 'hun')} klasse geen functie met "
+            f"een aantal leidingen draagt ({delen}).{voorbeeld}"
+        ]
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal hulpstukken met een telbare functie."""
+        return len(_hulpstuktelling(context).telbaar)
+
+
+@register
+class HulpstukMetTeWeinigAansluitingen(_HulpstukAansluitingen):
+    """TOP-022: er ontbreekt een leiding, of het object is geen T-stuk."""
+
+    id = "TOP-022"
+    title = "Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft"
+    severity = Severity.ERROR
+    dimension = Dimension.CONSISTENCY
+    rollen = ("hulpstukken", "leidingen")
+    kenmerken = ()
+    te_veel = False
+
+
+@register
+class HulpstukMetTeVeelAansluitingen(_HulpstukAansluitingen):
+    """TOP-023: waarschijnlijk de verkeerde klasse; voor vier bestaat Kruisstuk."""
+
+    id = "TOP-023"
+    title = "Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft"
+    severity = Severity.WARNING
+    dimension = Dimension.CONSISTENCY
+    rollen = ("hulpstukken", "leidingen")
+    kenmerken = ()
+    te_veel = True

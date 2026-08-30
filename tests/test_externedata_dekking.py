@@ -77,7 +77,7 @@ def test_melding_noemt_alle_drie_de_uitwegen(tmp_path: Path) -> None:
     tekst = str(fout.value)
     assert "extracten opnieuw" in tekst
     assert "dekking_tolerantie_m" in tekst
-    assert "bgt_putdeksellagen = []" in tekst
+    assert "bgt_waterlagen = []" in tekst
     assert "alle lagen tegelijk" in tekst
 
 

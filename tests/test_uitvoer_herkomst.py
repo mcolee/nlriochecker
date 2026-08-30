@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker import __version__
 from nlriochecker.analysis import MetingAnalysis, analyze
@@ -29,7 +30,6 @@ from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import load_coverage_config
 from nlriochecker.coverage import assess_coverage
-from nlriochecker.dataset import load_dataset
 from nlriochecker.meting import Meetbereik, laad_nulmeting
 from nlriochecker.reporting import (
     FILE_COMPARISON_CSV,
@@ -62,7 +62,12 @@ from nlriochecker.uitvoer.herkomst import (
     schrijf_json,
     schrijf_markdown,
 )
-from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    GEEN_ONDERDRUKKING,
+    Melding,
+    Onderdrukking,
+    bouw_meldingen,
+)
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 BRON = Path(__file__).resolve().parents[1] / "src"
@@ -101,9 +106,6 @@ MAG_ZELF_SCHRIJVEN = {
     # heen. Hij draagt zijn herkomst in het veld `gereedschap` van `gwsw_run`, en
     # `test_geopackage_runtabel_noemt_het_gereedschap` bewaakt dat.
     "nlriochecker/uitvoer/gpkg.py",
-    # Schrijft de datasetcache, geen uitvoer voor een lezer. De cachesleutel draagt
-    # de broncode van de lader, dus een cache van een andere versie wordt genegeerd.
-    "nlriochecker/cache.py",
 }
 
 MARKDOWN_BESTANDEN = {
@@ -132,7 +134,7 @@ def toets() -> CheckRun:
     """Een toetsrun met ten minste een bevinding, zodat de CSV rijen krijgt."""
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl")
+    dataset = load_dataset(TTL_DIR / "hgt004_bob_boven_deksel.ttl", [])
     return run_checks(CheckContext(dataset=dataset, config=config))
 
 
@@ -412,7 +414,7 @@ def test_schrijf_json_draagt_de_envelop(tmp_path: Path) -> None:
     )
 
     document = json.loads(pad.read_text(encoding="utf-8"))
-    assert document["schema_versie"] == SCHEMA_VERSIE == "1.1"
+    assert document["schema_versie"] == SCHEMA_VERSIE == "1.2"
     assert document["gereedschap"] == gereedschap()
     assert document["run_datum"] == "2026-08-17"
     assert document["dataset"] == "dewolden.ttl"
@@ -508,7 +510,7 @@ def test_json_zonder_geopackage_blijft_geschreven(toets: CheckRun, tmp_path: Pat
     assert uitvoer.json is not None
 
 
-def test_geen_json_laat_het_bestand_weg(toets: CheckRun, tmp_path: Path) -> None:
+def test_zonder_json_laat_het_bestand_weg(toets: CheckRun, tmp_path: Path) -> None:
     """Wie de JSON niet wil, houdt de andere drie."""
     uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_json=False)
 
@@ -551,6 +553,17 @@ def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> Non
         typeringspoort_toegepast=True,
         markering="een voorbehoud",
         gebieden=["Koekange", "Ruinen"],
+        onderdrukking=Onderdrukking(
+            klassen=("Leiding",), checks=("TOP-001",), per_check={"TOP-001": 1}, per_klasse={}
+        ),
+        checks=[
+            {
+                "check_id": "TOP-001",
+                "bekeken": 3,
+                "bekeken_scope": "analyseset",
+                "populatie": "netwerkknopen",
+            }
+        ],
     )
     document = json.loads(pad.read_text(encoding="utf-8"))
     doc = (Path(__file__).resolve().parents[1] / "docs" / "json-schema.md").read_text(
@@ -558,6 +571,7 @@ def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> Non
     )
 
     ontbreekt = [veld for veld in document if f"`{veld}`" not in doc]
+    ontbreekt += [veld for veld in document["checks"][0] if f"`{veld}`" not in doc]
 
     assert ontbreekt == []
 
@@ -664,3 +678,80 @@ def test_totaal_json_noemt_alle_gebieden(tmp_path: Path) -> None:
 
     assert document["gebied"] is None
     assert document["gebieden"] == ["Noord", "Zuid"]
+
+
+def test_json_zonder_onderdrukking_draagt_het_veld_niet(tmp_path: Path) -> None:
+    """Optioneel en additief: een run zonder lijsten blijft byte-voor-byte gelijk (BO-49)."""
+    zonder = _envelop(tmp_path / "zonder.json")
+    leeg = _envelop(tmp_path / "leeg.json", onderdrukking=GEEN_ONDERDRUKKING)
+
+    assert "onderdrukt" not in zonder
+    assert "onderdrukt" not in leeg
+    assert (tmp_path / "zonder.json").read_text(encoding="utf-8") == (
+        tmp_path / "leeg.json"
+    ).read_text(encoding="utf-8")
+
+
+def test_json_met_onderdrukking_draagt_de_lijsten_en_de_telling(tmp_path: Path) -> None:
+    """De telling hoort bij de run; de CSV draagt hem niet (BO-49)."""
+    document = _envelop(
+        tmp_path / "b.json",
+        onderdrukking=Onderdrukking(
+            klassen=("Leiding",), checks=("TOP-001",), per_check={"TOP-001": 1}, per_klasse={}
+        ),
+    )
+
+    assert document["onderdrukt"] == {"klassen": ["Leiding"], "checks": ["TOP-001"], "meldingen": 1}
+    assert document["schema_versie"] == SCHEMA_VERSIE
+
+
+def test_json_zonder_checks_draagt_het_veld_niet(tmp_path: Path) -> None:
+    """Optioneel en additief, net als `onderdrukt`: geen checks, geen veld (issue #77)."""
+    document = _envelop(tmp_path / "b.json")
+
+    assert "checks" not in document
+
+
+def test_json_labelt_per_check_waarover_bekeken_geteld_is(toets: CheckRun, tmp_path: Path) -> None:
+    """Elke check draagt de scope van zijn noemer en zijn declaratie (issue #77).
+
+    Zonder label mengt `bekeken` een rol op de analyseset, dezelfde rol op de
+    volledige export en kenmerkinstanties, en zijn de percentages die erop delen
+    onderling onvergelijkbaar. `populatie` is de declaratie en geen noemer: zonder
+    rollen zijn dat de kenmerken (RVZ-011), en zonder beide is het leeg (ADM-007).
+    """
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_geopackage=False)
+
+    assert uitvoer.json is not None
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    per_check = {rij["check_id"]: rij for rij in document["checks"]}
+
+    assert [rij["check_id"] for rij in document["checks"]] == sorted(per_check)
+    assert len(per_check) == len(toets.outcomes)
+    assert per_check["ADM-002"]["bekeken_scope"] == "volledige_export"
+    assert per_check["ATTR-014"]["bekeken_scope"] == "attribuut_instanties"
+    assert per_check["ATTR-014"]["populatie"] == "alle kenmerken"
+    assert per_check["RVZ-011"]["populatie"] == (
+        "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau"
+    )
+    assert per_check["ADM-007"]["populatie"] == ""
+    assert all(rij["populatie"] != "de hele export" for rij in document["checks"])
+    assert per_check["TOP-001"] == {
+        "check_id": "TOP-001",
+        "bekeken": next(o.examined for o in toets.outcomes if o.check_id == "TOP-001"),
+        "bekeken_scope": "analyseset",
+        "populatie": "leidingen, netwerkknopen, vrijvervalrioolleidingen",
+    }
+
+
+def test_de_csv_krijgt_de_checkscope_niet(toets: CheckRun, tmp_path: Path) -> None:
+    """Bekeken hoort bij de check, niet bij de rij -- dezelfde scheiding als de CFK-set."""
+    uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_geopackage=False)
+
+    assert uitvoer.csv is not None
+    kolommen = list(pd.read_csv(uitvoer.csv, sep=";", encoding="utf-8").columns)
+
+    assert "bekeken_scope" not in kolommen
+    assert "Gaat over" not in kolommen
+    assert "Populatie" not in kolommen
+    assert "Bekeken" not in kolommen

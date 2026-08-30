@@ -46,6 +46,31 @@ def check_ids_in_tests() -> set[str]:
     return gevonden
 
 
+def _kenmerk_kort(kenmerk: str) -> str:
+    """Een compacte weergave van een gedeclareerd kenmerk voor de matrix."""
+    if kenmerk == "*":
+        return "alle kenmerken"
+    if kenmerk.startswith("config:"):
+        return "config:" + kenmerk.removeprefix("config:").rsplit(".", 1)[-1]
+    return kenmerk
+
+
+def _rollen_kenmerken(entry: RegisterEntry) -> str:
+    """De gedeclareerde rollen en kenmerken van een check (issue #64), of `—`.
+
+    Rollen in plaats van hun uitgeschreven klassen: `netwerkknopen` staat voor elf
+    klassen, en de klassenlijst hangt bovendien aan de projectconfig terwijl de matrix
+    configloos is. De rolnaam is stabiel en compact; `bevindingen.py` toont in het rapport
+    de uitgeschreven klassen uit de gekozen config.
+    """
+    check = REGISTRY.get(entry.check_id)
+    if check is None:
+        return "—"
+    rollen = ", ".join(check.rollen) or "—"
+    kenmerken = ", ".join(_kenmerk_kort(k) for k in check.kenmerken) or "—"
+    return f"{rollen} · {kenmerken}"
+
+
 def status(entry: RegisterEntry, getest: set[str]) -> tuple[str, str]:
     """De status van een check-ID plus een toelichting."""
     if entry.dropped:
@@ -86,14 +111,15 @@ def render(register: Register, categorieen: list[str]) -> str:
             "",
             f"## {categorie}",
             "",
-            "| ID | Omschrijving | Ernst | Dimensie | Status | Toelichting |",
-            "| --- | --- | --- | --- | --- | --- |",
+            "| ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ]
         for entry in posten:
             stand, toelichting = status(entry, getest)
             regels.append(
                 f"| {entry.check_id} | {_kort(entry.title)} | {entry.severity or '—'} | "
-                f"{entry.dimension or '—'} | {stand} | {_kort(toelichting) or '—'} |"
+                f"{entry.dimension or '—'} | {stand} | {_rollen_kenmerken(entry)} | "
+                f"{_kort(toelichting) or '—'} |"
             )
 
     onbekend = sorted(set(REGISTRY) - {entry.check_id for entry in register.entries})

@@ -1,0 +1,22 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: uv installeren
+        # setup-uv publiceert geen meebewegende major-tag meer; daarom een vast nummer,
+        # gelijk aan toets.yml.
+        uses: astral-sh/setup-uv@v10.0.1
+      - name: Bouwen
+        run: uv build
+      - name: GitHub Release met wheel en sdist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

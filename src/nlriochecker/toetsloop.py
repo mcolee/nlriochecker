@@ -26,17 +26,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from gwsw_orox_helpers.dataset import GwswDataset
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
+
 from nlriochecker.afbakening import GedeeldeIndex, bouw_analyseset, bouw_gedeelde_index
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.checks.treffers import Trefferregister
-from nlriochecker.dataset import GwswDataset
+from nlriochecker.checks.treffers import Trefferregister, Wegvakregister
 from nlriochecker.externedata import ExternalData
 from nlriochecker.meting import Meetbereik
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import Studiegebieden, StudyArea, mapnaam
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 
 @dataclass(frozen=True)
@@ -143,16 +144,28 @@ def _per_gebied(
 ) -> GebiedsRun:
     """Bouwt de analyseset van een gebied en draait er de checks op."""
     analyseset = bouw_analyseset(basis.dataset, area, config, gedeeld=gedeeld)
-    # Vers register en verse cache per gebied. Een gedeeld register zou geen verkeerde
-    # laag opleveren -- de join op de meldingen van dit gebied beslist -- maar het zou
-    # wel meegroeien met het aantal buurten en bij het debuggen treffers van een ander
-    # gebied tonen.
+    # Verse registers en verse cache per gebied. Bij het trefferregister is dat netheid:
+    # een gedeeld exemplaar zou geen verkeerde laag opleveren -- de join op de meldingen
+    # van dit gebied beslist -- maar het zou wel meegroeien met het aantal buurten en bij
+    # het debuggen treffers van een ander gebied tonen.
+    #
+    # Bij het wegvakregister is het correctheid, en dat is de reden dat dit twee regels
+    # zijn en geen een. Dat register wordt niet via de meldingen gejoind: élke rij erin
+    # komt in de laag `vlakken` terecht (BO-79). `_cache={}` hieronder laat
+    # `beoordeel(context)` per gebied opnieuw draaien, en dan tegen de uitgedunde dataset
+    # van dát gebied -- een straat buiten deze kern en schil telt daar nul meter streng en
+    # heet dus rood. Met een gedeeld register won het eerste gebied, en erfden alle volgende
+    # zijn oordeel over straten die zij zelf heel anders zien: een bediende straat verdween
+    # dan uit de laag (rood zonder melding krijgt geen rij) of kreeg een groen vlak met een
+    # rode melding erin. `tests/test_toetsloop.py` legt de equivalentie vast, en
+    # `Wegvakregister.registreer` weigert zo'n tegenspraak sindsdien luid.
     context = replace(
         basis,
         dataset=analyseset.dataset,
         analyseset=analyseset,
         gedeelde_volledige_context=volledig,
         treffers=Trefferregister(),
+        wegvakken=Wegvakregister(),
         _cache={},
     )
     naam = area.gebied or area.name

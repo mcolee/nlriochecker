@@ -11,8 +11,8 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import pytest
+from gwsw_orox_helpers.dataset import load_dataset
 
-from nlriochecker.dataset import load_dataset
 from nlriochecker.uitvoer.objectkaart import STATUSSEN
 from nlriochecker.uitvoer.stijlen.symbolen import (
     LIJNSYMBOLEN,
@@ -25,12 +25,33 @@ from nlriochecker.uitvoer.stijlen.symbolen import (
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 STIJLEN = Path(__file__).resolve().parents[1] / "src" / "nlriochecker" / "uitvoer" / "stijlen"
+VLAKKEN_QML = STIJLEN / "vlakken.qml"
+
+# De legendaregels van `vlakken.qml`, op volgorde: één per check, met de checkcode voorop
+# (issue #107, BO-85). Ze staan hier en niet in beide testbestanden, want
+# `tests/test_uitvoer_qgis.py` toetst dezelfde labels op wat QGIS eruit terugleest; twee
+# losse lijsten zouden apart van elkaar kunnen verouderen.
+VLAKKEN_LEGENDA = (
+    "EXT-001 - Pand of bouwwerk (BGT/BAG)",
+    "EXT-003 - Waterdeel (BGT)",
+    "RVZ-006 - Gemengd stelsel zonder overstort",
+    "EXT-009 - Mogelijk ontbrekend riool",
+)
 
 
 @pytest.fixture(params=["putten", "strengen"])
 def laag(request: pytest.FixtureRequest) -> str:
     """De twee objectlagen met een opgebouwde stijl."""
     return str(request.param)
+
+
+@pytest.fixture(params=["putten", "strengen", "vlakken"])
+def stijlboom(request: pytest.FixtureRequest) -> ET.Element:
+    """De QML van elke laag: de twee opgebouwde plus het bestand van `vlakken`."""
+    gekozen = str(request.param)
+    if gekozen == "vlakken":
+        return ET.fromstring(VLAKKEN_QML.read_text(encoding="utf-8"))
+    return _boom(gekozen)
 
 
 def _boom(laag: str) -> ET.Element:
@@ -64,12 +85,16 @@ def test_de_qml_is_geldige_xml(laag: str) -> None:
     assert _boom(laag).tag == "qgis"
 
 
-def test_elke_regel_verwijst_naar_een_bestaand_symbool(laag: str) -> None:
-    """Een regel zonder symbool tekent niets, zonder dat QGIS iets meldt."""
-    boom = _boom(laag)
-    namen = {symbool.get("name") for symbool in boom.iter("symbol") if symbool.get("type")}
+def test_elke_regel_verwijst_naar_een_bestaand_symbool(stijlboom: ET.Element) -> None:
+    """Een regel zonder symbool tekent niets, zonder dat QGIS iets meldt.
+
+    Ook over `vlakken.qml`, en daar zit het echte risico: die symboolnummers staan met de
+    hand in het bestand en zijn bij issue #107 hernummerd. Een verwijzing die na zo'n
+    hernummering naast een verdwenen symbool valt, levert een lege kaart op.
+    """
+    namen = {symbool.get("name") for symbool in stijlboom.iter("symbol") if symbool.get("type")}
     verwijzingen = {
-        regel.get("symbol") for regel in boom.iter("rule") if regel.get("symbol") is not None
+        regel.get("symbol") for regel in stijlboom.iter("rule") if regel.get("symbol") is not None
     }
 
     assert verwijzingen
@@ -174,16 +199,32 @@ def test_de_opbouw_is_deterministisch(laag: str) -> None:
     assert bouw_qml(laag) == bouw_qml(laag)
 
 
-def test_de_vlaklagen_blijven_gewone_bestanden() -> None:
-    """De vlaklagen dragen een bestand-QML; alleen de twee objectlagen zijn opgebouwd.
+def test_de_vlakkenlaag_blijft_een_gewoon_bestand() -> None:
+    """De vlakkenlaag draagt een bestand-QML; alleen de twee objectlagen zijn opgebouwd.
 
-    Bouwwerken en waterdelen hebben een enkele symbologie, en de stelsellaag (#25) een
-    rule-based stijl op `bereikt_eindpunt`; geen van drie volgt de objecttype x
-    status-structuur die `symbolen.py` opbouwt.
+    Zij is rule-based op `soort` (#67, sinds #98 met de RVZ-006-deelstelsels erbij) en
+    volgt dus niet de objecttype x status-structuur die `symbolen.py` opbouwt.
     """
     aanwezig = {pad.name for pad in STIJLEN.glob("*.qml")}
 
-    assert aanwezig == {"bouwwerken.qml", "waterdelen_zonder_zinker.qml", "stelsels.qml"}
+    assert aanwezig == {"vlakken.qml"}
+
+
+def test_de_vlakkenlaag_geeft_elke_check_precies_een_regel() -> None:
+    """De labels van `vlakken.qml`, getoetst zonder QGIS (issue #107, BO-85).
+
+    De legenda hoort te lezen als de checklijst: één regel per check, met de checkcode
+    voorop. `tests/test_uitvoer_qgis.py` doet de andere helft (of QGIS die regels ook
+    werkelijk toepast), maar die test slaat over waar geen PyQGIS staat -- op de CI-runner
+    dus. Dat deze test het bestand ontleedt is daar het tweede nut van: een QML die geen
+    geldige XML meer is (een dubbel koppelteken in een commentaar volstaat) laat QGIS
+    stilzwijgend met een lege foutboodschap vallen.
+    """
+    boom = ET.fromstring(VLAKKEN_QML.read_text(encoding="utf-8"))
+
+    labels = [regel.get("label") for regel in boom.iter("rule")]
+
+    assert labels == list(VLAKKEN_LEGENDA)
 
 
 def test_elk_objecttype_in_de_voorbeelddataset_staat_in_de_tabel(juinen) -> None:
@@ -282,7 +323,7 @@ def test_een_type_met_een_afwijkende_schrijfwijze_valt_niet_in_het_vangnet(
 
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl")
+    dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config))
     pad = schrijf_geopackage(
         run, bouw_meldingen(run, date(2026, 8, 19)), tmp_path, date(2026, 8, 19)

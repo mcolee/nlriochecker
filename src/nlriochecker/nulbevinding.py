@@ -25,6 +25,12 @@ Drie dingen gebeuren hier, en nergens anders:
    instanties van dat type in de dataset. Zonder objecttype of zonder instanties is
    er geen noemer en valt de vlag naar de veilige kant: een melding ten onrechte
    systemisch noemen haalt hem van de kaart.
+4. **De tekstkeuze.** De leesbare zin bij de vorm komt uit de vertaaltabel
+   (`nulmeting_teksten.py`, issue #101). Hier en niet in de schrijvers: `Source`,
+   `Message` en `Value` staan alleen op deze plek bij elkaar, en de vier uitvoervormen
+   horen dezelfde zin te dragen. `boodschap` blijft de technische SHACL-tekst -- hij is
+   de ontdubbelsleutel en gaat mee in de melding-ID, dus een leesbaardere formulering
+   erin zou elke melding-ID van de nulmeting laten verschuiven.
 
 De teller van die vlag telt over de volledige export, vóór afbakening tot een
 studiegebied -- dezelfde keuze als bij de eigen checks (`melding._is_systemisch`), en
@@ -38,10 +44,11 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
+from gwsw_orox_helpers.dataset import GWSW, GwswDataset, aspect_holders_of, part_holders_of
 from rdflib import URIRef
 
-from nlriochecker.dataset import GWSW, GwswDataset, aspect_holders_of, part_holders_of
 from nlriochecker.meting import Nulmeting
+from nlriochecker.nulmeting_teksten import leesbaar
 from nlriochecker.uitvoer.identiteit import kort
 
 logger = logging.getLogger(__name__)
@@ -88,6 +95,10 @@ class Nulbevinding:
     # betekenis als op een checkbevinding: de melding blijft staan, maar is niet
     # betrouwbaar te duiden.
     typering_betrouwbaar: bool = True
+    # De leesbare zin bij deze vorm (issue #101), naast de technische `boodschap`. Leeg
+    # als er geen tekstkeuze gemaakt is -- een met de hand gebouwde bevinding in een
+    # test; de melding valt dan terug op `boodschap`, net als een onvertaalde vorm.
+    leesbaar: str = ""
 
 
 def bouw_nulbevindingen(
@@ -114,9 +125,9 @@ def bouw_nulbevindingen(
         ernst_rauw, waarde, objecttype, label, cfks = gegevens
         uri = joiner.herleid(focus)
         # Een focusnode die geen knoop of streng is maar wel een geregistreerd stelsel
-        # (#17) krijgt het stelsel zelf als object, zodat de overtreding aan de
-        # stelsellaag koppelt (#25). Het blijft onherleid: een stelsel is geen knoop of
-        # streng, dus het krijgt geen studiegebied en geen foutlocatie (BO-12).
+        # (#17) krijgt het stelsel zelf als object, zodat de melding zegt waarover ze
+        # gaat. Het blijft onherleid: een stelsel is geen knoop of streng, dus het krijgt
+        # geen studiegebied, geen foutlocatie en geen kaartobject (BO-12, #75).
         stelsel_uri = joiner.stelsel(focus) if not uri else ""
         object_uri = uri or stelsel_uri
         object_ = (dataset.nodes.get(uri) or dataset.conduits.get(uri)) if uri else None
@@ -138,6 +149,7 @@ def bouw_nulbevindingen(
                 ),
                 herleid=bool(uri),
                 typering_betrouwbaar=uri not in onbetrouwbaar,
+                leesbaar=leesbaar(vorm, boodschap, waarde),
             )
         )
     return bevindingen
@@ -287,15 +299,21 @@ class _Joiner:
         """De URI van het geregistreerde stelsel achter deze focusnode, of leeg.
 
         Voor focusnodes die `herleid` niet op een knoop of streng kreeg: een deel ervan
-        zijn stelselobjecten (`vw_geb_1` c.s.), die #17 blootlegde en die #25 als vlak
-        tekent. Een `CfkTypes_typ`-klassenaam matcht hier niet: die is een klasse, geen
-        instantie, dus `graph_is_a` op de Stelsel-afsluiting geeft False.
+        zijn stelselobjecten (`vw_geb_1` c.s.), die #17 blootlegde. Een
+        `CfkTypes_typ`-klassenaam matcht hier niet: die is een klasse, geen instantie,
+        dus `graph_is_a` op de Stelsel-afsluiting geeft False.
 
-        Alleen een stelsel dat #25 ook als vlak tekent koppelt hier: een lokaal stelsel
-        met alleen strengen. De gemeentebrede `_geb_0`-buckets (strengen naast putten)
-        krijgen geen vlak, dus een melding erop zou naar een niet-bestaande feature
-        wijzen; die blijft objectloos en telt als "nergens op uit". Zelfde regel als
-        `lees_stelsels`, via `dataset.stelsel_leden`.
+        De melding houdt het stelsel als `object_uri`, zodat in de CSV, de JSON en de
+        meldingentabel te zien blijft over welk stelsel de overtreding gaat. Een
+        kaartobject wordt het niet: een stelsel is geen knoop of streng, en sinds issue
+        #75 tekent de GeoPackage er ook geen vlak meer omheen. Het rapport telt deze
+        overtredingen daarom apart onder "geen kaartobject" (`bevindingen.py`).
+
+        Alleen een lokaal stelsel -- met alleen strengen -- koppelt hier, via
+        `dataset.stelsel_leden`. De gemeentebrede `_geb_0`-buckets uit #17 dragen
+        strengen en putten door elkaar heen over de hele gemeente; zo'n bak is geen
+        stelsel waarover een overtreding iets plaatselijks zegt, en die blijft
+        objectloos.
         """
         if not self._basis:
             return ""

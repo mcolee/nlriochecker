@@ -4,9 +4,15 @@ Gebruik:
 
     uv run python scripts/uitgave.py patch|minor|major
 
+Draai dit op `dev`, niet op `main`: `main` is beschermd en neemt alleen wijzigingen
+via een pull request (ook van de eigenaar). Het script bumpt, toetst, schuift het
+wijzigingslog en commit `Versie X.Y.Z` op `dev`, en tagt die commit als `vX.Y.Z`.
+Daarna land je de release op `main` via een PR die je met een **merge-commit** samenvoegt
+(niet squash of rebase, want dan verandert de SHA en wijst de tag naar een commit die
+niet op `main` ligt). De tag volgt het nummer (`vX.Y.Z`), nooit andersom.
+
 De waarheid over het versienummer staat in `pyproject.toml`; `uv version --bump`
-schrijft hem daar. De tag volgt het nummer (`vX.Y.Z`), nooit andersom. Pushen doet
-dit script niet: dat blijft een bewuste handeling.
+schrijft hem daar. Pushen doet dit script niet: dat blijft een bewuste handeling.
 
 Faalt er onderweg iets, dan wordt alles wat dit script al gedaan had teruggedraaid --
 eerst de commit, dan de bump. Een half opgehoogd nummer zonder tag is namelijk precies
@@ -24,7 +30,9 @@ from datetime import date
 from pathlib import Path
 
 SOORTEN = ("patch", "minor", "major")
-TAKVOORWAARDE = "main"
+# De release wordt op `dev` voorbereid en daarna via een merge-commit-PR op `main`
+# geland: `main` is beschermd en weigert een rechtstreekse push, ook van de eigenaar.
+TAKVOORWAARDE = "dev"
 # De ondergrens op de testdekking (percentage), afgedwongen met `--cov-fail-under`. Dezelfde
 # grens draait op CI (`.github/workflows/toets.yml`); dit is het enige getal in code, en
 # tests/test_uitgave.py bindt CI, deze poort en `CLAUDE.md` eraan (BO-38, issue #54).
@@ -109,7 +117,9 @@ def controleer_niet_achter() -> None:
 
     achter = _git("rev-list", "--count", f"HEAD..{tracking}")
     if achter != "0":
-        raise ReleaseAbortedError(f"main loopt {achter} commits achter op {tracking}; pull eerst")
+        raise ReleaseAbortedError(
+            f"{TAKVOORWAARDE} loopt {achter} commits achter op {tracking}; pull eerst"
+        )
     voor = _git("rev-list", "--count", f"{tracking}..HEAD")
     _meld(f"gelijk met {tracking}", "ok" if voor == "0" else f"{voor} voor")
 
@@ -333,7 +343,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nUitgave afgebroken: {fout}", file=sys.stderr, flush=True)
         return 1
 
-    print(f"\n{tag} staat klaar. Pushen met:\n\n    git push --follow-tags\n", flush=True)
+    print(
+        f"\n{tag} staat klaar op {TAKVOORWAARDE}. Landen op de beschermde main:\n\n"
+        f"    git push --follow-tags origin {TAKVOORWAARDE}\n"
+        f"    gh pr create --base main --head {TAKVOORWAARDE} --fill\n"
+        "    gh pr merge --merge          # merge-commit, geen squash/rebase\n"
+        "    git fetch origin main\n"
+        f"    git branch -f {TAKVOORWAARDE} origin/main   # zet dev weer gelijk aan main\n",
+        flush=True,
+    )
     return 0
 
 

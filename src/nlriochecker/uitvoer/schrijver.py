@@ -1,11 +1,15 @@
 """De orkestratie van de vier uitvoervormen: Markdown, CSV, GeoPackage en JSON.
 
-`schrijf_uitvoer` is de enige ingang die ze alle vier tegelijk wegschrijft. Hij
-bouwt de meldingenlijst een keer en geeft hem aan elke schrijver door, zodat de vier
-uitvoervormen niet uit elkaar kunnen lopen.
+`schrijf_uitvoer` is de enige ingang die ze wegschrijft. Het Markdown-rapport komt er
+altijd -- het draagt de markering en het voorbehoud -- en de andere drie naar keuze
+(`met_csv`, `met_geopackage`, `met_json`). Hij bouwt de meldingenstroom een keer --
+meldingen plus de onderdrukking die `[rapport]` erop toepaste -- en geeft hem aan elke
+schrijver door, zodat de uitvoervormen niet uit elkaar kunnen lopen. Wat de
+onderdrukking wegliet bereikt geen van hen; drie van de vier dragen de telling ervan
+(BO-49).
 
 `schrijf_uitvoer_gebieden` doet hetzelfde voor een run over meerdere
-studiegebied-features: per gebied een submap met dezelfde vier vormen, plus een
+studiegebied-features: per gebied een submap met dezelfde vormen, plus een
 `totaal/` met de synthese en de unieke meldingen. Ook daar komt geen nieuwe
 schrijver aan te pas.
 """
@@ -17,6 +21,9 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
+
+from nlriochecker.checkconfig import ReportOptions
 from nlriochecker.checks import CheckRun
 from nlriochecker.studiegebied import MAP_TOTAAL
 from nlriochecker.taal import getal
@@ -24,17 +31,22 @@ from nlriochecker.toetsloop import GebiedsRun
 from nlriochecker.uitvoer.bevindingen import (
     FILE_CHECKS_CSV,
     FILE_CHECKS_JSON,
+    checks_json,
     meldingen_json,
     meldingen_tabel,
     write_check_report,
 )
 from nlriochecker.uitvoer.gpkg import schrijf_geopackage
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_json, schrijf_markdown
-from nlriochecker.uitvoer.melding import Melding, bouw_meldingen
+from nlriochecker.uitvoer.melding import (
+    Melding,
+    Meldingenstroom,
+    Onderdrukking,
+    bouw_meldingenstroom,
+)
 from nlriochecker.uitvoer.synthese import GebiedsSamenvatting, totaalsynthese
 from nlriochecker.uitvoer.tabel import prepare
 from nlriochecker.uitvoer.voorbehoud import markering
-from nlriochecker.voortgang import NUL_VOORTGANG, Voortgang
 
 # De naam van het bestand met de synthese over alle gebieden. De mapnaam ernaast
 # (`MAP_TOTAAL`) staat in `studiegebied.py`, want daar wordt hij als gebiedsnaam
@@ -48,7 +60,8 @@ class Uitvoer:
     """De geschreven bestanden van een toets."""
 
     markdown: Path
-    csv: Path
+    # `None` als de CSV niet gevraagd is (`--uitvoer` zonder `csv`).
+    csv: Path | None
     geopackage: Path | None
     json: Path | None
 
@@ -70,29 +83,50 @@ def schrijf_uitvoer(
     output_dir: Path,
     run_datum: date | None = None,
     *,
+    met_csv: bool = True,
     met_geopackage: bool = True,
     met_json: bool = True,
     voortgang: Voortgang = NUL_VOORTGANG,
     gebied: str | None = None,
-    meldingen: list[Melding] | None = None,
+    stroom: Meldingenstroom | None = None,
     notities: Sequence[str] = (),
 ) -> Uitvoer:
     """Schrijft rapport, archief, GIS-uitvoer en JSON uit dezelfde meldingenstroom.
+
+    Het rapport wordt altijd geschreven; `met_csv`, `met_geopackage` en `met_json`
+    zeggen welke bijproducten ernaast komen.
 
     De JSON komt na het rapport: `write_check_report` maakt de uitvoermap aan. Zet
     hem er niet voor zonder zelf `prepare` te roepen.
 
     `gebied` komt in de JSON-envelop terecht en is alleen gevuld bij een run over
-    meerdere studiegebied-features; `meldingen` mag de beller meegeven om dezelfde
-    lijst ook voor de totaalsynthese te gebruiken. `notities` gaan naar het rapport
-    en melden wat het studiegebiedbestand niet mocht bijdragen.
+    meerdere studiegebied-features; `stroom` mag de beller meegeven om dezelfde
+    meldingen en dezelfde onderdrukkingstelling ook voor de totaalsynthese te
+    gebruiken. `notities` gaan naar het rapport en melden wat het studiegebiedbestand
+    niet mocht bijdragen.
     """
     run_datum = run_datum or date.today()
-    meldingen = meldingen if meldingen is not None else bouw_meldingen(run, run_datum)
+    stroom = stroom if stroom is not None else bouw_meldingenstroom(run, run_datum)
+    meldingen = stroom.meldingen
 
-    markdown, csv = write_check_report(run, output_dir, run_datum, meldingen, notities)
+    markdown, csv = write_check_report(
+        run,
+        output_dir,
+        run_datum,
+        meldingen,
+        notities,
+        met_csv=met_csv,
+        onderdrukking=stroom.onderdrukking,
+    )
     geopackage = (
-        schrijf_geopackage(run, meldingen, output_dir, run_datum, voortgang=voortgang)
+        schrijf_geopackage(
+            run,
+            meldingen,
+            output_dir,
+            run_datum,
+            voortgang=voortgang,
+            onderdrukking=stroom.onderdrukking,
+        )
         if met_geopackage
         else None
     )
@@ -107,6 +141,8 @@ def schrijf_uitvoer(
             typeringspoort_toegepast=run.typing_gate_applied,
             markering=markering(run),
             gebied=gebied,
+            onderdrukking=stroom.onderdrukking,
+            checks=checks_json(run),
         )
         if met_json
         else None
@@ -119,6 +155,7 @@ def schrijf_uitvoer_gebieden(
     output_dir: Path,
     run_datum: date | None = None,
     *,
+    met_csv: bool = True,
     met_geopackage: bool = True,
     met_json: bool = True,
     voortgang: Voortgang = NUL_VOORTGANG,
@@ -141,6 +178,7 @@ def schrijf_uitvoer_gebieden(
                     alleen.run,
                     output_dir,
                     run_datum,
+                    met_csv=met_csv,
                     met_geopackage=met_geopackage,
                     met_json=met_json,
                     voortgang=voortgang,
@@ -152,16 +190,17 @@ def schrijf_uitvoer_gebieden(
     per_gebied: dict[str, Uitvoer] = {}
     verzameld: list[GebiedsSamenvatting] = []
     for gebiedsrun in runs:
-        meldingen = bouw_meldingen(gebiedsrun.run, run_datum)
+        stroom = bouw_meldingenstroom(gebiedsrun.run, run_datum)
         per_gebied[gebiedsrun.naam] = schrijf_uitvoer(
             gebiedsrun.run,
             Path(output_dir) / gebiedsrun.map,
             run_datum,
+            met_csv=met_csv,
             met_geopackage=met_geopackage,
             met_json=met_json,
             voortgang=voortgang,
             gebied=gebiedsrun.naam,
-            meldingen=meldingen,
+            stroom=stroom,
             notities=overgeslagen,
         )
         analyseset = gebiedsrun.run.analyseset
@@ -171,12 +210,13 @@ def schrijf_uitvoer_gebieden(
                 oppervlak_ha=gebiedsrun.gebied.area_ha if gebiedsrun.gebied is not None else 0.0,
                 weggelaten=gebiedsrun.run.weggelaten,
                 kern_objecten=len(analyseset.kern) if analyseset is not None else 0,
-                meldingen=meldingen,
+                meldingen=stroom.meldingen,
+                onderdrukking=stroom.onderdrukking,
             )
         )
 
     synthese, totaal_csv, totaal_json = _schrijf_totaal(
-        runs, verzameld, output_dir, run_datum, beschikbaar, overgeslagen, met_json
+        runs, verzameld, output_dir, run_datum, beschikbaar, overgeslagen, met_csv, met_json
     )
     return UitvoerPerGebied(
         per_gebied=per_gebied,
@@ -193,8 +233,9 @@ def _schrijf_totaal(
     run_datum: date,
     beschikbaar: Sequence[str],
     overgeslagen: Sequence[str],
+    met_csv: bool,
     met_json: bool,
-) -> tuple[Path, Path, Path | None]:
+) -> tuple[Path, Path | None, Path | None]:
     """Schrijft de synthese en de unieke meldingen over alle gebieden.
 
     Geen GeoPackage: de featurelagen zijn per gebied afgebakend, en een unie ervan
@@ -218,11 +259,18 @@ def _schrijf_totaal(
         # De titel noemt het gebied waar het rapport over gaat, net als het
         # bevindingenrapport per gebied; de dataset staat in de romp.
         f"# Totaal ({getal(len(runs), 'gebied', 'gebieden')})",
-        totaalsynthese(verzameld, beschikbaar, overgeslagen, eerste.dataset.source.name),
+        totaalsynthese(
+            verzameld,
+            beschikbaar,
+            overgeslagen,
+            eerste.dataset.source.name,
+            met_csv=met_csv,
+            met_json=met_json,
+        ),
         run_datum,
         markering=markering(eerste),
     )
-    totaal_csv = schrijf_csv(meldingen_tabel(unieke), doel / FILE_CHECKS_CSV)
+    totaal_csv = schrijf_csv(meldingen_tabel(unieke), doel / FILE_CHECKS_CSV) if met_csv else None
     totaal_json = (
         schrijf_json(
             doel / FILE_CHECKS_JSON,
@@ -234,8 +282,31 @@ def _schrijf_totaal(
             typeringspoort_toegepast=eerste.typing_gate_applied,
             markering=markering(eerste),
             gebieden=[gebiedsrun.naam for gebiedsrun in runs],
+            onderdrukking=_som_onderdrukking(verzameld, eerste.config.rapport),
         )
         if met_json
         else None
     )
     return synthese, totaal_csv, totaal_json
+
+
+def _som_onderdrukking(
+    verzameld: Sequence[GebiedsSamenvatting], rapport: ReportOptions
+) -> Onderdrukking:
+    """De onderdrukking van alle gebieden samen, als som en niet ontdubbeld.
+
+    Dezelfde regel als de kolom Meldingen in de synthese: een object op een gebiedsgrens
+    telt in elk rakend gebied mee. Ontdubbelen zou een derde getal opleveren dat noch bij
+    de gebiedsrapporten noch bij de synthese aansluit. De twee lijsten komen uit de
+    projectconfiguratie, die voor alle gebieden dezelfde is.
+    """
+    per_check: dict[str, int] = {}
+    per_klasse: dict[str, int] = {}
+    for deel in verzameld:
+        for sleutel, aantal in deel.onderdrukking.per_check.items():
+            per_check[sleutel] = per_check.get(sleutel, 0) + aantal
+        for sleutel, aantal in deel.onderdrukking.per_klasse.items():
+            per_klasse[sleutel] = per_klasse.get(sleutel, 0) + aantal
+    return Onderdrukking(
+        tuple(rapport.onderdruk_klassen), tuple(rapport.onderdruk_checks), per_check, per_klasse
+    )

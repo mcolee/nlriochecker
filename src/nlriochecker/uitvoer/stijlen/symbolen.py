@@ -14,8 +14,8 @@ regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 44
 knooptypen en 40 verbindingstypen in deze tabel zijn dat 220 respectievelijk 200
 bladregels met evenzoveel symbolen. Met de hand is dat ruim vierduizend regels XML
 waarin een tikfout de kaart stil leegtrekt, en waarin de typenlijst op twee plekken
-zou staan. `bouwwerken.qml` en `waterdelen_zonder_zinker.qml` blijven wel gewone
-bestanden: die hebben een enkel symbool en veranderen niet.
+zou staan. `vlakken.qml` blijft wel een gewoon bestand: die heeft een vaste structuur
+(vier soorten) die niet met de data meeschaalt.
 
 Een opgebouwde stijl draagt alleen regels voor de objecttypen die werkelijk in zijn
 laag staan; die krijgt hij van de schrijver mee. Dat is niet alleen zuiniger maar
@@ -273,7 +273,7 @@ MAPTIP = """<style>
   .e-F .e { color: #b2182b; }
   .e-W .e { color: #e08214; }
   .gwsw-popup .c { font-weight: bold; margin-right: 4px; }
-  .gwsw-popup .v, .gwsw-popup .d, .gwsw-popup .y, .gwsw-popup .h {
+  .gwsw-popup .v, .gwsw-popup .d, .gwsw-popup .h {
     color: #666; font-size: 8pt; margin-left: 5px;
   }
   .gwsw-popup .x, .gwsw-popup .z, .gwsw-popup .n {
