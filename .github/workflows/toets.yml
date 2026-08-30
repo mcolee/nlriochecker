@@ -3,16 +3,19 @@ name: toets
 on:
   push:
     branches: [main, dev]
-  # Alleen pull requests naar main. Dat dekt de werkwijze zoals hij is: er wordt op dev
-  # gecommit en dev wordt in main gemerged, zonder PR. Wat de twee filters samen NIET
-  # uitsluiten: staat er een PR dev -> main open, dan start een push naar dev zowel een
-  # push- als een pull_request-run voor dezelfde commit, en die twee cancelen elkaar niet
-  # (verschillende github.ref, dus verschillende concurrency-groep). Gaan er ooit PR's
-  # naar dev lopen, dan draait daar juist helemaal geen toets op: de bronbranch valt
-  # buiten het push-filter en de basis valt buiten het pull_request-filter. Zet in dat
-  # geval dev in de lijst hieronder en haal hem uit het push-filter.
+  # Pull requests naar main én naar dev. Het dagelijkse werk gaat via een push op dev
+  # (hierboven), maar sinds .github/dependabot.yml zijn PR's op dev opent
+  # (`target-branch: dev`, want main draagt alleen uitgebrachte versies) lopen er wel
+  # degelijk PR's naar dev. Zonder dev in dit filter krijgt zo'n PR helemaal geen toets:
+  # de bronbranch (dependabot/...) valt buiten het push-filter en de basis viel buiten
+  # dit filter. Het push-filter blijft [main, dev] staan: een gewone push naar dev is het
+  # CI-signaal van de werkwijze. Wat de twee filters samen NIET uitsluiten: staat er een
+  # PR open vanaf een tak die zelf in het push-filter staat (dev -> main), dan start een
+  # push naar dev zowel een push- als een pull_request-run voor dezelfde commit, en die
+  # twee cancelen elkaar niet (verschillende github.ref, dus verschillende
+  # concurrency-groep).
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 # Bewust geen paths-ignore op '**.md' of docs/**: Markdown is hier invoer van de suite en
 # niet alleen documentatie. tests/test_uitvoer_herkomst.py toetst docs/json-schema.md,
@@ -23,6 +26,14 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+# De GITHUB_TOKEN van deze workflow hoeft alleen te lezen. Nagelopen: checkout, setup-uv,
+# `uv sync` en vier `uv run`-commando's -- geen `gh`-aanroep, geen upload, geen cachepush
+# buiten setup-uv zelf. Zonder dit blok erft de token de repo-default. release.yml heeft
+# wél `contents: write`, want die job maakt een release aan. Komt er ooit een stap bij die
+# schrijft, zet de ruimere scope dan op die job en niet hier op de workflow.
+permissions:
+  contents: read
 
 jobs:
   toets:
@@ -83,11 +94,14 @@ jobs:
       # (TestReport) in rapporteur.stats["skipped"].
       NLRIOCHECKER_MAX_MODULE_OVERGESLAGEN: "1"
     steps:
-      - uses: actions/checkout@v7
+      # Op de commit-SHA gepind, met de tag als commentaar: een tag kan naar een andere
+      # commit verplaatst worden, een SHA niet. Dependabot bumpt beide (github-actions,
+      # .github/dependabot.yml) en houdt het commentaar mee bij.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: uv installeren
         # setup-uv publiceert geen meebewegende major-tag meer; daarom een vast nummer.
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 

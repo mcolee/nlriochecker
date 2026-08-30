@@ -83,6 +83,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   *"Diameterverjonging …"*: *verjonging* betekent vernieuwen, terwijl de check meldt dat
   de diameter benedenstrooms kleiner wordt. Puur een terminologiecorrectie — het check-ID,
   de logica en de tellingen (0 F / 525 W op De Wolden) veranderen niet (issue #112).
+- **CI- en repo-hygiëne** (issue #120): `.github/workflows/toets.yml` draagt een
+  `permissions: contents: read`-blok (geen stap in die job schrijft; `release.yml` houdt
+  `contents: write`), beide workflows pinnen `actions/checkout` en `astral-sh/setup-uv` op
+  hun commit-SHA met de tag als commentaar, en een nieuwe `.github/dependabot.yml` houdt
+  die pins bij (`github-actions`, wekelijks, `target-branch: dev`) -- waarvoor het
+  `pull_request`-filter van `toets.yml` op `[main, dev]` staat, anders krijgt een
+  dependabot-PR geen poort. De vier `uv run`-stappen in `scripts/uitgave.py:toets()`
+  draaien met `--frozen`, zodat de poort `uv.lock` niet aanraakt: die lock gaat mee in de
+  commit `Versie X.Y.Z` en een wijziging halverwege de uitgave zou ongezien meerijden. De
+  CI-pytest-regel blijft ongewijzigd (`scripts/runnerpoort.py` leest hem letterlijk).
+  `/scratchpad/` en `/.claude/workflows/` staan in `.gitignore`. Twee nieuwe drifttests in
+  `tests/test_uitgave.py` bewaken `--frozen` en de pinvorm. Geen regel in `src/`
+  verandert; de uitslag van een run blijft identiek.
 - `tests/test_uitgave.py::test_het_echte_wijzigingslog_is_verwerkbaar` roept
   `controleer_changelog` niet meer aan. Dat is een release-preconditie (een lege
   `[Unreleased]` afkeuren) en precies dat is de toestand van een release-commit, dus de

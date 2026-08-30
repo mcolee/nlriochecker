@@ -8,6 +8,7 @@ ongetoetst: die zijn niet na te bootsen zonder een echte uitgave te doen.
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -18,6 +19,10 @@ import pytest
 WORTEL = Path(__file__).resolve().parents[1]
 SCRIPT = WORTEL / "scripts" / "uitgave.py"
 CHANGELOG = WORTEL / "CHANGELOG.md"
+WORKFLOWS = WORTEL / ".github" / "workflows"
+# `owner/repo@<40 hex>` gevolgd door de tag als commentaar. De tag hoort erbij: zonder
+# die regel is bij de volgende bump niet te zien welke versie er gepind staat.
+PATROON_PIN = re.compile(r"uses: [\w.-]+/[\w.-]+@[0-9a-f]{40} +# \S+$")
 
 VOORBEELD = """# Wijzigingslog
 
@@ -150,6 +155,55 @@ def test_de_dekkingsondergrens_is_overal_hetzelfde_getal() -> None:
     assert "uv run --with pytest-cov pytest --cov=nlriochecker" in claude
     # Anker op de ondergrens-zin, niet op het losse "97%" van de laatste meting.
     assert f"ondergrens van {grens}%" in claude
+
+
+def test_de_uitgavepoort_draait_op_de_vastgezette_lock() -> None:
+    """Geen poortstap mag `uv.lock` aanraken (issue #120).
+
+    `uv.lock` staat in `VERSIEBESTANDEN` en gaat dus mee in de commit `Versie X.Y.Z`: een
+    lockwijziging die `uv run` halverwege de uitgave maakt, rijdt ongezien de release in.
+    `--frozen` ("run without updating the uv.lock file") houdt hem onaangeroerd; niet
+    `--locked`, want het doel is niet te bewijzen dat de lock vers is. De CI bouwt haar
+    omgeving om dezelfde reden uit de lock, en die binding wordt hier meegetoetst.
+    """
+    module = _laad_script()
+    opdrachten: list[tuple[str, ...]] = []
+
+    def _recorder(*opdracht: str, opvangen: bool = False) -> str:
+        opdrachten.append(opdracht)
+        return ""
+
+    def _stil(*_argumenten: object, **_sleutelwoorden: object) -> None:
+        return None
+
+    module._draai = _recorder
+    module._meld = _stil
+
+    module.toets()
+
+    uv_run = [opdracht for opdracht in opdrachten if opdracht[:2] == ("uv", "run")]
+    assert len(uv_run) == 4, f"verwacht vier `uv run`-stappen, gevonden {len(uv_run)}"
+    for opdracht in uv_run:
+        assert "--frozen" in opdracht, f"`{' '.join(opdracht)}` draait zonder --frozen"
+
+    # De CI bouwt de omgeving uit dezelfde lock; loopt dat uiteen, dan toetst de uitgave
+    # iets anders dan de runner.
+    workflow = (WORKFLOWS / "toets.yml").read_text(encoding="utf-8")
+    assert "uv sync --frozen" in workflow
+
+
+def test_de_workflows_pinnen_hun_actions_op_een_sha() -> None:
+    """Elke `uses:` staat op een commit-SHA met de tag erachter (issue #120).
+
+    Een tag kan naar een andere commit verplaatst worden, een SHA niet. Zonder deze test
+    glijdt de pin bij de eerstvolgende handmatige bump terug naar een tag.
+    """
+    for naam in ("toets.yml", "release.yml"):
+        regels = (WORKFLOWS / naam).read_text(encoding="utf-8").splitlines()
+        gebruiken = [regel for regel in regels if regel.lstrip().startswith(("uses:", "- uses:"))]
+        assert gebruiken, f"{naam} noemt geen enkele action"
+        for regel in gebruiken:
+            assert PATROON_PIN.search(regel), f"{naam}: `{regel.strip()}` is niet op een SHA gepind"
 
 
 def test_het_echte_wijzigingslog_is_verwerkbaar() -> None:

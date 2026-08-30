@@ -32,3 +32,9 @@ data/*
 # de run en na een crash. Zonder deze regel wist `git clean -fd` hem.
 /data_runnerpoort_opzij/
 /manifesto.md
+
+# Werkmappen van agent-sessies, niet in versiebeheer. Met een leidende slash, om dezelfde
+# reden als /uitvoer/ hierboven: zonder die slash sluit de regel ook een gelijknamige map
+# dieper in de boom uit.
+/scratchpad/
+/.claude/workflows/

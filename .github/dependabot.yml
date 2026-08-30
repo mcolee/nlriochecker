@@ -1,0 +1,17 @@
+# Houdt de SHA-gepinde actions in .github/workflows/ bij; zonder deze bewaking verstenen
+# die pins zodra ze er staan.
+#
+# Twee keuzes die vastliggen:
+# - `target-branch: dev`, want main draagt alleen uitgebrachte, getagde versies
+#   (CLAUDE.md, Werkwijze). Zonder die regel opent dependabot zijn PR's op main. Zo'n PR
+#   krijgt een toets-run doordat `pull_request` in toets.yml ook op dev filtert.
+# - Alleen `github-actions`, geen Python-ecosysteem: de zwaarste afhankelijkheid
+#   (gwsw-orox-helpers) is een git-tag die dependabot niet bumpt, en de rest staat op
+#   `>=`-ondergrenzen die elke `uv lock` al meeneemt.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"

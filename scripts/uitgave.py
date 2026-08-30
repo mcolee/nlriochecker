@@ -166,16 +166,22 @@ def toets() -> None:
     `--cov-fail-under=DEKKINGSONDERGRENS` laat de run vallen zodra de dekking eronder zakt.
     Zowel deze poort (met de volledige `data/`) als de CI (zonder) meet ruim boven die
     grens; zie BO-38.
+
+    Alle vier de stappen draaien met `--frozen`, zodat de poort `uv.lock` niet aanraakt:
+    die lock staat in `VERSIEBESTANDEN` en zou anders halverwege de uitgave gewijzigd
+    meerijden in de commit `Versie X.Y.Z`. Niet `--locked`: het doel is dat de lock
+    onaangeroerd blijft, niet dat hij bewezen vers is.
     """
-    _draai("uv", "run", "ruff", "check", ".")
+    _draai("uv", "run", "--frozen", "ruff", "check", ".")
     _meld("ruff check")
-    _draai("uv", "run", "ruff", "format", "--check", ".")
+    _draai("uv", "run", "--frozen", "ruff", "format", "--check", ".")
     _meld("ruff format")
-    _draai("uv", "run", "mypy")
+    _draai("uv", "run", "--frozen", "mypy")
     _meld("mypy")
     _draai(
         "uv",
         "run",
+        "--frozen",
         "--with",
         "pytest-cov",
         "pytest",
