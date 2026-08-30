@@ -14,16 +14,20 @@ from __future__ import annotations
 import ast
 import json
 import sqlite3
-from dataclasses import replace
+from dataclasses import fields, replace
 from datetime import date
 from pathlib import Path
+from typing import get_args, get_type_hints
 
 import pytest
-from gwsw_orox_helpers.dataset import load_dataset
+from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
+from nlriochecker.analysis import MetingAnalysis
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.meting import Meetbereik
+from nlriochecker.comparison import MetingComparison
+from nlriochecker.coverage import CoverageResult
+from nlriochecker.meting import Meetbereik, Nulmeting
 from nlriochecker.uitvoer.samenvatting import NIET_GEMETEN, REGEL_EIGEN_CHECKS, VINKJE
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 from nlriochecker.uitvoer.voorbehoud import (
@@ -52,6 +56,22 @@ MAG_ZELF_MARKEREN = {
     # naast deze (`toetsrun.py`, `_datasetregels`), dus hier verdwijnt er niets.
     "nlriochecker/toetsrun.py",
 }
+
+# De uitslagtypen van `analyseer`, `dekking` en `vergelijk`, plus de `Nulmeting` waar
+# `MetingAnalysis` naar wijst. Zij zijn de bellers van `markering_van`, en de premisse
+# eronder is dat geen van hen een datasetobject draagt.
+ZONDER_DATASETOBJECT = (CoverageResult, MetingAnalysis, MetingComparison, Nulmeting)
+
+
+def _noemt_dataset(annotatie: object) -> bool:
+    """Of deze annotatie ergens een `GwswDataset` noemt.
+
+    Ook binnen een unie of een verzameling: `GwswDataset | None` is geen `GwswDataset`
+    voor een `is`-vergelijking, maar draagt er wel een. Precies die vorm zou een
+    optioneel datasetveld door de drifttest hieronder laten glippen.
+    """
+    return annotatie is GwswDataset or any(_noemt_dataset(deel) for deel in get_args(annotatie))
+
 
 DEELSET = "**Onvolledige meting:** getoetst op Hyd, MdsPlan;"
 
@@ -206,6 +226,32 @@ def test_markering_van_geeft_precies_de_meetbereikmarkering() -> None:
         assert markering_van(bereik) == bereik.markering()
 
     assert markering_van(Meetbereik.van(VEREIST, VEREIST)) is None
+
+
+def test_de_bellers_van_markering_van_dragen_werkelijk_geen_datasetobject() -> None:
+    """De premisse onder `markering_van`, als drifttest (issue #118).
+
+    `markering_van` mag maar één voorbehoud doorgeven omdat zijn bellers de andere bron
+    niet kúnnen kennen: `klassenhierarchie_bekend` hangt aan een `GwswDataset`, en
+    `CoverageResult` draagt een datasetnáám terwijl `MetingAnalysis`, `MetingComparison`
+    en de `Nulmeting` eronder alleen een bestandsnaam dragen. Krijgt een van hen ooit
+    wél een datasetobject, dan is die premisse vervallen en verdwijnt het
+    hierarchievoorbehoud uit `samenvatting.md`, `dekking.md` en `vergelijking.md`
+    zonder dat er iets omvalt.
+
+    Valt deze test om, dan is dat de opdracht: laat `markering_van` vervallen en laat de
+    betreffende schrijver op `markering(run)` overgaan. Hem hier "even bijwerken" haalt
+    precies de garantie weg waar hij voor bestaat.
+    """
+    met_dataset = sorted(
+        f"{klasse.__name__}.{veld.name}"
+        for klasse in ZONDER_DATASETOBJECT
+        for hints in [get_type_hints(klasse)]
+        for veld in fields(klasse)
+        if _noemt_dataset(hints[veld.name])
+    )
+
+    assert met_dataset == []
 
 
 def test_alleen_de_samenstelplek_roept_de_meetbereikmarkering_aan() -> None:

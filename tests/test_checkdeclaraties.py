@@ -163,29 +163,46 @@ def test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd() -> None:
     assert gemarkeerd == {"ATTR-014", "BTR-006"}
 
 
+def _bouwt_finding(bron: str) -> bool:
+    """Of deze broncode ergens een `Finding` construeert.
+
+    Twee vormen: `Finding(...)` en `base.Finding(...)`. Een annotatie of een returntype
+    is geen aanroep en telt niet mee -- `Finding` komt als `Iterator[Finding]` door de
+    hele checkmap voor, dus een tekstsweep op `Finding(` zou het halve bestand vlaggen.
+
+    De grens: een import onder een andere naam (`from ... import Finding as F`) is
+    statisch niet te volgen en ontsnapt. Dat is een bewuste rest, geen omissie -- zij
+    vergt een naamresolutie die deze sweep niet doet.
+    """
+    return any(
+        isinstance(knoop, ast.Call)
+        and (
+            (isinstance(knoop.func, ast.Name) and knoop.func.id == "Finding")
+            or (isinstance(knoop.func, ast.Attribute) and knoop.func.attr == "Finding")
+        )
+        for knoop in ast.walk(ast.parse(bron))
+    )
+
+
 def test_alleen_de_gedeelde_fabriek_bouwt_een_finding() -> None:
     """Elke bevinding komt uit `Check.finding()` en nergens anders (issue #118).
 
     Die fabriek is de plek waar `typing_reliable` via `context.is_reliable()` gezet
-    wordt. Een check die zelf een `Finding(` bouwt zet die vlag met de hand -- ATTR-014
-    en ATTR-015 deden dat, allebei op een hardgecodeerde `True` -- en dan hangt de
+    wordt. Wie zelf een `Finding(` bouwt zet die vlag met de hand -- ATTR-014 en
+    ATTR-015 deden dat, allebei op een hardgecodeerde `True` -- en dan hangt de
     typeringspoort af van wie er toevallig aan denkt.
 
-    De sweep leest de AST en niet de tekst: `Finding` komt als annotatie en als
-    returntype overal voor, en alleen een aanroep telt.
+    De sweep loopt over heel `src/` en niet alleen over `checks/`: een bevinding buiten
+    de checkmap zou dezelfde vlag met de hand zetten en al helemaal geen check achter
+    zich hebben. Alleen `checks/base.py` is vrijgesteld, want daar staat de fabriek.
     """
-    checks = Path(REGISTRY["ATTR-014"].__module__.replace(".", "/")).parent
+    src = WORTEL / "src"
 
     overtreders = sorted(
-        pad.name
-        for pad in (WORTEL / "src" / checks).glob("*.py")
-        if pad.name != "base.py"
-        and any(
-            isinstance(knoop, ast.Call)
-            and isinstance(knoop.func, ast.Name)
-            and knoop.func.id == "Finding"
-            for knoop in ast.walk(ast.parse(pad.read_text(encoding="utf-8")))
-        )
+        pad.relative_to(src).as_posix()
+        for pad in src.rglob("*.py")
+        if pad.relative_to(src).as_posix() != "nlriochecker/checks/base.py"
+        and _bouwt_finding(pad.read_text(encoding="utf-8"))
     )
 
     assert overtreders == []
@@ -194,21 +211,13 @@ def test_alleen_de_gedeelde_fabriek_bouwt_een_finding() -> None:
 def test_de_findingsweep_kan_werkelijk_afgaan() -> None:
     """De tegenproef: de sweep herkent een eigen constructor ook echt.
 
-    Zonder haar zou een sweep die alleen naar `ast.Attribute` kijkt hier groen blijven
-    terwijl `checks/attributen.py` twee constructors draagt -- precies de toestand van
-    vóór dit issue.
+    Zonder haar zou een sweep die alleen naar de verkeerde knoopsoort kijkt hier groen
+    blijven terwijl `checks/attributen.py` twee constructors draagt -- precies de
+    toestand van vóór dit issue.
     """
-
-    def bouwt_zelf(bron: str) -> bool:
-        """Of deze broncode ergens `Finding(...)` aanroept."""
-        return any(
-            isinstance(knoop, ast.Call)
-            and isinstance(knoop.func, ast.Name)
-            and knoop.func.id == "Finding"
-            for knoop in ast.walk(ast.parse(bron))
-        )
-
-    assert bouwt_zelf("yield Finding(check_id=self.id, systemisch=True)")
+    assert _bouwt_finding("yield Finding(check_id=self.id, systemisch=True)")
+    # De gekwalificeerde vorm: `from nlriochecker.checks import base` en dan `base.Finding`.
+    assert _bouwt_finding("yield base.Finding(check_id=self.id)")
     # Een annotatie of een returntype is geen constructie, en de fabriek zelf ook niet.
-    assert not bouwt_zelf("def run(self) -> Iterator[Finding]:\n    return iter(())")
-    assert not bouwt_zelf("yield self.finding(context, uri, label, boodschap)")
+    assert not _bouwt_finding("def run(self) -> Iterator[Finding]:\n    return iter(())")
+    assert not _bouwt_finding("yield self.finding(context, uri, label, boodschap)")

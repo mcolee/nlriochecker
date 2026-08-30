@@ -34,6 +34,11 @@ BRON = Path(__file__).resolve().parents[1] / "src"
 PAKKET = "nlriochecker"
 LEESLAAG = "gwsw_orox_helpers"
 
+# De bestandsnamen in `checks/`. Ze scheiden `from nlriochecker.checks import selectie`
+# (de submodule zelf, dus buiten de facade om) van `from nlriochecker.checks import
+# CheckRun` (een waardetype uit de facade, altijd toegestaan).
+CHECKMODULES = frozenset(pad.stem for pad in (BRON / PAKKET / "checks").glob("*.py"))
+
 # Wat een module onder `uitvoer/` uit een checksubmodule mag halen, met de reden erbij.
 # De facade `nlriochecker.checks` staat er niet in: die is altijd toegestaan, want daar
 # wonen de waardetypen (`CheckRun`, `Finding`, `Severity`) die de uitvoerlaag per
@@ -106,21 +111,49 @@ def _importregels(bron: str) -> list[tuple[str, tuple[str, ...]]]:
 
 
 def _uitvoerimports(bron: str) -> list[str]:
-    """De modules uit `nlriochecker.uitvoer` die deze broncode importeert."""
-    return [
-        module
-        for module, _ in _importregels(bron)
-        if module == f"{PAKKET}.uitvoer" or module.startswith(f"{PAKKET}.uitvoer.")
-    ]
+    """De modules uit `nlriochecker.uitvoer` die deze broncode importeert.
+
+    Drie vormen: `import nlriochecker.uitvoer[.x]`, `from nlriochecker.uitvoer[.x] import
+    …` en `from nlriochecker import uitvoer` -- die laatste noemt de uitvoerlaag als naam
+    en niet als module, en ontsnapte daarmee aan de eerste versie van deze sweep.
+
+    Wat er niet onder valt en de gedocumenteerde grens is: `import nlriochecker` gevolgd
+    door `nlriochecker.uitvoer.…` als attribuut. Die vorm komt in deze codebase nergens
+    voor en is statisch niet van elk ander attribuutgebruik te onderscheiden.
+    """
+    gevonden: list[str] = []
+    for module, namen in _importregels(bron):
+        if module == f"{PAKKET}.uitvoer" or module.startswith(f"{PAKKET}.uitvoer."):
+            gevonden.append(module)
+        elif module == PAKKET and "uitvoer" in namen:
+            gevonden.append(f"{PAKKET}.uitvoer")
+    return gevonden
 
 
 def _checksubmodule_imports(bron: str) -> list[tuple[str, tuple[str, ...]]]:
-    """De imports uit een checksubmodule; de facade `nlriochecker.checks` telt niet mee."""
-    return [
-        (module, namen)
-        for module, namen in _importregels(bron)
-        if module.startswith(f"{PAKKET}.checks.")
-    ]
+    """De imports uit een checksubmodule; de facade `nlriochecker.checks` telt niet mee.
+
+    Twee vormen halen de submodule als geheel binnen in plaats van een naam eruit, en
+    geven daarmee toegang tot álles wat erin staat. Ze krijgen `"*"` als naam, en `"*"`
+    staat in geen enkele allowlist-regel:
+
+    * `import nlriochecker.checks.netwerk` levert nul namen, dus een sweep die de
+      geïmporteerde namen tegen de allowlist houdt heeft niets te vergelijken en laat
+      hem door;
+    * `from nlriochecker.checks import selectie` ziet eruit als een facade-import, maar
+      `selectie` is een bestand in `checks/` en geen waardetype. Wat de facade wél mag
+      leveren -- `CheckRun`, `Finding`, `Severity` -- is geen bestandsnaam en blijft dus
+      toegestaan.
+    """
+    gevonden: list[tuple[str, tuple[str, ...]]] = []
+    for module, namen in _importregels(bron):
+        if module.startswith(f"{PAKKET}.checks."):
+            gevonden.append((module, namen or ("*",)))
+        elif module == f"{PAKKET}.checks":
+            gevonden += [
+                (f"{PAKKET}.checks.{naam}", ("*",)) for naam in namen if naam in CHECKMODULES
+            ]
+    return gevonden
 
 
 def _prive_leeslaagnamen(bron: str) -> list[str]:
@@ -180,6 +213,34 @@ def test_de_uitvoerlaag_leest_alleen_de_toegestane_checksubmodules() -> None:
     assert sorted(overtreders) == []
 
 
+def test_geen_enkele_allowlistregel_is_verouderd() -> None:
+    """De lijst mag krimpen -- en dan moet dat krimpen ook gebeuren.
+
+    Zonder deze test is "alleen krimpen" een instructie in een docstring: een import die
+    verdwijnt laat zijn regel achter, en die regel houdt de deur open voor precies die
+    import zonder dat er nog een reden voor is. Hij gaat pas af nádat een import
+    weggehaald is -- issue #122 haalt naar verwachting `aanwijzingen_van` uit `gpkg.py`
+    -- en dwingt dan alleen het opruimen van de regel af, niet het behouden van de
+    import.
+    """
+    feitelijk = {
+        (pad, module, naam)
+        for pad, bron in _modules(f"{PAKKET}/uitvoer")
+        for module, namen in _checksubmodule_imports(bron)
+        for naam in namen
+    }
+
+    verouderd = sorted(
+        f"{pad}: {module} -> {naam}"
+        for pad, per_module in MAG_UIT_CHECKSUBMODULE.items()
+        for module, namen in per_module.items()
+        for naam in namen
+        if (pad, module, naam) not in feitelijk
+    )
+
+    assert verouderd == []
+
+
 def test_geen_enkele_module_leest_een_prive_naam_uit_de_leeslaag() -> None:
     """a3: de leeslaag-API is bevroren op haar publieke namen.
 
@@ -205,10 +266,25 @@ def test_de_sweeps_kunnen_werkelijk_afgaan() -> None:
         "nlriochecker.uitvoer.herkomst"
     ]
     assert _uitvoerimports("import nlriochecker.uitvoer") == ["nlriochecker.uitvoer"]
+    # De uitvoerlaag als naam in plaats van als module; ontsnapte aan de eerste versie.
+    assert _uitvoerimports("from nlriochecker import uitvoer") == ["nlriochecker.uitvoer"]
 
     assert _checksubmodule_imports("from nlriochecker.checks.netwerk import NET") == [
         ("nlriochecker.checks.netwerk", ("NET",))
     ]
+    # De twee vormen die de submodule als geheel binnenhalen: nul namen respectievelijk
+    # een naam die op de facade lijkt. Allebei `"*"`, en `"*"` staat in geen allowlist.
+    assert _checksubmodule_imports("import nlriochecker.checks.netwerk") == [
+        ("nlriochecker.checks.netwerk", ("*",))
+    ]
+    assert _checksubmodule_imports("from nlriochecker.checks import selectie") == [
+        ("nlriochecker.checks.selectie", ("*",))
+    ]
+    assert all(
+        "*" not in namen
+        for per_module in MAG_UIT_CHECKSUBMODULE.values()
+        for namen in per_module.values()
+    )
 
     assert _prive_leeslaagnamen("from gwsw_orox_helpers.dataset import _intern") == [
         "gwsw_orox_helpers.dataset._intern"

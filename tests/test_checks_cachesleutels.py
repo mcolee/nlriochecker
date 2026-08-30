@@ -118,15 +118,25 @@ def _scope(functie: ast.AST, geerfd: dict[str, str]) -> dict[str, str]:
     return buiten | _fstring_namen(functie)
 
 
-def _sleutelargument(knoop: ast.Call) -> ast.expr | None:
-    """Het argument waarin de cachesleutel staat, of None als dit geen sleutelaanroep is."""
+def _sleutelplek(knoop: ast.Call) -> int | None:
+    """De plaats van het sleutelargument in deze aanroep, of None als het er geen is."""
     if isinstance(knoop.func, ast.Attribute) and knoop.func.attr == "cached":
-        plek = 0
-    elif isinstance(knoop.func, ast.Name) and knoop.func.id in DOORGEEFHELPERS:
-        plek = DOORGEEFHELPERS[knoop.func.id]
-    else:
-        return None
-    return knoop.args[plek] if plek < len(knoop.args) else None
+        return 0
+    if isinstance(knoop.func, ast.Name) and knoop.func.id in DOORGEEFHELPERS:
+        return DOORGEEFHELPERS[knoop.func.id]
+    return None
+
+
+def _sleutelargument(knoop: ast.Call, plek: int) -> ast.expr | None:
+    """Het sleutelargument, positioneel of als keyword.
+
+    Zonder de keyword-vorm zou `context.cached(sleutel="…", bouw=…)` volledig aan de
+    sweep ontsnappen: `args` is dan leeg, en een aanroep die de sweep helemaal niet ziet
+    telt ook niet als doorgegeven. De parameter heet in alle drie de functies `sleutel`.
+    """
+    if plek < len(knoop.args):
+        return knoop.args[plek]
+    return next((woord.value for woord in knoop.keywords if woord.arg == "sleutel"), None)
 
 
 def _sleutels_van_module(bron: str, module: str) -> tuple[list[Sleutel], int]:
@@ -141,8 +151,9 @@ def _sleutels_van_module(bron: str, module: str) -> tuple[list[Sleutel], int]:
             if isinstance(kind, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda):
                 loop(kind, _scope(kind, namen))
                 continue
-            if isinstance(kind, ast.Call) and (argument := _sleutelargument(kind)) is not None:
-                sleutel = _sleutel_van(argument, namen, module)
+            if isinstance(kind, ast.Call) and (plek := _sleutelplek(kind)) is not None:
+                argument = _sleutelargument(kind, plek)
+                sleutel = None if argument is None else _sleutel_van(argument, namen, module)
                 if sleutel is None:
                     doorgegeven += 1
                 else:
@@ -292,6 +303,10 @@ def _rol(context):
     return _knopen(context, "sel:verzonnen", [])
 
 
+def _met_keyword(context):
+    return context.cached(sleutel="keyword:sleutel", bouw=bouw)
+
+
 def _doorgeef(context, sleutel):
     return context.cached(sleutel, bouw)
 """
@@ -302,6 +317,9 @@ def _doorgeef(context, sleutel):
         ("verzonnen:sleutel", True),
         ("anders:", False),
         ("sel:verzonnen", True),
+        # De keyword-vorm heeft lege `args` en ontsnapte volledig aan de eerste versie:
+        # de sweep zag de aanroep niet, en telde hem ook niet als doorgegeven.
+        ("keyword:sleutel", True),
     }
     assert doorgegeven == 1
     assert Sleutel("verzonnen", "netwerk", letterlijk=True).voorvoegsel == ""
