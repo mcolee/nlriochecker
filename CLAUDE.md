@@ -223,6 +223,20 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   Daarna land je die op `main` via een **merge-commit-PR** (geen squash/rebase, anders
   hangt de tag naast `main`) en zet je `dev` weer gelijk aan `main`. De volledige flow
   staat in `docs/versionering.md`.
+- **Release-poort naar bump-grootte: de review-swarm.** Het script staat geborgd in
+  `.claude/workflows/nlrio-swarm.js`; draai `Workflow({name: 'nlrio-swarm'})` (8
+  Opus-lens-agents → adversariële verify → Fable-regisseur met ≤25 aanbevelingen). De poort
+  hangt af van de bump:
+  - **Major** (na 1.0): **verplicht** vóór de release — draaien en de uitkomst **wegen** is
+    een poort, geen suggestie.
+  - **Minor en patch:** **aanbevolen, maar alleen ná expliciete goedkeuring van de auteur**
+    draai je hem — standaard sla je hem over. Hij kost tokens en wall-clock; elke minor/patch
+    blind draaien is de overkill die we bewust vermijden.
+  Verplicht (bij major) is het **draaien en wegen** van de bevindingen, niet het overnemen
+  ervan: je mag alles parkeren, maar je legt in de release-notitie (of een comment op de
+  release-PR) kort vast dát je hem hebt gedraaid en wat je met de top-bevindingen doet
+  (oppakken, als `ready-for-agent`-issue wegzetten, of bewust laten liggen). Contract-rakers
+  gaan nooit stilzwijgend mee: die zijn een auteursbeslissing.
 - Eén sessie = één issue, en het issue is de enige plek waar de voortgang staat. Eindig je
   een issue niet af, zet dan een comment met de echte toestand: wat gecommit is en wat de
   poort nog mist. Beweer nooit "klaar/gepusht" als het dat niet is, en laat geen half
