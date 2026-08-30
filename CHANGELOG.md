@@ -13,6 +13,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **HGT-010** heet voortaan *"Diameterverkleining in afvoerrichting"* in plaats van
+  *"Diameterverjonging …"*: *verjonging* betekent vernieuwen, terwijl de check meldt dat
+  de diameter benedenstrooms kleiner wordt. Puur een terminologiecorrectie — het check-ID,
+  de logica en de tellingen (0 F / 525 W op De Wolden) veranderen niet (issue #112).
 - `tests/test_uitgave.py::test_het_echte_wijzigingslog_is_verwerkbaar` roept
   `controleer_changelog` niet meer aan. Dat is een release-preconditie (een lege
   `[Unreleased]` afkeuren) en precies dat is de toestand van een release-commit, dus de

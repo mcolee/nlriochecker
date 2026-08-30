@@ -500,11 +500,11 @@ class BobSprongZonderValput(_KnoopVergelijking):
 
 
 @register
-class DiameterverjongingInAfvoerrichting(_KnoopVergelijking):
+class DiameterverkleiningInAfvoerrichting(_KnoopVergelijking):
     """HGT-010: benedenstrooms een kleinere buis dan bovenstrooms."""
 
     id = "HGT-010"
-    title = "Diameterverjonging in afvoerrichting (benedenstrooms kleiner dan bovenstrooms)"
+    title = "Diameterverkleining in afvoerrichting (benedenstrooms kleiner dan bovenstrooms)"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
     rollen = ("netwerkknopen", "vrijvervalrioolleidingen")

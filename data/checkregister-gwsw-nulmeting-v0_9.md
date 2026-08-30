@@ -107,7 +107,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | HGT-007 | Verhang vuilwater of gemengd onder drempelwaarde | W | Plausibiliteit |
 | HGT-008 | Extreem verhang (steiler dan bijv. 1:50; v0.9 zei "…, indicatie verwisselde BOB's"; tekstherstel in #84) | W | Plausibiliteit |
 | HGT-009 | BOB-sprong tussen aansluitende strengen boven drempel zonder valput | W | Plausibiliteit |
-| HGT-010 | Diameterverjonging in afvoerrichting (benedenstrooms kleiner dan bovenstrooms) | W | Plausibiliteit |
+| HGT-010 | Diameterverkleining in afvoerrichting (benedenstrooms kleiner dan bovenstrooms) | W | Plausibiliteit |
 | HGT-011 | Overstortdrempel lager dan BOB aanvoerende streng of hoger dan maaiveld | F | Consistentie |
 | HGT-012 | Putdiepte (deksel minus bodem) negatief of groter dan X m | F | Plausibiliteit |
 | HGT-013 | Gronddekking op bovenkant buis kleiner dan 0,5 m of groter dan 4 m | W | Plausibiliteit |
