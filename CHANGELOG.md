@@ -92,8 +92,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
-- **Kapotte invoer eindigt in een nette foutmelding in plaats van een traceback** (issue
-  #119). Vier invoerlezers lieten een uitzondering door die de CLI niet kent: een
+- **Vier kapotte invoerpaden eindigen in een nette foutmelding in plaats van een
+  traceback** (issue #119). Ze lieten een uitzondering door die de CLI niet kent: een
   GeoPackage-geometrieblob die te kort is voor zijn kop (`IndexError`) of een afgeknotte
   WKB draagt (`GEOSException`), een SHACL-CSV met een veld boven `csv.field_size_limit()`
   (`_csv.Error`) en een diep genest GeoJSON (`RecursionError`, een `RuntimeError` en dus

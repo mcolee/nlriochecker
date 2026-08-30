@@ -481,6 +481,15 @@ def test_afgeknotte_wkb_is_een_nette_fout(tmp_path: Path) -> None:
         load_study_area(pad)
 
 
+def test_blob_zonder_geometrie_na_de_kop(tmp_path: Path) -> None:
+    """Een blob met een geldige kop maar zonder WKB erachter."""
+    kop = b"GP" + bytes([0, 0]) + struct.pack("<i", 28992)
+    pad = _maak_geopackage(tmp_path / "kaal.gpkg", VIERKANT, blob=kop)
+
+    with pytest.raises(StudyAreaError, match=r"geen geometrie na de kop"):
+        load_study_area(pad)
+
+
 def test_vraagteken_in_de_bestandsnaam_maakt_geen_tweede_database(tmp_path: Path) -> None:
     """`?` is betekenisdragend in een sqlite-URI: mode=ro viel weg en er werd geschreven.
 
@@ -491,7 +500,10 @@ def test_vraagteken_in_de_bestandsnaam_maakt_geen_tweede_database(tmp_path: Path
     pad = tmp_path / "weird?mode=rwc&x=.gpkg"
     pad.write_bytes(b"")
 
-    with pytest.raises(StudyAreaError):
+    # De melding bewijst dat dít bestand read-only geopend werd: een lege database
+    # heeft geen `gpkg_contents`. Zonder de match zou de test ook slagen op een fout
+    # over een heel ander pad.
+    with pytest.raises(StudyAreaError, match="kan niet gelezen worden"):
         load_study_area(pad)
 
     assert [bestand.name for bestand in tmp_path.iterdir()] == ["weird?mode=rwc&x=.gpkg"]
