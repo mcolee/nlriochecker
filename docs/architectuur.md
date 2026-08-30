@@ -192,6 +192,16 @@ alleen het bestand waarin zij staat is verhuisd.
   Markdown-rapport valt er bewust buiten, want dat is een view die samenvat en weglaat
   (systemische bevindingen, `max_bevindingen_per_check`) en dus per definitie niet
   dezelfde rijen draagt. De twee kolomdrifttests ernaast vergelijken alleen kolomnamen.
+- **De laagsnit tussen `checks/` en `uitvoer/`, en de bevroren leeslaag-API.** `checks/`
+  importeert nooit `nlriochecker.uitvoer.*`: de engine levert bevindingen en weet niet in
+  welke vorm ze landen. `uitvoer/` leest waardetypen uit de package-facade
+  `nlriochecker.checks`; verder alleen uit een benoemde, krimpende lijst checksubmodules --
+  wat een schrijver aan logica uit `checks/` haalt is een uitzondering met een reden, geen
+  gewoonte. En geen module in `src/` importeert een naam die met `_` begint uit
+  `gwsw_orox_helpers`: dat is de bevriezing van de leeslaag-API uit `CLAUDE.md`, hier voor
+  het eerst opgeschreven op de plek waar zij te toetsen is. De sweep in
+  `tests/test_architectuur_laagsnit.py` bewaakt de drie; de lijst met toegestane
+  submodule-imports staat daar, met de reden per regel.
 
 ## GeoPackage en QGIS
 - De GeoPackage draagt sinds issue #98 precies drie featurelagen, een per geometrievorm:

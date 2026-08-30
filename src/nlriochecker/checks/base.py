@@ -97,6 +97,52 @@ class Finding:
 _Afgeleid = TypeVar("_Afgeleid")
 
 
+# Wie welk cachevoorvoegsel vult (issue #118). `CheckContext._cache` is één platte
+# stringruimte over alle checkmodules heen, en `cached` leunt met zijn ene `cast` op de
+# afspraak dat een sleutel altijd met dezelfde `bouw` gevuld wordt. Die afspraak stond
+# alleen in proza in de docstring hieronder; deze tabel maakt haar toetsbaar --
+# `tests/test_checks_cachesleutels.py` houdt elke sleutel in `src/` ertegen, en een
+# botsing is nergens anders aan te zien: de `cast` gelooft de beller op zijn woord.
+#
+# Het voorvoegsel is het deel voor de eerste dubbele punt. `ext:` is van de EXT-familie
+# en daarmee het enige met twee eigenaren.
+CACHE_VOORVOEGSELS: dict[str, tuple[str, ...]] = {
+    "aansluitingen": ("nlriochecker.checks.verbanden",),
+    "adm010": ("nlriochecker.checks.administratief",),
+    "ahn": ("nlriochecker.checks.extern",),
+    "attr014": ("nlriochecker.checks.attributen",),
+    "attr015": ("nlriochecker.checks.attributen",),
+    "deelstelsel": ("nlriochecker.checks.verbanden",),
+    "ext": ("nlriochecker.checks.extern", "nlriochecker.checks.wegvakken"),
+    "hgt": ("nlriochecker.checks.hoogten",),
+    "hulpstukken": ("nlriochecker.checks.hulpstukken",),
+    "net004": ("nlriochecker.checks.netwerk",),
+    "net006": ("nlriochecker.checks.netwerk",),
+    "onbereikbaar": ("nlriochecker.checks.netwerk",),
+    "rvz": ("nlriochecker.checks.randvoorzieningen",),
+    "sel": ("nlriochecker.checks.selectie",),
+    "topologie": ("nlriochecker.checks.topologie",),
+    "vrijverval": ("nlriochecker.checks.verbanden",),
+}
+
+# De sleutels zonder voorvoegsel, elk met de module die hem vult. Ze staan apart, want
+# "begint met een bekend voorvoegsel" is niet hetzelfde als "heeft een voorvoegsel":
+# `topologie` is allebei -- een kale sleutel én het voorvoegsel van `topologie:snapping`.
+# Ze zijn niet fout en hoeven niet weg; ze moeten alleen opgeschreven staan, anders deelt
+# een nieuwe kale sleutel ongemerkt de naamruimte met deze negen.
+CACHE_KALE_SLEUTELS: dict[str, tuple[str, ...]] = {
+    "afvoerpaden": ("nlriochecker.checks.verbanden",),
+    "bereikbaarheid": ("nlriochecker.checks.verbanden",),
+    "karakteristiek": ("nlriochecker.checks.base",),
+    "net009": ("nlriochecker.checks.netwerk",),
+    "netwerk": ("nlriochecker.checks.verbanden",),
+    "netwerkdelen": ("nlriochecker.checks.verbanden",),
+    "netwerkstrengen": ("nlriochecker.checks.verbanden",),
+    "topologie": ("nlriochecker.checks.topologie",),
+    "volledige-context": ("nlriochecker.checks.base",),
+}
+
+
 @dataclass(frozen=True)
 class CheckContext:
     """Alles wat een check nodig heeft om te draaien."""
@@ -161,8 +207,13 @@ class CheckContext:
         elk voorvoegsel heeft een eigenaar. `hgt:` en `rvz:` zijn van hun eigen
         checkmodule; `sel:` en `aansluitingen:` zijn juist gedeeld en horen bij
         `checks/selectie.py` respectievelijk `checks/verbanden.py`, die als enige
-        die sleutels vullen; `ext:` is van `checks/extern.py`, waar EXT-003 zijn
-        kruisingenlijst onder bewaart.
+        die sleutels vullen; `ext:` is van de EXT-familie en heeft er twee --
+        `checks/extern.py`, waar EXT-003 zijn kruisingenlijst onder bewaart, en
+        `checks/wegvakken.py`, dat EXT-009 is.
+
+        Welk voorvoegsel bij welke module hoort staat volledig in `CACHE_VOORVOEGSELS`
+        hierboven, met de sleutels zonder voorvoegsel in `CACHE_KALE_SLEUTELS`; deze
+        opsomming is een toelichting daarop en niet een tweede lijst.
         """
         if sleutel not in self._cache:
             self._cache[sleutel] = bouw()
