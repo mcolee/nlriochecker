@@ -701,6 +701,16 @@ def _reden_niet_beoordeeld(
 CHECK_KRUISING_BOUWWERK = "EXT-001"
 VLAK_CHECKS = (CHECK_KRUISING_BOUWWERK, "EXT-003")
 
+# De feiten die deze schrijver uit de zijmap van de meldingenstroom leest (issue #122).
+# Ze staan als `feit_sleutels` op hun check -- `EXT-001` in `checks/extern.py`, `RVZ-006`
+# in `checks/randvoorzieningen.py` -- en de bewaking `_eis_feiten` houdt de twee kanten
+# aan elkaar: spelt de een ze anders dan de ander, dan faalt het luid in plaats van een
+# lege popupregel of een lege kolom op te leveren. Een import uit die checkmodules zou de
+# laagsnit weer openzetten, en dat is precies wat dit issue dichttrok.
+SLEUTEL_AFSTAND = "afstand_m"
+SLEUTEL_AANDEEL = "aandeel_gemengd"
+SLEUTEL_OVERIGE = "overige_aanwijzingen"
+
 # De soort van een vlak volgt op één plek uit `Treffer.bron`: de rol waarmee de check hem
 # registreerde. Panden komen uit twee bronnen (BGT en BAG) maar zijn dezelfde soort.
 VLAK_SOORT = {
@@ -864,24 +874,32 @@ def _vlak_label(treffer: Treffer) -> str:
     return treffer.label
 
 
-def _eis_feiten(feiten: Feiten, meldingen: list[Melding], wat: str) -> None:
-    """Faalt luid als een melding die de laag nodig heeft geen rij in de zijmap draagt.
+def _eis_feiten(feiten: Feiten, meldingen: list[Melding], wat: str, *sleutels: str) -> None:
+    """Faalt luid als een melding die de laag nodig heeft de gevraagde feiten mist.
 
     De derde bewaking naast die op het trefferregister en die op de deelstelsel-ID's, en
     om dezelfde reden: hier zou de laag niet kleiner worden dan de uitslag maar stil
     ánders -- een feitenregel zonder aandeel, een lege `afstand_min_m` -- en dat valt aan
-    het bestand niet af te zien. `Meldingenstroom.feiten` vult de rij voor elke bevinding
-    van een check die `feit_sleutels` declareert, dus een gat betekent dat schrijver en
-    stroom niet uit dezelfde run komen.
+    het bestand niet af te zien. `Meldingenstroom.feiten` vult voor elke bevinding van een
+    check met `feit_sleutels` een rij met precies die sleutels, dus een gat betekent dat
+    schrijver en stroom niet uit dezelfde run komen, of dat de check haar declaratie
+    anders spelt dan de lezer hier.
+
+    De sleutels worden meegeteld en niet alleen de rij: een rij zonder de gevraagde
+    sleutel is dezelfde stille afwijking, en een lezer die daarop met een lege tekst
+    terugvalt maakt haar onzichtbaar.
     """
     ontbreekt = sorted(
-        melding.melding_id for melding in meldingen if melding.melding_id not in feiten
+        melding.melding_id
+        for melding in meldingen
+        if melding.melding_id not in feiten or not set(sleutels) <= set(feiten[melding.melding_id])
     )
     if ontbreekt:
         raise PipelineError(
-            f"laag 'vlakken': {len(ontbreekt)} {wat}-melding(en) dragen geen feiten in de "
-            f"meldingenstroom ({', '.join(ontbreekt[:5])}). De laag zou stil anders zijn dan "
-            "de uitslag; geef `schrijf_geopackage` de `feiten` van dezelfde stroom mee."
+            f"laag 'vlakken': {len(ontbreekt)} {wat}-melding(en) dragen niet de feiten "
+            f"{', '.join(sleutels) or '(geen)'} in de meldingenstroom "
+            f"({', '.join(ontbreekt[:5])}). De laag zou stil anders zijn dan de uitslag; "
+            "geef `schrijf_geopackage` de `feiten` van dezelfde stroom mee."
         )
 
 
@@ -951,6 +969,7 @@ def _trefferrijen(
             if melding.check_id == CHECK_KRUISING_BOUWWERK
         ],
         CHECK_KRUISING_BOUWWERK,
+        SLEUTEL_AFSTAND,
     )
     return rijen, grenzen
 
@@ -1022,7 +1041,7 @@ def _kleinste_afstand(feiten: Feiten, meldingen: list[Melding]) -> float | None:
     afstanden = [
         float(waarde)
         for melding in meldingen
-        if (waarde := feiten.get(melding.melding_id, {}).get("afstand_m")) is not None
+        if (waarde := feiten.get(melding.melding_id, {}).get(SLEUTEL_AFSTAND)) is not None
     ]
     return min(afstanden) if afstanden else None
 
@@ -1110,6 +1129,8 @@ def _gemengde_deelstelselrijen(
         feiten,
         [melding for groep in per_cluster.values() for melding in groep],
         CHECK_GEMENGD_ZONDER_OVERSTORT,
+        SLEUTEL_AANDEEL,
+        SLEUTEL_OVERIGE,
     )
 
     index = strengen_per_knoop(run.context)
@@ -1209,8 +1230,7 @@ def _gemengd_rij(
     """
     strenglengte = sum(conduit.line.length for conduit in conduits if conduit.line is not None)
     eigen = feiten[meldingen[0].melding_id]
-    aandeel = eigen.get("aandeel_gemengd", "")
-    overige = eigen.get("overige_aanwijzingen", "")
+    aandeel, overige = eigen[SLEUTEL_AANDEEL], eigen[SLEUTEL_OVERIGE]
     kop = Objectkop(
         label=cluster,
         objecttype=SOORT_GEMENGD_DEELSTELSEL,

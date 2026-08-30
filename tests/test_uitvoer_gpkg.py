@@ -1433,6 +1433,24 @@ def test_deelstelselvlak_zonder_zijmap_faalt_luid(tmp_path: Path) -> None:
         schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
 
+def test_een_feitenrij_zonder_de_gevraagde_sleutel_faalt_luid(tmp_path: Path) -> None:
+    """Ook een rij die er wél is maar de sleutel mist, is een stille afwijking.
+
+    Zou de schrijver daarop met een lege tekst terugvallen, dan is een check die haar
+    `feit_sleutels` anders spelt dan deze lezer aan het bestand niet te zien: de popup
+    mist dan zijn tweede feitenregel en verder klopt alles.
+    """
+    run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    verminkt = {
+        melding_id: {naam: waarde for naam, waarde in feiten.items() if naam != "aandeel_gemengd"}
+        for melding_id, feiten in stroom.feiten.items()
+    }
+
+    with pytest.raises(PipelineError, match="aandeel_gemengd"):
+        schrijf_geopackage(run, stroom.meldingen, tmp_path, RUNDATUM, feiten=verminkt)
+
+
 # Issue #65: onderdrukking uit `[rapport]`. De fixture: vrijvervalstreng L1 (GemengdRiool)
 # kruist persleiding L2 (Persleiding) en duiker L3 (Duiker). TOP-011 meldt sinds issue #82
 # alleen het duikerpaar -- een persleiding valt buiten die populatie -- dus een keer, met
