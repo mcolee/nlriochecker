@@ -18,6 +18,7 @@ from nlriochecker.uitvoer.bevindingen import (
 )
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.tabel import TOP_N, prepare, table, title
+from nlriochecker.uitvoer.voorbehoud import markering_van
 
 FILE_MARKDOWN = "samenvatting.md"
 FILE_CSV = "geaggregeerde_meldingen.csv"
@@ -57,7 +58,7 @@ def write_markdown(
         target,
         titel,
         _render_markdown(analyse, coverage),
-        markering=analyse.meting.meetbereik.markering(),
+        markering=markering_van(analyse.meting.meetbereik),
     )
 
 
@@ -182,7 +183,7 @@ def write_coverage_report(result: CoverageResult, output_dir: Path) -> tuple[Pat
         Path(output_dir) / FILE_COVERAGE_MARKDOWN,
         f"# Dekkinganalyse {result.dataset}",
         _render_coverage(result),
-        markering=result.meetbereik.markering(),
+        markering=markering_van(result.meetbereik),
     )
 
     csv_path = Path(output_dir) / FILE_COVERAGE_CSV
@@ -391,7 +392,7 @@ def write_comparison_reports(
         _render_comparison(comparison),
         # De twee meetbereiken zijn gelijk: `compare_metingen` weigert ongelijke
         # sets. Het latere meetmoment staat hier dus voor beide.
-        markering=comparison.later.meting.meetbereik.markering(),
+        markering=markering_van(comparison.later.meting.meetbereik),
     )
 
     csv_path = Path(output_dir) / FILE_COMPARISON_CSV

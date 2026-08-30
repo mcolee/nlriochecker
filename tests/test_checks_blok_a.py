@@ -16,7 +16,15 @@ import pytest
 from gwsw_orox_helpers.dataset import GWSW, Aspect, load_dataset, markeer_vulwaarden
 
 from nlriochecker.checkconfig import CheckConfig, VerhangStap, load_check_config
-from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
+from nlriochecker.checks import (
+    REGISTRY,
+    CheckContext,
+    CheckOutcome,
+    Dimension,
+    Finding,
+    Severity,
+    run_checks,
+)
 from nlriochecker.checks.administratief import LozeLeidingAanActiefRiool, _LozeKeten
 from nlriochecker.checks.verbanden import deelstelsel_ids
 from nlriochecker.plausibiliteit import load_plausibility
@@ -1125,6 +1133,71 @@ def test_attr015_zwijgt_bij_te_weinig_gedateerde_objecten() -> None:
     assert any("te weinig" in note and "minimum van 30" in note for note in outcome.notes), (
         outcome.notes
     )
+
+
+def test_de_systemische_bevindingen_lopen_veld_voor_veld_door_de_gedeelde_fabriek() -> None:
+    """ATTR-014 en ATTR-015 bouwden hun `Finding` met de hand (issue #118).
+
+    Ze waren de enige twee `Finding(`-constructors in heel `src/` buiten `Check.finding()`,
+    en dus de enige twee die `typing_reliable` hardgecodeerd op `True` zetten in plaats
+    van hem via de poort `context.is_reliable()` te halen. Dat gaf hetzelfde antwoord --
+    `is_reliable("")` is waar, want de lege URI staat niet in `unreliable_objects` -- maar
+    naast de poort om.
+
+    Deze test pint de negen velden van beide bevindingen letterlijk vast, zodat de gang
+    door `self.finding(..., systemisch=True)` er geen enkel veld van verschuift. Zonder
+    `systemisch` in de fabriek konden ze er niet doorheen: dat veld is wat een melding
+    generiek in plaats van per object laat landen (issue #76).
+    """
+    (attr015,) = uitkomst("attr015_vulwaardejaar.ttl", "ATTR-015").findings
+    (attr014,) = uitkomst("attr014_reference_op_waardekenmerk.ttl", "ATTR-014").findings
+
+    assert attr015 == Finding(
+        check_id="ATTR-015",
+        severity=Severity.WARNING,
+        dimension=Dimension.COMPLETENESS,
+        object_uri="",
+        object_label="1900",
+        message=(
+            "Begindatum 1900 draagt 40.0% van de 40 gedateerde objecten (16); boven de "
+            "signaaldrempel van 20% en mogelijk een vulwaarde in plaats van een echte "
+            "aanlegdatum."
+        ),
+        typing_reliable=True,
+        details={"jaar": 1900, "aandeel_procent": 40.0, "aantal": 16},
+        location=None,
+        systemisch=True,
+    )
+    assert attr014 == Finding(
+        check_id="ATTR-014",
+        severity=Severity.ERROR,
+        dimension=Dimension.CONSISTENCY,
+        object_uri="",
+        object_label="LengteLeiding",
+        message="LengteLeiding gebruikt hasReference in plaats van hasValue op 1 objecten.",
+        typing_reliable=True,
+        details={"kenmerk": "LengteLeiding"},
+        location=None,
+        systemisch=True,
+    )
+
+
+def test_finding_zet_systemisch_alleen_als_de_check_erom_vraagt() -> None:
+    """De fabriek staat standaard op niet-systemisch, en `systemisch` is geen detail.
+
+    Keyword-only en vóór `**details`: zou de naam als detailsleutel opgeslokt kunnen
+    worden, dan zou een check die per ongeluk `systemisch=True` als detail meegeeft een
+    melding krijgen die per object landt terwijl haar detailveld het tegendeel beweert.
+    """
+    check = REGISTRY["ATTR-015"]()
+    context = context_voor("attr_schoon.ttl", fixtureconfig())
+
+    gewoon = check.finding(context, "uri", "label", "boodschap", jaar=1900)
+    systemisch = check.finding(context, "", "1900", "boodschap", systemisch=True, jaar=1900)
+
+    assert gewoon.systemisch is False
+    assert systemisch.systemisch is True
+    assert gewoon.details == systemisch.details == {"jaar": 1900}
 
 
 def test_attr007_verantwoordt_de_objecten_zonder_begindatum() -> None:

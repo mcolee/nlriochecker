@@ -17,6 +17,9 @@ ontologietest lost ze op.
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import pytest
 from gwsw_orox_helpers.dataset import Conduit, Node
 
@@ -27,6 +30,8 @@ from nlriochecker.checks.base import REGISTRY, Check, Dimension, Severity, Skele
 # De eigenschappen van `Node`/`Conduit` die geen GWSW-kenmerk lezen maar de geometrie: de
 # z-waarde uit de GML-lijn. Ze horen daarom niet in `DERIVED_PROPS`.
 GEOMETRIE_EIGENSCHAPPEN = frozenset({"z_start", "z_end"})
+
+WORTEL = Path(__file__).resolve().parents[1]
 
 DECLARATIES = analyseer_alle_checks()
 CHECK_IDS = sorted(REGISTRY)
@@ -156,3 +161,54 @@ def test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd() -> None:
     gemarkeerd = {cid for cid in CHECK_IDS if REGISTRY[cid].telt_instanties}
 
     assert gemarkeerd == {"ATTR-014", "BTR-006"}
+
+
+def test_alleen_de_gedeelde_fabriek_bouwt_een_finding() -> None:
+    """Elke bevinding komt uit `Check.finding()` en nergens anders (issue #118).
+
+    Die fabriek is de plek waar `typing_reliable` via `context.is_reliable()` gezet
+    wordt. Een check die zelf een `Finding(` bouwt zet die vlag met de hand -- ATTR-014
+    en ATTR-015 deden dat, allebei op een hardgecodeerde `True` -- en dan hangt de
+    typeringspoort af van wie er toevallig aan denkt.
+
+    De sweep leest de AST en niet de tekst: `Finding` komt als annotatie en als
+    returntype overal voor, en alleen een aanroep telt.
+    """
+    checks = Path(REGISTRY["ATTR-014"].__module__.replace(".", "/")).parent
+
+    overtreders = sorted(
+        pad.name
+        for pad in (WORTEL / "src" / checks).glob("*.py")
+        if pad.name != "base.py"
+        and any(
+            isinstance(knoop, ast.Call)
+            and isinstance(knoop.func, ast.Name)
+            and knoop.func.id == "Finding"
+            for knoop in ast.walk(ast.parse(pad.read_text(encoding="utf-8")))
+        )
+    )
+
+    assert overtreders == []
+
+
+def test_de_findingsweep_kan_werkelijk_afgaan() -> None:
+    """De tegenproef: de sweep herkent een eigen constructor ook echt.
+
+    Zonder haar zou een sweep die alleen naar `ast.Attribute` kijkt hier groen blijven
+    terwijl `checks/attributen.py` twee constructors draagt -- precies de toestand van
+    vóór dit issue.
+    """
+
+    def bouwt_zelf(bron: str) -> bool:
+        """Of deze broncode ergens `Finding(...)` aanroept."""
+        return any(
+            isinstance(knoop, ast.Call)
+            and isinstance(knoop.func, ast.Name)
+            and knoop.func.id == "Finding"
+            for knoop in ast.walk(ast.parse(bron))
+        )
+
+    assert bouwt_zelf("yield Finding(check_id=self.id, systemisch=True)")
+    # Een annotatie of een returntype is geen constructie, en de fabriek zelf ook niet.
+    assert not bouwt_zelf("def run(self) -> Iterator[Finding]:\n    return iter(())")
+    assert not bouwt_zelf("yield self.finding(context, uri, label, boodschap)")

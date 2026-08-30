@@ -1048,24 +1048,17 @@ class BegindatumVulwaardejaar(Check):
             aandeel = aantal / totaal
             if aandeel <= drempel:
                 continue
-            yield Finding(
-                check_id=self.id,
-                severity=self.severity,
-                dimension=self.dimension,
-                object_uri="",
-                object_label=str(jaar),
-                message=(
-                    f"Begindatum {jaar} draagt {aandeel * 100:.1f}% van de {totaal} gedateerde "
-                    f"objecten ({aantal}); boven de signaaldrempel van {drempel * 100:g}% en "
-                    "mogelijk een vulwaarde in plaats van een echte aanlegdatum."
-                ),
-                typing_reliable=True,
-                details={
-                    "jaar": jaar,
-                    "aandeel_procent": round(aandeel * 100, 1),
-                    "aantal": aantal,
-                },
+            yield self.finding(
+                context,
+                "",
+                str(jaar),
+                f"Begindatum {jaar} draagt {aandeel * 100:.1f}% van de {totaal} gedateerde "
+                f"objecten ({aantal}); boven de signaaldrempel van {drempel * 100:g}% en "
+                "mogelijk een vulwaarde in plaats van een echte aanlegdatum.",
                 systemisch=True,
+                jaar=jaar,
+                aandeel_procent=round(aandeel * 100, 1),
+                aantal=aantal,
             )
 
     def examined(self, context: CheckContext) -> int:
@@ -1436,16 +1429,13 @@ class PropertyTegenOntologie(Check):
         for kenmerk, telling in sorted(self._tellingen(context).items()):
             if telling.fout == 0:
                 continue
-            yield Finding(
-                check_id=self.id,
-                severity=self.severity,
-                dimension=self.dimension,
-                object_uri="",
-                object_label=kenmerk,
-                message=_property_boodschap(kenmerk, telling),
-                typing_reliable=True,
-                details={"kenmerk": kenmerk},
+            yield self.finding(
+                context,
+                "",
+                kenmerk,
+                _property_boodschap(kenmerk, telling),
                 systemisch=True,
+                kenmerk=kenmerk,
             )
 
     def examined(self, context: CheckContext) -> int:

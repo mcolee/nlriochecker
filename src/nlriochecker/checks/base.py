@@ -571,9 +571,18 @@ class Check(ABC):
         label: str,
         message: str,
         location: tuple[float, float] | None = None,
+        *,
+        systemisch: bool = False,
         **details: object,
     ) -> Finding:
-        """Bouwt een bevinding en zet de typeringsvlag op grond van het label."""
+        """Bouwt een bevinding en zet de typeringsvlag op grond van het label.
+
+        `systemisch` staat keyword-only en vóór `**details`, zodat de naam nooit als
+        detailsleutel opgeslokt kan worden: een check die hem meegaf zou anders een
+        melding per object krijgen met een detailveld dat het tegendeel beweert. Wat een
+        systemische bevinding is en waar zij landt staat bij `Finding.systemisch`
+        (issue #76).
+        """
         return Finding(
             check_id=self.id,
             severity=self.severity,
@@ -584,6 +593,7 @@ class Check(ABC):
             typing_reliable=context.is_reliable(uri),
             details=details,
             location=location,
+            systemisch=systemisch,
         )
 
 

@@ -19,6 +19,7 @@ hoort bij de run en niet bij de melding, dus het wordt geen kolom op elke rij (B
 from __future__ import annotations
 
 from nlriochecker.checks import CheckRun
+from nlriochecker.meting import Meetbereik
 
 # De tekst spreekt de lezer van het rapport aan, niet de ontwikkelaar: geen
 # functienamen, wel GWSW-klassen die hij in QGIS terugvindt. Twee dingen staan er
@@ -75,3 +76,21 @@ def markering(run: CheckRun) -> str | None:
     """
     regels = voorbehouden(run)
     return "\n\n".join(regels) if regels else None
+
+
+def markering_van(meetbereik: Meetbereik) -> str | None:
+    """De kop voor een schrijver die geen `CheckRun` heeft, maar wel een meetbereik.
+
+    `analyseer`, `dekking` en `vergelijk` schrijven over een nulmeting en niet over een
+    toetsrun: `CoverageResult` draagt een datasetnáám en `MetingAnalysis` en
+    `MetingComparison` dragen helemaal geen datasetobject. `klassenhierarchie_bekend` is
+    daar dus onbereikbaar, en die drie kunnen per constructie maar één voorbehoud dragen
+    -- dat van het meetbereik. Deze ingang zegt dat hardop, in plaats van de aanroep
+    verspreid over `reporting.py` te laten staan waar niets hem aan de samenstelplek
+    bindt.
+
+    Hij geeft exact `meetbereik.markering()` terug en vervalt zodra `CoverageResult` of
+    `MetingAnalysis` wél een datasetobject gaat dragen: dan gaan die drie schrijvers over
+    op `markering(run)` en is er weer één ingang.
+    """
+    return meetbereik.markering()

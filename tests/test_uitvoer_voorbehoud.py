@@ -4,10 +4,14 @@
 tegelijk gelden: een `--cfk`-deelset op een dataset zonder klassenhierarchie draagt er
 twee. Zonder samenstelplek zou een schrijver er een moeten kiezen en verdwijnt de
 andere stilzwijgend -- en een voorbehoud dat je niet ziet, is geen voorbehoud.
+
+Onderaan staat sinds issue #118 de sweep die die belofte afdwingt in plaats van haar
+alleen op te schrijven.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import sqlite3
 from dataclasses import replace
@@ -22,11 +26,32 @@ from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.meting import Meetbereik
 from nlriochecker.uitvoer.samenvatting import NIET_GEMETEN, REGEL_EIGEN_CHECKS, VINKJE
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
-from nlriochecker.uitvoer.voorbehoud import GEEN_KLASSENHIERARCHIE, markering, voorbehouden
+from nlriochecker.uitvoer.voorbehoud import (
+    GEEN_KLASSENHIERARCHIE,
+    markering,
+    markering_van,
+    voorbehouden,
+)
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
+BRON = Path(__file__).resolve().parents[1] / "src"
 VEREIST = ["Hyd", "MdsPlan", "MdsProj"]
 RUNDATUM = date(2026, 8, 21)
+
+# Wie `Meetbereik.markering()` rechtstreeks mag aanroepen, met de reden erbij. De
+# definitie zelf (`meting.py`) staat er niet in: `def markering(self)` is geen aanroep en
+# valt buiten deze sweep.
+#
+# Wie hier een module aan toevoegt, schrijft de reden erbij -- en bedenkt dat een
+# rechtstreekse aanroep per definitie maar één voorbehoud kan dragen.
+MAG_ZELF_MARKEREN = {
+    # De samenstelplek zelf: hier komen het hierarchie- en het meetbereikvoorbehoud
+    # samen tot één kop.
+    "nlriochecker/uitvoer/voorbehoud.py",
+    # Terminaluitvoer, geen rapport. Het hierarchie-voorbehoud staat daar als eigen regel
+    # naast deze (`toetsrun.py`, `_datasetregels`), dus hier verdwijnt er niets.
+    "nlriochecker/toetsrun.py",
+}
 
 DEELSET = "**Onvolledige meting:** getoetst op Hyd, MdsPlan;"
 
@@ -162,6 +187,74 @@ def test_de_vinkjeassertie_kan_werkelijk_falen(toets: CheckRun, tmp_path: Path) 
 
     tabel = _samenvattingstabel(markdown)
     assert sum(1 for regel in tabel if regel.startswith(f"| {VINKJE} |")) == 3
+
+
+def test_markering_van_geeft_precies_de_meetbereikmarkering() -> None:
+    """De ingang voor een beller zonder datasetobject verandert de tekst niet.
+
+    `CoverageResult` draagt een datasetnaam en `MetingAnalysis`/`MetingComparison`
+    dragen helemaal geen dataset, dus `klassenhierarchie_bekend` is daar onbereikbaar en
+    kan er maar één voorbehoud gelden. Deze ingang bestaat om die aanroep zichtbaar te
+    maken, niet om hem anders te laten luiden; alle drie de toestanden moeten dus
+    letterlijk hetzelfde opleveren als de methode zelf.
+    """
+    for bereik in (
+        Meetbereik.van(VEREIST, VEREIST),
+        Meetbereik.van(VEREIST, ["Hyd"]),
+        Meetbereik.niet_gemeten(VEREIST),
+    ):
+        assert markering_van(bereik) == bereik.markering()
+
+    assert markering_van(Meetbereik.van(VEREIST, VEREIST)) is None
+
+
+def test_alleen_de_samenstelplek_roept_de_meetbereikmarkering_aan() -> None:
+    """`docs/architectuur.md` belooft dit; tot issue #118 stond het er alleen.
+
+    Een schrijver die `meetbereik.markering()` rechtstreeks aanroept, kan per constructie
+    maar één voorbehoud doorgeven -- `schrijf_markdown` heeft één markeringsslot -- en
+    laat het andere stilzwijgend vallen. Dat er nog geen fout uit volgde is structureel
+    en niet toevallig: de drie bellers in `reporting.py` hebben geen datasetobject en
+    kunnen het hierarchie-voorbehoud dus niet kennen. Krijgt `CoverageResult` er ooit
+    een, dan is dit de test die de dan ontstane stilte tegenhoudt.
+    """
+    overtreders = sorted(
+        pad.relative_to(BRON).as_posix()
+        for pad in BRON.rglob("*.py")
+        if pad.relative_to(BRON).as_posix() not in MAG_ZELF_MARKEREN
+        and any(
+            isinstance(knoop, ast.Call)
+            and isinstance(knoop.func, ast.Attribute)
+            and knoop.func.attr == "markering"
+            for knoop in ast.walk(ast.parse(pad.read_text(encoding="utf-8")))
+        )
+    )
+
+    assert overtreders == []
+
+
+def test_de_markeringsweep_kan_werkelijk_afgaan() -> None:
+    """De tegenproef: de sweep herkent een rechtstreekse aanroep ook echt.
+
+    De vrijstellingslijst dekt twee modules, dus de sweep hierboven is groen. Zonder
+    deze test is dat niet te onderscheiden van een sweep die de aanroep niet herkent --
+    en dan staat er een hek dat nooit kan afgaan.
+    """
+
+    def roept_aan(bron: str) -> bool:
+        """Of deze broncode ergens een `.markering()` aanroept."""
+        return any(
+            isinstance(knoop, ast.Call)
+            and isinstance(knoop.func, ast.Attribute)
+            and knoop.func.attr == "markering"
+            for knoop in ast.walk(ast.parse(bron))
+        )
+
+    assert roept_aan("kop = analyse.meting.meetbereik.markering()")
+    # De definitie in `meting.py` is geen aanroep, en de modulefunctie `markering(run)`
+    # uit `voorbehoud.py` is geen attribuutaanroep: allebei terecht buiten de sweep.
+    assert not roept_aan("def markering(self) -> str | None:\n    return None")
+    assert not roept_aan("kop = markering(run)")
 
 
 def test_de_json_zwijgt_zonder_voorbehoud(toets: CheckRun, tmp_path: Path) -> None:

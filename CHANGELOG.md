@@ -13,6 +13,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Vier drifthekken op afspraken die alleen in proza stonden** (issue #118): de laagsnit
+  en de bevroren leeslaag-API (`tests/test_architectuur_laagsnit.py`, met een gevulde,
+  krimpende allowlist van toegestane checksubmodule-imports in `uitvoer/`; de regel zelf
+  staat nu in `docs/architectuur.md`), de 52 literale cachesleutels van `CheckContext` op
+  uniciteit en eigendom (`tests/test_checks_cachesleutels.py`, tegen de eigenaarstabel
+  `CACHE_VOORVOEGSELS`/`CACHE_KALE_SLEUTELS` in `checks/base.py`), één ingang voor de
+  runbrede markering (`uitvoer/voorbehoud.markering_van` voor de drie bellers zonder
+  datasetobject, met een sweep in `tests/test_uitvoer_voorbehoud.py`) en `Finding(` als
+  constructor alleen nog in `checks/base.py` -- `Check.finding()` kent nu `systemisch`,
+  zodat ATTR-014 en ATTR-015 hun typeringsvlag via `context.is_reliable()` krijgen in
+  plaats van hardgecodeerd. Geen check, drempel of selectie verandert; de uitslag van een
+  run blijft identiek.
 - **Gouden ledger** (`tests/golden/ledger.json`, generator `scripts/maak_ledger.py`): per
   (fixture, check) het aantal bevindingen, de bekeken populatie en het aantal
   toelichtingen over de hele registry op alle 183 TTL-fixtures, plus per check het aantal
