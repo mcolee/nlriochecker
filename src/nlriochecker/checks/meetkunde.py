@@ -45,6 +45,11 @@ def endpoints_kern(punten: Punten) -> tuple[Point, Point] | None:
     return Point(punten[0][:2]), Point(punten[-1][:2])
 
 
+# De omhullingen hieronder -- `endpoints`, `distinct_coords`, `max_offset_from_chord`,
+# `vertex_angles`, `duplicate_vertices` en `overlap_length` -- hebben sinds issue #123 geen
+# beller meer in `src/`: de checks gaan langs de gedeelde tabellen en de kernen. Ze blijven
+# staan omdat ze het orakel zijn van de gelijkheidstests (de tabel moet geven wat zij geven)
+# en de ingang voor `scripts/`; niet weghalen bij een opruimronde.
 def endpoints(line: LineString | None) -> tuple[Point, Point] | None:
     """Het begin- en eindpunt van een lijngeometrie, of None."""
     return endpoints_kern(coords_of(line))

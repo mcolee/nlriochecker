@@ -22,11 +22,11 @@ from gwsw_orox_helpers.cache import laad_met_cache
 
 from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
 from nlriochecker.checks import CheckContext
+from nlriochecker.checks.meetkunde import overlap_length
 from nlriochecker.checks.topologie import (
     _buren,
     _nabijheid,
     half_diameter_m,
-    overlap_length,
     verbonden_knopen,
 )
 

@@ -24,6 +24,7 @@ from nlriochecker.checks.extern import (
     MARKERING_BUITEN_SCOPE,
     MARKERING_NIET_TOETSBAAR,
     KruisingMetBouwwerk,
+    _ExterneCheck,
 )
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.uitvoer.melding import bouw_meldingen
@@ -82,6 +83,23 @@ def uitkomst(
 def labels(outcome: CheckOutcome) -> list[str]:
     """De labels van de gevonden objecten, gesorteerd."""
     return sorted(finding.object_label for finding in outcome.findings)
+
+
+def test_geen_ext_check_overschrijft_geometrie_van() -> None:
+    """Issue #123: de gedeelde geometrietabel in `_selecteer` is op URI gesleuteld.
+
+    Zou een tweede `geometrie_van` bestaan, dan krijgt de check die als tweede langs
+    hetzelfde object komt de geometrie van de eerste terug -- zonder foutmelding, want de
+    tabel kent alleen de URI. Vandaag is er één definitie; dit hek zegt het hardop.
+    """
+    afwijkend = sorted(
+        check.__name__
+        for check in REGISTRY.values()
+        if issubclass(check, _ExterneCheck)
+        and check.geometrie_van is not _ExterneCheck.geometrie_van
+    )
+
+    assert afwijkend == []
 
 
 def test_bronnen_worden_gelezen_in_rd(bronnen: ExternalData) -> None:

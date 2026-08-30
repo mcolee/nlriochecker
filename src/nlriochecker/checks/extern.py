@@ -114,10 +114,12 @@ def _selecteer(
 
     De geometrie komt uit een tabel die alle EXT-checks van deze context delen (issue
     #123): elke check loopt over dezelfde putten en strengen, en `geometrie_van` doet
-    er per aanroep tot twee `is_empty` voor. `_ExterneCheck.geometrie_van` heeft één
-    definitie en geen enkele override, dus de tabel is eenduidig. De toets hieronder
-    blijft er onverkort staan: deze functie krijgt de afleiding als parameter en mag
-    niet aannemen dat er nooit een andere langskomt.
+    er per aanroep tot twee `is_empty` voor. De tabel is op URI gesleuteld en dus alleen
+    eenduidig zolang `_ExterneCheck.geometrie_van` één definitie houdt; dat bewaakt
+    `test_geen_ext_check_overschrijft_geometrie_van` in `tests/test_checks_extern.py`,
+    want een tweede afleiding zou hier stil de geometrie van de eerste teruggeven. De
+    toets hieronder blijft er onverkort staan: deze functie krijgt de afleiding als
+    parameter en mag niet aannemen dat er nooit een andere langskomt.
     """
     bronnen = context.bronnen
     tabel = context.cached("geo:extern-geometrie", _lege_geometrietabel)
