@@ -136,7 +136,9 @@ def _van_soort[Object: (Node, Conduit)](selectie: _Selectie, soort: type[Object]
     en haalt haar populatie hier terug in de vorm waarin haar eigen `objecten()` hem
     opleverde. Er valt per constructie niets weg.
     """
-    return [object_ for object_ in selectie.toetsbaar if isinstance(object_, soort)]
+    smal = [object_ for object_ in selectie.toetsbaar if isinstance(object_, soort)]
+    assert len(smal) == len(selectie.toetsbaar)  # de populatie is enkelsoortig
+    return smal
 
 
 def _bereiknotities(context: CheckContext, selectie: _Selectie, soort: str) -> list[str]:
