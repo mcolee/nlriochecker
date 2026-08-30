@@ -933,6 +933,21 @@ def _trefferrijen(
     sinds BO-43 elke echte doorkruising terug, ook meerdere per streng.
     """
     per_treffer = _groepeer_op_treffer(meldingen, *VLAK_CHECKS)
+    # Vóór de lus, net als in `_gemengde_deelstelselrijen`: `_trefferrij` leest de zijmap
+    # al, dus een bewaking erna zou over rijen oordelen die met een lege afstand gebouwd
+    # zijn. Alleen EXT-001 draagt er een; EXT-003 declareert geen `feit_sleutels` en laat
+    # `afstand_min_m` per ontwerp leeg (`checks/extern.py`).
+    _eis_feiten(
+        feiten,
+        [
+            melding
+            for groep in per_treffer.values()
+            for melding in groep
+            if melding.check_id == CHECK_KRUISING_BOUWWERK
+        ],
+        CHECK_KRUISING_BOUWWERK,
+        SLEUTEL_AFSTAND,
+    )
     rijen = []
     ontbreekt: list[str] = []
     grenzen: _Grenzen = []
@@ -958,19 +973,6 @@ def _trefferrijen(
             f"({', '.join(sorted(ontbreekt)[:5])}). De laag zou stil kleiner zijn dan de "
             f"uitslag; controleer of de check zijn treffer registreert."
         )
-    # Alleen EXT-001 draagt een afstand; EXT-003 declareert geen `feit_sleutels` en
-    # laat `afstand_min_m` per ontwerp leeg (`checks/extern.py`).
-    _eis_feiten(
-        feiten,
-        [
-            melding
-            for groep in per_treffer.values()
-            for melding in groep
-            if melding.check_id == CHECK_KRUISING_BOUWWERK
-        ],
-        CHECK_KRUISING_BOUWWERK,
-        SLEUTEL_AFSTAND,
-    )
     return rijen, grenzen
 
 

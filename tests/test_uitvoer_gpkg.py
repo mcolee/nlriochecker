@@ -944,8 +944,16 @@ def test_melding_zonder_geregistreerde_treffer_faalt_luid(tmp_path: Path) -> Non
         object2_uri="bgt:pand/verdwenen",
     )
 
+    # Mét feitenrij: die bewaking staat sinds issue #122 vóór deze, en zonder de rij zou
+    # deze test op háár melding vallen in plaats van op de ontbrekende treffer.
     with pytest.raises(PipelineError, match="trefferregister"):
-        schrijf_geopackage(run, [melding], tmp_path, RUNDATUM)
+        schrijf_geopackage(
+            run,
+            [melding],
+            tmp_path,
+            RUNDATUM,
+            feiten={melding.melding_id: {"afstand_m": "0.0"}},
+        )
 
 
 def test_de_voortgangsstappen_zijn_precies_de_vastgelegde_rij(tmp_path: Path) -> None:
@@ -1297,7 +1305,8 @@ def test_deelstelselvlak_toont_de_aanwijzingen_van_de_melding(tmp_path: Path) ->
 
     Ze komen uit de eerste melding van het cluster -- ze zijn per deelstelsel gelijk -- en
     niet uit een eigen afleiding: dan zou het vlak iets anders kunnen zeggen dan de melding
-    ernaast. `Finding.details` bereikt deze schrijver niet, dus de boodschap is de weg.
+    ernaast. De weg is sinds issue #122 de zijmap `Meldingenstroom.feiten`, gevuld uit de
+    `feit_sleutels` van de check; de boodschapzin wordt niet meer teruggeparseerd.
     """
     pad = _schrijf(_run("rvz006_aanwijzing_persleiding_en_lozingspunt.ttl", "RVZ-006"), tmp_path)
 

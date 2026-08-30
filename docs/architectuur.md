@@ -104,8 +104,10 @@ alleen het bestand waarin zij staat is verhuisd.
   JSON-envelop (`onderdrukt`) dragen de telling; de CSV niet. Zie BO-49.
 - **Het feitenkanaal naast de vijf gereserveerde detailsleutels** (issue #122).
   `Finding.details` haalt de meldingenstroom niet: `_alle_meldingen` leest alleen
-  `object2_uri`, `object2_label`, `waarde`, `drempel` en `cluster_id`, en al het andere
-  valt weg. Een check die meer aan de uitvoer wil doorgeven declareert dat met
+  `object2_uri`, `object2_label`, `waarde`, `drempel` en `cluster_id` -- plus, via
+  `_uniek_id_van_finding`, de `id_sleutels` van de check, en die gaan in het melding-ID op
+  in plaats van in een eigen veld. Al het andere valt weg. Een check die meer aan de
+  uitvoer wil doorgeven declareert dat met
   `Check.feit_sleutels` -- dezelfde vorm als `id_sleutels`, en geen algemeen doorgeefluik:
   alleen wat er staat reist mee. De waarden landen als tekst in `Meldingenstroom.feiten`,
   een zijmap `melding_id -> sleutel -> waarde` die nooit geserialiseerd wordt en met de
@@ -305,7 +307,7 @@ alleen het bestand waarin zij staat is verhuisd.
   cluster** en niet uit een eigen afleiding hier: de aanwijzingen gelden voor het
   deelstelsel, dus elke melding ervan draagt dezelfde feiten, en een tweede afleiding zou
   het vlak iets anders kunnen laten zeggen dan de melding ernaast. Ze reizen sinds issue
-  #122 door het feitenkanaal hieronder en niet meer door de boodschaptekst: die is een
+  #122 door het feitenkanaal hierboven en niet meer door de boodschaptekst: die is een
   mensgerichte zin, en de schrijver parseerde haar terug om er weer twee feiten uit te
   winnen -- elke herformulering brak de popup stilzwijgend. Zie BO-84. `gwsw_run`
   telt deze rijen apart in `n_gemengd_zonder_overstort`, naast `n_vlakken` dat de hele laag
