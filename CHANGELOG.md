@@ -24,6 +24,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `tests/test_voorbeeld.py` vergelijkt de meldingen per check met dezelfde ledger. De
   generator is ook de enige veeglus: `tests/test_uitvoer_identiteit_sweep.py` deelt hem
   via een session-fixture, dus de suite veegt één keer in plaats van twee (issue #113).
+- **Waardegelijkheid tussen de drie archieven** (`tests/test_uitvoer_gelijkheid.py`): per
+  `melding_id` draagt elk veld van `Melding` in `bevindingen.csv`, `bevindingen.json` en
+  de meldingentabel van de GeoPackage dezelfde waarde, en de samenvattingskolommen van
+  `putten` en `strengen` (`n_fout`, `n_waarschuwing`, `n_systemisch`, `checks_f`,
+  `checks_w`, `ergste_ernst`, `prioriteit`, `status` en de negen categoriekolommen)
+  kloppen met de meldingentabel in datzelfde bestand. De bestaande drifttests vergeleken
+  alleen kolom*namen*: een verwisseling in `CSV_VELD_NAAR_KOLOM` of in de positionele
+  tuple van `_melding_rij` (28 posities) bleef daarin groen. Test-only; geen regel in
+  `src/` verandert (issue #114).
 
 ### Gewijzigd
 

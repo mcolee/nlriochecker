@@ -182,8 +182,12 @@ alleen het bestand waarin zij staat is verhuisd.
   `schrijf_csv` de kolom `Gereedschap` achteraan, `schrijf_json` het enveloppeveld
   `gereedschap`, en de GeoPackage krijgt het veld `gereedschap` in `gwsw_run`. Roep nooit
   zelf `to_csv`, `write_text` of `json.dump` aan -- de sweep in
-  `tests/test_uitvoer_herkomst.py` verbiedt een tweede schrijver in `src/`, en die is de
-  waarborg dat de vier uitvoervormen niet uit elkaar lopen.
+  `tests/test_uitvoer_herkomst.py` verbiedt een tweede schrijver in `src/`. Die sweep
+  borgt dat er **één schrijver** is; dat de uitvoervormen dezelfde **waarden** dragen
+  borgt `tests/test_uitvoer_gelijkheid.py` (issue #114): per `melding_id` legt hij elk
+  veld van `Melding` in CSV, JSON en de meldingentabel naast elkaar, en de
+  samenvattingskolommen van `putten` en `strengen` naast diezelfde meldingentabel. De
+  twee kolomdrifttests ernaast vergelijken alleen kolomnamen.
 
 ## GeoPackage en QGIS
 - De GeoPackage draagt sinds issue #98 precies drie featurelagen, een per geometrievorm:
