@@ -1374,20 +1374,32 @@ def _property_tellingen(context: CheckContext) -> dict[str, _PropertyTelling]:
     de datagraaf. Een fout is een instantie die de geeiste property mist maar de andere wel
     draagt -- `hasValue` waar `hasReference` hoort, of andersom. Een instantie zonder beide
     is geen property-fout maar een leeg kenmerk en telt niet mee.
+
+    **Welke property er staat komt uit twee indexsweeps, niet uit twee `value`-aanroepen
+    per instantie** (issue #124). De conditie hierboven vraagt alleen of de property er is,
+    en `GraafIndex.value(s, p)` geeft None precies wanneer er geen enkele `(s, p, o)`-triple
+    is; lidmaatschap van `s` in de sweepverzameling is dus letterlijk
+    `value(s, p) is not None`. Duplicaten bestaan niet in de index, dus `totaal` verschuift
+    evenmin. De echte waarde is maar op een plek nodig -- `_is_vulwaarde_nul` -- en die
+    blijft een `graph.value` per **foute** instantie: op De Wolden en Hoogeveen 23.440
+    aanroepen in plaats van 2 x 459.108. De twee verzamelingen lopen over alle triples met
+    die predicaten, ook die van niet-kenmerkinstanties; dat is de prijs.
     """
     graph = context.dataset.graph
+    met_waarde = {subject for subject, _ in graph.subject_objects(HAS_VALUE)}
+    met_referentie = {subject for subject, _ in graph.subject_objects(HAS_REFERENCE)}
     tellingen: dict[str, _PropertyTelling] = {}
     for kenmerk, verwacht in context.dataset.kenmerk_property.items():
         totaal = fout = vulwaarde_nul = 0
         for instantie in graph.subjects(RDF.type, URIRef(GWSW + kenmerk)):
             totaal += 1
-            waarde = graph.value(instantie, HAS_VALUE)
-            referentie = graph.value(instantie, HAS_REFERENCE)
-            if verwacht == "hasReference" and referentie is None and waarde is not None:
+            heeft_waarde = instantie in met_waarde
+            heeft_referentie = instantie in met_referentie
+            if verwacht == "hasReference" and not heeft_referentie and heeft_waarde:
                 fout += 1
-                if _is_vulwaarde_nul(waarde):
+                if _is_vulwaarde_nul(graph.value(instantie, HAS_VALUE)):
                     vulwaarde_nul += 1
-            elif verwacht == "hasValue" and waarde is None and referentie is not None:
+            elif verwacht == "hasValue" and not heeft_waarde and heeft_referentie:
                 fout += 1
         tellingen[kenmerk] = _PropertyTelling(verwacht, totaal, fout, vulwaarde_nul)
     return tellingen

@@ -86,6 +86,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De twee laatste herhaalde graafscans zijn gededupliceerd** (issue #124): `_eindpunten`
+  in `checks/verbanden.py` staat achter `context.cached` (sleutel `eindpunten:<rol>`), net
+  als de acht andere afgeleide structuren in dat bestand -- vijf plekken vroegen hem op en
+  elke aanroep kostte een volledige `of_class`-scan per wortelklasse. En
+  `_property_tellingen` van ATTR-014 leest of een kenmerkinstantie `hasValue` dan wel
+  `hasReference` draagt uit twee indexsweeps (`GraafIndex.subject_objects`) in plaats van
+  uit twee `graph.value`-aanroepen per instantie; de echte waarde is alleen nog nodig waar
+  de property fout is. Op De Wolden en Hoogeveen daalt `of_class` van 114 naar 64 aanroepen
+  (`types_of` 5.350.336 → 3.004.086) en `graph.value` van 918.216 naar 23.440. **Nul
+  verschuiving**: de ATTR-014-telling is over alle 509 kenmerktypen identiek (459.108
+  instanties; WIBONThema 23.440 fout waarvan 18.363 met de vulwaarde 0), en de volle run op
+  De Wolden en Hoogeveen levert `bevindingen.md`, `.csv` en `.json` byte-identiek op
+  (147.706 meldingen). De winst is bescheiden: `run_checks` gaat van 33,5 naar 31,6 s
+  (mediaan van vijf runs, zonder profiler, −5,8%); de twee sweepverzamelingen dragen 460.251
+  paren en kosten 21 MB. Gemeten met `scripts/meet_graafscans.py`.
 - **De TOP-familie vraagt shapely niet meer per check hetzelfde** (issue #123): de
   coordinaten van een streng staan in twee tabellen aan de context (`geo:coords` en
   `geo:unieke-coords`, gevuld via `meetkunde.coords_van`/`unieke_coords_van`) in plaats van

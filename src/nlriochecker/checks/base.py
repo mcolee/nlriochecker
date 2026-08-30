@@ -113,6 +113,7 @@ CACHE_VOORVOEGSELS: dict[str, tuple[str, ...]] = {
     "attr014": ("nlriochecker.checks.attributen",),
     "attr015": ("nlriochecker.checks.attributen",),
     "deelstelsel": ("nlriochecker.checks.verbanden",),
+    "eindpunten": ("nlriochecker.checks.verbanden",),
     "ext": ("nlriochecker.checks.extern", "nlriochecker.checks.wegvakken"),
     "geo": ("nlriochecker.checks.extern", "nlriochecker.checks.meetkunde"),
     "hgt": ("nlriochecker.checks.hoogten",),
@@ -206,9 +207,10 @@ class CheckContext:
         vasthouden; die ene `cast` is de prijs. Hij is veilig zolang een sleutel
         altijd met dezelfde `bouw` gevuld wordt, en daar zorgt het voorvoegsel voor:
         elk voorvoegsel heeft een eigenaar. `hgt:` en `rvz:` zijn van hun eigen
-        checkmodule; `sel:` en `aansluitingen:` zijn juist gedeeld en horen bij
-        `checks/selectie.py` respectievelijk `checks/verbanden.py`, die als enige
-        die sleutels vullen; `ext:` is van de EXT-familie en heeft er twee --
+        checkmodule; `sel:`, `aansluitingen:` en `eindpunten:` zijn juist gedeeld en
+        horen bij `checks/selectie.py` respectievelijk `checks/verbanden.py` (die
+        laatste twee allebei), die als enige die sleutels vullen; `ext:` is van de
+        EXT-familie en heeft er twee --
         `checks/extern.py`, waar EXT-003 zijn kruisingenlijst onder bewaart, en
         `checks/wegvakken.py`, dat EXT-009 is. `geo:` draagt de gedeelde
         geometrietabellen (issue #123) en heeft er ook twee: `checks/meetkunde.py`

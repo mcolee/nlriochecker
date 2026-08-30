@@ -8,7 +8,7 @@ from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext
-from nlriochecker.checks.verbanden import afvoerpad_van_streng, afvoerpaden
+from nlriochecker.checks.verbanden import _eindpunten, afvoerpad_van_streng, afvoerpaden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -149,6 +149,37 @@ def test_afvoerpad_loopt_door_een_telbaar_hulpstuk() -> None:
     assert pad is not None
     # A -> T1 -> O -> gemaal: drie stappen van 50 m, met het T-stuk als doorgeefknoop.
     assert (pad.eindpunt, pad.stappen, pad.meters) == (_uri(dataset, "G"), 3, 150.0)
+
+
+def test_eindpunten_wordt_per_context_een_keer_gebouwd() -> None:
+    """Twee aanroepen leveren hetzelfde exemplaar; de tweede scant niets opnieuw.
+
+    Vier plekken vragen deze verzameling op, waarvan een tweemaal, en elke aanroep kostte
+    een volledige `of_class`-scan per wortelklasse over alle objecten van de export
+    (issue #124). Het exemplaar wordt gedeeld: wie hem opvraagt leest hem en muteert hem
+    niet.
+    """
+    context = _context("net_afvoerpad_keten.ttl")
+
+    assert _eindpunten(context, "afvoer_eindpunt") is _eindpunten(context, "afvoer_eindpunt")
+
+
+def test_elke_eindpuntrol_heeft_een_eigen_cachesleutel() -> None:
+    """De twee rollen delen geen sleutel; een botsing zou stil de verkeerde lijst geven.
+
+    Dezelfde reden als bij `sel:` in `test_checks_selectie.py`: het cachewoordenboek is
+    privé, en van buiten is een botsing niet te zien -- NET-008 zou dan de afvoereindpunten
+    voor lozingspunten aanzien zonder dat er iets faalt. De keten draagt een gemaal en geen
+    lozingspunt, dus de twee rollen horen hier verschillende antwoorden te geven.
+    """
+    context = _context("net_afvoerpad_keten.ttl")
+
+    afvoer = _eindpunten(context, "afvoer_eindpunt")
+    lozing = _eindpunten(context, "lozings_eindpunt")
+
+    assert {"eindpunten:afvoer_eindpunt", "eindpunten:lozings_eindpunt"} <= set(context._cache)
+    assert afvoer == {_uri(context.dataset, "G")}
+    assert lozing == set()
 
 
 def test_knoop_zonder_afvoerpad_staat_niet_in_de_uitkomst() -> None:

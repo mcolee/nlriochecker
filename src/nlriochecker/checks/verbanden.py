@@ -357,7 +357,24 @@ def _eindpunten(context: CheckContext, rol: str) -> set[str]:
     dat alleen aan het persnet hangt is wel degelijk een eindpunt, maar komt in de
     vrijvervalgraaf niet voor. Die graaf is een deelverzameling van deze, dus voor de
     lezers die met vrijvervalknopen werken verandert er niets.
+
+    Een keer per context en per rol, net als de acht andere afgeleide structuren in dit
+    bestand (issue #124). Elke aanroep kostte anders een volledige `of_class`-scan per
+    wortelklasse over alle objecten van de export, en er zijn vijf aanroepplekken:
+    `_eindpuntset` in `checks/netwerk.py` (drie bellers), `_ZonderAfvoerpad`,
+    NET-008 en `_uitstroompunten` hieronder, die er twee rollen tegelijk opvraagt.
+
+    **De uitkomst is gedeeld: wie hem opvraagt leest hem en muteert hem niet.** Alle
+    huidige bellers houden zich daaraan -- ze verenigen hem in een eigen verzameling
+    (`gevonden |= ...`), snijden ermee (`deel & endpoints`) of maken er een nieuwe van
+    (`a | b`). Een nieuwe beller die de verzameling wél wijzigt, wijzigt hem voor alle
+    andere.
     """
+    return context.cached(f"eindpunten:{rol}", lambda: _bouw_eindpunten(context, rol))
+
+
+def _bouw_eindpunten(context: CheckContext, rol: str) -> set[str]:
+    """Scant de wortelklassen van deze rol en houdt de knopen over die in de graaf staan."""
     graaf = _bereikbaarheid(context)
     dataset = context.dataset
     return {
