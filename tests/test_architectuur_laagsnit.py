@@ -47,14 +47,10 @@ CHECKMODULES = frozenset(pad.stem for pad in (BRON / PAKKET / "checks").glob("*.
 # **Deze lijst mag alleen krimpen.** Elke regel is logica die een schrijver uit de engine
 # haalt, en elke regel is dus een plek waar laag en uitslag uit elkaar kunnen lopen. Wie
 # hier iets toevoegt schrijft de reden erbij; wie een import overbodig maakt haalt de
-# regel weg. Issue #122 haalt naar verwachting de eerste regel eruit: als het
-# feitenkanaal `aanwijzingen_van` overbodig maakt, verdwijnt die import uit `gpkg.py`.
+# regel weg. Issue #122 heeft dat gedaan: het feitenkanaal maakte `aanwijzingen_van`
+# overbodig, en daarmee verdween de regel voor `checks.randvoorzieningen` uit `gpkg.py`.
 MAG_UIT_CHECKSUBMODULE: dict[str, dict[str, frozenset[str]]] = {
     "nlriochecker/uitvoer/gpkg.py": {
-        # De aanwijzingen van RVZ-006 reizen door de boodschaptekst; die ene plek
-        # schrijft en leest het formaat, zodat het vlak niet iets anders kan zeggen dan
-        # de melding ernaast (BO-84).
-        f"{PAKKET}.checks.randvoorzieningen": frozenset({"aanwijzingen_van"}),
         # Het mechanische riool krijgt geen richtingspijl en geen beoordeelde kleuring
         # (issue #74); de schrijver heeft de rol dus zelf nodig.
         f"{PAKKET}.checks.selectie": frozenset({"mechanischeleidingen"}),
@@ -219,9 +215,9 @@ def test_geen_enkele_allowlistregel_is_verouderd() -> None:
     Zonder deze test is "alleen krimpen" een instructie in een docstring: een import die
     verdwijnt laat zijn regel achter, en die regel houdt de deur open voor precies die
     import zonder dat er nog een reden voor is. Hij gaat pas af nádat een import
-    weggehaald is -- issue #122 haalt naar verwachting `aanwijzingen_van` uit `gpkg.py`
-    -- en dwingt dan alleen het opruimen van de regel af, niet het behouden van de
-    import.
+    weggehaald is -- issue #122 haalde `aanwijzingen_van` uit `gpkg.py`, en deze test
+    ging af tot de regel eronder ook weg was -- en dwingt dan alleen het opruimen van de
+    regel af, niet het behouden van de import.
     """
     feitelijk = {
         (pad, module, naam)

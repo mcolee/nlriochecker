@@ -175,6 +175,74 @@ def test_cluster_id_komt_mee_uit_de_netwerkchecks() -> None:
     assert meldingen[0].cluster_id.startswith("ds-")
 
 
+# Issue #122: het feitenkanaal naast de meldingenstroom. Een check declareert met
+# `feit_sleutels` welke detailsleutels de uitvoer mag lezen; ze reizen in een zijmap
+# `melding_id -> feiten` en niet in een veld op `Melding` -- dat zou reflectief in de
+# bevroren JSON-envelop landen.
+AANWIJZINGEN_KOP = "Aanwijzingen: "
+AANWIJZING_SCHEIDING = "; "
+
+
+def test_de_zijmap_draagt_de_gedeclareerde_feiten_van_rvz006() -> None:
+    """Elke RVZ-006-melding krijgt haar twee aanwijzingen als eigen rij in de zijmap.
+
+    De waarden zijn per constructie hetzelfde als wat de boodschap achter
+    `Aanwijzingen: ` draagt -- de GeoPackage parseerde die zin tot issue #122 terug om er
+    weer twee feiten uit te winnen. Deze test legt de gelijkheid vast, zodat de popup en
+    de zin niet uit elkaar kunnen lopen.
+    """
+    stroom = bouw_meldingenstroom(_run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006"), RUNDATUM)
+
+    rvz = [melding for melding in stroom.meldingen if melding.check_id == "RVZ-006"]
+    assert rvz
+    for melding in rvz:
+        staart = melding.boodschap.partition(AANWIJZINGEN_KOP)[2].rstrip(".")
+        aandeel, _, overige = staart.partition(AANWIJZING_SCHEIDING)
+        assert stroom.feiten[melding.melding_id] == {
+            "aandeel_gemengd": aandeel,
+            "overige_aanwijzingen": overige,
+        }
+
+
+def test_een_check_zonder_feit_sleutels_laat_geen_rij_in_de_zijmap_achter() -> None:
+    """Geen algemeen doorgeefluik: alleen wat een check declareert reist mee.
+
+    TOP-001 declareert niets, dus zijn `details` blijven waar ze zijn -- net zoals
+    `id_sleutels` alleen doorlaat wat de check benoemt.
+    """
+    stroom = bouw_meldingenstroom(_run("top001_losliggende_put.ttl", "TOP-001"), RUNDATUM)
+
+    assert stroom.meldingen
+    assert stroom.feiten == {}
+
+
+def _run_rvz006_onderdrukt(klassen: Sequence[str] = (), checks: Sequence[str] = ()) -> CheckRun:
+    """RVZ-006 op de gemengde fixture, met de twee lijsten uit `[rapport]` gezet."""
+    config = _config()
+    config.rapport.onderdruk_klassen = list(klassen)
+    config.rapport.onderdruk_checks = list(checks)
+    dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl", [])
+    return run_checks(CheckContext(dataset=dataset, config=config), ["RVZ-006"])
+
+
+def test_wat_onderdrukt_wordt_laat_ook_geen_feit_achter() -> None:
+    """De zijmap blijft gelijk aan de lijst: wat `[rapport]` wegliet bereikt niemand.
+
+    Zowel op check-ID als op de klasse van het hoofdobject (BO-49). Zou de map de
+    weggevallen meldingen houden, dan droeg zij feiten waar geen melding meer bij hoort.
+    """
+    ongefilterd = bouw_meldingenstroom(_run_rvz006_onderdrukt(), RUNDATUM)
+    assert ongefilterd.feiten
+
+    op_check = bouw_meldingenstroom(_run_rvz006_onderdrukt(checks=["RVZ-006"]), RUNDATUM)
+    op_klasse = bouw_meldingenstroom(_run_rvz006_onderdrukt(klassen=["Leiding"]), RUNDATUM)
+
+    assert op_check.onderdrukking.per_check == {"RVZ-006": len(ongefilterd.feiten)}
+    assert op_klasse.onderdrukking.per_klasse == {"Leiding": len(ongefilterd.feiten)}
+    assert op_check.feiten == {}
+    assert op_klasse.feiten == {}
+
+
 def test_check_boven_de_drempel_heet_systemisch() -> None:
     """De drempel is configureerbaar; hier verlaagd om het gedrag te tonen.
 

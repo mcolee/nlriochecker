@@ -86,29 +86,20 @@ class Trefferregister:
     """De externe objecten die de checks tijdens deze run geraakt hebben."""
 
     _treffers: dict[str, Treffer] = field(default_factory=dict)
-    _afstanden: dict[tuple[str, str, str], float] = field(default_factory=dict)
     _zonder_id: dict[str, set[str]] = field(default_factory=dict)
 
-    def registreer(
-        self,
-        treffer: Treffer,
-        *,
-        check_id: str,
-        object_uri: str,
-        afstand_m: float | None = None,
-    ) -> str:
+    def registreer(self, treffer: Treffer, *, check_id: str, object_uri: str) -> str:
         """Legt een treffer vast en levert zijn sleutel terug.
 
         De eerste registratie van een sleutel wint; de geometrie is per sleutel per
-        definitie dezelfde. `afstand_m` hoort bij deze ene melding en niet bij de
-        treffer -- twee objecten kunnen hetzelfde pand op verschillende afstand raken
-        -- en wordt daarom bewaard onder de drie velden die elke melding wél draagt.
-        `Melding` zelf draagt de afstand niet, dus dit is de enige weg waarlangs de
-        schrijver hem exact voor de meldingen van déze uitvoer kan terugvinden.
+        definitie dezelfde.
+
+        Tot issue #122 bewaarde dit register daarnaast de afstand per melding, omdat
+        `Finding.details` de meldingenstroom niet haalde. Die weg loopt nu over
+        `Check.feit_sleutels` en de zijmap `Meldingenstroom.feiten`; hier blijft
+        uitsluitend de opzoektabel op sleutel over.
         """
         self._treffers.setdefault(treffer.sleutel, treffer)
-        if afstand_m is not None:
-            self._afstanden[(treffer.sleutel, check_id, object_uri)] = afstand_m
         return treffer.sleutel
 
     def meld_zonder_id(self, check_id: str, bronbestand: str) -> None:
@@ -128,10 +119,6 @@ class Trefferregister:
     def get(self, sleutel: str) -> Treffer | None:
         """De treffer bij deze sleutel, of None als hij niet geregistreerd is."""
         return self._treffers.get(sleutel)
-
-    def afstand(self, sleutel: str, check_id: str, object_uri: str) -> float | None:
-        """De afstand die bij deze melding hoort, of None."""
-        return self._afstanden.get((sleutel, check_id, object_uri))
 
     def __len__(self) -> int:
         """Het aantal verschillende getroffen objecten."""

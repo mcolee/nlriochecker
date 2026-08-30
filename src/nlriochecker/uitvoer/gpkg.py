@@ -41,7 +41,6 @@ from shapely.ops import unary_union
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
-from nlriochecker.checks.randvoorzieningen import aanwijzingen_van
 from nlriochecker.checks.selectie import mechanischeleidingen
 from nlriochecker.checks.treffers import Treffer, Wegvakoordeel
 from nlriochecker.checks.verbanden import (
@@ -59,6 +58,7 @@ from nlriochecker.uitvoer.melding import (
     BRON_NULMETING,
     BRON_REGISTER,
     GEEN_ONDERDRUKKING,
+    Feiten,
     Melding,
     Onderdrukking,
     categorie_van,
@@ -194,6 +194,7 @@ def schrijf_geopackage(
     *,
     voortgang: Voortgang = NUL_VOORTGANG,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    feiten: Feiten | None = None,
 ) -> Path:
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
 
@@ -207,6 +208,13 @@ def schrijf_geopackage(
     `gwsw_run` daarover meldt. De meldingen die `[rapport]` wegliet zitten niet in
     `meldingen`, en zonder die telling zou het bestand niet zeggen dat er iets
     weggelaten is (BO-49).
+
+    `feiten` komt uit dezelfde stroom (issue #122): de detailwaarden die RVZ-006 en
+    EXT-001 met `Check.feit_sleutels` doorgeven, per melding-ID. Hij heeft een default,
+    net als `onderdrukking`, maar geen stille terugval: draagt een melding van een van
+    die twee checks geen rij, dan faalt het luid. Zonder die bewaking zou een aanroeper
+    die de map vergeet de feitenregel van elk deelstelselvlak en de kolom
+    `afstand_min_m` stil leeg laten lopen.
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)
@@ -222,7 +230,7 @@ def schrijf_geopackage(
         verbinding = sqlite3.connect(doel)
         _leg_fundament(verbinding)
         tellingen = _schrijf_features(
-            verbinding, run, meldingen, binnen, run_datum, voortgang, onderdrukking
+            verbinding, run, meldingen, feiten or {}, binnen, run_datum, voortgang, onderdrukking
         )
         _schrijf_meldingen(verbinding, meldingen)
         voortgang.stap(label="meldingen")
@@ -487,6 +495,7 @@ def _schrijf_features(
     verbinding: sqlite3.Connection,
     run: CheckRun,
     meldingen: list[Melding],
+    feiten: Feiten,
     binnen: frozenset[str] | None,
     run_datum: date,
     voortgang: Voortgang = NUL_VOORTGANG,
@@ -615,7 +624,7 @@ def _schrijf_features(
         voortgang.stap(label=laag)
 
     vlakken, gemengd, zonder_vlak, wegvakken = _schrijf_vlakken(
-        verbinding, run, config, meldingen, voortgang
+        verbinding, run, config, meldingen, feiten, voortgang
     )
 
     return _LaagTellingen(
@@ -689,7 +698,8 @@ def _reden_niet_beoordeeld(
 # De EXT-checks die een extern vlak aanwijzen. Alleen hun meldingen worden op het
 # trefferregister gejoind; een andere check met een `object2_uri` (een SHACL-paar) wijst
 # geen extern object aan en hoort niet in deze laag.
-VLAK_CHECKS = ("EXT-001", "EXT-003")
+CHECK_KRUISING_BOUWWERK = "EXT-001"
+VLAK_CHECKS = (CHECK_KRUISING_BOUWWERK, "EXT-003")
 
 # De soort van een vlak volgt op één plek uit `Treffer.bron`: de rol waarmee de check hem
 # registreerde. Panden komen uit twee bronnen (BGT en BAG) maar zijn dezelfde soort.
@@ -776,6 +786,7 @@ def _schrijf_vlakken(
     run: CheckRun,
     config: CheckConfig,
     meldingen: list[Melding],
+    feiten: Feiten,
     voortgang: Voortgang,
 ) -> tuple[int, int, int, int]:
     """Schrijft de laag `vlakken`: alles wat bij een melding hoort en geen punt of lijn is.
@@ -811,8 +822,10 @@ def _schrijf_vlakken(
         "rode; de groene en grijze staan wel in deze tabel (kolom `status`) maar niet op "
         "de kaart (BO-85).",
     )
-    gemengd, gemengd_grenzen, zonder_vlak = _gemengde_deelstelselrijen(run, config, meldingen)
-    treffers, treffer_grenzen = _trefferrijen(run, meldingen)
+    gemengd, gemengd_grenzen, zonder_vlak = _gemengde_deelstelselrijen(
+        run, config, meldingen, feiten
+    )
+    treffers, treffer_grenzen = _trefferrijen(run, meldingen, feiten)
     wegvakken, wegvak_grenzen = _wegvakrijen(run, meldingen)
     # De grote vlakken voorop: de rijvolgorde is in QGIS ook de tekenvolgorde, en
     # andersom zouden de deelstelsels en de straatvlakken de panden eronder overdekken.
@@ -851,7 +864,30 @@ def _vlak_label(treffer: Treffer) -> str:
     return treffer.label
 
 
-def _trefferrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], _Grenzen]:
+def _eis_feiten(feiten: Feiten, meldingen: list[Melding], wat: str) -> None:
+    """Faalt luid als een melding die de laag nodig heeft geen rij in de zijmap draagt.
+
+    De derde bewaking naast die op het trefferregister en die op de deelstelsel-ID's, en
+    om dezelfde reden: hier zou de laag niet kleiner worden dan de uitslag maar stil
+    ánders -- een feitenregel zonder aandeel, een lege `afstand_min_m` -- en dat valt aan
+    het bestand niet af te zien. `Meldingenstroom.feiten` vult de rij voor elke bevinding
+    van een check die `feit_sleutels` declareert, dus een gat betekent dat schrijver en
+    stroom niet uit dezelfde run komen.
+    """
+    ontbreekt = sorted(
+        melding.melding_id for melding in meldingen if melding.melding_id not in feiten
+    )
+    if ontbreekt:
+        raise PipelineError(
+            f"laag 'vlakken': {len(ontbreekt)} {wat}-melding(en) dragen geen feiten in de "
+            f"meldingenstroom ({', '.join(ontbreekt[:5])}). De laag zou stil anders zijn dan "
+            "de uitslag; geef `schrijf_geopackage` de `feiten` van dezelfde stroom mee."
+        )
+
+
+def _trefferrijen(
+    run: CheckRun, meldingen: list[Melding], feiten: Feiten
+) -> tuple[list[tuple], _Grenzen]:
     """De rijen voor de externe objecten waarnaar de EXT-meldingen verwijzen.
 
     Pand, bouwwerk en water in dezelfde laag (issue #67); de soort staat in de kolom
@@ -893,7 +929,7 @@ def _trefferrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple],
         rijen.append(
             (
                 _blob(_als_multipolygon(treffer.geometrie)),
-                *_trefferrij(run, treffer, per_treffer[sleutel]),
+                *_trefferrij(treffer, per_treffer[sleutel], feiten),
             )
         )
 
@@ -904,10 +940,22 @@ def _trefferrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple],
             f"({', '.join(sorted(ontbreekt)[:5])}). De laag zou stil kleiner zijn dan de "
             f"uitslag; controleer of de check zijn treffer registreert."
         )
+    # Alleen EXT-001 draagt een afstand; EXT-003 declareert geen `feit_sleutels` en
+    # laat `afstand_min_m` per ontwerp leeg (`checks/extern.py`).
+    _eis_feiten(
+        feiten,
+        [
+            melding
+            for groep in per_treffer.values()
+            for melding in groep
+            if melding.check_id == CHECK_KRUISING_BOUWWERK
+        ],
+        CHECK_KRUISING_BOUWWERK,
+    )
     return rijen, grenzen
 
 
-def _trefferrij(run: CheckRun, treffer: Treffer, verwijzend: list[Melding]) -> tuple[object, ...]:
+def _trefferrij(treffer: Treffer, verwijzend: list[Melding], feiten: Feiten) -> tuple[object, ...]:
     """De attribuutvelden van een extern vlak, in kolomvolgorde.
 
     De vier deelstelselkolommen blijven leeg: die gelden alleen voor een gemengd
@@ -923,7 +971,7 @@ def _trefferrij(run: CheckRun, treffer: Treffer, verwijzend: list[Melding]) -> t
         treffer.bronbestand,
         _vlak_label(treffer),
         _sterkste_relatie(verwijzend),
-        _kleinste_afstand(run, treffer.sleutel, verwijzend),
+        _kleinste_afstand(feiten, verwijzend),
         len(verwijzend),
         _check_ids(verwijzend),
         None,
@@ -960,18 +1008,21 @@ def _sterkste_relatie(meldingen: list[Melding]) -> str:
     return min(relaties, key=RELATIE_STERKTE.index)
 
 
-def _kleinste_afstand(run: CheckRun, sleutel: str, meldingen: list[Melding]) -> float | None:
+def _kleinste_afstand(feiten: Feiten, meldingen: list[Melding]) -> float | None:
     """De kleinste afstand over de verwijzende meldingen, of None.
 
-    `Melding` draagt de afstand niet -- die zit in `Finding.details` en komt daar niet
-    doorheen -- dus hij komt uit het trefferregister, opgezocht op de drie velden die
-    elke melding wel draagt.
+    Uit de zijmap van de meldingenstroom (issue #122): EXT-001 declareert `afstand_m`
+    als feit, dus de waarde hoort bij precies deze melding. Leeg blijft de kolom alleen
+    waar geen enkele verwijzende melding een afstand draagt -- bij water, dat van
+    EXT-003 komt.
+
+    Getoetst wordt op `is not None` en niet op waarheid: `"0.0"` is een geldige afstand
+    (een object binnen een pand) en zou anders wegvallen.
     """
     afstanden = [
-        afstand
+        float(waarde)
         for melding in meldingen
-        if (afstand := run.treffers.afstand(sleutel, melding.check_id, melding.object_uri))
-        is not None
+        if (waarde := feiten.get(melding.melding_id, {}).get("afstand_m")) is not None
     ]
     return min(afstanden) if afstanden else None
 
@@ -1006,6 +1057,7 @@ def _gemengde_deelstelselrijen(
     run: CheckRun,
     config: CheckConfig,
     meldingen: list[Melding],
+    feiten: Feiten,
 ) -> tuple[list[tuple], _Grenzen, int]:
     """De rijen voor de gemengde deelstelsels; geeft ook de niet-tekenbare terug.
 
@@ -1054,6 +1106,11 @@ def _gemengde_deelstelselrijen(
             f"({', '.join(onbekend[:5])}). De laag zou stil kleiner zijn dan de uitslag; "
             f"controleer of de check en deze schrijver dezelfde context lezen."
         )
+    _eis_feiten(
+        feiten,
+        [melding for groep in per_cluster.values() for melding in groep],
+        CHECK_GEMENGD_ZONDER_OVERSTORT,
+    )
 
     index = strengen_per_knoop(run.context)
     rijen = []
@@ -1071,7 +1128,7 @@ def _gemengde_deelstelselrijen(
             (
                 _blob(_als_multipolygon(geometrie)),
                 *_gemengd_rij(
-                    cluster, putknopen(run.context, knopen), conduits, per_cluster[cluster]
+                    cluster, putknopen(run.context, knopen), conduits, per_cluster[cluster], feiten
                 ),
             )
         )
@@ -1117,6 +1174,7 @@ def _gemengd_rij(
     putten: set[str],
     conduits: list[Conduit],
     meldingen: list[Melding],
+    feiten: Feiten,
 ) -> tuple[object, ...]:
     """De attribuutvelden van een gemengd-deelstelselvlak, in kolomvolgorde.
 
@@ -1143,11 +1201,16 @@ def _gemengd_rij(
     De feitenregels dragen sinds issue #106 de aanwijzingen van de check: het aandeel
     gemengde strengen naast het aantal gemelde, en de overige aanwijzingen op een eigen
     regel. Ze komen uit de eerste melding van het cluster -- de aanwijzingen gelden voor
-    het deelstelsel, dus elke melding ervan draagt dezelfde zin -- en niet uit een eigen
-    afleiding hier: dan zou het vlak iets anders kunnen zeggen dan de melding ernaast.
+    het deelstelsel, dus elke melding ervan draagt dezelfde feiten -- en niet uit een
+    eigen afleiding hier: dan zou het vlak iets anders kunnen zeggen dan de melding
+    ernaast. Sinds issue #122 komen ze uit de zijmap van de meldingenstroom en niet meer
+    uit de boodschaptekst: die is een mensgerichte Nederlandse zin, en elke
+    herformulering ervan brak de popup stilzwijgend.
     """
     strenglengte = sum(conduit.line.length for conduit in conduits if conduit.line is not None)
-    aandeel, overige = aanwijzingen_van(meldingen[0].boodschap)
+    eigen = feiten[meldingen[0].melding_id]
+    aandeel = eigen.get("aandeel_gemengd", "")
+    overige = eigen.get("overige_aanwijzingen", "")
     kop = Objectkop(
         label=cluster,
         objecttype=SOORT_GEMENGD_DEELSTELSEL,

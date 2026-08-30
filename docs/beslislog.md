@@ -4657,8 +4657,11 @@ bewoording (`_rvz006_aanwijzingen` in `checks/randvoorzieningen.py`):
 Per soort noemt de melding er hooguit drie, op URI-volgorde, gevolgd door "… en N meer";
 zo blijft zij leesbaar en geeft zij bij twee runs op dezelfde data dezelfde tekst. De
 diagnose wordt een keer per deelstelsel gerekend: elke gemengde streng ervan draagt
-dezelfde zin. Het vlak in de GeoPackage leest ze uit de eerste melding van zijn cluster
-terug (`aanwijzingen_van`), want `Finding.details` bereikt de meldingenstroom niet.
+dezelfde zin. Het vlak in de GeoPackage leest ze van de eerste melding van zijn cluster.
+Tot issue #122 parseerde het daarvoor die zin terug (`aanwijzingen_van`), omdat
+`Finding.details` de meldingenstroom niet haalde; sindsdien declareert de check de twee
+stukken als `feit_sleutels` (`aandeel_gemengd`, `overige_aanwijzingen`) en reizen zij in
+de zijmap `Meldingenstroom.feiten` mee. De zin zelf verandert er geen teken door.
 
 **Waarom.** De analyse van RVZ-006 klopte, maar de melding zei niet waardóór een
 deelstelsel los lag of onvolledig was; bij de review van alle 99 vlakken (29-08-2026) moest

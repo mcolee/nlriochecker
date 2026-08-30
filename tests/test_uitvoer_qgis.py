@@ -66,7 +66,7 @@ from nlriochecker.checkconfig import load_check_config  # noqa: E402
 from nlriochecker.checks import CheckContext, run_checks  # noqa: E402
 from nlriochecker.checks.treffers import Wegvakoordeel, Wegvakregister  # noqa: E402
 from nlriochecker.uitvoer.gpkg import FEATURELAGEN, schrijf_geopackage  # noqa: E402
-from nlriochecker.uitvoer.melding import bouw_meldingen  # noqa: E402
+from nlriochecker.uitvoer.melding import bouw_meldingenstroom  # noqa: E402
 from test_uitvoer_symbolen import VLAKKEN_LEGENDA  # noqa: E402
 
 pytestmark = pytest.mark.qgis
@@ -94,7 +94,8 @@ def geschreven_gpkg(tmp_path_factory) -> Path:
     dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config))
     map_ = tmp_path_factory.mktemp("qgis")
-    return schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), map_, RUNDATUM)
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    return schrijf_geopackage(run, stroom.meldingen, map_, RUNDATUM, feiten=stroom.feiten)
 
 
 @pytest.fixture(scope="module")
@@ -105,7 +106,8 @@ def gpkg_met_deelstelselvlak(tmp_path_factory) -> Path:
     dataset = load_dataset(TTL_DIR / "rvz006_gemengd_zonder_overstort.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config), ["RVZ-006"])
     map_ = tmp_path_factory.mktemp("qgis_vlak")
-    return schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), map_, RUNDATUM)
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    return schrijf_geopackage(run, stroom.meldingen, map_, RUNDATUM, feiten=stroom.feiten)
 
 
 @pytest.fixture(scope="module")
@@ -142,9 +144,8 @@ def gpkg_met_wegvakken(tmp_path_factory) -> Path:
         )
     met_wegvakken = replace(run, wegvakken=register)
     map_ = tmp_path_factory.mktemp("qgis_wegvak")
-    return schrijf_geopackage(
-        met_wegvakken, bouw_meldingen(met_wegvakken, RUNDATUM), map_, RUNDATUM
-    )
+    stroom = bouw_meldingenstroom(met_wegvakken, RUNDATUM)
+    return schrijf_geopackage(met_wegvakken, stroom.meldingen, map_, RUNDATUM, feiten=stroom.feiten)
 
 
 @pytest.mark.parametrize("laag", FEATURELAGEN)

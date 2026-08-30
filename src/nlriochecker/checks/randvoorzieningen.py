@@ -57,8 +57,9 @@ from nlriochecker.checks.verbanden import (
 )
 
 # De vaste inleiding van de aanwijzingen in de RVZ-006-melding, en het scheidingsteken
-# ertussen. De GeoPackage leest ze uit de boodschap terug (`aanwijzingen_van`), want
-# `Finding.details` bereikt de meldingenstroom niet; de vorm staat daarom op één plek.
+# ertussen. Ze horen bij de zin die de lezer krijgt; de GeoPackage leest de twee feiten
+# sinds issue #122 uit de zijmap van de meldingenstroom (`feit_sleutels`) en niet meer
+# uit deze tekst terug.
 AANWIJZINGEN_KOP = "Aanwijzingen: "
 AANWIJZING_SCHEIDING = "; "
 
@@ -489,22 +490,6 @@ def _lozingspunt_uris(context: CheckContext) -> frozenset[str]:
     )
 
 
-def aanwijzingen_van(boodschap: str) -> tuple[str, str]:
-    """De aanwijzingen uit een RVZ-006-boodschap: het aandeel gemengd en de rest.
-
-    De GeoPackage zet het aandeel op de feitenregel met de gemelde strengen en de rest op
-    een eigen regel. Splitsen op de eerste puntkomma volstaat en is het enige wat werkt:
-    alleen het aandeel is een aanwijzing zonder puntkomma erin.
-
-    De aanwijzingen reizen door de boodschap en niet door `Finding.details`, want de
-    meldingenstroom laat details niet doorstromen -- alleen de gereserveerde sleutels
-    (`uitvoer/melding.py`). Vandaar dat de vorm hier staat, naast de code die haar schrijft.
-    """
-    staart = boodschap.partition(AANWIJZINGEN_KOP)[2].rstrip(".")
-    aandeel, _, rest = staart.partition(AANWIJZING_SCHEIDING)
-    return aandeel, rest
-
-
 @register
 class RandvoorzieningNietAangesloten(Check):
     """RVZ-001: een randvoorziening die topologisch nergens op uitkomt."""
@@ -767,6 +752,10 @@ class GemengdDeelstelselZonderOverstort(Check):
     # De snapping-tolerantie is geen GWSW-kenmerk maar de enige grens die de aanwijzingen
     # gebruiken (issue #106); zij staat hier zodat de dekkingsmatrix haar noemt.
     kenmerken = ("config:drempels.snapping_tolerantie_m",)
+    # De twee feiten die het deelstelselvlak in de GeoPackage op zijn feitenregel zet
+    # (issue #122). Ze staan ook in de boodschap, maar de popup leest ze hier: een
+    # mensgerichte zin terugparseren breekt stil bij elke herformulering ervan.
+    feit_sleutels = ("aandeel_gemengd", "overige_aanwijzingen")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt gemengde deelstelsels zonder overstort of zonder afvoereindpunt.
@@ -822,6 +811,11 @@ class GemengdDeelstelselZonderOverstort(Check):
                     knopen_in_deelstelsel=len(putten),
                     gemengde_strengen=len(strengen),
                     cluster_id=cluster,
+                    # Dezelfde twee stukken als de zin hierboven draagt, apart voor de
+                    # popup van het deelstelselvlak (issue #122). Het aandeel staat per
+                    # constructie op plek 0 en is de enige aanwijzing zonder `; ` erin.
+                    aandeel_gemengd=aanwijzingen[0],
+                    overige_aanwijzingen=AANWIJZING_SCHEIDING.join(aanwijzingen[1:]),
                 )
 
     def notes(self, context: CheckContext) -> list[str]:

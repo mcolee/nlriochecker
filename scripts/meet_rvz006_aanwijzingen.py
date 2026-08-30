@@ -7,9 +7,11 @@ via de gewone engine over de De Wolden en Hoogeveen-export en telt per soort aan
 de deelstelsels die haar dragen. De uitslag verandert er niet door -- het aantal
 meldingen en deelstelsels hoort gelijk te blijven aan de run ervoor.
 
-Het script leest de meldingstekst terug in plaats van de diagnosefunctie opnieuw aan te
+Het script leest de bevinding terug in plaats van de diagnosefunctie opnieuw aan te
 roepen: zo meet het wat de lezer werkelijk te zien krijgt. Een meting die de code
-tweemaal aanroept meet alleen zichzelf.
+tweemaal aanroept meet alleen zichzelf. Sinds issue #122 leest het de twee
+gedeclareerde feiten (`aandeel_gemengd`, `overige_aanwijzingen`) uit `Finding.details`
+in plaats van ze uit de zin terug te parseren -- dezelfde twee stukken, korter.
 
 Bewaard omdat een getal in een BO of een issue een script hoort te hebben dat het
 herhaalt (BO-43). Gemeten op commit c6f42b5 (na issue #105).
@@ -28,8 +30,7 @@ from gwsw_orox_helpers.cache import laad_met_cache
 from gwsw_orox_helpers.dataset import markeer_vulwaarden
 
 from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
-from nlriochecker.checks import CheckContext, run_checks
-from nlriochecker.checks.randvoorzieningen import aanwijzingen_van
+from nlriochecker.checks import CheckContext, Finding, run_checks
 
 DATASET = Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl")
 PROJECTCONFIG = Path("configs/dewoldenhoogeveen.toml")
@@ -52,9 +53,10 @@ MINDERHEID = "aandeel gemengd < helft"
 GEEN = "geen van deze"
 
 
-def soorten_van(boodschap: str) -> set[str]:
-    """De soorten aanwijzing in een RVZ-006-melding."""
-    aandeel, overige = aanwijzingen_van(boodschap)
+def soorten_van(bevinding: Finding) -> set[str]:
+    """De soorten aanwijzing in een RVZ-006-bevinding, uit haar gedeclareerde feiten."""
+    aandeel = str(bevinding.details["aandeel_gemengd"])
+    overige = str(bevinding.details["overige_aanwijzingen"])
     gevonden = {naam for naam, fragment in FRAGMENTEN if fragment in overige}
     treffer = AANDEEL.match(aandeel)
     if treffer is not None and 2 * int(treffer[1]) < int(treffer[2]):
@@ -76,7 +78,7 @@ def main() -> None:
 
     per_deelstelsel: dict[str, set[str]] = {}
     for bevinding in outcome.findings:
-        per_deelstelsel[bevinding.details["cluster_id"]] = soorten_van(bevinding.message)
+        per_deelstelsel[str(bevinding.details["cluster_id"])] = soorten_van(bevinding)
 
     print(f"{CHECK}: {len(outcome.findings)} meldingen op {len(per_deelstelsel)} deelstelsels")
     print(f"bekeken: {outcome.examined} gemengde strengen")

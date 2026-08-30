@@ -298,6 +298,10 @@ class KruisingMetBouwwerk(_ExterneCheck):
     dimension = Dimension.PLAUSIBILITY
     rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
     kenmerken = ()
+    # De afstand die de kolom `afstand_min_m` van de laag `vlakken` vult (issue #122).
+    # Zij hoort bij deze ene melding en niet bij het pand -- twee objecten kunnen
+    # hetzelfde pand op verschillende afstand raken -- dus reist zij per melding mee.
+    feit_sleutels = ("afstand_m",)
     rol = "bgt_pand"
     soort = "vrijvervalstrengen en putten"
 
@@ -326,9 +330,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
             if geraakt is None:
                 continue
             relatie, afstand, laag, vorm, attributen = geraakt
-            sleutel, aanduiding = self._registreer(
-                context, object_, laag, vorm, attributen, afstand
-            )
+            sleutel, aanduiding = self._registreer(context, object_, laag, vorm, attributen)
             yield self.finding(
                 context,
                 object_.uri,
@@ -351,7 +353,6 @@ class KruisingMetBouwwerk(_ExterneCheck):
         laag: VectorLayer,
         vorm: BaseGeometry,
         attributen: dict[str, object],
-        afstand: float,
     ) -> tuple[str, str]:
         """Legt het geraakte bouwwerk vast en levert sleutel en aanduiding terug.
 
@@ -379,7 +380,6 @@ class KruisingMetBouwwerk(_ExterneCheck):
             ),
             check_id=self.id,
             object_uri=object_.uri,
-            afstand_m=round(afstand, 3),
         )
         return sleutel, aanduiding
 

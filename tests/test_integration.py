@@ -586,7 +586,7 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
     en geen eigenschap van deze test.
     """
     from nlriochecker.uitvoer.gpkg import schrijf_geopackage
-    from nlriochecker.uitvoer.melding import bouw_meldingen
+    from nlriochecker.uitvoer.melding import bouw_meldingenstroom
 
     dataset = load_dataset(
         OROX_DEWOLDENHOOGEVEEN, [ONTOLOGIE_TOTAAL], fallback_encoding=FALLBACK_ENCODING
@@ -595,9 +595,10 @@ def test_ext_lagen_op_dewoldenhoogeveen(tmp_path: Path) -> None:
         dataset=dataset, config=load_check_config(), bronnen=_koekangerveld_bronnen()
     )
     run = run_checks(context, ["EXT-001", "EXT-003"])
-    meldingen = bouw_meldingen(run, RUNDATUM)
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    meldingen = stroom.meldingen
 
-    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM, feiten=stroom.feiten)
 
     verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
     try:

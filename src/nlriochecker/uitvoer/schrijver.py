@@ -126,6 +126,7 @@ def schrijf_uitvoer(
             run_datum,
             voortgang=voortgang,
             onderdrukking=stroom.onderdrukking,
+            feiten=stroom.feiten,
         )
         if met_geopackage
         else None

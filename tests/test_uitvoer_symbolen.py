@@ -319,14 +319,15 @@ def test_een_type_met_een_afwijkende_schrijfwijze_valt_niet_in_het_vangnet(
     from nlriochecker.checkconfig import load_check_config
     from nlriochecker.checks import CheckContext, run_checks
     from nlriochecker.uitvoer.gpkg import schrijf_geopackage
-    from nlriochecker.uitvoer.melding import bouw_meldingen
+    from nlriochecker.uitvoer.melding import bouw_meldingenstroom
 
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
     dataset = load_dataset(TTL_DIR / "mechanisch_riool.ttl", [])
     run = run_checks(CheckContext(dataset=dataset, config=config))
+    stroom = bouw_meldingenstroom(run, date(2026, 8, 19))
     pad = schrijf_geopackage(
-        run, bouw_meldingen(run, date(2026, 8, 19)), tmp_path, date(2026, 8, 19)
+        run, stroom.meldingen, tmp_path, date(2026, 8, 19), feiten=stroom.feiten
     )
 
     verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)

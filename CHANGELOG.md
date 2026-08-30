@@ -13,6 +13,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Een feitenkanaal naast de meldingenstroom** (issue #122): een check declareert met
+  `Check.feit_sleutels` welke detailsleutels de uitvoer mag lezen, en die reizen als tekst
+  mee in de zijmap `Meldingenstroom.feiten` (`melding_id -> sleutel -> waarde`) --
+  ontstaan naast de lijst, mee door de onderdrukking, nooit geserialiseerd. Geen veld op
+  `Melding`, dus de JSON-envelop en `SCHEMA_VERSIE` blijven ongemoeid. Daarmee vervallen
+  twee omwegen in de GeoPackage-schrijver: de popup van een RVZ-006-deelstelselvlak
+  parseert de Nederlandse boodschapzin niet meer terug (`randvoorzieningen.aanwijzingen_van`
+  is weg, en met haar de laatste import van `uitvoer/gpkg.py` uit `checks.randvoorzieningen`)
+  en de kolom `afstand_min_m` komt uit de melding in plaats van uit een tweede woordenboek
+  op het trefferregister (`Trefferregister._afstanden` en `afstand()` zijn weg). Beide
+  lezers hebben een luide bewaking gekregen, naast die op het trefferregister en die op de
+  deelstelsel-ID's. De uitslag verandert niet: dezelfde checks, dezelfde teksten, dezelfde
+  CSV, JSON, popup en afstanden.
 - **Vier drifthekken op afspraken die alleen in proza stonden** (issue #118): de laagsnit
   en de bevroren leeslaag-API (`tests/test_architectuur_laagsnit.py`, met een gevulde,
   krimpende allowlist van toegestane checksubmodule-imports in `uitvoer/`; de regel zelf

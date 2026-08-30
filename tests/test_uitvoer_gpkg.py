@@ -69,8 +69,14 @@ def _run(bestand: str, *check_ids: str) -> CheckRun:
 
 
 def _schrijf(run: CheckRun, map_: Path) -> Path:
-    """Schrijft de GeoPackage van een run."""
-    return schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), map_, RUNDATUM)
+    """Schrijft de GeoPackage van een run, uit één meldingenstroom.
+
+    Meldingen én feiten komen uit dezelfde stroom (issue #122); de schrijver eist dat
+    ook luid, want een feitenloze aanroep zou de popup van een deelstelselvlak en de
+    kolom `afstand_min_m` stil anders maken dan de uitslag.
+    """
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    return schrijf_geopackage(run, stroom.meldingen, map_, RUNDATUM, feiten=stroom.feiten)
 
 
 def _rijen(pad: Path, sql: str, *parameters) -> list[tuple]:
@@ -418,10 +424,13 @@ def test_stapelnummering_is_onafhankelijk_van_lijstvolgorde(tmp_path: Path) -> N
     kan leiden.
     """
     run = _run("top005_dubbele_put.ttl")
-    meldingen = bouw_meldingen(run, RUNDATUM)
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    meldingen = stroom.meldingen
 
-    eerste_pad = schrijf_geopackage(run, meldingen, tmp_path / "a", RUNDATUM)
-    tweede_pad = schrijf_geopackage(run, list(reversed(meldingen)), tmp_path / "b", RUNDATUM)
+    eerste_pad = schrijf_geopackage(run, meldingen, tmp_path / "a", RUNDATUM, feiten=stroom.feiten)
+    tweede_pad = schrijf_geopackage(
+        run, list(reversed(meldingen)), tmp_path / "b", RUNDATUM, feiten=stroom.feiten
+    )
 
     eerste = {
         melding_id: (aantal, nummer)
@@ -685,8 +694,9 @@ def _laagrijen(pad: Path, laag: str) -> list[dict]:
 def test_vlakkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) -> None:
     """De kerntest: niets erbij, niets eraf. Eén laag voor alle checks uit VLAK_CHECKS."""
     run = _ext_run()
-    meldingen = bouw_meldingen(run, RUNDATUM)
-    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    meldingen = stroom.meldingen
+    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM, feiten=stroom.feiten)
 
     verwacht = {m.object2_uri for m in meldingen if m.check_id in VLAK_CHECKS and m.object2_uri}
 
@@ -700,7 +710,7 @@ def test_vlakkenlaag_is_exact_de_verzameling_uit_de_meldingen(tmp_path: Path) ->
 def test_pandvlak_wordt_ontdubbeld_met_de_sterkste_relatie(tmp_path: Path) -> None:
     """Vier objecten raken hetzelfde pand: één rij, vier meldingen, binnen wint."""
     run = _ext_run()
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+    pad = _schrijf(run, tmp_path)
 
     panden = [rij for rij in _laagrijen(pad, "vlakken") if rij["soort"] == "pand"]
 
@@ -729,7 +739,7 @@ def test_watervlakken_blijven_bestaan_en_hangen_aan_ext003(tmp_path: Path) -> No
     doorkruising door de als zinker geregistreerde streng 3, die EXT-003 overslaat.
     """
     run = _ext_run()
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+    pad = _schrijf(run, tmp_path)
 
     water = {rij["id"]: rij for rij in _laagrijen(pad, "vlakken") if rij["soort"] == "water"}
 
@@ -802,7 +812,7 @@ def test_nabij_geval_komt_in_de_laag(tmp_path: Path) -> None:
     )
     run = _run_met_bronnen(bronnen, "EXT-001")
 
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
+    pad = _schrijf(run, tmp_path / "uit")
     rijen = _laagrijen(pad, "vlakken")
 
     assert [rij["id"] for rij in rijen] == ["bgt:pand/p-nabij"]
@@ -810,6 +820,22 @@ def test_nabij_geval_komt_in_de_laag(tmp_path: Path) -> None:
     assert rijen[0]["relatie"] == "nabij"
     assert rijen[0]["aantal_meldingen"] == 2
     assert rijen[0]["afstand_min_m"] == 0.5
+
+
+def test_afstand_zonder_zijmap_faalt_luid(tmp_path: Path) -> None:
+    """Issue #122: dezelfde bewaking voor de EXT-001-afstand als voor het deelstelselvlak.
+
+    De kolom `afstand_min_m` komt sinds dit issue uit de zijmap en niet meer uit een
+    tweede woordenboek op het trefferregister. Zonder bewaking zou een aanroeper die de
+    map vergeet de kolom stil leeg laten lopen.
+    """
+    bronnen = _bronnen_met_pand(
+        tmp_path / "bron", [({"lokaal_id": "p-nabij"}, box(1000, 2000.5, 1010, 2005))]
+    )
+    run = _run_met_bronnen(bronnen, "EXT-001")
+
+    with pytest.raises(PipelineError, match="feiten"):
+        schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
 
 
 def test_bron_zonder_id_levert_een_geo_sleutel(tmp_path: Path) -> None:
@@ -821,7 +847,7 @@ def test_bron_zonder_id_levert_een_geo_sleutel(tmp_path: Path) -> None:
     )
     run = _run_met_bronnen(bronnen, "EXT-001")
 
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path / "uit", RUNDATUM)
+    pad = _schrijf(run, tmp_path / "uit")
     rijen = _laagrijen(pad, "vlakken")
 
     assert rijen[0]["id"].startswith("geo:")
@@ -851,7 +877,7 @@ def test_geo_sleutel_is_stabiel_over_runs(tmp_path: Path) -> None:
 def test_runmetadata_telt_de_vlakkenlaag_mee(tmp_path: Path) -> None:
     """Het aantal vlakken hoort ook in gwsw_run te staan, net als de andere lagen."""
     run = _ext_run()
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+    pad = _schrijf(run, tmp_path)
 
     (aantal,) = _rijen(pad, "select n_vlakken from gwsw_run")[0]
 
@@ -877,7 +903,7 @@ def test_de_vlakkenlaag_draagt_beide_bronnen_naast_elkaar(tmp_path: Path) -> Non
     context = CheckContext(dataset=dataset, config=_config(), bronnen=_ext_bronnen())
     run = run_checks(context, [*VLAK_CHECKS, "RVZ-006"])
 
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+    pad = _schrijf(run, tmp_path)
 
     rijen = _laagrijen(pad, "vlakken")
     deelstelsels = [rij for rij in rijen if rij["soort"] == VLAK_SOORT_GEMENGD]
@@ -900,7 +926,7 @@ def test_de_vlakkenlaag_draagt_beide_bronnen_naast_elkaar(tmp_path: Path) -> Non
 def test_watervlak_subtype_noemt_type_en_label_de_identificatie(tmp_path: Path) -> None:
     """`subtype` is om op te filteren, `label` is om iets in terug te vinden."""
     run = _ext_run()
-    pad = schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
+    pad = _schrijf(run, tmp_path)
 
     rij = next(r for r in _laagrijen(pad, "vlakken") if r["id"] == "bgt:waterdeel/water-1")
 
@@ -1322,11 +1348,11 @@ def test_gemengd_vlak_zwijgt_niet_over_systemisch_genoemde_meldingen(tmp_path: P
     De fixture meldt op beide gemengde strengen (2 van 2), dus de vlag staat aan.
     """
     run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
-    meldingen = bouw_meldingen(run, RUNDATUM)
-    rvz = [melding for melding in meldingen if melding.check_id == "RVZ-006"]
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    rvz = [melding for melding in stroom.meldingen if melding.check_id == "RVZ-006"]
     assert rvz and all(melding.systemisch for melding in rvz)
 
-    pad = schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+    pad = schrijf_geopackage(run, stroom.meldingen, tmp_path, RUNDATUM, feiten=stroom.feiten)
 
     ((popup,),) = _rijen(pad, "select popup_html from vlakken where soort = ?", VLAK_SOORT_GEMENGD)
     assert "RVZ-006" in popup
@@ -1390,6 +1416,21 @@ def test_onbekend_deelstelsel_id_faalt_luid(tmp_path: Path) -> None:
 
     with pytest.raises(PipelineError, match="ds-bestaat-niet"):
         schrijf_geopackage(run, meldingen, tmp_path, RUNDATUM)
+
+
+def test_deelstelselvlak_zonder_zijmap_faalt_luid(tmp_path: Path) -> None:
+    """Issue #122: een aanroeper die de feiten vergeet krijgt geen stille lege popupregel.
+
+    Het aandeel gemengd en de overige aanwijzingen komen sinds dit issue uit de zijmap
+    van de meldingenstroom. Zou de schrijver bij een ontbrekende rij terugvallen op een
+    lege tekst, dan miste de popup van elk deelstelselvlak zijn tweede feitenregel zonder
+    dat er iets van te zien was -- dezelfde stille afwijking tussen laag en uitslag die
+    de twee bewakingen hierboven uitsluiten.
+    """
+    run = _run("rvz006_gemengd_zonder_overstort.ttl", "RVZ-006")
+
+    with pytest.raises(PipelineError, match="feiten"):
+        schrijf_geopackage(run, bouw_meldingen(run, RUNDATUM), tmp_path, RUNDATUM)
 
 
 # Issue #65: onderdrukking uit `[rapport]`. De fixture: vrijvervalstreng L1 (GemengdRiool)

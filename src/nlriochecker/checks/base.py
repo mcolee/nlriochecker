@@ -269,6 +269,10 @@ class CheckOutcome:
     # bouwt er de toelichtingsregel "Toetst <klassen> op <kenmerken>" mee op.
     rollen: tuple[str, ...] = ()
     kenmerken: tuple[str, ...] = ()
+    # Issue #122: overgenomen uit de checkklasse, net als `id_sleutels`. De
+    # meldingenlaag vult er de zijmap `Meldingenstroom.feiten` mee; hier met een
+    # default, want `id_sleutels` hierboven staat vóór de eerste default.
+    feit_sleutels: tuple[str, ...] = ()
     # Issue #96: de deelpopulatie in woorden van een check zonder rollen, overgenomen
     # uit de checkklasse. De uitvoerlaag zet hem in de regel "Toetst ..." waar anders
     # "de hele export" zou staan.
@@ -520,6 +524,14 @@ class Check(ABC):
     # per strengeinde. Heeft een check een eigen onderscheid, dan declareert ze dat
     # hier; de meldingenlaag waarschuwt als er toch twee dezelfde ID krijgen.
     id_sleutels: ClassVar[tuple[str, ...]] = ("zijde",)
+    # Issue #122: de detailsleutels die deze check aan de uitvoer doorgeeft. Dezelfde
+    # vorm als `id_sleutels` hierboven, en met dezelfde reden: `Finding.details` haalt
+    # de meldingenstroom niet, en een algemeen doorgeefluik zou elke detailsleutel van
+    # elke check tot een uitvoercontract maken. Wat hier staat reist mee in de zijmap
+    # `Meldingenstroom.feiten` -- niet in een veld op `Melding`, want dat landt
+    # reflectief in de bevroren JSON-envelop. Optioneel, anders moeten 99 checks een
+    # lege tuple opschrijven.
+    feit_sleutels: ClassVar[tuple[str, ...]] = ()
     # Checks die over de hele populatie gaan in plaats van over losse objecten
     # (ADM-002: dubbele identificaties kunnen overal in de export zitten). Ze
     # draaien ook met een studiegebied op de volledige export. Een project kan
@@ -708,6 +720,7 @@ def run_checks(
                     examined=check.examined(gebruikt),
                     findings=bevindingen,
                     id_sleutels=check.id_sleutels,
+                    feit_sleutels=check.feit_sleutels,
                     volledig_bereik=check.volledig_bereik,
                     notes=check.notes(gebruikt),
                     skeleton=check.markering if isinstance(check, SkeletonCheck) else "",

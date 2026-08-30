@@ -102,6 +102,22 @@ alleen het bestand waarin zij staat is verhuisd.
   bereikt geen enkele schrijver. Het rapport (verantwoording), `totaal/synthese.md`,
   `gwsw_run` (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en de
   JSON-envelop (`onderdrukt`) dragen de telling; de CSV niet. Zie BO-49.
+- **Het feitenkanaal naast de vijf gereserveerde detailsleutels** (issue #122).
+  `Finding.details` haalt de meldingenstroom niet: `_alle_meldingen` leest alleen
+  `object2_uri`, `object2_label`, `waarde`, `drempel` en `cluster_id`, en al het andere
+  valt weg. Een check die meer aan de uitvoer wil doorgeven declareert dat met
+  `Check.feit_sleutels` -- dezelfde vorm als `id_sleutels`, en geen algemeen doorgeefluik:
+  alleen wat er staat reist mee. De waarden landen als tekst in `Meldingenstroom.feiten`,
+  een zijmap `melding_id -> sleutel -> waarde` die nooit geserialiseerd wordt en met de
+  meldingenlijst mee door de onderdrukking gaat. Bewust géén veld op `Melding`:
+  `uitvoer/bevindingen.py` bouwt de JSON-rijen reflectief uit `fields(Melding)`, dus zo'n
+  veld landt vanzelf in de bevroren envelop en dat is een schemabesluit met een bump van
+  `SCHEMA_VERSIE`. Twee checks gebruiken het kanaal, en alleen de GeoPackage-schrijver
+  leest het: RVZ-006 (`aandeel_gemengd`, `overige_aanwijzingen`, voor de feitenregel van
+  het deelstelselvlak) en EXT-001 (`afstand_m`, voor de kolom `afstand_min_m`). Beide
+  hebben in `gpkg.py` een luide bewaking naast die op het trefferregister en die op de
+  deelstelsel-ID's: draagt zo'n melding geen rij in de zijmap, dan faalt het in plaats van
+  stil een lege popupregel of een lege kolom te schrijven.
 - Het bevindingenrapport van `toets` leest van gebied naar detail: gebiedsnaam als
   titel, aantallen (objecttype x stelseltype over de kern, leidingen ook in meters),
   managementsamenvatting (een regel per CFK plus de eigen checks; vinkje = nul fouten),
@@ -287,11 +303,11 @@ alleen het bestand waarin zij staat is verhuisd.
   elkaar tot één regel; het zijn dus geen drie regels in de popup. Die twee laatste
   elementen komen uit de **eerste melding van het
   cluster** en niet uit een eigen afleiding hier: de aanwijzingen gelden voor het
-  deelstelsel, dus elke melding ervan draagt dezelfde zin, en een tweede afleiding zou het
-  vlak iets anders kunnen laten zeggen dan de melding ernaast. Ze reizen door de
-  boodschaptekst omdat `Finding.details` de meldingenstroom niet haalt -- alleen de
-  gereserveerde sleutels komen erdoor -- en `randvoorzieningen.aanwijzingen_van` schrijft
-  en leest dat formaat op een plek. Zie BO-84. `gwsw_run`
+  deelstelsel, dus elke melding ervan draagt dezelfde feiten, en een tweede afleiding zou
+  het vlak iets anders kunnen laten zeggen dan de melding ernaast. Ze reizen sinds issue
+  #122 door het feitenkanaal hieronder en niet meer door de boodschaptekst: die is een
+  mensgerichte zin, en de schrijver parseerde haar terug om er weer twee feiten uit te
+  winnen -- elke herformulering brak de popup stilzwijgend. Zie BO-84. `gwsw_run`
   telt deze rijen apart in `n_gemengd_zonder_overstort`, naast `n_vlakken` dat de hele laag
   telt; het aantal externe vlakken is het verschil. Twee dingen kunnen er minder vlakken
   opleveren dan er gemelde deelstelsels zijn, en

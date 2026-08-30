@@ -55,21 +55,11 @@ def test_lege_waarde_telt_niet_als_id() -> None:
 def test_registreren_ontdubbelt_op_de_sleutel() -> None:
     register = Trefferregister()
 
-    register.registreer(_treffer(), check_id="EXT-001", object_uri="urn:a", afstand_m=0.0)
-    register.registreer(_treffer(), check_id="EXT-001", object_uri="urn:b", afstand_m=0.5)
+    register.registreer(_treffer(), check_id="EXT-001", object_uri="urn:a")
+    register.registreer(_treffer(), check_id="EXT-001", object_uri="urn:b")
 
     assert len(register) == 1
     assert register.get("bgt:pand/p1") is not None
-
-
-def test_afstand_wordt_per_melding_bewaard() -> None:
-    """`Melding` draagt de afstand niet; de schrijver moet hem hier terugvinden."""
-    register = Trefferregister()
-    register.registreer(_treffer(), check_id="EXT-001", object_uri="urn:a", afstand_m=0.0)
-    register.registreer(_treffer(), check_id="EXT-001", object_uri="urn:b", afstand_m=0.5)
-
-    assert register.afstand("bgt:pand/p1", "EXT-001", "urn:b") == 0.5
-    assert register.afstand("bgt:pand/p1", "EXT-001", "urn:onbekend") is None
 
 
 def test_registreren_levert_de_sleutel_terug() -> None:

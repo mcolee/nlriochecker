@@ -20,7 +20,11 @@ from shapely.geometry import LineString, box
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
-from nlriochecker.checks.extern import MARKERING_BUITEN_SCOPE, MARKERING_NIET_TOETSBAAR
+from nlriochecker.checks.extern import (
+    MARKERING_BUITEN_SCOPE,
+    MARKERING_NIET_TOETSBAAR,
+    KruisingMetBouwwerk,
+)
 from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
@@ -506,15 +510,24 @@ def test_ext001_registreert_de_treffer_met_geometrie(
     assert len(run.treffers) == 1
 
 
-def test_ext001_bewaart_de_afstand_per_melding(config: CheckConfig, bronnen: ExternalData) -> None:
-    """`Melding` draagt de afstand niet; de laag haalt hem uit het register."""
+def test_ext001_geeft_de_afstand_als_gedeclareerd_feit_door(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """De afstand hoort bij deze ene melding en reist sinds issue #122 als feit mee.
+
+    Tot dat issue bewaarde het trefferregister hem in een tweede woordenboek, omdat
+    `Finding.details` de meldingenstroom niet haalde; nu declareert de check hem met
+    `feit_sleutels` en leest de laag `vlakken` hem uit de zijmap van de stroom.
+    """
     dataset = load_dataset(SCENARIO, [])
     context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
 
     run = run_checks(context, ["EXT-001"])
     streng = next(f for f in run.findings if f.object_label == "1")
 
-    assert run.treffers.afstand("bgt:pand/pand-1", "EXT-001", streng.object_uri) == 0.0
+    assert KruisingMetBouwwerk.feit_sleutels == ("afstand_m",)
+    assert streng.details["afstand_m"] == 0.0
+    assert streng.details["object2_uri"] == "bgt:pand/pand-1"
 
 
 def test_ext001_verandert_zijn_uitslag_niet(config: CheckConfig, bronnen: ExternalData) -> None:

@@ -139,7 +139,7 @@ def _stroom_met_alle_velden(run: CheckRun) -> Meldingenstroom:
     meldingen[doel] = replace(
         meldingen[doel], drempel="0.10", gebied="Testgebied", foutlocatie=ONRONDE_LOCATIE
     )
-    return Meldingenstroom(meldingen, stroom.onderdrukking)
+    return Meldingenstroom(meldingen, stroom.onderdrukking, stroom.feiten)
 
 
 @pytest.fixture(scope="module")

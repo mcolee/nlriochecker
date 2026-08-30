@@ -58,6 +58,14 @@ SLEUTEL_WAARDE = "waarde"
 SLEUTEL_DREMPEL = "drempel"
 SLEUTEL_CLUSTER = "cluster_id"
 
+# Het feitenkanaal naast die vijf (issue #122): per melding-ID de detailsleutels die
+# haar check met `Check.feit_sleutels` declareerde, als tekst. Een zijmap en geen veld
+# op `Melding`, want `uitvoer/bevindingen.py` bouwt de JSON-rijen reflectief uit
+# `fields(Melding)` -- een veld erbij landt dus vanzelf in de bevroren envelop, en dat
+# is een schemabesluit. Deze map wordt nergens geserialiseerd: alleen de
+# GeoPackage-schrijver leest haar.
+Feiten = dict[str, dict[str, str]]
+
 
 @dataclass(frozen=True)
 class Melding:
@@ -153,6 +161,10 @@ class Meldingenstroom:
 
     meldingen: list[Melding]
     onderdrukking: Onderdrukking
+    # Per melding-ID de feiten die haar check declareerde (issue #122). Alleen gevuld
+    # voor de checks met `feit_sleutels`; hij loopt gelijk op met `meldingen`, dus wat
+    # de onderdrukking wegliet laat ook geen feit achter.
+    feiten: Feiten = field(default_factory=dict)
 
 
 def bouw_meldingenstroom(run: CheckRun, run_datum: date) -> Meldingenstroom:
@@ -162,7 +174,8 @@ def bouw_meldingenstroom(run: CheckRun, run_datum: date) -> Meldingenstroom:
     `[rapport] onderdruk_klassen` en `onderdruk_checks` gelezen worden: wat hier wegvalt
     bereikt geen enkele schrijver. Zie BO-49.
     """
-    return _onderdruk(_alle_meldingen(run, run_datum), run)
+    meldingen, feiten = _alle_meldingen(run, run_datum)
+    return _onderdruk(meldingen, feiten, run)
 
 
 def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
@@ -170,7 +183,7 @@ def bouw_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
     return bouw_meldingenstroom(run, run_datum).meldingen
 
 
-def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
+def _onderdruk(meldingen: list[Melding], feiten: Feiten, run: CheckRun) -> Meldingenstroom:
     """Houdt de meldingen uit de stroom die `[rapport]` onderdrukt, en telt ze.
 
     Eerst op check-ID, dan op de klasse van het hoofdobject (`object_uri`, niet
@@ -179,6 +192,9 @@ def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
 
     Wat op klasse wegvalt telt in beide tellingen mee: onder haar wortel in `per_klasse`
     en onder haar check-ID in `per_check`. Zie `Onderdrukking` voor de reden.
+
+    De zijmap loopt mee: alleen de feiten van de meldingen die overblijven gaan de
+    stroom in. Wat `[rapport]` wegliet laat ook geen feit achter (issue #122, BO-49).
     """
     rapport = run.config.rapport
     checks = set(rapport.onderdruk_checks)
@@ -203,6 +219,11 @@ def _onderdruk(meldingen: list[Melding], run: CheckRun) -> Meldingenstroom:
         Onderdrukking(
             tuple(rapport.onderdruk_klassen), tuple(rapport.onderdruk_checks), per_check, per_klasse
         ),
+        {
+            melding.melding_id: feiten[melding.melding_id]
+            for melding in over
+            if melding.melding_id in feiten
+        },
     )
 
 
@@ -219,14 +240,19 @@ def _onderdrukte_klasse(run: CheckRun, object_uri: str, klassen: list[str]) -> s
     return next((wortel for wortel in klassen if run.dataset.is_a(object_uri, wortel)), None)
 
 
-def _alle_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
-    """De drie bronnen samengesteld, vóór de onderdrukking."""
+def _alle_meldingen(run: CheckRun, run_datum: date) -> tuple[list[Melding], Feiten]:
+    """De drie bronnen samengesteld, vóór de onderdrukking, plus de zijmap met feiten.
+
+    Alleen een checkbevinding kan feiten dragen: een nulmelding en een datasetsignaal
+    hebben geen `Finding` en dus geen `details`.
+    """
     config = run.config
     scope = SCOPE_BINNEN if run.study_area is not None else SCOPE_GEEN_GEBIED
     gebied = run.study_area.gebied if run.study_area is not None else ""
     kritiek = set(config.klassen.kritiek)
 
     meldingen: list[Melding] = []
+    feiten: Feiten = {}
     gebruikte_ids: set[str] = set()
     for outcome in run.outcomes:
         outcome_systemisch = _is_systemisch(outcome, config)
@@ -237,6 +263,13 @@ def _alle_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
             systemisch = outcome_systemisch or finding.systemisch
             kenmerk = _uniek_id_van_finding(finding, sleutels, gebruikte_ids)
             gebruikte_ids.add(kenmerk)
+            if outcome.feit_sleutels:
+                # De sleutel is het al ontdubbelde melding-ID, dus botsen kan niet.
+                feiten[kenmerk] = {
+                    sleutel: _tekst(finding.details[sleutel])
+                    for sleutel in outcome.feit_sleutels
+                    if sleutel in finding.details
+                }
             meldingen.append(
                 Melding(
                     melding_id=kenmerk,
@@ -268,7 +301,7 @@ def _alle_meldingen(run: CheckRun, run_datum: date) -> list[Melding]:
 
     meldingen += _nulmeldingen(run, run_datum, scope, gebied, kritiek, gebruikte_ids)
     meldingen += _signaalmeldingen(run, run_datum, scope, gebruikte_ids)
-    return meldingen
+    return meldingen, feiten
 
 
 def _signaalmeldingen(
