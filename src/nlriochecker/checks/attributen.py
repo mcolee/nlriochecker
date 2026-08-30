@@ -1385,6 +1385,12 @@ def _property_tellingen(context: CheckContext) -> dict[str, _PropertyTelling]:
     aanroepen in plaats van 2 x 459.108. De twee verzamelingen lopen over alle triples met
     die predicaten, ook die van niet-kenmerkinstanties; dat is de prijs.
     """
+    # Zonder klassenhierarchie draagt geen enkel kenmerktype een property-restrictie en is
+    # de uitkomst leeg. Zonder deze poort zouden de twee sweeps hieronder er alsnog circa
+    # 460.000 paren (21 MB) voor bouwen; `--geen-ontologie` is een expliciet ondersteunde
+    # modus en hoort daar niet voor te betalen. `notes()` meldt die toestand apart.
+    if not context.dataset.kenmerk_property:
+        return {}
     graph = context.dataset.graph
     met_waarde = {subject for subject, _ in graph.subject_objects(HAS_VALUE)}
     met_referentie = {subject for subject, _ in graph.subject_objects(HAS_REFERENCE)}

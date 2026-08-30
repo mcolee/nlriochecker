@@ -207,9 +207,9 @@ class CheckContext:
         vasthouden; die ene `cast` is de prijs. Hij is veilig zolang een sleutel
         altijd met dezelfde `bouw` gevuld wordt, en daar zorgt het voorvoegsel voor:
         elk voorvoegsel heeft een eigenaar. `hgt:` en `rvz:` zijn van hun eigen
-        checkmodule; `sel:`, `aansluitingen:` en `eindpunten:` zijn juist gedeeld en
-        horen bij `checks/selectie.py` respectievelijk `checks/verbanden.py` (die
-        laatste twee allebei), die als enige die sleutels vullen; `ext:` is van de
+        checkmodule; `sel:`, `aansluitingen:` en `eindpunten:` zijn juist gedeeld --
+        `sel:` hoort bij `checks/selectie.py`, `aansluitingen:` en `eindpunten:` bij
+        `checks/verbanden.py`; die modules vullen die sleutels als enige. `ext:` is van de
         EXT-familie en heeft er twee --
         `checks/extern.py`, waar EXT-003 zijn kruisingenlijst onder bewaart, en
         `checks/wegvakken.py`, dat EXT-009 is. `geo:` draagt de gedeelde

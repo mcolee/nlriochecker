@@ -86,10 +86,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
-- **De twee laatste herhaalde graafscans zijn gededupliceerd** (issue #124): `_eindpunten`
-  in `checks/verbanden.py` staat achter `context.cached` (sleutel `eindpunten:<rol>`), net
-  als de acht andere afgeleide structuren in dat bestand -- vijf plekken vroegen hem op en
-  elke aanroep kostte een volledige `of_class`-scan per wortelklasse. En
+- **Twee resterende herhaalde graafscans zijn gededupliceerd** (issue #124): `_eindpunten`
+  in `checks/verbanden.py` staat achter `context.cached` (sleutel `eindpunten:<rol>`, een
+  `frozenset` omdat de uitkomst gedeeld is), net als de acht andere afgeleide structuren in
+  dat bestand -- vier plekken vroegen hem op, één ervan tweemaal, en elke aanroep kostte een
+  volledige `of_class`-scan per wortelklasse. En
   `_property_tellingen` van ATTR-014 leest of een kenmerkinstantie `hasValue` dan wel
   `hasReference` draagt uit twee indexsweeps (`GraafIndex.subject_objects`) in plaats van
   uit twee `graph.value`-aanroepen per instantie; de echte waarde is alleen nog nodig waar

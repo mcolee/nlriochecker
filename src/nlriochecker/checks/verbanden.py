@@ -350,7 +350,7 @@ def _stijgt(conduit: Conduit) -> bool:
     return verval is not None and verval < 0
 
 
-def _eindpunten(context: CheckContext, rol: str) -> set[str]:
+def _eindpunten(context: CheckContext, rol: str) -> frozenset[str]:
     """De knopen in de graaf die als eindpunt van deze soort afvoer gelden.
 
     Getoetst op de bereikbaarheidsgraaf en niet op het zuivere vrijverval: een gemaal
@@ -360,29 +360,29 @@ def _eindpunten(context: CheckContext, rol: str) -> set[str]:
 
     Een keer per context en per rol, net als de acht andere afgeleide structuren in dit
     bestand (issue #124). Elke aanroep kostte anders een volledige `of_class`-scan per
-    wortelklasse over alle objecten van de export, en er zijn vijf aanroepplekken:
-    `_eindpuntset` in `checks/netwerk.py` (drie bellers), `_ZonderAfvoerpad`,
-    NET-008 en `_uitstroompunten` hieronder, die er twee rollen tegelijk opvraagt.
+    wortelklasse over alle objecten van de export, en er zijn vier aanroepplekken --
+    `_eindpuntset` en `_ZonderAfvoerpad._bouw_onbereikbaar` in `checks/netwerk.py`,
+    NET-008, en `_uitstroompunten` hieronder, die hem tweemaal aanroept.
 
-    **De uitkomst is gedeeld: wie hem opvraagt leest hem en muteert hem niet.** Alle
-    huidige bellers houden zich daaraan -- ze verenigen hem in een eigen verzameling
-    (`gevonden |= ...`), snijden ermee (`deel & endpoints`) of maken er een nieuwe van
-    (`a | b`). Een nieuwe beller die de verzameling wél wijzigt, wijzigt hem voor alle
-    andere.
+    **Een `frozenset`, want de uitkomst is gedeeld.** Alle bellers lezen hem alleen -- ze
+    verenigen hem in een eigen verzameling (`gevonden |= ...`), snijden ermee
+    (`deel & endpoints`) of maken er een nieuwe van (`a | b`) -- en het type houdt dat zo:
+    een beller die de gedeelde verzameling zou wijzigen, wijzigt hem voor alle andere, en
+    dat hoort niet van een docstring af te hangen.
     """
     return context.cached(f"eindpunten:{rol}", lambda: _bouw_eindpunten(context, rol))
 
 
-def _bouw_eindpunten(context: CheckContext, rol: str) -> set[str]:
+def _bouw_eindpunten(context: CheckContext, rol: str) -> frozenset[str]:
     """Scant de wortelklassen van deze rol en houdt de knopen over die in de graaf staan."""
     graaf = _bereikbaarheid(context)
     dataset = context.dataset
-    return {
+    return frozenset(
         uri
         for wortel in getattr(context.config.klassen, rol)
         for uri in dataset.of_class(wortel)
         if uri in graaf
-    }
+    )
 
 
 @dataclass(frozen=True)
@@ -403,8 +403,12 @@ class Afvoer:
 
 
 def _uitstroompunten(context: CheckContext) -> set[str]:
-    """De knopen die als uitstroompunt gelden: afvoer- en lozingseindpunten samen."""
-    return _eindpunten(context, "afvoer_eindpunt") | _eindpunten(context, "lozings_eindpunt")
+    """De knopen die als uitstroompunt gelden: afvoer- en lozingseindpunten samen.
+
+    Een gewone `set`: de vereniging van twee `frozenset`s is er zelf een, en die zou het
+    deelverbod van `_eindpunten` doorgeven aan een beller die hem niet deelt.
+    """
+    return set(_eindpunten(context, "afvoer_eindpunt") | _eindpunten(context, "lozings_eindpunt"))
 
 
 def afvoerpaden(context: CheckContext) -> dict[str, Afvoer]:

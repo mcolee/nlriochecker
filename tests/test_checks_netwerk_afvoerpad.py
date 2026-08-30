@@ -154,10 +154,10 @@ def test_afvoerpad_loopt_door_een_telbaar_hulpstuk() -> None:
 def test_eindpunten_wordt_per_context_een_keer_gebouwd() -> None:
     """Twee aanroepen leveren hetzelfde exemplaar; de tweede scant niets opnieuw.
 
-    Vier plekken vragen deze verzameling op, waarvan een tweemaal, en elke aanroep kostte
-    een volledige `of_class`-scan per wortelklasse over alle objecten van de export
-    (issue #124). Het exemplaar wordt gedeeld: wie hem opvraagt leest hem en muteert hem
-    niet.
+    Er zijn vier aanroepplekken, waarvan `_uitstroompunten` hem tweemaal aanroept, en elke
+    aanroep kostte een volledige `of_class`-scan per wortelklasse over alle objecten van de
+    export (issue #124). Het exemplaar wordt gedeeld; dat het een `frozenset` is, houdt een
+    beller ervan af het voor alle andere te wijzigen.
     """
     context = _context("net_afvoerpad_keten.ttl")
 

@@ -46,7 +46,9 @@ KENMERKLEZERS = frozenset({"aspect", "number", "reference", "date"})
 
 # De methoden die een dynamische rol als tekst krijgen; het tweede argument (of `rol=`)
 # is een veldnaam uit `[klassen]`.
-DYNAMISCHE_ROL_HELPERS = frozenset({"aansluitingen", "_eindpunten", "_bouw_aansluitingen"})
+DYNAMISCHE_ROL_HELPERS = frozenset(
+    {"aansluitingen", "_bouw_aansluitingen", "_eindpunten", "_bouw_eindpunten"}
+)
 
 # Module-eigen hulpfuncties die zich als kenmerklezer gedragen: de naam koppelt aan de
 # positie van het kenmerk-argument. `_waarde(context, subject, "Drempelniveau")` in

@@ -10,11 +10,22 @@ kenmerk en het aantal bevindingen per check; het bewijs dat de deduplicatie werk
 
 Waarom dit script onder `scripts/` staat en niet in een scratchpad (BO-43): het
 onderbouwt de getallen in issue #124 en in het `CHANGELOG`, en het is de enige manier om
-ze na een codewijziging opnieuw te meten. Het meet de HUIDIGE toestand -- er zit geen
-monkeypatch in. Draai hem vóór en ná de wijziging en vergelijk de twee JSON-bestanden:
+ze na een codewijziging opnieuw te meten.
+
+**Wat het script wel en niet doet.** Het meet één toestand: de code zoals die op dít
+moment in de werkboom staat, zonder monkeypatch. Het vergelijkt niets en het wisselt geen
+broncode om. Een voor/na-vergelijking maak je door hem twee keer te draaien met de
+wijziging ertussenin, en de twee JSON-bestanden naast elkaar te leggen:
 
     uv run python scripts/meet_graafscans.py --uit uitvoer/meting_124_voor.json
     uv run python scripts/meet_graafscans.py --uit uitvoer/meting_124_na.json
+
+Het veld `commit` in de uitslag zegt welke toestand gemeten is; het draagt `-vuil` zodra er
+ongecommitte wijzigingen in `src/` staan. De vijf-runs-per-kant-tijdmeting van issue #124
+komt dus **niet** uit dit script: die is gedraaid door een wikkel die `--alleen-tijd
+--runs 5` twee keer aanroept en de drie gewijzigde bronbestanden ertussenin omwisselt
+(`git checkout --` naar HEAD en weer terug). Dat omwisselen hoort niet in een meetscript
+thuis -- het schrijft in de werkboom -- en staat daarom in het verslag van het issue.
 
 Drie dingen die de meting anders waardeloos maken:
 
@@ -212,11 +223,21 @@ def _rss_mb() -> float:
 
 
 def _commit() -> str:
-    """De HEAD-commit waarop deze meting draaide."""
+    """De HEAD-commit waarop deze meting draaide, met `-vuil` bij ongecommitte `src/`.
+
+    Zonder dat achtervoegsel dragen een voor- en een na-meting hetzelfde commit-nummer
+    zolang de wijziging nog in de werkboom staat, en is achteraf niet te zien welk bestand
+    welke kant meet. Alleen `src/` telt: een gewijzigd meetscript of `CHANGELOG` verandert
+    de gemeten code niet.
+    """
     gedraaid = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False
     )
-    return gedraaid.stdout.strip() or "onbekend"
+    commit = gedraaid.stdout.strip() or "onbekend"
+    vuil = subprocess.run(
+        ["git", "status", "--porcelain", "--", "src/"], capture_output=True, text=True, check=False
+    )
+    return f"{commit}-vuil" if vuil.stdout.strip() else commit
 
 
 def main() -> None:
