@@ -95,6 +95,8 @@ def _lees_rijen(path: Path) -> list[list[str]]:
         raise ReportFormatError(f"{path}: bestand kan niet gelezen worden ({error}).") from error
     except UnicodeDecodeError as error:
         raise ReportFormatError(f"{path}: geen geldige {ENCODING} ({error}).") from error
+    except csv.Error as error:
+        raise ReportFormatError(f"{path}: geen leesbare CSV ({error}).") from error
 
 
 def _kop_index(path: Path, rijen: list[list[str]]) -> int:

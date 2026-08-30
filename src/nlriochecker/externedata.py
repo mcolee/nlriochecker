@@ -477,8 +477,10 @@ def _laagnamen(pad: Path) -> list[str]:
     """De feature-lagen in een GeoPackage."""
     import sqlite3
 
+    from nlriochecker.studiegebied import readonly_uri
+
     try:
-        verbinding = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+        verbinding = sqlite3.connect(readonly_uri(pad), uri=True)
     except sqlite3.Error as error:
         raise ExternalDataError(f"{pad}: kan niet geopend worden ({error}).") from error
     try:

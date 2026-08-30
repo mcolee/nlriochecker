@@ -191,6 +191,20 @@ def test_zonder_dekkingseis_geen_poort(tmp_path: Path) -> None:
     assert load_external_data(bronnen, tmp_path / "b").layer("bgt_pand") is not None
 
 
+def test_bronnenmap_met_procentteken_wordt_gewoon_gelezen(tmp_path: Path) -> None:
+    """`%` is betekenisdragend in een sqlite-URI; een normale mapnaam mag er niet op stuk.
+
+    De f-string-URI in `_laagnamen` maakte van `50%data` een ander pad, en dat kwam als
+    "kan niet geopend worden" naar buiten terwijl het bestand er gewoon stond.
+    """
+    map_pad = tmp_path / "50%data"
+    bronnen = _bronnen(map_pad, [box(-10, -10, 110, 110)])
+
+    data = load_external_data(bronnen, map_pad, dekkingseis=Dekkingseis(0.0, 0.0))
+
+    assert data.layer("bgt_pand") is not None
+
+
 def test_te_klein_raster_faalt(tmp_path: Path) -> None:
     """De HGT-checks falen even stil als de EXT-checks; het raster telt dus mee."""
     rasterio = pytest.importorskip("rasterio")

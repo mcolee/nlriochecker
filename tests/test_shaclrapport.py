@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 from datetime import datetime
 from pathlib import Path
 
@@ -91,6 +92,16 @@ def test_ongeldig_tijdstempel(mini_hyd_shacl: Path, tmp_path: Path) -> None:
 def test_ontbrekend_bestand(tmp_path: Path) -> None:
     with pytest.raises(ReportFormatError, match="kan niet gelezen worden"):
         lees_shacl_rapport(tmp_path / "weg.csv")
+
+
+def test_veld_boven_de_csv_veldgrens(tmp_path: Path) -> None:
+    """Een veld boven `csv.field_size_limit()` gaf een kale `_csv.Error`."""
+    stuk = tmp_path / "reuzenveld.csv"
+    reus = "A" * (csv.field_size_limit() + 1)
+    stuk.write_text(f'Focus node;Source\n"{reus}";x\n', encoding="utf-8")
+
+    with pytest.raises(ReportFormatError, match="geen leesbare CSV"):
+        lees_shacl_rapport(stuk)
 
 
 def test_lege_meldingtabel(mini_hyd_shacl: Path, tmp_path: Path) -> None:

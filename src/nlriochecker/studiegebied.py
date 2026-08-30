@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from shapely import from_wkb
+from shapely.errors import GEOSException
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
@@ -38,6 +39,7 @@ RD_NEW = 28992
 
 # GeoPackage Binary: 'GP', versie, vlaggen, srs_id, envelope, dan de WKB.
 GPKG_MAGIC = b"GP"
+GPKG_KOP_BYTES = 8
 GPKG_ENVELOPE_BYTES = {0: 0, 1: 32, 2: 48, 3: 48, 4: 64}
 
 # De kolom of property waarmee een bestand met meerdere features zijn gebieden
@@ -407,10 +409,24 @@ def _filter_vlakken(features: list[_Vlak]) -> tuple[list[_Vlak], tuple[str, ...]
     return vlakken, overgeslagen
 
 
+def readonly_uri(pad: Path) -> str:
+    """Een read-only sqlite-URI waarin het pad correct gecodeerd staat.
+
+    In een `file:`-URI zijn `?`, `#` en `%` betekenisdragend. Een pad er ongecodeerd
+    in plakken laat een `?` in een bestandsnaam de rest van de URI overnemen -- dan
+    valt `mode=ro` weg en wordt er een nieuwe, schrijfbare database aangemaakt -- en
+    laat een gewone map met `%` erin niet openen. `Path.as_uri()` codeert die tekens.
+
+    Zonder leidende underscore, want `externedata` leest hem ook: deze module draagt
+    de GeoPackage-leeskennis, dus de helper hoort hier en niet daar.
+    """
+    return pad.resolve().as_uri() + "?mode=ro"
+
+
 def _lees_geopackage(path: Path, laag: str | None) -> _Ruw:
     """Leest een laag uit een GeoPackage met de standaardbibliotheek."""
     try:
-        verbinding = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        verbinding = sqlite3.connect(readonly_uri(path), uri=True)
     except sqlite3.Error as error:
         raise StudyAreaError(f"{path}: kan niet geopend worden ({error}).") from error
 
@@ -460,7 +476,8 @@ def _lees_geopackage(path: Path, laag: str | None) -> _Ruw:
                 for index, (naam, waarde) in enumerate(zip(kolommen, rij, strict=True))
                 if index != geometrie_index
             }
-            features.append(_Vlak(rijnummer, _ontleed_gpkg(blob), attributen))
+            geometrie = _ontleed_gpkg(blob, f"{path} rij {rijnummer}: ")
+            features.append(_Vlak(rijnummer, geometrie, attributen))
         aanduiding = _gebiedsaanduiding(verbinding, laag)
     except sqlite3.Error as error:
         raise StudyAreaError(f"{path}: kan niet gelezen worden ({error}).") from error
@@ -500,15 +517,32 @@ def _gebiedsaanduiding(verbinding: sqlite3.Connection, laag: str) -> str:
     return f"{code} {naam}".strip()
 
 
-def _ontleed_gpkg(blob: bytes) -> BaseGeometry:
-    """Haalt de WKB uit een GeoPackage-geometrieblob."""
+def _ontleed_gpkg(blob: bytes, herkomst: str = "") -> BaseGeometry:
+    """Haalt de WKB uit een GeoPackage-geometrieblob.
+
+    `herkomst` komt vooraan in elke melding te staan en noemt bestand en rij; zonder
+    die aanduiding zegt de melding niet waar in het bestand het defect zit. Optioneel,
+    omdat een blob ook los ontleed wordt.
+    """
     if blob[:2] != GPKG_MAGIC:
-        raise StudyAreaError("geometrie is geen GeoPackage-blob")
+        raise StudyAreaError(f"{herkomst}geometrie is geen GeoPackage-blob")
+    if len(blob) < GPKG_KOP_BYTES:
+        raise StudyAreaError(
+            f"{herkomst}de GeoPackage-blob is met {len(blob)} bytes te kort voor een kop."
+        )
     vlaggen = blob[3]
     envelope = (vlaggen >> 1) & 0x07
     if envelope not in GPKG_ENVELOPE_BYTES:
-        raise StudyAreaError(f"onbekend envelope-type {envelope} in de GeoPackage-blob")
-    return from_wkb(blob[8 + GPKG_ENVELOPE_BYTES[envelope] :])
+        raise StudyAreaError(f"{herkomst}onbekend envelope-type {envelope} in de GeoPackage-blob")
+    begin = GPKG_KOP_BYTES + GPKG_ENVELOPE_BYTES[envelope]
+    if len(blob) <= begin:
+        raise StudyAreaError(f"{herkomst}de GeoPackage-blob draagt geen geometrie na de kop.")
+    try:
+        return from_wkb(blob[begin:])
+    except GEOSException as error:
+        raise StudyAreaError(
+            f"{herkomst}de geometrie in de GeoPackage-blob is niet leesbaar ({error})."
+        ) from error
 
 
 def _lees_geojson(path: Path, grenzen: RdGrenzen | None) -> _Ruw:
@@ -521,7 +555,9 @@ def _lees_geojson(path: Path, grenzen: RdGrenzen | None) -> _Ruw:
     """
     try:
         inhoud = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, json.JSONDecodeError, RecursionError) as error:
+        # `RecursionError` staat er apart bij: diep genest JSON haalt de scanner van
+        # `json` niet, en die fout is een RuntimeError en geen ValueError.
         raise StudyAreaError(f"{path}: geen leesbare GeoJSON ({error}).") from error
 
     features = inhoud.get("features") if inhoud.get("type") == "FeatureCollection" else [inhoud]

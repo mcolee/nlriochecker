@@ -90,6 +90,24 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   preconditie blijft volledig gedekt door de synthetische gevallen in dezelfde testmodule
   (issue #110).
 
+### Gerepareerd
+
+- **Kapotte invoer eindigt in een nette foutmelding in plaats van een traceback** (issue
+  #119). Vier invoerlezers lieten een uitzondering door die de CLI niet kent: een
+  GeoPackage-geometrieblob die te kort is voor zijn kop (`IndexError`) of een afgeknotte
+  WKB draagt (`GEOSException`), een SHACL-CSV met een veld boven `csv.field_size_limit()`
+  (`_csv.Error`) en een diep genest GeoJSON (`RecursionError`, een `RuntimeError` en dus
+  buiten de bestaande `json.JSONDecodeError`-vangst). Ze worden nu alle vier een
+  `StudyAreaError` of `ReportFormatError`; de blobmeldingen noemen voortaan bestand en
+  rijnummer. Dit is een gedragsverandering op het **foutpad**: op geldige invoer verandert
+  er niets -- geen check, geen drempel, geen selectie.
+- **De sqlite-URI codeert het pad** (`studiegebied.readonly_uri`, gebruikt door
+  `studiegebied._lees_geopackage` en `externedata._laagnamen`). In een `file:`-URI zijn
+  `?`, `#` en `%` betekenisdragend en het pad werd er ongecodeerd in geplakt: een
+  bestandsnaam met een `?` erin nam de rest van de URI over, waardoor `mode=ro` wegviel en
+  er naast het origineel een nieuwe, schrijfbare database ontstond, en een gewone map met
+  een `%` erin gaf "kan niet geopend worden" terwijl het bestand er stond (issue #119).
+
 ## [0.3.1] - 2026-08-30
 
 ### Toegevoegd

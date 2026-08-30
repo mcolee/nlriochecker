@@ -19,8 +19,18 @@ from nlriochecker.studiegebied import (
 )
 
 
-def _maak_geopackage(pad: Path, vlak: Polygon, srs_id: int = 28992, laag: str = "gebied") -> Path:
-    """Schrijft een minimale GeoPackage met een enkel vlak."""
+def _maak_geopackage(
+    pad: Path,
+    vlak: Polygon,
+    srs_id: int = 28992,
+    laag: str = "gebied",
+    blob: bytes | None = None,
+) -> Path:
+    """Schrijft een minimale GeoPackage met een enkel vlak.
+
+    `blob` vervangt de geldige geometrieblob door eigen bytes, zodat een defecte
+    geometrie drie regels kost in plaats van een gecommitte fixture.
+    """
     con = sqlite3.connect(pad)
     con.execute("PRAGMA application_id = 0x47504B47")
     con.execute(
@@ -37,7 +47,8 @@ def _maak_geopackage(pad: Path, vlak: Polygon, srs_id: int = 28992, laag: str = 
         "insert into gpkg_geometry_columns values (?, 'geom', 'POLYGON', ?)", (laag, srs_id)
     )
     kop = b"GP" + bytes([0, 0]) + struct.pack("<i", srs_id)
-    con.execute(f'insert into "{laag}" (geom) values (?)', (kop + vlak.wkb,))
+    geometrie = blob if blob is not None else kop + vlak.wkb
+    con.execute(f'insert into "{laag}" (geom) values (?)', (geometrie,))
     con.commit()
     con.close()
     return pad
@@ -450,6 +461,57 @@ def test_rijnummer_telt_de_rijen_van_het_bestand(tmp_path: Path) -> None:
     )
 
     with pytest.raises(StudyAreaError, match="rij 3"):
+        load_studiegebieden(pad)
+
+
+def test_te_korte_geometrieblob_noemt_bestand_en_rij(tmp_path: Path) -> None:
+    """Een blob van precies `GP` gaf een kale IndexError uit de leeslaag."""
+    pad = _maak_geopackage(tmp_path / "kop.gpkg", VIERKANT, blob=b"GP")
+
+    with pytest.raises(StudyAreaError, match=r"kop\.gpkg rij 1: .*te kort"):
+        load_study_area(pad)
+
+
+def test_afgeknotte_wkb_is_een_nette_fout(tmp_path: Path) -> None:
+    """Shapely gooit hier een GEOSException; die hoort de gebruiker niet te zien."""
+    kop = b"GP" + bytes([0, 0]) + struct.pack("<i", 28992)
+    pad = _maak_geopackage(tmp_path / "wkb.gpkg", VIERKANT, blob=kop + VIERKANT.wkb[:12])
+
+    with pytest.raises(StudyAreaError, match=r"wkb\.gpkg rij 1: .*niet leesbaar"):
+        load_study_area(pad)
+
+
+def test_vraagteken_in_de_bestandsnaam_maakt_geen_tweede_database(tmp_path: Path) -> None:
+    """`?` is betekenisdragend in een sqlite-URI: mode=ro viel weg en er werd geschreven.
+
+    De naam `weird?mode=rwc&x=.gpkg` opende niet dit bestand read-only, maar maakte een
+    nieuwe, schrijfbare database op het afgeknotte pad `weird`. Dat er daarnaast een
+    foutmelding kwam maskeerde het juist.
+    """
+    pad = tmp_path / "weird?mode=rwc&x=.gpkg"
+    pad.write_bytes(b"")
+
+    with pytest.raises(StudyAreaError):
+        load_study_area(pad)
+
+    assert [bestand.name for bestand in tmp_path.iterdir()] == ["weird?mode=rwc&x=.gpkg"]
+
+
+def test_procentteken_in_het_pad_wordt_gewoon_gelezen(tmp_path: Path) -> None:
+    """Een volstrekt normale map met `%` gaf 'kan niet geopend worden'."""
+    map_pad = tmp_path / "50%data"
+    map_pad.mkdir()
+    pad = _maak_geopackage(map_pad / "gebied.gpkg", VIERKANT)
+
+    assert load_study_area(pad).area_ha == pytest.approx(1.0)
+
+
+def test_diep_geneste_geojson_is_een_nette_fout(tmp_path: Path) -> None:
+    """De C-scanner van json gooit een RecursionError, en die is geen ValueError."""
+    pad = tmp_path / "diep.geojson"
+    pad.write_text("[" * 200_000 + "]" * 200_000, encoding="utf-8")
+
+    with pytest.raises(StudyAreaError, match="geen leesbare GeoJSON"):
         load_studiegebieden(pad)
 
 
