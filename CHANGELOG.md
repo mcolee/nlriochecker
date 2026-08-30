@@ -13,6 +13,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Release-workflow** (`.github/workflows/release.yml`): op de tag `vX.Y.Z` bouwt CI de
+  wheel en de sdist met `uv build` en hangt ze aan een GitHub Release. De wheel hoeft niet
+  meer met de hand gebouwd of geüpload te worden; zie [docs/versionering.md](docs/versionering.md).
 - **EXT-009: straat in de bebouwde kom zonder vrijvervalriolering** (issue #104, BO-79 t/m
   BO-81). De eerste dekkingsvraag in het register: niet "ligt deze streng ergens
   doorheen?" maar "ligt er langs deze weg riolering?". Het toetsobject is daarom een

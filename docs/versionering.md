@@ -69,6 +69,17 @@ commit die niet op `main` ligt. Met een merge-commit landt de getagde `Versie X.
 ongewijzigd op `main` en blijft de tag kloppen. Zet `dev` daarna weer gelijk aan `main`,
 anders mist de volgende sessie de merge-commit.
 
+## De wheel komt vanzelf
+
+`.github/workflows/release.yml` gaat af zodra de tag `vX.Y.Z` naar GitHub wordt geduwd
+(`git push --follow-tags`). Hij draait `uv build` en hangt de wheel én de sdist met
+`gh release create --verify-tag --generate-notes` aan een nieuwe GitHub Release. Draai dus
+nooit met de hand `gh release create` en bouw de wheel niet lokaal om te uploaden: dat zou
+een tweede, mogelijk afwijkend artefact naast het door CI gebouwde zetten. De tag wordt
+op `dev` gezet en via de merge-commit naar `main` gebracht; de workflow reageert op de
+tag-push, los van de branch, dus de Release ontstaat al bij de push naar `dev` en de
+latere merge verandert daar niets aan.
+
 ## Wat betekenen de cijfers
 
 De package staat in `0.x` en blijft daar zolang fase 4 (EXT) loopt en er checks uit het
