@@ -11,6 +11,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Toegevoegd
+
+- **Gouden ledger** (`tests/golden/ledger.json`, generator `scripts/maak_ledger.py`): per
+  (fixture, check) het aantal bevindingen, de bekeken populatie en het aantal
+  toelichtingen over de hele registry op alle 183 TTL-fixtures, plus per check het aantal
+  meldingen van het getrackte voorbeeld. De suite toetste per defectfixture precies één
+  check; van de 869 rijen met minstens één bevinding lagen er 813 buiten elk vangnet.
+  `tests/test_ledger.py` vergelijkt de veeg met het bestand (het verschil noemt fixture,
+  check, vastgelegde en gemeten rij), bewaakt dat `examined` nooit kleiner is dan het
+  aantal gemelde objecten en dat geen enkele fixture registrybreed stil is;
+  `tests/test_voorbeeld.py` vergelijkt de meldingen per check met dezelfde ledger. De
+  generator is ook de enige veeglus: `tests/test_uitvoer_identiteit_sweep.py` deelt hem
+  via een session-fixture, dus de suite veegt één keer in plaats van twee (issue #113).
+
 ### Gewijzigd
 
 - **HGT-010** heet voortaan *"Diameterverkleining in afvoerrichting"* in plaats van

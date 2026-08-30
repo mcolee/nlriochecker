@@ -1,0 +1,1280 @@
+{
+  "fixtures": {
+    "adm002_dubbel_label.ttl": {
+      "ADM-002": [2, 4, 1],
+      "ATTR-018": [3, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    },
+    "adm006_vervallen_object.ttl": {
+      "ADM-006": [1, 3, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "adm007_overstort_met_drempel.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "adm007_overstort_zonder_functie.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-006": [1, 1, 2]
+    },
+    "adm008_losse_compartimenten.ttl": {
+      "ADM-008": [1, 2, 1],
+      "ADM-009": [1, 1, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "adm009_leiding_aan_put.ttl": {
+      "ADM-009": [1, 1, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "adm010_loze_keten_aanvoer.ttl": {
+      "ADM-010": [1, 1, 1],
+      "ATTR-018": [4, 4, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "adm010_loze_keten_afvoer.ttl": {
+      "ADM-010": [1, 1, 1],
+      "ATTR-018": [4, 4, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "adm010_loze_keten_doorgaand.ttl": {
+      "ADM-010": [2, 2, 1],
+      "ATTR-018": [9, 9, 1],
+      "NET-001": [3, 3, 3],
+      "RVZ-006": [3, 3, 2]
+    },
+    "adm010_loze_keten_losgekoppeld.ttl": {
+      "ATTR-018": [2, 2, 1]
+    },
+    "adm010_loze_keten_rakend.ttl": {
+      "ADM-010": [1, 1, 1],
+      "ATTR-018": [6, 6, 1],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "afbakening_buffer_los_object.ttl": {
+      "ATTR-018": [1, 1, 0],
+      "TOP-001": [1, 1, 0]
+    },
+    "afbakening_compartiment_zonder_geometrie.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3]
+    },
+    "afbakening_kern_en_schil.ttl": {
+      "ATTR-018": [11, 11, 0],
+      "NET-001": [1, 5, 2]
+    },
+    "afbakening_los_uiteinde.ttl": {
+      "ATTR-018": [2, 2, 0],
+      "TOP-003": [1, 1, 1]
+    },
+    "afbakening_parallelle_strengen.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [3, 3, 3],
+      "TOP-008": [1, 3, 0]
+    },
+    "afbakening_persnet.ttl": {
+      "ATTR-018": [3, 3, 1],
+      "TOP-019": [1, 1, 1],
+      "TOP-022": [1, 1, 0]
+    },
+    "attr001_constructietype_drainage.ttl": {
+      "ATTR-001": [2, 3, 2],
+      "ATTR-002": [3, 3, 3],
+      "ATTR-018": [4, 7, 0],
+      "HGT-010": [1, 4, 0],
+      "NET-002": [1, 3, 3]
+    },
+    "attr001_diameter_bij_materiaal.ttl": {
+      "ATTR-001": [1, 1, 2],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr001_diameterbesluit.ttl": {
+      "ATTR-002": [1, 4, 3],
+      "ATTR-006": [4, 4, 0],
+      "ATTR-018": [5, 9, 0],
+      "NET-001": [4, 4, 3]
+    },
+    "attr001_ongetoetste_uitsplitsing.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [4, 4, 3],
+      "RVZ-006": [4, 4, 2],
+      "TOP-002": [3, 4, 1],
+      "TOP-004": [6, 4, 0],
+      "TOP-013": [4, 4, 0]
+    },
+    "attr002_kleine_diameter.ttl": {
+      "ATTR-002": [1, 1, 3],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr002_stelseltype.ttl": {
+      "ATTR-002": [1, 2, 3],
+      "ATTR-018": [3, 5, 0],
+      "NET-001": [2, 2, 3],
+      "NET-006": [1, 3, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr003_begindatum_besluit.ttl": {
+      "ATTR-003": [1, 3, 2],
+      "ATTR-018": [4, 7, 0],
+      "NET-001": [3, 3, 3]
+    },
+    "attr003_pvc_te_vroeg.ttl": {
+      "ATTR-003": [1, 1, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr004_muil_te_hoog.ttl": {
+      "ATTR-004": [1, 1, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr004_rond_ongelijk.ttl": {
+      "ATTR-004": [1, 1, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr005_centimeters.ttl": {
+      "ATTR-001": [1, 1, 2],
+      "ATTR-002": [1, 1, 3],
+      "ATTR-005": [2, 1, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr006_te_grote_streng.ttl": {
+      "ATTR-006": [1, 1, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr006_twee_te_kleine_putten.ttl": {
+      "ATTR-006": [2, 1, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr007_toekomstig_jaar.ttl": {
+      "ADM-006": [1, 3, 1],
+      "ATTR-007": [1, 3, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr009_lengte_wijkt_af.ttl": {
+      "ATTR-009": [1, 1, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr010_gresput.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr010_materiaal_put.ttl": {
+      "ATTR-010": [1, 1, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr012_metselwerk_rond.ttl": {
+      "ATTR-012": [1, 1, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr013_vulwaarde_hoogte.ttl": {
+      "ATTR-013": [3, 5, 1],
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [1, 2, 3],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "attr014_reference_op_waardekenmerk.ttl": {
+      "ATTR-014": [1, 1, 1],
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr014_wibon_correct.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr014_wibon_hasvalue.ttl": {
+      "ATTR-014": [1, 2, 1],
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr015_geen_piek.ttl": {
+      "ATTR-009": [40, 40, 0],
+      "TOP-002": [40, 40, 1]
+    },
+    "attr015_vulwaardejaar.ttl": {
+      "ATTR-009": [40, 40, 0],
+      "ATTR-015": [1, 40, 1],
+      "TOP-002": [40, 40, 1]
+    },
+    "attr016_ronde_put_lengte_nul.ttl": {
+      "ATTR-016": [1, 2, 0],
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr016_ronde_put_ongelijk.ttl": {
+      "ATTR-016": [1, 3, 0],
+      "ATTR-018": [3, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    },
+    "attr017_wandruwheid_hele_mm.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "attr017_wandruwheid_pe_betonwaarde.ttl": {
+      "ATTR-017": [1, 3, 1],
+      "ATTR-018": [4, 7, 0],
+      "NET-001": [3, 3, 3],
+      "RVZ-006": [3, 3, 2]
+    },
+    "attr018_zonder_begindatum.ttl": {
+      "ATTR-018": [2, 6, 1],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "attr_schoon.ttl": {
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "btr006_afgeronde_bobs.ttl": {
+      "ATTR-015": [1, 40, 1],
+      "ATTR-018": [41, 81, 0],
+      "BTR-006": [1, 162, 5],
+      "HGT-004": [47, 40, 1],
+      "HGT-007": [40, 40, 3],
+      "HGT-012": [41, 41, 0],
+      "HGT-013": [71, 40, 0],
+      "HGT-015": [33, 41, 0],
+      "HGT-016": [25, 41, 0],
+      "NET-001": [40, 40, 3],
+      "RVZ-006": [40, 40, 2]
+    },
+    "codering_cp850.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "dataset_dubbele_schrijfrichting.ttl": {
+      "ADM-009": [1, 1, 1],
+      "ATTR-018": [1, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "dataset_fantoomkoppeling.ttl": {
+      "ATTR-018": [8, 8, 0],
+      "NET-001": [2, 2, 4],
+      "RVZ-006": [4, 4, 2],
+      "TOP-019": [1, 1, 1],
+      "TOP-022": [1, 1, 0]
+    },
+    "dataset_inverse_properties.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "dataset_meervoudig_objecttype.ttl": {
+      "TOP-001": [1, 1, 0]
+    },
+    "dataset_twee_houders_put_eerst.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "dataset_twee_houders_straat_eerst.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "dataset_zwaarverkeerdeksel.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "ext009_straten.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    },
+    "ext_scenario.ttl": {
+      "ADM-002": [2, 29, 1],
+      "ADM-007": [1, 2, 1],
+      "ATTR-009": [3, 9, 1],
+      "ATTR-018": [23, 27, 1],
+      "HGT-004": [4, 9, 3],
+      "HGT-007": [1, 9, 3],
+      "HGT-008": [1, 9, 0],
+      "HGT-009": [1, 19, 1],
+      "HGT-013": [4, 9, 1],
+      "HGT-014": [3, 9, 1],
+      "HGT-015": [5, 18, 1],
+      "HGT-016": [4, 18, 1],
+      "HGT-018": [1, 9, 3],
+      "NET-001": [5, 9, 2],
+      "RVZ-006": [8, 8, 2],
+      "TOP-001": [3, 19, 0],
+      "TOP-006": [1, 10, 1],
+      "TOP-010": [1, 10, 3]
+    },
+    "geometriefout.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "TOP-001": [1, 3, 0],
+      "TOP-007": [1, 2, 0],
+      "TOP-009": [1, 5, 1]
+    },
+    "hgt001_grens.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "TOP-001": [5, 5, 0]
+    },
+    "hgt004_bob_boven_deksel.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-004": [1, 1, 1],
+      "HGT-008": [1, 1, 0],
+      "HGT-013": [1, 1, 0],
+      "HGT-014": [1, 1, 0],
+      "HGT-015": [1, 2, 0],
+      "HGT-016": [1, 2, 0],
+      "HGT-018": [1, 1, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt006_net_onder_de_forsgrens.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 4],
+      "NET-009": [1, 1, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt006_tegenverhang_fors.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-006": [1, 1, 1],
+      "HGT-016": [1, 2, 0],
+      "NET-001": [1, 1, 4],
+      "NET-009": [1, 1, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt007_staffel.ttl": {
+      "ATTR-002": [1, 5, 3],
+      "ATTR-009": [1, 5, 0],
+      "ATTR-018": [11, 11, 0],
+      "HGT-007": [1, 5, 3],
+      "HGT-010": [1, 6, 0],
+      "NET-001": [4, 5, 3],
+      "NET-002": [1, 5, 3],
+      "NET-005": [2, 5, 1],
+      "NET-006": [2, 6, 2],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt007_te_weinig_verhang.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt008_extreem_verhang.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-008": [1, 1, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt009_bob_sprong.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-004": [1, 2, 1],
+      "HGT-007": [2, 2, 3],
+      "HGT-009": [1, 3, 1],
+      "HGT-015": [1, 3, 0],
+      "HGT-016": [2, 3, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "hgt010_diameterverjonging.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [2, 2, 3],
+      "HGT-010": [1, 3, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "hgt011_drempel_onder_bob.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "HGT-011": [1, 2, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt012_putdiepte.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "HGT-012": [1, 2, 0],
+      "HGT-015": [1, 2, 0],
+      "HGT-016": [1, 2, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt013_gronddekking.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "HGT-013": [2, 1, 0],
+      "HGT-015": [2, 2, 0],
+      "HGT-016": [2, 2, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt014_maaiveldverloop.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "HGT-013": [1, 1, 0],
+      "HGT-014": [1, 1, 0],
+      "HGT-015": [1, 2, 0],
+      "HGT-016": [1, 2, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt015_putbodem_te_hoog.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-004": [1, 1, 1],
+      "HGT-007": [1, 1, 3],
+      "HGT-015": [1, 2, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt016_bob_boven_bodem.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "HGT-013": [2, 1, 0],
+      "HGT-015": [2, 2, 0],
+      "HGT-016": [2, 2, 0],
+      "HGT-018": [2, 1, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt017_z_wijkt_af.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "HGT-017": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt018_buiskruin_boven_maaiveld.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-008": [1, 1, 0],
+      "HGT-013": [1, 1, 0],
+      "HGT-014": [1, 1, 0],
+      "HGT-015": [1, 2, 0],
+      "HGT-016": [1, 2, 0],
+      "HGT-018": [1, 1, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "hgt_schoon.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "karakteristiek_datums.ttl": {
+      "ATTR-009": [4, 4, 0],
+      "ATTR-018": [5, 9, 0],
+      "HGT-007": [3, 4, 3],
+      "HGT-013": [5, 4, 0],
+      "HGT-015": [5, 5, 0],
+      "HGT-016": [8, 5, 0],
+      "NET-001": [4, 4, 3],
+      "RVZ-006": [4, 4, 2]
+    },
+    "mechanisch_riool.ttl": {
+      "ATTR-018": [5, 5, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "mechanisch_riool_twee.ttl": {
+      "ATTR-018": [4, 4, 1]
+    },
+    "net001_alleen_lozingspunt.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-005": [2, 2, 1],
+      "NET-006": [2, 2, 1],
+      "RVZ-006": [1, 1, 2],
+      "TOP-006": [1, 2, 1]
+    },
+    "net001_bouwwerk_eindknoop.ttl": {
+      "ATTR-018": [2, 2, 0],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net001_drukriolering_gemaal.ttl": {
+      "ATTR-018": [3, 3, 1],
+      "TOP-019": [1, 1, 1],
+      "TOP-022": [1, 1, 0]
+    },
+    "net001_drukriolering_lozingsput.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [4, 4, 1],
+      "TOP-019": [1, 1, 1],
+      "TOP-022": [1, 1, 0]
+    },
+    "net001_geen_afvoerpad.ttl": {
+      "ATTR-018": [7, 7, 0],
+      "NET-001": [1, 3, 2],
+      "RVZ-006": [3, 3, 2]
+    },
+    "net001_overnamepunt.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "RVZ-006": [2, 2, 2],
+      "TOP-003": [1, 2, 1]
+    },
+    "net001_pompunit_zonder_persnet.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3]
+    },
+    "net001_twee_losse_deelstelsels.ttl": {
+      "ATTR-018": [10, 10, 0],
+      "NET-001": [2, 4, 2],
+      "RVZ-006": [4, 4, 2]
+    },
+    "net002_drukriolering_lozingsput.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [4, 4, 1],
+      "TOP-019": [1, 1, 1],
+      "TOP-022": [1, 1, 0]
+    },
+    "net002_hemelwater_zonder_lozingspunt.ttl": {
+      "ATTR-018": [7, 7, 0],
+      "NET-002": [1, 3, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "net003_tegen_de_richting.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "HGT-006": [1, 1, 1],
+      "NET-001": [1, 1, 4],
+      "NET-009": [1, 1, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net004_kringloop.ttl": {
+      "ATTR-018": [10, 10, 0],
+      "NET-001": [3, 5, 1],
+      "NET-004": [1, 5, 0],
+      "RVZ-006": [5, 5, 2]
+    },
+    "net004_lus_door_richtingsfout.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "HGT-006": [1, 3, 1],
+      "NET-001": [3, 3, 3],
+      "NET-009": [1, 3, 1],
+      "RVZ-006": [3, 3, 2]
+    },
+    "net004_parallelle_strengen.ttl": {
+      "ATTR-018": [11, 11, 0],
+      "NET-001": [4, 6, 1],
+      "NET-004": [1, 6, 0],
+      "RVZ-006": [6, 6, 2],
+      "TOP-008": [1, 6, 0]
+    },
+    "net004_parallelle_strengen_omgekeerd.ttl": {
+      "ATTR-018": [11, 11, 0],
+      "NET-001": [4, 6, 1],
+      "NET-004": [1, 6, 0],
+      "RVZ-006": [6, 6, 2],
+      "TOP-008": [1, 6, 0]
+    },
+    "net004_ring_met_putsprong.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [3, 3, 2],
+      "RVZ-006": [3, 3, 2]
+    },
+    "net004_vermaasde_ring.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [3, 3, 2],
+      "RVZ-006": [3, 3, 2]
+    },
+    "net005_afwijkend_stelseltype.ttl": {
+      "ATTR-018": [7, 7, 0],
+      "NET-001": [2, 3, 3],
+      "NET-002": [1, 3, 3],
+      "NET-005": [1, 3, 1],
+      "NET-006": [2, 4, 1],
+      "RVZ-006": [2, 2, 2]
+    },
+    "net006_doorgaand_gemengd_hoofdriool.ttl": {
+      "ATTR-018": [7, 7, 0],
+      "NET-001": [3, 3, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "net006_gemengd_naar_vuilwater.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [2, 2, 3],
+      "NET-006": [1, 3, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net006_koppeling_stelseltypen.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [1, 2, 3],
+      "NET-002": [1, 2, 3],
+      "NET-006": [1, 3, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net006_vuilwater_naar_gemengd.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net007_it_met_drempel.ttl": {
+      "ATTR-018": [7, 7, 0],
+      "RVZ-006": [2, 2, 2]
+    },
+    "net007_it_met_overstortput.ttl": {
+      "ATTR-018": [9, 9, 0],
+      "NET-006": [1, 6, 1],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-006": [2, 2, 2]
+    },
+    "net007_it_zonder_drempel.ttl": {
+      "ATTR-018": [7, 7, 0],
+      "NET-007": [1, 3, 1],
+      "RVZ-006": [2, 2, 2]
+    },
+    "net008_veel_lozingspunten.ttl": {
+      "ATTR-018": [7, 7, 0],
+      "NET-008": [3, 4, 0],
+      "RVZ-006": [3, 3, 2]
+    },
+    "net009_bob_vulwaarde.ttl": {
+      "ATTR-013": [1, 3, 1],
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net009_geen_signaal.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "TOP-001": [2, 4, 0],
+      "TOP-007": [1, 2, 0],
+      "TOP-009": [1, 6, 1]
+    },
+    "net009_omgekeerd_getekend.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "NET-009": [1, 1, 0],
+      "RVZ-006": [1, 1, 2],
+      "TOP-004": [2, 1, 0]
+    },
+    "net009_signaalvarianten.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "HGT-006": [1, 2, 1],
+      "NET-001": [2, 2, 4],
+      "NET-009": [2, 2, 1],
+      "RVZ-006": [2, 2, 2],
+      "TOP-001": [2, 4, 0],
+      "TOP-004": [2, 1, 0],
+      "TOP-007": [1, 2, 0],
+      "TOP-009": [1, 6, 1]
+    },
+    "net009_vlakke_streng.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net_afvoerpad_keten.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "RVZ-006": [3, 3, 2]
+    },
+    "net_afvoerpad_mechanisch.ttl": {
+      "ATTR-018": [3, 3, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "net_afvoerpad_parallel.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "RVZ-006": [2, 2, 2],
+      "TOP-008": [1, 2, 0]
+    },
+    "net_afvoerpad_twee_eindpunten.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "RVZ-006": [2, 2, 2]
+    },
+    "net_afvoerpad_zonder_lijn.ttl": {
+      "ATTR-018": [2, 2, 0],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [2, 2, 0],
+      "TOP-007": [1, 1, 0],
+      "TOP-009": [1, 3, 1]
+    },
+    "net_hulpstuk_afsluitstuk.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [5, 5, 0],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-006": [1, 3, 2],
+      "TOP-003": [2, 3, 1]
+    },
+    "net_hulpstuk_doorgeefknoop.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [5, 5, 0],
+      "RVZ-002": [1, 1, 2],
+      "TOP-019": [1, 1, 1],
+      "TOP-022": [1, 1, 0]
+    },
+    "net_schoon.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "RVZ-006": [2, 2, 2]
+    },
+    "nulmeting_join.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    },
+    "onderdruk_persleiding.ttl": {
+      "ATTR-018": [7, 7, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-011": [1, 2, 2]
+    },
+    "richting_niet_bepaalbaar_met_bob.ttl": {
+      "ATTR-018": [2, 2, 0],
+      "HGT-008": [1, 1, 0],
+      "NET-001": [1, 1, 2],
+      "NET-004": [1, 1, 0],
+      "RVZ-006": [1, 1, 2],
+      "TOP-007": [1, 1, 0],
+      "TOP-008": [1, 1, 0],
+      "TOP-012": [1, 1, 0],
+      "TOP-017": [1, 1, 1],
+      "TOP-018": [1, 1, 0]
+    },
+    "richting_omgekeerd_met_bob.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "NET-009": [1, 1, 0],
+      "RVZ-006": [1, 1, 2],
+      "TOP-004": [2, 1, 0]
+    },
+    "richting_persleiding_met_bob.ttl": {
+      "ATTR-018": [5, 5, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz001_losse_overstort.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [3, 4, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-001": [1, 1, 0],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    },
+    "rvz001_overstort_aan_loze_leiding.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [2, 2, 1],
+      "RVZ-001": [1, 1, 0],
+      "RVZ-002": [1, 1, 2]
+    },
+    "rvz002_drempel_zonder_niveau.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [1, 2, 3],
+      "HGT-016": [2, 3, 0],
+      "NET-001": [1, 2, 3],
+      "NET-006": [1, 3, 1],
+      "RVZ-002": [1, 1, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz002_overstort_zonder_drempel.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [1, 2, 3],
+      "HGT-016": [2, 3, 0],
+      "NET-001": [1, 2, 3],
+      "NET-006": [1, 3, 1],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz002_twee_drempels_zonder_breedte.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [1, 2, 3],
+      "HGT-016": [2, 3, 0],
+      "NET-001": [1, 2, 3],
+      "NET-006": [1, 3, 1],
+      "RVZ-002": [1, 1, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz003_drempel_zonder_breedte.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [1, 2, 3],
+      "HGT-016": [2, 3, 0],
+      "NET-001": [1, 2, 3],
+      "NET-006": [1, 3, 1],
+      "RVZ-002": [1, 1, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz004_overstort_zonder_water.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-004": [1, 1, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz005_overstort_op_hemelwater.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [2, 3, 0],
+      "NET-002": [1, 1, 3],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-005": [1, 1, 0]
+    },
+    "rvz006_aanwijzing_aandeel_gemengd.ttl": {
+      "ATTR-018": [4, 7, 0],
+      "HGT-004": [1, 3, 1],
+      "HGT-007": [1, 3, 3],
+      "NET-001": [1, 3, 3],
+      "NET-002": [2, 3, 3],
+      "NET-006": [1, 4, 1],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz006_aanwijzing_knoop_op_streng.ttl": {
+      "ATTR-009": [1, 2, 0],
+      "ATTR-018": [4, 6, 0],
+      "HGT-007": [2, 2, 3],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-010": [1, 2, 2]
+    },
+    "rvz006_aanwijzing_met_afvoereindpunt.ttl": {
+      "ATTR-018": [2, 4, 1],
+      "HGT-007": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "rvz006_aanwijzing_persleiding_en_lozingspunt.ttl": {
+      "ATTR-009": [3, 4, 0],
+      "ATTR-018": [5, 9, 1],
+      "HGT-007": [4, 4, 3],
+      "NET-008": [4, 5, 0],
+      "RVZ-006": [4, 4, 2],
+      "TOP-014": [1, 6, 0]
+    },
+    "rvz006_aanwijzing_samenvallende_knoop.ttl": {
+      "ATTR-009": [1, 2, 0],
+      "ATTR-018": [4, 6, 0],
+      "HGT-007": [2, 2, 3],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz006_gemengd_alleen_pompunit.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [2, 2, 3],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "rvz006_gemengd_over_hulpstukken.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [3, 3, 3],
+      "RVZ-006": [3, 3, 2],
+      "TOP-019": [2, 2, 1],
+      "TOP-022": [2, 2, 0]
+    },
+    "rvz006_gemengd_zonder_afvoereindpunt.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "rvz006_gemengd_zonder_geometrie.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [2, 2, 0],
+      "TOP-007": [1, 1, 0],
+      "TOP-009": [1, 3, 1]
+    },
+    "rvz006_gemengd_zonder_overstort.ttl": {
+      "ATTR-018": [3, 5, 0],
+      "HGT-007": [2, 2, 3],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2]
+    },
+    "rvz007_bbb_zonder_berging.ttl": {
+      "ATTR-018": [2, 4, 0],
+      "HGT-004": [1, 2, 1],
+      "HGT-007": [2, 2, 3],
+      "HGT-015": [1, 2, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "RVZ-007": [1, 1, 0]
+    },
+    "rvz008_bbb_met_lediging.ttl": {
+      "ATTR-018": [1, 3, 0],
+      "HGT-007": [2, 2, 3]
+    },
+    "rvz008_bbb_zonder_lediging.ttl": {
+      "ATTR-018": [1, 2, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "RVZ-008": [1, 1, 1]
+    },
+    "rvz009_bbb_zonder_nooduitlaat.ttl": {
+      "ATTR-018": [2, 4, 0],
+      "HGT-004": [1, 2, 1],
+      "HGT-007": [2, 2, 3],
+      "HGT-015": [1, 2, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "RVZ-009": [1, 1, 1]
+    },
+    "rvz010_interne_overstort.ttl": {
+      "ATTR-018": [4, 7, 0],
+      "HGT-004": [1, 3, 1],
+      "HGT-007": [2, 3, 3],
+      "NET-001": [2, 3, 3],
+      "NET-005": [1, 3, 1],
+      "NET-006": [2, 4, 1],
+      "RVZ-006": [2, 2, 2],
+      "RVZ-010": [1, 1, 1]
+    },
+    "rvz011_te_weinig_waking.ttl": {
+      "ATTR-018": [2, 3, 0],
+      "HGT-007": [1, 1, 3],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "RVZ-011": [1, 1, 1]
+    },
+    "rvz_schoon.ttl": {
+      "ATTR-018": [3, 6, 0],
+      "HGT-007": [2, 3, 3],
+      "HGT-016": [2, 3, 0],
+      "NET-006": [1, 4, 1]
+    },
+    "schoon.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2]
+    },
+    "selectie_rollen.ttl": {
+      "ADM-007": [1, 2, 1],
+      "ATTR-018": [10, 10, 1],
+      "NET-006": [1, 5, 2],
+      "NET-007": [1, 4, 1],
+      "RVZ-001": [1, 2, 0],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-004": [1, 1, 1],
+      "RVZ-006": [1, 1, 2],
+      "RVZ-007": [1, 1, 1],
+      "RVZ-009": [1, 1, 2],
+      "TOP-001": [1, 8, 0],
+      "TOP-022": [1, 1, 0]
+    },
+    "stelsels_registratie.ttl": {
+      "ATTR-018": [9, 9, 0],
+      "NET-001": [1, 3, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-003": [1, 4, 1]
+    },
+    "top001_losliggend_in_de_schil.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    },
+    "top001_losliggende_put.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    },
+    "top001_put_aan_persleiding.ttl": {
+      "ATTR-018": [5, 5, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 4, 0]
+    },
+    "top002_losliggende_streng.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 4],
+      "RVZ-006": [1, 2, 2],
+      "TOP-002": [1, 2, 1]
+    },
+    "top002_streng_op_hulpstuk.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [2, 2, 4],
+      "RVZ-006": [3, 4, 2],
+      "TOP-002": [1, 4, 1],
+      "TOP-003": [1, 4, 1],
+      "TOP-019": [1, 2, 1],
+      "TOP-022": [2, 2, 1]
+    },
+    "top003_dedup_buiten_snapping.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "TOP-003": [1, 2, 2]
+    },
+    "top003_een_put.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 4],
+      "RVZ-006": [2, 2, 2],
+      "TOP-003": [1, 2, 1]
+    },
+    "top004_niet_gesnapt.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 2, 0],
+      "TOP-003": [1, 1, 1],
+      "TOP-004": [1, 1, 0]
+    },
+    "top005_compartimentduplicaat.ttl": {
+      "ADM-002": [2, 18, 1],
+      "ATTR-018": [18, 18, 0],
+      "NET-001": [5, 5, 3],
+      "RVZ-006": [5, 5, 2],
+      "TOP-001": [2, 11, 1],
+      "TOP-005": [1, 11, 1]
+    },
+    "top005_dubbele_put.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0],
+      "TOP-005": [1, 3, 0]
+    },
+    "top006_drempels.ttl": {
+      "ATTR-018": [12, 12, 0],
+      "NET-001": [6, 6, 3],
+      "RVZ-006": [6, 6, 2],
+      "TOP-006": [1, 6, 1]
+    },
+    "top006_overlappende_streng.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "TOP-006": [1, 2, 1]
+    },
+    "top007_nul_lengte.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [2, 2, 2],
+      "RVZ-006": [2, 2, 2],
+      "TOP-007": [1, 2, 0],
+      "TOP-012": [1, 2, 0],
+      "TOP-016": [1, 4, 0],
+      "TOP-018": [1, 2, 0]
+    },
+    "top008_boog.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-008": [1, 1, 0]
+    },
+    "top009_buiten_rd.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-009": [2, 3, 1]
+    },
+    "top010_buffer_kruising.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "TOP-010": [1, 2, 2],
+      "TOP-011": [1, 2, 2]
+    },
+    "top011_hartlijnkruising.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "TOP-011": [1, 2, 2]
+    },
+    "top012_zelfde_put.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [2, 2, 2],
+      "RVZ-006": [2, 2, 2],
+      "TOP-007": [1, 2, 0],
+      "TOP-008": [1, 2, 0],
+      "TOP-012": [1, 2, 0],
+      "TOP-017": [1, 2, 1],
+      "TOP-018": [1, 2, 0]
+    },
+    "top013_parallel.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [3, 3, 3],
+      "RVZ-006": [3, 3, 2],
+      "TOP-008": [2, 3, 0],
+      "TOP-013": [3, 3, 0]
+    },
+    "top014_vijf_strengen.ttl": {
+      "ATTR-018": [11, 11, 0],
+      "NET-001": [5, 5, 3],
+      "RVZ-006": [5, 5, 2],
+      "TOP-014": [1, 6, 0]
+    },
+    "top015_multipart.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 2, 0],
+      "TOP-003": [1, 1, 1],
+      "TOP-004": [1, 1, 0],
+      "TOP-015": [1, 3, 0]
+    },
+    "top016_ongeldige_geometrie.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 2, 0],
+      "TOP-004": [1, 1, 0],
+      "TOP-007": [1, 1, 0],
+      "TOP-008": [1, 1, 0],
+      "TOP-016": [1, 3, 0],
+      "TOP-017": [1, 1, 1],
+      "TOP-021": [1, 2, 0]
+    },
+    "top017_zelfkruisend.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 2, 0],
+      "TOP-003": [1, 1, 1],
+      "TOP-004": [1, 1, 0],
+      "TOP-007": [1, 1, 0],
+      "TOP-008": [1, 1, 0],
+      "TOP-017": [1, 1, 1]
+    },
+    "top018_spike.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-007": [1, 1, 0],
+      "TOP-017": [1, 1, 1],
+      "TOP-018": [1, 1, 0]
+    },
+    "top019_pseudoknoop.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "NET-001": [2, 2, 3],
+      "RVZ-006": [2, 2, 2],
+      "TOP-019": [1, 1, 1]
+    },
+    "top019_pseudoknoop_hulpstuk.ttl": {
+      "ATTR-018": [9, 9, 0],
+      "NET-001": [5, 5, 3],
+      "RVZ-006": [5, 5, 2],
+      "TOP-007": [1, 5, 0],
+      "TOP-008": [1, 5, 0],
+      "TOP-017": [1, 5, 1],
+      "TOP-018": [1, 5, 0],
+      "TOP-019": [1, 3, 1],
+      "TOP-022": [3, 3, 0]
+    },
+    "top021_put_op_streng.ttl": {
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0],
+      "TOP-021": [1, 3, 0]
+    },
+    "top022_hulpstuk_te_weinig.ttl": {
+      "ATTR-018": [21, 21, 0],
+      "NET-001": [10, 10, 4],
+      "RVZ-006": [11, 11, 2],
+      "TOP-003": [1, 11, 1],
+      "TOP-006": [1, 11, 1],
+      "TOP-019": [1, 3, 1],
+      "TOP-022": [1, 3, 1]
+    },
+    "top023_hulpstuk_te_veel.ttl": {
+      "ATTR-018": [8, 8, 0],
+      "NET-001": [4, 4, 3],
+      "RVZ-006": [4, 4, 2],
+      "TOP-023": [1, 1, 0]
+    },
+    "top_nabijheid_scope.ttl": {
+      "ATTR-018": [24, 24, 1],
+      "NET-001": [6, 6, 3],
+      "RVZ-006": [6, 6, 2],
+      "TOP-006": [1, 8, 1],
+      "TOP-010": [1, 8, 3],
+      "TOP-011": [1, 8, 2]
+    },
+    "typering_onbetrouwbaar.ttl": {
+      "ADM-007": [1, 1, 1],
+      "ATTR-018": [4, 4, 0],
+      "NET-001": [1, 1, 3],
+      "RVZ-001": [1, 1, 0],
+      "RVZ-002": [1, 1, 2],
+      "RVZ-006": [1, 1, 2],
+      "TOP-001": [1, 3, 0]
+    }
+  },
+  "peildatum": "2026-01-01",
+  "voorbeeld": {
+    "ADM-010": 2,
+    "ATTR-002": 6,
+    "ATTR-014": 1,
+    "ATTR-015": 2,
+    "ATTR-018": 36,
+    "EXT-001": 2,
+    "EXT-003": 1,
+    "HGT-006": 8,
+    "HGT-007": 9,
+    "HGT-008": 1,
+    "HGT-010": 3,
+    "HGT-014": 1,
+    "NET-001": 7,
+    "NET-009": 14,
+    "NULMETING-BeginpuntLeiding_Knooppunt_card": 8,
+    "NULMETING-BreedteLeiding_val": 12,
+    "NULMETING-BreedtePut_val": 4,
+    "NULMETING-CfkTypes_typ": 3,
+    "NULMETING-EindpuntLeiding_Knooppunt_card": 12,
+    "NULMETING-Gemaal_CapaciteitGemaal_card": 1,
+    "NULMETING-Gemaal_Pomp_card": 1,
+    "NULMETING-HoogteLeiding_val": 12,
+    "NULMETING-Knooppunt_Netwerk_conn": 8,
+    "NULMETING-LengteLeiding_val": 7,
+    "NULMETING-LengtePut_val": 4,
+    "NULMETING-Maaiveldorientatie_Putorientatie_card": 1,
+    "NULMETING-Put_HoogtePut_card": 39,
+    "NULMETING-Put_MateriaalPut_card": 5,
+    "NULMETING-Put_VormPut_card": 6,
+    "NULMETING-Rioolput_BergendOppervlak_card": 39,
+    "NULMETING-Rioolput_Maaiveldschematisering_card": 39,
+    "RVZ-006": 26,
+    "SIG-hulpstukkoppeling": 1,
+    "SIG-nulklasse": 10,
+    "TOP-008": 1,
+    "TOP-014": 1,
+    "TOP-019": 1,
+    "TOP-022": 3
+  }
+}

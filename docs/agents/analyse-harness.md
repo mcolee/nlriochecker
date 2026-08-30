@@ -117,6 +117,7 @@ Bewerk de generator en regenereer; anders valt de bijbehorende drifttest:
 |---|---|
 | `tests/fixtures/ttl/*.ttl` | `scripts/maak_ttl_fixtures.py` |
 | `tests/fixtures/gis/**` | `scripts/maak_gis_fixtures.py` |
+| `tests/golden/ledger.json` | `scripts/maak_ledger.py` |
 | `docs/dekkingsmatrix.md` | `scripts/dekkingsmatrix.py` |
 | `voorbeelden/koekangerveld/**` | `scripts/maak_voorbeeld.py` |
 | `docs/img/*.png` | `scripts/maak_schermafdruk.py` (na een `toets` naar `uitvoer/voorbeeld`) — **geen drifttest** |

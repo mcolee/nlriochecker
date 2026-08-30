@@ -13,37 +13,34 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from gwsw_orox_helpers.dataset import load_dataset
 
-from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
-from nlriochecker.checks import CheckContext, run_checks
+from nlriochecker.checks import CheckRun
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
 WORTEL = Path(__file__).resolve().parent.parent
-TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 RUNDATUM = date(2026, 8, 16)
 
 
-def test_geen_enkele_fixture_levert_een_botsende_melding_id(caplog) -> None:
+def test_geen_enkele_fixture_levert_een_botsende_melding_id(
+    fixtureveeg: dict[str, CheckRun], caplog
+) -> None:
     """Het volgnummer-vangnet mag in de praktijk nooit hoeven aanslaan.
 
     Slaat het toch aan, dan mist een check een identificerende detailsleutel en is
     haar melding-ID afhankelijk van de verwerkingsvolgorde -- precies de
     eigenschap die de ID niet hoort te hebben.
-    """
-    config = load_check_config()
-    config.drempels.rd_y_min = 0.0
 
+    De veeg over alle fixtures komt uit de gedeelde session-fixture (zie
+    `scripts/maak_ledger.py`), zodat de suite hem een keer draait; het bouwen van de
+    meldingen en de logcontrole blijven hier, want die bewaken het gedrag dat deze test
+    toetst.
+    """
     botsingen: list[tuple[str, str]] = []
     with caplog.at_level(logging.WARNING, logger="nlriochecker.uitvoer.melding"):
-        for pad in sorted(TTL_DIR.glob("*.ttl")):
-            # De sweep loopt over elke fixture, en `codering_cp850.ttl` is met opzet
-            # geen UTF-8; zonder terugvalcodering valt hij hier om.
-            dataset = load_dataset(pad, [], fallback_encoding=FALLBACK_ENCODING)
-            run = run_checks(CheckContext(dataset=dataset, config=config))
+        for naam, run in sorted(fixtureveeg.items()):
             for melding in bouw_meldingen(run, RUNDATUM):
                 if "-" in melding.melding_id[16:]:
-                    botsingen.append((pad.name, melding.check_id))
+                    botsingen.append((naam, melding.check_id))
 
     assert botsingen == []
     assert [record.message for record in caplog.records if "id_sleutels" in record.message] == []

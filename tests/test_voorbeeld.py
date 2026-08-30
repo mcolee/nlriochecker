@@ -16,6 +16,7 @@ export. Hij laadt de echte data en is daarom `zwaar` en overgeslagen zonder `dat
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -54,6 +55,11 @@ VOLLE_SHACL = (
 # ATTR-007 op het huidige jaar als bovengrens), dus een export met datums rond nu zou
 # dit getal vanzelf laten schuiven; deze export heeft die niet.
 MELDINGEN_IN_HET_VOORBEELD = 337
+
+# De sectie `voorbeeld` van de gouden ledger draagt datzelfde getal uitgesplitst per
+# check (`scripts/maak_ledger.py`). Het losse getal hierboven blijft ernaast staan: wie
+# de ledger klakkeloos regenereert loopt alsnog tegen die assertie aan.
+LEDGER = Path(__file__).parent / "golden" / "ledger.json"
 
 
 def _leunt_op_raster(check) -> bool:
@@ -151,6 +157,22 @@ def test_het_voorbeeld_levert_hetzelfde_aantal_meldingen(voorbeeld) -> None:
     envelop = json.loads(pad.read_text(encoding="utf-8"))
 
     assert envelop["aantal_meldingen"] == MELDINGEN_IN_HET_VOORBEELD
+
+
+def test_het_voorbeeld_meldt_per_check_hetzelfde_aantal(voorbeeld) -> None:
+    """Per check vastgelegd; een verschuiving tussen twee checks valt hier op.
+
+    Het totaal hierboven ziet twintig meldingen die van HGT-007 naar HGT-013 verhuizen
+    niet: dat blijven er 337. De uitsplitsing telt ook de `NULMETING-*`-vormen en de
+    `SIG-*`-datasetsignalen mee -- die zitten in dezelfde meldingenstroom.
+    """
+    pad = _geschreven(voorbeeld).json
+    assert pad is not None
+
+    envelop = json.loads(pad.read_text(encoding="utf-8"))
+    gemeten = Counter(melding["check_id"] for melding in envelop["meldingen"])
+
+    assert dict(gemeten) == json.loads(LEDGER.read_text(encoding="utf-8"))["voorbeeld"]
 
 
 @pytest.mark.zwaar

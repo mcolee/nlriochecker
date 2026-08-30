@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
 
 from nlriochecker.checkconfig import FALLBACK_ENCODING
+from nlriochecker.checks import CheckRun
 
 # Een schone kloon heeft `data/` niet: die map staat buiten versiebeheer omdat de
 # OroX-export en de GIS-bronnen gigabytes beslaan. De tests die erop leunen slaan
@@ -45,6 +48,7 @@ SHACL_DIR = FIXTURE_DIR / "shacl"
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 OROX_DIR = DATA_DIR / "gwsw_orox_ttl"
 VOORBEELD_TTL = OROX_DIR / "GwswDataset__Voorbeeld_v1_6_orox.ttl"
+LEDGER_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "maak_ledger.py"
 
 
 @pytest.fixture(scope="session")
@@ -64,6 +68,33 @@ def juinen(ontologie: Path) -> GwswDataset:
     if not VOORBEELD_TTL.exists():
         pytest.skip("het OroX-voorbeeldbestand staat niet in data/")
     return load_dataset(VOORBEELD_TTL, [ontologie], fallback_encoding=FALLBACK_ENCODING)
+
+
+@pytest.fixture(scope="session")
+def ledgergenerator() -> ModuleType:
+    """`scripts/maak_ledger.py` als module; het schrijft bij import niets.
+
+    Hetzelfde patroon als `tests/test_ttl_fixtures.py` gebruikt voor de
+    fixturegenerator: de tests draaien zo letterlijk de lus die het getrackte bestand
+    geschreven heeft, in plaats van een tweede die er net naast kan liggen.
+    """
+    spec = importlib.util.spec_from_file_location("maak_ledger", LEDGER_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="session")
+def fixtureveeg(ledgergenerator: ModuleType) -> dict[str, CheckRun]:
+    """De volledige registry over elke TTL-fixture, een keer per pytest-run.
+
+    Session-scoped: de veeg kost circa drie seconden en meer dan een test leunt erop
+    (`test_ledger.py` en `test_uitvoer_identiteit_sweep.py`). De klokpin van ADM-006 en
+    de peildatum van ATTR-007 zitten in `veeg()` respectievelijk `veegconfig()` van de
+    generator, zodat het vastgelegde bestand en deze veeg dezelfde dag lezen.
+    """
+    return ledgergenerator.veeg(ledgergenerator.veegconfig())
 
 
 @pytest.fixture
