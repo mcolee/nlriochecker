@@ -36,6 +36,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `_melding_rij` (28 posities) bleef daarin groen. Het Markdown-rapport valt er bewust
   buiten: dat is een view die samenvat en weglaat. Test-only; geen regel in `src/`
   verandert (issue #114).
+- **Directe tests op de meetkundige primitieven** (`tests/test_checks_meetkunde.py`): de
+  negen functies van `checks/meetkunde.py` dragen zeven TOP-checks maar werden alleen
+  indirect geraakt, via de TTL-fixtures. Met kale shapely-objecten (geen TTL, geen
+  leeslaag, geen `data/`) liggen nu ook de rommelige-data-terugvallen vast: een
+  multi-geometrie, een vlak met een gat, een NaN in de binnenring, een segment met
+  2D-lengte nul, en het verschil tussen `duplicate_vertices` (plat, x en y) en
+  `distinct_coords` (hele tupels, dus 3D). Eén ervan legt een defect vast in plaats van
+  een contract: `is_finite` op een `MultiLineString` valt om met een
+  `NotImplementedError`, want `_flat_coords` vangt die uitzondering niet zoals
+  `coords_of` dat wel doet. Gelijktrekken is een auteursbesluit en gebeurt hier niet.
+  Test-only; geen regel in `src/` verandert (issue #116).
 
 ### Gewijzigd
 
