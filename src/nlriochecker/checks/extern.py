@@ -96,18 +96,38 @@ class _Selectie:
         return len(self.toetsbaar) + self.buiten_gebied + self.onbetrouwbaar + self.zonder_geometrie
 
 
+def _lege_geometrietabel() -> dict[str, BaseGeometry | None]:
+    """Een lege geometrietabel.
+
+    Een eigen functie in plaats van een `lambda`, zodat `CheckContext.cached` zijn
+    TypeVar uit deze returnannotatie oplost en de beller geen `cast` nodig heeft.
+    """
+    return {}
+
+
 def _selecteer(
     context: CheckContext,
     objecten: Iterable[Node | Conduit],
     geometrie_van: Callable[[Node | Conduit], BaseGeometry | None],
 ) -> _Selectie:
-    """Splitst objecten in toetsbaar, buiten het gebied en niet betrouwbaar getypeerd."""
+    """Splitst objecten in toetsbaar, buiten het gebied en niet betrouwbaar getypeerd.
+
+    De geometrie komt uit een tabel die alle EXT-checks van deze context delen (issue
+    #123): elke check loopt over dezelfde putten en strengen, en `geometrie_van` doet
+    er per aanroep tot twee `is_empty` voor. `_ExterneCheck.geometrie_van` heeft één
+    definitie en geen enkele override, dus de tabel is eenduidig. De toets hieronder
+    blijft er onverkort staan: deze functie krijgt de afleiding als parameter en mag
+    niet aannemen dat er nooit een andere langskomt.
+    """
     bronnen = context.bronnen
+    tabel = context.cached("geo:extern-geometrie", _lege_geometrietabel)
     toetsbaar: list[Node | Conduit] = []
     buiten = onbetrouwbaar = zonder = 0
 
     for object_ in objecten:
-        geometrie = geometrie_van(object_)
+        if object_.uri not in tabel:
+            tabel[object_.uri] = geometrie_van(object_)
+        geometrie = tabel[object_.uri]
         if geometrie is None or geometrie.is_empty:
             zonder += 1
             continue

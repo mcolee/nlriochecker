@@ -10,6 +10,13 @@ from shapely.geometry import Point
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import CheckContext, Finding, run_checks
+from nlriochecker.checks.meetkunde import (
+    coords_of,
+    coords_van,
+    distinct_coords,
+    unieke_coords_van,
+)
+from nlriochecker.checks.topologie import _nabijheid
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -346,3 +353,61 @@ def test_top006_zet_de_foutlocatie_op_het_overlappende_deel() -> None:
     assert dataset.conduits[bevinding.object_uri].line.distance(punt) == pytest.approx(
         0.0, abs=1e-6
     )
+
+
+# Issue #123: de coordinaten en de buffers worden per context een keer bepaald in plaats
+# van per check opnieuw. Een cache mag de uitkomst niet raken, dus de tabel moet letterlijk
+# geven wat de losse functies geven -- en hij moet werkelijk geraakt worden, anders is het
+# geen cache maar een omweg.
+GEOMETRIEFIXTURES = [
+    "schoon.ttl",
+    "top006_overlappende_streng.ttl",
+    "top007_nul_lengte.ttl",
+    "top008_boog.ttl",
+    "top016_ongeldige_geometrie.ttl",
+    "top017_zelfkruisend.ttl",
+    "top018_spike.ttl",
+]
+
+
+def _context_van(bestand: str) -> CheckContext:
+    """Een context over een fixture, zonder een check te draaien."""
+    return CheckContext(dataset=load_dataset(TTL_DIR / bestand, []), config=fixtureconfig())
+
+
+@pytest.mark.parametrize("bestand", GEOMETRIEFIXTURES)
+def test_de_coordinatentabel_geeft_hetzelfde_als_de_losse_functies(bestand: str) -> None:
+    context = _context_van(bestand)
+    # Eerst de checks, zodat de tabel staat zoals een echte run hem achterlaat; de
+    # vergelijking gaat dus over de gevulde tabel en niet alleen over het bijvullen.
+    run_checks(context, MEETKUNDIGE_IDS)
+
+    for conduit in context.dataset.conduits.values():
+        assert coords_van(context, conduit.uri, conduit.line) == tuple(coords_of(conduit.line))
+        assert unieke_coords_van(context, conduit.uri, conduit.line) == tuple(
+            distinct_coords(conduit.line)
+        )
+
+
+def test_de_coordinatentabel_wordt_werkelijk_geraakt() -> None:
+    """Een tweede aanroep geeft hetzelfde object terug; er wordt niets opnieuw gebouwd."""
+    context = _context_van("top018_spike.ttl")
+    conduit = next(iter(context.dataset.conduits.values()))
+
+    coords = coords_van(context, conduit.uri, conduit.line)
+    uniek = unieke_coords_van(context, conduit.uri, conduit.line)
+
+    assert coords_van(context, conduit.uri, conduit.line) is coords
+    assert unieke_coords_van(context, conduit.uri, conduit.line) is uniek
+
+
+def test_de_buffer_van_een_streng_wordt_hergebruikt_per_tolerantie() -> None:
+    """Stap 3 van issue #123: een buffer per (streng, tolerantie), niet per paar."""
+    context = _context_van("top006_overlappende_streng.ttl")
+    nabijheid = _nabijheid(context)
+    conduit = nabijheid.conduits[0]
+
+    eerste = nabijheid.buffer_van(conduit, 0.02)
+
+    assert nabijheid.buffer_van(conduit, 0.02) is eerste
+    assert nabijheid.buffer_van(conduit, 0.05) is not eerste

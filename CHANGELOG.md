@@ -86,6 +86,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De TOP-familie vraagt shapely niet meer per check hetzelfde** (issue #123): de
+  coordinaten van een streng staan in twee tabellen aan de context (`geo:coords` en
+  `geo:unieke-coords`, gevuld via `meetkunde.coords_van`/`unieke_coords_van`) in plaats van
+  vijf tot zes keer per streng uit `coords_of`; de EXT-checks lezen de geometrie waarmee zij
+  selecteren uit één gedeelde tabel (`geo:extern-geometrie`); en TOP-006 bouwt de buffer om
+  een streng nog één keer per (streng, tolerantie) in plaats van per strengpaar
+  (`_Nabijheid.buffer_van`, `meetkunde.overlap_length_met_buffer`). Elke functie in
+  `checks/meetkunde.py` die zelf `coords_of` deed is gesplitst in een kern over een
+  puntenreeks en een dunne omhulling met dezelfde naam en signatuur, dus er is geen tweede
+  implementatie bij gekomen. Puur rekenwerk: geen drempel, rol, selectie of kenmerk
+  verandert, de gouden ledger blijft byte-identiek en de volle run op De Wolden en Hoogeveen
+  levert `bevindingen.md`, `.csv` en `.json` byte-identiek op -- alleen sneller: 204,1 s →
+  179,7 s (-12%) bij een gelijk piekgeheugen (3,98 → 3,99 GB). Op de veel kleinere gebiedsrun
+  Koekangerveld valt de winst weg in de ruis (15,5 s → 16,2 s mediaan van drie): die run
+  wordt door het laden en het wegschrijven bepaald, niet door de meetkunde.
 - **De testdekking wordt per tak gemeten**, niet meer alleen per regel:
   `[tool.coverage.run] branch = true` in `pyproject.toml`. De ondergrens blijft 95% en het
   meetcommando verandert niet; de instelling staat op één plek, zodat de CI,

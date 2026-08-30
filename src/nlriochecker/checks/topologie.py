@@ -24,14 +24,15 @@ from nlriochecker.checks.base import (
 )
 from nlriochecker.checks.hulpstukken import _hulpstuktelling
 from nlriochecker.checks.meetkunde import (
-    distinct_coords,
-    duplicate_vertices,
-    endpoints,
+    coords_van,
+    duplicate_vertices_kern,
+    endpoints_kern,
     half_diameter_m,
     is_finite,
-    max_offset_from_chord,
-    overlap_length,
-    vertex_angles,
+    max_offset_from_chord_kern,
+    overlap_length_met_buffer,
+    unieke_coords_van,
+    vertex_angles_kern,
 )
 from nlriochecker.checks.selectie import (
     functieloze_knopen,
@@ -57,8 +58,8 @@ def _punt(node: Node) -> Point:
 def _lijn(conduit: Conduit) -> LineString:
     """De hartlijn van een streng uit `_Topologie.lined`.
 
-    Dezelfde belofte als `_punt`: `lined` bevat alleen strengen waarvan
-    `endpoints(conduit.line)` iets opleverde, dus met een geometrie. Dat filter laat
+    Dezelfde belofte als `_punt`: `lined` bevat alleen strengen waarvan de uiteinden
+    te bepalen waren, dus met een geometrie. Dat filter laat
     strikt genomen ook een andere lijnvormige geometrie dan `LineString` door (zie
     `coords_of` in `checks/meetkunde.py`); de cast is een runtime-noop en de gebruikte
     bewerkingen -- afstand, kruising, snijpunt -- gelden voor elke shapely-geometrie.
@@ -83,16 +84,20 @@ class _Topologie:
     # staan; `_dedupnotitie` verantwoordt ze. Zie `_dedupliceer` en BO-71.
     samengevoegd: int = 0
 
-    def endpoints_of(self, conduit: Conduit) -> tuple[Point, Point] | None:
+    def endpoints_of(self, context: CheckContext, conduit: Conduit) -> tuple[Point, Point] | None:
         """Het begin- en eindpunt van de strenggeometrie, uit de gedeelde tabel.
 
         Vult de tabel bij een onbekende streng alsnog: de vrijvervalselectie is in
         de praktijk een deelverzameling van alle leidingen, maar dat is aan de
         configuratie niet af te dwingen, en een ontbrekende streng als "geen
-        uiteinden" lezen zou een stille gedragswijziging zijn.
+        uiteinden" lezen zou een stille gedragswijziging zijn. Het bijvullen loopt
+        over de coordinatentabel van de context, zodat de streng ook daar bekend
+        wordt (issue #123).
         """
         if conduit.uri not in self.eindpunten:
-            self.eindpunten[conduit.uri] = endpoints(conduit.line)
+            self.eindpunten[conduit.uri] = endpoints_kern(
+                coords_van(context, conduit.uri, conduit.line)
+            )
         return self.eindpunten[conduit.uri]
 
     def nearest_node(self, punt: Point, tolerantie: float) -> Node | None:
@@ -125,7 +130,10 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
     tree = STRtree([node.point for node in knopen]) if knopen else None
 
     alle = leidingen(context)
-    eindpunten = {conduit.uri: endpoints(conduit.line) for conduit in alle}
+    eindpunten = {
+        conduit.uri: endpoints_kern(coords_van(context, conduit.uri, conduit.line))
+        for conduit in alle
+    }
     met_lijn = [conduit for conduit in alle if eindpunten[conduit.uri] is not None]
 
     return _Topologie(
@@ -247,7 +255,7 @@ def _bouw_snapping(context: CheckContext) -> dict[str, tuple[Node | None, ...]]:
 
     snapping: dict[str, tuple[Node | None, ...]] = {}
     for uri, conduit in strengen.items():
-        uiteinden = topologie.endpoints_of(conduit)
+        uiteinden = topologie.endpoints_of(context, conduit)
         if uiteinden is None:
             continue
         snapping[uri] = tuple(topologie.nearest_node(punt, tolerantie) for punt in uiteinden)
@@ -345,6 +353,25 @@ class _Nabijheid:
     # populatie, anders noemt die regel een ander getal dan er getoetst is.
     buiten: int
     totaal: int
+    # Per (streng-URI, tolerantie) de gebufferde hartlijn, lui gevuld. TOP-006 bouwde
+    # die per paar, terwijl hij alleen van de streng en van een vaste drempel afhangt;
+    # de tolerantie zit in de sleutel zodat een tweede beller met een andere drempel de
+    # tabel niet stil verkeerd maakt. Een muteerbare dict op een `frozen=True`
+    # dataclass, net als `_Topologie.eindpunten`. Zie issue #123.
+    buffers: dict[tuple[str, float], BaseGeometry] = field(default_factory=dict)
+
+    def buffer_van(self, conduit: Conduit, tolerantie: float) -> BaseGeometry:
+        """De gebufferde hartlijn van deze streng, een keer gebouwd per tolerantie.
+
+        `intersection` muteert de buffer niet, dus dezelfde geometrie mag mee naar
+        elk volgend paar waarin deze streng de tegenpartij is.
+        """
+        sleutel = (conduit.uri, tolerantie)
+        gebufferd = self.buffers.get(sleutel)
+        if gebufferd is None:
+            gebufferd = _lijn(conduit).buffer(tolerantie)
+            self.buffers[sleutel] = gebufferd
+        return gebufferd
 
 
 def _nabijheid(context: CheckContext) -> _Nabijheid:
@@ -375,7 +402,7 @@ def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
     conduits: list[Conduit] = []
     eindpunten: dict[str, tuple[Point, Point]] = {}
     for conduit in binnen:
-        uiteinden = endpoints(conduit.line)
+        uiteinden = endpoints_kern(coords_van(context, conduit.uri, conduit.line))
         if uiteinden is None:
             continue
         eindpunten[conduit.uri] = uiteinden
@@ -490,7 +517,7 @@ class _StrengPutAansluiting(Check):
 
         for conduit in topologie.conduits:
             treffers = snapping.get(conduit.uri)
-            uiteinden = topologie.endpoints_of(conduit)
+            uiteinden = topologie.endpoints_of(context, conduit)
             if treffers is None or uiteinden is None:
                 continue
             geldig = sum(
@@ -537,7 +564,7 @@ class _StrengPutAansluiting(Check):
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen met geometrie."""
         topologie = _topologie(context)
-        return sum(1 for conduit in topologie.conduits if topologie.endpoints_of(conduit))
+        return sum(1 for conduit in topologie.conduits if topologie.endpoints_of(context, conduit))
 
 
 @register
@@ -599,7 +626,7 @@ class NietGesneptStrengeinde(Check):
         topologie = _topologie(context)
 
         for conduit in topologie.conduits:
-            uiteinden = topologie.endpoints_of(conduit)
+            uiteinden = topologie.endpoints_of(context, conduit)
             if uiteinden is None:
                 continue
             koppelingen = (
@@ -629,7 +656,7 @@ class NietGesneptStrengeinde(Check):
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen met geometrie."""
         topologie = _topologie(context)
-        return sum(1 for conduit in topologie.conduits if topologie.endpoints_of(conduit))
+        return sum(1 for conduit in topologie.conduits if topologie.endpoints_of(context, conduit))
 
 
 @register
@@ -751,7 +778,9 @@ class OverlappendeStreng(Check):
                 sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
                 if sleutel in gemeld:
                     continue
-                lengte = overlap_length(conduit.line, ander.line, tolerantie)
+                lengte = overlap_length_met_buffer(
+                    _lijn(conduit), nabijheid.buffer_van(ander, tolerantie)
+                )
                 if lengte < minimum:
                     continue
                 gemeld.add(sleutel)
@@ -799,7 +828,7 @@ class DegeneratieveGeometrie(Check):
         drempel = context.config.drempels.nul_lengte_m
 
         for conduit in _topologie(context).all_conduits:
-            reden = self._reden(conduit, drempel)
+            reden = self._reden(context, conduit, drempel)
             if reden is None:
                 continue
             yield self.finding(
@@ -810,13 +839,13 @@ class DegeneratieveGeometrie(Check):
                 nul_lengte_m=drempel,
             )
 
-    def _reden(self, conduit: Conduit, drempel: float) -> str | None:
+    def _reden(self, context: CheckContext, conduit: Conduit, drempel: float) -> str | None:
         """De reden waarom deze geometrie onbruikbaar is, of None."""
         if conduit.line is None or conduit.line.is_empty:
             return "Heeft geen lijngeometrie."
         if not is_finite(conduit.line):
             return "Bevat coordinaten die geen eindig getal zijn."
-        punten = distinct_coords(conduit.line)
+        punten = unieke_coords_van(context, conduit.uri, conduit.line)
         if len(punten) < 2:
             return f"Bestaat uit {len(punten)} verschillend(e) punt(en) en heeft geen verloop."
         if conduit.line.length <= drempel:
@@ -855,10 +884,10 @@ class StrengNietRecht(Check):
         for conduit in _topologie(context).conduits:
             if conduit.line is None or conduit.line.is_empty:
                 continue
-            punten = distinct_coords(conduit.line)
+            punten = unieke_coords_van(context, conduit.uri, conduit.line)
             if len(punten) < 3:
                 continue
-            afwijking = max_offset_from_chord(conduit.line)
+            afwijking = max_offset_from_chord_kern(punten)
             if afwijking <= drempel:
                 continue
             yield self.finding(
@@ -1338,8 +1367,12 @@ class DubbeleVertexOfSpike(Check):
             line = conduit.line
             if line is None or line.is_empty:
                 continue
-            dubbel = duplicate_vertices(line, tolerantie)
-            spikes = [(index, hoek) for index, hoek in vertex_angles(line) if hoek <= hoekdrempel]
+            punten = coords_van(context, conduit.uri, line)
+            uniek = unieke_coords_van(context, conduit.uri, line)
+            dubbel = duplicate_vertices_kern(punten, tolerantie)
+            spikes = [
+                (index, hoek) for index, hoek in vertex_angles_kern(uniek) if hoek <= hoekdrempel
+            ]
             if not dubbel and not spikes:
                 continue
             yield self.finding(
@@ -1502,7 +1535,7 @@ class PutNaastDoorlopendeStreng(Check):
                 afstand = _lijn(conduit).distance(node.point)
                 if afstand > tolerantie:
                     continue
-                uiteinden = topologie.endpoints_of(conduit)
+                uiteinden = topologie.endpoints_of(context, conduit)
                 if (
                     uiteinden is not None
                     and min(punt.distance(node.point) for punt in uiteinden) <= afstand

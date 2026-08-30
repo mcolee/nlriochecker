@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
+
+if TYPE_CHECKING:
+    # Alleen als typehint: zo houdt deze module haar meetkunde los van de checklaag en
+    # krijgt `checks/base.py` er geen importer bij tijdens het draaien.
+    from nlriochecker.checks.base import CheckContext
+
+# Een coordinatenreeks zoals `coords_of` en de gedeelde tabel hem opleveren: een lijst of
+# een tuple van punten. De kernfuncties hieronder lezen alleen, dus de vorm doet er niet toe.
+Punten = Sequence[tuple[float, ...]]
 
 
 def coords_of(geometry: BaseGeometry | None) -> list[tuple[float, ...]]:
@@ -27,21 +38,80 @@ def coords_of(geometry: BaseGeometry | None) -> list[tuple[float, ...]]:
         return []
 
 
+def endpoints_kern(punten: Punten) -> tuple[Point, Point] | None:
+    """Het begin- en eindpunt van een coordinatenreeks, of None."""
+    if len(punten) < 2:
+        return None
+    return Point(punten[0][:2]), Point(punten[-1][:2])
+
+
 def endpoints(line: LineString | None) -> tuple[Point, Point] | None:
     """Het begin- en eindpunt van een lijngeometrie, of None."""
-    coordinaten = coords_of(line)
-    if len(coordinaten) < 2:
-        return None
-    return Point(coordinaten[0][:2]), Point(coordinaten[-1][:2])
+    return endpoints_kern(coords_of(line))
+
+
+def distinct_coords_kern(punten: Punten) -> list[tuple[float, ...]]:
+    """Een coordinatenreeks zonder direct herhaalde punten."""
+    uniek: list[tuple[float, ...]] = []
+    for punt in punten:
+        if not uniek or punt != uniek[-1]:
+            uniek.append(punt)
+    return uniek
 
 
 def distinct_coords(line: LineString | None) -> list[tuple[float, ...]]:
     """De coordinaten van een lijn zonder direct herhaalde punten."""
-    uniek: list[tuple[float, ...]] = []
-    for punt in coords_of(line):
-        if not uniek or punt != uniek[-1]:
-            uniek.append(punt)
-    return uniek
+    return distinct_coords_kern(coords_of(line))
+
+
+def _lege_coordinatentabel() -> dict[str, tuple[tuple[float, ...], ...]]:
+    """Een lege coordinatentabel.
+
+    Een eigen functie in plaats van een `lambda`, zodat `CheckContext.cached` zijn
+    TypeVar uit deze returnannotatie oplost en de bellers geen `cast` nodig hebben.
+    """
+    return {}
+
+
+def coords_van(
+    context: CheckContext, uri: str, geometrie: BaseGeometry | None
+) -> tuple[tuple[float, ...], ...]:
+    """De coordinaten van dit object, uit de tabel die deze context deelt.
+
+    Dezelfde streng wordt door vijf tot zes checks langs `coords_of` gehaald, en die
+    doet er elke keer een `is_empty` en een verse lijst uit de shapely-buffer voor.
+    Deze tabel bepaalt ze een keer per context (issue #123). De uitkomst is per
+    constructie gelijk aan `tuple(coords_of(geometrie))`.
+
+    Tuples en geen lijsten: de tabel wordt gedeeld, en een lijst laat een beller de
+    inhoud voor alle andere veranderen. Bijvullen bij een misser, net als
+    `_Topologie.endpoints_of`: "onbekend" mag nooit als "geen geometrie" gelezen
+    worden, want de tabel is gevuld met de populatie van deze context en een beller
+    kan met een object uit de volledige export langskomen.
+    """
+    tabel = context.cached("geo:coords", _lege_coordinatentabel)
+    punten = tabel.get(uri)
+    if punten is None:
+        punten = tuple(coords_of(geometrie))
+        tabel[uri] = punten
+    return punten
+
+
+def unieke_coords_van(
+    context: CheckContext, uri: str, geometrie: BaseGeometry | None
+) -> tuple[tuple[float, ...], ...]:
+    """De coordinaten zonder direct herhaalde punten, uit de gedeelde tabel.
+
+    Afgeleid uit `coords_van` en niet nog een keer uit `coords_of`, zodat een streng
+    zijn coordinaten hoogstens een keer uit shapely haalt. Gelijk aan
+    `tuple(distinct_coords(geometrie))`.
+    """
+    tabel = context.cached("geo:unieke-coords", _lege_coordinatentabel)
+    punten = tabel.get(uri)
+    if punten is None:
+        punten = tuple(distinct_coords_kern(coords_van(context, uri, geometrie)))
+        tabel[uri] = punten
+    return punten
 
 
 def is_finite(geometry: BaseGeometry | None) -> bool:
@@ -74,22 +144,28 @@ def _flat_coords(geometry: BaseGeometry):
         yield from _flat_coords(deel)
 
 
-def max_offset_from_chord(line: LineString) -> float:
-    """De grootste afstand van een tussenvertex tot de rechte begin-eindverbinding."""
-    punten = distinct_coords(line)
+def max_offset_from_chord_kern(punten: Punten) -> float:
+    """De grootste afstand van een tussenvertex tot de rechte begin-eindverbinding.
+
+    Over de *unieke* punten: een direct herhaald punt is geen tussenvertex.
+    """
     if len(punten) < 3:
         return 0.0
     koorde = LineString([punten[0], punten[-1]])
     return max(koorde.distance(Point(punt[0], punt[1])) for punt in punten[1:-1])
 
 
-def vertex_angles(line: LineString) -> list[tuple[int, float]]:
-    """De hoek in graden bij elke tussenvertex, met haar index.
+def max_offset_from_chord(line: LineString) -> float:
+    """De grootste afstand van een tussenvertex tot de rechte begin-eindverbinding."""
+    return max_offset_from_chord_kern(distinct_coords(line))
+
+
+def vertex_angles_kern(punten: Punten) -> list[tuple[int, float]]:
+    """De hoek in graden bij elke tussenvertex van de unieke punten, met haar index.
 
     De hoek is die tussen de twee aansluitende segmenten: 180 graden is recht
     doorlopend, 0 graden is helemaal terug over zichzelf (een spike).
     """
-    punten = distinct_coords(line)
     hoeken: list[tuple[int, float]] = []
     for index in range(1, len(punten) - 1):
         vorige, huidig, volgende = punten[index - 1], punten[index], punten[index + 1]
@@ -104,9 +180,13 @@ def vertex_angles(line: LineString) -> list[tuple[int, float]]:
     return hoeken
 
 
-def duplicate_vertices(line: LineString, tolerantie: float) -> list[int]:
-    """De indexen van vertices die binnen de tolerantie op hun voorganger vallen."""
-    punten = coords_of(line)
+def vertex_angles(line: LineString) -> list[tuple[int, float]]:
+    """De hoek in graden bij elke tussenvertex van een lijn, met haar index."""
+    return vertex_angles_kern(distinct_coords(line))
+
+
+def duplicate_vertices_kern(punten: Punten, tolerantie: float) -> list[int]:
+    """De indexen van punten die binnen de tolerantie op hun voorganger vallen."""
     dubbel: list[int] = []
     for index in range(1, len(punten)):
         vorige, huidig = punten[index - 1], punten[index]
@@ -115,10 +195,24 @@ def duplicate_vertices(line: LineString, tolerantie: float) -> list[int]:
     return dubbel
 
 
+def duplicate_vertices(line: LineString, tolerantie: float) -> list[int]:
+    """De indexen van vertices die binnen de tolerantie op hun voorganger vallen."""
+    return duplicate_vertices_kern(coords_of(line), tolerantie)
+
+
+def overlap_length_met_buffer(line: LineString, gebufferd: BaseGeometry) -> float:
+    """De lengte waarover een lijn binnen een al gebufferde geometrie valt.
+
+    De buffer hangt alleen van de tegenpartij en de tolerantie af, niet van het paar.
+    Wie hem over meerdere paren hergebruikt roept deze variant aan; `intersection`
+    muteert haar argument niet, dus dezelfde buffer kan mee naar het volgende paar.
+    """
+    return float(line.intersection(gebufferd).length)
+
+
 def overlap_length(line: LineString, other: LineString, tolerantie: float) -> float:
     """De lengte waarover een lijn binnen de buffer van een andere lijn valt."""
-    doorsnede = line.intersection(other.buffer(tolerantie))
-    return float(doorsnede.length)
+    return overlap_length_met_buffer(line, other.buffer(tolerantie))
 
 
 def half_diameter_m(breedte_mm: float | None, hoogte_mm: float | None) -> float:

@@ -104,8 +104,8 @@ _Afgeleid = TypeVar("_Afgeleid")
 # `tests/test_checks_cachesleutels.py` houdt elke sleutel in `src/` ertegen, en een
 # botsing is nergens anders aan te zien: de `cast` gelooft de beller op zijn woord.
 #
-# Het voorvoegsel is het deel voor de eerste dubbele punt. `ext:` is van de EXT-familie
-# en daarmee het enige met twee eigenaren.
+# Het voorvoegsel is het deel voor de eerste dubbele punt. `ext:` is van de EXT-familie en
+# `geo:` van de gedeelde geometrietabellen (issue #123); die twee hebben elk twee eigenaren.
 CACHE_VOORVOEGSELS: dict[str, tuple[str, ...]] = {
     "aansluitingen": ("nlriochecker.checks.verbanden",),
     "adm010": ("nlriochecker.checks.administratief",),
@@ -114,6 +114,7 @@ CACHE_VOORVOEGSELS: dict[str, tuple[str, ...]] = {
     "attr015": ("nlriochecker.checks.attributen",),
     "deelstelsel": ("nlriochecker.checks.verbanden",),
     "ext": ("nlriochecker.checks.extern", "nlriochecker.checks.wegvakken"),
+    "geo": ("nlriochecker.checks.extern", "nlriochecker.checks.meetkunde"),
     "hgt": ("nlriochecker.checks.hoogten",),
     "hulpstukken": ("nlriochecker.checks.hulpstukken",),
     "net004": ("nlriochecker.checks.netwerk",),
@@ -209,7 +210,10 @@ class CheckContext:
         `checks/selectie.py` respectievelijk `checks/verbanden.py`, die als enige
         die sleutels vullen; `ext:` is van de EXT-familie en heeft er twee --
         `checks/extern.py`, waar EXT-003 zijn kruisingenlijst onder bewaart, en
-        `checks/wegvakken.py`, dat EXT-009 is.
+        `checks/wegvakken.py`, dat EXT-009 is. `geo:` draagt de gedeelde
+        geometrietabellen (issue #123) en heeft er ook twee: `checks/meetkunde.py`
+        voor de coordinaten (`geo:coords`, `geo:unieke-coords`) en `checks/extern.py`
+        voor de geometrie waarmee de EXT-checks hun objecten selecteren.
 
         Welk voorvoegsel bij welke module hoort staat volledig in `CACHE_VOORVOEGSELS`
         hierboven, met de sleutels zonder voorvoegsel in `CACHE_KALE_SLEUTELS`; deze
