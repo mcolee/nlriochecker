@@ -15,7 +15,7 @@ vervolgvalidaties voor zulke objecten immers onbetrouwbaar.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 
 from gwsw_orox_helpers.dataset import Conduit, Node
@@ -48,7 +48,7 @@ from nlriochecker.checks.wegvakken import (
     STATUS_ROOD,
     beoordeel,
 )
-from nlriochecker.externedata import ROL_RASTER, ROL_STUDIEGEBIED, VectorLayer
+from nlriochecker.externedata import ROL_RASTER, ROL_STUDIEGEBIED, RasterSampler, VectorLayer
 from nlriochecker.taal import getal, met_lidwoord
 
 MARKERING_BUITEN_SCOPE = "bron buiten scope in deze fase"
@@ -85,7 +85,7 @@ def _notitie_zonder_id(context: CheckContext, check_id: str) -> list[str]:
 class _Selectie:
     """De objecten waarover een externe check wel en niet iets mag zeggen."""
 
-    toetsbaar: list
+    toetsbaar: list[Node | Conduit]
     buiten_gebied: int
     onbetrouwbaar: int
     zonder_geometrie: int
@@ -96,10 +96,14 @@ class _Selectie:
         return len(self.toetsbaar) + self.buiten_gebied + self.onbetrouwbaar + self.zonder_geometrie
 
 
-def _selecteer(context: CheckContext, objecten, geometrie_van) -> _Selectie:
+def _selecteer(
+    context: CheckContext,
+    objecten: Iterable[Node | Conduit],
+    geometrie_van: Callable[[Node | Conduit], BaseGeometry | None],
+) -> _Selectie:
     """Splitst objecten in toetsbaar, buiten het gebied en niet betrouwbaar getypeerd."""
     bronnen = context.bronnen
-    toetsbaar: list = []
+    toetsbaar: list[Node | Conduit] = []
     buiten = onbetrouwbaar = zonder = 0
 
     for object_ in objecten:
@@ -121,6 +125,18 @@ def _selecteer(context: CheckContext, objecten, geometrie_van) -> _Selectie:
         onbetrouwbaar=onbetrouwbaar,
         zonder_geometrie=zonder,
     )
+
+
+def _van_soort[Object: (Node, Conduit)](selectie: _Selectie, soort: type[Object]) -> list[Object]:
+    """De toetsbare objecten van een selectie, versmald tot een enkel objecttype.
+
+    `_Selectie` draagt de brede unie omdat EXT-001 strengen en putten tegelijk toetst.
+    Een check waarvan de populatie uit uitsluitend knopen (of uitsluitend strengen)
+    bestaat leest velden die alleen daarop bestaan -- `Node.point`, `Conduit.line` --
+    en haalt haar populatie hier terug in de vorm waarin haar eigen `objecten()` hem
+    opleverde. Er valt per constructie niets weg.
+    """
+    return [object_ for object_ in selectie.toetsbaar if isinstance(object_, soort)]
 
 
 def _bereiknotities(context: CheckContext, selectie: _Selectie, soort: str) -> list[str]:
@@ -177,11 +193,16 @@ class _ExterneCheck(Check):
         """
         return frozenset({ROL_STUDIEGEBIED, *([cls.rol] if cls.rol else [])})
 
-    def objecten(self, context: CheckContext) -> list:
-        """De GWSW-objecten die deze check bekijkt."""
+    def objecten(self, context: CheckContext) -> Sequence[Node | Conduit]:
+        """De GWSW-objecten die deze check bekijkt.
+
+        `Sequence` en niet `list`: `list` is invariant, en de overrides hieronder leveren
+        een `list[Conduit]` of een `list[Node]` uit `checks/selectie.py`. Met `list[Node |
+        Conduit]` zou geen van die rolfuncties nog passen.
+        """
         raise NotImplementedError
 
-    def geometrie_van(self, object_):
+    def geometrie_van(self, object_: Node | Conduit) -> BaseGeometry | None:
         """De geometrie waarmee dit object in het platte vlak ligt.
 
         Een streng heeft een lijn, een knoop een punt; welke van de twee het is
@@ -201,7 +222,7 @@ class _ExterneCheck(Check):
             lambda: _selecteer(context, self.objecten(context), self.geometrie_van),
         )
 
-    def laag(self, context: CheckContext):
+    def laag(self, context: CheckContext) -> VectorLayer | None:
         """De externe laag die deze check nodig heeft, of None."""
         return context.bronnen.layer(self.rol) if context.bronnen is not None else None
 
@@ -278,7 +299,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
     rol = "bgt_pand"
     soort = "vrijvervalstrengen en putten"
 
-    def objecten(self, context: CheckContext) -> list:
+    def objecten(self, context: CheckContext) -> Sequence[Node | Conduit]:
         """De vrijvervalstrengen en de putten; beide horen niet in een pand."""
         return [*vrijvervalrioolleidingen(context), *netwerkknopen(context)]
 
@@ -322,7 +343,13 @@ class KruisingMetBouwwerk(_ExterneCheck):
             )
 
     def _registreer(
-        self, context: CheckContext, object_, laag, vorm, attributen, afstand: float
+        self,
+        context: CheckContext,
+        object_: Node | Conduit,
+        laag: VectorLayer,
+        vorm: BaseGeometry,
+        attributen: dict[str, object],
+        afstand: float,
     ) -> tuple[str, str]:
         """Legt het geraakte bouwwerk vast en levert sleutel en aanduiding terug.
 
@@ -354,7 +381,9 @@ class KruisingMetBouwwerk(_ExterneCheck):
         )
         return sleutel, aanduiding
 
-    def _sterkste(self, geometrie, lagen, buffer: float):
+    def _sterkste(
+        self, geometrie: BaseGeometry, lagen: Sequence[VectorLayer], buffer: float
+    ) -> tuple[str, float, VectorLayer, BaseGeometry, dict[str, object]] | None:
         """De zwaarste relatie met een bouwwerk binnen de buffer.
 
         Bij gelijke relatie wint het dichtstbijzijnde bouwwerk; zo hangt de melding
@@ -364,7 +393,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
         zijn nodig om de treffer te registreren voor de GIS-uitvoer; de keuze zelf
         verandert er niet door, want de vergelijking blijft op `(volgorde, afstand)`.
         """
-        beste = None
+        beste: tuple[int, float, str, VectorLayer, BaseGeometry, dict[str, object]] | None = None
         for laag in lagen:
             for vorm, attributen in laag.nabij(geometrie, buffer):
                 afstand = geometrie.distance(vorm)
@@ -385,7 +414,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
             return None
         return (beste[2], beste[1], beste[3], beste[4], beste[5])
 
-    def _relatie(self, geometrie, bouwwerk, afstand: float) -> str:
+    def _relatie(self, geometrie: BaseGeometry, bouwwerk: BaseGeometry, afstand: float) -> str:
         """De relatie tussen object en bouwwerk: binnen, kruist of nabij."""
         if geometrie.within(bouwwerk):
             return RELATIE_BINNEN
@@ -406,7 +435,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
         """Alle drie de pand- en bouwwerkrollen, niet alleen `rol`."""
         return frozenset({ROL_STUDIEGEBIED, *BOUWWERKROLLEN})
 
-    def bouwwerklagen(self, context: CheckContext) -> list:
+    def bouwwerklagen(self, context: CheckContext) -> list[VectorLayer]:
         """De pand- en bouwwerklagen die deze check gebruikt.
 
         EXT-001 leunt op drie rollen tegelijk; als er ook maar een van aanwezig is
@@ -571,7 +600,7 @@ class _WatergangKruising(_ExterneCheck):
     rol = "bgt_water"
     soort = "vrijvervalstrengen"
 
-    def objecten(self, context: CheckContext) -> list:
+    def objecten(self, context: CheckContext) -> Sequence[Conduit]:
         """De vrijvervalstrengen."""
         return vrijvervalrioolleidingen(context)
 
@@ -590,7 +619,7 @@ class _WatergangKruising(_ExterneCheck):
         afhangen. Wie hier ooit een tweede subklasse met een eigen populatie onder
         hangt (BO-25 verwierp dat voor EXT-003), moet haar dus een eigen sleutel geven.
         """
-        toetsbaar = self.selectie(context).toetsbaar
+        toetsbaar = _van_soort(self.selectie(context), Conduit)
         laag = self.laag(context)
         buffer = context.config.drempels.ext_watergang_buffer_m
         return context.cached(
@@ -778,7 +807,7 @@ class LozingspuntZonderWatergang(_ExterneCheck):
     rol = "bgt_water"
     soort = "lozingspunten op oppervlaktewater"
 
-    def objecten(self, context: CheckContext) -> list:
+    def objecten(self, context: CheckContext) -> Sequence[Node]:
         """De knopen die volgens het GWSW op oppervlaktewater lozen."""
         return waterlozingspunten(context)
 
@@ -815,7 +844,8 @@ class LozingspuntZonderWatergang(_ExterneCheck):
             return
         afstand = context.config.drempels.ext_lozingspunt_water_afstand_m
 
-        for node in self.selectie(context).toetsbaar:
+        for node in _van_soort(self.selectie(context), Node):
+            assert node.point is not None  # gedekt door _selecteer
             if any(
                 node.point.distance(geometrie) <= afstand
                 for geometrie, _ in laag.nabij(node.point, afstand)
@@ -870,7 +900,7 @@ class StraatZonderRiolering(_ExterneCheck):
         """Alle drie de wegvakrollen, niet alleen `rol`."""
         return frozenset({ROL_STUDIEGEBIED, *WEGVAKROLLEN})
 
-    def objecten(self, context: CheckContext) -> list:
+    def objecten(self, context: CheckContext) -> Sequence[Node | Conduit]:
         """Leeg: de populatie van deze check zijn wegvakken en geen GWSW-objecten.
 
         De basisklasse splitst GWSW-objecten in toetsbaar, buiten het gebied en niet
@@ -998,11 +1028,11 @@ class _AhnCheck(_ExterneCheck):
         """Deze checks leunen op het hoogteraster in plaats van op een vectorlaag."""
         return frozenset({ROL_STUDIEGEBIED, ROL_RASTER})
 
-    def objecten(self, context: CheckContext) -> list:
+    def objecten(self, context: CheckContext) -> Sequence[Node]:
         """De putten van het netwerk."""
         return netwerkknopen(context)
 
-    def raster(self, context: CheckContext):
+    def raster(self, context: CheckContext) -> RasterSampler | None:
         """Het hoogteraster, of None."""
         return context.bronnen.raster if context.bronnen is not None else None
 
@@ -1026,7 +1056,8 @@ class _AhnCheck(_ExterneCheck):
         def bemonster() -> list[tuple[Node, float]]:
             """Bemonstert het raster voor elke toetsbare put."""
             gevonden = []
-            for node in self.selectie(context).toetsbaar:
+            for node in _van_soort(self.selectie(context), Node):
+                assert node.point is not None  # gedekt door _selecteer
                 gemeten = raster.sample(node.point.x, node.point.y)
                 if gemeten is not None:
                     gevonden.append((node, gemeten))
@@ -1242,7 +1273,7 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elke BOB die op een toetsbare put uitkomt tegen het AHN."""
         diepte = context.config.drempels.bob_maximale_diepte_m
-        toetsbaar = {node.uri: node for node in self.selectie(context).toetsbaar}
+        toetsbaar = {node.uri: node for node in _van_soort(self.selectie(context), Node)}
         raster = self.raster(context)
         if raster is None:
             return
@@ -1256,6 +1287,7 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
                 node = toetsbaar.get(uri) if uri else None
                 if node is None or bob is None:
                     continue
+                assert node.point is not None  # gedekt door _selecteer
                 maaiveld = raster.sample(node.point.x, node.point.y)
                 if maaiveld is None:
                     continue
@@ -1292,7 +1324,9 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
         )
         return notities
 
-    def _melding(self, bob: float, maaiveld: float, diepte: float, zijde: str, node) -> str | None:
+    def _melding(
+        self, bob: float, maaiveld: float, diepte: float, zijde: str, node: Node
+    ) -> str | None:
         """De reden waarom deze BOB niet bij het AHN-maaiveld past, of None."""
         if bob > maaiveld:
             return (

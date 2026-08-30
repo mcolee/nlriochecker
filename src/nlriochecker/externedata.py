@@ -14,15 +14,23 @@ geherprojecteerd, en dat wordt vastgelegd in `notes`.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
 
+from nlriochecker.checkconfig import ExternalSources
 from nlriochecker.errors import PipelineError
 from nlriochecker.taal import getal
+
+if TYPE_CHECKING:
+    # `geopandas` wordt bewust pas binnen `_lees_laag` geimporteerd, om de opstarttijd
+    # laag te houden. `from __future__ import annotations` hierboven houdt de annotaties
+    # tekst, dus deze import draait alleen onder de typecontrole en blijft de import lui.
+    from geopandas import GeoDataFrame
 
 RD_NEW = 28992
 
@@ -55,7 +63,9 @@ class VectorLayer:
         """Het aantal features."""
         return len(self.geometries)
 
-    def nabij(self, geometrie: BaseGeometry, afstand: float):
+    def nabij(
+        self, geometrie: BaseGeometry, afstand: float
+    ) -> Iterator[tuple[BaseGeometry, dict[str, object]]]:
         """De features waarvan de omhullende binnen deze afstand komt.
 
         Levert paren van geometrie en attributen op. Bij afstand nul wordt de
@@ -193,7 +203,10 @@ def rol_van(ontbrekend: str) -> str:
 
 
 def load_external_data(
-    bronnen, wortel: Path | None = None, *, dekkingseis: Dekkingseis | None = None
+    bronnen: ExternalSources,
+    wortel: Path | None = None,
+    *,
+    dekkingseis: Dekkingseis | None = None,
 ) -> ExternalData:
     """Leest de externe bronnen uit de geconfigureerde map.
 
@@ -368,7 +381,7 @@ def _bbox(grenzen: tuple[float, float, float, float]) -> str:
 
 def _lees_studiegebied(
     map_pad: Path, bestand: str | None, ontbrekend: list[str], notities: list[str]
-):
+) -> tuple[BaseGeometry | None, Path | None, str]:
     """Leest de begrenzingspolygoon waarbinnen de externe bronnen gelden."""
     from nlriochecker.errors import StudyAreaError
     from nlriochecker.studiegebied import load_study_area
@@ -496,7 +509,9 @@ def _laagnamen(pad: Path) -> list[str]:
         verbinding.close()
 
 
-def _lees_laag(pad: Path, laag: str, notities: list[str]):
+def _lees_laag(
+    pad: Path, laag: str, notities: list[str]
+) -> tuple[list[tuple[BaseGeometry, dict[str, object]]], str, str | None]:
     """Leest een enkele laag met geopandas en bewaakt het coordinaatstelsel."""
     import geopandas as gpd
 
@@ -535,7 +550,7 @@ def _lees_laag(pad: Path, laag: str, notities: list[str]):
 HISTORIEVELDEN = ("eind_registratie", "termination_date")
 
 
-def _alleen_actueel(frame, pad: Path, laag: str, notities: list[str]):
+def _alleen_actueel(frame: GeoDataFrame, pad: Path, laag: str, notities: list[str]) -> GeoDataFrame:
     """Houdt van een BGT-laag alleen de actuele objectversies over.
 
     Elk BGT-object draagt zijn registratiegeschiedenis mee: de levende versie heeft

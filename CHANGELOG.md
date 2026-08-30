@@ -83,6 +83,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   *"Diameterverjonging …"*: *verjonging* betekent vernieuwen, terwijl de check meldt dat
   de diameter benedenstrooms kleiner wordt. Puur een terminologiecorrectie — het check-ID,
   de logica en de tellingen (0 F / 525 W op De Wolden) veranderen niet (issue #112).
+- **Mypy draait strikt, met een krimpende uitzonderingslijst** (issue #121, BO-86):
+  `disallow_untyped_defs`, `disallow_incomplete_defs` en `disallow_any_generics` staan aan
+  in `[tool.mypy]`; de vijftien modules die nog niet volledig geannoteerd zijn staan in één
+  `[[tool.mypy.overrides]]`-blok dat alleen korter mag worden. De EXT-tak is als eerste
+  tranche volledig geannoteerd (`checks/extern.py`, `externedata.py`,
+  `checks/selectie.klassen_van_rol`): 25 fouten vóór, 0 erna. `_ExterneCheck.objecten()`
+  levert een `Sequence[Node | Conduit]` en geen `list`, zodat de vijf overrides hun eigen
+  rolfunctie kunnen teruggeven. Ruff bewaakt daarnaast de docstrings (`D`, met D203, D213,
+  D400 en D401 uit — Engelse grammaticaregels tegen verplichte Nederlandse docstrings;
+  D415 blijft aan), buiten `tests/`, `scripts/` en `.claude/`. Geen regel logica verandert;
+  `bevindingen.csv` en `bevindingen.json` van een voor- en na-run op het voorbeeld
+  Koekangerveld zijn byte-gelijk.
 - **CI- en repo-hygiëne** (issue #120): `.github/workflows/toets.yml` draagt een
   `permissions: contents: read`-blok (geen stap in die job schrijft; `release.yml` houdt
   `contents: write`), beide workflows pinnen `actions/checkout` en `astral-sh/setup-uv` op

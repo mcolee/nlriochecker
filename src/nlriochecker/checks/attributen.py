@@ -621,8 +621,7 @@ def _buiten_band(waarde: float, regel: MaterialRoughness) -> bool:
 
 
 def _gekozen_schaal(context: CheckContext) -> float:
-    """De schaal waarmee de wandruwheid gelezen wordt: de kandidaat met de minste
-    afwijkingen op de data.
+    """De schaal waarmee de wandruwheid gelezen wordt: de kandidaat met de minste afwijkingen.
 
     Het GWSW-datatype `Dt_Wandruwheid` is een geheel getal in mm (0-99) en kan de
     kunststofwaarden uit C2100 (pvc en HPE 0,4 mm) niet uitdrukken; een export noteert
@@ -1580,13 +1579,13 @@ def _registreert_nulmaat(conduit: Conduit) -> bool:
 
 
 def _diameterverdeling(context: CheckContext, strengen: Sequence[Conduit]) -> str | None:
-    """Een Markdown-tabel met per materiaal het aantal, het aantal buiten bereik en de
-    feitelijke min- en max-diameter uit de data.
+    """Een Markdown-tabel met per materiaal de aantallen en de feitelijke diameters.
 
-    Het aantal telt alle strengen met dat materiaal; de min en max komen alleen uit de
-    strengen met een bruikbare profielmaat, en het aantal buiten bereik is 0 voor een
-    materiaal zonder regel -- zonder grens valt er niets te overschrijden. Geeft None als
-    geen streng een materiaal draagt.
+    De kolommen zijn het aantal, het aantal buiten bereik en de min- en max-diameter uit
+    de data. Het aantal telt alle strengen met dat materiaal; de min en max komen alleen
+    uit de strengen met een bruikbare profielmaat, en het aantal buiten bereik is 0 voor
+    een materiaal zonder regel -- zonder grens valt er niets te overschrijden. Geeft None
+    als geen streng een materiaal draagt.
 
     Buiten bereik telt per streng tegen het bereik waarop zij feitelijk getoetst is
     (issue #86), dus een drainageleiding tegen dat van haar constructietype. Anders zou

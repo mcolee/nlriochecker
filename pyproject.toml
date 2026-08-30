@@ -75,12 +75,27 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "N"]
+select = ["E", "F", "I", "UP", "B", "N", "D"]
+# D203/D213 zijn de tegenhangers van D211/D212 en kunnen niet samen aan; zonder deze twee
+# waarschuwt ruff bij elke run. D400 eist een punt aan het eind van de eerste docstringregel,
+# maar drie samenvattingen zijn een Nederlandse vraag ("... waar komt het water uit?",
+# checks/netwerk.py; checks/topologie.py; checks/wegvakken.py) -- een punt maakt die zin fout.
+# D415 blijft wel aan en eist punt, vraag- of uitroepteken; die slaagt overal al.
+# D401 eist de Engelse gebiedende wijs ("Return the ...") en misvuurt per definitie op de
+# verplichte Nederlandse docstrings ("True als de waarde onder het minimum valt", CLAUDE.md).
+ignore = ["D203", "D213", "D400", "D401"]
 
 [tool.ruff.lint.per-file-ignores]
 # De fixturegenerator bevat GML-literalen die niet af te breken zijn zonder de
 # TTL-uitvoer te veranderen.
 "scripts/maak_ttl_fixtures.py" = ["E501"]
+# De docstringregels gelden voor de package, niet voor de tests, de scratch-scripts en de
+# harness-hook: daar zijn het er 385 en zeggen ze niets over de kwaliteit van de uitvoer.
+# `ruff check .` draait over de hele repo, dus zonder deze regels staat de poort rood op
+# code die geen enkel rapport haalt.
+"tests/**" = ["D"]
+"scripts/**" = ["D"]
+".claude/**" = ["D"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -88,6 +103,36 @@ files = ["src/nlriochecker"]
 # rdflib, shapely, geopandas en rasterio leveren geen bruikbare stubs; zonder deze
 # regel verdrinkt elke echte melding in import-fouten.
 ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
+
+# Ratchet: de modules die nog niet volledig geannoteerd zijn. Deze lijst wordt alleen
+# korter, nooit langer. Is hij leeg, dan kan dit blok weg (en kan `ANN` erbij in ruff --
+# meet het dan opnieuw; `ANN001`/`ANN201`/`ANN202` slaan op dezelfde functies als de drie
+# vlaggen hierboven, dus zolang deze lijst bestaat zou `ANN` een tweede uitzonderingslijst
+# naast deze vragen).
+[[tool.mypy.overrides]]
+module = [
+    "nlriochecker.checkconfig",
+    "nlriochecker.checks.administratief",
+    "nlriochecker.checks.attributen",
+    "nlriochecker.checks.betrouwbaarheid",
+    "nlriochecker.checks.hoogten",
+    "nlriochecker.checks.meetkunde",
+    "nlriochecker.checks.netwerk",
+    "nlriochecker.checks.randvoorzieningen",
+    "nlriochecker.checks.topologie",
+    "nlriochecker.cli",
+    "nlriochecker.karakteristiek",
+    "nlriochecker.plausibiliteit",
+    "nlriochecker.uitvoer.bevindingen",
+    "nlriochecker.uitvoer.gpkg",
+    "nlriochecker.uitvoer.stijlen.symbolen",
+]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_any_generics = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

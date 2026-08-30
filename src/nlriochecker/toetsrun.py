@@ -336,8 +336,7 @@ def _nulmeting(
     dataset: GwswDataset,
     voortgang: Voortgang,
 ) -> tuple[frozenset[str], bool, Meetbereik, tuple[Nulbevinding, ...], tuple[str, ...]]:
-    """Leest de nulmeting en haalt er drie dingen uit: de poort, de overtredingen en
-    de klassen die de poort niet kon beoordelen.
+    """Leest de nulmeting: de poort, de overtredingen en de niet-beoordeelde klassen.
 
     De typeringspoort levert de te globaal getypeerde objecten. De SHACL-meting
     noemt de te globale klassen; de instanties komen uit de dataset. Dat geeft een

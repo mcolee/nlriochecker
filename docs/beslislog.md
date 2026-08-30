@@ -4747,3 +4747,50 @@ aanzetten, dan is dat een nieuwe beslissing.
 x status en kennen geen regel per check, dus de naamgeving hierboven geldt voor `vlakken`.
 
 Zie [#107](https://github.com/mcolee/nlriochecker/issues/107), BO-73 en BO-79.
+
+### BO-86 Mypy draait strikt, met een uitzonderingslijst die alleen krimpt
+
+**Wat.** `[tool.mypy]` in `pyproject.toml` draagt drie strictheidsvlaggen:
+`disallow_untyped_defs`, `disallow_incomplete_defs` en `disallow_any_generics`. Daarnaast
+staat er één `[[tool.mypy.overrides]]`-blok met de modules die nog niet volledig
+geannoteerd zijn, en dat blok kent één regel: **de lijst wordt alleen korter, nooit
+langer.** Is hij leeg, dan kan het blok weg. Een nieuwe module hoort er dus nooit bij; die
+wordt meteen geannoteerd.
+
+Ruff bewaakt sinds dezelfde beslissing de docstrings (`D`), met vier uitzonderingen:
+D203 en D213 (de tegenhangers van D211 en D212, die niet samen aan kunnen), **D400** en
+**D401**. Die laatste twee zijn Engelse grammaticaregels tegen verplicht Nederlandse
+docstrings: D400 eist een punt aan het eind van de eerste regel, maar drie samenvattingen
+in deze codebase zijn een vraag ("... waar komt het water uit?") en een punt maakt die zin
+fout; D401 eist de gebiedende wijs ("Return the ...") en misvuurt per definitie op "True
+als de waarde onder het minimum valt". **D415 blijft wél aan** en dekt de echte eis: de
+samenvatting eindigt op een punt, vraag- of uitroepteken. De regels gelden voor de
+package; `tests/`, `scripts/` en `.claude/` staan in `per-file-ignores`, want 385 van de
+392 meldingen staan daar en zeggen niets over de kwaliteit van de uitvoer.
+
+**Waarom.** `uv run mypy` meldde "Success: no issues found in 54 source files" terwijl de
+sectie geen enkele strictheidsvlag droeg: een functie zonder annotaties werd niet
+gecontroleerd en alles wat eruit kwam was `Any`. Op de EXT-tak liep dat het verst uit de
+hand -- `object_.uri`, `object_.line`, `laag.source.name` en `laag.layer` waren over
+`checks/extern.py` heen `Any`, zodat een `Node` waar een `Conduit` hoort pas als
+runtime-fout of, erger, als stille verkeerde bevinding boven water komt. Een groene poort
+die niets meet is duurder dan geen poort, want hij wekt vertrouwen.
+
+De ratchet staat in `pyproject.toml` en niet in de twee poortscripts
+(`.github/workflows/toets.yml` en `scripts/uitgave.py`), zodat de CI, de uitgavepoort en
+een handmatige `uv run mypy` dezelfde meting doen -- dezelfde vindplaats-redenering als bij
+`[tool.coverage.run] branch` en bij de dekkingsondergrens van BO-38. Het onderscheid met
+BO-38 blijft: dekking meet of de tests de regels ráken, dit meet of de typen kloppen.
+
+**`ANN` gaat nu niet mee.** `ANN001`, `ANN201` en `ANN202` slaan op dezelfde functies als
+de eerste twee vlaggen (88 ruff-hits tegen 62 mypy-fouten; ruff telt per parameter, mypy
+per functie). Ze aanzetten vóór de overrides-lijst leeg is vraagt een tweede
+uitzonderingslijst naast de eerste: één afspraak op twee plekken. Zodra het blok weg kan,
+wordt `ANN` opnieuw gemeten.
+
+**Wat dit niet is.** Geen gedragswijziging: annotaties zijn strings
+(`from __future__ import annotations`) en de configwijzigingen raken alleen de poort. Het
+bewijs is een byte-vergelijking van `bevindingen.csv` en `bevindingen.json` over een
+voor/na-paar op dezelfde HEAD.
+
+Zie [#121](https://github.com/mcolee/nlriochecker/issues/121) en BO-38.

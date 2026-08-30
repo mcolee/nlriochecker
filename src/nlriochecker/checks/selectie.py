@@ -28,6 +28,7 @@ from collections.abc import Callable, Mapping, Sequence
 
 from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
 
+from nlriochecker.checkconfig import ClassRoots
 from nlriochecker.checks.base import CheckContext
 
 
@@ -399,7 +400,7 @@ _ROL_VELDEN: dict[str, str] = {
 }
 
 
-def klassen_van_rol(rol: str, klassen) -> list[str]:
+def klassen_van_rol(rol: str, klassen: ClassRoots) -> list[str]:
     """De wortelklassen van een rol in deze `[klassen]`-configuratie.
 
     `netwerkknopen` is een samengestelde property; de andere rollen lezen één veld.
