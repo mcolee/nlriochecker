@@ -39,6 +39,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De testdekking wordt per tak gemeten**, niet meer alleen per regel:
+  `[tool.coverage.run] branch = true` in `pyproject.toml`. De ondergrens blijft 95% en het
+  meetcommando verandert niet; de instelling staat op één plek, zodat de CI,
+  `scripts/uitgave.py` en een handmatige run dezelfde meting doen. Gemeten op dev mét
+  `data/`: 96% mét takken (183 deels genomen takken van 2624), tegen 97,4% regel-only in
+  dezelfde run (issue #115).
 - **HGT-010** heet voortaan *"Diameterverkleining in afvoerrichting"* in plaats van
   *"Diameterverjonging …"*: *verjonging* betekent vernieuwen, terwijl de check meldt dat
   de diameter benedenstrooms kleiner wordt. Puur een terminologiecorrectie — het check-ID,

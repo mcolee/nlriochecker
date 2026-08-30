@@ -2159,6 +2159,18 @@ invariant breken en een regressie pas bij de uitgave vangen, voor geen winst). A
 commando vindbaar maken zonder ondergrens (verworpen: dan blijft de dekking een meting en
 geen belofte -- de kern van issue #54).
 
+**Aanvulling 30-08-2026 (issue #115): dezelfde grens, maar over takken.** `pyproject.toml`
+draagt sinds dit issue `[tool.coverage.run] branch = true`. Wat verandert is wat er *onder*
+de 95 valt, niet de grens zelf: een `if` telt pas als gedekt wanneer beide takken gelopen
+zijn. De instelling staat in `pyproject.toml` en niet in de twee poortcommando's, zodat de
+CI, `scripts/uitgave.py` en een handmatige run dezelfde meting doen -- één vindplaats; die
+twee commando's blijven letterlijk zoals ze waren, ook omdat `scripts/runnerpoort.py` de
+run-regel van de workflow met een regex leest. **Gemeten** (dev, mét `data/`, 30-08-2026):
+9123 regels, 234 gemist, 2624 takken, 183 deels genomen, TOTAL 96% (regel-only in dezelfde
+run: 97,4%). De takstraf is dus circa één procentpunt. De CI-conditie staat regel-only een
+punt onder dev, dus daar is de marge boven de 95 dun; zakt zij eronder, dan geldt de
+kanttekening hierboven (CI-grens splitsen) en niet het verlagen van de belofte.
+
 ### BO-39 De wandruwheid wordt gelezen op een uit de data afgeleide schaal, niet in hele mm
 
 **Wat.** ATTR-017 leest de kenmerken `WandruwheidBinnenboven` en `WandruwheidBinnenonder`

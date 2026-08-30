@@ -209,10 +209,14 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   `pytest-cov` staat bewust niet in de dev-groep (afhankelijkheden minimaal); `--with`
   lost hem per run op. Beide poorten dwingen een ondergrens van 95% af
   (`DEKKINGSONDERGRENS` in `scripts/uitgave.py`, gelijk in de CI; `--cov-fail-under`).
-  Laatst gemeten: 97% mét `data/` (dev, 2026-08-23) en 96% in de CI-conditie zonder
-  `data/` -- beide ruim boven de grens, dus 95% raakt normale schommeling niet maar wel
-  een echte regressie. Alleen een totaalgrens; de per-module-cijfers blijven een
-  observatie in de rondeverslagen. Zie BO-38.
+  De meting telt sinds issue #115 **takken** mee: `[tool.coverage.run] branch = true` in
+  `pyproject.toml` is de enige vindplaats, dus de CI, de uitgavepoort en een handmatige
+  run doen dezelfde meting. Laatst gemeten mét takken: 96% mét `data/` (dev, 2026-08-30;
+  regel-only 97,4% in diezelfde run, dus de takstraf is circa één procentpunt). De
+  CI-conditie zonder `data/` staat regel-only een punt onder dev, dus daar is de marge
+  boven de grens dun -- 95% raakt normale schommeling niet maar wel een echte regressie.
+  Alleen een totaalgrens; de per-module-cijfers blijven een observatie in de
+  rondeverslagen. Zie BO-38.
 - CLI-ingang: nlriochecker (via entry point), subcommands: analyseer, dekking, vergelijk, toets.
 - Werk op `dev`, niet op `main`. Elke wijziging gaat naar `dev`; `main` draagt alleen
   uitgebrachte, getagde versies. `main` is GitHub-beschermd: PR verplicht en

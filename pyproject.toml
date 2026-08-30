@@ -98,3 +98,10 @@ markers = [
     "zwaar: laadt de volledige OroX-dataset (circa anderhalve minuut en bijna 3 GB geheugen)",
     "qgis: vereist PyQGIS; overgeslagen waar qgis.core niet importeerbaar is",
 ]
+
+[tool.coverage.run]
+# Takdekking: op een codebase van vrijwel louter voorwaardelijke domeinlogica telt een
+# `if` pas als gedekt wanneer beide takken gelopen zijn. De instelling staat hier en niet
+# in de twee poortcommando's, zodat de CI, scripts/uitgave.py en een handmatige run
+# dezelfde meting doen -- één vindplaats.
+branch = true
