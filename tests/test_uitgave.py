@@ -157,7 +157,12 @@ def test_het_echte_wijzigingslog_is_verwerkbaar() -> None:
     module = _laad_script()
     tekst = CHANGELOG.read_text(encoding="utf-8")
 
-    module.controleer_changelog(tekst)
+    # Bewust géén controleer_changelog hier: dat is een release-preconditie (een lege
+    # [Unreleased] afkeuren), en precies dat is de legitieme toestand van een
+    # release-commit -- uitgave.py verschuift de sectie en laat [Unreleased] leeg achter.
+    # De poort op die commit (en op main na de merge) zou er anders rood van worden. De
+    # preconditie zelf blijft gedekt door de synthetische gevallen hierboven. Deze test
+    # bewaakt alleen dat verwerk_changelog het échte bestand aankan (issue #110).
     nieuw = module.verwerk_changelog(tekst, "0.9.9", date(2026, 9, 1))
 
     assert "## [0.9.9] - 2026-09-01" in nieuw

@@ -11,6 +11,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gewijzigd
+
+- `tests/test_uitgave.py::test_het_echte_wijzigingslog_is_verwerkbaar` roept
+  `controleer_changelog` niet meer aan. Dat is een release-preconditie (een lege
+  `[Unreleased]` afkeuren) en precies dat is de toestand van een release-commit, dus de
+  `toets`-run op elke release-commit (en op `main` na de merge) werd er rood van. De
+  preconditie blijft volledig gedekt door de synthetische gevallen in dezelfde testmodule
+  (issue #110).
+
 ## [0.3.1] - 2026-08-30
 
 ### Toegevoegd
