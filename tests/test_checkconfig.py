@@ -143,7 +143,7 @@ def test_persnet_of_pompunit_maakt_de_config_wel_geldig(tmp_path: Path) -> None:
     basis = (
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
         "afvoer_eindpunt = ['Overnamepunt', 'Gemaal']\n{extra}"
-        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n"
     )
     met_persnet = tmp_path / "met_persnet.toml"
     met_persnet.write_text(
@@ -168,7 +168,7 @@ def test_een_lege_eindpuntlijst_valt_buiten_de_poort(tmp_path: Path) -> None:
     pad = tmp_path / "leeg.toml"
     pad.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
-        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n",
         encoding="utf-8",
     )
 
@@ -186,7 +186,7 @@ def test_eigen_config_vervangt_de_drempels(tmp_path: Path) -> None:
     eigen = tmp_path / "eigen.toml"
     eigen.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
-        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n"
         "[drempels]\nsnapping_tolerantie_m = 0.5\n",
         encoding="utf-8",
     )

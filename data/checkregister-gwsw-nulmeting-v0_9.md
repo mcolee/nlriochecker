@@ -125,7 +125,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk; gezocht op de betrouwbare richting (de strengen die NET-009 niet tegenspreekt). Een kring die alleen administratief bestaat valt uiteen en telt niet; een vlakke BOB-consistente ring is bewust vermaasd net (legitiem) en een ring die via een BOB-sprong omhoog sluit hoort bij HGT-009 -- beide gedempt (BO-77) | F | Consistentie |
 | NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie |
-| NET-006 | Koppelingen tussen verschillende stelseltypen | W | Plausibiliteit |
+| NET-006 | Ongeldige koppeling tussen stelseltypen: een gerichte koppeling (bovenstroom → benedenstroom, op de betrouwbare stroomrichting) die niet in de configureerbare koppelmatrix `[koppelregels]` staat. Koppelingen zonder betrouwbare richting en typeloze strengen worden niet beoordeeld (BO-87) | W | Plausibiliteit |
 | NET-007 | IT-stelsel zonder drempel | F | Compleetheid |
 | NET-008 | Opvallend veel lozingspunten binnen een klein deelstelsel | W | Plausibiliteit |
 | NET-009 | Richtingssignalen (administratie, geometrie, BOB) spreken elkaar tegen | W | Consistentie |

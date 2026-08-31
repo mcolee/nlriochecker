@@ -86,6 +86,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **NET-006 toetst nu een configureerbare koppelmatrix** (issue #126): de ad-hoc regel van
+  issue #97 (alleen vuilwater benedenstrooms van gemengd) is vervangen door de whitelist
+  `[koppelregels]` in de projectconfig (bovenstroom-tag → toegestane benedenstroom-tags),
+  verplicht en zonder default in Python. Per knoop kijkt de check welke stelseltypen
+  instromen en welke uitstromen -- alleen bij een betrouwbare stroomrichting (BO-76/#80) --
+  en meldt een gerichte koppeling `boven → beneden` die niet in de whitelist staat.
+  `[klassen.stelseltypen]` heeft er twee eigen tags bij (`DIT`/`DT`, grondwater ≠
+  hemelwater). Wat niet gericht te beoordelen is (koppelingen zonder betrouwbare richting,
+  typeloze strengen) komt in de toelichting. Zie BO-87.
+
 - **Twee resterende herhaalde graafscans zijn gededupliceerd** (issue #124): `_eindpunten`
   in `checks/verbanden.py` staat achter `context.cached` (sleutel `eindpunten:<rol>`, een
   `frozenset` omdat de uitkomst gedeeld is), net als de acht andere afgeleide structuren in

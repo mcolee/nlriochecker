@@ -633,6 +633,11 @@ class CheckConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     klassen: ClassRoots
+    # NET-006 (issue #126): de koppelmatrix boven -> toegestane benedenstroomse tags.
+    # Verplicht en zonder default: de regels zijn een domeinafspraak en horen in de TOML,
+    # niet hardgecodeerd in Python. Ontbreekt de sectie, dan is dat een duidelijke
+    # configfout in plaats van een stille lege matrix.
+    koppelregels: dict[str, list[str]]
     drempels: CheckThresholds = Field(default_factory=CheckThresholds)
     netwerk: NetworkOptions = Field(default_factory=NetworkOptions)
     studiegebied: StudyAreaOptions = Field(default_factory=StudyAreaOptions)

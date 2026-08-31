@@ -819,6 +819,78 @@ FIXTURES["net006_doorgaand_gemengd_hoofdriool.ttl"] = (
     ),
 )
 
+# NET-006 (issue #126): hemelwater komt op knoop B binnen en gaat als gemengd verder.
+# `hemelwater -> gemengd` staat in de koppelregels (matrix #15: Ja), dus NET-006 zwijgt --
+# terwijl de oude ad-hoc regel elke gemengd+hemelwater-knoop nog meldde. Beide strengen zijn
+# betrouwbaar gericht (BOB daalt, geometrie mee), zodat de richting vaststaat.
+FIXTURES["net006_hemelwater_naar_gemengd.ttl"] = (
+    "geen; hemelwater komt op knoop B binnen en gaat als gemengd verder (koppelregels-conform)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        klasse="Hemelwaterriool",
+        bob=(10.5, 10.0),
+    )
+    + leiding("L2", "2", [(1025.0, 2000.0), (1050.0, 2000.0)], "PutB", "PutC", bob=(10.0, 9.5)),
+)
+
+# NET-006 (issue #126): een DIT-riool (drainage-infiltratie-transport, grondwater) komt op
+# knoop B binnen en gaat als vuilwater verder. `DIT -> vuilwater` staat NIET in de koppelregels
+# (matrix #30: Nee) -- grondwater hoort niet in een vuilwaterriool -- dus B wordt gemeld. De
+# fixture bewijst tegelijk dat de eigen tag `DIT` (issue #126) herkend wordt. Betrouwbaar gericht.
+FIXTURES["net006_dit_naar_vuilwater.ttl"] = (
+    "op knoop B komt een DIT-riool binnen en gaat als vuilwater verder (matrix #30: niet toegestaan)",
+    DRAINAGE_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        klasse="DIT_riool",
+        bob=(10.5, 10.0),
+    )
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        bob=(10.0, 9.5),
+    ),
+)
+
+# NET-006 (issue #126): twee stelseltypen komen samen op knoop B, maar de gemengde streng L1
+# heeft een stijgende BOB (NET-009 spreekt haar tegen), dus haar richting is onbetrouwbaar. De
+# koppeling is daardoor niet gericht te beoordelen: geen bevinding, wel een telling in de
+# toelichting ("wat NIET beoordeeld is"). L2 (hemelwater) is wel betrouwbaar gericht.
+FIXTURES["net006_onbetrouwbare_richting.ttl"] = (
+    "geen bevinding; op knoop B komen twee typen samen maar de gemengde streng is onbetrouwbaar gericht",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1025.0, 2000.0)], "PutA", "PutB", bob=(10.0, 10.5))
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        klasse="Hemelwaterriool",
+        bob=(10.0, 9.5),
+    ),
+)
+
 # NET-008: drie lozingsputten in een deelstelsel van vier knopen.
 FIXTURES["net008_veel_lozingspunten.ttl"] = (
     "een deelstelsel van vier knopen heeft drie lozingsputten",

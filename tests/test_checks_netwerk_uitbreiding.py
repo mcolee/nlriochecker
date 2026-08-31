@@ -53,10 +53,12 @@ def test_net005_noemt_het_afwijkende_type_en_dat_van_de_buren() -> None:
     assert bevinding.details["buurtypen"] == ["gemengd"]
 
 
-def test_net006_meldt_beide_stelseltypen_op_de_knoop() -> None:
+def test_net006_meldt_de_gerichte_koppeling_op_de_knoop() -> None:
+    # Op knoop B stroomt gemengd binnen en gaat als hemelwater verder; `gemengd → hemelwater`
+    # staat niet in de koppelregels (matrix #3), dus de bevinding noemt die gerichte koppeling.
     bevinding = uitkomst(TTL_DIR / "net006_koppeling_stelseltypen.ttl", "NET-006").findings[0]
 
-    assert bevinding.details["stelseltypen"] == ["gemengd", "hemelwater"]
+    assert bevinding.details["koppelingen"] == ["gemengd→hemelwater"]
 
 
 def test_net005_zwijgt_over_een_streng_aan_de_rand() -> None:
@@ -67,55 +69,76 @@ def test_net005_zwijgt_over_een_streng_aan_de_rand() -> None:
     assert outcome.findings == []
 
 
-def test_net006_dempt_vuilwater_dat_op_gemengd_uitkomt() -> None:
-    """Gemengd benedenstrooms van vuilwater is normaal en hoort niet gemeld (issue #97).
+def test_net006_staat_vuilwater_naar_gemengd_toe() -> None:
+    """Gemengd benedenstrooms van vuilwater staat in de koppelregels (matrix #8: Ja).
 
     Op knoop B stroomt vuilwater binnen en gaat het als gemengd verder. Beide strengen
-    hebben een betrouwbare richting (BOB daalt, geometrie mee, NET-009 spreekt ze niet
-    tegen), dus de koppeling is de goede kant op en NET-006 zwijgt. De toelichting maakt
-    de demping zichtbaar in plaats van haar te verzwijgen.
+    hebben een betrouwbare richting (BOB daalt, geometrie mee), dus de koppeling is gericht
+    te toetsen; `vuilwater → gemengd` is toegestaan en NET-006 zwijgt.
     """
     outcome = uitkomst(TTL_DIR / "net006_vuilwater_naar_gemengd.ttl", "NET-006")
 
     assert outcome.findings == []
-    assert any("vuilwater" in note and "gemengd" in note for note in outcome.notes)
 
 
-def test_net006_dempt_doorgaand_gemengd_hoofdriool_met_vuilwatertak() -> None:
-    """Een doorgaand gemengd hoofdriool met een vuilwatertak is geen fout (issue #97, optie B).
+def test_net006_staat_doorgaand_gemengd_hoofdriool_met_vuilwatertak_toe() -> None:
+    """Een doorgaand gemengd hoofdriool met een aansluitende vuilwatertak is conform.
 
     Op knoop B stroomt gemengd zowel in als uit (het hoofdriool loopt door) en sluit een
-    vuilwatertak aan die instroomt. De foutvorm -- vuilwater benedenstrooms van gemengd
-    (gemengd ín én vuilwater úit) -- is afwezig en alle strengen zijn betrouwbaar gericht,
-    dus NET-006 zwijgt. De strikte regel (optie A) meldde de knoop nog wél.
+    vuilwatertak aan die instroomt. De gerichte koppelingen zijn `gemengd → gemengd` en
+    `vuilwater → gemengd`, allebei in de koppelregels, dus NET-006 zwijgt.
     """
     outcome = uitkomst(TTL_DIR / "net006_doorgaand_gemengd_hoofdriool.ttl", "NET-006")
 
     assert outcome.findings == []
-    assert any("vuilwater" in note and "gemengd" in note for note in outcome.notes)
 
 
 def test_net006_meldt_gemengd_dat_op_vuilwater_uitkomt() -> None:
-    """De omgekeerde richting is wél een koppelingsfout (issue #97).
+    """De omgekeerde richting is wél een koppelingsfout (matrix #2: Nee).
 
     Gemengd bovenstrooms van vuilwater betekent gemengd afvalwater in een vuilwaterriool;
-    dat blijft een melding op de knoop.
+    `gemengd → vuilwater` staat niet in de koppelregels en blijft een melding op de knoop.
     """
     outcome = uitkomst(TTL_DIR / "net006_gemengd_naar_vuilwater.ttl", "NET-006")
 
     assert labels(outcome) == ["B"]
-    assert outcome.findings[0].details["stelseltypen"] == ["gemengd", "vuilwater"]
+    assert outcome.findings[0].details["koppelingen"] == ["gemengd→vuilwater"]
 
 
-def test_net006_meldt_andere_typeparen_ongewijzigd() -> None:
-    """De demping geldt alleen voor het paar gemengd+vuilwater; de rest verandert niet.
+def test_net006_staat_hemelwater_naar_gemengd_toe() -> None:
+    """De whitelist is richting-bewust: `hemelwater → gemengd` mag (matrix #15: Ja).
 
-    Op de bestaande fixture komen gemengd en hemelwater samen -- geen vuilwater -- dus de
-    richting-nuance van issue #97 raakt haar niet en de melding blijft staan.
+    De oude ad-hoc regel meldde elke gemengd+hemelwater-knoop; de koppelregels laten deze
+    richting toe. Zonder deze test zou een te ruime whitelist niet opvallen.
     """
-    outcome = uitkomst(TTL_DIR / "net006_koppeling_stelseltypen.ttl", "NET-006")
+    outcome = uitkomst(TTL_DIR / "net006_hemelwater_naar_gemengd.ttl", "NET-006")
+
+    assert outcome.findings == []
+
+
+def test_net006_meldt_dit_naar_vuilwater() -> None:
+    """De eigen tag `DIT` (issue #126) wordt herkend en getoetst (matrix #30: Nee).
+
+    Een DIT-riool (grondwater) mag niet bovenstrooms van een vuilwaterriool liggen;
+    `DIT → vuilwater` staat niet in de koppelregels.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_dit_naar_vuilwater.ttl", "NET-006")
 
     assert labels(outcome) == ["B"]
+    assert outcome.findings[0].details["koppelingen"] == ["DIT→vuilwater"]
+
+
+def test_net006_telt_een_koppeling_zonder_betrouwbare_richting_maar_meldt_die_niet() -> None:
+    """Wat niet gericht te beoordelen is, komt in de toelichting en niet als bevinding.
+
+    Op knoop B komen gemengd en hemelwater samen, maar de gemengde streng heeft een
+    stijgende BOB (NET-009 spreekt haar tegen), dus haar richting is onbetrouwbaar. De
+    koppeling valt dan niet in een richting te leggen: geen bevinding, wel een telling.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_onbetrouwbare_richting.ttl", "NET-006")
+
+    assert outcome.findings == []
+    assert any("zonder betrouwbare stroomrichting" in note for note in outcome.notes)
 
 
 def test_net008_telt_de_lozingspunten_en_de_knopen() -> None:

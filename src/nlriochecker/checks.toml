@@ -153,14 +153,34 @@ kritiek = ["Overstortput", "Bergbezinkbassin", "Gemaal"]
 # NET-005 en NET-006: welke leidingklassen tot welk stelseltype horen. Anders dan
 # de rollen hierboven (die zeggen welk eindpunt een streng moet bereiken) deelt
 # deze tabel het net in soorten in, om buurstrengen te kunnen vergelijken.
+# `DIT` en `DT` (grondwater) krijgen sinds issue #126 een eigen tag naast `infiltratie`
+# (hemelwater): grondwater is geen hemelwater, ook al gelden dezelfde koppelregels.
 [klassen.stelseltypen]
 gemengd = ["GemengdRiool"]
 vuilwater = ["Vuilwaterriool"]
 hemelwater = ["Hemelwaterriool"]
 infiltratie = ["Infiltratieriool"]
+DIT = ["DIT_riool"]
+DT = ["DT_riool"]
 drainage = ["Drain"]
 overstort = ["Overstortleiding"]
 transport = ["Duiker"]
+
+# NET-006 (issue #126): welke stelseltypen bovenstrooms van welke mogen liggen. Sleutel =
+# de bovenstroomse tag uit [klassen.stelseltypen]; waarde = de tags die er benedenstrooms
+# op mogen aansluiten. Een gerichte koppeling `boven -> beneden` is toegestaan als `beneden`
+# in `koppelregels[boven]` staat; anders is het een bevinding. De matrix is door de auteur
+# vastgesteld (grilling 2026-08-31, GWSW 1.6 als begrippenbron). Verplicht: ontbreekt de
+# sectie, dan is dat een configfout (geen default in Python). Tags buiten deze zeven
+# (drainage, transport) vallen buiten scope en worden niet gericht beoordeeld.
+[koppelregels]
+gemengd = ["gemengd", "overstort"]
+vuilwater = ["gemengd", "vuilwater"]
+hemelwater = ["gemengd", "vuilwater", "hemelwater", "infiltratie", "DIT", "DT"]
+infiltratie = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
+DIT = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
+DT = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
+overstort = ["overstort"]
 
 # ADM-007: welk puttype welke aansluiting nodig heeft in het netwerk. Een lege
 # lijst laat de check niets toetsen; regels zijn projectafspraken.

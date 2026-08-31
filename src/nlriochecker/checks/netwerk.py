@@ -800,10 +800,6 @@ def _geen_signaal(diagnose: _Richtingsdiagnose) -> bool:
     return diagnose.geometrie == _RICHTING_ONBEKEND and diagnose.bob == _RICHTING_ONBEKEND
 
 
-_STELSEL_GEMENGD = "gemengd"
-_STELSEL_VUILWATER = "vuilwater"
-
-
 def _richting_op_knoop(knoop: str, begin: str | None, eind: str | None, betrouwbaar: bool) -> str:
     """Of de streng op deze knoop instroomt ('in'), uitstroomt ('uit') of onbekend is.
 
@@ -818,26 +814,6 @@ def _richting_op_knoop(knoop: str, begin: str | None, eind: str | None, betrouwb
     if knoop == begin:
         return "uit"
     return "?"
-
-
-def _koppeling_is_goede_richting(richtingen: dict[str, set[str]]) -> bool:
-    """Geeft aan of deze gemengd+vuilwater-knoop de normale afvoerrichting heeft (issue #97).
-
-    Optie B (domein-getrouw): de enige koppelingsfout is vuilwater benedenstrooms van
-    gemengd -- gemengd stroomt de knoop ín en vuilwater stroomt eruit (de foutvorm). Elke
-    andere betrouwbaar gerichte gemengd+vuilwater-koppeling is normaal en wordt gedempt:
-    vuilwater dat in gemengd overgaat, én een doorgaand gemengd hoofdriool (gemengd zowel
-    in als uit) waarop een vuilwatertak aansluit. De strikte optie A dempte alleen het
-    eerste geval. Zodra een van beide typen een onbetrouwbare richting draagt (een '?' in
-    de set), of de foutvorm aanwezig is, blijft de melding staan.
-    """
-    if set(richtingen) != {_STELSEL_GEMENGD, _STELSEL_VUILWATER}:
-        return False
-    alle_betrouwbaar = (
-        "?" not in richtingen[_STELSEL_GEMENGD] and "?" not in richtingen[_STELSEL_VUILWATER]
-    )
-    foutvorm = "in" in richtingen[_STELSEL_GEMENGD] and "uit" in richtingen[_STELSEL_VUILWATER]
-    return alle_betrouwbaar and not foutvorm
 
 
 def _betrouwbaar_gericht(diagnose: _Richtingsdiagnose) -> bool:
@@ -1049,99 +1025,143 @@ class StelseltypeWijktAfVanBuren(Check):
         return len(_netwerk(context).conduits)
 
 
+@dataclass
+class _Koppelknoop:
+    """Een knoop met minstens één gerichte koppeling die de koppelregels overtreedt.
+
+    `verschillen` draagt de (bovenstroom, benedenstroom)-paren die niet in de whitelist
+    staan; `boven_labels`/`beneden_labels` de strenglabels per stelseltype dat op de knoop
+    in- respectievelijk uitstroomt, zodat de melding de betrokken strengen kan noemen.
+    """
+
+    uri: str
+    verschillen: tuple[tuple[str, str], ...]
+    boven_labels: dict[str, tuple[str, ...]]
+    beneden_labels: dict[str, tuple[str, ...]]
+
+
 @register
 class KoppelingTussenStelseltypen(Check):
-    """NET-006: een knoop waar verschillende stelseltypen samenkomen."""
+    """NET-006: een gerichte koppeling tussen stelseltypen die de koppelregels overtreedt."""
 
     id = "NET-006"
     title = "Koppelingen tussen verschillende stelseltypen"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
     rollen = ("hulpstukken", "vrijvervalrioolleidingen")
-    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
+    kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "config:koppelregels")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke knoop waarop strengen van meer dan een stelseltype uitkomen.
+        """Meldt elke knoop met een gerichte koppeling die de koppelregels overtreedt.
 
-        Zulke koppelingen bestaan legitiem — een overstort of een aansluiting van
-        hemelwater op een gemengd stelsel — maar ze horen bewust te zijn. De
-        bevinding staat op de knoop, want daar zit de koppeling.
+        Sinds issue #126 leunt de check op de whitelist `[koppelregels]` (bovenstroom-tag →
+        toegestane benedenstroom-tags) in plaats van op de ad-hoc gemengd+vuilwater-regel
+        van issue #97. Per knoop wordt gekeken welke stelseltypen er *binnenstromen* en welke
+        er *uitstromen* -- alleen bij een betrouwbare stroomrichting (`_betrouwbare_richting`,
+        de richtingsbron uit #80). Een gerichte koppeling `boven → beneden` is een bevinding
+        als `beneden` niet in `koppelregels[boven]` staat. De bevinding staat op de knoop,
+        want daar zit de koppeling.
 
-        Het paar gemengd+vuilwater is met een betrouwbare richting alleen fout in één
-        vorm: vuilwater benedenstrooms van gemengd (gemengd stroomt in, vuilwater uit).
-        Elke andere betrouwbaar gerichte gemengd+vuilwater-koppeling -- vuilwater dat in
-        gemengd overgaat, of een doorgaand gemengd hoofdriool met een aansluitende
-        vuilwatertak -- wordt gedempt (optie B, issue #97). Zie `_koppeling_is_goede_richting`
-        en `_betrouwbare_richting` (de richtingsbron uit #80).
+        Wat NIET beoordeeld wordt, meldt `notes()`: koppelingen waarvan de richting niet
+        betrouwbaar is (dan valt niet te zeggen wat boven- en wat benedenstrooms ligt) en
+        strengen zonder herkenbaar stelseltype. Tags buiten de zeven mediumbepalende
+        (drainage, transport) vallen buiten de whitelist en worden niet gericht getoetst.
         """
         dataset = context.dataset
         knopen, _ = self._koppelingen(context)
-        for uri, soorten in knopen:
-            node = dataset.nodes.get(uri)
-            omschrijving = "; ".join(
-                f"{soort}: {', '.join(sorted(labels))}" for soort, labels in sorted(soorten.items())
-            )
+        for knoop in knopen:
+            node = dataset.nodes.get(knoop.uri)
+            delen = [
+                f"{boven} → {beneden} "
+                f"({', '.join(knoop.boven_labels[boven])} → "
+                f"{', '.join(knoop.beneden_labels[beneden])})"
+                for boven, beneden in knoop.verschillen
+            ]
             yield self.finding(
                 context,
-                uri,
-                node.label if node is not None else uri,
-                f"Hier komen {len(soorten)} stelseltypen samen ({omschrijving}).",
-                stelseltypen=sorted(soorten),
+                knoop.uri,
+                node.label if node is not None else knoop.uri,
+                "Ongeldige koppeling tussen stelseltypen: "
+                f"{'; '.join(delen)}. Deze gerichte koppeling staat niet in de koppelregels.",
+                koppelingen=[f"{boven}→{beneden}" for boven, beneden in knoop.verschillen],
             )
 
-    def _koppelingen(
-        self, context: CheckContext
-    ) -> tuple[list[tuple[str, dict[str, list[str]]]], int]:
-        """De te melden koppelknopen plus het aantal gedempte vuilwater→gemengd-knopen.
+    def _koppelingen(self, context: CheckContext) -> tuple[list[_Koppelknoop], int]:
+        """De te melden koppelknopen plus het aantal niet gericht beoordeelde knopen.
 
-        `run()` meldt en `notes()` duidt; beide hebben zowel de meldingen als de
-        demptelling nodig, dus staat de beslissing hier een keer.
+        `run()` meldt en `notes()` duidt; beide hebben zowel de meldingen als de telling
+        van het onbeoordeelde nodig, dus staat de beslissing hier een keer.
         """
         return context.cached("net006:koppelingen", lambda: self._bouw_koppelingen(context))
 
-    def _bouw_koppelingen(
-        self, context: CheckContext
-    ) -> tuple[list[tuple[str, dict[str, list[str]]]], int]:
-        """Bepaalt per knoop de samenkomende stelseltypen en of de koppeling gemeld wordt."""
+    def _bouw_koppelingen(self, context: CheckContext) -> tuple[list[_Koppelknoop], int]:
+        """Bepaalt per knoop de gerichte koppelingen en toetst ze tegen de whitelist."""
         netwerk = _netwerk(context)
+        regels = context.config.koppelregels
+        in_scope = set(regels)
         betrouwbaar = _betrouwbare_richting(context)
 
-        per_knoop: dict[str, dict[str, list[str]]] = {}
-        richtingen: dict[str, dict[str, set[str]]] = {}
+        instroom: dict[str, dict[str, list[str]]] = {}
+        uitstroom: dict[str, dict[str, list[str]]] = {}
+        typen_per_knoop: dict[str, set[str]] = {}
+        onbetrouwbaar_bij: set[str] = set()
         for conduit in netwerk.conduits:
             soort = _stelseltype(context, conduit)
             if soort is None:
                 continue
             begin, eind = verbonden_knopen(context, conduit)
-            for uri in verbonden_knopen(context, conduit):
+            reliable = betrouwbaar.get(conduit.uri, False)
+            for uri in (begin, eind):
                 if uri is None:
                     continue
-                per_knoop.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
-                richting = _richting_op_knoop(uri, begin, eind, betrouwbaar.get(conduit.uri, False))
-                richtingen.setdefault(uri, {}).setdefault(soort, set()).add(richting)
+                typen_per_knoop.setdefault(uri, set()).add(soort)
+                if not reliable:
+                    onbetrouwbaar_bij.add(uri)
+                richting = _richting_op_knoop(uri, begin, eind, reliable)
+                if richting == "in":
+                    instroom.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
+                elif richting == "uit":
+                    uitstroom.setdefault(uri, {}).setdefault(soort, []).append(conduit.label)
 
-        knopen: list[tuple[str, dict[str, list[str]]]] = []
-        gedempt = 0
-        for uri, soorten in sorted(per_knoop.items()):
-            if len(soorten) < 2:
-                continue
-            if _koppeling_is_goede_richting(richtingen[uri]):
-                gedempt += 1
-                continue
-            knopen.append((uri, soorten))
-        return knopen, gedempt
+        knopen: list[_Koppelknoop] = []
+        onbeoordeeld = 0
+        for uri in sorted(typen_per_knoop):
+            boven = instroom.get(uri, {})
+            beneden = uitstroom.get(uri, {})
+            verschillen = [
+                (a, b)
+                for a in sorted(boven)
+                if a in in_scope
+                for b in sorted(beneden)
+                if b in in_scope and b not in regels[a]
+            ]
+            if verschillen:
+                knopen.append(
+                    _Koppelknoop(
+                        uri,
+                        tuple(verschillen),
+                        {soort: tuple(labels) for soort, labels in boven.items()},
+                        {soort: tuple(labels) for soort, labels in beneden.items()},
+                    )
+                )
+            elif len(typen_per_knoop[uri] & in_scope) >= 2 and uri in onbetrouwbaar_bij:
+                # Twee in-scope typen komen samen, maar door een onbetrouwbare richting was
+                # de koppeling niet in een richting te leggen: niet beoordeeld, geen stille
+                # groen. Zie `notes()`.
+                onbeoordeeld += 1
+        return knopen, onbeoordeeld
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Meldt de gedempte gemengd+vuilwater-koppelingen en de typeloze strengen."""
-        _, gedempt = self._koppelingen(context)
+        """Meldt wat niet gericht beoordeeld kon worden en de typeloze strengen."""
+        _, onbeoordeeld = self._koppelingen(context)
         notities = _stelseltype_notities(context)
-        if gedempt:
+        if onbeoordeeld:
             notities.insert(
                 0,
-                f"{getal(gedempt, 'gemengd+vuilwater-koppeling', 'gemengd+vuilwater-koppelingen')} "
-                f"in de normale afvoerrichting {vorm(gedempt, 'is', 'zijn')} niet gemeld: alleen "
-                "vuilwater benedenstrooms van gemengd is een fout (issue #97). De foutvorm en "
-                "elke onbetrouwbaar gerichte koppeling blijven wel gemeld.",
+                f"Op {getal(onbeoordeeld, 'knoop', 'knopen')} komen verschillende stelseltypen "
+                "samen zonder betrouwbare stroomrichting; daar "
+                f"{vorm(onbeoordeeld, 'kon', 'konden')} de koppeling niet gericht tegen de "
+                "koppelregels getoetst worden.",
             )
         return notities
 

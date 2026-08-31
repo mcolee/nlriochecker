@@ -165,9 +165,22 @@ gemengd = ["GemengdRiool"]
 vuilwater = ["Vuilwaterriool"]
 hemelwater = ["Hemelwaterriool"]
 infiltratie = ["Infiltratieriool"]
+DIT = ["DIT_riool"]
+DT = ["DT_riool"]
 drainage = ["Drain"]
 overstort = ["Overstortleiding"]
 transport = ["Duiker"]
+
+# NET-006 (issue #126): toegestane gerichte koppelingen boven -> beneden. Zie de toelichting
+# in src/nlriochecker/checks.toml. Verplicht per project (geen default in Python).
+[koppelregels]
+gemengd = ["gemengd", "overstort"]
+vuilwater = ["gemengd", "vuilwater"]
+hemelwater = ["gemengd", "vuilwater", "hemelwater", "infiltratie", "DIT", "DT"]
+infiltratie = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
+DIT = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
+DT = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
+overstort = ["overstort"]
 
 # ADM-007: welk puttype welke aansluiting nodig heeft in het netwerk. Een lege
 # lijst laat de check niets toetsen; regels zijn projectafspraken.

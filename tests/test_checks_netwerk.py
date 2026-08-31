@@ -72,7 +72,7 @@ def test_net001_accepteert_een_overnamepunt_op_de_orientatie(tmp_path: Path) -> 
     zonder_overnamepunt.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
         "afvoer_eindpunt = []\nvuilwater = ['GemengdRiool']\n"
-        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n",
         encoding="utf-8",
     )
     gevonden = _outcome(bestand, "NET-001", load_check_config(zonder_overnamepunt))
@@ -270,7 +270,7 @@ def test_eindpuntklassen_komen_uit_de_config(tmp_path: Path) -> None:
     zonder_gemaal.write_text(
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
         "lozings_eindpunt = ['Lozingspunt']\nvuilwater = ['GemengdRiool']\n"
-        "[nulmeting]\nvereiste_cfk = ['Hyd']\n",
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n",
         encoding="utf-8",
     )
 
@@ -519,7 +519,10 @@ def _zonder_persnet(config: CheckConfig) -> CheckConfig:
 def _testconfig(tmp_path: Path, naam: str, klassen: str) -> CheckConfig:
     """Een projectconfig met alleen de klassen die de test nodig heeft."""
     pad = tmp_path / f"{naam}.toml"
-    pad.write_text(f"[klassen]\n{klassen}[nulmeting]\nvereiste_cfk = ['Hyd']\n", encoding="utf-8")
+    pad.write_text(
+        f"[klassen]\n{klassen}[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n",
+        encoding="utf-8",
+    )
     return load_check_config(pad)
 
 
@@ -578,7 +581,7 @@ def test_richting_uit_het_bodemverloop_draait_strengen_om(tmp_path: Path) -> Non
         "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
         "mechanisch = ['MechanischeRioolleiding']\n"
         "afvoer_eindpunt = ['Gemaal']\nvuilwater = ['GemengdRiool']\n"
-        "[nulmeting]\nvereiste_cfk = ['Hyd']\n"
+        "[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n"
         "[netwerk]\nrichting = 'bob'\n",
         encoding="utf-8",
     )

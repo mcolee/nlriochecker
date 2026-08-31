@@ -4791,6 +4791,55 @@ per functie). Ze aanzetten vóór de overrides-lijst leeg is vraagt een tweede
 uitzonderingslijst naast de eerste: één afspraak op twee plekken. Zodra het blok weg kan,
 wordt `ANN` opnieuw gemeten.
 
+### BO-87 NET-006 leunt op een configureerbare koppelmatrix, gericht per betrouwbare stroomrichting
+
+**Wat.** NET-006 (`KoppelingTussenStelseltypen`) beoordeelt of twee stelseltypen op een
+knoop op elkaar mógen aansluiten aan de hand van de whitelist `[koppelregels]` in de
+projectconfig: per bovenstroom-tag een lijst toegestane benedenstroom-tags. Een gerichte
+koppeling `boven → beneden` is een bevinding als `beneden` niet in `koppelregels[boven]`
+staat. "Boven" en "beneden" volgen uit de betrouwbare administratieve stroomrichting
+(`_betrouwbare_richting`, de richtingsbron van BO-76/#80): op een knoop is een streng die
+er instroomt bovenstrooms en een die eruit stroomt benedenstrooms. De matrix is door de
+auteur vastgesteld (grilling 2026-08-31), met de GWSW 1.6-ontologie
+(`VrijvervalRioolleiding`) als begrippenbron; de 49 gerichte koppelingen staan in issue
+#126.
+
+`[koppelregels]` is **verplicht en heeft geen default in Python** -- dezelfde lijn als
+`[nulmeting]` (BO-7): de regels zijn een domeinafspraak en horen in de TOML, en een
+ontbrekende sectie is een duidelijke configfout in plaats van een stille lege matrix.
+`[klassen.stelseltypen]` krijgt er twee eigen tags bij, `DIT` (`DIT_riool`) en `DT`
+(`DT_riool`): grondwater is geen hemelwater, ook al gelden dezelfde koppelregels. De zeven
+mediumbepalende tags (gemengd, vuilwater, hemelwater, infiltratie, DIT, DT, overstort)
+vormen de scope; tags erbuiten (`drainage`, `transport`) worden niet gericht beoordeeld.
+
+Wat NIET beoordeeld wordt, komt in de toelichting van de check: knopen waar verschillende
+stelseltypen samenkomen zonder betrouwbare stroomrichting (dan valt boven- van
+benedenstrooms niet te scheiden) en strengen zonder herkenbaar stelseltype. De check meldt
+op de knoop, telt in putten (`putknopen`, BO-83) en levert de overtreden koppelingen als
+detailsleutel `koppelingen` (bijv. `["gemengd→hemelwater"]`).
+
+**Waarom.** De regel van issue #97 (`_koppeling_is_goede_richting`) dempte alleen het paar
+gemengd+vuilwater en meldde elke andere gemengd+X-knoop ongeacht richting -- te grof.
+Zij was een symptoombestrijding van één ontbrekende domeinregel (welke leidingtypen mogen
+gekoppeld zijn, en in welke richting), die #126, #127 en #128 deelden. De whitelist maakt
+die regel expliciet, richting-bewust en configureerbaar: `hemelwater → gemengd` mag
+(matrix #15) terwijl `gemengd → hemelwater` niet mag (matrix #3) -- een onderscheid dat de
+oude set niet kende.
+
+**Meting.** Op De Wolden en Hoogeveen (voor: referentierun `uitvoer/31082026_slotrun`,
+`bevindingen.json`, check_id NET-006 = 332; na, door de echte pijplijn met
+`markeer_vulwaarden`: 85) daalt NET-006 van 332 naar 85 bevindingen; het onderbouwende
+meetscript is `scripts/meet_net006.py` (BO-43). De 85 zijn allemaal echte matrix-Nee-cellen:
+gemengd→vuilwater (40), vuilwater→hemelwater (17), hemelwater→overstort (12),
+gemengd→hemelwater (11), infiltratie→overstort (4), overstort→gemengd (2) en
+overstort→hemelwater (1). De daling komt doordat de oude regel elke gemengd+hemelwater- en
+andere cross-koppeling meldde, terwijl de whitelist de meeste richtingen toestaat
+(`hemelwater → gemengd` bijvoorbeeld wél). 174 knopen met samenkomende stelseltypen
+konden niet gericht getoetst worden (geen betrouwbare stroomrichting) en staan als zodanig
+in de toelichting. Het VGS-voorbehoud (`hemelwater → vuilwater` alleen in een verbeterd
+gescheiden stelsel) is besluit B en een apart, laag-prioritair issue: het vergt dat de
+engine de stelselboom leest (nu ongebruikt).
+
 **Wat dit niet is.** Geen gedragswijziging: annotaties zijn strings
 (`from __future__ import annotations`) en de configwijzigingen raken alleen de poort. Het
 bewijs is een byte-vergelijking van `bevindingen.csv` en `bevindingen.json` over een
