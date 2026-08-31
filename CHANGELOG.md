@@ -86,6 +86,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **NET-002 accepteert een overnamepunt of gemaal als hemelwater via gemengd riool
+  afvoert** (issue #127): tot nu telde alleen een lozingspunt als bestemming
+  (`eindpuntrollen = ("lozings_eindpunt",)`), terwijl een hemelwaterstreng die onderweg
+  op een gemengd riool aansluit terecht via dat stelsel op een overnamepunt of gemaal
+  uitkomt. `afvoer_eindpunt` telt nu ook mee, maar alleen voor een streng die
+  benedenstrooms (op het zuivere vrijverval) in gemengd riool overgaat
+  (`_gemengd_benedenstrooms`, het "eenvoudiger"-alternatief uit de spec: geen eis dat het
+  exact hetzelfde pad is als naar het overnamepunt). Titel en melding noemen nu beide
+  bestemmingen. Op De Wolden en Hoogeveen daalt NET-002 van 3.046 naar 3.023 bevindingen
+  (`scripts/meet_net002.py`). Zie BO-88.
+
 - **NET-006 toetst nu een configureerbare koppelmatrix** (issue #126): de ad-hoc regel van
   issue #97 (alleen vuilwater benedenstrooms van gemengd) is vervangen door de whitelist
   `[koppelregels]` in de projectconfig (bovenstroom-tag → toegestane benedenstroom-tags),

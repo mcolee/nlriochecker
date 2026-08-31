@@ -63,8 +63,10 @@ hulpstuk = ["Hulpstuk"]
 # dekt ook GedammerdeLeiding, Uitlegger, VolgeschuimdeLeiding en VolgezandeLeiding; De
 # Wolden levert alleen instanties van LozeLeiding zelf (54).
 loze_leiding = ["LozeLeiding"]
-# NET-001 en NET-002 vragen om verschillende eindpunten. Overnamepunt bestaat wel
-# degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
+# NET-001 vraagt onvoorwaardelijk om dit eindpunt; NET-002 alleen voorwaardelijk, voor
+# een hemelwaterstreng die benedenstrooms in gemengd riool overgaat (issue #127, BO-88) --
+# zelfstandig blijft een overnamepunt voor hemelwater geen bestemming. Overnamepunt
+# bestaat wel degelijk in de GWSW-ontologie (owl:Class, subklasse van Aansluitpunt); wat
 # ontbreekt zijn de instanties in deze aanlevering, nul stuks in De Wolden.
 # Gemaal staat erbij als erkend noodverband zolang Overnamepunt op nul staat; het
 # noodverband en het criterium om het los te laten staan in BO-33.

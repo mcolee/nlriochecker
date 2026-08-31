@@ -4846,3 +4846,47 @@ bewijs is een byte-vergelijking van `bevindingen.csv` en `bevindingen.json` over
 voor/na-paar op dezelfde HEAD.
 
 Zie [#121](https://github.com/mcolee/nlriochecker/issues/121) en BO-38.
+
+### BO-88 NET-002 accepteert een overnamepunt via gemengd riool, niet zelfstandig
+
+**Wat.** NET-002 (`HemelwaterZonderAfvoerpad`) las tot issue #127 alleen `lozings_eindpunt`
+als geldige bestemming (`eindpuntrollen`), terwijl de titel (checkregister v0.9) altijd al
+"lozingspunt of overnamepunt" noemde -- een belofte die de code sinds issue #93 bewust
+liet vallen, want `Overnamepunt` staat in `afvoer_eindpunt` en die rol werd niet gelezen.
+Dat was geen bug maar een onvolledige regel: een hemelwaterstreng die zelfstandig op een
+overnamepunt uitkomt is geen afvoerpad, maar is zij onderweg op een gemengd riool
+aangesloten, dan loost het hemelwater via dat gemengde stelsel wél op het overnamepunt of
+gemaal, en is er niets mis.
+
+`_ZonderAfvoerpad` krijgt er een tweede, voorwaardelijke eindpuntverzameling bij:
+`eindpuntrollen_via_gemengd` (leeg voor NET-001, `("afvoer_eindpunt",)` voor NET-002). Een
+streng telt als afgevoerd als haar beginknoop óf de gewone eindpuntverzameling bereikt
+(zoals voorheen), óf de voorwaardelijke verzameling bereikt **en** zelf benedenstrooms in
+gemengd riool overgaat (`_gemengd_benedenstrooms`, op het zuivere vrijverval `netwerk.graph`
+via dezelfde omgekeerde-BFS-vorm als `_bereikbaar_vanaf`, die daarvoor een optioneel
+`graph`-argument kreeg in plaats van een tweede kopie van de doorloop). De twee voorwaarden
+staan los van elkaar -- dat is het "eenvoudiger"-alternatief uit de spec: het volstaat dat
+de streng ooit gemengd wordt, niet dat dat exact het pad naar het overnamepunt is. `afvoer_
+eindpunt` gaat wholesale mee (niet alleen `Overnamepunt`): een gemaal is voor gemengd water
+even legitiem een eindpunt als voor vuilwater (NET-001, BO-53), en de spec noemt zelf "rol
+`afvoer_eindpunt`". Er komt geen tweede tagset bij -- de stelseltypetag `"gemengd"` is
+dezelfde die de koppelmatrix van BO-87 gebruikt.
+
+**Waarom.** Twee onafhankelijke bereikbaarheidsvragen zijn eenvoudiger dan een
+padconditie ("bereikt dit overnamepunt via een gemengde kant") en dekken de praktijkeis
+uit het issue net zo goed: een streng die geen gemengd riool raakt blijft, ongeacht welk
+overnamepunt zij toevallig ooit bereikt, op het lozingspunt aangewezen.
+
+**Meting.** Op De Wolden en Hoogeveen (voor: referentierun `uitvoer/31082026_slotrun`,
+`bevindingen.json`, check_id NET-002 = 3.046; na, door de echte pijplijn met
+`markeer_vulwaarden`: 3.023) daalt NET-002 van 3.046 naar 3.023 bevindingen -- 23 strengen
+minder, precies de hemelwaterstrengen die via een gemengd riool op een overnamepunt of
+gemaal uitkwamen. Het onderbouwende meetscript is `scripts/meet_net002.py` (BO-43).
+
+**Wat dit niet is.** Geen wijziging aan NET-001 (`eindpuntrollen_via_gemengd` blijft leeg,
+dus dezelfde twee lege verzamelingen als voorheen) en geen nieuwe kenmerk- of
+roldeclaratie: de AST-sweep (`test_declaratie_volgt_de_code`) leidt `afvoer_eindpunt` niet
+af tot een rolnaam, want geen enkele functie in `selectie._ROLLEN` leest dat veld -- exact
+dezelfde reden waarom NET-001's `eindpuntrollen` dat veld nu al zonder declaratie leest.
+
+Zie [#127](https://github.com/mcolee/nlriochecker/issues/127) en BO-87.

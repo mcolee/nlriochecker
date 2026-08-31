@@ -122,7 +122,7 @@ Hyd dwingt het bestaan van alle benodigde hoogtedata af (BOB begin- en eindpunt 
 | ID | Check | Ernst | Dimensie |
 |---|---|---|---|
 | NET-001 | Vuilwater- of gemengde streng zonder afvoerpad naar gemaal, overnamepunt of lozingspunt (bereikbaarheidsanalyse); een pompput telt niet als eindpunt, dus de configuratie moet de mechanische leidingklassen noemen zodat de route door het persnet traceerbaar is. Een hulpstuk met een telbare GWSW-functie geldt als knoop in het net (BO-83) | F | Consistentie |
-| NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt | F | Consistentie |
+| NET-002 | Hemelwaterstreng zonder afvoerpad naar lozingspunt; een overnamepunt of gemaal telt ook als bestemming zodra de streng benedenstrooms in gemengd riool overgaat (BO-88) | F | Consistentie |
 | NET-004 | Cirkels (kringlopen) in het vrijvervalnetwerk; gezocht op de betrouwbare richting (de strengen die NET-009 niet tegenspreekt). Een kring die alleen administratief bestaat valt uiteen en telt niet; een vlakke BOB-consistente ring is bewust vermaasd net (legitiem) en een ring die via een BOB-sprong omhoog sluit hoort bij HGT-009 -- beide gedempt (BO-77) | F | Consistentie |
 | NET-005 | Stelseltype streng wijkt af van boven- en benedenstroomse buren | F | Consistentie |
 | NET-006 | Ongeldige koppeling tussen stelseltypen: een gerichte koppeling (bovenstroom → benedenstroom, op de betrouwbare stroomrichting) die niet in de configureerbare koppelmatrix `[koppelregels]` staat. Koppelingen zonder betrouwbare richting en typeloze strengen worden niet beoordeeld (BO-87) | W | Plausibiliteit |
