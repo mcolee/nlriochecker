@@ -1,8 +1,11 @@
-# AFK-regie: een reeks issues fixen met Opus-agents (sjabloon)
+# AFK-regie: een reeks issues fixen met subagents (sjabloon)
 
 Geef dit, met de issuelijst ingevuld, aan een **verse (gecleared) Fable-sessie** in
-`/home/martin/nlriochecker`. Fable is de regisseur; het echte werk doen **Opus-subagents**
-(`model: opus`; in deze harness levert dat Opus 5). De auteur is er niet bij — **unattended**.
+`/home/martin/nlriochecker`. Fable is de regisseur; het echte werk doen **subagents**. Kies
+per issue het model naar zwaarte volgens de globale `CLAUDE.md` (sectie **Modelkeuze
+subagents**): substantieel/kritiek-pad → **Opus 4.8** via de `opus48`-agent (de kale alias
+`model: opus` levert in deze harness Opus 5), klein/docs/config/test-only → **Sonnet**.
+**Rapporteer bij elke dispatch expliciet welk model je inzet.** De auteur is er niet bij — **unattended**.
 De vorige invulling staat in `afk-regie-issues-72-77.md`; de meting van die run (26-08) is
 de bron van de punten die hier zijn aangescherpt.
 
@@ -49,8 +52,10 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
 1. **Lees** het issue volledig: `gh api repos/mcolee/nlriochecker/issues/N --jq .body` en
    `.../issues/N/comments` (`gh issue view` faalt op een GraphQL-deprecatie). Dat is de spec.
 2. **Claim**: `gh issue edit N --add-assignee @me`.
-3. **Dispatch een Opus-implementer** (Agent-tool, `model: opus`, verse agent,
-   `subagent_type: general-purpose`). Brief, zelfstandig en met een taaklabel:
+3. **Dispatch de implementer** — kies het model naar de zwaarte van #N (globale `CLAUDE.md`,
+   **Modelkeuze subagents**): substantieel/kritiek-pad → Opus 4.8 via `subagent_type: opus48`;
+   klein/test-/config-only → `model: sonnet`, `subagent_type: general-purpose`. **Meld
+   expliciet welk model deze dispatch inzet.** Brief, zelfstandig en met een taaklabel:
 
    > **Task 1 — implementeer issue #N.** Repo `/home/martin/nlriochecker`, tak `dev`. Volg de
    > body van #N verbatim en `CLAUDE.md` strikt (Harde regels + Werkwijze). Draai
@@ -74,10 +79,10 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
 4. **Lees de geplakte poort.** Staat er een rode regel of ontbreekt een van de vier stappen,
    dispatch een fix-agent (Task 2). Is hij groen, dan **draai je hem niet nog eens**: in de run
    van 26-08 waren alle 12 herhalingen groen en kostten ze ~36 calls en ~1 uur pytest.
-5. **Review** (Opus-reviewer, verse agent):
+5. **Review** (reviewer, verse agent — model naar risico, zie **Modelkeuze subagents**):
    - **Klein** → `/code-review` (medium).
    - **Substantieel** (kritiek pad, publiek contract, Harde regel) →
-     `superpowers:requesting-code-review` met een verse Opus-reviewer: *"Task 3 — review de
+     `superpowers:requesting-code-review` met een verse **Opus 4.8**-reviewer (`opus48`-agent): *"Task 3 — review de
      diff op `dev` sinds de laatste commit tegen de spec van #N en de Harde regels.
      Adversarieel: correctheid, dekt het de spec, kloppen de drifttests, breekt het een publiek
      contract (JSON-schema, CLI, GeoPackage-structuur)?"* Verwerk de uitkomsten met
