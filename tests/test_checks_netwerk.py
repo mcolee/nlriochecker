@@ -167,6 +167,21 @@ def test_net002_blijft_hemelwater_rechtstreeks_naar_overnamepunt_melden() -> Non
     assert _labels("net002_hemelwater_naar_overnamepunt_zonder_gemengd.ttl", "NET-002") == ["1"]
 
 
+def test_net002_toelichting_telt_een_via_gemengd_bereikt_eindpunt_niet_als_doodlopend() -> None:
+    """Fixronde 1 op issue #127: de toelichting mag niet tegenspreken wat de check meet.
+
+    Overnamepunt C is de enige eindknoop (sink) in deze fixture, en de check accepteert
+    hem via het gemengde voorbehoud (`test_net002_accepteert_een_overnamepunt_via_gemengd_riool`
+    hierboven bewijst dat er geen bevinding op '1' komt). `_eindknoop_notitie` moet diezelfde
+    knoop dus ook als bereikt tellen -- zonder dat zou de toelichting beweren dat het
+    vrijverval doodloopt en "alles wat daarachter ligt" onbeoordeeld blijft, terwijl de check
+    die streng juist wél beoordeelde en goedkeurde.
+    """
+    outcome = _outcome("net002_hemelwater_via_gemengd_naar_overnamepunt.ttl", "NET-002")
+
+    assert not any("watert af op" in note for note in outcome.notes)
+
+
 def test_net004_vindt_de_kringloop() -> None:
     bevindingen = _outcome("net004_kringloop.ttl", "NET-004").findings
 

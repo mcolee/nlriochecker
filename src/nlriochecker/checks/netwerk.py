@@ -90,6 +90,26 @@ def _gemengd_benedenstrooms(context: CheckContext, netwerk: _Netwerk) -> set[str
     return _bereikbaar_vanaf(context, startknopen, netwerk.graph)
 
 
+def _bereikt_via_gemengd(
+    context: CheckContext, netwerk: _Netwerk, rollen_via_gemengd: Sequence[str]
+) -> set[str]:
+    """De knopen die een voorwaardelijke eindpuntrol bereiken én benedenstrooms gemengd worden.
+
+    Dezelfde combinatie als `_ZonderAfvoerpad._bouw_onbereikbaar` toepast op een streng
+    (issue #127/BO-88): een knoop telt hier pas mee als hij een eindpunt uit
+    `rollen_via_gemengd` bereikt *en* zelf in `_gemengd_benedenstrooms` zit. Gedeeld met de
+    toelichtingsfuncties hieronder (`_eindknoop_notitie`, `_richtingsverlies`), zodat de
+    toelichting nooit een andere bereikbaarheid claimt dan de bevinding toepast -- dat was
+    de fixronde-1-bevinding op dit issue: de toelichting gebruikte tot nu toe alleen de
+    onvoorwaardelijke `eindpuntrollen` en beweerde daardoor over een via-gemengd-bereikte
+    knoop nog steeds dat alles erachter zonder afvoerpad is.
+    """
+    if not rollen_via_gemengd:
+        return set()
+    endpoints = _eindpuntset(context, rollen_via_gemengd)
+    return _bereikbaar_vanaf(context, endpoints) & _gemengd_benedenstrooms(context, netwerk)
+
+
 def _eindpuntset(context: CheckContext, rollen: Sequence[str]) -> set[str]:
     """De knopen die als eindpunt van een van deze afvoerrollen gelden."""
     gevonden: set[str] = set()
@@ -98,8 +118,38 @@ def _eindpuntset(context: CheckContext, rollen: Sequence[str]) -> set[str]:
     return gevonden
 
 
+def _bereikt_voor_toelichting(
+    context: CheckContext,
+    netwerk: _Netwerk,
+    rollen: Sequence[str],
+    rollen_via_gemengd: Sequence[str],
+) -> set[str]:
+    """De 'bereikt'-verzameling voor de toelichtingsfuncties (issue #127, fixronde 1).
+
+    Drie delen, elk nodig om de toelichting niet iets anders te laten beweren dan
+    `_bouw_onbereikbaar` toepast: de onvoorwaardelijke ancestors van `rollen`
+    (ongewijzigd), de RAUWE eindpunten van `rollen_via_gemengd` zelf (zo'n knoop is per
+    definitie een erkend uitstroompunt van het bredere soort -- de gemengd-voorwaarde
+    gaat over de STRENG ernaartoe, niet over de knoop zelf, dus een overnamepunt- of
+    gemaalknoop die toevallig ook een netwerk-sink is hoort nooit als doodlopend te
+    gelden), en `_bereikt_via_gemengd` voor de ancestors die zelf aan de voorwaarde
+    voldoen (nodig voor `_richtingsverlies`, dat elke vrijvervalknoop beoordeelt en niet
+    alleen de sinks).
+    """
+    endpoints = _eindpuntset(context, rollen)
+    endpoints_via_gemengd = _eindpuntset(context, rollen_via_gemengd)
+    return (
+        _bereikbaar_vanaf(context, endpoints)
+        | endpoints_via_gemengd
+        | _bereikt_via_gemengd(context, netwerk, rollen_via_gemengd)
+    )
+
+
 def _eindknoop_notitie(
-    context: CheckContext, netwerk: _Netwerk, rollen: Sequence[str]
+    context: CheckContext,
+    netwerk: _Netwerk,
+    rollen: Sequence[str],
+    rollen_via_gemengd: Sequence[str] = (),
 ) -> list[str]:
     """Beschrijft waar het vrijverval op uitkomt en wat daarvan als uitstroom telt.
 
@@ -110,14 +160,17 @@ def _eindknoop_notitie(
 
     Een eindknoop die zelf geen uitstroompunt is maar er wel een bereikt -- een
     pompput met een persleiding naar het gemaal -- loopt niet dood en telt hier niet
-    mee; anders zou de notitie het persnet als gebrek presenteren.
+    mee; anders zou de notitie het persnet als gebrek presenteren. Sinds issue #127
+    telt hetzelfde voor een eindknoop van het voorwaardelijke soort
+    (`rollen_via_gemengd`, bijvoorbeeld een overnamepunt of gemaal): NET-002 keurt zo'n
+    knoop al goed als bestemming (`_bereikt_voor_toelichting`), en de toelichting mag
+    dat niet tegenspreken door haar toch als doodlopend te tellen.
     """
     sinks = [uri for uri in netwerk.graph if netwerk.graph.out_degree(uri) == 0]
     if not sinks:
         return []
 
-    endpoints = _eindpuntset(context, rollen)
-    bereikt = _bereikbaar_vanaf(context, endpoints)
+    bereikt = _bereikt_voor_toelichting(context, netwerk, rollen, rollen_via_gemengd)
     doodlopend = [uri for uri in sinks if uri not in bereikt]
     if not doodlopend:
         return []
@@ -145,7 +198,10 @@ def _soort(context: CheckContext, uri: str) -> str:
 
 
 def _richtingsverlies(
-    context: CheckContext, netwerk: _Netwerk, rollen: Sequence[str]
+    context: CheckContext,
+    netwerk: _Netwerk,
+    rollen: Sequence[str],
+    rollen_via_gemengd: Sequence[str] = (),
 ) -> tuple[int, int]:
     """Splitst de onbereikbare knopen in twee oorzaken.
 
@@ -163,15 +219,23 @@ def _richtingsverlies(
     Sinds BO-83 staan de telbare hulpstukken zelf in `netwerk.graph` -- ze geven daar
     door -- dus reduceert `putknopen` de verzameling hier tot de beoordeelde objecten.
     Zonder die aftrek zou dit getal ze meetellen en de zin erboven onwaar maken.
+
+    Sinds issue #127 telt een netwerkdeel met alleen een `rollen_via_gemengd`-eindpunt
+    (bijvoorbeeld een Gemaal zonder lozingspunt) ook als "met eindpunt": de graaf draagt
+    er wel degelijk een bestemming van het bredere soort, ook al accepteert de check hem
+    alleen voor een streng die zelf benedenstrooms gemengd wordt. `bereikt`
+    (`_bereikt_voor_toelichting`) telt dezelfde combinatie mee die `run()` toepast, zodat
+    het AANTAL geen knoop als onbereikt meetelt die de check al goedkeurde.
     """
     endpoints = _eindpuntset(context, rollen)
-    bereikt = _bereikbaar_vanaf(context, endpoints)
+    endpoints_via_gemengd = _eindpuntset(context, rollen_via_gemengd)
+    bereikt = _bereikt_voor_toelichting(context, netwerk, rollen, rollen_via_gemengd)
     vrijverval = putknopen(context, netwerk.graph)
 
     zonder = met = 0
     for deel in nx.weakly_connected_components(_bereikbaarheid(context)):
         onbereikt = len((deel & vrijverval) - bereikt)
-        if deel & endpoints:
+        if deel & (endpoints | endpoints_via_gemengd):
             met += onbereikt
         else:
             zonder += onbereikt
@@ -226,18 +290,25 @@ def _netwerk_notities(context: CheckContext) -> list[str]:
     return notities
 
 
-def _eindpuntnotities(context: CheckContext, rollen: Sequence[str]) -> list[str]:
+def _eindpuntnotities(
+    context: CheckContext, rollen: Sequence[str], rollen_via_gemengd: Sequence[str] = ()
+) -> list[str]:
     """De notities die op de bereikbaarheidsgraaf leunen: waar komt het water uit?
 
     Alleen voor de checks die werkelijk een eindpunt zoeken (NET-001, NET-002,
     NET-008). Die lezen daarmee het persnet -- dat is de rol `mechanischeleidingen`
     in hun declaratie -- terwijl de overige NET-checks op het zuivere vrijverval
     blijven. Zie BO-54.
+
+    `rollen_via_gemengd` is de voorwaardelijke eindpuntrol van NET-002 (issue #127):
+    zonder haar hier mee te geven zou deze toelichting een engere bereikbaarheid
+    beweren dan `run()` toepast (fixronde-1-bevinding op #127). Leeg voor de andere
+    aanroepers (NET-001, NET-008), die dat voorbehoud niet kennen.
     """
     netwerk = _netwerk(context)
-    notities = list(_eindknoop_notitie(context, netwerk, rollen))
+    notities = list(_eindknoop_notitie(context, netwerk, rollen, rollen_via_gemengd))
 
-    zonder, in_deel_met_eindpunt = _richtingsverlies(context, netwerk, rollen)
+    zonder, in_deel_met_eindpunt = _richtingsverlies(context, netwerk, rollen, rollen_via_gemengd)
     if in_deel_met_eindpunt:
         notities.append(
             f"{in_deel_met_eindpunt} knopen liggen in een netwerkdeel dat wel een eindpunt "
@@ -250,8 +321,12 @@ def _eindpuntnotities(context: CheckContext, rollen: Sequence[str]) -> list[str]
             f"{zonder} knopen liggen in een netwerkdeel zonder enig eindpunt van dit soort."
         )
 
-    if not _eindpuntset(context, rollen):
-        namen = [naam for rol in rollen for naam in getattr(context.config.klassen, rol)]
+    if not (_eindpuntset(context, rollen) | _eindpuntset(context, rollen_via_gemengd)):
+        namen = [
+            naam
+            for rol in (*rollen, *rollen_via_gemengd)
+            for naam in getattr(context.config.klassen, rol)
+        ]
         klassen = ", ".join(namen) or "geen geconfigureerd"
         notities.append(
             f"De graaf bevat geen enkel eindpunt van het gevraagde soort ({klassen}); "
@@ -332,12 +407,15 @@ class _ZonderAfvoerpad(Check):
 
         # Issue #127: een voorwaardelijke bestemming, alleen geldig voor een streng die
         # zelf benedenstrooms in gemengd riool overgaat. Ongebruikt (lege tuple) voor de
-        # andere subklassen, dus dan blijft dit twee lege verzamelingen.
-        via_gemengd: set[str] = set()
-        for rol in self.eindpuntrollen_via_gemengd:
-            via_gemengd |= _eindpunten(context, rol)
-        bereikt_via_gemengd = _bereikbaar_vanaf(context, via_gemengd)
-        gemengd_benedenstrooms = _gemengd_benedenstrooms(context, netwerk) if via_gemengd else set()
+        # andere subklassen, dus dan blijft `via_gemengd_raw` leeg en `bereikt_via_gemengd`
+        # ook. `via_gemengd_raw` (vóór de gemengd-voorwaarde) is de rauwe eindpuntverzameling
+        # -- die bepaalt of de graaf ÜBERHAUPT een eindpunt van dit soort draagt -- en is
+        # gedeeld met `_eindpuntnotities` (via `_eindpuntset`), zodat de toelichting niet
+        # een ander "geen eindpunt"-oordeel geeft dan deze vlag.
+        via_gemengd_raw = _eindpuntset(context, self.eindpuntrollen_via_gemengd)
+        bereikt_via_gemengd = _bereikt_via_gemengd(
+            context, netwerk, self.eindpuntrollen_via_gemengd
+        )
 
         dataset = context.dataset
         clusters = deelstelsel_ids(context)
@@ -356,14 +434,12 @@ class _ZonderAfvoerpad(Check):
             # streng die op een T-stuk begint in de graaf, en zou de putherleiding er
             # None voor geven en haar onvoorwaardelijk als onbereikbaar melden.
             begin, _ = _doorgeefknopen(context, conduit)
-            if begin in bereikt:
-                continue
-            if begin in bereikt_via_gemengd and begin in gemengd_benedenstrooms:
+            if begin in bereikt or begin in bereikt_via_gemengd:
                 continue
             # Een streng waarvan het beginpunt niet op te lossen is hoort hier thuis --
             # onbereikbaar is onbereikbaar -- maar heeft geen cluster.
             gevonden.append((conduit, clusters.get(begin, "") if begin else ""))
-        return gevonden, not endpoints and not via_gemengd
+        return gevonden, not endpoints and not via_gemengd_raw
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt wat er buiten de graaf viel; dat mag niet stilzwijgend verdwijnen.
@@ -374,7 +450,9 @@ class _ZonderAfvoerpad(Check):
         afgebakend is. Hier geteld zou de duiding het aantal deelstelsels van het
         hele werkbereik van de check melden bij de bevindingen van een enkele buurt.
         """
-        return _netwerk_notities(context) + _eindpuntnotities(context, self.eindpuntrollen)
+        return _netwerk_notities(context) + _eindpuntnotities(
+            context, self.eindpuntrollen, self.eindpuntrollen_via_gemengd
+        )
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen in de graaf."""
