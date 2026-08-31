@@ -1159,9 +1159,8 @@ class KoppelingTussenStelseltypen(Check):
             notities.insert(
                 0,
                 f"Op {getal(onbeoordeeld, 'knoop', 'knopen')} komen verschillende stelseltypen "
-                "samen zonder betrouwbare stroomrichting; daar "
-                f"{vorm(onbeoordeeld, 'kon', 'konden')} de koppeling niet gericht tegen de "
-                "koppelregels getoetst worden.",
+                "samen zonder betrouwbare stroomrichting; die koppelingen zijn niet gericht "
+                "tegen de koppelregels getoetst.",
             )
         return notities
 
