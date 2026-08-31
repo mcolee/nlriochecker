@@ -34,12 +34,16 @@ from nlriochecker.checks.verbanden import (
 from nlriochecker.taal import getal, vorm
 
 
-def _bereikbaar_vanaf(context: CheckContext, endpoints: set[str]) -> set[str]:
+def _bereikbaar_vanaf(
+    context: CheckContext, endpoints: set[str], graph: nx.DiGraph | None = None
+) -> set[str]:
     """De knopen die stroomafwaarts een van deze eindpunten bereiken.
 
-    Over de bereikbaarheidsgraaf, dus inclusief het mechanische riool als ongerichte
-    connectiviteit: een vrijvervalstreng die op een pompput eindigt voert wel degelijk
-    af, langs het persnet naar het gemaal erachter (BO-54).
+    Standaard over de bereikbaarheidsgraaf, dus inclusief het mechanische riool als
+    ongerichte connectiviteit: een vrijvervalstreng die op een pompput eindigt voert
+    wel degelijk af, langs het persnet naar het gemaal erachter (BO-54). Met een eigen
+    `graph` (issue #127: het zuivere vrijverval van `_gemengd_benedenstrooms`) draait
+    dezelfde doorloop op die graaf in plaats van op de bereikbaarheidslaag.
 
     Een enkele doorloop over de omgekeerde graaf vanaf alle eindpunten tegelijk.
     Per eindpunt afzonderlijk zoeken kost O(eindpunten x graaf): De Wolden en Hoogeveen heeft
@@ -49,7 +53,8 @@ def _bereikbaar_vanaf(context: CheckContext, endpoints: set[str]) -> set[str]:
     if not endpoints:
         return set()
 
-    omgekeerd = _bereikbaarheid(context).reverse(copy=False)
+    basis = graph if graph is not None else _bereikbaarheid(context)
+    omgekeerd = basis.reverse(copy=False)
     bereikt = {uri for uri in endpoints if uri in omgekeerd}
     stapel = list(bereikt)
     while stapel:
@@ -59,6 +64,30 @@ def _bereikbaar_vanaf(context: CheckContext, endpoints: set[str]) -> set[str]:
                 bereikt.add(buur)
                 stapel.append(buur)
     return bereikt
+
+
+def _gemengd_benedenstrooms(context: CheckContext, netwerk: _Netwerk) -> set[str]:
+    """Knopen vanwaar het vrijverval, benedenstrooms gevolgd, in gemengd riool overgaat.
+
+    Voor NET-002 (issue #127): een hemelwaterstreng die uiteindelijk in het gemengde
+    riool uitkomt, mag ook op een overnamepunt of gemaal uitkomen in plaats van op een
+    lozingspunt -- water dat eenmaal gemengd is, hoort niet meer bij het aparte
+    hemelwaterafvoerpad. De vereenvoudigde regel uit de spec (het "eenvoudiger"-
+    alternatief): het volstaat dat de streng benedenstrooms ooit gemengd wordt, los van
+    of dat exact hetzelfde pad is als waarlangs zij het overnamepunt bereikt.
+
+    Op het zuivere vrijverval (`netwerk.graph`), niet de bereikbaarheidslaag: een
+    gemengde streng is per definitie vrijverval, en het mechanische riool draagt geen
+    stelseltype.
+    """
+    startknopen: set[str] = set()
+    for conduit in netwerk.conduits:
+        if _stelseltype(context, conduit) != "gemengd":
+            continue
+        begin, _ = _doorgeefknopen(context, conduit)
+        if begin is not None:
+            startknopen.add(begin)
+    return _bereikbaar_vanaf(context, startknopen, netwerk.graph)
 
 
 def _eindpuntset(context: CheckContext, rollen: Sequence[str]) -> set[str]:
@@ -238,9 +267,15 @@ class _ZonderAfvoerpad(Check):
     # Meer dan een rol mag: NET-001 accepteert naast het afvoereindpunt ook het
     # lozingspunt (BO-53). De eindpuntverzameling is de vereniging van hun knopen.
     eindpuntrollen: tuple[str, ...]
+    # Rollen die alleen als geldige bestemming tellen als de streng zelf benedenstrooms
+    # in gemengd riool overgaat (`_gemengd_benedenstrooms`, issue #127): NET-002
+    # accepteert zo een overnamepunt of gemaal (`afvoer_eindpunt`) naast het lozingspunt.
+    # Leeg voor de andere subklassen -- die kennen dit voorbehoud niet.
+    eindpuntrollen_via_gemengd: tuple[str, ...] = ()
     # De leesbare naam van die eindpuntrollen, zoals hij in de melding verschijnt. Hij
-    # hoort niets te noemen dat `eindpuntrollen` niet zoekt; NET-002 beloofde tot issue
-    # #93 een overnamepunt dat alleen in `afvoer_eindpunt` staat.
+    # hoort niets te noemen dat `eindpuntrollen` (of, voorwaardelijk, `eindpuntrollen_via_
+    # gemengd`) niet zoekt; NET-002 beloofde tot issue #93 een overnamepunt dat alleen in
+    # `afvoer_eindpunt` staat.
     doel: str
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -281,7 +316,10 @@ class _ZonderAfvoerpad(Check):
         melden, de ander om te duiden hoeveel deelstelsels het betreft. Zonder deze
         gedeelde bron zouden ze uit elkaar kunnen lopen.
         """
-        sleutel = f"onbereikbaar:{self.stelselrol}:{'+'.join(self.eindpuntrollen)}"
+        sleutel = (
+            f"onbereikbaar:{self.stelselrol}:{'+'.join(self.eindpuntrollen)}:"
+            f"{'+'.join(self.eindpuntrollen_via_gemengd)}"
+        )
         return context.cached(sleutel, lambda: self._bouw_onbereikbaar(context))
 
     def _bouw_onbereikbaar(self, context: CheckContext) -> tuple[list[tuple[Conduit, str]], bool]:
@@ -291,6 +329,16 @@ class _ZonderAfvoerpad(Check):
         for rol in self.eindpuntrollen:
             endpoints |= _eindpunten(context, rol)
         bereikt = _bereikbaar_vanaf(context, endpoints)
+
+        # Issue #127: een voorwaardelijke bestemming, alleen geldig voor een streng die
+        # zelf benedenstrooms in gemengd riool overgaat. Ongebruikt (lege tuple) voor de
+        # andere subklassen, dus dan blijft dit twee lege verzamelingen.
+        via_gemengd: set[str] = set()
+        for rol in self.eindpuntrollen_via_gemengd:
+            via_gemengd |= _eindpunten(context, rol)
+        bereikt_via_gemengd = _bereikbaar_vanaf(context, via_gemengd)
+        gemengd_benedenstrooms = _gemengd_benedenstrooms(context, netwerk) if via_gemengd else set()
+
         dataset = context.dataset
         clusters = deelstelsel_ids(context)
         soorten = getattr(context.config.klassen, self.stelselrol)
@@ -308,11 +356,14 @@ class _ZonderAfvoerpad(Check):
             # streng die op een T-stuk begint in de graaf, en zou de putherleiding er
             # None voor geven en haar onvoorwaardelijk als onbereikbaar melden.
             begin, _ = _doorgeefknopen(context, conduit)
-            if begin not in bereikt:
-                # Een streng waarvan het beginpunt niet op te lossen is hoort hier
-                # thuis -- onbereikbaar is onbereikbaar -- maar heeft geen cluster.
-                gevonden.append((conduit, clusters.get(begin, "") if begin else ""))
-        return gevonden, not endpoints
+            if begin in bereikt:
+                continue
+            if begin in bereikt_via_gemengd and begin in gemengd_benedenstrooms:
+                continue
+            # Een streng waarvan het beginpunt niet op te lossen is hoort hier thuis --
+            # onbereikbaar is onbereikbaar -- maar heeft geen cluster.
+            gevonden.append((conduit, clusters.get(begin, "") if begin else ""))
+        return gevonden, not endpoints and not via_gemengd
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt wat er buiten de graaf viel; dat mag niet stilzwijgend verdwijnen.
@@ -359,16 +410,23 @@ class VuilwaterZonderAfvoerpad(_ZonderAfvoerpad):
 
 @register
 class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
-    """NET-002: hemelwater zonder pad naar een lozingspunt.
+    """NET-002: hemelwater zonder pad naar een lozingspunt, of via gemengd naar een overnamepunt.
 
-    De titel komt uit het checkregister (v0.9) en noemt daar ook het overnamepunt,
-    maar `Overnamepunt` staat in de rol `afvoer_eindpunt` en die leest NET-002 niet:
-    alleen `lozings_eindpunt` telt hier als bestemming. De melding noemt daarom sinds
-    issue #93 alleen het lozingspunt -- de tekst hoort te zeggen wat de check meet.
+    Tot issue #127 telde alleen `lozings_eindpunt`, ook al noemde de titel (checkregister
+    v0.9) en de oorspronkelijke docstring (issue #93) het overnamepunt niet -- terecht,
+    want die rol (`afvoer_eindpunt`) werd toen niet gelezen. Een hemelwaterstreng die
+    zelfstandig op een overnamepunt uitkomt is nog steeds geen afvoerpad; maar is zij
+    onderweg aangesloten op een gemengd riool, dan loost het hemelwater via dat gemengde
+    stelsel wél op het overnamepunt of gemaal, en is er niets mis. Dat voorbehoud legt
+    `eindpuntrollen_via_gemengd` vast: `afvoer_eindpunt` telt alleen mee voor een streng
+    die benedenstrooms in gemengd riool overgaat (`_gemengd_benedenstrooms`). Zie BO-88.
     """
 
     id = "NET-002"
-    title = "Hemelwaterstreng zonder afvoerpad naar lozingspunt of overnamepunt"
+    title = (
+        "Hemelwaterstreng zonder afvoerpad naar een lozingspunt, of via gemengd riool "
+        "naar een overnamepunt of gemaal"
+    )
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
     rollen = (
@@ -380,7 +438,8 @@ class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
     stelselrol = "hemelwater"
     eindpuntrollen = ("lozings_eindpunt",)
-    doel = "een lozingspunt"
+    eindpuntrollen_via_gemengd = ("afvoer_eindpunt",)
+    doel = "een lozingspunt, of via een gemengd riool een overnamepunt of gemaal"
 
 
 @register

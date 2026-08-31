@@ -129,21 +129,42 @@ def test_net001_noemt_het_stelseltype_van_de_streng() -> None:
     assert vuilwater.details["stelseltype"] == "vuilwater"
 
 
-def test_net002_noemt_hemelwater_en_zoekt_alleen_een_lozingspunt() -> None:
-    """Dezelfde verheldering voor NET-002, met het eindpunt dat de check echt zoekt.
+def test_net002_noemt_hemelwater_en_het_eindpunt_dat_hij_zoekt() -> None:
+    """Dezelfde verheldering voor NET-002, nu met het bredere eindpunt van issue #127.
 
-    NET-002 leest alleen de rol `lozings_eindpunt`; `Overnamepunt` staat in
-    `afvoer_eindpunt` en is voor deze check nooit een bestemming geweest. De tekst
-    noemde hem toch, en beloofde daarmee meer dan de check meet.
+    Sinds #127 leest NET-002 ook `afvoer_eindpunt` (overnamepunt/gemaal), maar alleen
+    als de hemelwaterstreng benedenstrooms in gemengd riool overgaat. Deze fixture heeft
+    geen gemengd riool en geen lozingspunt, maar wél een Gemaal (via de standaardconfig
+    in `afvoer_eindpunt`); de "geen enkel bereikbaar eindpunt"-staart verdwijnt dus, want
+    de graaf draagt wel degelijk een eindpunt van het bredere soort -- alleen bereikt
+    deze streng het niet (geen gemengd ertussen).
     """
     bevinding = _outcome("net002_hemelwater_zonder_lozingspunt.ttl", "NET-002").findings[0]
 
     assert bevinding.message == (
-        "Streng van stelseltype 'hemelwater' zonder afvoerpad naar een lozingspunt. "
-        "De graaf bevat geen enkel bereikbaar eindpunt van dit soort, dus geldt dit "
-        "voor elke streng."
+        "Streng van stelseltype 'hemelwater' zonder afvoerpad naar een lozingspunt, of "
+        "via een gemengd riool een overnamepunt of gemaal."
     )
     assert bevinding.details["stelseltype"] == "hemelwater"
+
+
+def test_net002_accepteert_een_overnamepunt_via_gemengd_riool() -> None:
+    """De kern van issue #127: hemelwater dat benedenstrooms gemengd wordt, mag op een
+    overnamepunt uitkomen. `1` (hemelwater) gaat op knoop B over in `2` (gemengd) en komt
+    uit op overnamepunt C; er is geen lozingspunt in de fixture.
+    """
+    assert _labels("net002_hemelwater_via_gemengd_naar_overnamepunt.ttl", "NET-002") == []
+
+
+def test_net002_blijft_hemelwater_rechtstreeks_naar_overnamepunt_melden() -> None:
+    """De controlehelft: zonder gemengd ertussen blijft een overnamepunt geen bestemming.
+
+    Streng '1' is hemelwater en komt rechtstreeks op een overnamepunt uit, zonder dat
+    het stelseltype ooit gemengd wordt. Zou de check zomaar élk overnamepunt accepteren,
+    dan was deze fixture ook groen -- en dat is precies de valse-positief-onderdrukking
+    die het issue niet vraagt.
+    """
+    assert _labels("net002_hemelwater_naar_overnamepunt_zonder_gemengd.ttl", "NET-002") == ["1"]
 
 
 def test_net004_vindt_de_kringloop() -> None:
