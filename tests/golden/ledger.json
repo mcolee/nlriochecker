@@ -571,6 +571,14 @@
       "TOP-019": [1, 1, 1],
       "TOP-022": [1, 1, 0]
     },
+    "net002_hemelwater_naar_overnamepunt_zonder_gemengd.ttl": {
+      "ATTR-018": [3, 3, 0],
+      "NET-002": [1, 1, 3]
+    },
+    "net002_hemelwater_via_gemengd_naar_overnamepunt.ttl": {
+      "ATTR-018": [5, 5, 0],
+      "RVZ-006": [1, 1, 2]
+    },
     "net002_hemelwater_zonder_lozingspunt.ttl": {
       "ATTR-018": [7, 7, 0],
       "NET-002": [1, 3, 3],

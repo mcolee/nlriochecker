@@ -1945,6 +1945,34 @@ FIXTURES["net002_drukriolering_lozingsput.ttl"] = (
     + leiding("D2", "d2", [(1100.0, 2000.0), (1150.0, 2000.0)], "T1", "Loz", klasse="Drukleiding"),
 )
 
+# NET-002 (issue #127): hemelwaterstreng '1' gaat op knoop B over in gemengd riool ('2')
+# en komt uit op een overnamepunt (C). Een hemelwaterstreng die benedenstrooms in gemengd
+# overgaat mag op een overnamepunt uitkomen -- geen lozingspunt nodig. De extra
+# `rdf:type gwsw:Overnamepunt` op :PutC_ori volgt het patroon van net001_overnamepunt.ttl:
+# de klasse staat op de orientatie, niet op de put zelf.
+FIXTURES["net002_hemelwater_via_gemengd_naar_overnamepunt.ttl"] = (
+    "geen; hemelwater '1' gaat op knoop B over in gemengd '2' en komt uit op overnamepunt C",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0, extra="\n:PutC_ori rdf:type gwsw:Overnamepunt .")
+    + leiding(
+        "L1", "1", [(1000.0, 2000.0), (1025.0, 2000.0)], "PutA", "PutB", klasse="Hemelwaterriool"
+    )
+    + leiding("L2", "2", [(1025.0, 2000.0), (1050.0, 2000.0)], "PutB", "PutC"),
+)
+
+# NET-002 (issue #127): de controlehelft. Hemelwaterstreng '1' komt rechtstreeks op een
+# overnamepunt uit, zonder dat er ergens gemengd riool tussen zit. Zonder de gemengde
+# overgang blijft een lozingspunt de enige geldige bestemming, dus '1' blijft gemeld.
+FIXTURES["net002_hemelwater_naar_overnamepunt_zonder_gemengd.ttl"] = (
+    "hemelwaterstreng '1' komt rechtstreeks op een overnamepunt uit, zonder gemengd riool ertussen",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0, extra="\n:PutB_ori rdf:type gwsw:Overnamepunt .")
+    + leiding(
+        "L1", "1", [(1000.0, 2000.0), (1025.0, 2000.0)], "PutA", "PutB", klasse="Hemelwaterriool"
+    ),
+)
+
 # NET-001 (#73): een pompunit is een overdrachtspunt naar de drukriolering en geen
 # afvoereindpunt (BO-55). Deze keten heeft geen persleiding achter de pompunit, dus
 # streng '1' komt nergens uit en hoort gemeld te worden. Het tegenbeeld staat hierboven:
