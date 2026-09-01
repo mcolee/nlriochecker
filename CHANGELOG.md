@@ -86,6 +86,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- `configs/dewoldenhoogeveen.toml` onderdrukt naast het mechanische riool nu ook de
+  `Pompunit` (`[rapport] onderdruk_klassen`). De pompput hoort bij de drukriolering, die
+  buiten het checkregister valt; meldingen erop (o.a. ATTR-018 begindatum) blijven zo uit
+  rapport en kaart en worden in de verantwoording geteld. De T-stukken op het persnet
+  (TOP-019/022) blijven voorlopig staan: hun klasse is niet drukriool-exclusief.
 - **NET-002 accepteert een overnamepunt of gemaal als hemelwater via gemengd riool
   afvoert** (issue #127): tot nu telde alleen een lozingspunt als bestemming
   (`eindpuntrollen = ("lozings_eindpunt",)`), terwijl een hemelwaterstreng die onderweg

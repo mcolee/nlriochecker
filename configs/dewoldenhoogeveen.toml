@@ -506,11 +506,14 @@ systemisch_drempel = 0.80
 systemisch_minimum_bekeken = 100
 # Versie van het checkregister waaraan deze run getoetst is.
 register_versie = "v0.9"
-# Meldingen die de uitvoer niet halen (issue #65): het mechanische riool, dezelfde twee
-# wortels als `[klassen] mechanisch`. Het checkregister rekent mechanisch riool buiten
-# scope; wat TOP-010/TOP-011 en de nulmeting er toch op melden, blijft zo uit rapport en
-# kaart en wordt in de verantwoording geteld. Zie BO-49.
-onderdruk_klassen = ["MechanischeRioolleiding", "MechanischeTransportleiding"]
+# Meldingen die de uitvoer niet halen (issue #65): het mechanische riool (dezelfde twee
+# wortels als `[klassen] mechanisch`) plus de pompunit, de pompput van de drukriolering.
+# Het checkregister rekent mechanisch riool buiten scope; wat de checks (TOP-010/TOP-011,
+# en op de pompunit ATTR-018) en de nulmeting er toch op melden, blijft zo uit rapport en
+# kaart en wordt in de verantwoording geteld. `Pompunit` is een `Rioolput` in het
+# mechanische stelsel (BO-55), geen vrijvervalput; subklassen ervan raakt de onderdrukking
+# dus niet mis. Zie BO-49.
+onderdruk_klassen = ["MechanischeRioolleiding", "MechanischeTransportleiding", "Pompunit"]
 onderdruk_checks = []
 
 # Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks

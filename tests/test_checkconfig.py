@@ -286,11 +286,13 @@ def test_onbekend_onderdruk_check_id_faalt_bij_het_laden(tmp_path: Path) -> None
         load_check_config(pad)
 
 
-def test_de_projectconfig_onderdrukt_het_mechanische_riool() -> None:
-    """De Wolden: dezelfde twee wortels als `[klassen] mechanisch` (issue #56, #65)."""
+def test_de_projectconfig_onderdrukt_het_mechanische_riool_en_de_pompunit() -> None:
+    """De Wolden: de twee `[klassen] mechanisch`-wortels plus `Pompunit`, de pompput van
+    de drukriolering (issue #56, #65; `Pompunit` is een `Rioolput` in het mechanische
+    stelsel, BO-55)."""
     config = load_check_config(PROJECTCONFIG)
 
-    assert config.rapport.onderdruk_klassen == config.klassen.mechanisch
+    assert config.rapport.onderdruk_klassen == [*config.klassen.mechanisch, "Pompunit"]
     assert config.rapport.onderdruk_checks == []
 
 
