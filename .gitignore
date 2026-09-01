@@ -38,3 +38,10 @@ data/*
 # dieper in de boom uit.
 /scratchpad/
 /.claude/workflows/
+
+# hookify lokale regels (niet delen)
+.claude/*.local.md
+
+# Ad-hoc runscripts (koude volledige/koekangerveld-run), niet in versiebeheer
+/run_volledig_koud.sh
+/run_koekangerveld_koud.sh
