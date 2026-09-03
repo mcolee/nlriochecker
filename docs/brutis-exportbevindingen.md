@@ -17,7 +17,7 @@ zijn afgeleid uit de dialooglabels in de exe en getoetst aan de verdeling van de
   drie in mm. `CAH` is voor **10.225** knopen gevuld (9.752 van de 16.626 inspectieputten;
   mediaan 1,61 m, 5–95 % tussen 1,17 en 2,85 m). Dat is de GWSW-`HoogtePut`.
 - Het exportsjabloon in de exe schrijft per put `CAF → BreedtePut`, `CAG → LengtePut`,
-  `CAC → Maaiveldhoogte`, `CCD → VormPut`, materiaal en begindatum, maar **geen
+  `CAC → Maaiveldhoogte`, `CAE → VormPut`, `CCD → MateriaalPut` en begindatum, maar **geen
   `CAH → HoogtePut`** en geen `Putdekselniveau`. De OroX van De Wolden en Hoogeveen bevestigt
   het: 20.758 × `BreedtePut`/`LengtePut`, 0 × `HoogtePut`, 0 × `Putdekselniveau`.
 - Gevolg: 43 % van de putten heeft in de bron een putdiepte, 0 % in OroX. De hoogtechecks
@@ -46,7 +46,46 @@ zijn afgeleid uit de dialooglabels in de exe en getoetst aan de verdeling van de
 - **Vraag aan de leverancier:** `Overnamepunt` als puttype opnemen, of `hulppunt` een
   instelbare GWSW-klasse geven.
 
-## 4. Wat wij er níét mee doen
+## 4. Mutatiebestand (`.mut`/`.rev`): bevestigd formaat en kolomsleutel
+
+Proefondervindelijk vastgesteld op 2026-09-03 met BrutIS zelf: exporteer via
+"CSV (knopen en strengen)", wijzig een waarde, importeer via hetzelfde menu-item; BrutIS
+schrijft dan de `.mut`. Het formaat (CRLF, komma, codering van de bron):
+
+```
+#A3=,
+#A6=0
+#B=ABH
+SWO De Wolden
+#I-KNOOP=CAA,CC6,CC7,CBF,CBG,XAK,CAR,CAC,CAD,CFJ,XAH,CKM,CCN,CCM,CAE,CAG,CAF,CAH,...
+Nw2V0002,,,20250712,1202,onbekend,rioolgemaal,100.000,,,,onbekend,0,0,rechthoekig,1000,1000,2630,...
+```
+
+Regel 4 is de beheerdersnaam uit de DBB-kop. De `#I-KNOOP`-kop somt de kolomcodes op, de
+datarij de waarden in die volgorde -- domeinwaarden als tekst (`rioolgemaal`, `beton`),
+niet als index. Kolomcodes zijn drie tekens (`#D-`/`#U-` bestaan ook; sleutel van een knoop
+is `CAA,CBF,CBG`, van een leiding `van,naar,volgnr,CBF,CBG`). De CSV-export en de
+`.mut`-kop leveren samen de sleutel code ↔ label voor de knooptabel (106 kolommen; hier
+de beheervelden, de conditie-, afstroom- en projectvelden erachter zijn weggelaten):
+
+`CAA` Knoopnr · `CC6` Objectnr · `CC7` Inlaat leiding GUID · `CBF` Datum mutatie ·
+`CBG` Tijd mutatie · `XAK` Status functioneren · `CAR` Type knoop · `CAC` Rand [m NAP] ·
+`CAD` Bodem [m NAP] · `CFJ` Waterpeil · `XAH` Instelpeil · `CKM` Inwinning NAP rand ·
+`CCN` Jaar aanleg · `CCM` Jaar renovatie · `CAE` Profiel · `CAG` Lengte [mm] ·
+`CAF` Breedte [mm] · `CAH` Hoogte [mm] · `CFG` Oppervlak · `CCD` Materiaal ·
+`AC8` Materiaal lining · `XAC` Drukklasse · `XAD` SDR · `ACO` Voegverbinding ·
+`AXP` Voegmateriaal · `CCO` Type afdekking · `CFH` Stroomprofiel · `CFI` Constructie ·
+`CAX`/`CAY` X/Y [m] · `CKC` Inwinning coordinaat · `LKM`/`LKD` Inwin methode/datum ·
+`ZOI` GUID · `IMG` IMGEO-ID · `CCU` Afvoertype · `XAR` WIBON-thema · `XAA`/`XAB`
+Begin-/Einddatum · `CC2`/`CC3` Beheergroep code/naam · `ZOC` Objectgroep · `CC5` Wijk ·
+`AAS` Straatcode · `XAE` Plaatsnaam · `NMK` Straatnaam · `ONR`/`OLE` Huisnummer/-letter ·
+`XAF` Eigenaar · `XAG` Beheerder · `XAL` Leverancier · `CDE` Opmerkingen · `CK0`–`CK9`
+Eigenschap 0–9.
+
+Terugschrijven vanuit nlriochecker is bewust géén functie (zie 5); de sleutel staat hier
+zodat een bevinding met de hand of met een los script naar een `.mut` te vertalen is.
+
+## 5. Wat wij er níét mee doen
 
 - Geen BRUTIS-kennis in de checks: GWSW is leidend en de tool blijft dataset-onafhankelijk.
 - Geen tweede invoerbron naast de OroX om de splitsing "niet gemeten / niet geëxporteerd"
