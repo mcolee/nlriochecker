@@ -13,6 +13,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **`docs/brutis-exportbevindingen.md`** (bij issue #133): wat de BrutIS/Kikker-export van De
+  Wolden en Hoogeveen aan de bron wél heeft maar niet naar OroX schrijft (putdiepte `CAH` →
+  `HoogtePut` voor 10.225 knopen; `Putdekselniveau`), wat de bron nooit registreerde
+  (bodempeil `CAD`, alle 23.889 knopen leeg) en welk GWSW-begrip BrutIS niet kent
+  (`Overnamepunt`; `hulppunt` landt als `Inspectieput`). Naslag voor de leveranciersvraag;
+  geen check verandert.
 - **Een feitenkanaal naast de meldingenstroom** (issue #122): een check declareert met
   `Check.feit_sleutels` welke detailsleutels de uitvoer mag lezen, en die reizen als tekst
   mee in de zijmap `Meldingenstroom.feiten` (`melding_id -> sleutel -> waarde`) --
