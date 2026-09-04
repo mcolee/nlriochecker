@@ -112,6 +112,11 @@ waterlozingspunt = ["Uitlaatconstructie", "UitlaatPunt", "LozingspuntOppervlakte
 # in `afvoer_eindpunt`. Staat er een pompunit naast een straat, dan zegt het ontbreken
 # van vrijverval daar niets over de datakwaliteit: die straat wordt niet beoordeeld.
 pompunit = ["Pompunit"]
+# Issue #131: de stelselinstanties, voor de inverse stelsel-leeslaag
+# (`CheckContext.stelsels_van`). Stelsel is de ontologische wortel van Transportstelsel,
+# Rioolstelsel, Drainagestelsel, Duikerstelsel en Warmtewinningsnet; de subklassen volgen
+# uit de ontologie. Nog geen consumer -- de leeslaag blokkeert #129.
+stelsel = ["Stelsel"]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]

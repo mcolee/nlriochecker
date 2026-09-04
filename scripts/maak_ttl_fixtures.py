@@ -2790,6 +2790,8 @@ FIXTURES["selectie_rollen.ttl"] = (
     HULPSTUK_KLASSEN
     + LOZE_KLASSE
     + POMP_KLASSE
+    + STELSEL_HIERARCHIE
+    + "\n"
     + (
         "# Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude"
         " kent haar niet.\n"
@@ -2856,7 +2858,11 @@ FIXTURES["selectie_rollen.ttl"] = (
         "Duiker1", "Duiker1", [(1000.0, 2200.0), (1050.0, 2200.0)], None, None, klasse="Duiker"
     )
     # Oppervlaktewater is lijnvormig en komt dus bij de verbindingen terecht.
-    + leiding("Sloot1", "Sloot1", [(1000.0, 2100.0), (1250.0, 2100.0)], None, None, klasse="Sloot"),
+    + leiding("Sloot1", "Sloot1", [(1000.0, 2100.0), (1250.0, 2100.0)], None, None, klasse="Sloot")
+    # Een stelselinstantie die streng L1 via hasPart draagt: de rol `stelsels` leest de
+    # stelselobjecten zelf (geen Node of Conduit), en `CheckContext.stelsels_van(L1)` vindt
+    # dit stelsel terug (issue #131).
+    + stelsel("Stelsel1", "Stelsel1", "Rioolstelsel", ["L1"]),
 )
 
 

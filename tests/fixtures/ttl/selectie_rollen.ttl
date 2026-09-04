@@ -57,6 +57,11 @@ gwsw:LozeLeiding rdfs:subClassOf gwsw:Leiding .
 
 gwsw:Pompunit rdfs:subClassOf gwsw:Rioolput .
 
+gwsw:Vuilwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:GemengdStelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:Hemelwaterstelsel rdfs:subClassOf gwsw:Rioolstelsel .
+gwsw:Rioolstelsel rdfs:subClassOf gwsw:Stelsel .
+
 # Alleen deze fixture heeft de bergbezinkleiding nodig; de gedeelde prelude kent haar niet.
 gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
 
@@ -179,3 +184,5 @@ gwsw:Bergbezinkleiding rdfs:subClassOf gwsw:VrijvervalRioolleiding .
         gwsw:hasValue "<gml:LineString xmlns:gml=\"http://www.opengis.net/gml\"><gml:posList srsDimension=\"2\">1000.0 2100.0 1250.0 2100.0</gml:posList></gml:LineString>"^^geo:gmlLiteral ] .
 :Sloot1_b rdf:type gwsw:BeginpuntLeiding .
 :Sloot1_e rdf:type gwsw:EindpuntLeiding .
+:Stelsel1 rdf:type gwsw:Rioolstelsel ; rdfs:label "Stelsel1" ;
+    gwsw:hasPart :L1 .

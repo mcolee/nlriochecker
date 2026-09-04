@@ -84,6 +84,13 @@ class ClassRoots(BaseModel):
     # afvoer in plaats van een buurtaansluiting. De wortel komt uit de ontologie en niet
     # uit een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`.
     pompunit: list[str] = Field(default_factory=lambda: ["Pompunit"])
+    # Issue #131: de stelselinstanties, voor de inverse stelsel-leeslaag
+    # (`CheckContext.stelsels_van`). Wortelklasse `gwsw:Stelsel` met haar subklassen
+    # Transportstelsel, Rioolstelsel, Drainagestelsel, Duikerstelsel en Warmtewinningsnet;
+    # de subklassen volgen uit de ontologie. De wortel komt uit de ontologie en niet uit
+    # een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`. Geen consumer
+    # nog; #129 bouwt erop.
+    stelsel: list[str] = Field(default_factory=lambda: ["Stelsel"])
     vuilwater: list[str] = Field(default_factory=list)
     hemelwater: list[str] = Field(default_factory=list)
     infiltratie: list[str] = Field(default_factory=list)

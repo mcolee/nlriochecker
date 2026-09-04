@@ -13,6 +13,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Stelselboom-leeslaag** (issue #131): de engine leest nu het lidmaatschap van een knoop
+  of streng in een geregistreerd `gwsw:Stelsel`. Nieuwe configsleutel `[klassen] stelsel`
+  (`["Stelsel"]`), de rol `stelsels` in `checks/selectie.py` (de stelselinstanties zelf) en
+  de inverse `CheckContext.stelsels_van(uri) -> tuple[str, ...]` (de stelsels die het object
+  via `hasPart` omvatten; lege tuple als geen). Nog geen consumer -- deze leeslaag blokkeert
+  #129 -- dus geen enkele melding verandert.
+
 - **GWSW 1.7-ondersteuning** (issue #125): de leeslaag draagt via `gwsw-orox-helpers` nu
   1.6 én 1.7 gebundeld en leidt de versie uit de dataset af. Het bevindingenrapport toont
   die versie in de kop ("GWSW-versie: 1.7 (uit de dataset)"); kon de leeslaag haar niet

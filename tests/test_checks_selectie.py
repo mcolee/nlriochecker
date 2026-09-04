@@ -87,6 +87,9 @@ ROLLENSET_AANTALLEN = {
     "vuilwaterleidingen": 1,
     "infiltratieleidingen": 1,
     "oppervlaktewaterobjecten": 1,
+    # Eén stelselinstantie (Stelsel1, een Rioolstelsel) die streng L1 via hasPart draagt.
+    # De rol levert de stelsel-URI's zelf, geen Node of Conduit (issue #131).
+    "stelsels": 1,
 }
 
 # De aantallen per rol op het Juinen-voorbeeld: 25 knopen en 25 verbindingen. De
@@ -209,6 +212,22 @@ def test_subklassen_tellen_mee(rollenset: GwswDataset) -> None:
         "L4",
     }
     assert "Lozing1" in {node.label for node in putten(context)}
+
+
+def test_stelsels_van_vindt_het_omvattende_stelsel(rollenset: GwswDataset) -> None:
+    """`stelsels_van` geeft de stelsels die een lid via hasPart omvatten; leeg als geen.
+
+    De rol `stelsels` levert de stelselinstanties zelf; `CheckContext.stelsels_van`
+    is de inverse: van een knoop of streng naar het stelsel dat hem omvat (issue #131).
+    """
+    context = context_van(rollenset)
+    stelsel_uris = set(_ROLLEN["stelsels"](context))
+    assert len(stelsel_uris) == 1
+    lid = next(uri for uri, conduit in rollenset.conduits.items() if conduit.label == "L1")
+    assert set(context.stelsels_van(lid)) == stelsel_uris
+    # Een streng die in geen enkel stelsel zit, geeft een lege tuple.
+    los = next(uri for uri, conduit in rollenset.conduits.items() if conduit.label == "Duiker1")
+    assert context.stelsels_van(los) == ()
 
 
 def test_oppervlaktewater_kijkt_in_beide_verzamelingen(rollenset: GwswDataset) -> None:

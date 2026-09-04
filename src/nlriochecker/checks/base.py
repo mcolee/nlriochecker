@@ -123,6 +123,7 @@ CACHE_VOORVOEGSELS: dict[str, tuple[str, ...]] = {
     "onbereikbaar": ("nlriochecker.checks.netwerk",),
     "rvz": ("nlriochecker.checks.randvoorzieningen",),
     "sel": ("nlriochecker.checks.selectie",),
+    "stelsel": ("nlriochecker.checks.base",),
     "topologie": ("nlriochecker.checks.topologie",),
     "vrijverval": ("nlriochecker.checks.verbanden",),
 }
@@ -252,6 +253,40 @@ class CheckContext:
         if self.analyseset is None:
             return "deze dataset"
         return "het geanalyseerde deel (kern plus contextschil)"
+
+    def stelsels_van(self, uri: str) -> tuple[str, ...]:
+        """De stelselinstanties die deze knoop of streng via `hasPart` omvatten (issue #131).
+
+        Meestal nul of één, maar een streng kan tegelijk in een `Rioolstelsel` en het
+        omvattende `Transportstelsel` zitten -- vandaar een tuple en geen `str | None`.
+        Lege tuple als geen stelsel het object noemt. De inverse index wordt een keer per
+        context gebouwd (`stelsel:inverse`) uit `dataset.stelsel_leden` over alle
+        stelselinstanties.
+
+        Nog geen consumer: dit is de leeslaag waarop #129 verder bouwt.
+        """
+        return self._stelsel_inverse().get(uri, ())
+
+    def _stelsel_inverse(self) -> dict[str, tuple[str, ...]]:
+        """Per knoop- of streng-URI de stelsels die haar via `hasPart` omvatten.
+
+        `dataset.stelsel_leden` geeft per stelsel zijn `(strengen, knopen)`; die worden
+        hier een keer omgekeerd tot lid -> stelsels. De stelsels per lid zijn ontdubbeld
+        en gesorteerd, zodat de tuple stabiel is.
+        """
+
+        def bouw() -> dict[str, tuple[str, ...]]:
+            """Bouwt de inverse index uit alle stelselinstanties."""
+            omvat: dict[str, set[str]] = {}
+            for wortel in self.config.klassen.stelsel:
+                for subject in self.dataset.subjects_of_class(wortel):
+                    stelsel = str(subject)
+                    strengen, knopen = self.dataset.stelsel_leden(stelsel)
+                    for lid in (*strengen, *knopen):
+                        omvat.setdefault(lid, set()).add(stelsel)
+            return {lid: tuple(sorted(stelsels)) for lid, stelsels in omvat.items()}
+
+        return self.cached("stelsel:inverse", bouw)
 
 
 @dataclass(frozen=True)

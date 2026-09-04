@@ -340,6 +340,29 @@ def oppervlaktewaterobjecten(context: CheckContext) -> list[Node | Conduit]:
     return context.cached("sel:oppervlaktewaterobjecten", bouw)
 
 
+def stelsels(context: CheckContext) -> list[str]:
+    """De stelselinstanties: `gwsw:Stelsel` en haar subklassen (Rioolstelsel, Transportstelsel).
+
+    Anders dan de andere rollen levert deze de stelsel-URI's zelf en geen `Node` of
+    `Conduit`: een stelsel draagt geen eigen punt- of lijngeometrie en staat daarom niet in
+    `dataset.nodes` of `.conduits`, maar wel in `dataset.subjects_of_class`. Wie de leden van
+    een stelsel wil -- of andersom, het stelsel van een lid -- leest `CheckContext.stelsels_van`.
+
+    Geen consumer nog: deze rol en de inverse zijn de leeslaag voor #129 (issue #131).
+    """
+
+    def bouw() -> list[str]:
+        """De unieke stelsel-URI's over de sluiting van `[klassen] stelsel`, in vaste volgorde."""
+        gevonden = {
+            str(subject)
+            for wortel in context.config.klassen.stelsel
+            for subject in context.dataset.subjects_of_class(wortel)
+        }
+        return sorted(gevonden)
+
+    return context.cached("sel:stelsels", bouw)
+
+
 # Alle rollen op naam. Bewust privé: een publieke opzoeking op naam zou de
 # generieke ingang zijn die deze module juist opheft -- `objecten_van_klassen` stond
 # klaar, en dus schreef elke checkmodule zijn eigen variant. Een check kiest de
@@ -368,6 +391,7 @@ _ROLLEN: dict[str, Callable[[CheckContext], Sequence[object]]] = {
     "mechanischeleidingen": mechanischeleidingen,
     "lozeleidingen": lozeleidingen,
     "oppervlaktewaterobjecten": oppervlaktewaterobjecten,
+    "stelsels": stelsels,
 }
 
 
@@ -397,6 +421,7 @@ _ROL_VELDEN: dict[str, str] = {
     "mechanischeleidingen": "mechanisch",
     "lozeleidingen": "loze_leiding",
     "oppervlaktewaterobjecten": "oppervlaktewater",
+    "stelsels": "stelsel",
 }
 
 
