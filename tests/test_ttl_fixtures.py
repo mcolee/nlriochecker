@@ -24,6 +24,7 @@ import pytest
 WORTEL = Path(__file__).resolve().parents[1]
 SCRIPT = WORTEL / "scripts" / "maak_ttl_fixtures.py"
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
+TTL17_DIR = Path(__file__).parent / "fixtures" / "ttl17"
 
 
 def generator() -> ModuleType:
@@ -43,3 +44,14 @@ def test_fixture_komt_overeen_met_de_generator(naam: str) -> None:
     """Het bestand op schijf is letterlijk wat het script ervan zou maken."""
     defect, inhoud = GENERATOR.FIXTURES[naam]
     assert (TTL_DIR / naam).read_text(encoding="utf-8") == GENERATOR.render(defect, inhoud)
+
+
+@pytest.mark.parametrize("naam", sorted(GENERATOR.FIXTURES))
+def test_zeventien_fixture_komt_overeen_met_de_generator(naam: str) -> None:
+    """De 1.7-set onder `ttl17/` past bij de generator met versie 1.7 (issue #125).
+
+    Alleen het gwsw:-prefix verschilt van de 1.6-set; deze test bewaakt dat de 1.7-set
+    net zomin met de hand bijgewerkt wordt als de 1.6-set.
+    """
+    defect, inhoud = GENERATOR.FIXTURES[naam]
+    assert (TTL17_DIR / naam).read_text(encoding="utf-8") == GENERATOR.render(defect, inhoud, "1.7")

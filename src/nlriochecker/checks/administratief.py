@@ -463,8 +463,8 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
         ruimer is dan de expliciete vorm -- `graph_types_of` unieert ook de
         orientatietypen -- kan hier geen extra treffer opleveren: de afsluiting van
         `Compartiment` (drie klassen) en die van `Knooppunt` (vijftien) delen in de
-        GWSW-totaalontologie 1.6 geen enkele klasse, dus geen orientatietype valt onder
-        `Compartiment`.
+        gebundelde GWSW-totaalontologie geen enkele klasse, dus geen orientatietype valt
+        onder `Compartiment`.
         """
         return context.dataset.onderdelen(node.uri, "Compartiment")
 

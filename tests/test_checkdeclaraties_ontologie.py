@@ -45,7 +45,7 @@ import json
 from functools import cache
 from pathlib import Path
 
-from gwsw_orox_helpers.bronnen import vocabulaire_index_pad
+from gwsw_orox_helpers.bronnen import vocabulaire_index_pad, vocabulaire_index_pad_voor
 
 import nlriochecker.checks  # noqa: F401  (vult de registry)
 from checkdeclaratie_analyse import _veld_naar_rol
@@ -242,3 +242,17 @@ def test_globale_uitzondering_wordt_gebruikt() -> None:
     gedeclareerd = {k for check in REGISTRY.values() for k in _concrete_kenmerken(check)}
     ongebruikt = [k for k in GLOBALE_UITZONDERINGEN if k not in gedeclareerd]
     assert not ongebruikt, f"GLOBALE_UITZONDERINGEN die niemand declareert: {ongebruikt}"
+
+
+def test_attr006_kenmerken_bestaan_ook_op_de_zeventien_index() -> None:
+    """ATTR-006 leunt op `BreedteBouwwerk`/`LengteBouwwerk`; die blijven in 1.7 bestaan.
+
+    Geen aanname maar een test (issue #125): de klassen `BreedteBouwwerk`/`LengteBouwwerk`/
+    `HoogteBouwwerk` verdwijnen in 1.7 niet breed -- alleen hun toepassing op Wadi vervalt --
+    dus ATTR-006 en de BBB-check zijn niet geraakt. Zakt deze assertie, dan is die aanname
+    onwaar en moet de check herzien worden.
+    """
+    document = json.loads(vocabulaire_index_pad_voor("1.7").read_text(encoding="utf-8"))
+    termen = document["termen"]
+    for kenmerk in ("BreedteBouwwerk", "LengteBouwwerk", "HoogteBouwwerk"):
+        assert kenmerk in termen, f"{kenmerk} ontbreekt in de 1.7-index"

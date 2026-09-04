@@ -52,6 +52,20 @@ GEEN_KLASSENHIERARCHIE = (
 )
 
 
+# De leeslaag draagt sinds gwsw-orox-helpers 0.2 twee GWSW-versies gebundeld (1.6 en 1.7)
+# en leidt de versie van een dataset af uit de typen van haar knopen en strengen. Draagt de
+# dataset geen enkel object met een herkenbare GWSW-namespace, dan valt de leeslaag terug op
+# de gepinde standaardversie: knopen en strengen zijn dan mogelijk tegen de verkeerde
+# klassenhierarchie gesloten. `{waarde}` is de teruggevallen versie. Zie issue #125.
+GWSW_VERSIE_TERUGVAL = (
+    "**GWSW-versie niet herkend:** deze dataset draagt geen object met een herkenbare "
+    "GWSW-namespace, dus de leeslaag is teruggevallen op de gebundelde standaardversie "
+    "{waarde} in plaats van de versie uit de dataset af te leiden. Is de dataset uit een "
+    "andere GWSW-versie aangeleverd, dan zijn knopen en strengen tegen de verkeerde "
+    "klassenhierarchie gesloten en draagt de uitkomst van deze run geen oordeel. Lever de "
+    "dataset opnieuw aan uit een GWSW-OroX-export met een herkenbare namespace."
+)
+
 # De meting is met een maximum aan het aantal meldingen gedraaid: boven dat maximum
 # kapt de GWSW-server de meldingtabel af, en dan telt deze toets minder overtredingen uit
 # de nulmeting dan er in de dataset staan. `{waarde}` is de gemeten limiet, of bij
@@ -83,14 +97,18 @@ def voorbehouden(run: CheckRun) -> list[str]:
 
     De klassenhierarchie staat voorop: ontbreekt zij, dan draagt geen enkele uitkomst
     van deze run een oordeel, en doet de vraag tegen welke conformiteitsklassen er
-    gemeten is er nauwelijks meer toe. Daaronder de nulmeting-kopblokvelden: een limiet
-    op het aantal meldingen (de tabel kan afgekapt zijn) en lokale kwaliteitseisen (er
-    zijn niet-GWSW-vormen bijgemeten). Ze verschijnen alleen als ze van hun neutrale
-    waarde afwijken.
+    gemeten is er nauwelijks meer toe. Daarnaast de GWSW-versie-terugval: kon de leeslaag
+    de versie niet uit de dataset afleiden, dan is zij op de standaardversie teruggevallen
+    en kan de klassenhierarchie van de verkeerde versie zijn. Daaronder de
+    nulmeting-kopblokvelden: een limiet op het aantal meldingen (de tabel kan afgekapt zijn)
+    en lokale kwaliteitseisen (er zijn niet-GWSW-vormen bijgemeten). Ze verschijnen alleen
+    als ze van hun neutrale waarde afwijken.
     """
     gevonden = []
     if not run.dataset.klassenhierarchie_bekend:
         gevonden.append(GEEN_KLASSENHIERARCHIE)
+    if not run.dataset.gwsw_versie.gedetecteerd:
+        gevonden.append(GWSW_VERSIE_TERUGVAL.format(waarde=run.dataset.gwsw_versie.versie))
     bereik = run.meetbereik.markering()
     if bereik:
         gevonden.append(bereik)

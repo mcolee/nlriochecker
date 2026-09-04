@@ -13,6 +13,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **GWSW 1.7-ondersteuning** (issue #125): de leeslaag draagt via `gwsw-orox-helpers` nu
+  1.6 én 1.7 gebundeld en leidt de versie uit de dataset af. Het bevindingenrapport toont
+  die versie in de kop ("GWSW-versie: 1.7 (uit de dataset)"); kon de leeslaag haar niet
+  herkennen, dan valt zij terug op de standaardversie 1.6 en dragen de rapportkop,
+  `gwsw_run.markering` en de JSON-envelop een voorbehoud. Additief -- `SCHEMA_VERSIE` blijft
+  1.2 -- en 1.6 blijft de standaard: De Wolden/Hoogeveen (1.6) verandert niet. De
+  TTL-fixturegenerator schrijft naast de 1.6-set nu ook een 1.7-set (`tests/fixtures/ttl17/`),
+  en de vocabulaire-drifttests draaien tegen beide gebundelde indexen.
+
 - **Geaccepteerde bevindingen (uitzonderingen)** (issue #132, BO-91): een bevinding die na
   controle terecht blijkt te kloppen kun je per melding accepteren zonder haar te laten
   verdwijnen. `[rapport] uitzonderingen` wijst een los JSON-bestand aan (pad relatief aan de

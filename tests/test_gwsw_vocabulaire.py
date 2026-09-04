@@ -60,7 +60,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from gwsw_orox_helpers.bronnen import vocabulaire_index_pad
+from gwsw_orox_helpers.bronnen import (
+    GEBUNDELDE_VERSIES,
+    vocabulaire_index_pad,
+    vocabulaire_index_pad_voor,
+)
 
 from nlriochecker.checkconfig import VULWAARDE_KENMERKEN, ClassRoots, load_check_config
 from nlriochecker.plausibiliteit import load_plausibility
@@ -341,6 +345,37 @@ def _laad_index() -> dict[str, frozenset[str]]:
 INDEX = _laad_index()
 
 
+def _termen_van_versie(versie: str) -> dict[str, frozenset[str]]:
+    """De naam-naar-`rdf:type`-afbeelding van een specifieke gebundelde GWSW-versie.
+
+    Het restrisico dat de moduledocstring benoemt -- een naam die 1.7 hernoemt valideert
+    stil door tegen de 1.6-index -- is pas afgedekt zodra de 1.7-index zelf meeloopt.
+    Deze loader haalt hem op via de publieke API van de leeslaag (issue #125).
+    """
+    document = json.loads(vocabulaire_index_pad_voor(versie).read_text(encoding="utf-8"))
+    return {naam: frozenset(soorten) for naam, soorten in document["termen"].items()}
+
+
+INDEX_16 = _termen_van_versie("1.6")
+INDEX_17 = _termen_van_versie("1.7")
+
+# De gemeten omvang van de twee gebundelde indexen (helper-release met dual-version).
+# Vastgelegd als drifttest: groeit of krimpt een index zonder dat iemand deze getallen
+# bijwerkt, dan is er een helper-index stilzwijgend veranderd. Zie issue #125.
+INDEX_TERMEN = {"1.6": 3316, "1.7": 3485}
+INDEX_OWL_KLASSEN = {"1.6": 2087, "1.7": 2167}
+
+# De conceptrenames van 1.6 -> 1.7 die alleen in de vocabulaire-index en de drifttests
+# leven, niet in de check-logica (bevestigd in issue #125): elke naam verdween in 1.7 en
+# kreeg een of meer opvolgers. `Infiltratiekrat` bestond al in 1.6 en staat er dus niet bij.
+RENAMES_17 = {
+    "Infiltratiereservoir": ("Infiltratiekoffer",),
+    "Leidingomhulling": ("Omhulling",),
+}
+# Nieuw in 1.7, bestond niet in 1.6.
+NIEUW_IN_17 = ("Revisieproject",)
+
+
 def _laad_kinderen() -> dict[str, frozenset[str]]:
     """De omgekeerde `subklasse_van` uit de index: per klasse haar directe subklassen."""
     document = json.loads(INDEXBESTAND.read_text(encoding="utf-8"))
@@ -507,6 +542,54 @@ def test_de_index_is_niet_uitgehold() -> None:
         "WijzeVanInwinningColl",
     ):
         assert [naam for naam in INDEX if collectie in INDEX[naam]], collectie
+
+
+def test_de_leeslaag_levert_beide_gebundelde_versies() -> None:
+    """De helper draagt sinds de dual-version-release 1.6 én 1.7 gebundeld (issue #125).
+
+    Zakt deze assertie, dan is de premisse onder de 1.7-drifttests hieronder weg: die
+    lezen dan een index die er niet is.
+    """
+    assert GEBUNDELDE_VERSIES == ("1.6", "1.7")
+    # De default-index (`vocabulaire_index_pad()`, waarop de rest van deze module leunt)
+    # blijft de 1.6-index; de dual-version-release verschuift de standaard niet.
+    assert vocabulaire_index_pad() == vocabulaire_index_pad_voor("1.6")
+
+
+@pytest.mark.parametrize("versie", ("1.6", "1.7"))
+def test_de_gebundelde_index_heeft_de_vastgelegde_omvang(versie: str) -> None:
+    """Elke gebundelde index draagt het vastgelegde aantal termen en owl:Class-en.
+
+    Een drifttest in twee richtingen: de index mag niet stil groeien of krimpen zonder
+    dat deze getallen meebewegen. De 1.7-index is groter dan de 1.6-index -- dat is de
+    indexgroei die issue #125 vastlegt (3316 -> 3485 termen, 2087 -> 2167 owl:Class).
+    """
+    index = {"1.6": INDEX_16, "1.7": INDEX_17}[versie]
+    owl_klassen = sum(1 for soorten in index.values() if OWL_KLASSE in soorten)
+    assert len(index) == INDEX_TERMEN[versie], f"{versie}: {len(index)} termen"
+    assert owl_klassen == INDEX_OWL_KLASSEN[versie], f"{versie}: {owl_klassen} owl:Class"
+    if versie == "1.7":
+        assert len(INDEX_17) > len(INDEX_16)
+        assert owl_klassen > sum(1 for soorten in INDEX_16.values() if OWL_KLASSE in soorten)
+
+
+def test_de_zeventien_conceptrenames_zijn_zichtbaar() -> None:
+    """De 1.7-renames staan alleen luid in de 1.7-index, niet stil in de 1.6-index.
+
+    Dit is het restrisico uit de moduledocstring (regel 45-48): een hernoemde naam
+    valideert door tegen de 1.6-index tot de 1.7-index meeloopt. Nu die meeloopt, legt
+    deze test de renames vast: elke oude naam bestaat in 1.6 maar niet meer in 1.7, en
+    elke opvolger andersom (issue #125).
+    """
+    for oud, opvolgers in RENAMES_17.items():
+        assert oud in INDEX_16, f"{oud} hoort in de 1.6-index te bestaan"
+        assert oud not in INDEX_17, f"{oud} is in 1.7 hernoemd en hoort er niet meer te staan"
+        for opvolger in opvolgers:
+            assert opvolger not in INDEX_16, f"{opvolger} bestaat nog niet in 1.6"
+            assert opvolger in INDEX_17, f"{opvolger} is de 1.7-opvolger van {oud}"
+    for nieuw in NIEUW_IN_17:
+        assert nieuw not in INDEX_16, f"{nieuw} bestaat nog niet in 1.6"
+        assert nieuw in INDEX_17, f"{nieuw} is nieuw in 1.7"
 
 
 @pytest.mark.parametrize(("naam", "collectie"), SLEUTELS, ids=_kort)

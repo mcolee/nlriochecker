@@ -7,12 +7,26 @@ maar een object per klassenrol, om de selecties uit `checks/selectie.py` te dekk
 De prelude met de klassenhierarchie is voor alle fixtures gelijk; die staat hier een
 keer in plaats van twintig keer in de bestanden.
 
-Gebruik:  uv run python scripts/maak_ttl_fixtures.py
+De leeslaag draagt sinds gwsw-orox-helpers 0.2 twee GWSW-versies gebundeld (1.6 en 1.7).
+Het script schrijft daarom per versie een set: 1.6 naar `tests/fixtures/ttl/` (de bestaande
+182, byte-voor-byte gelijk) en 1.7 naar `tests/fixtures/ttl17/`. Alleen het gwsw:-prefix in
+de prelude verschilt; de fixtures zelf declareren hun klassenhierarchie inline en gebruiken
+geen in 1.7 hernoemde begrippen, dus de checks lezen ze in beide versies gelijk (issue #125).
+
+Gebruik:  uv run python scripts/maak_ttl_fixtures.py            # beide versies
+          uv run python scripts/maak_ttl_fixtures.py --versie 1.7  # alleen 1.7
 """
 
+import argparse
 from pathlib import Path
 
-DOEL = Path("tests/fixtures/ttl")
+# De doelmap per gebundelde GWSW-versie. Het gwsw:-prefix van de prelude hangt eraan.
+DOELEN = {
+    "1.6": Path("tests/fixtures/ttl"),
+    "1.7": Path("tests/fixtures/ttl17"),
+}
+STANDAARD_VERSIE = "1.6"
+GWSW_BASIS = "http://data.gwsw.nl/{versie}/totaal/"
 
 PRELUDE = """@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -3205,22 +3219,47 @@ FIXTURES["ext009_straten.ttl"] = (
 )
 
 
-def render(defect: str, inhoud: str) -> str:
+def _prelude(versie: str) -> str:
+    """De prelude met het gwsw:-prefix van de gevraagde versie.
+
+    Voor de standaardversie (1.6) is dat `PRELUDE` letterlijk, zodat de 182 bestaande
+    fixtures byte-voor-byte gelijk blijven; voor een andere versie wordt alleen het
+    namespace-prefix omgezet.
+    """
+    if versie == STANDAARD_VERSIE:
+        return PRELUDE
+    return PRELUDE.replace(
+        GWSW_BASIS.format(versie=STANDAARD_VERSIE), GWSW_BASIS.format(versie=versie)
+    )
+
+
+def render(defect: str, inhoud: str, versie: str = STANDAARD_VERSIE) -> str:
     """De volledige tekst van een fixture: de prelude, de DEFECT-regel en de inhoud.
 
     Staat apart van `main` zodat `tests/test_ttl_fixtures.py` dezelfde regel gebruikt
     om te bewaken dat de bestanden op schijf nog bij dit script passen. Zou de test
-    de opmaak overschrijven, dan bewaakte hij zijn eigen kopie.
+    de opmaak overschrijven, dan bewaakte hij zijn eigen kopie. `versie` kiest het
+    gwsw:-prefix; de standaard levert de 1.6-vorm die er altijd al stond.
     """
-    return f"{PRELUDE}\n# DEFECT: {defect}\n\n{inhoud}"
+    return f"{_prelude(versie)}\n# DEFECT: {defect}\n\n{inhoud}"
 
 
-def main() -> None:
-    DOEL.mkdir(parents=True, exist_ok=True)
-    for naam, (defect, inhoud) in FIXTURES.items():
-        (DOEL / naam).write_text(render(defect, inhoud), encoding="utf-8")
-        print(naam)
+def main(versies: tuple[str, ...] = tuple(DOELEN)) -> None:
+    for versie in versies:
+        doel = DOELEN[versie]
+        doel.mkdir(parents=True, exist_ok=True)
+        for naam, (defect, inhoud) in FIXTURES.items():
+            (doel / naam).write_text(render(defect, inhoud, versie), encoding="utf-8")
+            print(f"{versie}: {naam}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Schrijft de TTL-fixtures per GWSW-versie.")
+    parser.add_argument(
+        "--versie",
+        choices=sorted(DOELEN),
+        action="append",
+        help="alleen deze versie schrijven (herhaalbaar); standaard beide.",
+    )
+    args = parser.parse_args()
+    main(tuple(args.versie) if args.versie else tuple(DOELEN))

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import get_args, get_type_hints
 
 import pytest
-from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
+from gwsw_orox_helpers.dataset import GwswDataset, GwswVersie, load_dataset
 
 from nlriochecker.analysis import MetingAnalysis
 from nlriochecker.checkconfig import load_check_config
@@ -32,6 +32,7 @@ from nlriochecker.uitvoer.samenvatting import NIET_GEMETEN, REGEL_EIGEN_CHECKS, 
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 from nlriochecker.uitvoer.voorbehoud import (
     GEEN_KLASSENHIERARCHIE,
+    GWSW_VERSIE_TERUGVAL,
     LOKALE_EISEN,
     MELDINGENLIMIET,
     markering,
@@ -141,6 +142,65 @@ def test_twee_voorbehouden_komen_allebei_in_de_kop(toets: CheckRun, tmp_path: Pa
     assert markdown.index(GEEN_KLASSENHIERARCHIE) < markdown.index("## ")
     csv = uitvoer.csv.read_text(encoding="utf-8")
     assert "Onvolledige meting" not in csv and "Geen klassenhierarchie" not in csv
+
+
+def _terugval(run: CheckRun) -> CheckRun:
+    """Dezelfde run, maar met een dataset waarvan de GWSW-versie niet herkend is.
+
+    Een geldige geladen dataset draagt altijd objecten met een GWSW-namespace, dus
+    `gedetecteerd` is er in de praktijk nooit vals. Om de terugvaltak van issue #125 te
+    toetsen zonder een pathologische dataset te fabriceren, zet deze helper de
+    gememoiseerde `gwsw_versie` op de terugvalstand -- precies wat de leeslaag oplevert
+    voor een dataset zonder herkenbare namespace.
+    """
+    memo = run.dataset._gwsw_versie_memo
+    memo.clear()
+    memo.append(
+        GwswVersie(basis="http://data.gwsw.nl/1.6/totaal/", versie="1.6", gedetecteerd=False)
+    )
+    return run
+
+
+def test_gwsw_versie_terugval_wordt_een_voorbehoud(toets: CheckRun) -> None:
+    """Kon de leeslaag de GWSW-versie niet afleiden, dan hoort dat in de kop (issue #125)."""
+    run = _terugval(replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST)))
+
+    regels = voorbehouden(run)
+
+    assert len(regels) == 1
+    assert regels[0].startswith("**GWSW-versie niet herkend:**")
+    assert "1.6" in regels[0]
+
+
+def test_gwsw_versie_terugval_bereikt_de_drie_views_niet_de_csv(
+    toets: CheckRun, tmp_path: Path
+) -> None:
+    """Het terugval-voorbehoud landt in Markdown, gwsw_run en JSON; niet in de CSV.
+
+    Additief: `SCHEMA_VERSIE` blijft 1.2 en het voorbehoud reist door hetzelfde
+    markeringsslot als de andere voorbehouden (issue #125).
+    """
+    run = _terugval(replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST)))
+
+    uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM)
+
+    assert uitvoer.json is not None and uitvoer.geopackage is not None
+    markdown = uitvoer.markdown.read_text(encoding="utf-8")
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    verbinding = sqlite3.connect(f"file:{uitvoer.geopackage}?mode=ro", uri=True)
+    try:
+        ((uit_gpkg,),) = verbinding.execute("select markering from gwsw_run")
+    finally:
+        verbinding.close()
+
+    assert GWSW_VERSIE_TERUGVAL[:40] in markdown
+    assert GWSW_VERSIE_TERUGVAL[:40] in document["markering"]
+    assert GWSW_VERSIE_TERUGVAL[:40] in uit_gpkg
+    assert document["schema_versie"] == "1.2"
+    # En de rapportkop noemt de terugval ook op de versieregel zelf.
+    assert "*GWSW-versie: 1.6 (terugval, niet uit de dataset afgeleid).*" in markdown
+    csv = uitvoer.csv.read_text(encoding="utf-8")
+    assert "GWSW-versie niet herkend" not in csv
 
 
 def test_neutrale_kopblokvelden_geven_geen_voorbehoud(toets: CheckRun) -> None:

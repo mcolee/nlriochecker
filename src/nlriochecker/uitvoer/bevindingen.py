@@ -321,7 +321,8 @@ def _render_checks(
     juist voor de bevindingen die het rapport zelf weglaat (issue #66).
     """
     geaccepteerd = frozenset(uitzonderingen.geaccepteerd)
-    lines = _omvang_section(run)
+    lines = [_gwsw_versie_regel(run), ""]
+    lines += _omvang_section(run)
     lines += _samenvatting_section(run, meldingen, geaccepteerd)
     # De rode draad hoort bij de samenvatting en niet bij het detail: hij zegt wat de
     # bevindingen samen betekenen, en dat is precies wat een lezer na de vier regels
@@ -350,6 +351,20 @@ def _archiefzin(met_csv: bool) -> str:
         f"De CSV is met `--uitvoer` uitgezet; alle bevindingen staan in `{FILE_CHECKS_JSON}` "
         "en in de GeoPackage, voor zover die gevraagd zijn."
     )
+
+
+def _gwsw_versie_regel(run: CheckRun) -> str:
+    """De kopregel met de GWSW-versie waarop de dataset gelezen is (issue #125).
+
+    De leeslaag draagt sinds gwsw-orox-helpers 0.2 twee GWSW-versies gebundeld (1.6 en 1.7)
+    en leidt de versie uit de typen van de knopen en strengen af. Deze regel maakt zichtbaar
+    welke versie dat was; kon de leeslaag haar niet afleiden, dan zegt de regel dat het een
+    terugval op de standaardversie is en draagt de kop van het rapport daarnaast het
+    voorbehoud uit `uitvoer/voorbehoud.py`.
+    """
+    versie = run.dataset.gwsw_versie
+    herkomst = "uit de dataset" if versie.gedetecteerd else "terugval, niet uit de dataset afgeleid"
+    return f"*GWSW-versie: {versie.versie} ({herkomst}).*"
 
 
 def _omvang_section(run: CheckRun) -> list[str]:

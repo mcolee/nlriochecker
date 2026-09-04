@@ -498,7 +498,10 @@ def compare_command(
     "ontology_paths",
     multiple=True,
     type=RAPPORT_TYPE,
-    help="GWSW-ontologie (TTL); standaard de gebundelde versie 1.6; meermaals toegestaan.",
+    help=(
+        "GWSW-ontologie (TTL); standaard de gebundelde ontologie die bij de GWSW-versie "
+        "van de dataset past (1.6 of 1.7, standaard 1.6); meermaals toegestaan."
+    ),
 )
 @click.option(
     "--geen-ontologie",

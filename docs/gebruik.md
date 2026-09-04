@@ -269,7 +269,10 @@ gebiedsaanduiding, en anders geldt de terugval op `statcode`/`statnaam` of de la
 `bevindingen.md` leest van gebied naar detail:
 
 1. **De naam van het gebied** als titel. Zonder studiegebied blijft de dataset de
-   aanduiding; in `totaal/` heet de synthese "Totaal (N gebieden)".
+   aanduiding; in `totaal/` heet de synthese "Totaal (N gebieden)". Onder de titel staat
+   de **GWSW-versie** waarop de dataset gelezen is (1.6 of 1.7), afgeleid uit de dataset
+   zelf. Kon de leeslaag die versie niet herkennen, dan staat er een terugval op de
+   standaardversie en draagt de kop daarnaast een voorbehoud.
 2. **Wat er in dit gebied ligt:** een tabel objecttype x stelseltype over de kern, met bij
    de leidingen zowel het aantal als de meters. De contextschil staat als voetnoot en telt
    niet mee -- er wordt niet over gerapporteerd.

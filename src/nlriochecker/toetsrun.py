@@ -64,7 +64,8 @@ class Toetsopdracht:
     bronnen: Path | None = None
     cfk: tuple[str, ...] = ()
     # Bewust doorgaan zonder klassenhierarchie. Zonder deze vlag en zonder eigen
-    # ontologie geldt de gebundelde GWSW-ontologie 1.6; zie `_ontologiekeuze`.
+    # ontologie kiest de leeslaag de gebundelde GWSW-ontologie die bij de versie van de
+    # dataset past (1.6 of 1.7, standaard 1.6); zie `_ontologiekeuze`.
     geen_ontologie: bool = False
     met_csv: bool = True
     met_geopackage: bool = True
@@ -279,10 +280,10 @@ def _ontologiekeuze(opdracht: Toetsopdracht) -> list[Path] | None:
     """Welke ontologie de lader krijgt: eigen paden, geen, of de gebundelde.
 
     Drie toestanden, en ze zijn niet uitwisselbaar. Opgegeven paden gaan voor: wie ze
-    noemt wil precies die klassenhierarchie. `None` laat gwsw-orox-helpers de
-    gebundelde GWSW-ontologie 1.6 nemen -- de standaardweg sinds de leeslaag die
-    ontologie zelf meelevert; daarvoor moest de gebruiker haar aanwijzen en weigerde
-    deze module de run zonder.
+    noemt wil precies die klassenhierarchie. `None` laat gwsw-orox-helpers de gebundelde
+    GWSW-ontologie nemen die bij de versie van de dataset past (1.6 of 1.7, standaard
+    1.6) -- de standaardweg sinds de leeslaag die ontologieen zelf meelevert; daarvoor
+    moest de gebruiker haar aanwijzen en weigerde deze module de run zonder.
 
     Een lege lijst is de bewuste ontsnappingsvlag `--geen-ontologie`. Dan kent de
     lader de subklassen van Knooppunt en Verbinding niet en typeert de OroX-export

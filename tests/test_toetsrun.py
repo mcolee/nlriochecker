@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import json
+import sqlite3
 from pathlib import Path
 
 import pandas as pd
@@ -39,6 +40,7 @@ from nlriochecker.uitvoer.bevindingen import (
 from nlriochecker.uitvoer.voorbehoud import GEEN_KLASSENHIERARCHIE
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
+TTL17_DIR = Path(__file__).parent / "fixtures" / "ttl17"
 GIS_DIR = Path(__file__).parent / "fixtures" / "gis"
 SHACL_DIR = Path(__file__).parent / "fixtures" / "shacl"
 EXT_DIR = GIS_DIR / "ext"
@@ -469,6 +471,79 @@ def test_typeringsvoorbehoud_wordt_gemeld(tmp_path: Path) -> None:
     assert uitslag.typeringspoort_toegepast is True
     assert uitslag.runs[0].run.outcomes[0].unreliable_count
     assert any("met typeringsvoorbehoud" in regel for regel in uitslag.regels())
+
+
+def _gwsw_run_markering(geopackage: Path) -> str:
+    """De markering-kolom van `gwsw_run` uit een geschreven GeoPackage."""
+    verbinding = sqlite3.connect(f"file:{geopackage}?mode=ro", uri=True)
+    try:
+        ((markering,),) = verbinding.execute("select markering from gwsw_run")
+    finally:
+        verbinding.close()
+    return markering
+
+
+def _volle_toets(dataset_pad: Path, uitvoermap: Path, cachemap: Path) -> Toetsuitslag:
+    """Een volledige toets met alle vier de uitvoervormen, op een fixture."""
+    return voer_toets_uit(
+        Toetsopdracht(
+            dataset_pad=dataset_pad,
+            uitvoermap=uitvoermap,
+            geen_ontologie=True,
+            cachemap=cachemap,
+        )
+    )
+
+
+def test_een_zeventien_dataset_draait_en_toont_de_versie(tmp_path: Path) -> None:
+    """Een 1.7-dataset loopt volledig door checks + rapport (issue #125), end to end.
+
+    De leeslaag leidt de GWSW-versie uit de dataset af; de rapportkop toont haar. Omdat
+    de versie herkend is, blijven `gwsw_run.markering` en de JSON-envelop byte-voor-byte
+    zoals ze waren -- de versie polluteert het voorbehoudslot niet. En de 1.7-namespace
+    wordt gelijk aan 1.6 gelezen: dezelfde bevindingen.
+    """
+    fixture = "net003_tegen_de_richting.ttl"
+    uit17 = _volle_toets(TTL17_DIR / fixture, tmp_path / "u17", tmp_path / "c17")
+    uit16 = _volle_toets(TTL_DIR / fixture, tmp_path / "u16", tmp_path / "c16")
+
+    assert uit17.dataset.gwsw_versie.versie == "1.7"
+    assert uit17.dataset.gwsw_versie.gedetecteerd is True
+
+    geschreven17 = uit17.uitvoer.per_gebied[""]
+    geschreven16 = uit16.uitvoer.per_gebied[""]
+    markdown = geschreven17.markdown.read_text(encoding="utf-8")
+    assert "*GWSW-versie: 1.7 (uit de dataset).*" in markdown
+
+    # De GeoPackage draagt de herkende versie niet in het voorbehoudslot: `gwsw_run.markering`
+    # is bij 1.7 exact wat hij bij 1.6 is (hier het "Geen nulmeting"-voorbehoud van deze
+    # run zonder --shacl), zonder enige versievermelding erin.
+    assert geschreven17.geopackage is not None and geschreven16.geopackage is not None
+    markering17 = _gwsw_run_markering(geschreven17.geopackage)
+    markering16 = _gwsw_run_markering(geschreven16.geopackage)
+    assert markering17 == markering16
+    assert "GWSW-versie niet herkend" not in markering17
+
+    # De JSON draagt hetzelfde markeringveld als de 1.6-run (geen versievermelding), en
+    # SCHEMA_VERSIE blijft 1.2 (additief).
+    assert geschreven17.json is not None and geschreven16.json is not None
+    document17 = json.loads(geschreven17.json.read_text(encoding="utf-8"))
+    document16 = json.loads(geschreven16.json.read_text(encoding="utf-8"))
+    assert document17["schema_versie"] == "1.2"
+    assert document17.get("markering") == document16.get("markering")
+    assert "GWSW-versie niet herkend" not in (document17.get("markering") or "")
+
+    # De 1.6- en de 1.7-run zien dezelfde populatie en dezelfde bevindingen.
+    run16, run17 = uit16.runs[0].run, uit17.runs[0].run
+    assert (len(run17.dataset.nodes), len(run17.dataset.conduits)) == (
+        len(run16.dataset.nodes),
+        len(run16.dataset.conduits),
+    )
+    assert sorted(f.check_id for f in run17.findings) == sorted(f.check_id for f in run16.findings)
+
+    # En de 1.6-run toont zijn eigen versie in de kop.
+    markdown16 = uit16.uitvoer.per_gebied[""].markdown.read_text(encoding="utf-8")
+    assert "*GWSW-versie: 1.6 (uit de dataset).*" in markdown16
 
 
 def test_de_module_kent_de_opdrachtregel_niet() -> None:
