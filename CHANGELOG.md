@@ -11,6 +11,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gewijzigd
+
+- **NET-006 keurt hemelwater→vuilwater alleen binnen een VGS goed** (issue #129): de
+  koppeling hemelwater → vuilwater is uit de whitelist `[koppelregels]` van beide configs
+  gehaald en in code voorwaardelijk gemaakt. Buiten een Verbeterd Gescheiden Stelsel hoort
+  hemelwater niet op een vuilwaterriool; binnen een VGS wordt een beperkt deel van het
+  hemelwater bewust naar het vuilwaterriool afgevoerd en is de koppeling toegestaan. VGS =
+  alleen expliciete `gwsw:VerbeterdGescheidenStelsel`-instanties (nieuwe configsleutel
+  `[klassen] vgs`, `["VerbeterdGescheidenStelsel"]`), rechtstreeks gelezen omdat een VGS in
+  de ontologie een `Systeem` is en niet in de sluiting van `gwsw:Stelsel` valt (BO-92). Op
+  De Wolden en Hoogeveen (0 VGS-instanties): +24 NET-006-bevindingen.
+
 ### Toegevoegd
 
 - **Stelselboom-leeslaag** (issue #131): de engine leest nu het lidmaatschap van een knoop

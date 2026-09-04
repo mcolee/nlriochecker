@@ -5044,3 +5044,48 @@ JSON-blok `uitzonderingen`. Niet in de CSV -- run-context, geen rij-eigenschap, 
 en de onderdrukking.
 
 Zie [#132](https://github.com/mcolee/nlriochecker/issues/132), BO-49 en `docs/json-schema.md`.
+
+### BO-92 De hemelwater→vuilwater-koppeling is alleen binnen een VGS toegestaan
+
+**Wat.** NET-006 keurt een gerichte koppeling `hemelwater → vuilwater` sinds issue #129 niet
+meer onvoorwaardelijk goed. De tag `vuilwater` is uit `koppelregels[hemelwater]` van beide
+configs gehaald en die ene cel is in code voorwaardelijk gemaakt (`_bouw_koppelingen` in
+`checks/netwerk.py`): ligt de koppelknoop in een **Verbeterd Gescheiden Stelsel**, dan is de
+koppeling toegestaan; anders is hemelwater op een vuilwaterriool een bevinding. De rest van de
+koppelmatrix blijft ongewijzigd. Op De Wolden en Hoogeveen (0 VGS-instanties): +24
+NET-006-bevindingen.
+
+**VGS = alleen expliciete instanties.** Wat als VGS telt zijn uitsluitend expliciete
+`gwsw:VerbeterdGescheidenStelsel`-instanties (typesluiting via `[klassen] vgs`,
+`["VerbeterdGescheidenStelsel"]`). De impliciete gepaarde-rioleringsgebied-variant (een
+`Rioleringsgebied` met gepaard `Hemelwaterstelsel` + `Vuilwaterstelsel`) is bewust verworpen:
+dat zou een begrip verzinnen dat de ontologie niet zo legt, en GWSW is leidend.
+
+**Waarom rechtstreeks gelezen en niet via `stelsels_van` (afwijking van de issuebrief).** Het
+issue nam aan dat een VGS "in de sluiting van `gwsw:Stelsel`" ligt en dat `CheckContext.stelsels_van`
+(de rol `stelsels` uit #131) hem dus zou zien. Dat is onjuist: in de gebundelde ontologie (GWSW
+1.6) is `VerbeterdGescheidenStelsel` een subklasse van `GescheidenSysteem < Systeem`, en `Systeem`
+en `Stelsel` zijn **zusters** onder `FysiekObject` -- geen van beide ligt in de sluiting van de
+ander. `stelsels_van` is gebouwd op `[klassen] stelsel = ["Stelsel"]` en ziet een VGS daardoor
+structureel niet: `subjects_of_class("Stelsel")` levert op De Wolden en Hoogeveen 276 instanties,
+alle uit de Stelsel-tak (Rioolstelsel, Vuilwaterstelsel, GemengdStelsel, ...), en `subjects_of_class`
+op `Systeem`/`GescheidenSysteem`/`VerbeterdGescheidenStelsel` nul. Een intersectie
+`stelsels_van(knoop) ∩ VGS-instanties` zou daarom altijd leeg zijn en de voorwaarde stil dood
+maken. NET-006 leest de VGS-instanties daarom rechtstreeks: `subjects_of_class` over `[klassen] vgs`
+met hun `hasPart`-leden via `stelsel_leden` (dezelfde publieke leeslaag-API die `_stelsel_inverse`
+gebruikt), precies zoals NET-007 zijn drempels via `[klassen] drempel` leest. Dit is een kleine,
+check-lokale, gecachte index (`net006:vgs-leden`), geen tweede algemene stelsellezer.
+
+**Declaratie (issue #64).** De rol/kenmerk-declaratie van NET-006 verandert niet. De VGS-populatie
+wordt -- net als NET-007's `[klassen] drempel` -- via `subjects_of_class` gelezen, wat de AST-sweep
+`test_declaratie_volgt_de_code` niet als rol ziet; er is dus geen `stelsels`-rol toegevoegd (die
+zou tegen de code afwijken) en geen los kenmerk (de VGS-typering is puur een typesluiting, geen
+GWSW-kenmerk). `docs/dekkingsmatrix.md` verandert daardoor niet.
+
+**Waar het staat.** Config: `ClassRoots.vgs` in `checkconfig.py`, de sleutel `[klassen] vgs` in
+`checks.toml` en `configs/dewoldenhoogeveen.toml`, en `hemelwater` in `[koppelregels]` van beide
+zonder `vuilwater`. Code: `_VGS_KOPPELING` en `_vgs_leden` in `checks/netwerk.py`, plus de conditie
+in `_bouw_koppelingen`. Fixtures: `net006_hemelwater_naar_vuilwater.ttl` (bevinding) en
+`net006_hemelwater_naar_vuilwater_vgs.ttl` (geen bevinding).
+
+Zie [#129](https://github.com/mcolee/nlriochecker/issues/129), [#131](https://github.com/mcolee/nlriochecker/issues/131) en BO-51.

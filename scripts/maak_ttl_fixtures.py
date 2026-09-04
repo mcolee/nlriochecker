@@ -905,6 +905,72 @@ FIXTURES["net006_onbetrouwbare_richting.ttl"] = (
     ),
 )
 
+# NET-006 (issue #129): hemelwater komt op knoop B binnen en gaat als vuilwater verder,
+# buiten een Verbeterd Gescheiden Stelsel. `hemelwater -> vuilwater` staat sinds dit issue
+# niet meer in de koppelregels -- hemelwater hoort niet op een vuilwaterriool -- dus B wordt
+# gemeld. Beide strengen zijn betrouwbaar gericht (BOB daalt, geometrie mee).
+FIXTURES["net006_hemelwater_naar_vuilwater.ttl"] = (
+    "op knoop B komt hemelwater binnen en gaat als vuilwater verder, buiten een VGS "
+    "(hemelwater op een vuilwaterriool, issue #129)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        klasse="Hemelwaterriool",
+        bob=(10.5, 10.0),
+    )
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        bob=(10.0, 9.5),
+    ),
+)
+
+# NET-006 (issue #129): dezelfde hemelwater->vuilwater-koppeling op knoop B, maar nu ligt de
+# knoop in een Verbeterd Gescheiden Stelsel. Binnen een VGS wordt een beperkt deel van het
+# hemelwater bewust naar het vuilwaterriool afgevoerd, dus die ene cel is toegestaan en
+# NET-006 zwijgt. `VerbeterdGescheidenStelsel` is in de ontologie een `Systeem` (geen
+# subklasse van `Stelsel`); NET-006 leest de instantie rechtstreeks via `[klassen] vgs`.
+FIXTURES["net006_hemelwater_naar_vuilwater_vgs.ttl"] = (
+    "geen; dezelfde hemelwater->vuilwater-koppeling op knoop B ligt in een Verbeterd "
+    "Gescheiden Stelsel en is daar toegestaan (issue #129)",
+    "gwsw:VerbeterdGescheidenStelsel rdfs:subClassOf gwsw:Systeem .\n"
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding(
+        "L1",
+        "1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        klasse="Hemelwaterriool",
+        bob=(10.5, 10.0),
+    )
+    + leiding(
+        "L2",
+        "2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        klasse="Vuilwaterriool",
+        bob=(10.0, 9.5),
+    )
+    # De VGS-instantie draagt de koppelknoop en beide strengen via hasPart. `stelsel()`
+    # staat verderop in dit script gedefinieerd, dus hier inline (dezelfde vorm).
+    + ':vgs1 rdf:type gwsw:VerbeterdGescheidenStelsel ; rdfs:label "vgs-1" ;\n'
+    "    gwsw:hasPart :PutB , :L1 , :L2 .\n",
+)
+
 # NET-008: drie lozingsputten in een deelstelsel van vier knopen.
 FIXTURES["net008_veel_lozingspunten.ttl"] = (
     "een deelstelsel van vier knopen heeft drie lozingsputten",

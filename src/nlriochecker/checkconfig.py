@@ -91,6 +91,15 @@ class ClassRoots(BaseModel):
     # een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`. Geen consumer
     # nog; #129 bouwt erop.
     stelsel: list[str] = Field(default_factory=lambda: ["Stelsel"])
+    # Issue #129: het Verbeterd Gescheiden Stelsel, voor de voorwaardelijke
+    # hemelwater->vuilwater-koppeling van NET-006. Let op: `VerbeterdGescheidenStelsel` is
+    # in de GWSW-ontologie een `Systeem` (VerbeterdGescheidenStelsel < GescheidenSysteem <
+    # Systeem), géén subklasse van `Stelsel` -- die twee zijn zusters onder `FysiekObject`.
+    # `CheckContext.stelsels_van` leest de rol `stelsels` (`stelsel`, wortel `Stelsel`) en
+    # ziet een VGS daardoor structureel niet; NET-006 leest de VGS-instanties rechtstreeks
+    # via `subjects_of_class` over deze wortel. De wortel komt uit de ontologie en niet uit
+    # een projectkeuze -- vandaar een gevulde default, zoals bij `rioolput`. Zie BO-92.
+    vgs: list[str] = Field(default_factory=lambda: ["VerbeterdGescheidenStelsel"])
     vuilwater: list[str] = Field(default_factory=list)
     hemelwater: list[str] = Field(default_factory=list)
     infiltratie: list[str] = Field(default_factory=list)

@@ -1177,6 +1177,44 @@ class _Koppelknoop:
     beneden_labels: dict[str, tuple[str, ...]]
 
 
+# NET-006 (issue #129, BO-92): de koppeling hemelwater -> vuilwater staat sinds dit issue
+# niet meer onvoorwaardelijk in de koppelregels (uit beide configs gehaald), maar is alleen
+# toegestaan binnen een Verbeterd Gescheiden Stelsel. Alleen deze ene cel is voorwaardelijk;
+# de rest van de matrix volgt de whitelist. De tags zijn de stelseltype-tags uit
+# `[koppelregels]`/`[klassen.stelseltypen]`.
+_VGS_KOPPELING = ("hemelwater", "vuilwater")
+
+
+def _vgs_leden(context: CheckContext) -> frozenset[str]:
+    """De knopen en strengen die in een expliciet Verbeterd Gescheiden Stelsel liggen.
+
+    `VerbeterdGescheidenStelsel` is in de GWSW-ontologie een `Systeem`
+    (VerbeterdGescheidenStelsel < GescheidenSysteem < Systeem), géén subklasse van `Stelsel`
+    -- die twee zijn zusters onder `FysiekObject`. `context.stelsels_van` leest de rol
+    `stelsels` (`[klassen] stelsel`, wortel `Stelsel`) en ziet een VGS daardoor structureel
+    niet: op De Wolden en Hoogeveen levert `subjects_of_class("Stelsel")` 276 instanties, alle
+    uit de Stelsel-tak (Rioolstelsel, Vuilwaterstelsel, ...), en nul uit de Systeem-tak. Deze
+    check leest de VGS-instanties daarom rechtstreeks -- `subjects_of_class` over de
+    typesluiting van `[klassen] vgs`, met hun `hasPart`-leden via `stelsel_leden`, precies
+    zoals NET-007 zijn drempels via `[klassen] drempel` leest. De impliciete gepaarde-
+    rioleringsgebied-variant doen we bewust niet: GWSW is leidend en de ontologie legt VGS
+    niet zo. Zie issue #129 en BO-92.
+    """
+
+    def bouw() -> frozenset[str]:
+        """Verzamelt de leden over alle VGS-instanties in de dataset."""
+        leden: set[str] = set()
+        dataset = context.dataset
+        for wortel in context.config.klassen.vgs:
+            for subject in dataset.subjects_of_class(wortel):
+                strengen, knopen = dataset.stelsel_leden(str(subject))
+                leden.update(strengen)
+                leden.update(knopen)
+        return frozenset(leden)
+
+    return context.cached("net006:vgs-leden", bouw)
+
+
 @register
 class KoppelingTussenStelseltypen(Check):
     """NET-006: een gerichte koppeling tussen stelseltypen die de koppelregels overtreedt."""
@@ -1198,6 +1236,12 @@ class KoppelingTussenStelseltypen(Check):
         de richtingsbron uit #80). Een gerichte koppeling `boven → beneden` is een bevinding
         als `beneden` niet in `koppelregels[boven]` staat. De bevinding staat op de knoop,
         want daar zit de koppeling.
+
+        Eén cel is sinds issue #129 voorwaardelijk: `hemelwater → vuilwater` staat niet meer
+        in de whitelist (uit beide configs gehaald), maar is wél toegestaan binnen een
+        Verbeterd Gescheiden Stelsel. Ligt de koppelknoop in een expliciete
+        `gwsw:VerbeterdGescheidenStelsel`-instantie (`_vgs_leden`), dan vervalt die ene cel;
+        anders is hemelwater op een vuilwaterriool een bevinding. Zie BO-92.
 
         Wat NIET beoordeeld wordt, meldt `notes()`: koppelingen waarvan de richting niet
         betrouwbaar is (dan valt niet te zeggen wat boven- en wat benedenstrooms ligt) en
@@ -1237,6 +1281,7 @@ class KoppelingTussenStelseltypen(Check):
         regels = context.config.koppelregels
         in_scope = set(regels)
         betrouwbaar = _betrouwbare_richting(context)
+        vgs_leden = _vgs_leden(context)
 
         instroom: dict[str, dict[str, list[str]]] = {}
         uitstroom: dict[str, dict[str, list[str]]] = {}
@@ -1272,6 +1317,11 @@ class KoppelingTussenStelseltypen(Check):
                 for b in sorted(beneden)
                 if b in in_scope and b not in regels[a]
             ]
+            # Issue #129/BO-92: hemelwater -> vuilwater staat niet meer in de koppelregels,
+            # maar is toegestaan binnen een Verbeterd Gescheiden Stelsel. Ligt deze knoop in
+            # een VGS, dan vervalt juist die ene cel; de rest van de matrix blijft gelden.
+            if uri in vgs_leden:
+                verschillen = [paar for paar in verschillen if paar != _VGS_KOPPELING]
             if verschillen:
                 knopen.append(
                     _Koppelknoop(

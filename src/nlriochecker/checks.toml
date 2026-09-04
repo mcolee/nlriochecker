@@ -115,8 +115,13 @@ pompunit = ["Pompunit"]
 # Issue #131: de stelselinstanties, voor de inverse stelsel-leeslaag
 # (`CheckContext.stelsels_van`). Stelsel is de ontologische wortel van Transportstelsel,
 # Rioolstelsel, Drainagestelsel, Duikerstelsel en Warmtewinningsnet; de subklassen volgen
-# uit de ontologie. Nog geen consumer -- de leeslaag blokkeert #129.
+# uit de ontologie.
 stelsel = ["Stelsel"]
+# Issue #129: het Verbeterd Gescheiden Stelsel, voor de voorwaardelijke
+# hemelwater->vuilwater-koppeling van NET-006. `VerbeterdGescheidenStelsel` is een `Systeem`
+# (< GescheidenSysteem < Systeem), géén subklasse van `Stelsel`, dus `stelsels_van` ziet hem
+# niet; NET-006 leest deze instanties rechtstreeks. Zie BO-92.
+vgs = ["VerbeterdGescheidenStelsel"]
 # Stelseltypen, voor de bereikbaarheidsanalyse per soort afvoer. De namen zijn
 # geverifieerd tegen de ontologie: het zijn subklassen van VrijvervalRioolleiding.
 vuilwater = ["Vuilwaterriool", "GemengdRiool"]
@@ -183,7 +188,10 @@ transport = ["Duiker"]
 [koppelregels]
 gemengd = ["gemengd", "overstort"]
 vuilwater = ["gemengd", "vuilwater"]
-hemelwater = ["gemengd", "vuilwater", "hemelwater", "infiltratie", "DIT", "DT"]
+# hemelwater -> vuilwater is bewust NIET onvoorwaardelijk toegestaan (issue #129): buiten
+# een Verbeterd Gescheiden Stelsel hoort hemelwater niet op een vuilwaterriool. NET-006
+# maakt die ene cel voorwaardelijk in code (`[klassen] vgs`); zie BO-92.
+hemelwater = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
 infiltratie = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
 DIT = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]
 DT = ["gemengd", "hemelwater", "infiltratie", "DIT", "DT"]

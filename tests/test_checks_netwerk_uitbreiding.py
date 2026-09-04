@@ -128,6 +128,32 @@ def test_net006_meldt_dit_naar_vuilwater() -> None:
     assert outcome.findings[0].details["koppelingen"] == ["DIT→vuilwater"]
 
 
+def test_net006_meldt_hemelwater_naar_vuilwater_buiten_vgs() -> None:
+    """Hemelwater op een vuilwaterriool is buiten een VGS een koppelingsfout (issue #129).
+
+    `hemelwater → vuilwater` staat sinds dit issue niet meer in de koppelregels. Op knoop B
+    komt hemelwater binnen en gaat het als vuilwater verder; de knoop ligt in geen enkel
+    Verbeterd Gescheiden Stelsel, dus de koppeling blijft gemeld.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_hemelwater_naar_vuilwater.ttl", "NET-006")
+
+    assert labels(outcome) == ["B"]
+    assert outcome.findings[0].details["koppelingen"] == ["hemelwater→vuilwater"]
+
+
+def test_net006_staat_hemelwater_naar_vuilwater_binnen_vgs_toe() -> None:
+    """Binnen een Verbeterd Gescheiden Stelsel is diezelfde koppeling wél toegestaan (issue #129).
+
+    Dezelfde knoop B, maar nu draagt een expliciete `gwsw:VerbeterdGescheidenStelsel`-
+    instantie de koppelknoop via hasPart. Binnen een VGS wordt een beperkt deel van het
+    hemelwater bewust naar het vuilwaterriool afgevoerd, dus NET-006 zwijgt. Alleen deze ene
+    cel is voorwaardelijk; de rest van de matrix blijft gelden.
+    """
+    outcome = uitkomst(TTL_DIR / "net006_hemelwater_naar_vuilwater_vgs.ttl", "NET-006")
+
+    assert outcome.findings == []
+
+
 def test_net006_telt_een_koppeling_zonder_betrouwbare_richting_maar_meldt_die_niet() -> None:
     """Wat niet gericht te beoordelen is, komt in de toelichting en niet als bevinding.
 
