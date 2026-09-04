@@ -998,6 +998,47 @@ class BegindatumOntbreekt(Check):
 
 
 @register
+class PutdiepteOntbreekt(_PutCheck):
+    """ATTR-019: een put zonder putdiepte (`HoogtePut`).
+
+    Het GWSW kent geen kenmerk `Putbodemniveau`; de putbodem is afgeleid uit het
+    putdekselniveau min de putdiepte `HoogtePut` (een aspect van `gwsw:Put`, in mm).
+    Ontbreekt `HoogtePut`, dan slaan HGT-004, HGT-012, HGT-015 en HGT-016 de put over en
+    zeggen dat alleen in hun toelichting; de put blijft op de kaart groen -- en groen
+    betekent daar "beoordeeld en niets gevonden". De tegenhanger van ATTR-018 voor de
+    putdiepte, en net als daar per object zodat het gat op de kaart komt (issue #133).
+
+    Waarschuwing en geen fout (anders dan ATTR-018): de putdiepte is een afgeleide die
+    vier hoogtechecks blokkeert maar op zichzelf geen registratiefout bewijst, en de
+    SHACL-nulmeting eist `HoogtePut` in geen enkele CFK. Alleen het *ontbreken* telt: een
+    geregistreerde 0 mm leest deze check als aanwezig en laat HGT-012 die op zijn
+    ondergrens toetsen (BO-90). Op De Wolden en Hoogeveen draagt geen enkele put een
+    `HoogtePut`, dus meldt hij alle putten -- systemisch boven de rapportdrempel.
+    """
+
+    id = "ATTR-019"
+    title = "Putdiepte ontbreekt"
+    severity = Severity.WARNING
+    dimension = Dimension.COMPLETENESS
+    rollen = ("putten",)
+    kenmerken = ("HoogtePut",)
+
+    def run(self, context: CheckContext) -> Iterator[Finding]:
+        """Meldt elke put zonder `HoogtePut`."""
+        for node in putten(context):
+            if node.number("HoogtePut") is not None:
+                continue
+            yield self.finding(
+                context,
+                node.uri,
+                node.label,
+                "Deze put draagt geen putdiepte (`HoogtePut`); zonder haar is het "
+                "bodemniveau niet af te leiden en slaan de hoogtechecks HGT-004, HGT-012, "
+                "HGT-015 en HGT-016 de put over.",
+            )
+
+
+@register
 class BegindatumVulwaardejaar(Check):
     """ATTR-015: een enkel jaartal draagt een onevenredig deel van de begindatums.
 

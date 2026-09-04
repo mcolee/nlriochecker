@@ -1475,6 +1475,16 @@ FIXTURES["attr018_zonder_begindatum.ttl"] = (
     + nette_put("PutD", "D", *D, Begindatum="1985-01-01"),
 )
 
+FIXTURES["attr019_zonder_hoogteput.ttl"] = (
+    "put B draagt geen `HoogtePut` en is de enige ATTR-019-bevinding; put A draagt er een "
+    "(1500 mm) en put C een geregistreerde 0, die als aanwezig telt (issue #133)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B, HoogtePut=None)
+    + nette_put("PutC", "C", *C, HoogtePut=0)
+    + nette_leiding("L1", "1", [A, B], "PutA", "PutB")
+    + nette_leiding("L2", "2", [B, C], "PutB", "PutC"),
+)
+
 FIXTURES["attr009_lengte_wijkt_af.ttl"] = (
     "streng 1 is 50 m getekend maar staat als 100 m geregistreerd",
     nette_put("PutA", "A", *A)

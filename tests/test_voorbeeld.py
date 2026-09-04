@@ -49,7 +49,8 @@ VOLLE_SHACL = (
 # verklaard is. Twee checks lezen de dag van vandaag (ADM-006 op Einddatum/Begindatum,
 # ATTR-007 op het huidige jaar als bovengrens), dus een export met datums rond nu zou
 # dit getal vanzelf laten schuiven; deze export heeft die niet.
-MELDINGEN_IN_HET_VOORBEELD = 335
+# 335 → 374 (+39): ATTR-019 meldt de 39 putten van de kern zonder `HoogtePut` (issue #133).
+MELDINGEN_IN_HET_VOORBEELD = 374
 
 # De sectie `voorbeeld` van de gouden ledger draagt datzelfde getal uitgesplitst per
 # check (`scripts/maak_ledger.py`). Het losse getal hierboven blijft ernaast staan: wie

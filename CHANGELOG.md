@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **ATTR-019 "Putdiepte ontbreekt"** (W, Compleetheid; issue #133): meldt elke put zonder
+  putdiepte `HoogtePut`. Het GWSW kent geen `Putbodemniveau`; de putbodem volgt uit
+  putdekselniveau min `HoogtePut`, en zonder die diepte slaan HGT-004/012/015/016 de put over
+  zonder dat het per object in de uitvoer stond -- de put bleef op de kaart groen. De
+  tegenhanger van ATTR-018 voor de putdiepte, op alle putten (`rollen = ("putten",)`,
+  `kenmerken = ("HoogtePut",)`). Waarschuwing en geen fout: de diepte is een afgeleide die
+  geen registratiefout bewijst en de nulmeting eist haar in geen enkele CFK; alleen het
+  ontbreken telt, een geregistreerde 0 mm geldt als aanwezig en blijft aan HGT-012. Op De
+  Wolden en Hoogeveen draagt geen enkele put een `HoogtePut`, zodat hij alle 20.758 putten
+  meldt -- systemisch boven de rapportdrempel. Zie BO-90.
 - **`docs/brutis-exportbevindingen.md`** (bij issue #133): wat de BrutIS/Kikker-export van De
   Wolden en Hoogeveen aan de bron wél heeft maar niet naar OroX schrijft (putdiepte `CAH` →
   `HoogtePut` voor 10.225 knopen; `Putdekselniveau`), wat de bron nooit registreerde

@@ -8,13 +8,13 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | --- | ---: | ---: | ---: | ---: | ---: |
 | TOP | 22 | 22 | 0 | 0 | 0 |
 | ADM | 10 | 7 | 0 | 0 | 3 |
-| ATTR | 18 | 16 | 0 | 0 | 2 |
+| ATTR | 19 | 17 | 0 | 0 | 2 |
 | HGT | 17 | 17 | 0 | 0 | 0 |
 | NET | 8 | 8 | 0 | 0 | 0 |
 | RVZ | 10 | 10 | 0 | 0 | 0 |
 | BTR | 4 | 4 | 0 | 0 | 0 |
 | EXT | 5 | 5 | 0 | 0 | 0 |
-| **totaal** | **94** | **89** | **0** | **0** | **5** |
+| **totaal** | **95** | **90** | **0** | **0** | **5** |
 
 ## TOP
 
@@ -80,6 +80,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De… | F | Consistentie | geimplementeerd met test | putten · BreedtePut, LengtePut, VormPut | — |
 | ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2… | W | Plausibiliteit | geimplementeerd met test | leidingen · MateriaalLeiding, WandruwheidBinnenboven, WandruwheidBinnenonder | — |
 | ATTR-018 | Begindatum ontbreekt op een vrijvervalrioolleiding of put. ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een aanwezige datum en de nulmeting eist `Be… | F | Compleetheid | geimplementeerd met test | leidingen, putten, vrijvervalrioolleidingen · Begindatum | — |
+| ATTR-019 | Putdiepte (`HoogtePut`) ontbreekt op een put. Het GWSW kent geen `Putbodemniveau`; de putbodem volgt uit putdekselniveau min `HoogtePut`, en zonder d… | W | Compleetheid | geimplementeerd met test | putten · HoogtePut | — |
 
 ## HGT
 

@@ -87,7 +87,8 @@ Onwaarschijnlijke uitkomsten eerst wantrouwen (zie de hoofdregel in `CLAUDE.md`)
 zijn geen bug:
 
 - **ATTR-001** toetst de vrijverval-subset (~17603 strengen), niet alle conduits (~23440).
-- **HGT-012** leest `HoogtePut`; De Wolden levert daar **0** instanties.
+- **HGT-012** leest `HoogtePut`; De Wolden levert daar **0** instanties; ATTR-019 meldt dat
+  gat per put (20.758 ruw, ~19.651 in de CSV na de `Pompunit`-onderdrukking; issue #133).
 - **EXT-009** kijkt niet naar GWSW-objecten maar naar NWB-wegvakken: van de **9787**
   wegvakken zijn er **4116** kandidaat (412 niet-gemeentelijk, 2211 pad/parkeren, 1661
   korter dan 25 m, 1387 buiten de bebouwde kom vallen af). `examined` telt dus 4116 en niet

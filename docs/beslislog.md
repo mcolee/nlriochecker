@@ -4936,3 +4936,44 @@ meetscript is `scripts/meet_issue130.py` (BO-43). De volle De Wolden/Hoogeveen-d
 niet in de clone; het effect daar is niet lokaal te meten.
 
 Zie [#130](https://github.com/mcolee/nlriochecker/issues/130), BO-51, BO-72 en BO-83.
+
+### BO-90 Ontbrekende putdiepte is een waarschuwing per put (ATTR-019), op alle putten
+
+**Wat.** Nieuwe check ATTR-019 "Putdiepte ontbreekt" (issue #133): meldt elke put zonder
+putdiepte `HoogtePut` (`rollen = ("putten",)`, `kenmerken = ("HoogtePut",)`). Het GWSW kent
+geen kenmerk `Putbodemniveau`; de putbodem is afgeleid uit putdekselniveau min `HoogtePut` (een
+aspect van `gwsw:Put`, in mm). Ontbreekt `HoogtePut`, dan slaan HGT-004, HGT-012, HGT-015 en
+HGT-016 de put over en zeggen dat alleen in hun toelichting; de put bleef daardoor op de kaart
+groen, en groen betekent daar "beoordeeld en niets gevonden". ATTR-019 is de tegenhanger van
+ATTR-018 (begindatum ontbreekt, BO-45) voor de putdiepte: per object, zodat het gat op de kaart
+komt. De check leest hetzelfde getal als HGT-012 (`node.number("HoogtePut")`), zodat "ontbreekt"
+hier hetzelfde betekent als "kon niet toetsen" daar.
+
+**Twee keuzes (met de auteur afgestemd, 2026-09-04).** (1) **Waarschuwing en geen fout** (anders
+dan ATTR-018, dat F is): de putdiepte is een afgeleide die vier hoogtechecks blokkeert maar op
+zichzelf geen registratiefout bewijst, en de SHACL-nulmeting eist `HoogtePut` in geen enkele CFK
+(Hyd, MdsPlan, MdsProj; geen sentinel in `data/dekking.toml`). (2) **Alle putten** (`selectie.putten`,
+`gwsw:Put` en subklassen), niet alleen `rioolputten`: `HoogtePut` staat in de ontologie-index als
+aspect van `Put`, dus `test_declaratie_past_bij_de_ontologie` haalt de brede rol. Alleen het
+*ontbreken* telt -- een geregistreerde 0 mm leest de check als aanwezig en laat HGT-012 die op
+zijn ondergrens toetsen; ATTR-019 bouwt geen 0/sentinel-logica.
+
+**Wat het níét raakt.** De "n van de m zonder afleidbaar bodemniveau"-regels van HGT-004/012/015/016
+blijven staan (elke check meldt wat hij niet bekeek). De BrutIS-herkomst blijft buiten de code: het
+gat is in de bron tweeledig -- BrutIS schrijft de wél gevulde putdiepte (`CAH`, 10.225 knopen) niet
+als `HoogtePut` naar OroX (conversiegat), en het bodempeil (`CAD`) is er voor alle 23.889 knopen leeg
+-- maar de check leest alleen de OroX en draagt geen De Wolden-specifieke bronkennis. Die herkomst
+staat in `docs/brutis-exportbevindingen.md` en in het meetcomment, niet in `notes()` of `checks.toml`.
+
+**Meting** (volle run `uitvoer/04092026_issue133`, drie `--shacl`, `--projectconfig
+configs/dewoldenhoogeveen.toml`, `--bronnen data/gis_dewoldenhoogeveen`; gemeten tegen de referentie
+`uitvoer/04092026_issue135`, 141.645). ATTR-019 ziet en meldt ruw **20.758** putten (= `examined()`,
+100% systemisch); in `bevindingen.csv` blijven er **19.651** over doordat de `Pompunit`-putten
+(1.107, een `Rioolput`-subklasse) op `[rapport] onderdruk_klassen` in `configs/dewoldenhoogeveen.toml`
+wegvallen. HGT-012 blijft 20.756 bekeken / 0. Het totaal (`aantal_meldingen`) stijgt naar **161.136**
+(+19.491). De referentie is één commit ouder dan HEAD (`5d4a3db`, issue #130): TOP-019/022/023
+zakten daar van 108/224/37 naar 47/143/19 (samen −160), dus het totaalverschil is 19.651 − 160 =
+19.491. ATTR-019 is de enige check die déze wijziging toevoegt; geen andere check verschuift door
+issue #133.
+
+Zie [#133](https://github.com/mcolee/nlriochecker/issues/133), BO-45 en `docs/brutis-exportbevindingen.md`.

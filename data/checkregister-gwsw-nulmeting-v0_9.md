@@ -92,6 +92,7 @@ gebreken" leest.
 | ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De tegenhanger van ATTR-004 voor putten in plaats van leidingen, met dezelfde tolerantie (`rondheid_tolerantie_mm`); de nulmeting toetst alleen de aanwezigheid van de vorm (`Put_VormPut_card`), niet de samenhang met de afmetingen (issue #39) | F | Consistentie |
 | ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2100 tabel B2.1 (`plausibiliteit.toml`). Het GWSW-datatype is een geheel getal in mm en kan de kunststofwaarden niet uitdrukken, dus de schaal wordt uit de data afgeleid (`wandruwheid_schalen`); de nulmeting toetst de wandruwheid nergens (issue #38, BO-39) | W | Plausibiliteit |
 | ATTR-018 | Begindatum ontbreekt op een vrijvervalrioolleiding of put. ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een aanwezige datum en de nulmeting eist `Begindatum` in geen van de drie CFK-rapporten; zonder aanlegjaar is er geen vervangingsplanning, geen levensduur en geen ATTR-003. Mechanisch riool valt buiten de populatie en wordt in de toelichting geteld (issue #61) | F | Compleetheid |
+| ATTR-019 | Putdiepte (`HoogtePut`) ontbreekt op een put. Het GWSW kent geen `Putbodemniveau`; de putbodem volgt uit putdekselniveau min `HoogtePut`, en zonder die diepte slaan HGT-004/012/015/016 de put over zonder dat het in de uitvoer per object staat. De tegenhanger van ATTR-018 voor de putdiepte; waarschuwing (geen fout), want de diepte is een afgeleide die geen registratiefout bewijst en de nulmeting eist haar nergens. Alleen het ontbreken telt: een geregistreerde 0 mm geldt als aanwezig en blijft aan HGT-012 (issue #133) | W | Compleetheid |
 
 ## HGT: Hoogten en verhang
 
@@ -310,6 +311,21 @@ elke check draagt hier precies één ernst. Tegelijk herstelt de lader de fantoo
 de BrutIS-export (`<hulpstuk>_put`) en meldt dat als datasetsignaal; zonder dat herstel zag
 de engine bij alle 1054 T-stukken van De Wolden en Hoogeveen nul leidingen. Zie
 [#60](https://github.com/mcolee/nlriochecker/issues/60) en BO-46.
+
+Versie 0.9, addendum (2026-09-04): ATTR-019 toegevoegd (W, Compleetheid): een put zonder
+putdiepte `HoogtePut`. Het GWSW kent geen kenmerk `Putbodemniveau`; de putbodem is afgeleid
+uit putdekselniveau min `HoogtePut`, en zonder die diepte slaan HGT-004, HGT-012, HGT-015 en
+HGT-016 de put over -- tot nu toe alleen zichtbaar in hun toelichting, waardoor de put op de
+kaart groen bleef. De tegenhanger van ATTR-018 voor de putdiepte, per object zodat het gat op
+de kaart komt. Waarschuwing en geen fout: de putdiepte is een afgeleide die geen
+registratiefout bewijst en de nulmeting eist haar in geen enkele CFK; alleen het ontbreken
+telt, een geregistreerde 0 mm geldt als aanwezig en blijft aan HGT-012. Op De Wolden en
+Hoogeveen draagt geen enkele put een `HoogtePut`, zodat hij alle 20.758 putten meldt --
+systemisch boven de rapportdrempel. Het gat is in de bron tweeledig (BrutIS schrijft de wél
+gevulde putdiepte `CAH` niet als `HoogtePut` naar OroX, en het bodempeil is er voor alle
+knopen leeg); die herkomst hoort in `docs/brutis-exportbevindingen.md` en niet in de check,
+die alleen de OroX leest. Zie
+[#133](https://github.com/mcolee/nlriochecker/issues/133) en BO-90.
 
 Versie 0.9, addendum (2026-08-24): ATTR-018 toegevoegd (F, Compleetheid): een
 vrijvervalrioolleiding of put zonder `Begindatum`. Tot nu toe kreeg zo'n object nergens een

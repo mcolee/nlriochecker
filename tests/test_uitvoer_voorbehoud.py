@@ -188,8 +188,9 @@ def test_zonder_klassenhierarchie_is_er_geen_vinkje_in_de_samenvatting(
     assert regel.startswith(f"| {NIET_GEMETEN} |")
     assert "geen klassenhierarchie" in regel and "onvolledige selectie" in regel
     # Vier fouten meer dan voorheen: ATTR-018 meldt de streng en de drie putten van deze
-    # fixture, die geen van alle een begindatum dragen (issue #61).
-    assert "11 fouten en 0 waarschuwingen" in regel, regel
+    # fixture, die geen van alle een begindatum dragen (issue #61). De drie waarschuwingen
+    # zijn ATTR-019: geen van de drie putten draagt een `HoogtePut` (issue #133).
+    assert "11 fouten en 3 waarschuwingen" in regel, regel
     assert VINKJE not in "\n".join(tabel), tabel
 
 
