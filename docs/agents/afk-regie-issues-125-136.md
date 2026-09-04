@@ -36,20 +36,23 @@ uitslag (#133: +20.758, #129: +24). Dat maakt de meting per issue de bewijslast.
    neem altijd `grep -n '^### BO-' docs/beslislog.md | tail -1` + 1 op het moment van
    schrijven, nooit een nummer uit een issue (#130 noemde ooit "BO-89"; dat is een
    voorspelling, geen reservering).
-6. Native GitHub-dependencies staan op #125 (← #135) en #129 (← #131). De frontier-query uit
-   `issue-tracker.md` slaat een geblokkeerd issue vanzelf over; de volgorde hieronder
-   respecteert ze al.
+6. Native GitHub-dependencies staan op #135 (← `mcolee/gwsw-orox-helpers#39`), #125
+   (← #135 en helper#39) en #129 (← #131). De frontier-query uit `issue-tracker.md` slaat
+   een geblokkeerd issue vanzelf over; de volgorde hieronder respecteert ze al. **Is
+   helper#39 nog open of nog niet uitgebracht bij de start, dan begin je bij #130 en laat je
+   #135 en #125 liggen** — de rest van de reeks leunt er niet op. Een helper-release is
+   handwerk van de auteur; vraag er niet om, meld het in het slotrapport.
 
 ## Volgorde — strikt sequentieel
 
 | # | Issue | Blocked by | Model | Review | Poort-bijzonderheid |
 |---|---|---|---|---|---|
-| 1 | **#135** leeslaag naar `gwsw-orox-helpers` v0.2.1 | — | Sonnet | `/code-review medium` | geen `src/**.py`; **`pytest -m zwaar` verplicht** (de leeslaag zelf verandert) + volle run = 147.706 |
+| 1 | **#135** leeslaag naar de `gwsw-orox-helpers`-release met #39 (≥ v0.2.1) | helper#39 | Sonnet | `/code-review medium` | geen `src/**.py`; **`pytest -m zwaar` verplicht** (de leeslaag zelf verandert) + volle run = 147.706 |
 | 2 | **#130** TOP-019/022/023: zuiver-mechanische hulpstukken buiten scope | — | Opus 4.8 | **Substantieel** | `checks/` + `rollen`-declaratie; fixtures via `scripts/maak_ttl_fixtures.py`; meting op Koekangerveld |
 | 3 | **#133** ATTR-019 putdiepte ontbreekt | — | Opus 4.8 | **Substantieel** | nieuwe check; `runnerpoort.py` (datatest erbij); dekkingsmatrix regenereren |
 | 4 | **#134** nulmeting-kopblok: `max_meldingen`, `lokale_eisen` als voorbehoud | — | Opus 4.8 | **Substantieel** | meldingenstroom + JSON (additief, `SCHEMA_VERSIE` blijft 1.2) |
 | 5 | **#132** geaccepteerde bevindingen (uitzonderingen) | — | Opus 4.8 | **Altijd-Substantieel** | `[rapport] uitzonderingen`, vijfde `status`-waarde, `gwsw_run`-kolommen, JSON-blok; QGIS-stijl |
-| 6 | **#125** GWSW 1.7-support | #135 | Opus 4.8 | **Substantieel** | 1.7-fixtureset, versie-bewuste drifttests, rapportkop; **géén** `gh issue create` (#136 bestaat al) |
+| 6 | **#125** GWSW 1.7-support | #135, helper#39 | Opus 4.8 | **Substantieel** | 1.7-fixtureset, versie-bewuste drifttests, rapportkop; **géén** `gh issue create` (#136 bestaat al) |
 | 7 | **#131** stelselboom-leeslaag: `stelsels_van`, rol `stelsels` | — | Opus 4.8 | **Substantieel** | aansluiting op de leeslaag; alleen publieke helper-API (`stelsel_leden`, `subjects_of_class`) |
 | 8 | **#129** VGS-voorwaarde NET-006 | #131 | Opus 4.8 | **Substantieel** | `checks/` + koppelmatrix in twee configs; declaratie NET-006 |
 
@@ -94,10 +97,11 @@ nieuwe waarheid.
   `waarde`, geen tolerantie. Status `geaccepteerd` krijgt een eigen grijstint, onderscheiden
   van `grijs`; kies hem in de stijlmodule en leg de keuze in de comment vast. Lijsten in het
   rapport volledig, niet afgekapt. `SCHEMA_VERSIE` blijft 1.2 (additief).
-- **#125.** Geen monkeypatch of omweg naar helper-internals; is `gwsw_basis` niet via de
-  publieke `GwswDataset`-API bereikbaar, dan is dát de bevinding (comment, issue open laten
-  voor een helper-verzoek) — niet eromheen bouwen. Taak 6 verwijst naar #136; er wordt
-  **geen** issue aangemaakt.
+- **#125.** De versie in de rapportkop komt uit de publieke property
+  `GwswDataset.gwsw_versie` (`basis`, `versie`, `gedetecteerd`) die helper#39 levert; `_basis`
+  en `graph.gwsw_basis` zijn verboden terrein (harde techniekregel). Ontbreekt de property
+  in de gepinde release, dan is dát de bevinding: comment, issue open laten, niet eromheen
+  bouwen. Taak 6 verwijst naar #136; er wordt **geen** issue aangemaakt.
 - **#131.** Geen consumer. Tuple, geen `str | None`: een streng kan in een `Rioolstelsel` én
   het omvattende `Transportstelsel` zitten. Cache-voorvoegsel registreren in `base.py`.
 - **#129.** Pas na #131 (native dependency). VGS = alleen expliciete

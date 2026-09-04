@@ -132,12 +132,12 @@ uit`.
 
 | # | Issue | Blocked by | Waarom hier |
 |---|-------|------------|-------------|
-| 31 | #135 | — | leeslaag naar helper v0.2.1; elke latere meting draait op de nieuwe leeslaag |
+| 31 | #135 | helper#39 | leeslaag naar de helper-release met `gwsw_versie`; elke latere meting draait op de nieuwe leeslaag |
 | 32 | #130 | — | drukriool-ruis op TOP-019/022/023; klein en volledig gespecificeerd |
 | 33 | #133 | — | ATTR-019 putdiepte ontbreekt; +20.758, de grootste verschuiving |
 | 34 | #134 | — | nulmeting-kopblok als voorbehoud; eerste contractraker (JSON additief) |
 | 35 | #132 | — | uitzonderingen; zwaarste contractraker (config, status, JSON, `gwsw_run`) |
-| 36 | #125 | #135 | GWSW 1.7-support op de nieuwe helper-API |
+| 36 | #125 | #135, helper#39 | GWSW 1.7-support op de nieuwe helper-API |
 | 37 | #131 | — | stelselboom-leeslaag; geen consumer, geen verschuiving |
 | 38 | #129 | #131 | VGS-voorwaarde NET-006; +24 |
 
