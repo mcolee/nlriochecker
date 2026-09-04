@@ -53,6 +53,31 @@ def test_eigen_eisenlijst(mini_hyd_shacl: Path) -> None:
     assert meting.cfks == ["Hyd"]
 
 
+def test_nulmeting_voegt_de_kopblokvelden_samen(shacl_drieluik: list[Path]) -> None:
+    """Dragen alle CFK-rapporten dezelfde waarde, dan is dat de samengevoegde waarde."""
+    meting = laad_nulmeting(shacl_drieluik, VEREIST)
+
+    assert meting.max_meldingen == "onbeperkt"
+    assert meting.lokale_eisen == "geen"
+
+
+def test_nulmeting_noemt_alle_afwijkende_waarden_per_cfk(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Bij ongelijke waarden worden ze alle per CFK genoemd, niet stilzwijgend de eerste."""
+    afwijkend = tmp_path / "hyd_limiet.csv"
+    afwijkend.write_text(
+        shacl_drieluik[0]
+        .read_text(encoding="utf-8")
+        .replace("Maximaal aantal meldingen;onbeperkt", "Maximaal aantal meldingen;1000"),
+        encoding="utf-8",
+    )
+    meting = laad_nulmeting([afwijkend, shacl_drieluik[1], shacl_drieluik[2]], VEREIST)
+
+    assert meting.max_meldingen == "Hyd: 1000, MdsPlan: onbeperkt, MdsProj: onbeperkt"
+    assert meting.lokale_eisen == "geen"
+
+
 def test_meetbereik_op_de_volle_set_is_volledig() -> None:
     """Alle klassen gekozen betekent volledig en niets ontbrekend."""
     bereik = Meetbereik.van(VEREIST, VEREIST)

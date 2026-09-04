@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Voorbehoud bij een afgekapte of niet-zuivere nulmeting** (issue #134): twee tot nu toe
+  ongelezen kopblokvelden van het SHACL-rapport worden gelezen en samengevoegd over de
+  CFK-rapporten (`ShaclReport`/`Nulmeting.max_meldingen`, `.lokale_eisen`). Wijkt "Maximaal
+  aantal meldingen" af van `onbeperkt` (de GWSW-server kan de meldingtabel hebben afgekapt,
+  waardoor de toets een ondergrens telt) of "Lokale kwaliteitseisen uit bestand" van `geen`
+  (er zijn niet-GWSW-vormen bijgemeten), dan draagt de run een extra alinea in de bestaande
+  markering (`uitvoer/voorbehoud.py`), zichtbaar in Markdown, in `gwsw_run.markering` en in
+  het JSON-veld `markering` -- niet in de CSV. Additief: `SCHEMA_VERSIE` blijft 1.2 en een
+  run zonder afwijking blijft byte-voor-byte gelijk (beide voorbeeldrapporten dragen
+  `onbeperkt` en `geen`).
 - **ATTR-019 "Putdiepte ontbreekt"** (W, Compleetheid; issue #133): meldt elke put zonder
   putdiepte `HoogtePut`. Het GWSW kent geen `Putbodemniveau`; de putbodem volgt uit
   putdekselniveau min `HoogtePut`, en zonder die diepte slaan HGT-004/012/015/016 de put over

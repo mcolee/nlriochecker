@@ -217,9 +217,15 @@ def voer_toets_uit(
     dataset = markeer_vulwaarden(
         dataset, config.vulwaarden.hoogte_kenmerken, config.vulwaarden.hoogte_band_m
     )
-    onbetrouwbaar, poort_toegepast, meetbereik, nulbevindingen, niet_beoordeeld = _nulmeting(
-        opdracht, config, dataset, voortgang
-    )
+    (
+        onbetrouwbaar,
+        poort_toegepast,
+        meetbereik,
+        max_meldingen,
+        lokale_eisen,
+        nulbevindingen,
+        niet_beoordeeld,
+    ) = _nulmeting(opdracht, config, dataset, voortgang)
 
     try:
         runs = toets_gebieden(
@@ -232,6 +238,8 @@ def voer_toets_uit(
             check_ids=list(opdracht.check_ids) or None,
             typing_gate_applied=poort_toegepast,
             meetbereik=meetbereik,
+            max_meldingen=max_meldingen,
+            lokale_eisen=lokale_eisen,
             nulbevindingen=nulbevindingen,
             niet_beoordeelde_klassen=niet_beoordeeld,
             voortgang=voortgang,
@@ -335,7 +343,7 @@ def _nulmeting(
     config: CheckConfig,
     dataset: GwswDataset,
     voortgang: Voortgang,
-) -> tuple[frozenset[str], bool, Meetbereik, tuple[Nulbevinding, ...], tuple[str, ...]]:
+) -> tuple[frozenset[str], bool, Meetbereik, str, str, tuple[Nulbevinding, ...], tuple[str, ...]]:
     """Leest de nulmeting: de poort, de overtredingen en de niet-beoordeelde klassen.
 
     De typeringspoort levert de te globaal getypeerde objecten. De SHACL-meting
@@ -359,7 +367,7 @@ def _nulmeting(
     volledig = config.nulmeting.vereiste_cfk
     gekozen = kies_cfk(opdracht.cfk, volledig)
     if not opdracht.shacl:
-        return frozenset(), False, Meetbereik.niet_gemeten(volledig), (), ()
+        return frozenset(), False, Meetbereik.niet_gemeten(volledig), "", "", (), ()
 
     nulmeting = laad_nulmeting(list(opdracht.shacl), gekozen, volledig, voortgang=voortgang)
     analyse = analyze(nulmeting, dataset)
@@ -376,6 +384,8 @@ def _nulmeting(
         onbetrouwbaar,
         True,
         nulmeting.meetbereik,
+        nulmeting.max_meldingen,
+        nulmeting.lokale_eisen,
         tuple(bevindingen),
         tuple(sorted(niet_beoordeeld)),
     )

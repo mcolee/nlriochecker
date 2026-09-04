@@ -129,7 +129,10 @@ conformiteitsklassen gemeten is die de projectconfiguratie eist.
 Een voorbehoud raakt de hele run en niet een melding: de meting liep over een deelset
 conformiteitsklassen (`--cfk`), of de dataset draagt geen klassenhierarchie
 (`--geen-ontologie`) en dan heeft de check-engine over een onvolledige selectie
-gedraaid. Er kunnen er twee tegelijk gelden; `markering` draagt ze dan allebei.
+gedraaid, of het nulmeting-kopblok noemt een meldingenlimiet (de GWSW-server kan de
+meldingtabel hebben afgekapt) of een bestand met lokale kwaliteitseisen (er zijn
+niet-GWSW-vormen bijgemeten). Er kunnen er meer tegelijk gelden; `markering` draagt ze
+dan allemaal, elk als eigen alinea.
 
 Het veld is redundant voor een afnemer die `cfk_set` en `volledig` al leest -- het is
 dezelfde uitspraak, in een zin. Het staat er voor de tweede oorzaak, die niet uit de

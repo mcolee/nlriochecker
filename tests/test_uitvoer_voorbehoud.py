@@ -32,6 +32,8 @@ from nlriochecker.uitvoer.samenvatting import NIET_GEMETEN, REGEL_EIGEN_CHECKS, 
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 from nlriochecker.uitvoer.voorbehoud import (
     GEEN_KLASSENHIERARCHIE,
+    LOKALE_EISEN,
+    MELDINGENLIMIET,
     markering,
     markering_van,
     voorbehouden,
@@ -139,6 +141,82 @@ def test_twee_voorbehouden_komen_allebei_in_de_kop(toets: CheckRun, tmp_path: Pa
     assert markdown.index(GEEN_KLASSENHIERARCHIE) < markdown.index("## ")
     csv = uitvoer.csv.read_text(encoding="utf-8")
     assert "Onvolledige meting" not in csv and "Geen klassenhierarchie" not in csv
+
+
+def test_neutrale_kopblokvelden_geven_geen_voorbehoud(toets: CheckRun) -> None:
+    """`onbeperkt` en `geen` zijn de neutrale waarden; ze horen niets voor te behouden."""
+    run = replace(
+        toets,
+        meetbereik=Meetbereik.van(VEREIST, VEREIST),
+        max_meldingen="onbeperkt",
+        lokale_eisen="geen",
+    )
+
+    assert voorbehouden(run) == []
+
+
+def test_meldingenlimiet_wordt_een_voorbehoud(toets: CheckRun) -> None:
+    """Een limiet op het aantal meldingen kapt de meldingtabel af; dat hoort in de kop."""
+    run = replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST), max_meldingen="1000")
+
+    regels = voorbehouden(run)
+
+    assert len(regels) == 1
+    assert regels[0].startswith("**Meldingenlimiet:**")
+    assert "1000" in regels[0]
+
+
+def test_lokale_eisen_wordt_een_voorbehoud(toets: CheckRun) -> None:
+    """Lokale kwaliteitseisen voegen niet-GWSW-vormen toe; dat hoort in de kop."""
+    run = replace(
+        toets,
+        meetbereik=Meetbereik.van(VEREIST, VEREIST),
+        lokale_eisen="dewolden_eisen.ttl",
+    )
+
+    regels = voorbehouden(run)
+
+    assert len(regels) == 1
+    assert regels[0].startswith("**Lokale kwaliteitseisen:**")
+    assert "dewolden_eisen.ttl" in regels[0]
+
+
+def test_beide_kopblokvoorbehouden_bereiken_de_drie_views_niet_de_csv(
+    toets: CheckRun, tmp_path: Path
+) -> None:
+    """Limiet én lokale eisen worden twee alinea's in Markdown, gwsw_run en JSON; niet in de CSV."""
+    run = replace(
+        toets,
+        meetbereik=Meetbereik.van(VEREIST, VEREIST),
+        max_meldingen="1000",
+        lokale_eisen="dewolden_eisen.ttl",
+    )
+
+    assert len(voorbehouden(run)) == 2
+
+    uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM)
+
+    assert uitvoer.json is not None and uitvoer.geopackage is not None
+    markdown = uitvoer.markdown.read_text(encoding="utf-8")
+    document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
+    verbinding = sqlite3.connect(f"file:{uitvoer.geopackage}?mode=ro", uri=True)
+    try:
+        ((uit_gpkg,),) = verbinding.execute("select markering from gwsw_run")
+    finally:
+        verbinding.close()
+
+    for kop in ("**Meldingenlimiet:**", "**Lokale kwaliteitseisen:**"):
+        assert kop in markdown
+        assert kop in document["markering"]
+        assert kop in uit_gpkg
+    csv = uitvoer.csv.read_text(encoding="utf-8")
+    assert "Meldingenlimiet" not in csv and "Lokale kwaliteitseisen" not in csv
+
+
+def test_de_kopblokvoorbehoudteksten_bestaan_los() -> None:
+    """De twee teksten zijn benoembare constanten, net als GEEN_KLASSENHIERARCHIE."""
+    assert MELDINGENLIMIET.startswith("**Meldingenlimiet:**")
+    assert LOKALE_EISEN.startswith("**Lokale kwaliteitseisen:**")
 
 
 def test_een_voorbehoud_alleen_verdringt_het_andere_niet(toets: CheckRun) -> None:

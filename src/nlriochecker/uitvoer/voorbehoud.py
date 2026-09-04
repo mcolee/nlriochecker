@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from nlriochecker.checks import CheckRun
 from nlriochecker.meting import Meetbereik
+from nlriochecker.shaclrapport import LOKALE_EISEN_GEEN, MELDINGEN_ONBEPERKT
 
 # De tekst spreekt de lezer van het rapport aan, niet de ontwikkelaar: geen
 # functienamen, wel GWSW-klassen die hij in QGIS terugvindt. Twee dingen staan er
@@ -51,12 +52,41 @@ GEEN_KLASSENHIERARCHIE = (
 )
 
 
+# De meting is met een maximum aan het aantal meldingen gedraaid: boven dat maximum
+# kapt de GWSW-server de meldingtabel af, en dan telt deze toets minder overtredingen uit
+# de nulmeting dan er in de dataset staan. `{waarde}` is de gemeten limiet, of bij
+# ongelijke CFK-rapporten de per-CFK-opsomming uit `Nulmeting.max_meldingen`.
+MELDINGENLIMIET = (
+    "**Meldingenlimiet:** de SHACL-meting is met een maximum aan het aantal meldingen "
+    "gedraaid ({waarde}); zonder limiet staat hier `onbeperkt`. Boven dat maximum kapt "
+    "de GWSW-server de meldingtabel af, en dan telt deze toets minder overtredingen uit "
+    "de nulmeting dan er in de dataset zitten. Wat hier over de nulmeting gerapporteerd "
+    "wordt is daarmee een ondergrens; laat de meting zonder limiet opnieuw draaien om "
+    "zeker te weten dat u alles ziet."
+)
+
+# De meting is tegen een bestand met lokale kwaliteitseisen gedraaid: die voegen vormen
+# toe die niet uit het GWSW komen, terwijl dit rapport de uitkomst als GWSW-nulmeting
+# presenteert. `{waarde}` is de eisenverwijzing zoals de bron hem noemt.
+LOKALE_EISEN = (
+    "**Lokale kwaliteitseisen:** de SHACL-meting is tegen een bestand met lokale "
+    "kwaliteitseisen gedraaid ({waarde}); zonder zo'n bestand staat hier `geen`. Die "
+    "eisen voegen vormen toe die niet uit het GWSW komen, terwijl dit rapport de "
+    "uitkomst als GWSW-nulmeting presenteert. Een overtreding kan daardoor op een lokale "
+    "eis slaan in plaats van op een GWSW-regel; leg het eisenbestand naast dit rapport "
+    "om ze te duiden."
+)
+
+
 def voorbehouden(run: CheckRun) -> list[str]:
     """De runbrede voorbehouden van deze run, in volgorde van zwaarte.
 
     De klassenhierarchie staat voorop: ontbreekt zij, dan draagt geen enkele uitkomst
     van deze run een oordeel, en doet de vraag tegen welke conformiteitsklassen er
-    gemeten is er nauwelijks meer toe.
+    gemeten is er nauwelijks meer toe. Daaronder de nulmeting-kopblokvelden: een limiet
+    op het aantal meldingen (de tabel kan afgekapt zijn) en lokale kwaliteitseisen (er
+    zijn niet-GWSW-vormen bijgemeten). Ze verschijnen alleen als ze van hun neutrale
+    waarde afwijken.
     """
     gevonden = []
     if not run.dataset.klassenhierarchie_bekend:
@@ -64,6 +94,10 @@ def voorbehouden(run: CheckRun) -> list[str]:
     bereik = run.meetbereik.markering()
     if bereik:
         gevonden.append(bereik)
+    if run.max_meldingen and run.max_meldingen != MELDINGEN_ONBEPERKT:
+        gevonden.append(MELDINGENLIMIET.format(waarde=run.max_meldingen))
+    if run.lokale_eisen and run.lokale_eisen != LOKALE_EISEN_GEEN:
+        gevonden.append(LOKALE_EISEN.format(waarde=run.lokale_eisen))
     return gevonden
 
 

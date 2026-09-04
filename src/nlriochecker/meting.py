@@ -140,6 +140,30 @@ class Nulmeting:
         """Het rapport van een conformiteitsklasse."""
         return self.reports[cfk]
 
+    @property
+    def max_meldingen(self) -> str:
+        """De meldingenlimiet, samengevoegd over de CFK-rapporten van deze run."""
+        return self._samengevoegd("max_meldingen")
+
+    @property
+    def lokale_eisen(self) -> str:
+        """De lokale-eisenverwijzing, samengevoegd over de CFK-rapporten van deze run."""
+        return self._samengevoegd("lokale_eisen")
+
+    def _samengevoegd(self, veld: str) -> str:
+        """Voegt een kopblokveld over de CFK-rapporten samen.
+
+        Dragen alle rapporten dezelfde waarde -- het normale geval -- dan is dat de
+        samengevoegde waarde. Wijken ze onderling af, dan worden ze alle per CFK
+        genoemd (`Hyd: 1000, MdsPlan: onbeperkt`), net als `Meetbereik.markering()` bij
+        een deelset alle klassen noemt; stilzwijgend de eerste nemen zou een afwijkende
+        limiet in een andere klasse verbergen.
+        """
+        waarden = {cfk: getattr(self.reports[cfk], veld) for cfk in self.cfks}
+        if len(set(waarden.values())) == 1:
+            return next(iter(waarden.values()))
+        return ", ".join(f"{cfk}: {waarden[cfk]}" for cfk in self.cfks)
+
 
 def laad_nulmeting(
     paden: list[Path],

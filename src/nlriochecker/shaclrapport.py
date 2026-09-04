@@ -33,6 +33,15 @@ SLEUTEL_PROCESSOR = "Gebruikte SHACL-processor"
 SLEUTEL_ONDERDELEN = "Gevalideerd op onderdelen"
 SLEUTEL_NIET = "Niet gevalideerd op"
 SLEUTEL_CONFORMS = "Rapport 'conforms'"
+SLEUTEL_MAX_MELDINGEN = "Maximaal aantal meldingen"
+SLEUTEL_LOKALE_EISEN = "Lokale kwaliteitseisen uit bestand"
+
+# De neutrale waarden die de GWSW-server schrijft als er geen limiet en geen lokale
+# eisen golden. Wijkt een rapport hiervan af, dan draagt de run een voorbehoud
+# (`uitvoer/voorbehoud.py`); deze twee constanten zijn de enige plek waar die
+# neutrale waarde staat.
+MELDINGEN_ONBEPERKT = "onbeperkt"
+LOKALE_EISEN_GEEN = "geen"
 
 VORM_TE_GLOBAAL = "CfkTypes_typ"
 
@@ -51,6 +60,13 @@ class ShaclReport:
     conforms: bool
     validated_parts: list[str]
     not_validated: str
+    # De twee kopblokvelden die zeggen of de meting compleet en zuiver GWSW is. Ze
+    # worden als tekst bewaard zoals de bron ze levert (`onbeperkt`/`geen` als er niets
+    # aan de hand is): een limiet is een serverinstelling, geen telling waarop gerekend
+    # wordt. Een run leest ze over de CFK-rapporten heen samengevoegd (`meting.py`) en
+    # maakt er een voorbehoud van (`uitvoer/voorbehoud.py`).
+    max_meldingen: str
+    lokale_eisen: str
     source_file: Path
     findings: pd.DataFrame
 
@@ -81,6 +97,8 @@ def lees_shacl_rapport(path: Path) -> ShaclReport:
         conforms=kopblok.get(SLEUTEL_CONFORMS, "").strip().lower() == "true",
         validated_parts=_lijst(kopblok.get(SLEUTEL_ONDERDELEN, "")),
         not_validated=kopblok.get(SLEUTEL_NIET, ""),
+        max_meldingen=kopblok.get(SLEUTEL_MAX_MELDINGEN, ""),
+        lokale_eisen=kopblok.get(SLEUTEL_LOKALE_EISEN, ""),
         source_file=path,
         findings=_meldingen(path, rijen, kop_index),
     )

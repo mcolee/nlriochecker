@@ -140,7 +140,11 @@ sets, want een daling die uit een kleinere getoetste set komt is geen verbeterin
 Gelden er meer runbrede voorbehouden tegelijk -- een deelset op een run met
 `--geen-ontologie` -- dan komen ze allebei in die kop te staan; `uitvoer/voorbehoud.py`
 stelt ze samen en de kolom `markering` in `gwsw_run` en het gelijknamige veld in de
-JSON-envelop dragen dezelfde tekst.
+JSON-envelop dragen dezelfde tekst. Diezelfde `markering` verschijnt ook als het
+nulmeting-kopblok een meldingenlimiet noemt (de GWSW-server kan de meldingtabel hebben
+afgekapt, waardoor de toets een ondergrens telt) of een bestand met lokale
+kwaliteitseisen (er zijn dan vormen bijgemeten die niet uit het GWSW komen). Beide staan
+er alleen bij afwijking van de neutrale waarden `onbeperkt` en `geen`.
 
 `bevindingen.csv` draagt de markering **niet**: de CFK-set hoort bij de run en niet bij
 elke melding. Twee CSV's uit een volle en een deelrun zijn daardoor aan het bestand zelf

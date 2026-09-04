@@ -17,8 +17,10 @@ alleen het bestand waarin zij staat is verhuisd.
 ### SHACL-nulmetingrapporten (data/shacl_nulmeting/)
 - CSV met puntkomma (;) als scheidingsteken, encoding utf-8.
 - Kopblok van sleutel;waarde-paren met onder meer "SHACL-meting op basis CFK", "Gevalideerd RDF-bestand" en "Rapport 'conforms'". Daaronder de kolomkop; zoek die op de regel die met `Focus node` begint, niet op een vast regelnummer.
+- Twee kopblokvelden zeggen of de meting compleet en zuiver GWSW is en worden als tekst gelezen (`ShaclReport.max_meldingen`/`lokale_eisen`, geen `int`-parse): "Maximaal aantal meldingen" (neutraal `onbeperkt`) en "Lokale kwaliteitseisen uit bestand" (neutraal `geen`). Een run voegt ze over de CFK-rapporten samen (`Nulmeting.max_meldingen`/`lokale_eisen`; bij ongelijke waarden alle per CFK genoemd) en maakt er een voorbehoud van zodra ze van hun neutrale waarde afwijken (zie de voorbehoudregel hieronder). "SHACL-meting op basis GWSW" en "Draaitijd" worden bewust niet gelezen: onschuldig, geen actie.
 - Kolommen: Focus node;Source;Value;Severity;Message;Path;Detail-message;Detail-value
 - `Focus node` is het URI-fragment uit de dataset en joint direct op de OroX-TTL. `Source` is de naam van de geschonden SHACL-vorm (bijvoorbeeld `LengteLeiding_val`). Uit `Detail-value` zijn `type=` en `label=` te halen; die ontbreken soms, en dan blijven ze leeg.
+- Van de acht kolommen bereiken er vier geen uitvoer en dat is bewust. `Path` (op Koekangerveld op 998 van de 1.247 rijen alleen `hasAspect`) en `Detail-message` (daar op alle rijen leeg) worden niet gebruikt; uit `Detail-value` leest de parser alleen `type=` en `label=`, niet de sleutels `hasAspect=`/`hasConnection=`. Ze staan hier opgeschreven zodat "ongebruikt" een keuze is en geen vergeten kolom; komt er een check die er een nodig heeft, dan is dit de plek die zegt dat hij nog braak lag.
 - Een regel per overtreding; er is geen aggregatiegewicht.
 
 ### OroX-dataset (data/gwsw_orox_ttl/)
@@ -187,7 +189,14 @@ alleen het bestand waarin zij staat is verhuisd.
   `meetbereik.markering()` rechtstreeks aan, dan verdwijnt het andere voorbehoud
   stilzwijgend. Markdown, de kolom `markering` in `gwsw_run` en het optionele veld
   `markering` in de JSON-envelop dragen dezelfde samengestelde tekst; de CSV bewust
-  geen enkel voorbehoud.
+  geen enkel voorbehoud. `voorbehouden()` kent naast de klassenhierarchie en het
+  meetbereik nog twee bronnen uit het nulmeting-kopblok (`MELDINGENLIMIET`,
+  `LOKALE_EISEN`): wijkt `run.max_meldingen` af van `onbeperkt`, dan kan de GWSW-server
+  de meldingtabel hebben afgekapt en telt de toets een ondergrens; wijkt
+  `run.lokale_eisen` af van `geen`, dan zijn er niet-GWSW-vormen bijgemeten. Ze
+  verschijnen alleen bij afwijking, dus een gewone run blijft byte-voor-byte gelijk, en
+  ze passen additief in het bestaande `markering`-veld -- `SCHEMA_VERSIE` blijft 1.2. Zie
+  issue #134.
 - Rapportage-output: Markdown, CSV, een GeoPackage en JSON naar een output-map; nooit
   invoerbestanden overschrijven. Alle vier komen uit dezelfde meldingenstroom
   (`uitvoer/melding.py`); een schrijver die zelf een `Finding` interpreteert laat ze uit

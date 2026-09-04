@@ -353,6 +353,13 @@ class CheckRun:
     # verschillende dingen over -- Markdown zweeg terwijl de JSON `volledig: false`
     # beweerde.
     meetbereik: Meetbereik = field(default_factory=lambda: Meetbereik.niet_gemeten(()))
+    # De twee kopblokvelden van de nulmeting, samengevoegd over de CFK-rapporten van de
+    # run (`Nulmeting.max_meldingen`/`lokale_eisen`). De uitvoerlaag maakt er een
+    # voorbehoud van als ze van hun neutrale waarde afwijken (`uitvoer/voorbehoud.py`),
+    # net als bij `meetbereik`. Leeg zonder nulmeting -- dan is er niets aan de hand en
+    # zwijgt het voorbehoud; het meegeven is minder broos dan de rapporten doorreiken.
+    max_meldingen: str = ""
+    lokale_eisen: str = ""
     # De overtredingen uit de SHACL-nulmeting, herleid tot objecten uit deze dataset.
     # Ze zijn geen `CheckOutcome`: de nulmeting is een tweede bron naast het register,
     # geen zeventigtal extra checks. `uitvoer.melding.bouw_meldingen` maakt er

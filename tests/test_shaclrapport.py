@@ -62,6 +62,31 @@ def test_te_globale_klassen_per_cfk(bestand: str, klassen: list[str]) -> None:
     assert rapport.too_generic_classes == klassen
 
 
+def test_max_meldingen_en_lokale_eisen_neutraal(mini_hyd_shacl: Path) -> None:
+    """De voorbeeldrapporten dragen de neutrale waarden `onbeperkt` en `geen`."""
+    rapport = lees_shacl_rapport(mini_hyd_shacl)
+
+    assert rapport.max_meldingen == "onbeperkt"
+    assert rapport.lokale_eisen == "geen"
+
+
+def test_max_meldingen_en_lokale_eisen_als_tekst(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Beide velden worden als tekst gelezen zoals de bron ze levert, geen `int`-parse."""
+    tekst = mini_hyd_shacl.read_text(encoding="utf-8")
+    tekst = tekst.replace("Maximaal aantal meldingen;onbeperkt", "Maximaal aantal meldingen;1000")
+    tekst = tekst.replace(
+        "Lokale kwaliteitseisen uit bestand;geen",
+        "Lokale kwaliteitseisen uit bestand;dewolden_eisen.ttl",
+    )
+    stuk = tmp_path / "met_limiet.csv"
+    stuk.write_text(tekst, encoding="utf-8")
+
+    rapport = lees_shacl_rapport(stuk)
+
+    assert rapport.max_meldingen == "1000"
+    assert rapport.lokale_eisen == "dewolden_eisen.ttl"
+
+
 def test_ontbrekende_kolomkop(tmp_path: Path) -> None:
     stuk = tmp_path / "stuk.csv"
     stuk.write_text("Rapport SHACL-meting dd;2026-01-01T00:00:00\n", encoding="utf-8")
