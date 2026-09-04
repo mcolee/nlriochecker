@@ -14,9 +14,11 @@ achtergrond -- de koude load kost circa een halve minuut.
 
     uv run python scripts/meet_stelsels.py
 
-Gemeten op repo-commit 35567566 (dev), dataset
-`data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl`. Bewaard onder BO-43: een getal dat een
-issue onderbouwt hoort in een script met de commit-hash erbij, niet in een losse heredoc.
+Gemeten op codestand `2af6927` (dev) -- de commit die zowel `selectie.stelsels` als
+`CheckContext.stelsels_van` als dit script draagt; op een eerdere stand bestaan die twee
+nog niet en crasht het script. Dataset `data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl`.
+Bewaard onder BO-43: een getal dat een issue onderbouwt hoort in een script met de
+commit-hash erbij, niet in een losse heredoc.
 """
 
 from __future__ import annotations
