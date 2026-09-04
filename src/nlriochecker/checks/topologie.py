@@ -22,7 +22,7 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.hulpstukken import _hulpstuktelling
+from nlriochecker.checks.hulpstukken import _hulpstuktelling, zuiver_mechanische_knopen
 from nlriochecker.checks.meetkunde import (
     coords_van,
     duplicate_vertices_kern,
@@ -1412,7 +1412,13 @@ class PseudoKnoop(Check):
     title = "Pseudo-knoop: twee strengen gescheiden door een functieloze knoop"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
-    rollen = ("functieloze_knopen", "leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = (
+        "functieloze_knopen",
+        "leidingen",
+        "mechanischeleidingen",
+        "netwerkknopen",
+        "vrijvervalrioolleidingen",
+    )
     kenmerken = ("BreedteLeiding", "HoogteLeiding", "MateriaalLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -1427,7 +1433,12 @@ class PseudoKnoop(Check):
             return
 
         dataset = context.dataset
-        functieloos = {node.uri for node in functieloze_knopen(context)}
+        # De functieloze knopen die zuiver in het drukriool zitten vallen buiten deze toets:
+        # het mechanische riool valt buiten het checkregister (issue #130). `notes()`
+        # verantwoordt hoeveel er zo overgeslagen zijn.
+        functieloos = {
+            node.uri for node in functieloze_knopen(context)
+        } - zuiver_mechanische_knopen(context)
         if not functieloos:
             return
 
@@ -1484,7 +1495,18 @@ class PseudoKnoop(Check):
                 "vrijwel elke knik een put, en die put is een functie; zonder expliciete "
                 "lijst zou de check het hele stelsel als pseudo-knopen melden."
             ]
-        return [f"Als functieloze knoop gelden: {', '.join(klassen)}."]
+        notities = [f"Als functieloze knoop gelden: {', '.join(klassen)}."]
+        functieloos = {node.uri for node in functieloze_knopen(context)}
+        overgeslagen = len(functieloos & zuiver_mechanische_knopen(context))
+        if overgeslagen:
+            notities.append(
+                f"{getal(overgeslagen, 'functieloze knoop', 'functieloze knopen')} "
+                f"{vorm(overgeslagen, 'valt', 'vallen')} buiten deze toets: "
+                f"{vorm(overgeslagen, 'die knoop zit', 'die knopen zitten')} zuiver in het "
+                "drukriool (alleen mechanische leidingen, geen vrijvervalrioolleiding), en het "
+                "mechanische riool valt buiten het checkregister. Zie issue #130."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal knopen van de geconfigureerde functieloze klassen."""
@@ -1577,9 +1599,19 @@ class _HulpstukAansluitingen(Check):
     te_veel: bool
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Vergelijkt per hulpstuk het aantal richtingen met de GWSW-functie."""
+        """Vergelijkt per hulpstuk het aantal richtingen met de GWSW-functie.
+
+        Een hulpstuk dat zuiver in het drukriool zit (alleen mechanische leidingen, geen
+        vrijvervalrioolleiding) valt buiten deze toets: het mechanische riool valt buiten
+        het checkregister. `notes()` verantwoordt hoeveel er zo overgeslagen zijn. Zie
+        issue #130. De telling zelf (`_hulpstuktelling`) blijft de volle populatie, zodat
+        TOP-002/003 een zuiver-mechanisch T-stuk nog wel als geldig strengeinde zien.
+        """
         dataset = context.dataset
+        zuiver_mechanisch = zuiver_mechanische_knopen(context)
         for aansluiting in _hulpstuktelling(context).telbaar:
+            if aansluiting.node.uri in zuiver_mechanisch:
+                continue
             if aansluiting.richtingen == aansluiting.verwacht:
                 continue
             if (aansluiting.richtingen > aansluiting.verwacht) != self.te_veel:
@@ -1610,26 +1642,56 @@ class _HulpstukAansluitingen(Check):
             )
 
     def notes(self, context: CheckContext) -> list[str]:
-        """Verantwoordt de hulpstukken waarvan de klasse geen aantal voorschrijft."""
-        buiten = _hulpstuktelling(context).buiten_per_klasse
-        if not buiten:
-            return []
-        aantal = sum(buiten.values())
-        delen = ", ".join(f"{hoeveel} {klasse}" for klasse, hoeveel in sorted(buiten.items()))
-        # Het voorbeeld alleen als er werkelijk een afsluitstuk tussen zit; anders zou
-        # het gaan uitleggen wat er niet staat.
-        voorbeeld = (
-            " Een afsluitstuk met een leiding is precies goed." if "Afsluitstuk" in buiten else ""
+        """Verantwoordt de hulpstukken die buiten deze toets vielen.
+
+        Twee groepen, om verschillende redenen: de klasse draagt geen functie met een aantal
+        leidingen (afsluit- en ontstoppingsstukken), of het hulpstuk zit zuiver in het
+        drukriool en valt daarmee buiten het checkregister (issue #130).
+        """
+        telling = _hulpstuktelling(context)
+        zuiver_mechanisch = zuiver_mechanische_knopen(context)
+        notities: list[str] = []
+
+        buiten = telling.buiten_per_klasse
+        if buiten:
+            aantal = sum(buiten.values())
+            delen = ", ".join(f"{hoeveel} {klasse}" for klasse, hoeveel in sorted(buiten.items()))
+            # Het voorbeeld alleen als er werkelijk een afsluitstuk tussen zit; anders zou
+            # het gaan uitleggen wat er niet staat.
+            voorbeeld = (
+                " Een afsluitstuk met een leiding is precies goed."
+                if "Afsluitstuk" in buiten
+                else ""
+            )
+            notities.append(
+                f"{getal(aantal, 'hulpstuk', 'hulpstukken')} {vorm(aantal, 'valt', 'vallen')} "
+                f"buiten deze toets omdat {vorm(aantal, 'zijn', 'hun')} klasse geen functie met "
+                f"een aantal leidingen draagt ({delen}).{voorbeeld}"
+            )
+
+        mechanisch = sum(
+            1 for aansluiting in telling.telbaar if aansluiting.node.uri in zuiver_mechanisch
         )
-        return [
-            f"{getal(aantal, 'hulpstuk', 'hulpstukken')} {vorm(aantal, 'valt', 'vallen')} "
-            f"buiten deze toets omdat {vorm(aantal, 'zijn', 'hun')} klasse geen functie met "
-            f"een aantal leidingen draagt ({delen}).{voorbeeld}"
-        ]
+        if mechanisch:
+            hoeveel = getal(
+                mechanisch, "zuiver-mechanisch hulpstuk", "zuiver-mechanische hulpstukken"
+            )
+            notities.append(
+                f"{hoeveel} {vorm(mechanisch, 'valt', 'vallen')} buiten deze toets "
+                f"(drukriool): {vorm(mechanisch, 'het verbindt', 'ze verbinden')} alleen "
+                "mechanische leidingen en geen vrijvervalrioolleiding, en het mechanische riool "
+                "valt buiten het checkregister. Zie issue #130."
+            )
+        return notities
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal hulpstukken met een telbare functie."""
-        return len(_hulpstuktelling(context).telbaar)
+        """Het aantal hulpstukken met een telbare functie, zonder de zuiver-mechanische."""
+        zuiver_mechanisch = zuiver_mechanische_knopen(context)
+        return sum(
+            1
+            for aansluiting in _hulpstuktelling(context).telbaar
+            if aansluiting.node.uri not in zuiver_mechanisch
+        )
 
 
 @register
@@ -1640,7 +1702,7 @@ class HulpstukMetTeWeinigAansluitingen(_HulpstukAansluitingen):
     title = "Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("hulpstukken", "leidingen")
+    rollen = ("hulpstukken", "leidingen", "mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ()
     te_veel = False
 
@@ -1653,6 +1715,6 @@ class HulpstukMetTeVeelAansluitingen(_HulpstukAansluitingen):
     title = "Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft"
     severity = Severity.WARNING
     dimension = Dimension.CONSISTENCY
-    rollen = ("hulpstukken", "leidingen")
+    rollen = ("hulpstukken", "leidingen", "mechanischeleidingen", "vrijvervalrioolleidingen")
     kenmerken = ()
     te_veel = True

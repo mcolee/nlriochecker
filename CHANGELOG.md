@@ -202,6 +202,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **TOP-019/022/023 melden niet meer op het zuivere drukriool** (issue #130). Een T-stuk of
+  functieloze knoop die alleen mechanische leidingen verbindt en geen enkele
+  vrijvervalrioolleiding, valt nu buiten de pseudo-knoop- en hulpstukchecks: het mechanische
+  riool valt buiten het checkregister, dus die meldingen waren false positives. De gedeelde
+  helper `zuiver_mechanische_knopen` bepaalt de grens; de toelichting van elke check
+  verantwoordt hoeveel knopen zo overgeslagen zijn. Op koekangerveld daalt TOP-022 van 7 naar
+  2 en TOP-019 van 5 naar 0 (27 zuiver-mechanische hulpstukken respectievelijk functieloze
+  knopen buiten scope). `telbare_hulpstukken`, de vrijvervalgraaf en TOP-002/003 blijven
+  ongemoeid. Zie BO-89.
 - **Vier kapotte invoerpaden eindigen in een nette foutmelding in plaats van een
   traceback** (issue #119). Ze lieten een uitzondering door die de CLI niet kent: een
   GeoPackage-geometrieblob die te kort is voor zijn kop (`IndexError`) of een afgeknotte

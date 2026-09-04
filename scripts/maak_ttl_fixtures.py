@@ -2939,6 +2939,83 @@ FIXTURES["top002_streng_op_hulpstuk.ttl"] = (
 )
 
 
+# TOP-019/022/023 (issue #130): een hulpstuk of functieloze knoop die zuiver in het
+# drukriool zit valt buiten deze toetsen -- het mechanische riool valt buiten het
+# checkregister. T1 verbindt drie persleidingen en geen enkele vrijvervalrioolleiding, dus
+# het is zuiver mechanisch: TOP-022/023 tellen het niet en `examined()` is nul.
+FIXTURES["top022_zuiver_mechanisch.ttl"] = (
+    "geen; T-stuk T1 verbindt drie persleidingen en geen vrijverval, dus het valt als "
+    "zuiver-mechanisch buiten TOP-022/023 (issue #130)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1100.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2050.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + leiding("P1", "p1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T1", klasse="Persleiding")
+    + leiding("P2", "p2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "PutB", klasse="Persleiding")
+    + leiding("P3", "p3", [(1050.0, 2000.0), (1050.0, 2050.0)], "T1", "PutC", klasse="Persleiding"),
+)
+
+# TOP-022 (issue #130): het spiegelbeeld -- een T-stuk dat drie vrijvervalrioolleidingen
+# verbindt blijft gewoon in de toets (geen regressie op de vrijverval-populatie).
+FIXTURES["top022_vrijverval_schoon.ttl"] = (
+    "geen; T-stuk T1 verbindt drie vrijvervalrioolleidingen -- precies zijn functie -- en "
+    "blijft in TOP-022/023 (issue #130)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1100.0, 2000.0)
+    + put("PutC", "C", 1050.0, 2050.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T1")
+    + leiding("L2", "2", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "PutB")
+    + leiding("L3", "3", [(1050.0, 2000.0), (1050.0, 2050.0)], "T1", "PutC"),
+)
+
+# TOP-022 (issue #130): een gemengd hulpstuk (>=1 mechanisch been en >=1 vrijverval) is
+# niet zuiver mechanisch en blijft in scope. T1 verbindt een vrijvervalstreng en een
+# persleiding: twee richtingen, waar VerbindenVanDrieLeidingen er drie voorschrijft, dus
+# TOP-022 meldt. Het mechanische been telt mee in de richtingtelling.
+FIXTURES["top022_gemengd_hulpstuk.ttl"] = (
+    "T-stuk T1 verbindt een vrijvervalstreng en een persleiding (twee richtingen) waar zijn "
+    "GWSW-functie er drie voorschrijft; gemengd, dus in scope (issue #130)",
+    HULPSTUK_KLASSEN
+    + put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1100.0, 2000.0)
+    + hulpstuk("T1", "T1", 1050.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "T1")
+    + leiding("P1", "p1", [(1050.0, 2000.0), (1100.0, 2000.0)], "T1", "PutB", klasse="Persleiding"),
+)
+
+# TOP-019 (issue #130): een functieloze knoop die zuiver in het drukriool zit valt buiten
+# de pseudo-knooptoets. Loze put B scheidt twee identieke persleidingen; zonder de
+# uitzondering zou dat een pseudo-knoop lijken, maar het persnet wordt niet getoetst.
+FIXTURES["top019_functieloze_knoop_mechanisch.ttl"] = (
+    "geen; loze put B scheidt twee identieke persleidingen, maar zit zuiver in het "
+    "drukriool en valt buiten TOP-019 (issue #130)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1025.0, 2000.0, klasse="LozePut")
+    + put("PutC", "C", 1050.0, 2000.0)
+    + leiding(
+        "P1",
+        "p1",
+        [(1000.0, 2000.0), (1025.0, 2000.0)],
+        "PutA",
+        "PutB",
+        klasse="Persleiding",
+        kenmerken=maat("P1", 300, 300),
+    )
+    + leiding(
+        "P2",
+        "p2",
+        [(1025.0, 2000.0), (1050.0, 2000.0)],
+        "PutB",
+        "PutC",
+        klasse="Persleiding",
+        kenmerken=maat("P2", 300, 300),
+    ),
+)
+
+
 # Een streng waarvan de GML-literaal een lijn met precies een coordinaat bevat. GEOS
 # weigert die, en de lader hoort het object als onleesbaar te tellen in plaats van af
 # te breken. Er staat een gezonde streng naast, zodat zichtbaar is dat de rest

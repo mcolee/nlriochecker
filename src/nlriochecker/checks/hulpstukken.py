@@ -19,7 +19,12 @@ from dataclasses import dataclass
 from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
 
 from nlriochecker.checks.base import CheckContext
-from nlriochecker.checks.selectie import hulpstukken, leidingen
+from nlriochecker.checks.selectie import (
+    hulpstukken,
+    leidingen,
+    mechanischeleidingen,
+    vrijvervalrioolleidingen,
+)
 
 # Het aantal leidingen dat een functiewaarde van een hulpstuk voorschrijft. De klasse
 # → functie-koppeling komt uit de ontologie (`GwswDataset.functie_per_klasse`); dit
@@ -79,6 +84,38 @@ def _bouw_telbare_hulpstukken(context: CheckContext) -> frozenset[str]:
     return frozenset(
         node.uri for node in hulpstukken(context) if _functie_met_aantal(dataset, node) is not None
     )
+
+
+def zuiver_mechanische_knopen(context: CheckContext) -> frozenset[str]:
+    """Knoop-URI's met >=1 mechanische leiding aangesloten en 0 vrijvervalrioolleiding.
+
+    Een knoop die uitsluitend het drukriool verbindt (een T-stuk of functieloze knoop in
+    het persnet) valt buiten het checkregister: het mechanische riool wordt niet getoetst.
+    TOP-019, TOP-022 en TOP-023 laten zulke knopen daarom buiten beschouwing (issue #130).
+
+    "Aangesloten" leest de rauwe `start_node`/`end_node`, net als `_bouw_hulpstuktelling`:
+    een hulpstuk is geen netwerkknoop en `resolve_network_node` geeft er None voor. Drain,
+    aansluitleiding en loze leiding tellen hierbij niet als vrijverval -- de vrij-kant leest
+    alleen `vrijvervalrioolleidingen` -- dus een knoop met een mechanisch been plus een drain
+    telt als zuiver mechanisch.
+    """
+    return context.cached(
+        "hulpstukken:zuiver_mechanisch", lambda: _bouw_zuiver_mechanische_knopen(context)
+    )
+
+
+def _bouw_zuiver_mechanische_knopen(context: CheckContext) -> frozenset[str]:
+    """De knopen die een mechanische leiding raken en geen enkele vrijvervalrioolleiding."""
+
+    def geraakt(conduits: list[Conduit]) -> set[str]:
+        """De knoop-URI's aan de uiteinden van deze leidingen."""
+        return {
+            uri for conduit in conduits for uri in (conduit.start_node, conduit.end_node) if uri
+        }
+
+    mech = geraakt(mechanischeleidingen(context))
+    vrij = geraakt(vrijvervalrioolleidingen(context))
+    return frozenset(mech - vrij)
 
 
 def _hulpstuktelling(context: CheckContext) -> _Hulpstuktelling:

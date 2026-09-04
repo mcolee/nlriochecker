@@ -87,9 +87,7 @@
       "TOP-008": [1, 3, 0]
     },
     "afbakening_persnet.ttl": {
-      "ATTR-018": [3, 3, 1],
-      "TOP-019": [1, 1, 1],
-      "TOP-022": [1, 1, 0]
+      "ATTR-018": [3, 3, 1]
     },
     "attr001_constructietype_drainage.ttl": {
       "ATTR-001": [2, 3, 2],
@@ -536,15 +534,11 @@
       "RVZ-006": [1, 1, 2]
     },
     "net001_drukriolering_gemaal.ttl": {
-      "ATTR-018": [3, 3, 1],
-      "TOP-019": [1, 1, 1],
-      "TOP-022": [1, 1, 0]
+      "ATTR-018": [3, 3, 1]
     },
     "net001_drukriolering_lozingsput.ttl": {
       "ADM-007": [1, 1, 1],
-      "ATTR-018": [4, 4, 1],
-      "TOP-019": [1, 1, 1],
-      "TOP-022": [1, 1, 0]
+      "ATTR-018": [4, 4, 1]
     },
     "net001_geen_afvoerpad.ttl": {
       "ATTR-018": [7, 7, 0],
@@ -567,9 +561,7 @@
     },
     "net002_drukriolering_lozingsput.ttl": {
       "ADM-007": [1, 1, 1],
-      "ATTR-018": [4, 4, 1],
-      "TOP-019": [1, 1, 1],
-      "TOP-022": [1, 1, 0]
+      "ATTR-018": [4, 4, 1]
     },
     "net002_hemelwater_naar_overnamepunt_zonder_gemengd.ttl": {
       "ATTR-018": [3, 3, 0],
@@ -1201,6 +1193,9 @@
       "TOP-017": [1, 1, 1],
       "TOP-018": [1, 1, 0]
     },
+    "top019_functieloze_knoop_mechanisch.ttl": {
+      "ATTR-018": [3, 3, 1]
+    },
     "top019_pseudoknoop.ttl": {
       "ATTR-018": [5, 5, 0],
       "NET-001": [2, 2, 3],
@@ -1225,6 +1220,12 @@
       "TOP-001": [1, 3, 0],
       "TOP-021": [1, 3, 0]
     },
+    "top022_gemengd_hulpstuk.ttl": {
+      "ATTR-018": [3, 3, 1],
+      "NET-001": [1, 1, 3],
+      "RVZ-006": [1, 1, 2],
+      "TOP-022": [1, 1, 0]
+    },
     "top022_hulpstuk_te_weinig.ttl": {
       "ATTR-018": [21, 21, 0],
       "NET-001": [10, 10, 4],
@@ -1233,6 +1234,14 @@
       "TOP-006": [1, 11, 1],
       "TOP-019": [1, 3, 1],
       "TOP-022": [1, 3, 1]
+    },
+    "top022_vrijverval_schoon.ttl": {
+      "ATTR-018": [6, 6, 0],
+      "NET-001": [3, 3, 3],
+      "RVZ-006": [3, 3, 2]
+    },
+    "top022_zuiver_mechanisch.ttl": {
+      "ATTR-018": [3, 3, 1]
     },
     "top023_hulpstuk_te_veel.ttl": {
       "ATTR-018": [8, 8, 0],
@@ -1296,7 +1305,6 @@
     "SIG-nulklasse": 10,
     "TOP-008": 1,
     "TOP-014": 1,
-    "TOP-019": 1,
-    "TOP-022": 3
+    "TOP-022": 2
   }
 }

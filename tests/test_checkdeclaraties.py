@@ -130,10 +130,25 @@ def test_alleen_de_bereikbaarheids_en_dekkingschecks_gaan_over_het_persnet() -> 
     BO-82) en leest het persnet alleen om te kúnnen zeggen waar het water dan wél heen
     gaat. Zou zij het als kant lezen, dan verdween het gebrek in plaats van dat het
     verklaard werd.
+
+    TOP-019, TOP-022 en TOP-023 staan er sinds issue #130 bij, om een vierde reden: zij
+    lezen het persnet niet als kant maar om een hulpstuk of functieloze knoop die zuiver
+    in het drukriool zit (alleen mechanische leidingen, geen vrijvervalrioolleiding) buiten
+    hun toets te laten -- dat riool valt buiten het checkregister. Zij vergelijken
+    `mechanischeleidingen` met `vrijvervalrioolleidingen` in `zuiver_mechanische_knopen`.
     """
     met_persnet = {cid for cid in CHECK_IDS if "mechanischeleidingen" in REGISTRY[cid].rollen}
 
-    assert met_persnet == {"EXT-009", "NET-001", "NET-002", "NET-008", "RVZ-006"}
+    assert met_persnet == {
+        "EXT-009",
+        "NET-001",
+        "NET-002",
+        "NET-008",
+        "RVZ-006",
+        "TOP-019",
+        "TOP-022",
+        "TOP-023",
+    }
 
 
 def test_alleen_een_check_zonder_rol_omschrijft_zijn_populatie() -> None:

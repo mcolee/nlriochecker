@@ -38,10 +38,10 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | TOP-016 | Ongeldige geometrie volgens OGC Simple Features (ST_IsValid: zelf-intersectie, niet-gesloten ringen) | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-017 | Niet-simple geometrie (ST_IsSimple: spikes, herhaalde structuren) | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-018 | Opeenvolgende dubbele vertices of spikes (hoek nabij 0 graden) in strenggeometrie | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
-| TOP-019 | Pseudo-knoop: twee strengen gescheiden door een functieloze knoop, met identieke attributen (diameter, materiaal, stelseltype); zouden een streng moe… | W | Consistentie | geimplementeerd met test | functieloze_knopen, leidingen, netwerkknopen, vrijvervalrioolleidingen · BreedteLeiding, HoogteLeiding, MateriaalLeiding | — |
+| TOP-019 | Pseudo-knoop: twee strengen gescheiden door een functieloze knoop, met identieke attributen (diameter, materiaal, stelseltype); zouden een streng moe… | W | Consistentie | geimplementeerd met test | functieloze_knopen, leidingen, mechanischeleidingen, netwerkknopen, vrijvervalrioolleidingen · BreedteLeiding, HoogteLeiding, MateriaalLeiding | — |
 | TOP-021 | Put valt niet samen met enig strengeindpunt maar ligt wel naast of op een doorlopende streng (verfijning van TOP-001) | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
-| TOP-022 | Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft. Het verwachte aantal volgt uit de `functie`-restrictie op de klasse in de onto… | F | Consistentie | geimplementeerd met test | hulpstukken, leidingen · — | — |
-| TOP-023 | Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft; waarschijnlijk de verkeerde klasse gekozen (voor vier bestaat `Kruisstuk`). Zelf… | W | Consistentie | geimplementeerd met test | hulpstukken, leidingen · — | — |
+| TOP-022 | Hulpstuk verbindt minder leidingen dan zijn GWSW-functie voorschrijft. Het verwachte aantal volgt uit de `functie`-restrictie op de klasse in de onto… | F | Consistentie | geimplementeerd met test | hulpstukken, leidingen, mechanischeleidingen, vrijvervalrioolleidingen · — | — |
+| TOP-023 | Hulpstuk verbindt meer leidingen dan zijn GWSW-functie voorschrijft; waarschijnlijk de verkeerde klasse gekozen (voor vier bestaat `Kruisstuk`). Zelf… | W | Consistentie | geimplementeerd met test | hulpstukken, leidingen, mechanischeleidingen, vrijvervalrioolleidingen · — | — |
 
 ## ADM
 

@@ -295,3 +295,56 @@ def test_hulpstukchecks_verantwoorden_de_klassen_zonder_aantal() -> None:
 
     assert outcome.examined == 3
     assert any("1 Afsluitstuk" in note for note in outcome.notes), outcome.notes
+
+
+def test_zuiver_mechanisch_hulpstuk_valt_buiten_top022_en_top023() -> None:
+    """Issue #130: een T-stuk met alleen persleidingen zit in het drukriool en telt niet.
+
+    TOP-022 en TOP-023 melden niets, `examined()` is nul (het enige hulpstuk viel weg) en
+    de toelichting verantwoordt het als zuiver-mechanisch buiten scope.
+    """
+    weinig = _uitslag("top022_zuiver_mechanisch.ttl", "TOP-022")
+    veel = _uitslag("top022_zuiver_mechanisch.ttl", "TOP-023")
+
+    assert weinig.findings == []
+    assert veel.findings == []
+    assert weinig.examined == 0
+    assert any("zuiver-mechanisch" in note and "drukriool" in note for note in weinig.notes), (
+        weinig.notes
+    )
+
+
+def test_vrijverval_hulpstuk_blijft_gewoon_in_top022() -> None:
+    """Issue #130: een T-stuk met drie vrijverval-leidingen blijft in de toets (geen regressie)."""
+    uitslag = _uitslag("top022_vrijverval_schoon.ttl", "TOP-022")
+
+    assert uitslag.findings == []
+    assert uitslag.examined == 1
+    assert not any("zuiver-mechanisch" in note for note in uitslag.notes), uitslag.notes
+
+
+def test_gemengd_hulpstuk_blijft_in_scope_en_telt_het_mechanische_been() -> None:
+    """Issue #130: 1 vrijverval + 1 persleiding is gemengd, dus in scope.
+
+    Het mechanische been telt mee in de richtingtelling: T1 verbindt twee richtingen waar
+    zijn functie er drie voorschrijft, dus TOP-022 meldt.
+    """
+    bevindingen = _bevindingen(TTL_DIR / "top022_gemengd_hulpstuk.ttl", "TOP-022")
+
+    assert _labels(bevindingen) == ["T1"]
+    assert bevindingen[0].details["aangesloten"] == 2
+    assert bevindingen[0].details["verwacht"] == 3
+
+
+def test_zuiver_mechanische_functieloze_knoop_valt_buiten_top019() -> None:
+    """Issue #130: loze put B scheidt twee gelijke persleidingen, maar zit in het drukriool.
+
+    Zonder de uitzondering zou TOP-019 een pseudo-knoop melden; nu meldt hij niets en
+    verantwoordt de toelichting de overgeslagen functieloze knoop.
+    """
+    uitslag = _uitslag("top019_functieloze_knoop_mechanisch.ttl", "TOP-019")
+
+    assert uitslag.findings == []
+    assert any("drukriool" in note and "functieloze knoop" in note for note in uitslag.notes), (
+        uitslag.notes
+    )

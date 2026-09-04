@@ -4890,3 +4890,49 @@ af tot een rolnaam, want geen enkele functie in `selectie._ROLLEN` leest dat vel
 dezelfde reden waarom NET-001's `eindpuntrollen` dat veld nu al zonder declaratie leest.
 
 Zie [#127](https://github.com/mcolee/nlriochecker/issues/127) en BO-87.
+
+### BO-89 Zuiver-mechanische hulpstukken en functieloze knopen vallen buiten TOP-019/022/023
+
+**Wat.** TOP-019 (pseudo-knoop), TOP-022 (hulpstuk verbindt te weinig leidingen) en TOP-023
+(te veel) melden tot issue #130 ook op T-stukken en functieloze knopen die **zuiver in het
+drukriool** zitten. Dat zijn false positives: het mechanische riool valt buiten het
+checkregister (zie `selectie.mechanischeleidingen`, "Getoetst wordt het mechanische riool
+niet"), dus een T-stuk of pseudo-knoop die alleen persleidingen verbindt hoort geen
+topologiegebrek te dragen. Een gedeelde helper `checks/hulpstukken.zuiver_mechanische_knopen`
+classificeert een knoop als zuiver mechanisch wanneer hij **≥1 mechanische leiding** raakt
+(rol `mechanischeleidingen`) en **0 vrijvervalrioolleiding** (rol `vrijvervalrioolleidingen`);
+TOP-019, TOP-022 en TOP-023 laten die knopen buiten hun toets en verantwoorden het aantal in
+`notes()`. De drie checks krijgen `mechanischeleidingen` (en TOP-022/023 ook
+`vrijvervalrioolleidingen`) in hun `rollen`-tuple (issue #64, BO-51).
+
+Drie besluiten (met de auteur afgestemd, 2026-09-04): (1) zuiver mechanisch = ≥1 mechanisch
+been én 0 vrijverval -- drain, aansluitleiding en loze leiding tellen niet als vrijverval;
+(2) een hulpstuk zónder enige aangesloten leiding blijft in scope (juist een verdacht los
+hulpstuk); (3) bij een gemengd hulpstuk tellen de mechanische benen mee in de
+richtingtelling (dat volgt vanzelf, want `_bouw_hulpstuktelling` telt over de rol `leidingen`).
+
+**Waarom deze afbakening en niet `onderdruk_klassen`.** Onderdrukking werkt op de klasse van
+het hoofdobject, en `Hulpstuk`/`T_stuk` komt óók in vrijverval voor; die klasse onderdrukken
+zou echte vrijverval-hulpstukgebreken wegvangen. Het is ook géén wijziging aan
+`telbare_hulpstukken`/de vrijvervalgraaf (BO-72, BO-83): die doorgeefknoop-rol raakt
+NET-001/002 en TOP-002/003 en blijft bewust ongemoeid.
+
+**Afwijking van de issue-body (§2b/§4).** De issue stelde voor de zuiver-mechanische
+hulpstukken in `_bouw_hulpstuktelling` uit `telbaar` te filteren en daar een veld
+`mechanisch_buiten` op de telling te zetten. Dat is niet gedaan: `_hulpstuktelling().telbaar`
+voedt via `_eindhulpstukken` óók TOP-002/003 (geldig strengeinde, BO-72), dus filteren in de
+telling zou die twee checks stilzwijgend van gedrag én van declaratie veranderen -- de
+AST-sweep dwong dan `mechanischeleidingen` op TOP-002/003, wat de issue nergens noemt (§2e
+somt uitsluitend TOP-019/022/023 op). De filtering staat daarom op checkniveau (in
+`_HulpstukAansluitingen.run/examined/notes` en TOP-019's `run/notes`); `_hulpstuktelling`
+blijft de volle, zuivere populatie en TOP-002/003 zijn onaangeroerd (geverifieerd: geen
+enkele TOP-002/003-regel in de gouden ledger verschoof).
+
+**Meting** (`voorbeelden/koekangerveld/koekangerveld_orox.ttl`, `configs/dewoldenhoogeveen.toml`,
+door de echte pijplijn met `markeer_vulwaarden`; gwsw-orox-helpers 0.2.2). TOP-022 7 → **2**,
+TOP-019 5 → **0**, TOP-023 0 → 0; `examined()` van TOP-022/023 29 → 2; de notities melden 27
+zuiver-mechanische hulpstukken / 27 functieloze knopen buiten scope. Het onderbouwende
+meetscript is `scripts/meet_issue130.py` (BO-43). De volle De Wolden/Hoogeveen-dataset zit
+niet in de clone; het effect daar is niet lokaal te meten.
+
+Zie [#130](https://github.com/mcolee/nlriochecker/issues/130), BO-51, BO-72 en BO-83.

@@ -49,7 +49,7 @@ VOLLE_SHACL = (
 # verklaard is. Twee checks lezen de dag van vandaag (ADM-006 op Einddatum/Begindatum,
 # ATTR-007 op het huidige jaar als bovengrens), dus een export met datums rond nu zou
 # dit getal vanzelf laten schuiven; deze export heeft die niet.
-MELDINGEN_IN_HET_VOORBEELD = 337
+MELDINGEN_IN_HET_VOORBEELD = 335
 
 # De sectie `voorbeeld` van de gouden ledger draagt datzelfde getal uitgesplitst per
 # check (`scripts/maak_ledger.py`). Het losse getal hierboven blijft ernaast staan: wie
@@ -137,7 +137,7 @@ def test_het_voorbeeld_meldt_per_check_hetzelfde_aantal(voorbeeld) -> None:
     """Per check vastgelegd; een verschuiving tussen twee checks valt hier op.
 
     Het totaal hierboven ziet twintig meldingen die van HGT-007 naar HGT-013 verhuizen
-    niet: dat blijven er 337. De uitsplitsing telt ook de `NULMETING-*`-vormen en de
+    niet: dat blijven er 335. De uitsplitsing telt ook de `NULMETING-*`-vormen en de
     `SIG-*`-datasetsignalen mee -- die zitten in dezelfde meldingenstroom.
     """
     pad = _geschreven(voorbeeld).json
