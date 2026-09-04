@@ -1185,31 +1185,49 @@ class _Koppelknoop:
 _VGS_KOPPELING = ("hemelwater", "vuilwater")
 
 
-def _vgs_leden(context: CheckContext) -> frozenset[str]:
-    """De knopen en strengen die in een expliciet Verbeterd Gescheiden Stelsel liggen.
+def _vgs_instanties(context: CheckContext) -> tuple[str, ...]:
+    """De expliciete `gwsw:VerbeterdGescheidenStelsel`-instanties in de dataset.
 
     `VerbeterdGescheidenStelsel` is in de GWSW-ontologie een `Systeem`
     (VerbeterdGescheidenStelsel < GescheidenSysteem < Systeem), géén subklasse van `Stelsel`
     -- die twee zijn zusters onder `FysiekObject`. `context.stelsels_van` leest de rol
     `stelsels` (`[klassen] stelsel`, wortel `Stelsel`) en ziet een VGS daardoor structureel
     niet: op De Wolden en Hoogeveen levert `subjects_of_class("Stelsel")` 276 instanties, alle
-    uit de Stelsel-tak (Rioolstelsel, Vuilwaterstelsel, ...), en nul uit de Systeem-tak. Deze
-    check leest de VGS-instanties daarom rechtstreeks -- `subjects_of_class` over de
-    typesluiting van `[klassen] vgs`, met hun `hasPart`-leden via `stelsel_leden`, precies
-    zoals NET-007 zijn drempels via `[klassen] drempel` leest. De impliciete gepaarde-
-    rioleringsgebied-variant doen we bewust niet: GWSW is leidend en de ontologie legt VGS
-    niet zo. Zie issue #129 en BO-92.
+    uit de Stelsel-tak (Rioolstelsel, Vuilwaterstelsel, ...), en nul uit de Systeem-tak. NET-006
+    leest de VGS-instanties daarom rechtstreeks -- `subjects_of_class` over de typesluiting van
+    `[klassen] vgs` -- precies zoals NET-007 zijn drempels via `[klassen] drempel` leest. De
+    impliciete gepaarde-rioleringsgebied-variant doen we bewust niet: GWSW is leidend en de
+    ontologie legt VGS niet zo. Zie issue #129 en BO-92.
+    """
+
+    def bouw() -> tuple[str, ...]:
+        """De unieke VGS-instantie-URI's over de typesluiting van `[klassen] vgs`."""
+        gevonden = {
+            str(subject)
+            for wortel in context.config.klassen.vgs
+            for subject in context.dataset.subjects_of_class(wortel)
+        }
+        return tuple(sorted(gevonden))
+
+    return context.cached("net006:vgs-instanties", bouw)
+
+
+def _vgs_leden(context: CheckContext) -> frozenset[str]:
+    """De knopen en strengen die in een expliciet Verbeterd Gescheiden Stelsel liggen.
+
+    De directe `hasPart`-leden (`stelsel_leden`, één hop) van elke VGS-instantie uit
+    `_vgs_instanties`. Let op de single-hop-aanname: een echte export die een VGS genest legt
+    (VGS -> sub-stelsels -> objecten, twee hops) zou hier leeg blijven; `notes()` maakt dat
+    voorbehoud luid. Zie BO-92.
     """
 
     def bouw() -> frozenset[str]:
         """Verzamelt de leden over alle VGS-instanties in de dataset."""
         leden: set[str] = set()
-        dataset = context.dataset
-        for wortel in context.config.klassen.vgs:
-            for subject in dataset.subjects_of_class(wortel):
-                strengen, knopen = dataset.stelsel_leden(str(subject))
-                leden.update(strengen)
-                leden.update(knopen)
+        for subject in _vgs_instanties(context):
+            strengen, knopen = context.dataset.stelsel_leden(subject)
+            leden.update(strengen)
+            leden.update(knopen)
         return frozenset(leden)
 
     return context.cached("net006:vgs-leden", bouw)
@@ -1349,6 +1367,18 @@ class KoppelingTussenStelseltypen(Check):
                 "samen zonder betrouwbare stroomrichting; die koppelingen zijn niet gericht "
                 "tegen de koppelregels getoetst.",
             )
+        # Issue #129/BO-92: de uitzondering hemelwater->vuilwater geldt alleen binnen een VGS.
+        # Wat de check daarvoor NIET zag hoort in het rapport: het VGS-lidmaatschap is als de
+        # directe hasPart-leden gelezen (één hop), dus een genest gelegde VGS (VGS -> sub-
+        # stelsels -> objecten) wordt niet herkend. Bij nul VGS-instanties is de uitzondering
+        # inert en meldt NET-006 elke hemelwater->vuilwater-koppeling.
+        vgs = len(_vgs_instanties(context))
+        notities.append(
+            f"De koppeling hemelwater→vuilwater is alleen binnen een Verbeterd Gescheiden "
+            f"Stelsel toegestaan; het lidmaatschap is gelezen als de directe hasPart-leden van "
+            f"{getal(vgs, 'VGS-instantie', 'VGS-instanties')} in de dataset. Een genest gelegde "
+            "VGS (VGS → sub-stelsels → objecten) wordt zo niet herkend."
+        )
         return notities
 
     def examined(self, context: CheckContext) -> int:

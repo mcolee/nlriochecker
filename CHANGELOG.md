@@ -21,7 +21,8 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   alleen expliciete `gwsw:VerbeterdGescheidenStelsel`-instanties (nieuwe configsleutel
   `[klassen] vgs`, `["VerbeterdGescheidenStelsel"]`), rechtstreeks gelezen omdat een VGS in
   de ontologie een `Systeem` is en niet in de sluiting van `gwsw:Stelsel` valt (BO-92). Op
-  De Wolden en Hoogeveen (0 VGS-instanties): +24 NET-006-bevindingen.
+  De Wolden en Hoogeveen (0 VGS-instanties): +22 NET-006-bevindingen (24 knopen dragen de
+  koppeling, 2 waren al gemeld, NET-006 telt per knoop; 85 → 107).
 
 ### Toegevoegd
 

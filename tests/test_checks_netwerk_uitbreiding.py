@@ -154,6 +154,23 @@ def test_net006_staat_hemelwater_naar_vuilwater_binnen_vgs_toe() -> None:
     assert outcome.findings == []
 
 
+def test_net006_notes_maken_de_vgs_leesweg_en_het_instantietal_luid() -> None:
+    """De toelichting meldt hoe het VGS-lidmaatschap gelezen is en hoeveel VGS er zijn (issue #129).
+
+    CLAUDE.md: wat een check niet bekeek hoort in het rapport. Het VGS-lidmaatschap is als de
+    directe hasPart-leden gelezen (één hop); een genest gelegde VGS wordt niet herkend, en bij
+    nul instanties is de uitzondering inert. `notes()` maakt dat voorbehoud luid.
+    """
+    zonder = uitkomst(TTL_DIR / "net006_hemelwater_naar_vuilwater.ttl", "NET-006")
+    assert any(
+        "0 VGS-instanties" in note and "directe hasPart-leden" in note for note in zonder.notes
+    )
+    assert any("niet herkend" in note for note in zonder.notes)
+
+    met = uitkomst(TTL_DIR / "net006_hemelwater_naar_vuilwater_vgs.ttl", "NET-006")
+    assert any("1 VGS-instantie" in note and "directe hasPart-leden" in note for note in met.notes)
+
+
 def test_net006_telt_een_koppeling_zonder_betrouwbare_richting_maar_meldt_die_niet() -> None:
     """Wat niet gericht te beoordelen is, komt in de toelichting en niet als bevinding.
 

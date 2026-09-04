@@ -5052,8 +5052,10 @@ meer onvoorwaardelijk goed. De tag `vuilwater` is uit `koppelregels[hemelwater]`
 configs gehaald en die ene cel is in code voorwaardelijk gemaakt (`_bouw_koppelingen` in
 `checks/netwerk.py`): ligt de koppelknoop in een **Verbeterd Gescheiden Stelsel**, dan is de
 koppeling toegestaan; anders is hemelwater op een vuilwaterriool een bevinding. De rest van de
-koppelmatrix blijft ongewijzigd. Op De Wolden en Hoogeveen (0 VGS-instanties): +24
-NET-006-bevindingen.
+koppelmatrix blijft ongewijzigd. Op De Wolden en Hoogeveen (0 VGS-instanties): +22
+NET-006-bevindingen (85 → 107) -- 24 knopen dragen een betrouwbaar gerichte
+`hemelwater → vuilwater`-koppeling, maar 2 daarvan waren al een NET-006-bevinding (andere
+koppelingsfout) en NET-006 telt per knoop, dus +22 nieuwe knopen.
 
 **VGS = alleen expliciete instanties.** Wat als VGS telt zijn uitsluitend expliciete
 `gwsw:VerbeterdGescheidenStelsel`-instanties (typesluiting via `[klassen] vgs`,
@@ -5075,6 +5077,19 @@ maken. NET-006 leest de VGS-instanties daarom rechtstreeks: `subjects_of_class` 
 met hun `hasPart`-leden via `stelsel_leden` (dezelfde publieke leeslaag-API die `_stelsel_inverse`
 gebruikt), precies zoals NET-007 zijn drempels via `[klassen] drempel` leest. Dit is een kleine,
 check-lokale, gecachte index (`net006:vgs-leden`), geen tweede algemene stelsellezer.
+
+**Single-hop-aanname, onbeproefd (voorbehoud).** `_vgs_leden` leest via `stelsel_leden` de
+**directe** `hasPart`-leden van een VGS-instantie -- één hop. Dat is bewezen levend voor de
+`Stelsel`-instanties op De Wolden en Hoogeveen (275 van de 276 dragen hun putten/strengen via
+één `hasPart`-hop; de inverse index dekt 46.925/46.925 knopen+strengen), maar niet voor een
+`Systeem`/VGS, want die zijn er nul. Legt een echte export een VGS genest
+(`VGS → sub-stelsels → objecten`, twee hops), dan geeft `stelsel_leden` de sub-stelsel-URI's
+terug (die niet in `nodes`/`conduits` staan), blijft `vgs_leden` leeg en vuurt de vrijstelling
+stil niet -- valse hemelwater→vuilwater-bevindingen binnen een echte VGS. Bewuste regie-keuze:
+niet bouwen (0 VGS in de aanlevering, geen bewijs hoe een export een VGS nest), wél luid maken.
+`notes()` van NET-006 meldt daarom hoe het VGS-lidmaatschap gelezen is (directe `hasPart`-leden)
+en hoeveel VGS-instanties de dataset draagt; toetsen zodra een VGS-dragende dataset beschikbaar
+is, of anders `stelsel_leden` transitief maken achter de leeslaag (helper-release, niet hier).
 
 **Declaratie (issue #64).** De rol/kenmerk-declaratie van NET-006 verandert niet. De VGS-populatie
 wordt -- net als NET-007's `[klassen] drempel` -- via `subjects_of_class` gelezen, wat de AST-sweep
