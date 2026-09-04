@@ -92,6 +92,11 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Leeslaag naar `gwsw-orox-helpers` v0.2.2** (issue #135): dezelfde 1.6-ontologie en
+  dezelfde checks, maar de bestandsnaam van de gebundelde ontologie in het rapport
+  wijzigt van `Ontologie_GWSW_Totaal.ttl` naar `gwsw_ontologie_totaal_16.ttl`. Twee
+  tests leidden die naam voortaan af uit `gebundelde_ontologie().name` in plaats van
+  hem te hardcoden. Geen wijziging in `src/`.
 - `configs/dewoldenhoogeveen.toml` onderdrukt naast het mechanische riool nu ook de
   `Pompunit` (`[rapport] onderdruk_klassen`). De pompput hoort bij de drukriolering, die
   buiten het checkregister valt; meldingen erop (o.a. ATTR-018 begindatum) blijven zo uit

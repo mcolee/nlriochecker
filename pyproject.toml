@@ -16,8 +16,9 @@ dependencies = [
     "click>=8.2",
     "geopandas>=1.1.4",
     # De leeslaag (dataset, graaf, geometrie, ontologie, cache, voortgang) plus de
-    # gebundelde GWSW-ontologie 1.6; afgesplitst als eigen MIT-package.
-    "gwsw-orox-helpers>=0.1.0",
+    # gebundelde GWSW-ontologie 1.6 (en sinds 0.2.1 ook 1.7); afgesplitst als eigen
+    # MIT-package.
+    "gwsw-orox-helpers>=0.2.2",
     "networkx>=3.3",
     "pandas>=2.2",
     "pydantic>=2.7",
@@ -40,7 +41,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-gwsw-orox-helpers = { git = "https://github.com/mcolee/gwsw-orox-helpers", tag = "v0.1.0" }
+gwsw-orox-helpers = { git = "https://github.com/mcolee/gwsw-orox-helpers", tag = "v0.2.2" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nlriochecker"]

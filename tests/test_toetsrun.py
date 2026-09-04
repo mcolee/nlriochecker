@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from shapely.geometry import box, mapping
 
 from nlriochecker import toetsrun as toetsrun_module
@@ -606,10 +607,11 @@ class TestOntologiekeuze:
             )
         )
 
-        assert [pad.name for pad in uitslag.dataset.ontologies] == ["Ontologie_GWSW_Totaal.ttl"]
+        gebundeld = gebundelde_ontologie().name
+        assert [pad.name for pad in uitslag.dataset.ontologies] == [gebundeld]
         assert uitslag.dataset.klassenhierarchie_bekend is True
         markdown = uitslag.uitvoer.per_gebied[""].markdown.read_text(encoding="utf-8")
-        assert "Ontologie_GWSW_Totaal.ttl" in markdown
+        assert gebundeld in markdown
         assert GEEN_KLASSENHIERARCHIE not in markdown
 
     def test_een_eigen_pad_gaat_voor_op_de_ontsnappingsvlag(self, tmp_path: Path) -> None:

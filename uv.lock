@@ -156,8 +156,8 @@ wheels = [
 
 [[package]]
 name = "gwsw-orox-helpers"
-version = "0.1.0"
-source = { git = "https://github.com/mcolee/gwsw-orox-helpers?tag=v0.1.0#49d93dfb87fd2a2197478a0f2accfb8d09483e9e" }
+version = "0.2.2"
+source = { git = "https://github.com/mcolee/gwsw-orox-helpers?tag=v0.2.2#efa0ade7277a7c48b55fb1b5044a55191ebe876b" }
 dependencies = [
     { name = "pyoxigraph" },
     { name = "rdflib" },
@@ -374,7 +374,7 @@ dev = [
 requires-dist = [
     { name = "click", specifier = ">=8.2" },
     { name = "geopandas", specifier = ">=1.1.4" },
-    { name = "gwsw-orox-helpers", git = "https://github.com/mcolee/gwsw-orox-helpers?tag=v0.1.0" },
+    { name = "gwsw-orox-helpers", git = "https://github.com/mcolee/gwsw-orox-helpers?tag=v0.2.2" },
     { name = "networkx", specifier = ">=3.3" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic", specifier = ">=2.7" },

@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from click.testing import CliRunner
+from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from shapely.geometry import box, mapping
 
 from nlriochecker.cli import _BalkVoortgang, main
@@ -1009,5 +1010,5 @@ def test_toets_zonder_ontologie_draait_op_de_gebundelde(tmp_path: Path) -> None:
 
     assert resultaat.exit_code == 0, resultaat.output
     rapport = (uitvoer / FILE_CHECKS_MARKDOWN).read_text(encoding="utf-8")
-    assert "Klassenhierarchie uit `Ontologie_GWSW_Totaal.ttl`." in rapport
+    assert f"Klassenhierarchie uit `{gebundelde_ontologie().name}`." in rapport
     assert "geen ontologie geladen" not in rapport
