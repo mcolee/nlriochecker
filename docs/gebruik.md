@@ -303,12 +303,13 @@ Invoerbestanden worden nooit overschreven.
 
 De GeoPackage draagt drie featurelagen, een per geometrievorm: `putten` (punt),
 `strengen` (lijn) en `vlakken` (vlak). De twee objectlagen dragen de gebreken *op* het
-object. Elk object draagt een kolom `status` met precies vier waarden --
+object. Elk object draagt een kolom `status` met vijf waarden --
 `rood` bij een fout, `oranje` bij alleen waarschuwingen, `groen` als er geen eigen gebrek
-is, `grijs` als er niet beoordeeld is -- en een kolom `popup_html` met de voorgebakken
-hoverpopup. Mechanisch riool staat tussen de strengen met status `grijs`: het objecttype
-klopt, alleen is er niets getoetst. Met een studiegebied staat de contextschil er ook
-grijs bij, zodat de kaart niet bij de gebiedsgrens ophoudt alsof daar niets ligt. De
+is, `grijs` als er niet beoordeeld is, en `geaccepteerd` als elke bevinding op het object
+via `[rapport] uitzonderingen` bewust aanvaard is -- en een kolom `popup_html` met de
+voorgebakken hoverpopup. Mechanisch riool staat tussen de strengen met status `grijs`: het
+objecttype klopt, alleen is er niets getoetst. Met een studiegebied staat de contextschil
+er ook grijs bij, zodat de kaart niet bij de gebiedsgrens ophoudt alsof daar niets ligt. De
 popup zegt per grijs object waarom.
 
 `status` telt systemische meldingen niet mee, net als `ergste_ernst`, `n_fout` en
@@ -351,7 +352,8 @@ De GeoPackage brengt haar eigen opmaak mee (tabel `layer_styles`), dus openen vo
 
 Het symbool zegt wat voor GWSW-object het is -- de indeling komt uit de PDOK-SLD's -- en
 de kleur zegt uitsluitend hoe het ervoor staat: rood bij een fout, oranje bij alleen
-waarschuwingen, groen als er geen eigen gebrek is, grijs als er niet beoordeeld is. Rood
+waarschuwingen, groen als er geen eigen gebrek is, grijs als er niet beoordeeld is, en een
+warme grijstint als de bevindingen geaccepteerd zijn. Rood
 is duidelijk donkerder dan groen, zodat de twee ook in grijstinten en bij kleurenblindheid
 uit elkaar te houden zijn. Een objecttype dat de symbolentabel niet kent krijgt een
 vangnetsymbool met het legendalabel "objecttype niet in de symbolentabel"; er is geen
@@ -430,6 +432,23 @@ optie geldt de meegeleverde `src/nlriochecker/checks.toml`, die naar Koekangerve
 Let op: `--projectconfig` vervangt de configuratie in haar geheel; er is geen overlay. Een
 projectconfiguratie is dus een volledige kopie van `checks.toml`, en een drempel die daar
 verandert moet in elke kopie na.
+
+### Geaccepteerde bevindingen
+
+Een bevinding die na controle terecht blijkt te kloppen -- een tegenverhang dat echt zo
+ligt, een riool onder een pand dat er hoort -- kun je **accepteren** zonder haar te laten
+verdwijnen. `[rapport] uitzonderingen` wijst een los JSON-bestand aan (pad relatief aan de
+projectconfig): één lijst van records met elk een verplichte `melding_id` (de machinesleutel
+uit `bevindingen.csv` / de JSON) en `reden`, en optioneel `check_id`, `object_id`,
+`waarde_snapshot`, `datum` en `wie`. Een geaccepteerde bevinding valt uit de foutentelling
+van haar object -- op de kaart krijgt dat object de status `geaccepteerd` -- maar blijft
+gewoon in het rapport, de CSV, de JSON en de meldingentabel staan. Het rapport en de
+JSON-envelop (`uitzonderingen`) en de kolommen `uitzonderingen_bestand`,
+`meldingen_geaccepteerd` en `uitzonderingen_zonder_bevinding` in `gwsw_run` verantwoorden
+hoeveel er geaccepteerd zijn. Twee dingen worden luid gemeld en vervallen nooit vanzelf: een
+`melding_id` uit het bestand dat de run niet meer oplevert ("uitzondering zonder bevinding"),
+en een melding die nog bestaat maar een andere waarde draagt dan de `waarde_snapshot` -- die
+wordt níét automatisch geaccepteerd en vraagt om herbeoordeling.
 
 ## Voortgang
 

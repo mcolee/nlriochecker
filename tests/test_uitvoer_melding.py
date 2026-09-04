@@ -10,7 +10,7 @@ from pathlib import Path
 from gwsw_orox_helpers.dataset import load_dataset
 
 from helpers_melding import nulbevinding
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig, Uitzondering, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import load_study_area
@@ -19,6 +19,7 @@ from nlriochecker.uitvoer.melding import (
     BRON_DATASET,
     BRON_NULMETING,
     GEEN_ONDERDRUKKING,
+    GEEN_UITZONDERINGEN,
     Melding,
     _is_systemisch,
     bouw_meldingen,
@@ -535,3 +536,103 @@ def test_onderdrukking_raakt_examined_en_systemisch_niet() -> None:
     assert _is_systemisch(met.outcomes[0], met.config) == _is_systemisch(
         zonder.outcomes[0], zonder.config
     )
+
+
+# Issue #132: geaccepteerde bevindingen (uitzonderingen). De acceptatie haalt de melding
+# uit de foutentelling maar laat haar in de stroom staan; de twee luide lijsten vervallen
+# nooit vanzelf.
+
+
+def _met_uitzonderingen(run: CheckRun, *records: Uitzondering) -> CheckRun:
+    """Zet een uitzonderingenbestand op de config van een bestaande run.
+
+    De config draagt normaal alleen het pad; `load_check_config` vult de records. Hier
+    zetten we beide met de hand, zoals de onderdrukkingstests de twee `[rapport]`-lijsten
+    rechtstreeks zetten.
+    """
+    run.config.rapport.uitzonderingen = "uitz.json"
+    run.config.rapport._uitzonderingen = list(records)
+    return run
+
+
+def test_zonder_bestand_zijn_er_geen_uitzonderingen() -> None:
+    """Zonder `[rapport] uitzonderingen` verandert er niets aan de stroom."""
+    stroom = bouw_meldingenstroom(_run("top001_losliggende_put.ttl", "TOP-001"), RUNDATUM)
+
+    assert stroom.uitzonderingen == GEEN_UITZONDERINGEN
+    assert not stroom.uitzonderingen.actief
+
+
+def test_een_uitzondering_accepteert_de_melding_maar_laat_haar_staan() -> None:
+    """De melding valt uit de foutentelling (geaccepteerd) maar blijft in de stroom."""
+    run = _run("top001_losliggende_put.ttl", "TOP-001")
+    doel = bouw_meldingenstroom(run, RUNDATUM).meldingen[0]
+    _met_uitzonderingen(
+        run, Uitzondering(melding_id=doel.melding_id, reden="klopt", waarde_snapshot=doel.waarde)
+    )
+
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    assert stroom.uitzonderingen.actief
+    assert stroom.uitzonderingen.bestand == "uitz.json"
+    assert stroom.uitzonderingen.geaccepteerd == (doel.melding_id,)
+    assert stroom.uitzonderingen.zonder_bevinding == ()
+    assert stroom.uitzonderingen.gewijzigde_waarde == ()
+    # De melding zelf blijft ongewijzigd in de stroom staan.
+    assert any(melding.melding_id == doel.melding_id for melding in stroom.meldingen)
+
+
+def test_een_dode_uitzondering_telt_als_zonder_bevinding() -> None:
+    """Een melding-ID uit het bestand dat deze run niet oplevert vervalt niet vanzelf."""
+    run = _met_uitzonderingen(
+        _run("top001_losliggende_put.ttl", "TOP-001"),
+        Uitzondering(melding_id="bestaat-niet", reden="ooit geaccepteerd"),
+    )
+
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    assert stroom.uitzonderingen.zonder_bevinding == ("bestaat-niet",)
+    assert stroom.uitzonderingen.geaccepteerd == ()
+
+
+def test_een_verschoven_waarde_telt_als_gewijzigde_waarde() -> None:
+    """Bestaat de melding nog maar wijkt de waarde af, dan is dat geen acceptatie."""
+    run = _run("top001_losliggende_put.ttl", "TOP-001")
+    doel = bouw_meldingenstroom(run, RUNDATUM).meldingen[0]
+    _met_uitzonderingen(
+        run,
+        Uitzondering(
+            melding_id=doel.melding_id, reden="ooit", waarde_snapshot=doel.waarde + "-anders"
+        ),
+    )
+
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    assert stroom.uitzonderingen.geaccepteerd == ()
+    assert len(stroom.uitzonderingen.gewijzigde_waarde) == 1
+    gewijzigd = stroom.uitzonderingen.gewijzigde_waarde[0]
+    assert gewijzigd.melding_id == doel.melding_id
+    assert gewijzigd.snapshot == doel.waarde + "-anders"
+    assert gewijzigd.waarde == doel.waarde
+
+
+def test_een_uitzondering_op_een_shacl_nulmelding_werkt() -> None:
+    """Reikwijdte: alle checks incl. de nulmeting, omdat ze dezelfde melding-ID krijgen."""
+    nul = nulbevinding()
+    run = replace(_run("top001_losliggende_put.ttl", "TOP-001"), nulbevindingen=(nul,))
+    nulmelding = next(
+        melding
+        for melding in bouw_meldingenstroom(run, RUNDATUM).meldingen
+        if melding.bron == BRON_NULMETING
+    )
+    _met_uitzonderingen(
+        run,
+        Uitzondering(
+            melding_id=nulmelding.melding_id, reden="terecht", waarde_snapshot=nulmelding.waarde
+        ),
+    )
+
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    assert stroom.uitzonderingen.geaccepteerd == (nulmelding.melding_id,)
+    assert any(melding.melding_id == nulmelding.melding_id for melding in stroom.meldingen)

@@ -29,8 +29,10 @@ from nlriochecker.uitvoer.melding import (
     BRON_DATASET,
     BRON_NULMETING,
     GEEN_ONDERDRUKKING,
+    GEEN_UITZONDERINGEN,
     Melding,
     Onderdrukking,
+    Uitzonderingen,
     bouw_meldingenstroom,
 )
 from nlriochecker.uitvoer.omvang import (
@@ -147,6 +149,7 @@ def write_check_report(
     *,
     met_csv: bool = True,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
 ) -> tuple[Path, Path | None]:
     """Schrijft de bevindingen van de check-engine als Markdown en CSV.
 
@@ -166,6 +169,11 @@ def write_check_report(
     zou lezen als "alles gecontroleerd" (BO-49). Bouwt deze functie de meldingen zelf,
     dan komt hij uit diezelfde stroom: het argument alleen honoreren zou een rapport
     opleveren dat wél gefilterd is maar dat nergens zegt.
+
+    `uitzonderingen` komt uit dezelfde stroom (issue #132) en krijgt een eigen sectie: de
+    geaccepteerde bevindingen per check plus de twee luide lijsten (dode uitzonderingen en
+    gewijzigde waarden), volledig. Bouwt deze functie de stroom zelf, dan neemt hij ook de
+    uitzonderingen daaruit, om dezelfde reden als bij de onderdrukking.
     """
     output_dir = prepare(output_dir)
     run_datum = run_datum or date.today()
@@ -173,11 +181,12 @@ def write_check_report(
         stroom = bouw_meldingenstroom(run, run_datum)
         meldingen = stroom.meldingen
         onderdrukking = stroom.onderdrukking
+        uitzonderingen = stroom.uitzonderingen
 
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
         f"# {_titel(run)}",
-        _render_checks(run, meldingen, notities, onderdrukking, met_csv=met_csv),
+        _render_checks(run, meldingen, notities, onderdrukking, uitzonderingen, met_csv=met_csv),
         run_datum,
         markering=markering(run),
     )
@@ -295,6 +304,7 @@ def _render_checks(
     meldingen: list[Melding],
     notities: Sequence[str] = (),
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
     *,
     met_csv: bool = True,
 ) -> list[str]:
@@ -316,6 +326,7 @@ def _render_checks(
     # hierboven wil weten -- niet pas achter de tabellen.
     lines += rode_draad(run, meldingen)
     lines += _verantwoording(run, meldingen, notities, onderdrukking, met_csv=met_csv)
+    lines += _uitzonderingen_section(uitzonderingen, meldingen)
     lines += ["", "## Detailrapportage", ""]
     nulmeting = _detail_nulmeting(run, meldingen)
     lines += nulmeting
@@ -665,6 +676,78 @@ def _telling(aantallen: dict[str, int]) -> str:
     if not aantallen:
         return "geen"
     return ", ".join(f"{sleutel} {aantallen[sleutel]}" for sleutel in sorted(aantallen))
+
+
+def _uitzonderingen_section(uitzonderingen: Uitzonderingen, meldingen: list[Melding]) -> list[str]:
+    """De geaccepteerde bevindingen, met de twee luide lijsten volledig (issue #132).
+
+    Een eigen sectie naast de onderdrukking, en met een tegengesteld doel: de
+    onderdrukking houdt meldingen uit de uitvoer, een uitzondering laat ze staan en
+    markeert ze alleen als geaccepteerd. De sectie staat er zodra de projectconfiguratie
+    een uitzonderingenbestand aanwees, ook als er nul bevindingen matchten -- de keuze
+    hoort verantwoord te worden.
+
+    Twee lijsten vervallen nooit vanzelf en staan er daarom volledig, niet afgekapt: de
+    dode uitzonderingen (een melding-ID uit het bestand dat deze run niet meer oplevert)
+    en de gewijzigde waarden (de melding bestaat nog maar draagt een andere waarde dan de
+    snapshot -- geen automatische acceptatie, maar een vraag om herbeoordeling).
+    """
+    if not uitzonderingen.actief:
+        return []
+
+    check_van = {melding.melding_id: melding.check_id for melding in meldingen}
+    per_check: dict[str, int] = defaultdict(int)
+    for melding_id in uitzonderingen.geaccepteerd:
+        per_check[check_van.get(melding_id, "?")] += 1
+
+    geaccepteerd = getal(
+        len(uitzonderingen.geaccepteerd), "bevinding geaccepteerd", "bevindingen geaccepteerd"
+    )
+    regels = [
+        "",
+        "## Uitzonderingen",
+        "",
+        f"**{geaccepteerd}** op grond van `[rapport] uitzonderingen` "
+        f"(`{uitzonderingen.bestand}`) — per check: {_telling(dict(per_check))}. Ze blijven in "
+        "elke uitvoervorm staan en krijgen op de kaart de status `geaccepteerd`; alleen uit de "
+        "foutentelling van hun object vallen ze weg.",
+        "",
+    ]
+
+    if uitzonderingen.zonder_bevinding:
+        dood = getal(
+            len(uitzonderingen.zonder_bevinding),
+            "uitzondering zonder bevinding",
+            "uitzonderingen zonder bevinding",
+        )
+        regels += [
+            f"**{dood}**: in het bestand genoemd, maar deze run levert die melding niet op "
+            "(defect verholpen, URI hernummerd, of op de onderdrukking weggevallen). Ze "
+            "vervallen niet vanzelf en vragen om een blik:",
+            "",
+        ]
+        regels += [f"- `{melding_id}`" for melding_id in uitzonderingen.zonder_bevinding]
+        regels += [""]
+
+    if uitzonderingen.gewijzigde_waarde:
+        gewijzigd_txt = getal(
+            len(uitzonderingen.gewijzigde_waarde),
+            "uitzondering met gewijzigde waarde",
+            "uitzonderingen met gewijzigde waarde",
+        )
+        regels += [
+            f"**{gewijzigd_txt}**: de melding bestaat nog maar draagt een andere waarde dan de "
+            "snapshot. Niet automatisch geaccepteerd; herbeoordeel X → Y:",
+            "",
+        ]
+        regels += [
+            f"- `{gewijzigd.melding_id}`: {gewijzigd.snapshot or '(leeg)'} → "
+            f"{gewijzigd.waarde or '(leeg)'}"
+            for gewijzigd in uitzonderingen.gewijzigde_waarde
+        ]
+        regels += [""]
+
+    return regels
 
 
 def _per_check(meldingen: list[Melding]) -> dict[str, list[Melding]]:

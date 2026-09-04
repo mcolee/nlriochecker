@@ -13,7 +13,11 @@ from xml.etree import ElementTree as ET
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
 
-from nlriochecker.uitvoer.objectkaart import STATUSSEN
+from nlriochecker.uitvoer.objectkaart import (
+    STATUS_GEACCEPTEERD,
+    STATUS_GRIJS,
+    STATUSSEN,
+)
 from nlriochecker.uitvoer.stijlen.symbolen import (
     LIJNSYMBOLEN,
     MECHANISCHE_LIJNEN,
@@ -134,6 +138,25 @@ def test_er_is_een_expliciet_vangnet(laag: str) -> None:
     labels = {regel.get("label") for regel in _boom(laag).iter("rule")}
 
     assert "objecttype niet in de symbolentabel" in labels
+
+
+def test_de_vijfde_status_geaccepteerd_heeft_een_eigen_kleur() -> None:
+    """Issue #132: `geaccepteerd` is een eigen tint, onderscheiden van `grijs`.
+
+    Ze staat in de statusreeks (dus krijgt elke laag er een regel voor) en draagt een
+    eigen RGB; zou hij gelijk zijn aan het neutrale grijs van "niet beoordeeld", dan waren
+    "bewust aanvaard" en "niet gekeken" op de kaart niet uit elkaar te houden.
+    """
+    assert STATUS_GEACCEPTEERD in STATUSSEN
+    assert STATUS_GEACCEPTEERD in STATUSKLEUR
+    assert STATUSKLEUR[STATUS_GEACCEPTEERD] != STATUSKLEUR[STATUS_GRIJS]
+
+
+def test_de_geaccepteerd_regel_staat_in_elke_objectlaag(laag: str) -> None:
+    """Elke opgebouwde laag krijgt de statusregel voor `geaccepteerd`."""
+    filters = [regel.get("filter", "") for regel in _boom(laag).iter("rule")]
+
+    assert any(f"\"status\" = '{STATUS_GEACCEPTEERD}'" in uitdrukking for uitdrukking in filters)
 
 
 def test_alleen_de_status_bepaalt_de_kleur(laag: str) -> None:

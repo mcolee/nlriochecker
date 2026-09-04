@@ -64,8 +64,11 @@ from nlriochecker.uitvoer.herkomst import (
 )
 from nlriochecker.uitvoer.melding import (
     GEEN_ONDERDRUKKING,
+    GEEN_UITZONDERINGEN,
+    GewijzigdeWaarde,
     Melding,
     Onderdrukking,
+    Uitzonderingen,
     bouw_meldingen,
 )
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
@@ -556,6 +559,12 @@ def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> Non
         onderdrukking=Onderdrukking(
             klassen=("Leiding",), checks=("TOP-001",), per_check={"TOP-001": 1}, per_klasse={}
         ),
+        uitzonderingen=Uitzonderingen(
+            bestand="uitz.json",
+            geaccepteerd=("a1",),
+            zonder_bevinding=("d1",),
+            gewijzigde_waarde=(GewijzigdeWaarde("g1", "0.01", "0.02"),),
+        ),
         checks=[
             {
                 "check_id": "TOP-001",
@@ -572,6 +581,7 @@ def test_json_schemadocument_beschrijft_elk_enveloppeveld(tmp_path: Path) -> Non
 
     ontbreekt = [veld for veld in document if f"`{veld}`" not in doc]
     ontbreekt += [veld for veld in document["checks"][0] if f"`{veld}`" not in doc]
+    ontbreekt += [veld for veld in document["uitzonderingen"] if f"`{veld}`" not in doc]
 
     assert ontbreekt == []
 
@@ -710,6 +720,39 @@ def test_json_zonder_checks_draagt_het_veld_niet(tmp_path: Path) -> None:
     document = _envelop(tmp_path / "b.json")
 
     assert "checks" not in document
+
+
+def test_json_zonder_uitzonderingen_draagt_het_veld_niet(tmp_path: Path) -> None:
+    """Optioneel en additief (issue #132): geen bestand, geen veld, byte-voor-byte gelijk."""
+    zonder = _envelop(tmp_path / "zonder.json")
+    leeg = _envelop(tmp_path / "leeg.json", uitzonderingen=GEEN_UITZONDERINGEN)
+
+    assert "uitzonderingen" not in zonder
+    assert "uitzonderingen" not in leeg
+    assert (tmp_path / "zonder.json").read_text(encoding="utf-8") == (
+        tmp_path / "leeg.json"
+    ).read_text(encoding="utf-8")
+
+
+def test_json_met_uitzonderingen_draagt_het_bestand_en_de_lijsten(tmp_path: Path) -> None:
+    """De geaccepteerde melding-ID's als lijst; de melding zelf blijft in `meldingen`."""
+    document = _envelop(
+        tmp_path / "b.json",
+        uitzonderingen=Uitzonderingen(
+            bestand="uitz.json",
+            geaccepteerd=("a1", "a2"),
+            zonder_bevinding=("d1",),
+            gewijzigde_waarde=(GewijzigdeWaarde("g1", "0.01 m", "0.05 m"),),
+        ),
+    )
+
+    assert document["uitzonderingen"] == {
+        "bestand": "uitz.json",
+        "geaccepteerd": ["a1", "a2"],
+        "zonder_bevinding": ["d1"],
+        "gewijzigde_waarde": [{"melding_id": "g1", "snapshot": "0.01 m", "waarde": "0.05 m"}],
+    }
+    assert document["schema_versie"] == SCHEMA_VERSIE
 
 
 def test_json_labelt_per_check_waarover_bekeken_geteld_is(toets: CheckRun, tmp_path: Path) -> None:

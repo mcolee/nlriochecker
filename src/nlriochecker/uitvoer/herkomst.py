@@ -32,7 +32,7 @@ from nlriochecker import __version__
 if TYPE_CHECKING:
     # Alleen voor de annotatie: deze module is de onderste laag van de uitvoer en hoeft
     # de meldingenstroom niet te kennen om een envelop te schrijven.
-    from nlriochecker.uitvoer.melding import Onderdrukking
+    from nlriochecker.uitvoer.melding import Onderdrukking, Uitzonderingen
 
 # De pakketnaam uit de modulenaam zelf, om hem niet naast `pyproject.toml` een
 # tweede keer op te schrijven -- dezelfde reden waarom het versienummer uit de
@@ -125,6 +125,7 @@ def schrijf_json(
     gebied: str | None = None,
     gebieden: list[str] | None = None,
     onderdrukking: Onderdrukking | None = None,
+    uitzonderingen: Uitzonderingen | None = None,
     checks: list[dict[str, object]] | None = None,
 ) -> Path:
     """Schrijft de meldingenstroom als JSON, met een envelop die de run beschrijft.
@@ -167,6 +168,13 @@ def schrijf_json(
     het staat er alleen als de projectconfiguratie iets onderdrukt, zodat een run zonder
     lijsten byte-voor-byte blijft zoals hij was en `SCHEMA_VERSIE` niet omhoog hoeft.
 
+    `uitzonderingen` zegt welke bevindingen als geaccepteerd gemarkeerd zijn (issue #132):
+    het bestand, de geaccepteerde `melding_id`'s (een lijst, want de melding zelf blijft
+    ongewijzigd in `meldingen` en een lezer joint erop), en de twee luide lijsten
+    `zonder_bevinding` en `gewijzigde_waarde`. Optioneel en additief, net als `onderdrukt`:
+    het veld staat er alleen als de projectconfiguratie een uitzonderingenbestand aanwees,
+    en `SCHEMA_VERSIE` blijft daarom 1.2.
+
     `checks` draagt per check wat hij bekeken heeft: hoeveel, waarover dat geteld is en
     welke populatie hij declareert (issue #77). Hij komt kant-en-klaar
     binnen via `bevindingen.checks_json`; ook hier interpreteert deze functie niets.
@@ -196,6 +204,20 @@ def schrijf_json(
             "klassen": list(onderdrukking.klassen),
             "checks": list(onderdrukking.checks),
             "meldingen": onderdrukking.totaal,
+        }
+    if uitzonderingen is not None and uitzonderingen.actief:
+        document["uitzonderingen"] = {
+            "bestand": uitzonderingen.bestand,
+            "geaccepteerd": list(uitzonderingen.geaccepteerd),
+            "zonder_bevinding": list(uitzonderingen.zonder_bevinding),
+            "gewijzigde_waarde": [
+                {
+                    "melding_id": gewijzigd.melding_id,
+                    "snapshot": gewijzigd.snapshot,
+                    "waarde": gewijzigd.waarde,
+                }
+                for gewijzigd in uitzonderingen.gewijzigde_waarde
+            ],
         }
     if markering:
         document["markering"] = markering

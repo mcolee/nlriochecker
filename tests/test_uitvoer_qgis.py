@@ -211,9 +211,10 @@ def test_de_legenda_blijft_hanteerbaar(qgis_app, geschreven_gpkg: Path) -> None:
 
         regels = len(vector.renderer().legendSymbolItems())
 
-        # Per objecttype vijf statusregels plus het vangnet, en bij de strengen drie
+        # Per objecttype de typeregel plus zes statusregels (vijf statuswaarden en het
+        # vangnet, sinds issue #132 met `geaccepteerd` erbij), en bij de strengen drie
         # richtingsregels. Ruim genomen, maar ver onder de tweehonderd.
-        assert regels <= (len(soorten) + 1) * 6 + 5, f"{laag}: {regels} legendaregels"
+        assert regels <= (len(soorten) + 1) * 7 + 5, f"{laag}: {regels} legendaregels"
 
 
 def test_de_maptip_van_beide_objectlagen_toont_de_popup(qgis_app, geschreven_gpkg: Path) -> None:

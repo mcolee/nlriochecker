@@ -24,21 +24,25 @@ uit te halen.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from html import escape
 
 from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.melding import BRON_NULMETING, Melding
 
-# De vier statuswaarden, en geen vijfde. De symbologie filtert erop, dus een waarde
-# erbij betekent een regel erbij in elke QML.
+# De vijf statuswaarden. De symbologie filtert erop, dus een waarde erbij betekent een
+# regel erbij in elke QML. `geaccepteerd` is de vijfde (issue #132): een object waarvan
+# alle eigen meldingen geaccepteerd zijn (uit de foutentelling gehaald, maar wel
+# zichtbaar gebleven). Het is een eigen tint naast `grijs`, want "beoordeeld en bewust
+# aanvaard" is iets anders dan "niet beoordeeld".
 STATUS_ROOD = "rood"
 STATUS_ORANJE = "oranje"
 STATUS_GROEN = "groen"
 STATUS_GRIJS = "grijs"
+STATUS_GEACCEPTEERD = "geaccepteerd"
 
-STATUSSEN = (STATUS_ROOD, STATUS_ORANJE, STATUS_GROEN, STATUS_GRIJS)
+STATUSSEN = (STATUS_ROOD, STATUS_ORANJE, STATUS_GROEN, STATUS_GRIJS, STATUS_GEACCEPTEERD)
 
 # Wat de status in woorden zegt. De QML-legenda gebruikt dezelfde teksten, zodat
 # kaart en popup hetzelfde zeggen.
@@ -47,6 +51,7 @@ STATUS_WOORD = {
     STATUS_ORANJE: "alleen waarschuwingen",
     STATUS_GROEN: "geen eigen gebrek",
     STATUS_GRIJS: "niet geanalyseerd",
+    STATUS_GEACCEPTEERD: "geaccepteerde bevindingen",
 }
 
 # Zoveel meldingen toont de popup; daarna volgt een afsluitende regel. Hoveren is
@@ -74,12 +79,24 @@ class Objectkop:
     reden: str = ""
 
 
-def bepaal_status(meldingen: Sequence[Melding], *, geanalyseerd: bool) -> str:
-    """De status van een object: rood, oranje, groen of grijs.
+def bepaal_status(
+    meldingen: Sequence[Melding],
+    *,
+    geanalyseerd: bool,
+    geaccepteerd: Collection[str] = (),
+) -> str:
+    """De status van een object: rood, oranje, groen, grijs of geaccepteerd.
 
     `geanalyseerd` is onwaar voor een object dat buiten de beoordeling viel -- de
     contextschil van een studiegebied, of mechanisch riool, dat het checkregister
     grotendeels overslaat.
+
+    `geaccepteerd` zijn de melding-ID's die een uitzondering (issue #132) uit de
+    foutentelling haalde. Een object waarvan *alle* eigen (niet-systemische) meldingen
+    geaccepteerd zijn, en dat er ten minste een draagt, krijgt de status `geaccepteerd`:
+    er blijft geen open gebrek over, maar er is er wel bewust een aanvaard, en dat leest
+    anders dan groen ("niets gevonden") of grijs ("niet beoordeeld"). Een nog openstaande
+    fout of waarschuwing wint: dan is het object rood of oranje, ongeacht de acceptaties.
 
     **Grijs wint niet van een gebrek.** Dat is een correctie op de aanname dat
     mechanisch riool ongetoetst blijft: TOP-010 en TOP-011 draaien er wel degelijk op,
@@ -99,10 +116,13 @@ def bepaal_status(meldingen: Sequence[Melding], *, geanalyseerd: bool) -> str:
     zet het er met zoveel woorden onder.
     """
     eigen = [melding for melding in meldingen if not melding.systemisch]
-    if any(melding.ernst == "F" for melding in eigen):
+    open_ = [melding for melding in eigen if melding.melding_id not in geaccepteerd]
+    if any(melding.ernst == "F" for melding in open_):
         return STATUS_ROOD
-    if eigen:
+    if open_:
         return STATUS_ORANJE
+    if any(melding.melding_id in geaccepteerd for melding in eigen):
+        return STATUS_GEACCEPTEERD
     return STATUS_GROEN if geanalyseerd else STATUS_GRIJS
 
 

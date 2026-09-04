@@ -21,7 +21,7 @@ from shapely.geometry import box
 
 from gpkghelper import schrijf_vlakken
 from nlriochecker.afbakening import bouw_analyseset
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig, Uitzondering, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, Severity, run_checks
 from nlriochecker.errors import PipelineError
 from nlriochecker.externedata import ExternalData, load_external_data
@@ -214,6 +214,80 @@ def test_overzicht_checks_labelt_waarover_bekeken_geteld_is(tmp_path: Path) -> N
         "Drempelbreedte, Drempelniveau, Maaiveldhoogte, Putdekselniveau",
     )
     assert rijen["ADM-007"] == ("analyseset", "")
+
+
+def _run_met_uitzondering(bestand: str, *check_ids: str):
+    """Een run waarvan de eerste melding als geaccepteerd gemarkeerd is (issue #132).
+
+    De systemisch-minimumpopulatie blijft op de default 100, anders vouwt de enige
+    melding van deze kleine fixture tot systemisch en telt zij niet in de status.
+    Levert de run plus de bijbehorende meldingenstroom.
+    """
+    dataset = load_dataset(TTL_DIR / bestand, [])
+    config = load_check_config()
+    config.drempels.rd_y_min = 0.0
+    run = run_checks(CheckContext(dataset=dataset, config=config), list(check_ids) or None)
+    doel = bouw_meldingenstroom(run, RUNDATUM).meldingen[0]
+    run.config.rapport.uitzonderingen = "uitz.json"
+    run.config.rapport._uitzonderingen = [
+        Uitzondering(melding_id=doel.melding_id, reden="terecht", waarde_snapshot=doel.waarde)
+    ]
+    return run, doel, bouw_meldingenstroom(run, RUNDATUM)
+
+
+def test_een_geaccepteerde_bevinding_geeft_het_object_status_geaccepteerd(tmp_path: Path) -> None:
+    """Issue #132: het object valt uit de foutentelling en krijgt de vijfde status."""
+    run, doel, stroom = _run_met_uitzondering("top001_losliggende_put.ttl", "TOP-001")
+    pad = schrijf_geopackage(
+        run,
+        stroom.meldingen,
+        tmp_path,
+        RUNDATUM,
+        uitzonderingen=stroom.uitzonderingen,
+        feiten=stroom.feiten,
+    )
+
+    ((status,),) = _rijen(pad, "select status from putten where gwsw_uri = ?", doel.object_uri)
+    assert status == "geaccepteerd"
+    # De melding blijft ongewijzigd in de meldingentabel staan.
+    ((aantal,),) = _rijen(
+        pad, "select count(*) from meldingen where melding_id = ?", doel.melding_id
+    )
+    assert aantal == 1
+
+
+def test_runmetadata_telt_de_uitzonderingen(tmp_path: Path) -> None:
+    """De drie nieuwe kolommen in gwsw_run (issue #132)."""
+    run, _, stroom = _run_met_uitzondering("top001_losliggende_put.ttl", "TOP-001")
+    pad = schrijf_geopackage(
+        run,
+        stroom.meldingen,
+        tmp_path,
+        RUNDATUM,
+        uitzonderingen=stroom.uitzonderingen,
+        feiten=stroom.feiten,
+    )
+
+    rij = _rijen(
+        pad,
+        "select uitzonderingen_bestand, meldingen_geaccepteerd, "
+        "uitzonderingen_zonder_bevinding from gwsw_run",
+    )[0]
+
+    assert rij == ("uitz.json", 1, 0)
+
+
+def test_runmetadata_zonder_uitzonderingen_laat_de_kolommen_leeg(tmp_path: Path) -> None:
+    """Een run zonder uitzonderingenbestand: leeg bestand, nul geaccepteerd."""
+    pad = _schrijf(_run("schoon.ttl"), tmp_path)
+
+    rij = _rijen(
+        pad,
+        "select uitzonderingen_bestand, meldingen_geaccepteerd, "
+        "uitzonderingen_zonder_bevinding from gwsw_run",
+    )[0]
+
+    assert rij == ("", 0, 0)
 
 
 def test_runmetadata_maakt_het_bestand_herleidbaar(tmp_path: Path) -> None:

@@ -4977,3 +4977,48 @@ zakten daar van 108/224/37 naar 47/143/19 (samen −160), dus het totaalverschil
 issue #133.
 
 Zie [#133](https://github.com/mcolee/nlriochecker/issues/133), BO-45 en `docs/brutis-exportbevindingen.md`.
+
+### BO-91 Een geaccepteerde bevinding verdwijnt niet maar wordt hermarkeerd
+
+**Wat.** Een bevinding die na controle terecht blijkt te kloppen (een tegenverhang dat echt zo
+ligt, een riool onder een pand dat er hoort) kan per melding **geaccepteerd** worden. Dat haalt
+haar uit de foutentelling van haar object -- op de kaart krijgt dat object de vijfde status
+`geaccepteerd` -- maar laat haar in de meldingenstroom staan: ze blijft in het rapport, de CSV,
+de JSON en de meldingentabel. `[rapport] uitzonderingen` (issue #132) wijst een los JSON-bestand
+aan met records die elk een verplichte `melding_id` (de machinesleutel uit `uitvoer/identiteit.py`)
+en `reden` dragen, en optioneel `check_id`, `object_id`, `waarde_snapshot`, `datum` en `wie`.
+
+**Spiegelbeeld van de onderdrukking (BO-49).** De onderdrukking uit `[rapport]` houdt meldingen
+*vóór* elke schrijver uit de stroom -- ze verdwijnen echt, alleen de telling blijft. Een
+uitzondering doet het omgekeerde: de melding blijft en wordt hermarkeerd. Beide zijn een
+ingreeppunt in `bouw_meldingenstroom`; de uitzonderingen rekenen *ná* de onderdrukking over de
+meldingen die de schrijvers werkelijk zien. De status `geaccepteerd` wordt in `bepaal_status`
+berekend uit de geaccepteerde melding-ID's; ze wordt niet op de `Melding` opgeslagen, en er komt
+géén veld op `Melding` bij, zodat de bevroren JSON-envelop (`fields(Melding)`) ongemoeid blijft
+en `SCHEMA_VERSIE` 1.2 blijft.
+
+**Twee luide lijsten, geen auto-verval.** De acceptatie matcht op stringgelijkheid van `waarde`
+met `waarde_snapshot` (geen tolerantie). Een `melding_id` uit het bestand dat de run niet meer
+oplevert telt als "uitzondering zonder bevinding"; een melding die nog bestaat maar een andere
+waarde draagt telt als "gewijzigde waarde X -> Y" en wordt níét automatisch geaccepteerd. Beide
+lijsten staan volledig in het rapport en in de JSON, zodat een dood geworden acceptatie niet
+stilzwijgend vervalt.
+
+**Aannames (issue #132, bevestigd zonder afwijking).** (1) Het pad in `[rapport] uitzonderingen`
+resolt relatief aan het configbestand (`path.parent` in `load_check_config`), een bewuste
+afwijking van de `[bronnen]`-paden die t.o.v. de werkmap resolven -- het uitzonderingenbestand
+hoort bij de projectconfig. (2) `datum` is ISO-8601 (`JJJJ-MM-DD`), niet afgedwongen. (3) De
+status `geaccepteerd` krijgt een eigen, warme grijstint (`190,178,150`) naast het neutrale grijs
+(`158,158,158`): warmer en iets lichter, zodat "beoordeeld en bewust aanvaard" op de kaart te
+onderscheiden is van "niet beoordeeld".
+
+**Waar het staat.** Config: `ReportOptions.uitzonderingen` (pad) plus het `PrivateAttr`
+`_uitzonderingen` met de geparste `Uitzondering`-records (gelezen en gevalideerd in
+`load_check_config`; een ontbrekend bestand, ongeldige JSON, of een record zonder `melding_id`
+of `reden` is een `ConfigError`). Stroom: `Uitzonderingen`/`GewijzigdeWaarde` in
+`uitvoer/melding.py`. Uitvoer: sectie "Uitzonderingen" in het rapport, de drie `gwsw_run`-kolommen
+(`uitzonderingen_bestand`, `meldingen_geaccepteerd`, `uitzonderingen_zonder_bevinding`), en het
+JSON-blok `uitzonderingen`. Niet in de CSV -- run-context, geen rij-eigenschap, net als de CFK-set
+en de onderdrukking.
+
+Zie [#132](https://github.com/mcolee/nlriochecker/issues/132), BO-49 en `docs/json-schema.md`.

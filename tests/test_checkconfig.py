@@ -28,6 +28,28 @@ from nlriochecker.errors import ConfigError
 
 PROJECTCONFIG = Path(__file__).resolve().parents[1] / "configs" / "dewoldenhoogeveen.toml"
 
+# Een minimale, geldige projectconfig; `{extra}` haakt eventuele extra secties aan.
+_MINIMALE_CONFIG = (
+    "[klassen]\nput = ['Put']\nvrijvervalleiding = ['VrijvervalRioolleiding']\n"
+    "[nulmeting]\nvereiste_cfk = ['Hyd']\n[koppelregels]\n{extra}"
+)
+
+
+def _config_met_uitzonderingen(tmp_path: Path, json_inhoud: str | None, verwijzing: str) -> Path:
+    """Schrijft een config die naar een uitzonderingenbestand `verwijzing` wijst.
+
+    Is `json_inhoud` niet None, dan komt er een `uitz.json` naast; anders blijft die weg,
+    om het ontbrekende-bestand-geval te toetsen.
+    """
+    if json_inhoud is not None:
+        (tmp_path / "uitz.json").write_text(json_inhoud, encoding="utf-8")
+    pad = tmp_path / "config.toml"
+    pad.write_text(
+        _MINIMALE_CONFIG.format(extra=f'[rapport]\nuitzonderingen = "{verwijzing}"\n'),
+        encoding="utf-8",
+    )
+    return pad
+
 
 def test_standaardconfig_laadt() -> None:
     config = load_check_config()
@@ -299,6 +321,87 @@ def test_de_projectconfig_onderdrukt_het_mechanische_riool_en_de_pompunit() -> N
 def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
     """Een fout op een overstort weegt zwaarder dan een fout op een gewone put."""
     assert "Overstortput" in load_check_config().klassen.kritiek
+
+
+class TestUitzonderingen:
+    """Issue #132: het uitzonderingenbestand met geaccepteerde bevindingen."""
+
+    def test_zonder_verwijzing_is_er_geen_bestand_en_geen_record(self) -> None:
+        """De standaardconfig wijst geen uitzonderingenbestand aan."""
+        rapport = load_check_config().rapport
+
+        assert rapport.uitzonderingen is None
+        assert rapport.uitzonderingen_records == []
+
+    def test_een_geldig_bestand_wordt_gelezen(self, tmp_path: Path) -> None:
+        """De records reizen mee tot in de config, klaar voor de meldingenstroom."""
+        pad = _config_met_uitzonderingen(
+            tmp_path,
+            '[{"melding_id": "abc123", "reden": "tegenverhang klopt", '
+            '"waarde_snapshot": "0.02 m", "check_id": "HGT-006"}]',
+            "uitz.json",
+        )
+
+        rapport = load_check_config(pad).rapport
+
+        assert rapport.uitzonderingen == "uitz.json"
+        assert len(rapport.uitzonderingen_records) == 1
+        record = rapport.uitzonderingen_records[0]
+        assert record.melding_id == "abc123"
+        assert record.reden == "tegenverhang klopt"
+        assert record.waarde_snapshot == "0.02 m"
+
+    def test_het_pad_is_relatief_aan_het_configbestand(self, tmp_path: Path) -> None:
+        """Aanname 1: config-relatief, niet t.o.v. de werkmap.
+
+        De config staat in een submap; het bestand ernaast is `uitz.json`. Zou het pad
+        t.o.v. de werkmap resolven, dan werd het hier niet gevonden.
+        """
+        sub = tmp_path / "project"
+        sub.mkdir()
+        pad = _config_met_uitzonderingen(sub, '[{"melding_id": "x", "reden": "ok"}]', "uitz.json")
+
+        assert load_check_config(pad).rapport.uitzonderingen_records[0].melding_id == "x"
+
+    def test_ontbrekend_bestand_faalt(self, tmp_path: Path) -> None:
+        pad = _config_met_uitzonderingen(tmp_path, None, "weg.json")
+
+        with pytest.raises(ConfigError, match="kan niet gelezen worden"):
+            load_check_config(pad)
+
+    def test_ongeldige_json_faalt(self, tmp_path: Path) -> None:
+        pad = _config_met_uitzonderingen(tmp_path, "{ dit is geen json", "uitz.json")
+
+        with pytest.raises(ConfigError, match="geen geldige JSON"):
+            load_check_config(pad)
+
+    def test_geen_lijst_faalt(self, tmp_path: Path) -> None:
+        """Eén top-level JSON-lijst; een los object is geen bestand van records."""
+        pad = _config_met_uitzonderingen(tmp_path, '{"melding_id": "a", "reden": "b"}', "uitz.json")
+
+        with pytest.raises(ConfigError, match="JSON-lijst van records"):
+            load_check_config(pad)
+
+    def test_record_zonder_melding_id_faalt(self, tmp_path: Path) -> None:
+        pad = _config_met_uitzonderingen(tmp_path, '[{"reden": "zonder sleutel"}]', "uitz.json")
+
+        with pytest.raises(ConfigError, match="melding_id"):
+            load_check_config(pad)
+
+    def test_record_zonder_reden_faalt(self, tmp_path: Path) -> None:
+        pad = _config_met_uitzonderingen(tmp_path, '[{"melding_id": "abc"}]', "uitz.json")
+
+        with pytest.raises(ConfigError, match="reden"):
+            load_check_config(pad)
+
+    def test_een_onbekende_sleutel_faalt(self, tmp_path: Path) -> None:
+        """Met de hand geschreven; een tikfout in een sleutelnaam hoort luid te falen."""
+        pad = _config_met_uitzonderingen(
+            tmp_path, '[{"melding_id": "a", "reden": "b", "waarde_snapshott": "x"}]', "uitz.json"
+        )
+
+        with pytest.raises(ConfigError):
+            load_check_config(pad)
 
 
 # De configuratiemodellen met drempelvormige velden, met de TOML-sectie waarin ze

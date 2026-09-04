@@ -117,6 +117,7 @@ def schrijf_uitvoer(
         notities,
         met_csv=met_csv,
         onderdrukking=stroom.onderdrukking,
+        uitzonderingen=stroom.uitzonderingen,
     )
     geopackage = (
         schrijf_geopackage(
@@ -126,6 +127,7 @@ def schrijf_uitvoer(
             run_datum,
             voortgang=voortgang,
             onderdrukking=stroom.onderdrukking,
+            uitzonderingen=stroom.uitzonderingen,
             feiten=stroom.feiten,
         )
         if met_geopackage
@@ -143,6 +145,7 @@ def schrijf_uitvoer(
             markering=markering(run),
             gebied=gebied,
             onderdrukking=stroom.onderdrukking,
+            uitzonderingen=stroom.uitzonderingen,
             checks=checks_json(run),
         )
         if met_json

@@ -58,9 +58,11 @@ from nlriochecker.uitvoer.melding import (
     BRON_NULMETING,
     BRON_REGISTER,
     GEEN_ONDERDRUKKING,
+    GEEN_UITZONDERINGEN,
     Feiten,
     Melding,
     Onderdrukking,
+    Uitzonderingen,
     categorie_van,
 )
 from nlriochecker.uitvoer.objectkaart import (
@@ -194,6 +196,7 @@ def schrijf_geopackage(
     *,
     voortgang: Voortgang = NUL_VOORTGANG,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
     feiten: Feiten | None = None,
 ) -> Path:
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
@@ -215,6 +218,11 @@ def schrijf_geopackage(
     die twee checks geen rij, dan faalt het luid. Zonder die bewaking zou een aanroeper
     die de map vergeet de feitenregel van elk deelstelselvlak en de kolom
     `afstand_min_m` stil leeg laten lopen.
+
+    `uitzonderingen` komt eveneens uit de stroom (issue #132): de geaccepteerde
+    melding-ID's bepalen welke objecten de status `geaccepteerd` krijgen, en de drie
+    tellingen komen in `gwsw_run`. De melding zelf blijft in `meldingen` en dus in de
+    meldingentabel staan.
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)
@@ -230,13 +238,23 @@ def schrijf_geopackage(
         verbinding = sqlite3.connect(doel)
         _leg_fundament(verbinding)
         tellingen = _schrijf_features(
-            verbinding, run, meldingen, feiten or {}, binnen, run_datum, voortgang, onderdrukking
+            verbinding,
+            run,
+            meldingen,
+            feiten or {},
+            binnen,
+            run_datum,
+            voortgang,
+            onderdrukking,
+            uitzonderingen,
         )
         _schrijf_meldingen(verbinding, meldingen)
         voortgang.stap(label="meldingen")
         _schrijf_overzicht(verbinding, run, meldingen)
         voortgang.stap(label="overzicht_checks")
-        _schrijf_runmetadata(verbinding, run, meldingen, run_datum, tellingen, onderdrukking)
+        _schrijf_runmetadata(
+            verbinding, run, meldingen, run_datum, tellingen, onderdrukking, uitzonderingen
+        )
         voortgang.stap(label="gwsw_run")
         _schrijf_stijlen(verbinding)
         voortgang.stap(label="layer_styles")
@@ -500,6 +518,7 @@ def _schrijf_features(
     run_datum: date,
     voortgang: Voortgang = NUL_VOORTGANG,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
 ) -> _LaagTellingen:
     """Schrijft de twee objectlagen plus de vlakkenlaag.
 
@@ -547,6 +566,7 @@ def _schrijf_features(
     config = run.config
     mechanisch = _mechanische_uris(run)
     onderdrukt = _onderdrukte_uris(run, onderdrukking.klassen)
+    geaccepteerd = frozenset(uitzonderingen.geaccepteerd)
     ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
     # Het afvoerpad per knoop, uit `run.context`: de NET-checks hebben de graaf daar
@@ -610,6 +630,7 @@ def _schrijf_features(
                         afvoer_meters=afvoer_meters,
                         afvoer_stappen=afvoer_stappen,
                         reden=reden,
+                        geaccepteerd=geaccepteerd,
                     ),
                 )
             )
@@ -1396,6 +1417,7 @@ def _samenvatting(
     afvoer_meters: float | None = None,
     afvoer_stappen: int | None = None,
     reden: str = "",
+    geaccepteerd: frozenset[str] = frozenset(),
 ) -> tuple[object, ...]:
     """De samenvattingsvelden van een object, in de volgorde van de kolommen.
 
@@ -1413,6 +1435,12 @@ def _samenvatting(
     noemt de popup waarom. De status volgt verder dezelfde regel als `ergste_ernst`:
     systemische meldingen tellen niet mee, want anders is op De Wolden en Hoogeveen vrijwel elke
     put rood. Zie `objectkaart.bepaal_status`.
+
+    `geaccepteerd` zijn de melding-ID's die een uitzondering uit de foutentelling haalde
+    (issue #132): is elke eigen melding van dit object geaccepteerd, dan krijgt het de
+    status `geaccepteerd` in plaats van rood of oranje. De kolommen `ergste_ernst`,
+    `n_fout` en `n_waarschuwing` blijven de meldingen wél tellen -- ze staan er nog, alleen
+    aanvaard, en de meldingentabel draagt ze onverkort.
     """
     niet_systemisch = [melding for melding in eigen if not melding.systemisch]
     fouten = [melding for melding in niet_systemisch if melding.ernst == "F"]
@@ -1426,7 +1454,7 @@ def _samenvatting(
 
     label = getattr(object_, "label", "")
     objecttype = run.dataset.beheerobjecttype(uri)
-    status = bepaal_status(eigen, geanalyseerd=not reden)
+    status = bepaal_status(eigen, geanalyseerd=not reden, geaccepteerd=geaccepteerd)
     kop = Objectkop(
         label=label,
         objecttype=objecttype,
@@ -1816,6 +1844,7 @@ def _schrijf_runmetadata(
     run_datum: date,
     tellingen: _LaagTellingen,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
 ) -> None:
     """Schrijft een enkele rij met alles wat het bestand herleidbaar maakt."""
     kolommen = [
@@ -1864,6 +1893,14 @@ def _schrijf_runmetadata(
         _Kolom("onderdruk_klassen", "text"),
         _Kolom("onderdruk_checks", "text"),
         _Kolom("meldingen_onderdrukt", "integer"),
+        # De geaccepteerde bevindingen uit `[rapport] uitzonderingen` (issue #132): het
+        # bestand, hoeveel meldingen als geaccepteerd gemarkeerd zijn (die blijven in de
+        # meldingentabel staan; alleen de objectstatus wordt `geaccepteerd`), en hoeveel
+        # uitzonderingen deze run geen bevinding meer hadden -- een dode uitzondering die
+        # verantwoording verdient in plaats van stil te vervallen.
+        _Kolom("uitzonderingen_bestand", "text"),
+        _Kolom("meldingen_geaccepteerd", "integer"),
+        _Kolom("uitzonderingen_zonder_bevinding", "integer"),
         # De runbrede voorbehouden als een tekst, samengesteld door
         # `uitvoer.voorbehoud`; leeg als er niets voor te behouden valt. Dezelfde
         # string die boven het Markdown-rapport staat en in de JSON-envelop.
@@ -1915,6 +1952,9 @@ def _schrijf_runmetadata(
             ", ".join(onderdrukking.klassen),
             ", ".join(onderdrukking.checks),
             onderdrukking.totaal,
+            uitzonderingen.bestand,
+            len(uitzonderingen.geaccepteerd),
+            len(uitzonderingen.zonder_bevinding),
             markering(run) or "",
         ),
     )

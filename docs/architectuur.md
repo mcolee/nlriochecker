@@ -105,6 +105,25 @@ alleen het bestand waarin zij staat is verhuisd.
   bereikt geen enkele schrijver. Het rapport (verantwoording), `totaal/synthese.md`,
   `gwsw_run` (`onderdruk_klassen`, `onderdruk_checks`, `meldingen_onderdrukt`) en de
   JSON-envelop (`onderdrukt`) dragen de telling; de CSV niet. Zie BO-49.
+- **De uitzonderingen uit `[rapport] uitzonderingen`** (issue #132, BO-91) zijn het
+  tweede ingreeppunt in `bouw_meldingenstroom`, naast de onderdrukking en met een
+  tegengesteld doel: een geaccepteerde bevinding wordt niet uit de stroom gehaald maar
+  hermarkeerd. `_uitzonderingen` rekent *ná* de onderdrukking over de meldingen die de
+  schrijvers werkelijk zien, en levert een `Uitzonderingen`-dataclass (analoog aan
+  `Onderdrukking`): `geaccepteerd` zijn de melding-ID's die exact matchten
+  (stringgelijkheid van `waarde` met de `waarde_snapshot` uit het record, geen tolerantie)
+  en dus uit de foutentelling van hun object vallen; `zonder_bevinding` de dode
+  uitzonderingen (een melding-ID uit het bestand dat deze run niet oplevert) en
+  `gewijzigde_waarde` de records waarvan de melding nog bestaat maar een andere waarde
+  draagt -- geen automatische acceptatie, maar een luide vraag om herbeoordeling. Beide
+  lijsten vervallen nooit vanzelf. De geaccepteerde melding zelf blijft ongewijzigd in
+  `meldingen` (er komt géén veld op `Melding` bij); het Markdown-rapport (sectie
+  "Uitzonderingen"), `gwsw_run` (`uitzonderingen_bestand`, `meldingen_geaccepteerd`,
+  `uitzonderingen_zonder_bevinding`), de objectstatus `geaccepteerd` en de JSON-envelop
+  (`uitzonderingen`) dragen het; de CSV niet, en `SCHEMA_VERSIE` blijft 1.2 (additief).
+  Het pad in `[rapport] uitzonderingen` resolt relatief aan het configbestand (aanname 1),
+  anders dan de `[bronnen]`-paden; `load_check_config` leest en valideert het bestand en
+  laat de records als `ReportOptions.uitzonderingen_records` meereizen.
 - **Het feitenkanaal naast de vijf gereserveerde detailsleutels** (issue #122).
   `Finding.details` haalt de meldingenstroom niet: `_alle_meldingen` leest alleen
   `object2_uri`, `object2_label`, `waarde`, `drempel` en `cluster_id` -- plus, via
@@ -235,10 +254,18 @@ alleen het bestand waarin zij staat is verhuisd.
 ## GeoPackage en QGIS
 - De GeoPackage draagt sinds issue #98 precies drie featurelagen, een per geometrievorm:
   `putten` (punt), `strengen` (lijn) en `vlakken` (vlak). De twee objectlagen dragen de
-  gebreken op het object. Elk object heeft `status` (precies vier waarden: rood, oranje,
-  groen, grijs) en `popup_html` (een voorgebakken fragment, zonder stijlblok -- dat
-  staat een keer in de maptip). Beide lagen dragen ook `begindatum_jaar` (het aanlegjaar
-  uit `Begindatum`, leeg zonder datum; ATTR-018 meldt dat gat per object, issue #61).
+  gebreken op het object. Elk object heeft `status` (vijf waarden: rood, oranje,
+  groen, grijs en sinds issue #132 `geaccepteerd`) en `popup_html` (een voorgebakken
+  fragment, zonder stijlblok -- dat staat een keer in de maptip). Beide lagen dragen ook
+  `begindatum_jaar` (het aanlegjaar uit `Begindatum`, leeg zonder datum; ATTR-018 meldt
+  dat gat per object, issue #61).
+  `geaccepteerd` (BO-91) is de status van een object waarvan álle eigen (niet-systemische)
+  meldingen door een uitzondering uit `[rapport] uitzonderingen` uit de foutentelling
+  gehaald zijn: de meldingen blijven op het object staan (en in de meldingentabel), maar
+  het object leest niet meer als rood of oranje. Een nog openstaande fout of waarschuwing
+  wint; `bepaal_status` krijgt de geaccepteerde melding-ID's mee en berekent de waarde,
+  ze wordt niet op de melding opgeslagen. Het is een eigen, warme grijstint naast `grijs`,
+  want "beoordeeld en bewust aanvaard" is iets anders dan "niet beoordeeld".
   Grijs betekent: niet beoordeeld **en** niets gevonden;
   mechanisch riool wordt door de meeste checks overgeslagen maar niet door alle, en wat
   er wel op staat kleurt het object. **Elk** object van een klasse uit `[rapport]

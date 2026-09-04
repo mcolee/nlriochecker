@@ -11,7 +11,7 @@ die hij vervangt.
 
 De QML's worden hier opgebouwd in plaats van als bestand meegeleverd. De
 regelstructuur die issue #14 voorschrijft is objecttype x status, en met de 44
-knooptypen en 40 verbindingstypen in deze tabel zijn dat 220 respectievelijk 200
+knooptypen en 40 verbindingstypen in deze tabel zijn dat 264 respectievelijk 240
 bladregels met evenzoveel symbolen. Met de hand is dat ruim vierduizend regels XML
 waarin een tikfout de kaart stil leegtrekt, en waarin de typenlijst op twee plekken
 zou staan. `vlakken.qml` blijft wel een gewoon bestand: die heeft een vaste structuur
@@ -19,10 +19,10 @@ zou staan. `vlakken.qml` blijft wel een gewoon bestand: die heeft een vaste stru
 
 Een opgebouwde stijl draagt alleen regels voor de objecttypen die werkelijk in zijn
 laag staan; die krijgt hij van de schrijver mee. Dat is niet alleen zuiniger maar
-noodzakelijk: met de volledige tabel toont de lagenboom van QGIS 225 legendaregels
-voor de putten en 208 voor de strengen, op een laag met zes voorkomende typen. Dat is
-geen legenda meer maar een muur. Met de voorkomende typen zijn het er 35 en 38 --
-gemeten met PyQGIS op de echte uitvoer.
+noodzakelijk: met de volledige tabel toont de lagenboom van QGIS 270 legendaregels
+voor de putten en 249 voor de strengen, op een laag met zes voorkomende typen. Dat is
+geen legenda meer maar een muur. Met de voorkomende typen zijn het er een stuk of
+veertig -- gemeten met PyQGIS op de echte uitvoer.
 
 De kleur komt uitsluitend van de kolom `status`; het symbool zegt wat voor object het
 is. Voor verbindingen kan het symbool dat maar half dragen: het GWSW onderscheidt
@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from xml.sax.saxutils import escape, quoteattr
 
 from nlriochecker.uitvoer.objectkaart import (
+    STATUS_GEACCEPTEERD,
     STATUS_GRIJS,
     STATUS_GROEN,
     STATUS_ORANJE,
@@ -51,12 +52,16 @@ from nlriochecker.uitvoer.objectkaart import (
 # De statuskleuren, als RGB. Kleurenblind-veilig gekozen: rood is duidelijk donkerder
 # dan groen, dus ook in grijstinten en bij deuteranopie blijven ze uit elkaar te
 # houden. Grijs is als enige onverzadigd en valt daarmee uit de reeks weg -- precies
-# wat "niet beoordeeld" hoort te doen.
+# wat "niet beoordeeld" hoort te doen. `geaccepteerd` (issue #132) krijgt een eigen,
+# warme grijstint (een lichte beige-taupe): warmer en iets lichter dan het neutrale
+# grijs, zodat "beoordeeld en bewust aanvaard" op de kaart te onderscheiden is van
+# "niet beoordeeld" -- een lauwe restkleur, niet de alarmkleuren rood/oranje.
 STATUSKLEUR = {
     STATUS_ROOD: "178,24,43",
     STATUS_ORANJE: "224,130,20",
     STATUS_GROEN: "77,146,33",
     STATUS_GRIJS: "158,158,158",
+    STATUS_GEACCEPTEERD: "190,178,150",
 }
 
 # De randkleur van elk symbool. Een donkere rand houdt een licht symbool leesbaar op
@@ -266,6 +271,7 @@ MAPTIP = """<style>
   .s-oranje .s { color: #e08214; }
   .s-groen .s { color: #4d9221; }
   .s-grijs .s { color: #777; }
+  .s-geaccepteerd .s { color: #8a7d55; }
   .gwsw-popup .f, .gwsw-popup .r { color: #555; font-size: 8pt; margin-bottom: 4px; }
   .gwsw-popup .m { margin: 0; padding-left: 14px; }
   .gwsw-popup .m li { margin-bottom: 3px; }
@@ -295,10 +301,10 @@ def bouw_qml(laag: str, objecttypen: Collection[str] | None = None) -> str:
     `objecttypen` zijn de typen die in deze laag voorkomen. De stijl reist mee in het
     bestand waar hij bij hoort, dus hij hoeft alleen regels te dragen voor de data die
     erin staat. Dat scheelt niet alleen bytes maar vooral **legenda**: met de volledige
-    tabel krijgt de lagenboom van QGIS 225 regels voor de putten en 208 voor de
+    tabel krijgt de lagenboom van QGIS 270 regels voor de putten en 249 voor de
     strengen, op een laag met zes voorkomende typen. Onbruikbaar, en precies wat een
     blik op het scherm zou hebben laten zien. Met de voorkomende typen zijn het er een
-    stuk of dertig.
+    stuk of veertig.
 
     Zonder `objecttypen` komt de hele tabel erin. Dat is wat de tests doen: zij toetsen
     de tabel, niet een dataset.

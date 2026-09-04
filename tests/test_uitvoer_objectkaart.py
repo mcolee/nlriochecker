@@ -8,6 +8,7 @@ from helpers_melding import melding as _basismelding
 from nlriochecker.uitvoer.melding import BRON_NULMETING, BRON_REGISTER, Melding
 from nlriochecker.uitvoer.objectkaart import (
     MAX_MELDINGEN_IN_POPUP,
+    STATUS_GEACCEPTEERD,
     STATUS_GRIJS,
     STATUS_GROEN,
     STATUS_ORANJE,
@@ -39,7 +40,7 @@ def _melding(
 
 
 class TestStatus:
-    """Vier waarden, en geen vijfde."""
+    """Vijf waarden: rood, oranje, groen, grijs en (issue #132) geaccepteerd."""
 
     def test_een_fout_maakt_rood(self) -> None:
         assert bepaal_status([_melding("F")], geanalyseerd=True) == STATUS_ROOD
@@ -77,6 +78,42 @@ class TestStatus:
         Dezelfde regel als `ergste_ernst`, `n_fout` en `n_waarschuwing` al volgen.
         """
         assert bepaal_status([_melding("F", systemisch=True)], geanalyseerd=True) == STATUS_GROEN
+
+    def test_alle_meldingen_geaccepteerd_maakt_geaccepteerd(self) -> None:
+        """Issue #132: geen open gebrek meer, maar wel bewust een aanvaard."""
+        melding = _melding("F")
+        assert (
+            bepaal_status([melding], geanalyseerd=True, geaccepteerd={melding.melding_id})
+            == STATUS_GEACCEPTEERD
+        )
+
+    def test_een_open_fout_wint_van_een_acceptatie(self) -> None:
+        """Een nog openstaande fout maakt rood, ongeacht de acceptaties ernaast."""
+        aanvaard = _melding("F", check_id="TOP-001")
+        open_fout = _melding("F", check_id="TOP-011")
+        assert (
+            bepaal_status(
+                [aanvaard, open_fout], geanalyseerd=True, geaccepteerd={aanvaard.melding_id}
+            )
+            == STATUS_ROOD
+        )
+
+    def test_een_open_waarschuwing_naast_een_acceptatie_maakt_oranje(self) -> None:
+        aanvaard = _melding("F", check_id="TOP-001")
+        open_waarschuwing = _melding("W", check_id="TOP-011")
+        assert (
+            bepaal_status(
+                [aanvaard, open_waarschuwing], geanalyseerd=True, geaccepteerd={aanvaard.melding_id}
+            )
+            == STATUS_ORANJE
+        )
+
+    def test_zonder_geaccepteerde_meldingen_blijft_de_status_ongewijzigd(self) -> None:
+        """Een acceptatie-ID die niet op dit object staat verandert niets."""
+        assert (
+            bepaal_status([_melding("F")], geanalyseerd=True, geaccepteerd={"ander-object"})
+            == STATUS_ROOD
+        )
 
 
 class TestPopup:

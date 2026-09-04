@@ -109,6 +109,7 @@ nulmeting er duizenden telt. Wie de SHACL-analyse machineleesbaar wil, heeft
 | `volledig` | boolean | Waar als `cfk_set` gelijk is aan de volledige set uit `checks.toml`. Onwaar bij een deelset én bij een run zonder nulmeting. |
 | `typeringspoort_toegepast` | boolean | Of de typeringspoort daadwerkelijk gedraaid heeft. Zie [Over `typering_betrouwbaar`](#over-typering_betrouwbaar) — lees dit veld voordat je `typering_betrouwbaar` gebruikt. |
 | `onderdrukt` | object | *Optioneel.* Wat `[rapport]` in de projectconfiguratie uit de stroom hield: `klassen` (array van string, de wortelklassen), `checks` (array van string, de check-ID's) en `meldingen` (integer, hoeveel meldingen wegvielen). Het veld ontbreekt als beide lijsten leeg zijn. In `totaal/bevindingen.json` is `meldingen` de som over de gebieden, niet ontdubbeld -- net als de kolom Meldingen in de synthese. De CSV draagt de lijsten niet: de keuze hoort bij de run, niet bij de melding. |
+| `uitzonderingen` | object | *Optioneel.* De geaccepteerde bevindingen uit `[rapport] uitzonderingen`: `bestand` (string, het pad uit de config), `geaccepteerd` (array van string, de `melding_id`'s die uit de foutentelling vielen), `zonder_bevinding` (array van string, melding-ID's uit het bestand die deze run niet oplevert) en `gewijzigde_waarde` (array van object met `melding_id`, `snapshot` en `waarde`). De melding zelf blijft ongewijzigd in `meldingen`; een lezer joint op `melding_id`. Het veld ontbreekt als de projectconfiguratie geen uitzonderingenbestand aanwees. Zie [Over `uitzonderingen`](#over-uitzonderingen). |
 | `markering` | string | *Optioneel.* De runbrede voorbehouden van deze run als een tekst voor een lezer, dezelfde die boven het Markdown-rapport staat en in de kolom `markering` van `gwsw_run`. Twee voorbehouden worden twee alinea's, gescheiden door een lege regel. Het veld ontbreekt als er niets voor te behouden valt. |
 | `checks` | array van object | *Optioneel.* Een rij per uitgevoerde check met wat hij bekeken heeft: het aantal, waarover dat geteld is en welke populatie hij declareert. Gesorteerd op `check_id`. Zie [Over `checks`](#over-checks). Ontbreekt in `totaal/bevindingen.json`. |
 | `aantal_meldingen` | integer | Het aantal elementen in `meldingen`. Redundant, maar zo kan een afnemer een afgekapt bestand herkennen. |
@@ -156,6 +157,31 @@ het totaal, waarin elke weggevallen melding een keer telt.
 
 Het veld kwam er binnen `1.1` bij, als optioneel en additief veld, net als `markering`:
 wie het niet kent leest het bestand zoals voorheen.
+
+### Over `uitzonderingen`
+
+Een uitzondering (issue #132) accepteert een bevinding die na controle terecht bleek te
+kloppen: ze wordt uit de foutentelling van haar object gehaald -- op de kaart krijgt dat
+object de status `geaccepteerd` -- maar ze **verdwijnt niet**. De melding blijft
+ongewijzigd in `meldingen`, in de CSV en in de meldingentabel van de GeoPackage staan; dit
+blok zegt alleen wélke dat zijn. Dat is het spiegelbeeld van `onderdrukt`, dat meldingen
+juist vóór elke uitvoervorm weghoudt.
+
+`geaccepteerd` is daarom een lijst van `melding_id`'s en geen aantal: een lezer joint erop
+om de aanvaarde meldingen in `meldingen` terug te vinden. `bestand` is het pad zoals in
+`[rapport] uitzonderingen` geschreven, relatief aan het configbestand.
+
+Twee lijsten vervallen nooit vanzelf, zodat een dood geworden acceptatie niet stilzwijgend
+verdwijnt. `zonder_bevinding` zijn de `melding_id`'s uit het bestand die deze run niet meer
+oplevert (het defect is verholpen, de URI is hernummerd, of de melding viel op de
+onderdrukking weg). `gewijzigde_waarde` zijn de records waarvan de melding nog bestaat maar
+een andere `waarde` draagt dan de `snapshot` waarbij ze geaccepteerd werd; elk element
+draagt `melding_id`, `snapshot` (de waarde ten tijde van accepteren) en `waarde` (de
+huidige). Zo'n verschoven waarde wordt **niet** automatisch geaccepteerd -- de melding telt
+gewoon mee -- en vraagt om een herbeoordeling.
+
+Het veld kwam er binnen `1.2` bij, optioneel en additief: wie het niet kent leest het
+bestand zoals voorheen, en de melding zelf verandert er niet door.
 
 ### Over `checks`
 
@@ -442,7 +468,8 @@ toegestaan binnen het hoofdnummer, maar een bestaande afnemer merkt het -- vanda
 verhoging, waar `markering` en `onderdrukt` er als optionele toevoeging binnen `1.1` bij
 mochten. Dezelfde stap dekt de GeoPackage-herindeling van issue #98: die laat de JSON
 ongemoeid op de verwijzingen na, en het contract kent één nummer per blok wijzigingen, geen
-nummer per issue.
+nummer per issue. Het optionele veld `uitzonderingen` (issue #132) kwam er later binnen `1.2`
+bij, zonder verhoging: het is puur additief en laat de melding zelf ongemoeid.
 
 **Binnen een hoofdversie mag:**
 

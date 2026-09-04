@@ -156,6 +156,52 @@ GEEN_ONDERDRUKKING = Onderdrukking()
 
 
 @dataclass(frozen=True)
+class GewijzigdeWaarde:
+    """Een uitzondering die nog bestaat maar een andere `waarde` draagt dan haar snapshot.
+
+    De mens accepteerde de bevinding bij waarde `snapshot`; de run levert nu `waarde`.
+    Geen automatische acceptatie: de melding telt gewoon mee, en deze regel vraagt om
+    een herbeoordeling van X -> Y. Zie issue #132.
+    """
+
+    melding_id: str
+    snapshot: str
+    waarde: str
+
+
+@dataclass(frozen=True)
+class Uitzonderingen:
+    """De geaccepteerde bevindingen van een run, analoog aan `Onderdrukking` (issue #132).
+
+    Anders dan de onderdrukking houdt dit niets uit de stroom: de geaccepteerde melding
+    blijft staan in `Meldingenstroom.meldingen` (en dus in CSV, JSON en de
+    meldingentabel) en wordt alleen hermarkeerd -- de kaart geeft haar object de status
+    `geaccepteerd`. Dit blok telt en verantwoordt.
+
+    `bestand` is het pad uit `[rapport] uitzonderingen`, zoals in de config geschreven.
+    `geaccepteerd` zijn de melding-ID's die exact matchten (waarde gelijk aan de
+    snapshot) en dus uit de foutentelling van hun object vallen. De twee luide lijsten
+    vervallen nooit vanzelf: `zonder_bevinding` zijn de melding-ID's uit het bestand die
+    deze run niet oplevert (defect verholpen, URI hernummerd, of op de onderdrukking
+    weggevallen), `gewijzigde_waarde` de records waarvan de melding nog bestaat maar een
+    andere `waarde` draagt.
+    """
+
+    bestand: str = ""
+    geaccepteerd: tuple[str, ...] = ()
+    zonder_bevinding: tuple[str, ...] = ()
+    gewijzigde_waarde: tuple[GewijzigdeWaarde, ...] = ()
+
+    @property
+    def actief(self) -> bool:
+        """Of de projectconfiguratie een uitzonderingenbestand aanwees."""
+        return bool(self.bestand)
+
+
+GEEN_UITZONDERINGEN = Uitzonderingen()
+
+
+@dataclass(frozen=True)
 class Meldingenstroom:
     """De meldingen die de schrijvers krijgen, plus wat er vóór hen uit is gehouden."""
 
@@ -165,6 +211,10 @@ class Meldingenstroom:
     # voor de checks met `feit_sleutels`; hij loopt gelijk op met `meldingen`, dus wat
     # de onderdrukking wegliet laat ook geen feit achter.
     feiten: Feiten = field(default_factory=dict)
+    # De geaccepteerde bevindingen (issue #132). Ze blijven in `meldingen` staan; dit
+    # blok telt ze apart en draagt de twee luide lijsten. Berekend na de onderdrukking,
+    # dus over de meldingen die de schrijvers werkelijk zien.
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN
 
 
 def bouw_meldingenstroom(run: CheckRun, run_datum: date) -> Meldingenstroom:
@@ -224,6 +274,49 @@ def _onderdruk(meldingen: list[Melding], feiten: Feiten, run: CheckRun) -> Meldi
             for melding in over
             if melding.melding_id in feiten
         },
+        _uitzonderingen(over, run),
+    )
+
+
+def _uitzonderingen(over: list[Melding], run: CheckRun) -> Uitzonderingen:
+    """Verdeelt de geaccepteerde bevindingen over geaccepteerd, dood en gewijzigd.
+
+    Het tweede ingreeppunt naast de onderdrukking (issue #132), en met opzet *na* haar:
+    het rekent over de meldingen die de schrijvers werkelijk zien (`over`), zodat een
+    uitzondering op een onderdrukte melding als "zonder bevinding" telt in plaats van
+    stil te matchen op iets wat toch niet in de uitvoer komt.
+
+    Per record uit het bestand: bestaat de melding niet meer, dan is de uitzondering
+    dood ("zonder bevinding"). Bestaat ze nog en is haar `waarde` gelijk aan de snapshot
+    (stringgelijkheid, geen tolerantie), dan is ze geaccepteerd en valt ze uit de
+    foutentelling van haar object. Wijkt de waarde af, dan telt ze gewoon mee en vraagt
+    een "gewijzigde waarde X -> Y" om herbeoordeling -- geen automatische acceptatie.
+    De uitkomsten zijn op melding-ID gesorteerd, zodat twee runs op dezelfde data
+    dezelfde JSON en hetzelfde rapport opleveren.
+    """
+    bestand = run.config.rapport.uitzonderingen
+    if bestand is None:
+        return GEEN_UITZONDERINGEN
+
+    per_id = {melding.melding_id: melding for melding in over}
+    geaccepteerd: list[str] = []
+    zonder_bevinding: list[str] = []
+    gewijzigd: list[GewijzigdeWaarde] = []
+    for record in run.config.rapport.uitzonderingen_records:
+        melding = per_id.get(record.melding_id)
+        if melding is None:
+            zonder_bevinding.append(record.melding_id)
+        elif melding.waarde == record.waarde_snapshot:
+            geaccepteerd.append(record.melding_id)
+        else:
+            gewijzigd.append(
+                GewijzigdeWaarde(record.melding_id, record.waarde_snapshot, melding.waarde)
+            )
+    return Uitzonderingen(
+        bestand=bestand,
+        geaccepteerd=tuple(sorted(geaccepteerd)),
+        zonder_bevinding=tuple(sorted(zonder_bevinding)),
+        gewijzigde_waarde=tuple(sorted(gewijzigd, key=lambda g: g.melding_id)),
     )
 
 

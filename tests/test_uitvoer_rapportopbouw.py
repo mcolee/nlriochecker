@@ -17,7 +17,7 @@ import pandas as pd
 from gwsw_orox_helpers.dataset import load_dataset
 
 from helpers_melding import melding as _basismelding
-from nlriochecker.checkconfig import CheckConfig, load_check_config
+from nlriochecker.checkconfig import CheckConfig, Uitzondering, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.externedata import ExternalData
 from nlriochecker.meting import Meetbereik, laad_nulmeting
@@ -392,6 +392,64 @@ class TestOnderdrukking:
         """Gesorteerd op sleutel: anders verschilt de zin tussen twee runs op dezelfde data."""
         assert _telling({"TOP-011": 3, "ATTR-001": 2}) == "ATTR-001 2, TOP-011 3"
         assert _telling({}) == "geen"
+
+
+class TestUitzonderingen:
+    """Issue #132: de geaccepteerde bevindingen krijgen een eigen sectie."""
+
+    @staticmethod
+    def _run_met(records_van, bestand: str = "top001_losliggende_put.ttl") -> CheckRun:
+        """Een run met de uitzonderingen die `records_van(eerste_melding)` oplevert."""
+        from nlriochecker.uitvoer.melding import bouw_meldingenstroom
+
+        run = _run(bestand, "TOP-001")
+        eerste = bouw_meldingenstroom(run, RUNDATUM).meldingen[0]
+        run.config.rapport.uitzonderingen = "uitz.json"
+        run.config.rapport._uitzonderingen = records_van(eerste)
+        return run
+
+    def test_zonder_bestand_is_er_geen_sectie(self, tmp_path: Path) -> None:
+        tekst = _rapport(_run("top001_losliggende_put.ttl", "TOP-001"), tmp_path)
+
+        assert "## Uitzonderingen" not in tekst
+
+    def test_een_geaccepteerde_bevinding_krijgt_de_sectie_met_de_telling_per_check(
+        self, tmp_path: Path
+    ) -> None:
+        run = self._run_met(
+            lambda melding: [
+                Uitzondering(
+                    melding_id=melding.melding_id, reden="terecht", waarde_snapshot=melding.waarde
+                )
+            ]
+        )
+
+        tekst = _rapport(run, tmp_path)
+
+        assert "## Uitzonderingen" in tekst
+        assert "1 bevinding geaccepteerd" in tekst
+        assert "per check: TOP-001 1" in tekst
+        assert "`uitz.json`" in tekst
+
+    def test_de_dode_en_gewijzigde_lijsten_staan_volledig(self, tmp_path: Path) -> None:
+        run = self._run_met(
+            lambda melding: [
+                Uitzondering(melding_id="dood-1", reden="ooit"),
+                Uitzondering(melding_id="dood-2", reden="ooit"),
+                Uitzondering(
+                    melding_id=melding.melding_id,
+                    reden="ooit",
+                    waarde_snapshot=melding.waarde + "-oud",
+                ),
+            ]
+        )
+
+        tekst = _rapport(run, tmp_path)
+
+        assert "2 uitzonderingen zonder bevinding" in tekst
+        assert "`dood-1`" in tekst
+        assert "`dood-2`" in tekst
+        assert "1 uitzondering met gewijzigde waarde" in tekst
 
 
 class TestSystemischGeneriek:

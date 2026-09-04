@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from importlib import resources
@@ -12,6 +13,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    PrivateAttr,
     ValidationError,
     field_validator,
     model_validator,
@@ -584,6 +586,35 @@ class ExternalSources(BaseModel):
     bgt_overige_bouwwerklagen: list[str] = Field(default_factory=list)
 
 
+class Uitzondering(BaseModel):
+    """Eén geaccepteerde bevinding uit het uitzonderingenbestand (issue #132).
+
+    Een geaccepteerde bevinding is een melding die na controle terecht bleek te
+    kloppen; ze verdwijnt niet maar wordt in de meldingenstroom hermarkeerd als
+    `geaccepteerd` en apart geteld. De machinesleutel is `melding_id` (uit
+    `uitvoer/identiteit.py`); `reden` is de verplichte verantwoording. De rest is
+    leesbare context voor de mens: `check_id` en `object_id` om het record thuis te
+    brengen, `waarde_snapshot` de waarde ten tijde van accepteren (waarop de stroom
+    stringgelijkheid toetst; wijkt de huidige waarde af, dan is dat een luide
+    "gewijzigde waarde" en géén automatische acceptatie), `datum` (ISO-8601, aanname 2
+    uit issue #132) en de optionele `wie`.
+
+    `extra="forbid"`: het bestand is met de hand geschreven, en een tikfout in een
+    sleutelnaam (`waarde_snapshott`) hoort luid te falen in plaats van stil genegeerd
+    te worden.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    melding_id: str = Field(min_length=1)
+    reden: str = Field(min_length=1)
+    check_id: str = ""
+    object_id: str = ""
+    waarde_snapshot: str = ""
+    datum: str = ""
+    wie: str = ""
+
+
 class ReportOptions(BaseModel):
     """Instellingen van de rapportage en de GIS-uitvoer."""
 
@@ -609,6 +640,20 @@ class ReportOptions(BaseModel):
     # om dezelfde reden als de CFK-set; zie BO-49.
     onderdruk_klassen: list[str] = Field(default_factory=list)
     onderdruk_checks: list[str] = Field(default_factory=list)
+    # Issue #132: pad naar een JSON-bestand met geaccepteerde bevindingen
+    # (uitzonderingen), relatief t.o.v. dít configbestand (aanname 1). Anders dan de
+    # `[bronnen]`-paden, die t.o.v. de werkmap resolven -- config-relatief is hier de
+    # robuustere keuze, want het uitzonderingenbestand hoort bij de projectconfig. Het
+    # veld draagt alleen het pad; de geparste records reizen mee in `_uitzonderingen`,
+    # dat `load_check_config` na het valideren vult (geen TOML-sleutel, dus een
+    # `PrivateAttr`).
+    uitzonderingen: str | None = None
+    _uitzonderingen: list[Uitzondering] = PrivateAttr(default_factory=list)
+
+    @property
+    def uitzonderingen_records(self) -> list[Uitzondering]:
+        """De geparste records uit het uitzonderingenbestand; leeg zonder bestand."""
+        return self._uitzonderingen
 
     @field_validator("onderdruk_checks")
     @classmethod
@@ -673,6 +718,45 @@ def load_check_config(path: Path | None = None) -> CheckConfig:
         raise ConfigError(f"{path}: geen geldige TOML ({error}).") from error
 
     try:
-        return CheckConfig.model_validate(rauw)
+        config = CheckConfig.model_validate(rauw)
     except ValidationError as error:
         raise ConfigError(f"{path}: configuratie is ongeldig.\n{error}") from error
+
+    if config.rapport.uitzonderingen is not None:
+        # Pad relatief t.o.v. het configbestand (aanname 1). Een absoluut pad blijft
+        # absoluut; `Path.__truediv__` handelt dat af.
+        config.rapport._uitzonderingen = _lees_uitzonderingen(
+            path.parent / config.rapport.uitzonderingen
+        )
+    return config
+
+
+def _lees_uitzonderingen(pad: Path) -> list[Uitzondering]:
+    """Leest en valideert het uitzonderingenbestand (issue #132).
+
+    Eén top-level JSON-lijst van records. Fouten -- een ontbrekend bestand, ongeldige
+    JSON, iets anders dan een lijst, of een record zonder `melding_id` of zonder
+    `reden` -- komen als `ConfigError` naar boven, net als de TOML-fouten hierboven.
+    """
+    try:
+        rauw = pad.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ConfigError(
+            f"{pad}: uitzonderingenbestand kan niet gelezen worden ({error})."
+        ) from error
+
+    try:
+        data = json.loads(rauw)
+    except json.JSONDecodeError as error:
+        raise ConfigError(f"{pad}: geen geldige JSON ({error}).") from error
+
+    if not isinstance(data, list):
+        raise ConfigError(f"{pad}: het uitzonderingenbestand moet een JSON-lijst van records zijn.")
+
+    records: list[Uitzondering] = []
+    for index, rauw_record in enumerate(data):
+        try:
+            records.append(Uitzondering.model_validate(rauw_record))
+        except ValidationError as error:
+            raise ConfigError(f"{pad}: uitzondering {index} is ongeldig.\n{error}") from error
+    return records
