@@ -120,6 +120,29 @@ Voor de auditissues geldt een afwijking van regel 1: de sessie is niet AFK, de a
 per check in de sessie zelf. Regel 2 blijft: de agent maakt geen issues aan; de
 vervolgvoorstellen staan in de sluitcomment en de auteur kiest.
 
+### Blok G — grilling van 04-09-2026 (blokken A–F zijn af)
+
+Acht issues, op 04-09 samen met de auteur naar de huisstijl gebracht. Anders dan de blokken
+hierboven worden ze niet één-per-sessie met de hand aangestuurd maar in één onbewaakte
+AFK-regiesessie: Fable 5.1 als regisseur, Opus 4.8-implementers en -reviewers. De volledige
+brief (volgorde, bewijslast, bijzonderheden, slotstap) staat in
+`docs/agents/afk-regie-issues-125-136.md`; de regels 1–6 hierboven gelden daar via het
+sjabloon `docs/agents/afk-regie.md`. Startprompt: `Voer docs/agents/afk-regie-issues-125-136.md
+uit`.
+
+| # | Issue | Blocked by | Waarom hier |
+|---|-------|------------|-------------|
+| 31 | #135 | — | leeslaag naar helper v0.2.1; elke latere meting draait op de nieuwe leeslaag |
+| 32 | #130 | — | drukriool-ruis op TOP-019/022/023; klein en volledig gespecificeerd |
+| 33 | #133 | — | ATTR-019 putdiepte ontbreekt; +20.758, de grootste verschuiving |
+| 34 | #134 | — | nulmeting-kopblok als voorbehoud; eerste contractraker (JSON additief) |
+| 35 | #132 | — | uitzonderingen; zwaarste contractraker (config, status, JSON, `gwsw_run`) |
+| 36 | #125 | #135 | GWSW 1.7-support op de nieuwe helper-API |
+| 37 | #131 | — | stelselboom-leeslaag; geen consumer, geen verschuiving |
+| 38 | #129 | #131 | VGS-voorwaarde NET-006; +24 |
+
+**#136** (needs-info) wacht op een 1.7-SHACL-CSV van de auteur en hoort niet in de reeks.
+
 ## Onderbouwing van de volgorde
 
 - **Bugs vóór vangnetten**: een drifttest die een vervuild getal vastlegt, bewaakt
