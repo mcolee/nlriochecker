@@ -24,8 +24,10 @@ from nlriochecker.taal import getal, vorm
 from nlriochecker.uitvoer.melding import (
     BRON_REGISTER,
     GEEN_ONDERDRUKKING,
+    GEEN_UITZONDERINGEN,
     Melding,
     Onderdrukking,
+    Uitzonderingen,
 )
 from nlriochecker.uitvoer.tabel import table
 
@@ -50,6 +52,10 @@ class GebiedsSamenvatting:
     # de gebieden op; de telling per check en per klasse staat in de verantwoording van
     # elk gebied.
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING
+    # De geaccepteerde bevindingen van dit gebied (issue #132). De "zonder bevinding"-lijst
+    # per gebied is vals alarm zodra er meer dan een gebied is -- een acceptatie in gebied A
+    # bestaat niet in gebied B -- dus de totaalsynthese verzoent haar tegen de vereniging.
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN
 
 
 # De checks die samen op een verkeerd geregistreerde afvoerrichting wijzen.
@@ -205,6 +211,7 @@ def totaalsynthese(
     *,
     met_csv: bool = True,
     met_json: bool = True,
+    uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
 ) -> list[str]:
     """Stelt de romp van de totaalsynthese over meerdere studiegebieden samen.
 
@@ -284,6 +291,31 @@ def totaalsynthese(
             "klasse staat in de verantwoording van elk gebied).",
             "",
         ]
+
+    if uitzonderingen.actief:
+        geaccepteerd = getal(
+            len(uitzonderingen.geaccepteerd), "bevinding geaccepteerd", "bevindingen geaccepteerd"
+        )
+        # Uniek over de gebieden: een object op een grens telt in elk rakend gebied mee,
+        # maar `geaccepteerd` is een lijst van melding-ID's en die hoort niet te dubbelen.
+        # "Zonder bevinding" is hier tegen de vereniging van alle gebieden beoordeeld, dus
+        # zonder het valse alarm dat een acceptatie in gebied A in gebied B zou geven.
+        zin = (
+            f"Over alle gebieden samen zijn {geaccepteerd} op grond van "
+            "`[rapport] uitzonderingen` (uniek over de gebieden); ze blijven in de archieven "
+            "staan en tellen in geen foutentelling mee."
+        )
+        if uitzonderingen.zonder_bevinding:
+            dood = getal(
+                len(uitzonderingen.zonder_bevinding),
+                "uitzondering",
+                "uitzonderingen",
+            )
+            zin += (
+                f" {dood} zonder bevinding in geen enkel gebied -- die vervalt niet vanzelf "
+                "en vraagt om een blik."
+            )
+        regels += [zin, ""]
 
     regels += [
         *table(per_gebied, "Per gebied"),

@@ -14,7 +14,7 @@ de meldingen, en de som over de regels ligt daarom hoger dan het totaal.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 from nlriochecker.checks import Severity
@@ -68,6 +68,7 @@ def samenvatting(
     meetbereik: Meetbereik,
     *,
     klassenhierarchie: bool = True,
+    geaccepteerd: Collection[str] = (),
 ) -> list[Regel]:
     """De regels van de managementsamenvatting, in vaste volgorde.
 
@@ -90,7 +91,15 @@ def samenvatting(
     wel hun oordeel dragen: hun tellingen komen uit de SHACL-nulmeting, die de dataset
     wel degelijk gemeten heeft, en ze op "niet gemeten" zetten zou een uitgevoerde
     meting verzwijgen.
+
+    `geaccepteerd` zijn de melding-ID's die een uitzondering (issue #132) uit de
+    foutentelling haalde. Ze tellen hier in geen enkele regel mee -- een vinkje mag niet
+    naar een kruisje omslaan om een bevinding die de beheerder bewust aanvaard heeft,
+    precies zoals de kaartstatus haar al negeert. Ze blijven wel als rij in de CSV, de
+    JSON, de meldingentabel en de detailtabellen staan.
     """
+    if geaccepteerd:
+        meldingen = [melding for melding in meldingen if melding.melding_id not in geaccepteerd]
     regels = [_cfk_regel(cfk, meldingen, meetbereik) for cfk in meetbereik.volledige_set]
     eigen = _eigen_regel(meldingen)
     regels.append(eigen if klassenhierarchie else _zonder_oordeel(eigen))

@@ -17,7 +17,7 @@ schrijver aan te pas.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
@@ -39,9 +39,12 @@ from nlriochecker.uitvoer.bevindingen import (
 from nlriochecker.uitvoer.gpkg import schrijf_geopackage
 from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_json, schrijf_markdown
 from nlriochecker.uitvoer.melding import (
+    GEEN_UITZONDERINGEN,
+    GewijzigdeWaarde,
     Melding,
     Meldingenstroom,
     Onderdrukking,
+    Uitzonderingen,
     bouw_meldingenstroom,
 )
 from nlriochecker.uitvoer.synthese import GebiedsSamenvatting, totaalsynthese
@@ -204,7 +207,10 @@ def schrijf_uitvoer_gebieden(
             met_json=met_json,
             voortgang=voortgang,
             gebied=gebiedsrun.naam,
-            stroom=stroom,
+            # Per gebied vervalt de "zonder bevinding"-lijst: het gedeelde bestand matcht
+            # tegen alleen dit gebied, dus een acceptatie in een ander gebied zou hier vals
+            # als dood tellen. `totaal/` beoordeelt haar tegen de vereniging (issue #132).
+            stroom=_zonder_dode_uitzonderingen(stroom),
             notities=overgeslagen,
         )
         analyseset = gebiedsrun.run.analyseset
@@ -216,6 +222,7 @@ def schrijf_uitvoer_gebieden(
                 kern_objecten=len(analyseset.kern) if analyseset is not None else 0,
                 meldingen=stroom.meldingen,
                 onderdrukking=stroom.onderdrukking,
+                uitzonderingen=stroom.uitzonderingen,
             )
         )
 
@@ -257,6 +264,7 @@ def _schrijf_totaal(
         for melding in deel.meldingen:
             uniek.setdefault(melding.melding_id, melding)
     unieke = list(uniek.values())
+    uitzonderingen = _som_uitzonderingen(verzameld, eerste.config.rapport)
 
     synthese = schrijf_markdown(
         doel / FILE_SYNTHESE,
@@ -270,6 +278,7 @@ def _schrijf_totaal(
             eerste.dataset.source.name,
             met_csv=met_csv,
             met_json=met_json,
+            uitzonderingen=uitzonderingen,
         ),
         run_datum,
         markering=markering(eerste),
@@ -287,11 +296,63 @@ def _schrijf_totaal(
             markering=markering(eerste),
             gebieden=[gebiedsrun.naam for gebiedsrun in runs],
             onderdrukking=_som_onderdrukking(verzameld, eerste.config.rapport),
+            uitzonderingen=uitzonderingen,
         )
         if met_json
         else None
     )
     return synthese, totaal_csv, totaal_json
+
+
+def _zonder_dode_uitzonderingen(stroom: Meldingenstroom) -> Meldingenstroom:
+    """Dezelfde stroom, maar met een lege "zonder bevinding"-lijst.
+
+    Voor de per-gebied-uitvoer van een run over meerdere gebieden: het gedeelde
+    uitzonderingenbestand matcht per gebied tegen alleen dat gebied, dus een acceptatie
+    die in een ander gebied wél een bevinding heeft zou hier vals als "zonder bevinding"
+    tellen. `totaal/` draagt de dode lijst, beoordeeld tegen de vereniging (issue #132).
+    """
+    if not stroom.uitzonderingen.zonder_bevinding:
+        return stroom
+    return replace(stroom, uitzonderingen=replace(stroom.uitzonderingen, zonder_bevinding=()))
+
+
+def _som_uitzonderingen(
+    verzameld: Sequence[GebiedsSamenvatting], rapport: ReportOptions
+) -> Uitzonderingen:
+    """De uitzonderingen van alle gebieden samen, voor `totaal/` (issue #132).
+
+    `geaccepteerd` en `gewijzigde_waarde` zijn de vereniging over de gebieden, ontdubbeld
+    op melding-ID: het zijn lijsten van melding-ID's en een object op een gebiedsgrens telt
+    daarin niet dubbel. "Zonder bevinding" wordt hier -- en alleen hier -- correct bepaald:
+    een record is pas echt dood als zijn melding-ID in géén enkel gebied een bevinding gaf,
+    dus niet als geaccepteerd en niet als gewijzigde waarde ergens matchte.
+    """
+    if rapport.uitzonderingen is None:
+        return GEEN_UITZONDERINGEN
+
+    geaccepteerd: dict[str, None] = {}
+    gewijzigd: dict[str, GewijzigdeWaarde] = {}
+    for deel in verzameld:
+        for melding_id in deel.uitzonderingen.geaccepteerd:
+            geaccepteerd.setdefault(melding_id)
+        for wijziging in deel.uitzonderingen.gewijzigde_waarde:
+            gewijzigd.setdefault(wijziging.melding_id, wijziging)
+
+    gematcht = set(geaccepteerd) | set(gewijzigd)
+    zonder_bevinding = sorted(
+        {
+            record.melding_id
+            for record in rapport.uitzonderingen_records
+            if record.melding_id not in gematcht
+        }
+    )
+    return Uitzonderingen(
+        bestand=rapport.uitzonderingen,
+        geaccepteerd=tuple(sorted(geaccepteerd)),
+        zonder_bevinding=tuple(zonder_bevinding),
+        gewijzigde_waarde=tuple(sorted(gewijzigd.values(), key=lambda w: w.melding_id)),
+    )
 
 
 def _som_onderdrukking(

@@ -28,6 +28,7 @@ from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import (
     BRON_DATASET,
     BRON_NULMETING,
+    BRON_REGISTER,
     GEEN_ONDERDRUKKING,
     GEEN_UITZONDERINGEN,
     Melding,
@@ -319,13 +320,14 @@ def _render_checks(
     niet naar verwijzen: dat zou de lezer naar een bestand sturen dat er niet is,
     juist voor de bevindingen die het rapport zelf weglaat (issue #66).
     """
+    geaccepteerd = frozenset(uitzonderingen.geaccepteerd)
     lines = _omvang_section(run)
-    lines += _samenvatting_section(run, meldingen)
+    lines += _samenvatting_section(run, meldingen, geaccepteerd)
     # De rode draad hoort bij de samenvatting en niet bij het detail: hij zegt wat de
     # bevindingen samen betekenen, en dat is precies wat een lezer na de vier regels
     # hierboven wil weten -- niet pas achter de tabellen.
     lines += rode_draad(run, meldingen)
-    lines += _verantwoording(run, meldingen, notities, onderdrukking, met_csv=met_csv)
+    lines += _verantwoording(run, meldingen, notities, onderdrukking, geaccepteerd, met_csv=met_csv)
     lines += _uitzonderingen_section(uitzonderingen, meldingen)
     lines += ["", "## Detailrapportage", ""]
     nulmeting = _detail_nulmeting(run, meldingen)
@@ -441,14 +443,22 @@ def _afhankelijkheden_section(run: CheckRun) -> list[str]:
     return regels
 
 
-def _samenvatting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
-    """Voldoen we in dit gebied: een regel per conformiteitsklasse plus de eigen checks."""
+def _samenvatting_section(
+    run: CheckRun, meldingen: list[Melding], geaccepteerd: frozenset[str] = frozenset()
+) -> list[str]:
+    """Voldoen we in dit gebied: een regel per conformiteitsklasse plus de eigen checks.
+
+    Geaccepteerde bevindingen (issue #132) tellen hier niet mee: een vinkje slaat niet om
+    naar een kruisje voor een bewust aanvaarde bevinding, net zoals de kaartstatus haar
+    negeert.
+    """
     regels = ["## Voldoen we in dit gebied?", ""]
     regels += als_tabel(
         samenvatting(
             meldingen,
             run.meetbereik,
             klassenhierarchie=run.dataset.klassenhierarchie_bekend,
+            geaccepteerd=geaccepteerd,
         )
     )
     regels += [
@@ -467,6 +477,7 @@ def _verantwoording(
     meldingen: list[Melding],
     notities: Sequence[str] = (),
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
+    geaccepteerd: frozenset[str] = frozenset(),
     *,
     met_csv: bool = True,
 ) -> list[str]:
@@ -475,15 +486,26 @@ def _verantwoording(
     Deze sectie stond voorheen boven aan het rapport. Ze is verplaatst, niet
     ingekort: wat een check *niet* bekeken heeft hoort in het rapport, en stilte
     leest als "alles gecontroleerd".
+
+    Geaccepteerde bevindingen (issue #132) tellen niet in de foutentelling "X fouten en
+    Y waarschuwingen": ze zijn bewust aanvaard en de kaartstatus negeert ze al. Ze
+    blijven wel als rij in de archieven en in de detailtabellen staan.
     """
     onbetrouwbaar = sum(outcome.unreliable_count for outcome in run.outcomes)
+    # `run.count` telt de eigen-check-bevindingen; trek de geaccepteerde register-
+    # meldingen ervan af, zodat de foutentelling dezelfde bevindingen negeert als de
+    # kaartstatus. De onderdrukking blijft ongemoeid: die zit niet in de stroom en dus
+    # niet in `geaccepteerd`, dat alleen melding-ID's uit `over` bevat.
+    geaccepteerd_fout = _geaccepteerd_eigen(meldingen, geaccepteerd, Severity.ERROR)
+    geaccepteerd_waarschuwing = _geaccepteerd_eigen(meldingen, geaccepteerd, Severity.WARNING)
     lines = [
         "## Verantwoording",
         "",
         f"Bron: `{run.dataset.source}` — {len(run.dataset.nodes)} knooppunten, "
         f"{len(run.dataset.conduits)} strengen.",
         "",
-        f"{run.count(Severity.ERROR)} fouten en {run.count(Severity.WARNING)} waarschuwingen "
+        f"{run.count(Severity.ERROR) - geaccepteerd_fout} fouten en "
+        f"{run.count(Severity.WARNING) - geaccepteerd_waarschuwing} waarschuwingen "
         f"uit {len(run.outcomes)} eigen checks.",
         "",
     ]
@@ -748,6 +770,26 @@ def _uitzonderingen_section(uitzonderingen: Uitzonderingen, meldingen: list[Meld
         regels += [""]
 
     return regels
+
+
+def _geaccepteerd_eigen(
+    meldingen: list[Melding], geaccepteerd: frozenset[str], severity: Severity
+) -> int:
+    """Hoeveel geaccepteerde eigen-check-meldingen deze ernst dragen (issue #132).
+
+    Precies de bevindingen die `run.count` telde maar die de acceptatie uit de
+    foutentelling haalt: register-meldingen met een geaccepteerde melding-ID. Nulmeting-
+    en datasetmeldingen tellen niet in `run.count` en horen hier dus niet af.
+    """
+    if not geaccepteerd:
+        return 0
+    return sum(
+        1
+        for melding in meldingen
+        if melding.bron == BRON_REGISTER
+        and melding.ernst == severity.value
+        and melding.melding_id in geaccepteerd
+    )
 
 
 def _per_check(meldingen: list[Melding]) -> dict[str, list[Melding]]:

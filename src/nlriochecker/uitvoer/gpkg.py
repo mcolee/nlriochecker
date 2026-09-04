@@ -1437,12 +1437,17 @@ def _samenvatting(
     put rood. Zie `objectkaart.bepaal_status`.
 
     `geaccepteerd` zijn de melding-ID's die een uitzondering uit de foutentelling haalde
-    (issue #132): is elke eigen melding van dit object geaccepteerd, dan krijgt het de
-    status `geaccepteerd` in plaats van rood of oranje. De kolommen `ergste_ernst`,
-    `n_fout` en `n_waarschuwing` blijven de meldingen wél tellen -- ze staan er nog, alleen
-    aanvaard, en de meldingentabel draagt ze onverkort.
+    (issue #132). Ze tellen in géén foutentelling of ernst-samenvatting mee, precies zoals
+    `status` ze al negeert: `ergste_ernst`, `n_fout`, `n_waarschuwing` en de lijsten
+    `checks_f`/`checks_w` slaan een geaccepteerde melding over. De categorietellingen
+    (`n_top`, ...) en de meldingentabel dragen haar onverkort -- de melding verdwijnt niet,
+    ze weegt alleen niet mee in het oordeel.
     """
-    niet_systemisch = [melding for melding in eigen if not melding.systemisch]
+    niet_systemisch = [
+        melding
+        for melding in eigen
+        if not melding.systemisch and melding.melding_id not in geaccepteerd
+    ]
     fouten = [melding for melding in niet_systemisch if melding.ernst == "F"]
     waarschuwingen = [melding for melding in niet_systemisch if melding.ernst == "W"]
     ernst = "F" if fouten else ("W" if waarschuwingen else "geen")

@@ -440,15 +440,25 @@ ligt, een riool onder een pand dat er hoort -- kun je **accepteren** zonder haar
 verdwijnen. `[rapport] uitzonderingen` wijst een los JSON-bestand aan (pad relatief aan de
 projectconfig): één lijst van records met elk een verplichte `melding_id` (de machinesleutel
 uit `bevindingen.csv` / de JSON) en `reden`, en optioneel `check_id`, `object_id`,
-`waarde_snapshot`, `datum` en `wie`. Een geaccepteerde bevinding valt uit de foutentelling
-van haar object -- op de kaart krijgt dat object de status `geaccepteerd` -- maar blijft
-gewoon in het rapport, de CSV, de JSON en de meldingentabel staan. Het rapport en de
+`waarde_snapshot`, `datum` en `wie`. Een geaccepteerde bevinding telt in **geen enkele
+foutentelling** meer mee: de managementsamenvatting (een vinkje slaat niet om naar een
+kruisje), de foutenregel in de verantwoording en de kolommen `status`, `n_fout`,
+`n_waarschuwing` en `ergste_ernst` op `putten`/`strengen` negeren haar -- op de kaart krijgt
+haar object de status `geaccepteerd`. Ze blijft wél als rij in het rapport (de detailtabellen),
+de CSV, de JSON en de meldingentabel staan; ze verdwijnt niet, ze weegt alleen niet mee in het
+oordeel. Het rapport en de
 JSON-envelop (`uitzonderingen`) en de kolommen `uitzonderingen_bestand`,
 `meldingen_geaccepteerd` en `uitzonderingen_zonder_bevinding` in `gwsw_run` verantwoorden
 hoeveel er geaccepteerd zijn. Twee dingen worden luid gemeld en vervallen nooit vanzelf: een
 `melding_id` uit het bestand dat de run niet meer oplevert ("uitzondering zonder bevinding"),
 en een melding die nog bestaat maar een andere waarde draagt dan de `waarde_snapshot` -- die
 wordt níét automatisch geaccepteerd en vraagt om herbeoordeling.
+
+Bij een run over meerdere gebieden matcht het gedeelde bestand per gebied tegen alleen dat
+gebied. De "zonder bevinding"-lijst per gebied zou dan vals alarm geven (een acceptatie in
+gebied A bestaat niet in gebied B), dus die lijst vervalt per gebied en staat alleen in
+`totaal/`, beoordeeld tegen alle gebieden samen; `totaal/synthese.md` en
+`totaal/bevindingen.json` dragen de geaccepteerde bevindingen net als de onderdrukking.
 
 ## Voortgang
 

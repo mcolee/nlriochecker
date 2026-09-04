@@ -180,6 +180,15 @@ draagt `melding_id`, `snapshot` (de waarde ten tijde van accepteren) en `waarde`
 huidige). Zo'n verschoven waarde wordt **niet** automatisch geaccepteerd -- de melding telt
 gewoon mee -- en vraagt om een herbeoordeling.
 
+In `totaal/bevindingen.json` (een run over meerdere studiegebied-features) zijn
+`geaccepteerd` en `gewijzigde_waarde` de vereniging over de gebieden, ontdubbeld op
+`melding_id`: het zijn lijsten van ID's en een object op een gebiedsgrens dubbelt daarin
+niet. `zonder_bevinding` wordt daar tegen de vereniging beoordeeld -- een record is pas dood
+als zijn `melding_id` in géén enkel gebied een bevinding gaf. In de per-gebied-bestanden is
+`zonder_bevinding` daarom leeg (die lijst hoort bij het geheel, niet bij een los gebied),
+terwijl `geaccepteerd` er de acceptaties van dat gebied toont. Dit spiegelt hoe `onderdrukt`
+in `totaal/` de som over de gebieden draagt.
+
 Het veld kwam er binnen `1.2` bij, optioneel en additief: wie het niet kent leest het
 bestand zoals voorheen, en de melding zelf verandert er niet door.
 

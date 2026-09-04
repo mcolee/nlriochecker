@@ -17,16 +17,22 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   controle terecht blijkt te kloppen kun je per melding accepteren zonder haar te laten
   verdwijnen. `[rapport] uitzonderingen` wijst een los JSON-bestand aan (pad relatief aan de
   projectconfig) met records die elk een verplichte `melding_id` en `reden` dragen. Een
-  geaccepteerde bevinding valt uit de foutentelling van haar object -- dat krijgt op de kaart
-  de vijfde status `geaccepteerd`, in een eigen warme grijstint -- maar blijft in het rapport,
-  de CSV, de JSON en de meldingentabel staan. Het rapport krijgt een sectie "Uitzonderingen",
+  geaccepteerde bevinding telt in geen enkele foutentelling meer mee -- de
+  managementsamenvatting, de foutenregel in de verantwoording en de kolommen `status`,
+  `n_fout`, `n_waarschuwing` en `ergste_ernst` op `putten`/`strengen` negeren haar, en het
+  object krijgt op de kaart de vijfde status `geaccepteerd` in een eigen warme grijstint --
+  maar blijft in het rapport (de detailtabellen), de CSV, de JSON en de meldingentabel staan.
+  Het rapport krijgt een sectie "Uitzonderingen",
   `gwsw_run` drie kolommen (`uitzonderingen_bestand`, `meldingen_geaccepteerd`,
   `uitzonderingen_zonder_bevinding`) en de JSON-envelop een top-level blok `uitzonderingen`
   (`geaccepteerd` als lijst van `melding_id`'s). Twee dingen worden luid gemeld en vervallen
   nooit vanzelf: een uitzondering zonder bevinding in deze run, en een melding die nog bestaat
-  maar een andere waarde draagt dan de snapshot (geen automatische acceptatie). Niet in de CSV;
-  additief, `SCHEMA_VERSIE` blijft 1.2 en een run zonder uitzonderingenbestand blijft
-  byte-voor-byte gelijk.
+  maar een andere waarde draagt dan de snapshot (geen automatische acceptatie). Bij meerdere
+  gebieden vervalt de "zonder bevinding"-lijst per gebied en draagt `totaal/` haar, beoordeeld
+  tegen de vereniging van alle gebieden. Niet in de CSV; additief, `SCHEMA_VERSIE` blijft 1.2.
+  Een run zonder uitzonderingenbestand blijft byte-voor-byte gelijk voor het Markdown-rapport,
+  de CSV en de JSON; de GeoPackage krijgt de drie `gwsw_run`-kolommen onvoorwaardelijk erbij
+  (leeg/0) en is dus alleen inhoudelijk ongewijzigd.
 - **Voorbehoud bij een afgekapte of niet-zuivere nulmeting** (issue #134): twee tot nu toe
   ongelezen kopblokvelden van het SHACL-rapport worden gelezen en samengevoegd over de
   CFK-rapporten (`ShaclReport`/`Nulmeting.max_meldingen`, `.lokale_eisen`). Wijkt "Maximaal

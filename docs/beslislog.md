@@ -4997,6 +4997,28 @@ berekend uit de geaccepteerde melding-ID's; ze wordt niet op de `Melding` opgesl
 géén veld op `Melding` bij, zodat de bevroren JSON-envelop (`fields(Melding)`) ongemoeid blijft
 en `SCHEMA_VERSIE` 1.2 blijft.
 
+**"Uit de foutentelling halen" is breder dan de kaartstatus (fixronde 1, I-1).** Een
+geaccepteerde melding telt in **geen enkele** foutentelling of ernst-samenvatting mee, precies
+zoals `bepaal_status` haar al negeert: de managementsamenvatting ("Voldoen we in dit gebied?",
+een vinkje slaat niet om naar een kruisje voor een aanvaarde bevinding), de foutenregel in de
+Verantwoording ("X fouten en Y waarschuwingen uit N eigen checks"), en de GeoPackage-kolommen
+`ergste_ernst`, `n_fout`, `n_waarschuwing` en `checks_f`/`checks_w` op `putten`/`strengen`.
+Ze wordt overal langs de set geaccepteerde melding-ID's uit de tel-dataclass geweerd, niet met
+een tweede afleiding per schrijver. Ze blijft wél als rij in de CSV, de JSON, de meldingentabel
+en de detailtabellen van het rapport staan (de categorietellingen `n_top`, ... dragen haar ook
+onverkort): de melding verdwijnt niet, ze weegt alleen niet mee in het oordeel.
+
+**Meerdere gebieden (fixronde 1, I-2).** Het uitzonderingenbestand is gedeeld, maar elke
+gebiedsrun matcht het tegen alleen zijn eigen meldingen. Een terechte acceptatie op een object
+in gebied A zou daardoor in élk ander gebied als "zonder bevinding" (dood) tellen -- vals alarm.
+Daarom vervalt de "zonder bevinding"-lijst per gebied zodra er meer dan één gebied is; `totaal/`
+(synthese en `bevindingen.json`) draagt haar, beoordeeld tegen de **vereniging** van alle
+gebieden: een record is pas echt dood als zijn melding-ID in géén enkel gebied een bevinding
+gaf. `geaccepteerd` en `gewijzigde_waarde` in `totaal/` zijn de vereniging over de gebieden,
+ontdubbeld op melding-ID (het zijn lijsten van ID's; een object op een gebiedsgrens dubbelt niet).
+`totaal/` draagt de uitzonderingen dus op dezelfde manier als `onderdrukt` (via
+`_som_uitzonderingen` naast `_som_onderdrukking`).
+
 **Twee luide lijsten, geen auto-verval.** De acceptatie matcht op stringgelijkheid van `waarde`
 met `waarde_snapshot` (geen tolerantie). Een `melding_id` uit het bestand dat de run niet meer
 oplevert telt als "uitzondering zonder bevinding"; een melding die nog bestaat maar een andere

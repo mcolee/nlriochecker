@@ -27,7 +27,12 @@ from nlriochecker.toetsloop import toets_gebieden
 from nlriochecker.uitvoer.bevindingen import _telling, write_check_report
 from nlriochecker.uitvoer.melding import Melding
 from nlriochecker.uitvoer.omvang import omvangtabel
-from nlriochecker.uitvoer.samenvatting import KRUISJE, NIET_GEMETEN, VINKJE
+from nlriochecker.uitvoer.samenvatting import (
+    KRUISJE,
+    NIET_GEMETEN,
+    REGEL_EIGEN_CHECKS,
+    VINKJE,
+)
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer, schrijf_uitvoer_gebieden
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -450,6 +455,84 @@ class TestUitzonderingen:
         assert "`dood-1`" in tekst
         assert "`dood-2`" in tekst
         assert "1 uitzondering met gewijzigde waarde" in tekst
+
+    def test_een_geaccepteerde_fout_valt_uit_de_foutentellingen(self, tmp_path: Path) -> None:
+        """I-1: de acceptatie werkt op de managementsamenvatting en de verantwoording.
+
+        TOP-001 is een fout (Severity.ERROR). Zonder acceptatie draagt de eigen-checks-regel
+        een kruisje en telt de verantwoording de fout; met acceptatie slaat het kruisje om
+        naar een vinkje en verdwijnt de fout uit de telling -- precies zoals de kaartstatus
+        haar al negeert.
+        """
+        zonder = _rapport(_run("top001_losliggende_put.ttl", "TOP-001"), tmp_path / "zonder")
+        run = self._run_met(
+            lambda melding: [
+                Uitzondering(
+                    melding_id=melding.melding_id, reden="terecht", waarde_snapshot=melding.waarde
+                )
+            ]
+        )
+        met = _rapport(run, tmp_path / "met")
+
+        assert f"{KRUISJE} | {REGEL_EIGEN_CHECKS}" in zonder
+        assert f"{VINKJE} | {REGEL_EIGEN_CHECKS}" in met
+        assert "1 fouten en 0 waarschuwingen uit" in zonder
+        assert "0 fouten en 0 waarschuwingen uit" in met
+
+    def test_multigebied_geen_valse_zonder_bevinding_en_totaal_telt(self, tmp_path: Path) -> None:
+        """I-2: een acceptatie in gebied A is in gebied B geen valse "zonder bevinding".
+
+        Het gedeelde bestand matcht per gebied tegen alleen dat gebied; zonder verzoening
+        zou een terechte acceptatie op een object in A in élk ander gebied als dood tellen.
+        De per-gebied-lijst vervalt daarom bij meerdere gebieden en `totaal/` beoordeelt
+        haar tegen de vereniging.
+        """
+        from nlriochecker.uitvoer.melding import bouw_meldingenstroom
+
+        gebieden = load_studiegebieden(GIS_DIR / "buurten_twee.gpkg")
+        config = _config()
+        runs = toets_gebieden(
+            load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
+            gebieden,
+            config,
+            meetbereik=Meetbereik.niet_gemeten(()),
+        )
+        # Kies een melding die in gebied A zit maar niet in gebied B.
+        per_gebied = [
+            {
+                melding.melding_id: melding
+                for melding in bouw_meldingenstroom(run.run, RUNDATUM).meldingen
+            }
+            for run in runs
+        ]
+        alleen_a = set(per_gebied[0]) - set(per_gebied[1])
+        assert alleen_a, "de fixture moet een melding in gebied A hebben die B niet kent"
+        doel = per_gebied[0][sorted(alleen_a)[0]]
+        for run in runs:
+            run.run.config.rapport.uitzonderingen = "uitz.json"
+            run.run.config.rapport._uitzonderingen = [
+                Uitzondering(
+                    melding_id=doel.melding_id, reden="terecht", waarde_snapshot=doel.waarde
+                )
+            ]
+
+        schrijf_uitvoer_gebieden(runs, tmp_path, RUNDATUM, met_geopackage=False)
+
+        # Gebied B: geen valse "zonder bevinding", niet in het rapport en niet in de JSON.
+        b_json = json.loads(
+            (tmp_path / runs[1].map / "bevindingen.json").read_text(encoding="utf-8")
+        )
+        assert b_json["uitzonderingen"]["zonder_bevinding"] == []
+        assert "zonder bevinding" not in (tmp_path / runs[1].map / "bevindingen.md").read_text(
+            encoding="utf-8"
+        )
+        # Totaal telt de acceptatie één keer en noemt geen dode uitzondering.
+        totaal = json.loads((tmp_path / "totaal" / "bevindingen.json").read_text(encoding="utf-8"))
+        assert totaal["uitzonderingen"]["geaccepteerd"] == [doel.melding_id]
+        assert totaal["uitzonderingen"]["zonder_bevinding"] == []
+        assert "1 bevinding geaccepteerd" in (tmp_path / "totaal" / "synthese.md").read_text(
+            encoding="utf-8"
+        )
 
 
 class TestSystemischGeneriek:

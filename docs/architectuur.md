@@ -116,11 +116,22 @@ alleen het bestand waarin zij staat is verhuisd.
   uitzonderingen (een melding-ID uit het bestand dat deze run niet oplevert) en
   `gewijzigde_waarde` de records waarvan de melding nog bestaat maar een andere waarde
   draagt -- geen automatische acceptatie, maar een luide vraag om herbeoordeling. Beide
-  lijsten vervallen nooit vanzelf. De geaccepteerde melding zelf blijft ongewijzigd in
-  `meldingen` (er komt géén veld op `Melding` bij); het Markdown-rapport (sectie
-  "Uitzonderingen"), `gwsw_run` (`uitzonderingen_bestand`, `meldingen_geaccepteerd`,
-  `uitzonderingen_zonder_bevinding`), de objectstatus `geaccepteerd` en de JSON-envelop
+  lijsten vervallen nooit vanzelf. **Een geaccepteerde melding telt in geen enkele
+  foutentelling mee**, langs dezelfde set melding-ID's: de managementsamenvatting
+  ("Voldoen we in dit gebied?"), de foutenregel in de Verantwoording en de
+  GeoPackage-kolommen `n_fout`/`n_waarschuwing`/`ergste_ernst`/`checks_f`/`checks_w` slaan
+  haar over, precies zoals `bepaal_status` dat doet -- niet met een tweede afleiding per
+  schrijver. De geaccepteerde melding zelf blijft ongewijzigd in
+  `meldingen` (er komt géén veld op `Melding` bij) en in de detailtabellen; het
+  Markdown-rapport (sectie "Uitzonderingen"), `gwsw_run` (`uitzonderingen_bestand`,
+  `meldingen_geaccepteerd`, `uitzonderingen_zonder_bevinding`), de objectstatus
+  `geaccepteerd` en de JSON-envelop
   (`uitzonderingen`) dragen het; de CSV niet, en `SCHEMA_VERSIE` blijft 1.2 (additief).
+  Bij een run over **meerdere gebieden** matcht het gedeelde bestand per gebied tegen
+  alleen dat gebied; de "zonder bevinding"-lijst vervalt daarom per gebied en `totaal/`
+  (synthese en `bevindingen.json`) draagt haar, beoordeeld tegen de vereniging van alle
+  gebieden (`_som_uitzonderingen` in `schrijver.py`, naast `_som_onderdrukking`), zodat een
+  acceptatie in gebied A geen vals "dood" in gebied B geeft.
   Het pad in `[rapport] uitzonderingen` resolt relatief aan het configbestand (aanname 1),
   anders dan de `[bronnen]`-paden; `load_check_config` leest en valideert het bestand en
   laat de records als `ReportOptions.uitzonderingen_records` meereizen.
@@ -264,7 +275,10 @@ alleen het bestand waarin zij staat is verhuisd.
   gehaald zijn: de meldingen blijven op het object staan (en in de meldingentabel), maar
   het object leest niet meer als rood of oranje. Een nog openstaande fout of waarschuwing
   wint; `bepaal_status` krijgt de geaccepteerde melding-ID's mee en berekent de waarde,
-  ze wordt niet op de melding opgeslagen. Het is een eigen, warme grijstint naast `grijs`,
+  ze wordt niet op de melding opgeslagen. Dezelfde geaccepteerde ID's laten ook
+  `n_fout`, `n_waarschuwing`, `ergste_ernst` en `checks_f`/`checks_w` de melding overslaan,
+  zodat die kolommen niet tegenspreken wat de status zegt; `n_systemisch` en de
+  categorietellingen tellen haar wel. Het is een eigen, warme grijstint naast `grijs`,
   want "beoordeeld en bewust aanvaard" is iets anders dan "niet beoordeeld".
   Grijs betekent: niet beoordeeld **en** niets gevonden;
   mechanisch riool wordt door de meeste checks overgeslagen maar niet door alle, en wat
