@@ -195,8 +195,9 @@ alleen het bestand waarin zij staat is verhuisd.
   de meldingtabel hebben afgekapt en telt de toets een ondergrens; wijkt
   `run.lokale_eisen` af van `geen`, dan zijn er niet-GWSW-vormen bijgemeten. Ze
   verschijnen alleen bij afwijking, dus een gewone run blijft byte-voor-byte gelijk, en
-  ze passen additief in het bestaande `markering`-veld -- `SCHEMA_VERSIE` blijft 1.2. Zie
-  issue #134.
+  ze passen additief in het bestaande `markering`-veld -- `SCHEMA_VERSIE` blijft 1.2. Deze
+  twee bronnen leunen op `CheckRun` en verschijnen dus alleen in `toets`; de `markering_van`-
+  bellers (`analyseer`, `dekking`, `vergelijk`) tonen ze nog niet. Zie issue #134.
 - Rapportage-output: Markdown, CSV, een GeoPackage en JSON naar een output-map; nooit
   invoerbestanden overschrijven. Alle vier komen uit dezelfde meldingenstroom
   (`uitvoer/melding.py`); een schrijver die zelf een `Finding` interpreteert laat ze uit

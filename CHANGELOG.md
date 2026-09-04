@@ -20,8 +20,9 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   waardoor de toets een ondergrens telt) of "Lokale kwaliteitseisen uit bestand" van `geen`
   (er zijn niet-GWSW-vormen bijgemeten), dan draagt de run een extra alinea in de bestaande
   markering (`uitvoer/voorbehoud.py`), zichtbaar in Markdown, in `gwsw_run.markering` en in
-  het JSON-veld `markering` -- niet in de CSV. Additief: `SCHEMA_VERSIE` blijft 1.2 en een
-  run zonder afwijking blijft byte-voor-byte gelijk (beide voorbeeldrapporten dragen
+  het JSON-veld `markering` -- niet in de CSV, en alleen in `toets` (`analyseer`, `dekking`
+  en `vergelijk` tonen de twee kopblokvelden nog niet). Additief: `SCHEMA_VERSIE` blijft 1.2
+  en een run zonder afwijking blijft byte-voor-byte gelijk (beide voorbeeldrapporten dragen
   `onbeperkt` en `geen`).
 - **ATTR-019 "Putdiepte ontbreekt"** (W, Compleetheid; issue #133): meldt elke put zonder
   putdiepte `HoogtePut`. Het GWSW kent geen `Putbodemniveau`; de putbodem volgt uit

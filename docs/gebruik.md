@@ -144,7 +144,9 @@ JSON-envelop dragen dezelfde tekst. Diezelfde `markering` verschijnt ook als het
 nulmeting-kopblok een meldingenlimiet noemt (de GWSW-server kan de meldingtabel hebben
 afgekapt, waardoor de toets een ondergrens telt) of een bestand met lokale
 kwaliteitseisen (er zijn dan vormen bijgemeten die niet uit het GWSW komen). Beide staan
-er alleen bij afwijking van de neutrale waarden `onbeperkt` en `geen`.
+er alleen bij afwijking van de neutrale waarden `onbeperkt` en `geen`. Deze twee
+kopblokvoorbehouden verschijnen alleen in `toets`; `analyseer`, `dekking` en `vergelijk`
+tonen de twee kopblokvelden nog niet en zwijgen er dus over.
 
 `bevindingen.csv` draagt de markering **niet**: de CFK-set hoort bij de run en niet bij
 elke melding. Twee CSV's uit een volle en een deelrun zijn daardoor aan het bestand zelf
