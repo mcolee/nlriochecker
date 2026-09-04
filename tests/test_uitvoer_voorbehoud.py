@@ -144,26 +144,26 @@ def test_twee_voorbehouden_komen_allebei_in_de_kop(toets: CheckRun, tmp_path: Pa
     assert "Onvolledige meting" not in csv and "Geen klassenhierarchie" not in csv
 
 
-def _terugval(run: CheckRun) -> CheckRun:
+def _terugval(run: CheckRun, monkeypatch: pytest.MonkeyPatch) -> CheckRun:
     """Dezelfde run, maar met een dataset waarvan de GWSW-versie niet herkend is.
 
     Een geldige geladen dataset draagt altijd objecten met een GWSW-namespace, dus
     `gedetecteerd` is er in de praktijk nooit vals. Om de terugvaltak van issue #125 te
-    toetsen zonder een pathologische dataset te fabriceren, zet deze helper de
-    gememoiseerde `gwsw_versie` op de terugvalstand -- precies wat de leeslaag oplevert
-    voor een dataset zonder herkenbare namespace.
+    toetsen zonder een pathologische dataset te fabriceren, wordt de *publieke* property
+    `gwsw_versie` overschreven -- precies wat de leeslaag oplevert voor een dataset zonder
+    herkenbare namespace. Bewust via de publieke property en niet via een leeslaag-intern:
+    deze repo mag niet van privegedrag van `gwsw-orox-helpers` afhangen.
     """
-    memo = run.dataset._gwsw_versie_memo
-    memo.clear()
-    memo.append(
-        GwswVersie(basis="http://data.gwsw.nl/1.6/totaal/", versie="1.6", gedetecteerd=False)
-    )
+    terugval = GwswVersie(basis="http://data.gwsw.nl/1.6/totaal/", versie="1.6", gedetecteerd=False)
+    monkeypatch.setattr(type(run.dataset), "gwsw_versie", property(lambda self: terugval))
     return run
 
 
-def test_gwsw_versie_terugval_wordt_een_voorbehoud(toets: CheckRun) -> None:
+def test_gwsw_versie_terugval_wordt_een_voorbehoud(
+    toets: CheckRun, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Kon de leeslaag de GWSW-versie niet afleiden, dan hoort dat in de kop (issue #125)."""
-    run = _terugval(replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST)))
+    run = _terugval(replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST)), monkeypatch)
 
     regels = voorbehouden(run)
 
@@ -173,14 +173,14 @@ def test_gwsw_versie_terugval_wordt_een_voorbehoud(toets: CheckRun) -> None:
 
 
 def test_gwsw_versie_terugval_bereikt_de_drie_views_niet_de_csv(
-    toets: CheckRun, tmp_path: Path
+    toets: CheckRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Het terugval-voorbehoud landt in Markdown, gwsw_run en JSON; niet in de CSV.
 
     Additief: `SCHEMA_VERSIE` blijft 1.2 en het voorbehoud reist door hetzelfde
     markeringsslot als de andere voorbehouden (issue #125).
     """
-    run = _terugval(replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST)))
+    run = _terugval(replace(toets, meetbereik=Meetbereik.van(VEREIST, VEREIST)), monkeypatch)
 
     uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM)
 
