@@ -81,7 +81,8 @@ volle De Wolden-meting tegelijk.
 | F | 28 | **#166** LEESLAAG pin v0.2.2 → v0.2.4; `leeslaag.py` delegeert | #158, #159 | Opus 4.8 | **Substantieel** | `uv lock`; cache koud herbouwd; gepaarde meting achter `flock` |
 | F | 29 | **#170** research puntbemonstering uit een float32-raster → `docs/onderzoek/` | — | Sonnet | Klein | geen code; `mattpocock-skills:research`; comment op #168 |
 
-Eén issue = commit + push + CI groen + comment + close vóór het volgende.
+Eén issue = commit + push + CI groen + comment + close; alleen de CI-wacht mag overlappen
+met de dispatch van het volgende issue (sjabloon, stap 7).
 
 ## Bewijslast per issue (De Wolden, tegen `uitvoer/04092026_slotrun`)
 
@@ -183,11 +184,14 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
   `docs/agents/analyse-harness.md` één keer volledig vóór je begint, en daarna elk bestand
   dat je aanraakt één keer volledig; geen `cd`; de repo-root is
   `/home/martin/Development/nlriochecker`; draai de poort en elke meetrun op de voorgrond en
-  plak de uitvoer; niet pushen."* Taaklabel "Task N" in het Engels. Geef de implementer het
+  plak de uitvoer; niet pushen."* Voor een **Sonnet/Klein-issue** vervang je het eerste deel
+  door de sectie(s) van `docs/architectuur.md` die het issue raakt (bij naam) en laat je
+  `analyse-harness.md` weg tenzij het issue meet. Taaklabel "Task N" in het Engels. Geef de implementer het
   issuenummer en de regel "kop 6 (Aannames) is je tweede bron; een afwijking leg je vast in
   je rapport, niet in een vraag".
 - Vertrouw de geplakte poort van de implementer; draai hem niet nog eens.
-  `scripts/runnerpoort.py` één keer, vlak vóór de push, nooit parallel aan een pytest.
+  `scripts/runnerpoort.py` alleen als het issue tests toevoegt die echte data laden
+  (CLAUDE.md), vlak vóór de push, nooit parallel aan een pytest.
 - Re-review alleen als de fixronde meer dan één bevinding of meer dan ~100 diffregels raakte.
 - Voor de Substantiële issues: verse **Opus 4.8**-reviewer (`opus48`) via
   `superpowers:requesting-code-review`, adversarieel, met de vraag erbij: *"welke meting in
@@ -195,9 +199,12 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
   meting gepaard en eenduidig, en is de CSV sha-gelijk?"*
 - Comment pas na het reviewoordeel; dan `gh issue close`. In de comment: het gemeten getal
   naast de verwachting uit de tabel hierboven.
-- Push: `timeout 45 git push`; CI selecteren op
+- Push: `timeout 45 git push`; **dispatch daarna meteen de implementer van het volgende
+  issue** en wacht pas dán op de CI: selecteren op
   `gh run list --commit "$(git rev-parse HEAD)" --json databaseId --jq '.[0].databaseId'`,
-  dan `gh run watch <id> --exit-status`. Rood → fixen, niet door naar het volgende issue.
+  dan `gh run watch <id> --exit-status`; comment en close van het vorige issue ná groen,
+  terwijl de nieuwe implementer werkt. Rood → fix-agent op het vorige issue vóór de
+  volgende commit landt (auteursbesluit 06-09, sessie C; zie het sjabloon, stap 7).
 - Na een dispatch of een achtergrondcommando: niets doen tot de melding komt.
 - Na elke stap en bij elke issuewisseling: de stavaza-tabel met emoticons uit het sjabloon
   (`afk-regie.md`, "Voortgang tonen") als bericht aan de auteur.

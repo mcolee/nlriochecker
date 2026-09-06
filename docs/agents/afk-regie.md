@@ -64,6 +64,9 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    > - **Lezen:** lees `docs/architectuur.md` en `docs/agents/analyse-harness.md` één keer
    >   volledig vóór je begint, en daarna elk bestand dat je aanraakt één keer volledig — niet
    >   per symbool in plakjes. Geen `cd`: de werkmap is al de repo-root.
+   >   (**Klein-issue op Sonnet:** van `docs/architectuur.md` alleen de sectie(s) die het
+   >   issue raakt — noem ze in de brief — en `analyse-harness.md` alleen als het issue een
+   >   meting of scratch-script vraagt; de volle leesfase kostte 3–5 min per dispatch.)
    > - Maak de BO('s) die het issue noemt aan in `docs/beslislog.md`; het volgende nummer is
    >   `grep -n '^### BO-' docs/beslislog.md | tail -1` + 1 (chronologisch onderaan).
    > - Regenereer elke generator die je raakt (`scripts/maak_ttl_fixtures.py`,
@@ -97,11 +100,19 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
      raakte.** Een één-bevinding-fix controleer je zelf op de diff: op 26-08 veranderden 6 van
      6 re-reviews niets.
 6. **Commit** op `dev`, boodschap eindigend op `(issue #N)`.
-7. **Push, dan CI.** Eén keer, ná de laatste fixronde: `uv run python scripts/runnerpoort.py`
-   (runner-conditie, strikte overslag, BO-48; draait alleen de CI-pytest-regel, nooit parallel
-   aan een eigen pytest — runnerpoort zet `data/` tijdelijk weg). Dan `git push` en
-   **`gh run watch --exit-status`** tot groen; dat bewijst de CI, een extra `gh run view` niet.
-8. **Comment + close — pas na het reviewoordeel.** `gh issue comment N` met wat er landde en
+7. **Push, dan CI — overlappend met het volgende issue** (auteursbesluit 06-09, sessie C).
+   - `uv run python scripts/runnerpoort.py` draai je **alleen als het issue tests toevoegt
+     die echte data laden** (de CLAUDE.md-regel; runner-conditie, strikte overslag, BO-48;
+     nooit parallel aan een eigen pytest — runnerpoort zet `data/` tijdelijk weg). Een
+     issue zonder zulke tests slaat hem over: de geplakte poort is dan het bewijs.
+   - `timeout 45 git push`, en **dispatch meteen de implementer van het volgende issue**:
+     de commit staat, dus die kan aan de slag terwijl de CI loopt.
+   - Dan pas `gh run watch --exit-status` (voorgrond-wacht, terwijl de implementer op de
+     achtergrond werkt); dat bewijst de CI, een extra `gh run view` niet. Rood → fix-agent
+     op het vorige issue vóór de volgende commit landt; de lopende implementer werkt door.
+   - Meting 06-09: de CI-wacht (~5 min) en runnerpoort (~1,5 min) waren samen ~20 % van
+     de tijd per issue.
+8. **Comment + close — pas na het reviewoordeel én CI groen.** `gh issue comment N` met wat er landde en
    het **gemeten getal** naast de voorspelling (klopt de ordegrootte? zo niet, verklaar het —
    geen nieuwe waarheid verzinnen). Schrijf de comment niet vooraf om hem later te patchen:
    op 26-08 kostte dat 6 patches en één teruggenomen claim. Dan `gh issue close N`.
