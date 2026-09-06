@@ -569,6 +569,7 @@ class OverstortZonderDrempelmaat(Check):
     dimension = Dimension.COMPLETENESS
     rollen = ("overstortputten",)
     kenmerken = ("Drempelbreedte", "Drempelniveau")
+    klassenlijsten = ("drempel",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke overstortput die een drempelniveau en/of -breedte mist."""
@@ -754,6 +755,7 @@ class GemengdDeelstelselZonderOverstort(Check):
     # De snapping-tolerantie is geen GWSW-kenmerk maar de enige grens die de aanwijzingen
     # gebruiken (issue #106); zij staat hier zodat de dekkingsmatrix haar noemt.
     kenmerken = ("config:drempels.snapping_tolerantie_m",)
+    klassenlijsten = ("afvoer_eindpunt",)
     # De twee feiten die het deelstelselvlak in de GeoPackage op zijn feitenregel zet
     # (issue #122). Ze staan ook in de boodschap, maar de popup leest ze hier: een
     # mensgerichte zin terugparseren breekt stil bij elke herformulering ervan.
@@ -903,6 +905,7 @@ class BbbZonderLediging(Check):
     dimension = Dimension.COMPLETENESS
     rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen")
     kenmerken = ()
+    klassenlijsten = ("ledigingsvoorziening",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BBB's zonder geregistreerde lediging.
@@ -964,6 +967,7 @@ class BbbZonderNooduitlaat(Check):
     dimension = Dimension.COMPLETENESS
     rollen = ("bergbezinkleidingen", "bergbezinkvoorzieningen", "overstortleidingen")
     kenmerken = ("Drempelbreedte", "Drempelniveau")
+    klassenlijsten = ("drempel",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt BBB's zonder overstortdrempel en zonder overstortleiding."""
@@ -1076,6 +1080,7 @@ class OnvoldoendeWaking(Check):
     dimension = Dimension.PLAUSIBILITY
     rollen = ()
     kenmerken = ("Drempelbreedte", "Drempelniveau", "Maaiveldhoogte", "Putdekselniveau")
+    klassenlijsten = ("drempel",)
     # De populatie komt uit `drempels_per_put()` en niet uit een rol; zonder deze zin
     # zei het rapport "Toetst de hele export" over een check die alleen de drempels aan
     # een put bekijkt -- op De Wolden en Hoogeveen nul stuks (issue #96).

@@ -756,6 +756,7 @@ class KruisingZonderZinkerOfDuiker(_WatergangKruising):
     dimension = Dimension.COMPLETENESS
     rollen = ("vrijvervalrioolleidingen",)
     kenmerken = ()
+    klassenlijsten = ("kruisingsleiding",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt doorkruisingen waarvan de streng geen kruisingsconstructie is."""

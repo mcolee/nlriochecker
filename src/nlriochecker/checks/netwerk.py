@@ -485,6 +485,7 @@ class VuilwaterZonderAfvoerpad(_ZonderAfvoerpad):
         "vrijvervalrioolleidingen",
     )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
+    klassenlijsten = ("afvoer_eindpunt",)
     stelselrol = "vuilwater"
     eindpuntrollen = ("afvoer_eindpunt", "lozings_eindpunt")
     doel = "een gemaal, overnamepunt of lozingspunt"
@@ -518,6 +519,7 @@ class HemelwaterZonderAfvoerpad(_ZonderAfvoerpad):
         "vrijvervalrioolleidingen",
     )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
+    klassenlijsten = ("afvoer_eindpunt",)
     stelselrol = "hemelwater"
     eindpuntrollen = ("lozings_eindpunt",)
     eindpuntrollen_via_gemengd = ("afvoer_eindpunt",)
@@ -747,6 +749,7 @@ class ItStelselZonderDrempel(Check):
         "vrijvervalrioolleidingen",
     )
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
+    klassenlijsten = ("drempel",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt samenhangende delen met infiltratieleidingen maar zonder drempel.
@@ -1077,6 +1080,7 @@ class StelseltypeWijktAfVanBuren(Check):
     dimension = Dimension.CONSISTENCY
     rollen = ("hulpstukken", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
+    klassenlijsten = ("stelseltypen",)
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Zoekt strengen die als enige van hun soort tussen andere soorten liggen.
@@ -1236,6 +1240,7 @@ class KoppelingTussenStelseltypen(Check):
     dimension = Dimension.PLAUSIBILITY
     rollen = ("hulpstukken", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding", "config:koppelregels")
+    klassenlijsten = ("stelseltypen", "vgs")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elke knoop met een gerichte koppeling die de koppelregels overtreedt.

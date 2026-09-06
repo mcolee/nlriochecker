@@ -5189,3 +5189,43 @@ serieel en parallel) gaat `pytest-xdist` niet in de poort; dat is precies wat hi
 geverifieerd is vóór de invoering.
 
 Zie `docs/onderzoek/2026-09-06-wallclock-afk-regie.md` (secties 1.1, 2.3).
+
+### BO-95 checks declareren hun `[klassen]`-lijsten; HGT-011 toetst de drempels
+
+**Wat.** Een check declareert naast `rollen` en `kenmerken` (issue #64, BO-51) sinds deze
+BO een derde lijst: `klassenlijsten`, de `[klassen]`-veldnamen die hij leest en die geen rol
+zijn (buiten `selectie._ROL_VELDEN`). Twaalf checks dragen er een: NET-006 het VGS (`vgs`),
+HGT-011/NET-007/RVZ-002/009/011 de drempels (`drempel`), NET-001/002/RVZ-006 het
+afvoereindpunt (`afvoer_eindpunt`), EXT-003 de kruisingsleiding (`kruisingsleiding`), RVZ-008
+de ledigingsvoorziening (`ledigingsvoorziening`) en NET-005/006 de stelseltypen
+(`stelseltypen`). Zulke lijsten dragen een populatie of classificatie, geen kenmerk, en
+horen dus niet in `kenmerken`; het zijn ook geen rol. Standaard leeg -- `register()` blijft
+alleen `rollen` en `kenmerken` eisen. `_toetst_regel` zet ze als "; leest verder `[klassen]
+<veld>`" achter de regel "Toetst ..." en `scripts/dekkingsmatrix.py` achter de kolom *Rollen
+· kenmerken*. De AST-sweep (`tests/checkdeclaratie_analyse.py`) leidt ze af uit elke
+`context.config.klassen.<veld>`-keten en elke veldnamen-ClassVar (`eindpuntrollen`) vanuit
+`run`/`examined`/`notes`, door hulpfuncties én functie-lokale imports heen, en
+`test_declaratie_klassenlijsten_volgt_de_code` bindt de declaratie er in beide richtingen
+aan. NET-009 raakt `stelseltypen` langs geen enkel bereikbaar pad (`_richtingsdiagnoses`
+leest ze niet) en declareert dus terecht geen `klassenlijsten`; de sweepgrens dat
+configmethodes (`klassen.stelseltype()`) niet gevolgd worden blijft zoals gedocumenteerd,
+maar is voor NET-009 niet de reden.
+
+**HGT-011.** De check toetst een *drempelniveau* (`drempels_per_put`, engine-navigatie),
+niet elke netwerkknoop. Zijn declaratie volgde dat niet: `rollen` droeg `netwerkknopen`
+(noch de populatie -- dat zijn de drempels -- noch de plek van een kenmerk), `examined`
+telde de 22.363 netwerkknopen. Gerepareerd naar het voorbeeld van RVZ-011: `rollen =
+("vrijvervalrioolleidingen",)` (de aanvoerende BOB, via `aansluitingen`), `examined =
+len(alle_drempels(context))`, `klassenlijsten = ("drempel",)` en een `populatie_omschrijving`
+("de overstortdrempels die aan een put hangen"). Die omschrijving gaat in `_toetst_regel`
+vóór de klassen van de rol (voorheen andersom): met een rol maar een andere populatie zou de
+regel anders de streng-klassen tonen. De ontologietest-uitzondering `(HGT-011,
+Putdekselniveau)` verschoof van `[domeinkeuze]` naar `[structuur]`: de bovenkant wordt
+gelezen op de put die de drempel draagt, niet meer op elke netwerkknoop -- de domeinvraag
+verviel.
+
+**Gevolg op De Wolden en Hoogeveen.** Geen enkele bevinding verschuift (de export bevat nul
+`Overstortdrempel`, structurele nul; HGT-011 blijft 0 F / 0 W). Alleen `examined` van HGT-011
+verandert (22.363 -> 0, gelijk aan RVZ-011) en de toelichtings-/rapportregels van HGT-011 en
+de elf andere declarerende checks. De nul-bewaking (BO-52) blijft ongewijzigd; haar aan
+`klassenlijsten` hangen is een schoon vervolg.

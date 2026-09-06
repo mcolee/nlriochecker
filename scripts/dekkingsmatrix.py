@@ -56,19 +56,23 @@ def _kenmerk_kort(kenmerk: str) -> str:
 
 
 def _rollen_kenmerken(entry: RegisterEntry) -> str:
-    """De gedeclareerde rollen en kenmerken van een check (issue #64), of `—`.
+    """De gedeclareerde rollen, kenmerken en klassenlijsten van een check (issue #64/#137), of `—`.
 
     Rollen in plaats van hun uitgeschreven klassen: `netwerkknopen` staat voor elf
     klassen, en de klassenlijst hangt bovendien aan de projectconfig terwijl de matrix
     configloos is. De rolnaam is stabiel en compact; `bevindingen.py` toont in het rapport
-    de uitgeschreven klassen uit de gekozen config.
+    de uitgeschreven klassen uit de gekozen config. De `[klassen]`-lijsten die geen rol
+    zijn (issue #137) staan er als `[klassen] <veld>` achter.
     """
     check = REGISTRY.get(entry.check_id)
     if check is None:
         return "—"
     rollen = ", ".join(check.rollen) or "—"
     kenmerken = ", ".join(_kenmerk_kort(k) for k in check.kenmerken) or "—"
-    return f"{rollen} · {kenmerken}"
+    regel = f"{rollen} · {kenmerken}"
+    if check.klassenlijsten:
+        regel += " · " + ", ".join(f"[klassen] {veld}" for veld in check.klassenlijsten)
+    return regel
 
 
 def status(entry: RegisterEntry, getest: set[str]) -> tuple[str, str]:

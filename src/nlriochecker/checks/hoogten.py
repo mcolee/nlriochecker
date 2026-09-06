@@ -28,7 +28,7 @@ from nlriochecker.checks.base import (
     register,
 )
 from nlriochecker.checks.meetkunde import bovenkant_bron, grootste_maat
-from nlriochecker.checks.randvoorzieningen import drempelnotitie, drempels_per_put
+from nlriochecker.checks.randvoorzieningen import alle_drempels, drempelnotitie, drempels_per_put
 from nlriochecker.checks.selectie import (
     netwerkknopen,
     rioolputten,
@@ -523,14 +523,18 @@ class DiameterverkleiningInAfvoerrichting(_KnoopVergelijking):
 
 
 @register
-class DrempelBuitenBereik(_KnoopCheck):
+class DrempelBuitenBereik(Check):
     """HGT-011: een overstortdrempel onder de aanvoerende BOB of boven maaiveld."""
 
     id = "HGT-011"
     title = "Overstortdrempel lager dan BOB aanvoerende streng of hoger dan maaiveld"
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    # De check loopt over de overstortdrempels (via `drempels_per_put`, engine-navigatie),
+    # net als RVZ-011; de gedeclareerde rol is de aanvoerende vrijvervalstreng waarvan de
+    # BOB de ondergrens levert. `netwerkknopen` verviel als rol met issue #137 -- die was
+    # noch de populatie (dat zijn de drempels) noch de plek waar een kenmerk gelezen wordt.
+    rollen = ("vrijvervalrioolleidingen",)
     kenmerken = (
         "BobEindpuntLeiding",
         "Drempelbreedte",
@@ -538,6 +542,8 @@ class DrempelBuitenBereik(_KnoopCheck):
         "Maaiveldhoogte",
         "Putdekselniveau",
     )
+    klassenlijsten = ("drempel",)
+    populatie_omschrijving = "de overstortdrempels die aan een put hangen"
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elk drempelniveau tegen de aanvoerende BOB en het maaiveld."""
@@ -584,6 +590,10 @@ class DrempelBuitenBereik(_KnoopCheck):
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt of er uberhaupt drempelniveaus in de dataset staan."""
         return drempelnotitie(context)
+
+    def examined(self, context: CheckContext) -> int:
+        """Het aantal overstortdrempels aan een put -- de populatie, gelijk aan RVZ-011."""
+        return len(alle_drempels(context))
 
 
 @register

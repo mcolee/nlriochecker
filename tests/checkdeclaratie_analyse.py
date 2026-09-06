@@ -104,31 +104,44 @@ def _str_constanten(node: ast.AST) -> frozenset[str]:
     )
 
 
+def _parse_module(naam: str, boom: ast.Module) -> ModuleModel:
+    """Bouwt het `ModuleModel` van één geparste checkmodule.
+
+    Functies, klassen en stringconstanten worden op moduleniveau verzameld; imports uit
+    `nlriochecker.checks.*` daarentegen over de hele boom (`ast.walk`), dus ook een
+    `from nlriochecker.checks.x import y` binnen een functie- of methodelichaam. Zonder
+    die functie-lokale lezing verloor de sweep een hulpfunctie die een check pas in haar
+    `run` importeerde -- de omissie die issue #137 blootlegde (HGT-011 las de drempels via
+    een lazy import). De naam is binnen een module uniek genoeg dat de plek van de import
+    er niet toe doet.
+    """
+    model = ModuleModel(naam)
+    for knoop in boom.body:
+        if isinstance(knoop, ast.FunctionDef):
+            model.funcs[knoop.name] = knoop
+        elif isinstance(knoop, ast.ClassDef):
+            model.classes[knoop.name] = knoop
+        elif isinstance(knoop, ast.Assign):
+            strings = _str_constanten(knoop.value)
+            if strings:
+                for doel in knoop.targets:
+                    if isinstance(doel, ast.Name):
+                        model.consts[doel.id] = strings
+    for knoop in ast.walk(boom):
+        if isinstance(knoop, ast.ImportFrom) and (knoop.module or "").startswith(
+            "nlriochecker.checks"
+        ):
+            bron = (knoop.module or "").rsplit(".", 1)[-1]
+            for alias in knoop.names:
+                model.imports[alias.asname or alias.name] = (bron, alias.name)
+    return model
+
+
 def _bouw_modules() -> dict[str, ModuleModel]:
     """Parseert elke checkmodule tot een `ModuleModel`."""
     modules: dict[str, ModuleModel] = {}
     for pad in sorted(CHECKS_DIR.glob("*.py")):
-        naam = pad.stem
-        model = ModuleModel(naam)
-        boom = ast.parse(pad.read_text(encoding="utf-8"))
-        for knoop in boom.body:
-            if isinstance(knoop, ast.FunctionDef):
-                model.funcs[knoop.name] = knoop
-            elif isinstance(knoop, ast.ClassDef):
-                model.classes[knoop.name] = knoop
-            elif isinstance(knoop, ast.ImportFrom) and (knoop.module or "").startswith(
-                "nlriochecker.checks"
-            ):
-                bron = (knoop.module or "").rsplit(".", 1)[-1]
-                for alias in knoop.names:
-                    model.imports[alias.asname or alias.name] = (bron, alias.name)
-            elif isinstance(knoop, ast.Assign):
-                strings = _str_constanten(knoop.value)
-                if strings:
-                    for doel in knoop.targets:
-                        if isinstance(doel, ast.Name):
-                            model.consts[doel.id] = strings
-        modules[naam] = model
+        modules[pad.stem] = _parse_module(pad.stem, ast.parse(pad.read_text(encoding="utf-8")))
     return modules
 
 
@@ -157,13 +170,33 @@ def _veld_naar_rol() -> dict[str, str]:
 
 
 def _rolnamen() -> frozenset[str]:
-    """De namen uit `selectie._ROLLEN`, plus `rioolputten` zodra die rol bestaat."""
+    """De namen uit `selectie._ROLLEN`."""
     from nlriochecker.checks import selectie
 
-    namen = set(selectie._ROLLEN)
-    if hasattr(selectie, "rioolputten"):
-        namen.add("rioolputten")
-    return frozenset(namen)
+    return frozenset(selectie._ROLLEN)
+
+
+def _rol_velden() -> frozenset[str]:
+    """De `[klassen]`-veldnamen die aan een rol hangen (`selectie._ROL_VELDEN`).
+
+    De klassenlijst-sweep houdt alleen de velden over die hier *niet* in staan: een veld
+    dat een rol draagt hoort in `rollen`, niet in `klassenlijsten`.
+    """
+    from nlriochecker.checks import selectie
+
+    return frozenset(selectie._ROL_VELDEN.values())
+
+
+def _klassen_velden() -> frozenset[str]:
+    """Elke veldnaam van `[klassen]` (`ClassRoots`).
+
+    Dient om een `self.eindpuntrollen`-achtige ClassVar te herkennen: een tuple waarvan
+    élk element een `[klassen]`-veld is, is een lijst met veldnamen (issue #137). Zo blijft
+    een gewone string-ClassVar (`stelselrol`, een drempelnaam) buiten beeld.
+    """
+    from nlriochecker.checkconfig import ClassRoots
+
+    return frozenset(ClassRoots.model_fields)
 
 
 @dataclass(frozen=True)
@@ -172,6 +205,9 @@ class Declaratie:
 
     rollen: frozenset[str]
     kenmerken: frozenset[str]
+    # Issue #137: de `[klassen]`-veldnamen die de check leest en die geen rol zijn (`vgs`,
+    # `drempel`, ...). Rolvelden vallen af; die staan in `rollen`.
+    klassenlijsten: frozenset[str]
 
 
 class _Sweep:
@@ -188,9 +224,10 @@ class _Sweep:
         self.veld_naar_rol = veld_naar_rol
 
     def analyseer(self, check: type) -> Declaratie:
-        """De rollen en kenmerken die vanuit `run`/`examined`/`notes` bereikt worden."""
+        """De rollen, kenmerken en klassenlijsten die vanuit `run`/`examined`/`notes` gaan."""
         self.rollen: set[str] = set()
         self.kenmerken: set[str] = set()
+        self.klassenlijsten: set[str] = set()
         self.check = check
         # De klassen uit de MRO die in een checkmodule staan, nieuw-naar-oud.
         self.mro = [
@@ -202,7 +239,8 @@ class _Sweep:
         self.bezocht: set[tuple[str, str, str]] = set()
         for methode in ("run", "examined", "notes"):
             self._volg_methode(methode)
-        return Declaratie(frozenset(self.rollen), frozenset(self.kenmerken))
+        klassenlijsten = frozenset(self.klassenlijsten) - _rol_velden()
+        return Declaratie(frozenset(self.rollen), frozenset(self.kenmerken), klassenlijsten)
 
     def _module_van(self, klass: type) -> ModuleModel:
         return self.modules[klass.__module__.rsplit(".", 1)[-1]]
@@ -229,6 +267,16 @@ class _Sweep:
         """De waarde van een ClassVar op de check, of None."""
         return getattr(self.check, naam, None)
 
+    def _veldnamen_classvar(self, naam: str) -> frozenset[str]:
+        """De `[klassen]`-velden uit een ClassVar-tuple met uitsluitend veldnamen (issue #137)."""
+        waarde = self._classvar(naam)
+        if not isinstance(waarde, tuple | list | frozenset | set):
+            return frozenset()
+        strings = {w for w in waarde if isinstance(w, str)}
+        if strings and strings <= _klassen_velden():
+            return frozenset(strings)
+        return frozenset()
+
     def _verwerk(self, func: ast.FunctionDef, model: ModuleModel, sleutel) -> None:
         if sleutel in self.bezocht:
             return
@@ -246,6 +294,27 @@ class _Sweep:
                 and id(knoop) not in aanroep_functies
             ):
                 self.kenmerken |= DERIVED_PROPS[knoop.attr]
+            # Een `[klassen]`-lijst gelezen als attribuutketen `...klassen.<veld>` (issue
+            # #137). Een methode-aanroep op `klassen` (`klassen.stelseltype(...)`) is de
+            # `.func` van een Call en telt niet mee -- dat is een berekening, geen lijst.
+            if (
+                isinstance(knoop, ast.Attribute)
+                and isinstance(knoop.value, ast.Attribute)
+                and knoop.value.attr == "klassen"
+                and id(knoop) not in aanroep_functies
+            ):
+                self.klassenlijsten.add(knoop.attr)
+            # Een ClassVar met veldnamen (`self.eindpuntrollen`, `self.eindpuntrollen_via_
+            # gemengd`): NET-002 leest zijn `afvoer_eindpunt` via zo'n tuple die door
+            # `_eindpuntset` heen geïtereerd wordt -- te ver voor de argument-koppeling van
+            # de sweep. Een tuple waarvan élk element een `[klassen]`-veld is, ís een
+            # veldnamenlijst; een gewone string-ClassVar (`stelselrol`) valt af. Zie #137.
+            if (
+                isinstance(knoop, ast.Attribute)
+                and _is_self(knoop.value)
+                and id(knoop) not in aanroep_functies
+            ):
+                self.klassenlijsten |= self._veldnamen_classvar(knoop.attr)
             if isinstance(knoop, ast.Call):
                 self._verwerk_call(knoop, func, model)
 
@@ -281,12 +350,19 @@ class _Sweep:
                 self._verwerk(bronmodel.funcs[orig], bronmodel, sleutel=("func", bron, orig))
 
     def _rol_uit_dynamische_helper(self, call: ast.Call, func: ast.FunctionDef) -> None:
-        """Leidt de rol af uit het tekstargument van `aansluitingen`/`_eindpunten`."""
+        """Leidt de rol of klassenlijst af uit het tekstargument van `aansluitingen`/`_eindpunten`.
+
+        Een dynamische-rol-helper krijgt een `[klassen]`-veld als tekst; is dat een rolveld
+        (`vrijvervalleiding`), dan is het de bijbehorende rol, en anders (`afvoer_eindpunt`,
+        de eindpuntrol van NET-001/002) een klassenlijst. De eindfilter in `analyseer` haalt
+        de rolvelden er weer af, dus toevoegen aan beide is veilig (issue #137).
+        """
         arg = _rol_argument(call)
         for veld in self._velden_uit_arg(arg, func):
             rol = self.veld_naar_rol.get(veld)
             if rol is not None:
                 self.rollen.add(rol)
+            self.klassenlijsten.add(veld)
 
     def _velden_uit_arg(self, arg: ast.expr | None, func: ast.FunctionDef) -> frozenset[str]:
         """De `[klassen]`-veldnaam/-namen achter een rol-argument."""

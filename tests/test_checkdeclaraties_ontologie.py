@@ -90,11 +90,13 @@ UITZONDERINGEN: dict[tuple[str, str], str] = {
     ),
     ("HGT-002", "Putdekselniveau"): ("[domeinkeuze] Als HGT-001, zware drempel."),
     ("HGT-011", "Putdekselniveau"): (
-        "[domeinkeuze] Leest het bovenkantniveau (deksel/maaiveld) op `netwerkknopen`."
+        "[structuur] Sinds issue #137 leest HGT-011 het bovenkantniveau (deksel/maaiveld) op "
+        "de put die de overstortdrempel draagt (via `drempels_per_put`), niet meer op elke "
+        "netwerkknoop; de gedeclareerde rol is de aanvoerende vrijvervalstreng."
     ),
     ("HGT-011", "Drempelniveau"): (
         "[structuur] Leest de overstortdrempels via `drempels_per_put` (engine-navigatie, "
-        "niet via een rol): die hangen aan overstortputten en niet aan elke netwerkknoop. "
+        "niet via een rol): die hangen aan overstortputten en niet aan de aanvoerende streng. "
         "Dezelfde drempelpopulatie als RVZ-011."
     ),
     ("HGT-011", "Drempelbreedte"): (
@@ -175,7 +177,6 @@ def _bereikbaar(klasse: str) -> frozenset[str]:
 
 
 _ROL_NAAR_VELD = {rol: veld for veld, rol in _veld_naar_rol().items()}
-_ROL_NAAR_VELD["rioolputten"] = "rioolput"
 
 
 def _wortels(rol: str, klassen) -> list[str]:
@@ -202,13 +203,15 @@ def _schendingen() -> dict[tuple[str, str], list[str]]:
             check = REGISTRY[check_id]
             nietleeg = {rol: wortels for rol in check.rollen if (wortels := _wortels(rol, klassen))}
             if not nietleeg:
-                # Een check zonder (niet-lege) rol valt hier buiten: RVZ-011 haalt zijn
-                # putten via de overstortdrempel-index (`drempels_per_put`, engine-navigatie)
-                # en niet via een rol, dus `rollen = ()`. Zijn dekselkenmerk staat feitelijk
+                # Een check zonder (niet-lege) rol valt hier buiten: RVZ-011 en ADM-007 halen
+                # hun populatie via de overstortdrempel-index respectievelijk `[[puttyperegels]]`
+                # en niet via een rol, dus `rollen = ()`. RVZ-011's dekselkenmerk staat feitelijk
                 # op overstortputten (een Rioolput, mét deksel), dus dat is correct, maar het
                 # wordt hier niet tegen de ontologie gehouden. Een check die zijn hele
-                # populatie via engine-navigatie haalt, ontsnapt zo aan deze bewaking; nu is
-                # dat alleen RVZ-011, met reden.
+                # populatie via engine-navigatie haalt, ontsnapt zo aan deze bewaking; dat zijn
+                # RVZ-011 en ADM-007, met reden. HGT-011 hoort er sinds issue #137 niet meer bij:
+                # die houdt de rol `vrijvervalrioolleidingen`, dus zijn drempelkenmerken worden
+                # hier wél getoetst en staan met reden in `UITZONDERINGEN`.
                 continue
             for kenmerk in _concrete_kenmerken(check):
                 if kenmerk in GLOBALE_UITZONDERINGEN:

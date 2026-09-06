@@ -382,6 +382,9 @@ class CheckOutcome:
     # bouwt er de toelichtingsregel "Toetst <klassen> op <kenmerken>" mee op.
     rollen: tuple[str, ...] = ()
     kenmerken: tuple[str, ...] = ()
+    # Issue #137: overgenomen uit de checkklasse, net als `rollen`. De uitvoerlaag zet ze
+    # in de regel "Toetst ..." als "leest verder `[klassen] <veld>`".
+    klassenlijsten: tuple[str, ...] = ()
     # Issue #122: overgenomen uit de checkklasse, net als `id_sleutels`. De
     # meldingenlaag vult er de zijmap `Meldingenstroom.feiten` mee; hier met een
     # default, want `id_sleutels` hierboven staat vóór de eerste default.
@@ -675,6 +678,15 @@ class Check(ABC):
     # ontologie.
     rollen: ClassVar[tuple[str, ...]]
     kenmerken: ClassVar[tuple[str, ...]]
+    # Issue #137: de `[klassen]`-lijsten die deze check leest en die geen rol zijn --
+    # veldnamen uit `[klassen]` die buiten `selectie._ROL_VELDEN` vallen (`vgs`, `drempel`,
+    # `afvoer_eindpunt`, `kruisingsleiding`, `ledigingsvoorziening`, `stelseltypen`). Zulke
+    # lijsten dragen een populatie of classificatie, geen kenmerk, en horen dus niet in
+    # `kenmerken`; ze zijn ook geen rol. Standaard leeg -- `register()` eist alleen `rollen`
+    # en `kenmerken` -- dus de checks zonder zo'n lijst raken niets. De AST-sweep in
+    # `tests/checkdeclaratie_analyse.py` houdt de declaratie in beide richtingen tegen de
+    # code (`test_declaratie_klassenlijsten_volgt_de_code`).
+    klassenlijsten: ClassVar[tuple[str, ...]] = ()
     # Issue #96: de deelpopulatie in woorden, voor een check die zijn objecten niet via
     # een rol haalt maar via engine-navigatie (RVZ-011 loopt de overstortdrempel-index)
     # of via de projectconfiguratie (ADM-007 leest `[[puttyperegels]]`). De regel
@@ -846,6 +858,7 @@ def run_checks(
                     skeleton=check.markering if isinstance(check, SkeletonCheck) else "",
                     rollen=check.rollen,
                     kenmerken=check.kenmerken,
+                    klassenlijsten=check.klassenlijsten,
                     populatie_omschrijving=check.populatie_omschrijving,
                     bekeken_scope=_scope(check, over_volledige_populatie),
                 )

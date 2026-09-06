@@ -899,16 +899,26 @@ def _kenmerk_labels(outcome: CheckOutcome, config: CheckConfig) -> list[str]:
 def _toetst_regel(outcome: CheckOutcome, config: CheckConfig) -> str:
     """De regel "Toetst <klassen> op <kenmerken>" onder een eigen check (issue #64).
 
-    Zonder rollen noemt de check zelf de deelpopulatie die hij bekeek
-    (`populatie_omschrijving`, issue #96); "de hele export" blijft over voor de check
-    die werkelijk niet tot een populatie beperkt is.
+    Noemt de check zijn populatie zelf in woorden (`populatie_omschrijving`, issue #96),
+    dan gaat die tekst vóór de klassen van de rollen: HGT-011 en RVZ-011 lezen de
+    overstortdrempels via engine-navigatie, en hun rol (de aanvoerende streng) ís niet de
+    populatie -- de rol bij HGT-011 zou hier anders een misleidende klassenlijst tonen.
+    Zonder omschrijving én zonder rollen blijft "de hele export" over.
+
+    Leest de check nog `[klassen]`-lijsten die geen rol zijn (issue #137), dan staan die
+    er als "; leest verder `[klassen] <veld>`" achter, zodat de herkomst compleet is: de
+    rapportregel noemt anders niet dat NET-006 het VGS of HGT-011 de drempels leest.
     """
     klassen = sorted({k for rol in outcome.rollen for k in klassen_van_rol(rol, config.klassen)})
-    klassen_txt = ", ".join(klassen) or outcome.populatie_omschrijving or "de hele export"
+    klassen_txt = outcome.populatie_omschrijving or ", ".join(klassen) or "de hele export"
     kenmerken = _kenmerk_labels(outcome, config)
+    staart = ""
+    if outcome.klassenlijsten:
+        lijsten = ", ".join(f"`[klassen] {veld}`" for veld in outcome.klassenlijsten)
+        staart = f"; leest verder {lijsten}"
     if not kenmerken:
-        return f"Toetst {klassen_txt} (structuur en geometrie, geen kenmerk)."
-    return f"Toetst {klassen_txt} op {', '.join(kenmerken)}."
+        return f"Toetst {klassen_txt} (structuur en geometrie, geen kenmerk){staart}."
+    return f"Toetst {klassen_txt} op {', '.join(kenmerken)}{staart}."
 
 
 def _detail_eigen(

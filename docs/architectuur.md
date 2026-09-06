@@ -230,7 +230,22 @@ alleen het bestand waarin zij staat is verhuisd.
   projectconfiguratie (ADM-007 leest `[[puttyperegels]]`); laat het leeg bij een check
   mét rollen -- daar komen de klassen uit de rollen en is de zin dode tekst -- en bij
   ATTR-014, die werkelijk de hele export op alle kenmerken langsloopt. Aan het veld
-  `populatie` ("gaat over") verandert dit niets. Zie BO-58.
+  `populatie` ("gaat over") verandert dit niets. Zie BO-58. Sinds issue #137 gaat de
+  omschrijving bovendien vóór de klassen van de rollen: HGT-011 houdt de rol
+  `vrijvervalrioolleidingen` (de aanvoerende streng) maar zijn populatie zijn de
+  overstortdrempels, en zonder deze voorrang zou de regel de streng-klassen tonen.
+- **Een derde checkdeclaratie: `klassenlijsten`** (issue #137, BO-95). Naast `rollen` en
+  `kenmerken` (issue #64) declareert een check de `[klassen]`-lijsten die hij leest en die
+  geen rol zijn -- veldnamen uit `[klassen]` buiten `selectie._ROL_VELDEN`, zoals het VGS van
+  NET-006, de drempels van HGT-011/NET-007/RVZ-002/009/011, het afvoereindpunt van
+  NET-001/002/RVZ-006, de kruisingsleiding van EXT-003, de ledigingsvoorziening van RVZ-008 en
+  de stelseltypen van NET-005/006. Ze dragen een populatie of classificatie, geen kenmerk, en
+  horen dus niet in `kenmerken`. `_toetst_regel` zet ze als "; leest verder `[klassen] <veld>`"
+  achter de regel "Toetst ...", en `scripts/dekkingsmatrix.py` achter de kolom *Rollen ·
+  kenmerken*. De AST-sweep in `tests/checkdeclaratie_analyse.py` leidt ze af uit elke
+  `context.config.klassen.<veld>`-keten en elke veldnamen-ClassVar vanuit `run`/`examined`/
+  `notes` (door hulpfuncties én functie-lokale imports heen), en houdt de niet-rol-velden over;
+  `test_declaratie_klassenlijsten_volgt_de_code` bindt de declaratie er in beide richtingen aan.
 - De runbrede markering boven een rapport wordt samengesteld in
   `uitvoer/voorbehoud.py`, en nergens anders. Er kan meer dan een voorbehoud tegelijk
   gelden -- een `--cfk`-deelset op een run met `--geen-ontologie` -- en

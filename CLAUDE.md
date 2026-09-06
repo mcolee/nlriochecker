@@ -118,11 +118,17 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   drifttest die elke checkdeclaratie (`rollen`, `kenmerken`) tegen de ontologie houdt
   (`tests/test_checkdeclaraties_ontologie.py`). De drifttests die index en ontologie aan
   elkaar en aan het versienummer binden (BO-32) draaien in de package-repo.
-- **Elke check declareert `rollen` en `kenmerken`** (issue #64, BO-51). Een nieuwe of
+- **Elke check declareert `rollen` en `kenmerken`, en zo nodig `klassenlijsten`** (issue
+  #64/#137, BO-51/BO-95). Een nieuwe of
   gewijzigde check moet zeggen over welke GWSW-populatie hij gaat (`rollen`, namen uit
   `selectie._ROLLEN`) en welke kenmerken hij leest (`kenmerken`, GWSW-namen, of
-  `config:<pad>`/`*`); `register()` weigert een check zonder beide. Twee drifttests bewaken
-  het: `test_declaratie_volgt_de_code` (AST-sweep) en `test_declaratie_past_bij_de_ontologie`.
+  `config:<pad>`/`*`); `register()` weigert een check zonder beide. Leest hij daarnaast een
+  `[klassen]`-lijst die géén rol is (het VGS, de drempels, het afvoereindpunt, de
+  kruisingsleiding, de ledigingsvoorziening, de stelseltypen), dan declareert hij die als
+  `klassenlijsten` (veldnamen uit `[klassen]` buiten `selectie._ROL_VELDEN`); standaard leeg.
+  Drie drifttests bewaken het: `test_declaratie_volgt_de_code` en
+  `test_declaratie_klassenlijsten_volgt_de_code` (AST-sweep, beide richtingen) en
+  `test_declaratie_past_bij_de_ontologie`.
   Verander je wat een check selecteert of leest, werk dan de declaratie bij -- de AST-sweep
   valt anders. De dekselchecks putdiepte/putbodem (HGT-012/015) toetsen op de rol
   `rioolputten` (`gwsw:Rioolput`), niet op elke `netwerkknoop`.

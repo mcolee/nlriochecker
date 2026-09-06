@@ -800,3 +800,24 @@ class TestBekekenScope:
             "(structuur en geometrie, geen kenmerk)._" in tekst
         )
         assert "de hele export" not in tekst
+
+    def test_een_check_met_rol_en_populatie_omschrijving_toont_de_omschrijving(
+        self, tmp_path: Path
+    ) -> None:
+        """HGT-011 houdt de rol maar noemt zijn eigen populatie en zijn `[klassen]`-lijst (#137).
+
+        Sinds issue #137 gaat `populatie_omschrijving` vóór de klassen van de rol in de
+        regel "Toetst ..." -- de rol is de aanvoerende streng, de populatie de drempels --
+        en de niet-rol-lijst `drempel` staat er als "leest verder `[klassen] drempel`"
+        achter.
+        """
+        tekst = _rapport(_run("hgt011_drempel_onder_bob.ttl", "HGT-011"), tmp_path)
+
+        assert "_Toetst de overstortdrempels die aan een put hangen op BobEindpuntLeiding" in tekst
+        assert "leest verder `[klassen] drempel`._" in tekst
+
+    def test_een_check_met_meerdere_klassenlijsten_noemt_ze_alle(self, tmp_path: Path) -> None:
+        """NET-006 leest het VGS én de stelseltypen; beide staan achter de regel "Toetst" (#137)."""
+        tekst = _rapport(_run("top013_parallel.ttl", "NET-006"), tmp_path)
+
+        assert "leest verder `[klassen] stelseltypen`, `[klassen] vgs`._" in tekst

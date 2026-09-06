@@ -13,6 +13,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Checks declareren hun `[klassen]`-lijsten; HGT-011 toetst de drempels** (issue #137,
+  BO-95). Een check declareert naast `rollen` en `kenmerken` (issue #64) nu ook
+  `klassenlijsten`: de `[klassen]`-veldnamen die hij leest en die geen rol zijn (het VGS, de
+  drempels, het afvoereindpunt, de kruisingsleiding, de ledigingsvoorziening, de
+  stelseltypen). De AST-sweep leidt ze in beide richtingen af
+  (`test_declaratie_klassenlijsten_volgt_de_code`, ook door functie-lokale imports heen), het
+  rapport en de dekkingsmatrix tonen ze ("leest verder `[klassen] <veld>`"). HGT-011 is
+  gerepareerd naar het voorbeeld van RVZ-011: rol `vrijvervalrioolleidingen` (`netwerkknopen`
+  verviel), `examined` telt de overstortdrempels in plaats van de netwerkknopen (22.363 -> 0),
+  met een `populatie_omschrijving`. Geen bevinding verschuift op De Wolden en Hoogeveen.
+
 - **Zes hekken die niet bijten, gerepareerd** (issue #160). (a) Een kringtest in
   `tests/test_architectuur_laagsnit.py` (networkx) dwingt af dat elke import-SCC een
   singleton is; de verborgen kring van negentien modules

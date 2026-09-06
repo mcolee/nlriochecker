@@ -26,6 +26,7 @@ from gwsw_orox_helpers.dataset import Conduit, Node
 import nlriochecker.checks  # noqa: F401  (vult de registry)
 from checkdeclaratie_analyse import (
     DERIVED_PROPS,
+    _parse_module,
     analyseer_alle_checks,
     bevinding_kwargs_van_check,
     drempelsleutels_van_check,
@@ -67,6 +68,45 @@ def test_declaratie_volgt_de_code(check_id: str) -> None:
         f"{check_id}: gedeclareerde kenmerken {sorted(_concrete_kenmerken(check))} wijken af "
         f"van wat de code leest {sorted(feitelijk.kenmerken)}."
     )
+
+
+@pytest.mark.parametrize("check_id", CODE_CHECK_IDS)
+def test_declaratie_klassenlijsten_volgt_de_code(check_id: str) -> None:
+    """De gedeclareerde `[klassen]`-lijsten zijn precies de niet-rol-velden die de code leest.
+
+    Issue #137: naast rollen en kenmerken leest een check soms een `[klassen]`-lijst die
+    geen rol is -- NET-006 het VGS, HGT-011/NET-007/RVZ-002/009/011 de drempels,
+    NET-001/002/RVZ-006 het afvoereindpunt, EXT-003 de kruisingsleiding, RVZ-008 de
+    ledigingsvoorziening, NET-005/006 de stelseltypen. De sweep vindt elke
+    `context.config.klassen.<veld>`-keten en elke veldnamen-ClassVar vanuit
+    `run`/`examined`/`notes`, houdt de niet-rol-velden over, en deze test bindt de
+    declaratie er in beide richtingen aan: te veel of te weinig is allebei rood.
+    """
+    check = REGISTRY[check_id]
+    feitelijk = DECLARATIES[check_id]
+    assert frozenset(check.klassenlijsten) == feitelijk.klassenlijsten, (
+        f"{check_id}: gedeclareerde klassenlijsten {sorted(check.klassenlijsten)} wijken af "
+        f"van wat de code leest {sorted(feitelijk.klassenlijsten)}."
+    )
+
+
+def test_parse_module_volgt_functie_lokale_imports() -> None:
+    """`_parse_module` verzamelt een import uit een checks-module ook binnen een functie.
+
+    De sweep volgt een hulpfunctie die een check pas in haar `run` importeert (issue #137;
+    de lazy import die de #64-sweep aanvankelijk miste). Een top-level import en een
+    functie-lokale import horen daarom allebei in `ModuleModel.imports` te landen; deze
+    gerichte proef bewijst dat zonder van een echte checkmodule af te hangen.
+    """
+    bron = (
+        "from nlriochecker.checks.selectie import putten\n"
+        "def run(self, context):\n"
+        "    from nlriochecker.checks.randvoorzieningen import alle_drempels\n"
+        "    return alle_drempels(context) or putten(context)\n"
+    )
+    model = _parse_module("mini", ast.parse(bron))
+    assert model.imports["putten"] == ("selectie", "putten")
+    assert model.imports["alle_drempels"] == ("randvoorzieningen", "alle_drempels")
 
 
 def test_elke_check_declareert_beide() -> None:
@@ -157,17 +197,21 @@ def test_alleen_de_bereikbaarheids_en_dekkingschecks_gaan_over_het_persnet() -> 
 
 
 def test_alleen_een_check_zonder_rol_omschrijft_zijn_populatie() -> None:
-    """Wie geen rol declareert, zegt zelf welke deelpopulatie hij bekeek (issue #96).
+    """Een `populatie_omschrijving` staat alleen waar de rol niet de populatie is (issue #96/#137).
 
-    `populatie_omschrijving` vult de regel "Toetst ..." waar anders "de hele export"
-    zou staan, en die terugval treedt alleen op zonder rollen. Op een check mét rollen
-    is de zin dus dode tekst; deze test houdt hem daar weg. ATTR-014 heeft ook geen
-    rollen en staat er met opzet niet bij: die gaat werkelijk over de hele export.
+    De omschrijving gaat in de regel "Toetst ..." vóór de klassen van de rollen
+    (`_toetst_regel`). Zonder rol is dat de enige populatiebron (ADM-007 leest
+    `[[puttyperegels]]`, RVZ-011 loopt de overstortdrempel-index). HGT-011 houdt sinds
+    issue #137 wél een rol -- de aanvoerende vrijvervalstreng -- maar zijn populatie zijn
+    de overstortdrempels, dus ook daar is de omschrijving nodig en geen dode tekst.
+    ATTR-014 staat er met opzet niet bij: die gaat werkelijk over de hele export.
     """
     met_omschrijving = {cid for cid in CHECK_IDS if REGISTRY[cid].populatie_omschrijving}
 
-    assert met_omschrijving == {"ADM-007", "RVZ-011"}
-    assert all(not REGISTRY[cid].rollen for cid in met_omschrijving)
+    assert met_omschrijving == {"ADM-007", "HGT-011", "RVZ-011"}
+    # Alleen HGT-011 draagt de omschrijving náást een rol; de andere twee hebben er geen.
+    assert not REGISTRY["ADM-007"].rollen and not REGISTRY["RVZ-011"].rollen
+    assert REGISTRY["HGT-011"].rollen == ("vrijvervalrioolleidingen",)
 
 
 def test_alleen_de_twee_instantietellers_zijn_zo_gemarkeerd() -> None:
