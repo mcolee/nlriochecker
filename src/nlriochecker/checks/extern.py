@@ -686,15 +686,18 @@ class _WatergangKruising(_ExterneCheck):
         afhangen. Wie hier ooit een tweede subklasse met een eigen populatie onder
         hangt (BO-25 verwierp dat voor EXT-003), moet haar dus een eigen sleutel geven.
         """
+        selectie = self.selectie(context)
         laag = self.laag(context)
         buffer = context.config.drempels.ext_watergang_buffer_m
-        # `_van_soort` staat binnen de gecachte lambda en niet ervoor: anders liep die
-        # O(n)-versmalling over de toetsbare strengen bij elke aanroep van deze methode
-        # opnieuw (uit `kruisingen()` én uit `notes()`), ook wanneer de kruisingstoets zelf
-        # al gecachet was (issue #172). De uitkomst verandert er niet door.
+        # De lambda sluit alleen over de al bepaalde `selectie`, `laag` en `buffer` --
+        # geen `self` -- zodat de bouwer onder de gedeelde cachesleutel niet van de eerste
+        # aanroeper kan gaan afhangen (zie de docstring). Alleen de O(n)-versmalling
+        # `_van_soort` staat binnen de lambda, zodat zij bij een herhaalde aanroep (uit
+        # `kruisingen()` én `notes()`) niet opnieuw draait als de toets al gecachet is
+        # (issue #172). De uitkomst verandert er niet door.
         return context.cached(
             "ext:watergangkruisingen",
-            lambda: _zoek_kruisingen(_van_soort(self.selectie(context), Conduit), laag, buffer),
+            lambda: _zoek_kruisingen(_van_soort(selectie, Conduit), laag, buffer),
         )
 
     def kruisingen(self, context: CheckContext) -> tuple[_Kruising, ...]:
