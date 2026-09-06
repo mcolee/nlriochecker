@@ -145,10 +145,13 @@ class ClassRoots(BaseModel):
         onbereikbaar -- op De Wolden en Hoogeveen 645 valse bevindingen. Precies daarom
         wachtte issue #73 op #72.
 
-        Deze poort hoort hier en niet bij de nul-bewaking: `load_check_config` valideert
-        een projectbestand op zichzelf en legt het niet over `checks.toml` heen, dus een
-        weggelaten `mechanisch` levert een lege lijst op, en een rol zonder klassen valt
-        uit de rollentelling weg (BO-52) in plaats van een signaal te geven.
+        Deze poort hoort hier en niet bij de nul-bewaking, en zij is een
+        `model_validator(mode="after")`: zij toetst dus de uiteindelijke config -- een
+        volledige kopie, of sinds issue #163 het gemergede resultaat van een
+        `basis = "standaard"`-overlay -- en blijft in beide gevallen juist. Een volledige
+        kopie die `mechanisch` weglaat levert een lege lijst op, en een rol zonder klassen
+        valt uit de rollentelling weg (BO-52) in plaats van een signaal te geven; daar
+        vangt deze poort het.
 
         Een lege `afvoer_eindpunt` valt erbuiten: dan is er in het geheel geen
         afvoereindpunt en is de uitkomst van NET-001 meteen zichtbaar iets anders. Dat is

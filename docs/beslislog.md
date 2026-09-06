@@ -5360,7 +5360,9 @@ data/gis_dewoldenhoogeveen`); een volledige kopie zonder `basis` -- ook de stand
 zegt "Projectconfiguratie volledig, geen overlay". Alleen Markdown: `CheckConfig` draagt de
 lijst overschreven paden in een privé-attribuut (`overschreven_paden`), geen JSON-veld, geen
 `gwsw_run`-kolom, geen `SCHEMA_VERSIE`-bump. De guard `ClassRoots._pompunit_heeft_een_uitweg`
-(BO-55) blijft staan: hij toetst het gemergede resultaat en is dus nog steeds juist.
+(BO-55) blijft inhoudelijk ongewijzigd, maar haar docstring is bijgewerkt: als
+`model_validator(mode="after")` toetst zij de uiteindelijke, gemergede config en is daarom
+ook met een `basis = "standaard"`-overlay nog juist.
 
 **Bewijs.** `configs/dewoldenhoogeveen.toml` 594 → ~60 regels (waarvan de acht sleutels; de
 rest is toelichting). De gemergede overlay is `==` aan de volledige kopie in elke sectie;
