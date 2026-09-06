@@ -53,6 +53,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De externe bronnen worden smal ingelezen** (issue #147): `externedata._lees_laag` leest
+  voortaan alleen de kolommen die de checks en de uitvoer werkelijk gebruiken
+  (`LEESKOLOMMEN`, als `columns=` aan `gpd.read_file`) in plaats van elke kolom van elke laag.
+  De selectie loopt hoofdletterongevoelig via `pyogrio.read_info`, zodat een NWB-extract met
+  `wegbehsrt` (Koekangerveld) net zo goed geraakt wordt als één met `WEGBEHSRT` (De Wolden) en
+  een ontbrekende kolom geen fout geeft. Op De Wolden en Hoogeveen zakt de bronfase van ~1,8
+  naar ~1,3 GB piek-RSS en van ~23 naar ~11 s (gepaard gemeten voor/na, referentie `ec1b15a`,
+  `scripts/meet_bronnen_kolomfilter.py`); de volle `toets` piekt ~4,2 → ~3,8 GB `ru_maxrss`.
+  Geen verschoven melding: `bevindingen.csv` van de volle run is sha256-gelijk (161.692 rijen).
+  Een drifttest (`test_leeskolommen_dekt_alle_lezers`) bindt de kolomlijst aan de sleutel-,
+  historie- en `KOLOM_*`-kolommen die de lezers noemen.
+
 - **De extent-toets van de EXT-checks is geprepareerd en de selectie wordt per populatie
   gedeeld** (issue #146): `binnen_bereik` toetst voor elk GWSW-object
   `extent.intersects(geometrie)` -- op De Wolden en Hoogeveen ruim 125.000 aanroepen op een

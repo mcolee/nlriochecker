@@ -554,14 +554,73 @@ def _laagnamen(pad: Path) -> list[str]:
         verbinding.close()
 
 
+# De kolommen die de checks en de uitvoer uit een aangeleverde vectorlaag lezen. Alleen
+# deze worden ingelezen (`columns=`), zodat een brede bron -- het BGT-wegdeel draagt 32
+# kolommen -- niet in zijn geheel in het geheugen belandt (issue #147). Een laag die er
+# geen van draagt levert een geometrie-only frame; `VectorLayer.kolom()` geeft voor een
+# niet-gelezen kolom `None`, net als voor een lege waarde.
+#
+# De lijst spiegelt drie lezers en `tests/test_externedata_kolomfilter.py`
+# (`test_leeskolommen_dekt_alle_lezers`) bindt hem eraan zodat hij niet stil achterloopt:
+#   - de sleutelkolommen (`checks/treffers.py::SLEUTELKOLOMMEN`) en `type`, die de
+#     treffer-registratie en `uitvoer/gpkg.py` lezen;
+#   - de historievelden (`HISTORIEVELDEN` hieronder), die `_alleen_actueel` filtert;
+#   - de `KOLOM_*` van `checks/wegvakken.py` (NWB-, TOP10NL- en BGT-wegdeelkolommen).
+# Ze staan hier als tekst en worden niet uit die modules geimporteerd: `checks/wegvakken.py`
+# importeert `externedata`, dus de omgekeerde import zou een cyclus geven.
+LEESKOLOMMEN = (
+    "lokaal_id",
+    "identificatie",
+    "id",
+    "type",
+    "eind_registratie",
+    "termination_date",
+    "WEGBEHSRT",
+    "BST_CODE",
+    "WVK_ID",
+    "STT_NAAM",
+    "bebouwdekom",
+    "naamnl",
+    "plus_fysiek_voorkomen",
+)
+
+
+def _leeskolommen(pad: Path, laag: str) -> list[str]:
+    """De velden uit `LEESKOLOMMEN` die deze laag werkelijk draagt, in bestandsvolgorde.
+
+    `columns=` van pyogrio is hoofdlettergevoelig, en de kolomnamen verschillen per extract
+    in hoofdlettergebruik (NWB: `WEGBEHSRT` in De Wolden, `wegbehsrt` in Koekangerveld).
+    Daarom haalt `read_info` eerst de veldenlijst op; die wordt hoofdletterongevoelig tegen
+    `LEESKOLOMMEN` gehouden en alleen de aanwezige velden gaan, in hun eigen schrijfwijze,
+    naar `gpd.read_file`. Zo weigert het lezen ook geen ontbrekende kolom (die wordt hier al
+    weggelaten) en blijft `VectorLayer.kolom()` de ene plek waar het hoofdletterverschil
+    verdwijnt.
+    """
+    import pyogrio
+
+    gewenst = {naam.casefold() for naam in LEESKOLOMMEN}
+    try:
+        velden = pyogrio.read_info(pad, layer=laag)["fields"]
+    except Exception as error:  # pyogrio gooit uiteenlopende fouten
+        raise ExternalDataError(f"{pad}: laag {laag!r} is niet leesbaar ({error}).") from error
+    return [str(naam) for naam in velden if str(naam).casefold() in gewenst]
+
+
 def _lees_laag(
     pad: Path, laag: str, notities: list[str]
 ) -> tuple[list[tuple[BaseGeometry, dict[str, object]]], str, str | None]:
-    """Leest een enkele laag met geopandas en bewaakt het coordinaatstelsel."""
+    """Leest een enkele laag met geopandas en bewaakt het coordinaatstelsel.
+
+    Alleen de kolommen uit `LEESKOLOMMEN` worden ingelezen; zie die constante voor het
+    waarom en `_leeskolommen` voor de hoofdletterongevoelige selectie (issue #147).
+    """
     import geopandas as gpd
 
+    # Buiten de `try`: `_leeskolommen` gooit zelf al een `ExternalDataError`, en die zou de
+    # buitenste `except` anders een tweede keer inpakken ("... is niet leesbaar (...)").
+    kolommen = _leeskolommen(pad, laag)
     try:
-        frame = gpd.read_file(pad, layer=laag)
+        frame = gpd.read_file(pad, layer=laag, columns=kolommen)
     except Exception as error:  # pyogrio en fiona gooien uiteenlopende fouten
         raise ExternalDataError(f"{pad}: laag {laag!r} is niet leesbaar ({error}).") from error
 

@@ -2307,7 +2307,11 @@ de moduledocstring van `graaf.py` draagt het volledige leescontract.
 
 **Gemeten.** Koude toetsrun op De Wolden en Hoogeveen: 107 s totaal waarvan laden 27,9 s
 (was 205 s totaal, laden 84,6 s). Warme run 98 s, cache-lezen 2,3 s (was 163 s / 34 s).
-Piek-RSS 1,76 GB (was 3,98 GB). De graafpickle in de cache is 91 MB (was 436 MB).
+Piek-RSS 1,76 GB (was 3,98 GB). De graafpickle in de cache is 91 MB (was 436 MB). Die
+1,76 GB is zonder `--bronnen` gemeten; een volle run mét `--bronnen` en JSON-uitvoer piekt
+op ~4,2 GB (gemeten 05-09), na issue #147 op ~3,8 GB -- daar leest `externedata` de externe
+bronnen smal in (`LEESKOLOMMEN`, `columns=`), wat de bronfase van ~1,8 naar ~1,3 GB piek
+brengt (`scripts/meet_bronnen_kolomfilter.py`).
 
 **Cache: picklen, niet herbouwen.** Beide alternatieven zijn gemeten: de gepicklede index
 laden kost 5,7 s, hem warm herbouwen uit een nieuwe pyoxigraph-parse 19,9 s. Daarom
