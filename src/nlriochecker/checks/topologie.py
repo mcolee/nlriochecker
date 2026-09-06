@@ -8,6 +8,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import cast
 
+import numpy as np
+import shapely
 from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
@@ -30,7 +32,6 @@ from nlriochecker.checks.meetkunde import (
     half_diameter_m,
     is_finite,
     max_offset_from_chord_kern,
-    overlap_length_met_buffer,
     unieke_coords_van,
     vertex_angles_kern,
 )
@@ -344,6 +345,11 @@ class _Nabijheid:
     """
 
     conduits: list[Conduit]
+    # De hartlijnen als object-array, in dezelfde volgorde als `conduits`. De drie checks
+    # bevragen de STRtree in bulk (`_paren`) en rekenen hun afstanden, snijdingen en
+    # buffers over deze array; hem een keer bewaren scheelt een array per aanroep. Zie
+    # issue #145.
+    lijnen: np.ndarray
     tree: STRtree | None
     # Per streng-URI de uiteinden; alleen voor de strengen in `conduits`, dus altijd
     # gevuld. TOP-010 gebruikt ze om een gedeeld uiteinde te herkennen.
@@ -353,25 +359,6 @@ class _Nabijheid:
     # populatie, anders noemt die regel een ander getal dan er getoetst is.
     buiten: int
     totaal: int
-    # Per (streng-URI, tolerantie) de gebufferde hartlijn, lui gevuld. TOP-006 bouwde
-    # die per paar, terwijl hij alleen van de streng en van een vaste drempel afhangt;
-    # de tolerantie zit in de sleutel zodat een tweede beller met een andere drempel de
-    # tabel niet stil verkeerd maakt. Een muteerbare dict op een `frozen=True`
-    # dataclass, net als `_Topologie.eindpunten`. Zie issue #123.
-    buffers: dict[tuple[str, float], BaseGeometry] = field(default_factory=dict)
-
-    def buffer_van(self, conduit: Conduit, tolerantie: float) -> BaseGeometry:
-        """De gebufferde hartlijn van deze streng, een keer gebouwd per tolerantie.
-
-        `intersection` muteert de buffer niet, dus dezelfde geometrie mag mee naar
-        elk volgend paar waarin deze streng de tegenpartij is.
-        """
-        sleutel = (conduit.uri, tolerantie)
-        gebufferd = self.buffers.get(sleutel)
-        if gebufferd is None:
-            gebufferd = _lijn(conduit).buffer(tolerantie)
-            self.buffers[sleutel] = gebufferd
-        return gebufferd
 
 
 def _nabijheid(context: CheckContext) -> _Nabijheid:
@@ -408,9 +395,11 @@ def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
         eindpunten[conduit.uri] = uiteinden
         conduits.append(conduit)
 
+    lijnen = np.array([conduit.line for conduit in conduits], dtype=object)
     return _Nabijheid(
         conduits=conduits,
-        tree=STRtree([conduit.line for conduit in conduits]) if conduits else None,
+        lijnen=lijnen,
+        tree=STRtree(lijnen) if conduits else None,
         eindpunten=eindpunten,
         buiten=totaal - len(in_populatie),
         totaal=totaal,
@@ -445,6 +434,24 @@ def _buren(nabijheid: _Nabijheid, conduit: Conduit, marge: float):
         ander = nabijheid.conduits[int(index)]
         if ander.uri != conduit.uri:
             yield ander
+
+
+def _paren(nabijheid: _Nabijheid, **kw: object) -> tuple[np.ndarray, np.ndarray]:
+    """De gerichte (a, b)-indexparen uit één STRtree-query over alle lijnen.
+
+    De bulkvariant van `_buren`: `tree.query(lijnen, ...)` levert alle kandidaatparen in
+    één keer, in plaats van een boomrondgang per streng. `a` en `b` zijn indexen in
+    `nabijheid.conduits`; het zelfpaar valt weg op de URI, net als in `_buren`. De
+    keyword-argumenten gaan onveranderd naar `STRtree.query` (`predicate=` en, voor de
+    afstandspredicaten, een `distance=` die scalair of per lijn mag zijn). Bij een lege
+    boom geeft de aanroeper deze functie niet aan; `nabijheid.tree` is dan `None`.
+    """
+    assert nabijheid.tree is not None
+    paren = nabijheid.tree.query(nabijheid.lijnen, **kw)  # type: ignore[arg-type]
+    a, b = paren[0], paren[1]
+    uris = np.array([conduit.uri for conduit in nabijheid.conduits], dtype=object)
+    houd = uris[a] != uris[b]
+    return a[houd], b[houd]
 
 
 @register
@@ -774,36 +781,52 @@ class OverlappendeStreng(Check):
         een paar moeten in de rol `nabijheidsleidingen` zitten (issue #82).
         """
         nabijheid = _nabijheid(context)
+        if nabijheid.tree is None:
+            return
         drempels = context.config.drempels
         tolerantie = drempels.overlap_tolerantie_m
         minimum = drempels.overlap_minimale_lengte_m
 
-        gemeld: set[tuple[str, str]] = set()
-        for conduit in nabijheid.conduits:
-            for ander in _buren(nabijheid, conduit, tolerantie):
-                sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
-                if sleutel in gemeld:
-                    continue
-                lengte = overlap_length_met_buffer(
-                    _lijn(conduit), nabijheid.buffer_van(ander, tolerantie)
-                )
-                if lengte < minimum:
-                    continue
-                gemeld.add(sleutel)
-                yield self.finding(
-                    context,
-                    conduit.uri,
-                    conduit.label,
-                    f"Valt over {lengte:.2f} m samen met streng {ander.label!r} "
-                    f"(tolerantie {tolerantie:g} m).",
-                    waarde=f"{lengte:.2f}",
-                    drempel=f"{minimum:g} (drempels.overlap_minimale_lengte_m)",
-                    object2_label=ander.label,
-                    object2_uri=ander.uri,
-                    overlaplengte_m=round(lengte, 3),
-                    tolerantie_m=tolerantie,
-                    foutlocatie=_dichtste_midden(conduit.line, ander.line),
-                )
+        a, b = _paren(nabijheid, predicate="dwithin", distance=tolerantie)
+        if not a.size:
+            return
+        # Buffer alleen de strengen die werkelijk als tegenpartij (`b`) voorkomen en map
+        # terug; `quad_segs=16` houdt het bit-gelijk aan het oude `_lijn(ander).buffer(tol)`.
+        # `intersection`/`length` daarna bulk over de paren.
+        uniek_b, terug = np.unique(b, return_inverse=True)
+        buffers = shapely.buffer(nabijheid.lijnen[uniek_b], tolerantie, quad_segs=16)
+        lengten = shapely.length(
+            shapely.intersection(nabijheid.lijnen[a], buffers[terug.reshape(-1)])
+        )
+        lengte_van = {
+            (int(i), int(j)): float(lengte) for i, j, lengte in zip(a, b, lengten, strict=True)
+        }
+
+        gemeld: set[tuple[int, int]] = set()
+        for i, j in zip(a, b, strict=True):
+            i, j = int(i), int(j)
+            sleutel = (min(i, j), max(i, j))
+            if sleutel in gemeld:
+                continue
+            lengte = lengte_van[(i, j)]
+            if lengte < minimum:
+                continue
+            gemeld.add(sleutel)
+            conduit, ander = nabijheid.conduits[i], nabijheid.conduits[j]
+            yield self.finding(
+                context,
+                conduit.uri,
+                conduit.label,
+                f"Valt over {lengte:.2f} m samen met streng {ander.label!r} "
+                f"(tolerantie {tolerantie:g} m).",
+                waarde=f"{lengte:.2f}",
+                drempel=f"{minimum:g} (drempels.overlap_minimale_lengte_m)",
+                object2_label=ander.label,
+                object2_uri=ander.uri,
+                overlaplengte_m=round(lengte, 3),
+                tolerantie_m=tolerantie,
+                foutlocatie=_dichtste_midden(conduit.line, ander.line),
+            )
 
     def notes(self, context: CheckContext) -> list[str]:
         """Verantwoordt de leidingen die buiten de versmalde populatie vielen."""
@@ -1034,48 +1057,62 @@ class StrengenRakenMetBuffer(Check):
         paar moeten in de rol `nabijheidsleidingen` zitten (issue #82).
         """
         nabijheid = _nabijheid(context)
+        if nabijheid.tree is None:
+            return
         marge = context.config.drempels.diameterbuffer_marge_m
         tolerantie = context.config.drempels.snapping_tolerantie_m
 
-        stralen = {
-            conduit.uri: half_diameter_m(conduit.breedte_mm, conduit.hoogte_mm)
-            for conduit in nabijheid.conduits
-        }
-        knopen = {conduit.uri: verbonden_knopen(context, conduit) for conduit in nabijheid.conduits}
+        stralen = np.array(
+            [half_diameter_m(c.breedte_mm, c.hoogte_mm) for c in nabijheid.conduits], dtype=float
+        )
         # De grootste straal in de dataset bepaalt hoe ver een tegenpartij kan
         # liggen en toch nog binnen de gezamenlijke buffer vallen.
-        grootste = max(stralen.values(), default=0.0)
+        grootste = float(stralen.max()) if stralen.size else 0.0
 
-        gemeld: set[tuple[str, str]] = set()
-        for conduit in nabijheid.conduits:
-            straal = stralen[conduit.uri]
-            for ander in _buren(nabijheid, conduit, straal + grootste + marge):
-                sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
-                if sleutel in gemeld:
-                    continue
-                buffer = straal + stralen[ander.uri] + marge
-                afstand = _lijn(conduit).distance(_lijn(ander))
-                if buffer <= 0.0 or afstand > buffer:
-                    continue
-                if self._deelt_put(knopen[conduit.uri], knopen[ander.uri]):
-                    continue
-                if self._deelt_uiteinde(nabijheid, conduit, ander, tolerantie):
-                    continue
-                gemeld.add(sleutel)
-                yield self.finding(
-                    context,
-                    conduit.uri,
-                    conduit.label,
-                    f"Ligt {afstand:.2f} m van streng "
-                    f"{ander.label!r}, binnen de gezamenlijke buisbuffer van {buffer:.2f} m.",
-                    waarde=f"{afstand:.2f}",
-                    drempel=f"{marge:g} (drempels.diameterbuffer_marge_m)",
-                    object2_label=ander.label,
-                    object2_uri=ander.uri,
-                    afstand_m=round(afstand, 3),
-                    buffer_m=round(buffer, 3),
-                    foutlocatie=_dichtste_midden(conduit.line, ander.line),
-                )
+        a, b = _paren(nabijheid, predicate="dwithin", distance=stralen + grootste + marge)
+        if not a.size:
+            return
+        afstanden = shapely.distance(nabijheid.lijnen[a], nabijheid.lijnen[b])
+        buffers = stralen[a] + stralen[b] + marge
+        houd = (buffers > 0.0) & (afstanden <= buffers)
+        a, b, afstanden, buffers = a[houd], b[houd], afstanden[houd], buffers[houd]
+
+        # De verbonden knopen alleen voor de strengen die na de buffertoets overblijven,
+        # lui: `verbonden_knopen` was in de oude vorm per streng vooraf uitgerekend.
+        knopen: dict[int, tuple[str | None, str | None]] = {}
+
+        def knopen_van(i: int) -> tuple[str | None, str | None]:
+            if i not in knopen:
+                knopen[i] = verbonden_knopen(context, nabijheid.conduits[i])
+            return knopen[i]
+
+        gemeld: set[tuple[int, int]] = set()
+        for i, j, afstand_ruw, buffer_ruw in zip(a, b, afstanden, buffers, strict=True):
+            i, j = int(i), int(j)
+            sleutel = (min(i, j), max(i, j))
+            if sleutel in gemeld:
+                continue
+            conduit, ander = nabijheid.conduits[i], nabijheid.conduits[j]
+            if self._deelt_put(knopen_van(i), knopen_van(j)):
+                continue
+            if self._deelt_uiteinde(nabijheid, conduit, ander, tolerantie):
+                continue
+            gemeld.add(sleutel)
+            afstand, buffer = float(afstand_ruw), float(buffer_ruw)
+            yield self.finding(
+                context,
+                conduit.uri,
+                conduit.label,
+                f"Ligt {afstand:.2f} m van streng "
+                f"{ander.label!r}, binnen de gezamenlijke buisbuffer van {buffer:.2f} m.",
+                waarde=f"{afstand:.2f}",
+                drempel=f"{marge:g} (drempels.diameterbuffer_marge_m)",
+                object2_label=ander.label,
+                object2_uri=ander.uri,
+                afstand_m=round(afstand, 3),
+                buffer_m=round(buffer, 3),
+                foutlocatie=_dichtste_midden(conduit.line, ander.line),
+            )
 
     def _deelt_put(self, links: tuple[str | None, str | None], rechts) -> bool:
         """Geeft aan of twee strengen administratief een put delen."""
@@ -1136,24 +1173,28 @@ class Hartlijnkruising(Check):
         in de rol `nabijheidsleidingen` zitten (issue #82).
         """
         nabijheid = _nabijheid(context)
+        if nabijheid.tree is None:
+            return
 
-        gemeld: set[tuple[str, str]] = set()
-        for conduit in nabijheid.conduits:
-            for ander in _buren(nabijheid, conduit, 0.0):
-                sleutel = (min(conduit.uri, ander.uri), max(conduit.uri, ander.uri))
-                if sleutel in gemeld or not _lijn(conduit).crosses(_lijn(ander)):
-                    continue
-                gemeld.add(sleutel)
-                snijpunt = _lijn(conduit).intersection(_lijn(ander))
-                yield self.finding(
-                    context,
-                    conduit.uri,
-                    conduit.label,
-                    f"De hartlijn kruist die van streng {ander.label!r}.",
-                    object2_label=ander.label,
-                    object2_uri=ander.uri,
-                    foutlocatie=_representatief(snijpunt),
-                )
+        a, b = _paren(nabijheid, predicate="crosses")
+        gemeld: set[tuple[int, int]] = set()
+        for i, j in zip(a, b, strict=True):
+            i, j = int(i), int(j)
+            sleutel = (min(i, j), max(i, j))
+            if sleutel in gemeld:
+                continue
+            gemeld.add(sleutel)
+            conduit, ander = nabijheid.conduits[i], nabijheid.conduits[j]
+            snijpunt = _lijn(conduit).intersection(_lijn(ander))
+            yield self.finding(
+                context,
+                conduit.uri,
+                conduit.label,
+                f"De hartlijn kruist die van streng {ander.label!r}.",
+                object2_label=ander.label,
+                object2_uri=ander.uri,
+                foutlocatie=_representatief(snijpunt),
+            )
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt de populatie en dat een kruising in het platte vlak nog geen conflict is."""

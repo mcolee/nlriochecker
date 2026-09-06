@@ -16,7 +16,6 @@ from nlriochecker.checks.meetkunde import (
     distinct_coords,
     unieke_coords_van,
 )
-from nlriochecker.checks.topologie import _nabijheid
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
@@ -399,15 +398,3 @@ def test_de_coordinatentabel_wordt_werkelijk_geraakt() -> None:
 
     assert coords_van(context, conduit.uri, conduit.line) is coords
     assert unieke_coords_van(context, conduit.uri, conduit.line) is uniek
-
-
-def test_de_buffer_van_een_streng_wordt_hergebruikt_per_tolerantie() -> None:
-    """Stap 3 van issue #123: een buffer per (streng, tolerantie), niet per paar."""
-    context = _context_van("top006_overlappende_streng.ttl")
-    nabijheid = _nabijheid(context)
-    conduit = nabijheid.conduits[0]
-
-    eerste = nabijheid.buffer_van(conduit, 0.02)
-
-    assert nabijheid.buffer_van(conduit, 0.02) is eerste
-    assert nabijheid.buffer_van(conduit, 0.05) is not eerste

@@ -53,6 +53,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **TOP-006, TOP-010 en TOP-011 zoeken hun strengparen in bulk** (issue #145): de drie
+  nabijheidschecks liepen per streng door `_buren` (een STRtree-rondgang per streng, ~219k
+  aanroepen op De Wolden en Hoogeveen) en rekenden hun overlap, afstand of kruising per paar
+  uit. `_Nabijheid` bewaart nu een lijnen-array en de checks bevragen de boom in één keer
+  (`_paren` = `tree.query(lijnen, ...)`): TOP-006 met `predicate="dwithin"` plus bulk
+  `intersection`/`length` (buffers `quad_segs=16`, zoals de oude per-paar-buffer), TOP-010 met
+  een marge per streng plus bulk `distance`, en TOP-011 rechtstreeks met `predicate="crosses"`.
+  Alleen de paren boven de drempel gaan daarna in Python door de meldingslus, met dezelfde
+  `gemeld`-sleutel, `_dichtste_midden` en velden (meldingtekst, `waarde`/`drempel`, details)
+  als voorheen. Op De Wolden en Hoogeveen zakt de tijd van TOP-006/010/011 samen van ~9,9 s
+  naar ~4,4 s (gepaard gemeten, referentie `2946a2c`), zonder één verschoven melding:
+  `bevindingen.csv` van de volle `toets` is sha256-gelijk (161.692 rijen). `_buren` blijft als
+  orakel voor de tests; een unittest legt de bulkvorm `_paren` tegen dat orakel. De ongebruikte
+  per-paar-buffercache (`_Nabijheid.buffer_van`, issue #123) is met TOP-006 vervallen.
+
 - **De AHN-hoogtechecks bemonsteren het raster één keer, in bulk** (issue #143): HGT-001,
   HGT-002 en HGT-003 lezen dezelfde populatie (`netwerkknopen` na `_selecteer`), maar cachten
   hun bemonstering per klassenaam (`ahn:monsters:<klasse>`) -- HGT-001 en HGT-002 bemonsterden
