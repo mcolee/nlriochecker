@@ -14,7 +14,7 @@ geherprojecteerd, en dat wordt vastgelegd in `notes`.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
@@ -133,6 +133,39 @@ class RasterSampler:
         if getal > 1e6 or getal < -1e6:
             return None
         return getal
+
+    def sample_many(self, coords: Sequence[tuple[float, float]]) -> list[float | None]:
+        """De rasterwaarden op deze RD-coordinaten, in dezelfde volgorde.
+
+        Dezelfde bounds-, nodata- en sentinelfilters als `sample`, maar met één
+        `reader.sample`-aanroep over alle punten binnen het raster in plaats van één per
+        punt; op een volledige dataset scheelt dat merkbaar (issue #143). Een coordinaat
+        buiten het raster, of op een nodata- of sentinelcel, levert `None` op precies
+        waar `sample` dat ook zou doen. Punten buiten het raster gaan niet mee naar
+        `reader.sample`: die geeft er een randwaarde voor terug, geen None.
+        """
+        resultaten: list[float | None] = [None] * len(coords)
+        if self.reader is None:
+            return resultaten
+        links, onder, rechts, boven = self.bounds
+        binnen = [
+            (i, xy)
+            for i, xy in enumerate(coords)
+            if links <= xy[0] <= rechts and onder <= xy[1] <= boven
+        ]
+        if not binnen:
+            return resultaten
+        monsters = self.reader.sample([xy for _, xy in binnen], 1)
+        for (i, _), waarde in zip(binnen, monsters, strict=True):
+            if waarde[0] is None:
+                continue
+            getal = float(waarde[0])
+            if self.nodata is not None and abs(getal - self.nodata) < 1e-6:
+                continue
+            if getal > 1e6 or getal < -1e6:
+                continue
+            resultaten[i] = getal
+        return resultaten
 
 
 @dataclass(frozen=True)

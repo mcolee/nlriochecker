@@ -1070,28 +1070,43 @@ class _AhnCheck(_ExterneCheck):
             return False
         return self.raster(context) is not None
 
-    def monsters(self, context: CheckContext) -> list[tuple[Node, float]]:
-        """Levert per toetsbare put het maaiveld uit de dataset en uit het AHN.
+    def monstertabel(self, context: CheckContext) -> dict[str, tuple[Node, float]]:
+        """Per toetsbare put het maaiveld uit het AHN, `uri -> (node, gemeten)`.
 
-        Het resultaat wordt per context bewaard. `run()`, `notes()` en de telling
-        van de nodata-cellen vragen er elk om, en elke doorloop bemonstert het
-        raster per put; op een volledige dataset is dat merkbaar duur.
+        Onder één cachesleutel `ahn:monsters` -- zonder de klassenaam, want HGT-001,
+        HGT-002 en HGT-003 lezen dezelfde populatie (`netwerkknopen` na `_selecteer`),
+        dus de tabel die de eerste check vult geldt voor alle drie. Daarvoor was de cache
+        per klasse gesleuteld en bemonsterden HGT-001 en HGT-002 elk apart, terwijl
+        HGT-003 per strengeinde bemonsterde. De tabel bevat alleen putten met een
+        rasterwaarde; nodata- en sentinelcellen vallen weg, net als in
+        `RasterSampler.sample` (issue #143).
         """
         raster = self.raster(context)
         if raster is None:
-            return []
+            return {}
 
-        def bemonster() -> list[tuple[Node, float]]:
-            """Bemonstert het raster voor elke toetsbare put."""
-            gevonden = []
-            for node in _van_soort(self.selectie(context), Node):
+        def bemonster() -> dict[str, tuple[Node, float]]:
+            """Bemonstert het raster in één bulkaanroep voor alle toetsbare putten."""
+            knopen = _van_soort(self.selectie(context), Node)
+            coords: list[tuple[float, float]] = []
+            for node in knopen:
                 assert node.point is not None  # gedekt door _selecteer
-                gemeten = raster.sample(node.point.x, node.point.y)
+                coords.append((node.point.x, node.point.y))
+            gevonden: dict[str, tuple[Node, float]] = {}
+            for node, gemeten in zip(knopen, raster.sample_many(coords), strict=True):
                 if gemeten is not None:
-                    gevonden.append((node, gemeten))
+                    gevonden[node.uri] = (node, gemeten)
             return gevonden
 
-        return context.cached(f"ahn:monsters:{type(self).__name__}", bemonster)
+        return context.cached("ahn:monsters", bemonster)
+
+    def monsters(self, context: CheckContext) -> list[tuple[Node, float]]:
+        """Levert per toetsbare put het maaiveld uit de dataset en uit het AHN.
+
+        `run()`, `notes()` en de telling van de nodata-cellen vragen er elk om; ze lezen
+        alle drie de gedeelde `monstertabel`.
+        """
+        return list(self.monstertabel(context).values())
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt het bereik en of het raster aanwezig was."""
@@ -1303,10 +1318,9 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elke BOB die op een toetsbare put uitkomt tegen het AHN."""
         diepte = context.config.drempels.bob_maximale_diepte_m
-        toetsbaar = {node.uri: node for node in _van_soort(self.selectie(context), Node)}
-        raster = self.raster(context)
-        if raster is None:
+        if self.raster(context) is None:
             return
+        tabel = self.monstertabel(context)
 
         for conduit in vrijvervalrioolleidingen(context):
             begin, eind = verbonden_knopen(context, conduit)
@@ -1314,13 +1328,10 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
                 (begin, conduit.bob_start, "beginpunt"),
                 (eind, conduit.bob_end, "eindpunt"),
             ):
-                node = toetsbaar.get(uri) if uri else None
-                if node is None or bob is None:
+                monster = tabel.get(uri) if uri else None
+                if monster is None or bob is None:
                     continue
-                assert node.point is not None  # gedekt door _selecteer
-                maaiveld = raster.sample(node.point.x, node.point.y)
-                if maaiveld is None:
-                    continue
+                node, maaiveld = monster
                 geval = self._melding(bob, maaiveld, diepte, zijde, node)
                 if geval is None:
                     continue

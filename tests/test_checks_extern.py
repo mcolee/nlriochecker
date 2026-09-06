@@ -702,6 +702,46 @@ def test_een_streng_meldt_elk_doorkruist_waterdeel(
     }
 
 
+def test_raster_sample_many_geeft_dezelfde_waarden_als_sample(bronnen: ExternalData) -> None:
+    """`sample_many` levert per coordinaat exact wat `sample` zou geven (issue #143).
+
+    De bulkweg doet één `reader.sample`-aanroep over alle punten binnen het raster in
+    plaats van één per punt, maar de bounds-, nodata- en sentinelfilters zijn dezelfde.
+    Een punt binnen het raster geeft de hoogte, de nodata-vlek en een punt buiten het
+    raster geven `None` -- op dezelfde plaats als bij `sample`.
+    """
+    raster = bronnen.raster
+    assert raster is not None
+    coords = [(1000.0, 2000.0), (1040.0, 2010.0), (5000.0, 5000.0)]
+
+    veel = raster.sample_many(coords)
+    los = [raster.sample(x, y) for x, y in coords]
+
+    assert veel == los
+    assert veel[0] == pytest.approx(10.0)
+    assert veel[1] is None
+    assert veel[2] is None
+
+
+def test_ahn_monsters_delen_een_enkele_cachesleutel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """HGT-001/002/003 bemonsteren het AHN één keer, onder `ahn:monsters` (issue #143).
+
+    Vroeger sleutelde de cache per klassenaam (`ahn:monsters:DekselAfwijkingLicht`),
+    zodat HGT-001 en HGT-002 elk apart bemonsterden en HGT-003 helemaal niet cachte. De
+    drie lezen dezelfde populatie (`netwerkknopen` na `_selecteer`), dus één gedeelde
+    tabel `uri -> (node, gemeten)` volstaat.
+    """
+    dataset = load_dataset(SCENARIO, [])
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run_checks(context, ["HGT-001", "HGT-002", "HGT-003"])
+
+    ahn_sleutels = sorted(s for s in context._cache if s.split(":", 1)[0] == "ahn")
+    assert ahn_sleutels == ["ahn:monsters"]
+
+
 def test_ext003_geeft_elke_doorkruising_een_eigen_melding_id(
     config: CheckConfig, bronnen: ExternalData, caplog: pytest.LogCaptureFixture
 ) -> None:

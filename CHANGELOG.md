@@ -53,6 +53,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De AHN-hoogtechecks bemonsteren het raster één keer, in bulk** (issue #143): HGT-001,
+  HGT-002 en HGT-003 lezen dezelfde populatie (`netwerkknopen` na `_selecteer`), maar cachten
+  hun bemonstering per klassenaam (`ahn:monsters:<klasse>`) -- HGT-001 en HGT-002 bemonsterden
+  elk apart en HGT-003 helemaal niet, per strengeinde. Er is nu één gedeelde tabel `ahn:monsters`
+  (`uri -> (node, gemeten)`); `_AhnCheck.monsters` levert `.values()` en HGT-003 leest
+  `tabel.get(uri)`. Bovendien doet `RasterSampler.sample_many(coords)` één `reader.sample`-aanroep
+  over alle putten binnen het raster in plaats van één per put, met dezelfde bounds-, nodata- en
+  sentinelfilters als `sample`. Op De Wolden en Hoogeveen zakt de checktijd van HGT-001/002/003
+  samen van ~27-29 s naar ~6-7 s (gepaard gemeten), zonder één verschoven melding:
+  `bevindingen.csv` is sha256-gelijk. De meetstraat staat nu in de repo (`scripts/harnas.py` met
+  de standen `meet`/`gepaard`/`profiel`, en `scripts/vergelijk_csv.py`); `gepaard` draait
+  referentie en experiment om en om in aparte processen in plaats van via een monkeypatch, zodat
+  elk volgend perf-issue er zonder patchmechaniek op kan leunen.
+
 - **NET-006 keurt hemelwater→vuilwater alleen binnen een VGS goed** (issue #129): de
   koppeling hemelwater → vuilwater is uit de whitelist `[koppelregels]` van beide configs
   gehaald en in code voorwaardelijk gemaakt. Buiten een Verbeterd Gescheiden Stelsel hoort
