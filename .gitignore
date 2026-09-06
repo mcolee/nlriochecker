@@ -37,7 +37,6 @@ data/*
 # reden als /uitvoer/ hierboven: zonder die slash sluit de regel ook een gelijknamige map
 # dieper in de boom uit.
 /scratchpad/
-/.claude/workflows/
 
 # hookify lokale regels (niet delen)
 .claude/*.local.md

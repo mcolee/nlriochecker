@@ -227,10 +227,13 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   Daarna land je die op `main` via een **merge-commit-PR** (geen squash/rebase, anders
   hangt de tag naast `main`) en zet je `dev` weer gelijk aan `main`. De volledige flow
   staat in `docs/versionering.md`.
-- **Release-poort naar bump-grootte: de review-swarm.** Het script staat geborgd in
-  `.claude/workflows/nlrio-swarm.js`; draai `Workflow({name: 'nlrio-swarm'})` (8
-  Opus-lens-agents → adversariële verify → Fable-regisseur met ≤25 aanbevelingen). De poort
-  hangt af van de bump:
+- **Release-poort naar bump-grootte: de review-swarm.** Twee scripts staan geborgd in
+  `.claude/workflows/`: `nlrio-swarm.js` (8 Opus-lens-agents → adversariële verify →
+  Fable-regisseur met ≤25 aanbevelingen; let op: zijn `CONTEXT` noemt nog het oude pad
+  `/home/martin/nlriochecker`) en de zwaardere `nlrio-fable-swarm.js` (12 Fable-lenzen met
+  bewijsplicht → Fable-skepticus → Fable-regisseur; eerst `args: {stap: 'audit'}` als
+  kostenmeting, dan volledig met `resumeFromRunId`; ~65 agents, ~2 u, ~5,7 M subagent-tokens
+  op 05-09-2026). De poort hangt af van de bump:
   - **Major** (na 1.0): **verplicht** vóór de release — draaien en de uitkomst **wegen** is
     een poort, geen suggestie.
   - **Minor en patch:** **aanbevolen, maar alleen ná expliciete goedkeuring van de auteur**
