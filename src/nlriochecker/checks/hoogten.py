@@ -460,33 +460,47 @@ class BobSprongZonderValput(_KnoopVergelijking):
     title = "BOB-sprong tussen aansluitende strengen boven drempel zonder valput"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
+    # Per aanvoerende streng een eigen melding op de put: verschillende strengen kunnen
+    # op dezelfde put boven de drempel springen (issue #141).
+    id_sleutels = ("streng",)
     rollen = ("netwerkknopen", "valconstructies", "vrijvervalrioolleidingen")
     kenmerken = ("BobBeginpuntLeiding", "BobEindpuntLeiding")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Vergelijkt de BOB van aanvoer en afvoer op elke put."""
+        """Vergelijkt elke aanvoerende streng met de hoogste afvoer op de put.
+
+        Per aanvoerende streng, niet op de laagste aanvoer samen: `min(aanvoer)`
+        overziet een enkele hoge aanvoer naast een lage die gelijk ligt met de afvoer,
+        terwijl juist die hoge streng de valconstructie nodig heeft (issue #141). Elke
+        aanvoer die boven de drempel binnenkomt krijgt een eigen melding op de put.
+        """
         drempel = context.config.drempels.bob_sprong_m
         valput_uris = {node.uri for node in valconstructies(context)}
 
         for node, aanvoer, afvoer in self.paren(context):
             if node.uri in valput_uris:
                 continue
-            binnen = [c.bob_end for c in aanvoer if c.bob_end is not None]
             uit = [c.bob_start for c in afvoer if c.bob_start is not None]
-            if not binnen or not uit:
+            if not uit:
                 continue
-            sprong = min(binnen) - max(uit)
-            if sprong <= drempel:
-                continue
-            yield self.finding(
-                context,
-                node.uri,
-                node.label,
-                f"De aanvoerende BOB ligt {sprong:.3f} m boven de afvoerende, zonder "
-                f"geregistreerde valconstructie (drempel {drempel:g} m).",
-                sprong_m=round(sprong, 3),
-                drempel_m=drempel,
-            )
+            hoogste_afvoer = max(uit)
+            for conduit in aanvoer:
+                if conduit.bob_end is None:
+                    continue
+                sprong = conduit.bob_end - hoogste_afvoer
+                if sprong <= drempel:
+                    continue
+                yield self.finding(
+                    context,
+                    node.uri,
+                    node.label,
+                    f"Aanvoerende streng {conduit.label!r} komt {sprong:.3f} m boven de "
+                    f"hoogste afvoerende BOB binnen, zonder geregistreerde valconstructie "
+                    f"(drempel {drempel:g} m).",
+                    streng=conduit.label,
+                    waarde=f"{sprong:.3f}",
+                    drempel=f"{drempel:g} (drempels.bob_sprong_m)",
+                )
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt welke klassen als valconstructie gelden."""

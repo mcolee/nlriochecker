@@ -1748,6 +1748,23 @@ FIXTURES["hgt009_bob_sprong.ttl"] = (
     + hoogteleiding("L2", "2", [B, C], "PutB", "PutC", bob=(8.00, 7.95)),
 )
 
+# HGT-009 (issue #141): op knoop K komen twee aanvoeren binnen -- L1 op BOB-eind 10,00
+# (gelijk aan de afvoer) en L2 op 10,60 -- terwijl de afvoer L3 op 10,00 vertrekt. De oude
+# toets nam min(aanvoer) en miste de hoge tweede aanvoer; per aanvoerende streng springt
+# alleen L2 0,60 m boven de afvoer, zonder valput. Plain put/leiding zoals de NET-fixtures,
+# zodat alleen de BOB's tellen. De reference met een enkele hoge aanvoer is hgt009_bob_sprong.
+FIXTURES["hgt009_tweede_aanvoer.ttl"] = (
+    "op knoop K komen twee aanvoeren binnen (BOB-eind 10,00 en 10,60) terwijl de afvoer op "
+    "10,00 vertrekt; alleen de tweede aanvoer springt boven de drempel, zonder valput (#141)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1000.0, 2050.0)
+    + put("PutK", "K", 1050.0, 2000.0)
+    + put("PutC", "C", 1100.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutK", bob=(10.1, 10.0))
+    + leiding("L2", "2", [(1000.0, 2050.0), (1050.0, 2000.0)], "PutB", "PutK", bob=(10.7, 10.6))
+    + leiding("L3", "3", [(1050.0, 2000.0), (1100.0, 2000.0)], "PutK", "PutC", bob=(10.0, 9.9)),
+)
+
 FIXTURES["hgt010_diameterverjonging.ttl"] = (
     "op put B komt 400 mm binnen en gaat 300 mm verder",
     hoogteput("PutA", "A", A)

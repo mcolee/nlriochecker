@@ -13,6 +13,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **HGT-009 toetst per aanvoerende streng in plaats van op de laagste aanvoer** (issue #141):
+  de BOB-sprongcheck vergeleek `min(aanvoer-BOB) - max(afvoer-BOB)` per put en miste zo een put
+  met twee aanvoeren waarvan er één ver boven de afvoer binnenkomt terwijl de andere gelijk ligt.
+  De check meldt nu per aanvoerende streng die boven de drempel `bob_sprong_m` (0,25 m) binnenkomt
+  zonder valconstructie; de melding blijft op de put (`id_sleutels = ("streng",)`), met de streng
+  in `details` en gevulde kolommen Waarde/Drempel. Op De Wolden en Hoogeveen: van 282 naar 730
+  knopen (816 meldingen). Let op bij `vergelijk` over deze wijziging heen: eenmalige trendbreuk,
+  en de melding-ID's verschuiven mee (BO-93). HGT-011 houdt bewust `min(aanvoer)`.
 - **De checks lezen de graaf versie-onafhankelijk** (issue #139): drie plekken bevroegen de
   datagraaf met de vaste 1.6-namespaceconstanten (`hasConnection` in `nulbevinding._Joiner`
   en ADM-008, `hasValue`/`hasReference` en de kenmerkklasse-IRI in ATTR-014). Op een

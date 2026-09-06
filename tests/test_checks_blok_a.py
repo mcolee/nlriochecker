@@ -109,6 +109,9 @@ DEFECTEN = [
     ("hgt007_te_weinig_verhang.ttl", "HGT-007", ["1"]),
     ("hgt008_extreem_verhang.ttl", "HGT-008", ["1"]),
     ("hgt009_bob_sprong.ttl", "HGT-009", ["B"]),
+    # Issue #141: twee aanvoeren op knoop K, een gelijk aan de afvoer en een 0,60 m erboven.
+    # De oude min(aanvoer)-toets miste dit; per aanvoerende streng meldt alleen de hoge (L2).
+    ("hgt009_tweede_aanvoer.ttl", "HGT-009", ["K"]),
     ("hgt010_diameterverjonging.ttl", "HGT-010", ["2"]),
     ("hgt011_drempel_onder_bob.ttl", "HGT-011", ["B"]),
     ("hgt012_putdiepte.ttl", "HGT-012", ["B"]),

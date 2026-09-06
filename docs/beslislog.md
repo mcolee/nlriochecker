@@ -5104,3 +5104,43 @@ in `_bouw_koppelingen`. Fixtures: `net006_hemelwater_naar_vuilwater.ttl` (bevind
 `net006_hemelwater_naar_vuilwater_vgs.ttl` (geen bevinding).
 
 Zie [#129](https://github.com/mcolee/nlriochecker/issues/129), [#131](https://github.com/mcolee/nlriochecker/issues/131) en BO-51.
+
+### BO-93 HGT-009 toetst per aanvoerende streng, niet op min(aanvoer)
+
+**Wat.** HGT-009 (BOB-sprong tussen aansluitende strengen zonder valconstructie) vergeleek per
+put `min(aanvoer-BOB-eind) - max(afvoer-BOB-begin)` met de drempel `bob_sprong_m` (0,25 m). De
+check toetst sinds issue #141 **per aanvoerende streng** `bob_eind - max(afvoer-BOB-begin)`: elke
+aanvoer die boven de drempel binnenkomt krijgt een eigen melding op de put. De melding blijft op
+de put (HGT-009 blijft een putcheck, `rollen` ongewijzigd) met `id_sleutels = ("streng",)`, zodat
+twee aanvoeren op dezelfde put twee onderscheiden meldingen geven; de strengaanduiding staat als
+`streng` in `details`, en de melding vult `waarde=` (de gemeten sprong als tekst) en `drempel=`
+(`"0.25 (drempels.bob_sprong_m)"`, de #142-conventie).
+
+**Waarom.** `min(aanvoer)` overzag een put met twee aanvoeren waarvan er één ver boven de afvoer
+binnenkomt terwijl de andere gelijk ligt met de afvoer: de minimum-aanvoer drukte de sprong naar
+nul en de put bleef stil, terwijl juist die ene hoge aanvoer de valconstructie nodig heeft. Het
+register spreekt van "BOB-sprong tussen aansluitende strengen" -- per aansluiting, niet per put.
+Er was geen eerder BO dat `min`/`max` vastlegde; de checkaudit van augustus bekrachtigde alleen de
+282 treffers die de min-toets opleverde. HGT-011 (overstortdrempel onder de laagste aanvoerende
+BOB) houdt bewust `min(aanvoer)`: een drempel onder de láágste aanvoer is eenduidig fout.
+
+**Meting (De Wolden en Hoogeveen, projectconfig, echte pijplijn).** 1874 knopen hebben ≥2
+aanvoerende BOB's. Oud (min-toets): **282 knopen**. Nieuw (per aanvoerende streng): **730 knopen /
+816 meldingen** -- HGT-009 telt op deze aanlevering 2,6× zoveel echte valconstructiegevallen, elk
+met een eenduidige herstelhandeling. Op het getrackte koekangerveld-voorbeeld: HGT-009 van 0 naar
+1 melding. Meetscript: `scripts/meet_hgt009.py` (BO-43).
+
+**Trendbreuk voor `vergelijk`.** Twee meetmomenten over deze codewijziging heen zijn voor HGT-009
+niet zuiver vergelijkbaar: `vergelijk` zal de sprong van 282 naar 816 HGT-009-meldingen tonen als
+nieuwe gebreken, terwijl het dezelfde dataset betreft en de meldingen enkel eerder gemist werden.
+De melding-ID's veranderen bovendien mee -- de sleutel draagt sinds #141 de streng in plaats van
+de default `zijde`, dus een `vergelijk` over de codewijziging heen matcht geen enkele oude HGT-009-
+melding op een nieuwe. Dit is een eenmalige breuk bij de eerste run ná #141, geen doorlopende drift.
+
+**Waar het staat.** Code: `BobSprongZonderValput` in `checks/hoogten.py` (`id_sleutels`, de
+`run`-lus per aanvoer). Fixtures: `hgt009_tweede_aanvoer.ttl` (twee aanvoeren, alleen de hoge
+meldt) naast de bestaande `hgt009_bob_sprong.ttl` (enkele aanvoer). De ledger en `docs/checks-audit-2026-08.md`
+(HGT-009-rij) zijn bijgewerkt; `docs/dekkingsmatrix.md` verandert niet (rollen en kenmerken blijven
+gelijk).
+
+Zie [#141](https://github.com/mcolee/nlriochecker/issues/141), BO-43 en BO-51.
