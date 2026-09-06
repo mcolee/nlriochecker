@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`--projectconfig` kan een overlay op de standaard zijn** (issue #163, BO-98). Een
+  projectconfig met `basis = "standaard"` bovenaan laadt eerst de meegeleverde `checks.toml`
+  en legt alleen de sleutels die hij noemt eroverheen: tabellen sleutel-voor-sleutel diep,
+  lijsten (ook `[[verhang_staffel]]`/`[[puttyperegels]]`) als geheel. Zo krimpt
+  `configs/dewoldenhoogeveen.toml` tot `basis` plus de acht afwijkende sleutels, en bereikt
+  een drempelbesluit in `checks.toml` alle projecten vanzelf. Zonder `basis` blijft een
+  projectconfig een volledige kopie -- ontbrekende sectie is nog steeds een configfout, byte-
+  voor-byte hetzelfde gedrag als voorheen. De Verantwoording in het rapport noemt elk
+  overschreven sleutelpad met basiswaarde en projectwaarde; geen JSON-, CSV-, `gwsw_run`- of
+  schemawijziging.
 - **`bevindingen.csv` is een NL-Excel-bestand** (issue #165, BO-97). Alle CSV's worden
   geschreven met komma als decimaalteken en een UTF-8-BOM (naast de bestaande puntkomma),
   zodat een Nederlandse Excel ze zonder verminkte coördinaten (`218994.745` -> `218994745`)

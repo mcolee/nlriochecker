@@ -29,6 +29,9 @@ from nlriochecker.checkconfig import (
 from nlriochecker.errors import ConfigError
 
 PROJECTCONFIG = Path(__file__).resolve().parents[1] / "configs" / "dewoldenhoogeveen.toml"
+# De projectconfiguraties uit `configs/`; sinds issue #163 overlays op de standaard. De
+# drifttests globben deze map zodat een tweede gemeenteconfig er vanzelf onder valt.
+PROJECTCONFIGS = sorted((Path(__file__).resolve().parents[1] / "configs").glob("*.toml"))
 
 # Een minimale, geldige projectconfig; `{extra}` haakt eventuele extra secties aan.
 _MINIMALE_CONFIG = (
@@ -362,6 +365,141 @@ def test_kritieke_klassen_bepalen_de_hoogste_prioriteit() -> None:
     assert "Overstortput" in load_check_config().klassen.kritiek
 
 
+def _schrijf(pad: Path, inhoud: str) -> Path:
+    """Schrijft een configbestand en geeft het pad terug."""
+    pad.write_text(inhoud, encoding="utf-8")
+    return pad
+
+
+class TestOverlay:
+    """Issue #163: `--projectconfig` als overlay met `basis = "standaard"` (BO-98)."""
+
+    def test_een_overlay_is_gelijk_aan_de_volledige_kopie(self, tmp_path: Path) -> None:
+        """Een overlay met een paar sleutels geeft dezelfde config als een volle kopie.
+
+        De volle kopie is de meegeleverde checks.toml met dezelfde twee sleutels
+        (een scalar in `[drempels]`, een pad in `[bronnen]`) veranderd; de overlay
+        noemt alleen die twee plus `basis`. `model_dump` vergelijkt elke sectie.
+        """
+        standaard = default_check_config_path().read_text(encoding="utf-8")
+        gewijzigd = standaard.replace(
+            "snapping_tolerantie_m = 0.10", "snapping_tolerantie_m = 0.5"
+        ).replace('map = "data/gis_koekangerveld"', 'map = "data/anders"')
+        volledig = _schrijf(tmp_path / "vol.toml", gewijzigd)
+        overlay = _schrijf(
+            tmp_path / "overlay.toml",
+            'basis = "standaard"\n'
+            "[drempels]\nsnapping_tolerantie_m = 0.5\n"
+            '[bronnen]\nmap = "data/anders"\n',
+        )
+
+        assert load_check_config(overlay).model_dump() == load_check_config(volledig).model_dump()
+
+    def test_niet_overschreven_secties_komen_uit_de_standaard(self, tmp_path: Path) -> None:
+        """Een overlay draagt de rest van de standaard: hele secties en losse velden."""
+        overlay = _schrijf(
+            tmp_path / "o.toml", 'basis = "standaard"\n[drempels]\nbob_sprong_m = 0.30\n'
+        )
+
+        config = load_check_config(overlay)
+
+        assert config.drempels.bob_sprong_m == 0.30
+        assert config.drempels.snapping_tolerantie_m == 0.10
+        assert config.klassen.put == ["Put"]
+        assert config.nulmeting.vereiste_cfk == ["Hyd", "MdsPlan", "MdsProj"]
+
+    def test_zonder_basis_faalt_een_kale_overlay_zoals_vandaag(self, tmp_path: Path) -> None:
+        """Zonder `basis` blijft een bestand een volledige config: ontbrekende sectie = fout.
+
+        Precies het gedrag van vóór #163: de acht-sleutel-overlay zonder `basis` mist
+        `klassen`, `koppelregels` en `nulmeting` en valt om.
+        """
+        overlay = _schrijf(tmp_path / "o.toml", '[bronnen]\nmap = "data/anders"\n')
+
+        with pytest.raises(ConfigError):
+            load_check_config(overlay)
+
+    def test_een_andere_basiswaarde_is_een_configfout(self, tmp_path: Path) -> None:
+        """Alleen `basis = "standaard"` bestaat; de fout noemt de toegestane waarde."""
+        overlay = _schrijf(tmp_path / "o.toml", 'basis = "anders"\n')
+
+        with pytest.raises(ConfigError, match="standaard"):
+            load_check_config(overlay)
+
+    def test_een_lijst_wordt_als_geheel_vervangen(self, tmp_path: Path) -> None:
+        """De staffel is een lijst (tabel-array): de overlay vervangt hem helemaal.
+
+        De standaard heeft vier treden; een overlay met één trede laat er één over,
+        geen deep-merge op index.
+        """
+        overlay = _schrijf(
+            tmp_path / "o.toml",
+            'basis = "standaard"\n[[verhang_staffel]]\nminimaal_verhang_een_op = 42\n',
+        )
+
+        staffel = load_check_config(overlay).verhang_staffel
+
+        assert len(staffel) == 1
+        assert staffel[0].minimaal_verhang_een_op == 42
+        assert staffel[0].tot_diameter_mm is None
+
+    def test_een_tabel_wordt_sleutel_voor_sleutel_gemerged(self, tmp_path: Path) -> None:
+        """Eén sleutel in `[drempels]` overschrijft; de rest van de tabel blijft standaard."""
+        overlay = _schrijf(
+            tmp_path / "o.toml", 'basis = "standaard"\n[drempels]\nbob_sprong_m = 0.30\n'
+        )
+
+        drempels = load_check_config(overlay).drempels
+
+        assert drempels.bob_sprong_m == 0.30
+        assert drempels.nul_lengte_m == 0.01
+
+    def test_een_typfout_sectie_wordt_geweigerd(self, tmp_path: Path) -> None:
+        """`extra="forbid"` weigert een verkeerd gespelde sectie ná de merge."""
+        overlay = _schrijf(
+            tmp_path / "o.toml", 'basis = "standaard"\n[drampels]\nbob_sprong_m = 0.30\n'
+        )
+
+        with pytest.raises(ConfigError):
+            load_check_config(overlay)
+
+    def test_de_overschreven_paden_dragen_basis_en_projectwaarde(self, tmp_path: Path) -> None:
+        """De config draagt per overschreven bladpad (basiswaarde, projectwaarde)."""
+        overlay = _schrijf(
+            tmp_path / "o.toml", 'basis = "standaard"\n[drempels]\nbob_sprong_m = 0.30\n'
+        )
+
+        assert load_check_config(overlay).overschreven_paden == [
+            ("drempels.bob_sprong_m", 0.25, 0.30)
+        ]
+
+    def test_een_volledige_kopie_draagt_geen_overschreven_paden(self) -> None:
+        """Zonder `basis` is er geen overlay; `overschreven_paden` is dan None."""
+        assert load_check_config().overschreven_paden is None
+
+
+def test_de_projectconfig_is_een_overlay_met_acht_overschreven_sleutels() -> None:
+    """`configs/dewoldenhoogeveen.toml` is sinds #163 een overlay op de standaard.
+
+    Precies de acht sleutels die van Koekangerveld naar De Wolden en Hoogeveen
+    verschillen (zeven in `[bronnen]`, plus `rapport.onderdruk_klassen`).
+    """
+    paden = load_check_config(PROJECTCONFIG).overschreven_paden
+
+    assert paden is not None
+    assert [pad for pad, _, _ in paden] == [
+        "bronnen.map",
+        "bronnen.bag_pand",
+        "bronnen.nwb_wegvakken",
+        "bronnen.top10nl",
+        "bronnen.studiegebied",
+        "bronnen.ahn_dtm",
+        "bronnen.bgt_putdeksellagen",
+        "rapport.onderdruk_klassen",
+    ]
+    assert ("bronnen.map", "data/gis_koekangerveld", "data/gis_dewoldenhoogeveen") in paden
+
+
 class TestUitzonderingen:
     """Issue #132: het uitzonderingenbestand met geaccepteerde bevindingen."""
 
@@ -457,9 +595,14 @@ DREMPELMODELLEN: list[tuple[str, type[BaseModel]]] = [
     ("bronnen", ExternalSources),
 ]
 
+# De standaard (`checks.toml`, geen overlay) plus elke projectconfig uit `configs/`
+# (sinds #163 overlays). Het derde veld zegt of het een overlay is: alleen de standaard
+# hoort elk drempelveld expliciet te dragen, een overlay draagt alleen wat hij overschrijft.
 CONFIGBESTANDEN = [
-    pytest.param(default_check_config_path(), "src/nlriochecker/checks.toml", id="checks.toml"),
-    pytest.param(PROJECTCONFIG, "configs/dewoldenhoogeveen.toml", id="dewoldenhoogeveen.toml"),
+    pytest.param(
+        default_check_config_path(), "src/nlriochecker/checks.toml", False, id="checks.toml"
+    ),
+    *[pytest.param(pad, f"configs/{pad.name}", True, id=pad.name) for pad in PROJECTCONFIGS],
 ]
 
 # Sleutels van `[drempels]` waarvoor `configs/dewoldenhoogeveen.toml` bewust van de
@@ -484,24 +627,29 @@ def _verplichte_velden(model: type[BaseModel]) -> set[str]:
 
 
 @pytest.mark.parametrize(("sectie", "model"), DREMPELMODELLEN, ids=[s for s, _ in DREMPELMODELLEN])
-@pytest.mark.parametrize(("pad", "herkomst"), CONFIGBESTANDEN)
+@pytest.mark.parametrize(("pad", "herkomst", "is_overlay"), CONFIGBESTANDEN)
 def test_elke_drempel_staat_expliciet_in_de_toml(
-    pad: Path, herkomst: str, sectie: str, model: type[BaseModel]
+    pad: Path, herkomst: str, is_overlay: bool, sectie: str, model: type[BaseModel]
 ) -> None:
-    """Issue #28: geen enkele drempel mag stilzwijgend op een Python-default vallen.
+    """Issue #28: in de standaard mag geen drempel stilzwijgend op een Python-default vallen.
 
     Vergelijkt de veldnamen van het model met de sleutels die daadwerkelijk onder de
     sectie in het bestand staan (via `tomllib`, niet via de geladen `CheckConfig` --
     die vult ontbrekende velden juist met de default op en zou het verschil
     verbergen). Een nieuw veld dat hier niet bij komt, of een hernoeming die de TOML
     niet meekrijgt, maakt deze test rood.
+
+    Voor een overlay (issue #163) geldt de volledigheidseis niet: hij draagt bewust
+    alleen de sleutels die hij overschrijft. Wat wél voor beide geldt is dat een
+    aanwezige sectie geen onbekend veld mag dragen -- een typfout hoort luid te falen.
     """
     verwacht = _verplichte_velden(model)
-    aanwezig = set(tomllib.loads(pad.read_text(encoding="utf-8"))[sectie])
+    aanwezig = set(tomllib.loads(pad.read_text(encoding="utf-8")).get(sectie, {}))
 
-    assert verwacht and not (verwacht - aanwezig), (
-        f"{herkomst} [{sectie}] mist {sorted(verwacht - aanwezig)}"
-    )
+    if not is_overlay:
+        assert verwacht and not (verwacht - aanwezig), (
+            f"{herkomst} [{sectie}] mist {sorted(verwacht - aanwezig)}"
+        )
     assert not (onbekend := aanwezig - set(model.model_fields)), (
         f"{herkomst} [{sectie}] draagt onbekende velden {sorted(onbekend)}"
     )
@@ -516,7 +664,13 @@ def _drempelafwijkingen(
     int waar een float hoort valt in pydantic stil goed.
     """
     standaard = CheckThresholds()
-    aanwezig = tomllib.loads(pad.read_text(encoding="utf-8"))["drempels"]
+    # Sinds issue #163 draagt een overlay `[drempels]` niet altijd (De Wolden overschrijft
+    # er geen). `.get` levert dan {} -- geen afwijkingen. Rauw uit het bestand en niet uit
+    # de gemergede config, zodat het int/float-onderscheid (`1` vs `1.0`) hier zichtbaar
+    # blijft; omdat de standaard gelijk is aan de defaults (bewaakt door
+    # `test_de_meegeleverde_drempels_zijn_de_defaults`) zijn de eigen [drempels]-afwijkingen
+    # van een overlay gelijk aan die van zijn gemergede config.
+    aanwezig = tomllib.loads(pad.read_text(encoding="utf-8")).get("drempels", {})
     return {
         veld: (waarde, verwacht)
         for veld, waarde in aanwezig.items()
@@ -567,7 +721,7 @@ def test_bewuste_afwijking_wijkt_ook_werkelijk_af() -> None:
     meer maakt, en dekt hij stilzwijgend de volgende drift op datzelfde veld af.
     """
     nog_afwijkend = _drempelafwijkingen(PROJECTCONFIG)
-    aanwezig = tomllib.loads(PROJECTCONFIG.read_text(encoding="utf-8"))["drempels"]
+    aanwezig = tomllib.loads(PROJECTCONFIG.read_text(encoding="utf-8")).get("drempels", {})
 
     for veld, reden in BEWUSTE_AFWIJKINGEN.items():
         assert veld in aanwezig, f"{veld} staat op BEWUSTE_AFWIJKINGEN maar niet in [drempels]"
@@ -585,16 +739,19 @@ BEWUSTE_KLASSEN_AFWIJKINGEN: dict[str, str] = {}
 
 
 def _klassenafwijkingen(
-    negeer: frozenset[str] | set[str] = frozenset(),
+    pad: Path, negeer: frozenset[str] | set[str] = frozenset()
 ) -> dict[str, tuple[object, object]]:
-    """Per sleutel in `[klassen]` de afwijking tussen checks.toml en de projectconfig.
+    """Per sleutel in `[klassen]` de afwijking tussen de standaard en de projectconfig.
 
-    Vergelijkt de twee `[klassen]`-blokken sleutel voor sleutel; het nest
-    `[klassen.stelseltypen]` gaat als deelwoordenboek mee. Een sleutel die maar in een
-    van beide bestanden staat telt ook als afwijking.
+    Sinds issue #163 is een projectconfig een overlay die `[klassen]` niet zelf draagt;
+    de vergelijking gaat daarom over de *gemergede* config (`load_check_config`) en niet
+    over het rauwe bestand -- anders zou elke klasse als "ontbreekt in het project"
+    lezen. Beide kanten via `model_dump`, zodat een veld met een default dat in geen van
+    beide TOML's staat (bv. `vervallen`) aan beide zijden gelijk telt. Het nest
+    `[klassen.stelseltypen]` gaat als deelwoordenboek mee.
     """
-    standaard = tomllib.loads(default_check_config_path().read_text(encoding="utf-8"))["klassen"]
-    project = tomllib.loads(PROJECTCONFIG.read_text(encoding="utf-8"))["klassen"]
+    standaard = load_check_config().klassen.model_dump()
+    project = load_check_config(pad).klassen.model_dump()
     return {
         sleutel: (project.get(sleutel), standaard.get(sleutel))
         for sleutel in standaard.keys() | project.keys()
@@ -602,31 +759,32 @@ def _klassenafwijkingen(
     }
 
 
-def test_de_klassenlijsten_zijn_in_beide_bestanden_gelijk() -> None:
-    """De `[klassen]`-blokken van beide configbestanden horen gelijk te blijven.
+@pytest.mark.parametrize("pad", PROJECTCONFIGS, ids=[p.name for p in PROJECTCONFIGS])
+def test_de_klassenlijsten_zijn_in_beide_bestanden_gelijk(pad: Path) -> None:
+    """De gemergede `[klassen]` van een projectconfig hoort gelijk te zijn aan de standaard.
 
     Niets dwong dat af (issue #52): wie een klasse aan de een toevoegt en de ander
     vergeet, krijgt een projectrun die stil andere objecten selecteert dan de
-    meegeleverde configuratie. `test_checkconfig` bewaakt sinds #28 de drempels op
-    waarde en type, maar de klassenlijsten vielen erbuiten. Een bewuste afwijking
-    hoort met haar reden op `BEWUSTE_KLASSEN_AFWIJKINGEN`.
+    meegeleverde configuratie. Sinds issue #163 erft een overlay de klassen; een bewuste
+    afwijking hoort met haar reden op `BEWUSTE_KLASSEN_AFWIJKINGEN`.
     """
-    afwijkend = _klassenafwijkingen(negeer=set(BEWUSTE_KLASSEN_AFWIJKINGEN))
+    afwijkend = _klassenafwijkingen(pad, negeer=set(BEWUSTE_KLASSEN_AFWIJKINGEN))
 
     assert not afwijkend, (
-        "configs/dewoldenhoogeveen.toml [klassen] wijkt onaangekondigd af van "
+        f"configs/{pad.name} [klassen] wijkt (na de overlay-merge) onaangekondigd af van "
         f"src/nlriochecker/checks.toml (sleutel: project, standaard): {afwijkend}. Zet de "
         "afwijking met haar reden op BEWUSTE_KLASSEN_AFWIJKINGEN, of maak de lijsten gelijk."
     )
 
 
-def test_bewuste_klassenafwijking_wijkt_ook_werkelijk_af() -> None:
+@pytest.mark.parametrize("pad", PROJECTCONFIGS, ids=[p.name for p in PROJECTCONFIGS])
+def test_bewuste_klassenafwijking_wijkt_ook_werkelijk_af(pad: Path) -> None:
     """De andere richting: een afwijking die geen afwijking meer is hoort van de lijst.
 
     Zonder deze test blijft `BEWUSTE_KLASSEN_AFWIJKINGEN` staan als een lijst keuzes die
     niemand meer maakt, en dekt hij stilzwijgend de volgende drift op datzelfde veld af.
     """
-    nog_afwijkend = _klassenafwijkingen()
+    nog_afwijkend = _klassenafwijkingen(pad)
 
     for sleutel, reden in BEWUSTE_KLASSEN_AFWIJKINGEN.items():
         assert sleutel in nog_afwijkend, (

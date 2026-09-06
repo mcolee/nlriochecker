@@ -94,8 +94,9 @@ met toestemming gepubliceerd, BGT, BAG, NWB en GWSW zijn CC0, TOP10NL is CC-BY 4
    bestanden en laagnamen het programma verwacht staat onder `[bronnen]` in de projectconfiguratie. Elke bron wordt
    vóór de eerste check gecontroleerd op dekking van je gebied ([meer](docs/gebruik.md#externe-bronnen-en-hun-dekking)).
 4. **Een projectconfiguratie** met je eigen drempels en bronpaden (`--projectconfig`; voorbeeld:
-   `configs/dewoldenhoogeveen.toml`). Dit bestand vervangt de standaardconfiguratie helemaal. Er is geen overlay, dus
-   begin met een volledige kopie van `src/nlriochecker/checks.toml` ([meer](docs/gebruik.md#projectconfiguraties)).
+   `configs/dewoldenhoogeveen.toml`). Begin met `basis = "standaard"` en zet er alleen de sleutels onder die van de
+   meegeleverde `src/nlriochecker/checks.toml` afwijken -- dat is een overlay van een paar regels. Zonder `basis` blijft
+   het bestand een volledige kopie van `checks.toml` ([meer](docs/gebruik.md#projectconfiguraties)).
 
 Rapporteren per buurt of wijk doe je met `--studiegebied`, eventueel beperkt met `--gebied`. Zie [Rapporteren per
 gebied](docs/gebruik.md#rapporteren-per-gebied) en [Eisen aan het studiegebiedbestand](docs/gebruik.md#eisen-aan-het-studiegebiedbestand).

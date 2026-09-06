@@ -455,9 +455,23 @@ er een mee met `--projectconfig`. `configs/dewoldenhoogeveen.toml` hoort bij de 
 `data/gis_dewoldenhoogeveen` en beslaat het hele gebied van de OroX-dataset. Zonder die
 optie geldt de meegeleverde `src/nlriochecker/checks.toml`, die naar Koekangerveld wijst.
 
-Let op: `--projectconfig` vervangt de configuratie in haar geheel; er is geen overlay. Een
-projectconfiguratie is dus een volledige kopie van `checks.toml`, en een drempel die daar
-verandert moet in elke kopie na.
+Zet je bovenaan `basis = "standaard"`, dan is het bestand een **overlay**: de meegeleverde
+`checks.toml` wordt eerst geladen en alleen de sleutels die je noemt worden eroverheen
+gelegd. Zo begint een tweede gemeente met een paar regels (zie `configs/dewoldenhoogeveen.toml`,
+dat tot acht sleutels krimpt) in plaats van met een kopie van de hele standaard, en bereikt
+een drempelbesluit in `checks.toml` alle projecten vanzelf. De merge-regels: tabellen worden
+sleutel-voor-sleutel diep samengevoegd (`[drempels]`, `[bronnen]`, `[klassen]`, …), en een
+lijst -- óók een tabel-array als `[[verhang_staffel]]` of `[[puttyperegels]]` -- vervangt als
+geheel (wie de staffel wijzigt schrijft hem helemaal). Er is geen verwijdermechanisme; `= []`
+maakt een lijst leeg. `basis` kent maar één waarde, `"standaard"`; iets anders is een
+configfout. De Verantwoording in het rapport noemt elk overschreven sleutelpad met de
+basiswaarde en de projectwaarde.
+
+Zonder `basis` blijft `--projectconfig` de configuratie in haar geheel vervangen: dan is het
+bestand een volledige kopie van `checks.toml` en is een ontbrekende sectie een configfout,
+precies als voorheen. `[rapport] uitzonderingen` resolt relatief aan het bestand dat het
+opschrijft (dus aan de overlay als die het zet); `[bronnen] map` blijft relatief aan de
+werkmap.
 
 ### Geaccepteerde bevindingen
 

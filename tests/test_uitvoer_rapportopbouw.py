@@ -290,6 +290,35 @@ class TestVerantwoordingBlijft:
         assert "Externe bronnen" in tekst
 
 
+class TestProjectconfiguratie:
+    """Issue #163: de Verantwoording noemt de overlay of de volledige kopie (BO-98)."""
+
+    def _overlay_run(self, tmp_path: Path, inhoud: str) -> CheckRun:
+        """Een run op de schoon-fixture met een overlay-projectconfig."""
+        overlay = tmp_path / "overlay.toml"
+        overlay.write_text(inhoud, encoding="utf-8")
+        dataset = load_dataset(TTL_DIR / "schoon.ttl", [])
+        config = load_check_config(overlay)
+        config.drempels.rd_y_min = 0.0
+        return run_checks(CheckContext(dataset=dataset, config=config), [])
+
+    def test_een_volledige_kopie_zegt_geen_overlay(self, tmp_path: Path) -> None:
+        """Zonder `basis` draagt de config geen overlay en zegt dat in de Verantwoording."""
+        tekst = _rapport(_run("schoon.ttl"), tmp_path)
+
+        assert "projectconfiguratie volledig, geen overlay" in tekst.lower()
+
+    def test_een_overlay_noemt_elk_overschreven_sleutelpad(self, tmp_path: Path) -> None:
+        """Eén regel per overschreven sleutelpad met basiswaarde en projectwaarde."""
+        run = self._overlay_run(tmp_path, 'basis = "standaard"\n[drempels]\nbob_sprong_m = 0.30\n')
+
+        tekst = _rapport(run, tmp_path)
+
+        assert "1 sleutel overschreven" in tekst
+        assert "drempels.bob_sprong_m" in tekst
+        assert "0.25 → 0.3" in tekst
+
+
 class TestOntbrekendeBronnen:
     """De banner mag alleen bronnen noemen waar een check op leunt (BO-64)."""
 

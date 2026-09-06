@@ -700,6 +700,70 @@ class CheckConfig(BaseModel):
     bronnen: ExternalSources = Field(default_factory=ExternalSources)
     rapport: ReportOptions = Field(default_factory=ReportOptions)
 
+    # Issue #163: de bladpaden die een overlay op de standaard overschreef, elk als
+    # (pad, basiswaarde, projectwaarde). `None` als deze config geen overlay is -- een
+    # volledige kopie of de meegeleverde standaard zelf. Een privé-attribuut: geen
+    # TOML-sleutel, geen JSON-veld en geen `gwsw_run`-kolom (geen schema-bump). Alleen het
+    # Markdown-rapport leest het, via `overschreven_paden`. `load_check_config` vult het.
+    _overschreven_paden: list[tuple[str, object, object]] | None = PrivateAttr(default=None)
+
+    @property
+    def overschreven_paden(self) -> list[tuple[str, object, object]] | None:
+        """De sleutelpaden die de overlay op de standaard overschreef (basis -> project).
+
+        `None` als deze config geen overlay is (een volledige kopie zonder `basis`, of
+        de meegeleverde standaard); een lijst -- mogelijk leeg -- als hij met
+        `basis = "standaard"` op de standaard is gelegd.
+        """
+        return self._overschreven_paden
+
+
+# Issue #163: de top-level sleutel die een projectconfig tot overlay maakt, en de enige
+# toegestane waarde ervan (de meegeleverde `checks.toml`).
+BASIS_SLEUTEL = "basis"
+BASIS_STANDAARD = "standaard"
+
+
+def _diep_samengevoegd(basis: dict[str, object], overlay: dict[str, object]) -> dict[str, object]:
+    """Legt `overlay` over `basis`: tabellen diep, lijsten en scalars als geheel (issue #163).
+
+    Een sleutel waarvan zowel basis als overlay een tabel (dict) is, wordt sleutel voor
+    sleutel samengevoegd; al het andere -- een scalar, een lijst, of een tabel waar de
+    basis er geen had -- vervangt de basiswaarde als geheel. Zo vervangt een overlay ook
+    een tabel-array als `[[verhang_staffel]]` in haar geheel: die is een lijst, geen tabel.
+    Er is geen verwijdermechanisme; `= []` maakt een lijst leeg.
+    """
+    resultaat = dict(basis)
+    for sleutel, waarde in overlay.items():
+        bestaand = resultaat.get(sleutel)
+        if isinstance(waarde, dict) and isinstance(bestaand, dict):
+            resultaat[sleutel] = _diep_samengevoegd(bestaand, waarde)
+        else:
+            resultaat[sleutel] = waarde
+    return resultaat
+
+
+def _overschreven_paden(
+    basis: dict[str, object], overlay: dict[str, object], prefix: str = ""
+) -> list[tuple[str, object, object]]:
+    """Per bladpad dat de overlay werkelijk verandert: (pad, basiswaarde, projectwaarde).
+
+    Loopt de overlay in bestandsvolgorde af met dezelfde grens als `_diep_samengevoegd`:
+    tabel-in-tabel wordt recursief doorlopen, al het andere is een blad. Een blad telt
+    alleen als het van de basis afwijkt (of er niet in staat); een sleutel die de overlay
+    op dezelfde waarde herhaalt, verandert niets en komt er niet bij. Een basis zonder de
+    sleutel levert `None` als basiswaarde.
+    """
+    paden: list[tuple[str, object, object]] = []
+    for sleutel, waarde in overlay.items():
+        pad = f"{prefix}{sleutel}"
+        bestaand = basis.get(sleutel)
+        if isinstance(waarde, dict) and isinstance(bestaand, dict):
+            paden += _overschreven_paden(bestaand, waarde, f"{pad}.")
+        elif bestaand != waarde:
+            paden.append((pad, bestaand, waarde))
+    return paden
+
 
 def default_check_config_path() -> Path:
     """Pad naar de meegeleverde standaardconfiguratie in het package."""
@@ -733,10 +797,27 @@ def load_check_config(
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
         raise ConfigError(f"{path}: geen geldige TOML ({error}).") from error
 
+    # Issue #163: een projectconfig met `basis = "standaard"` is een overlay op de
+    # meegeleverde standaard. De basis wordt geladen, de overlay eroverheen gemerged en
+    # `basis` gestript vóór de validatie; zonder de sleutel blijft het bestand een
+    # volledige config (byte-voor-byte hetzelfde gedrag als vandaag). BO-98.
+    overschreven: list[tuple[str, object, object]] | None = None
+    if BASIS_SLEUTEL in rauw:
+        basis_waarde = rauw.pop(BASIS_SLEUTEL)
+        if basis_waarde != BASIS_STANDAARD:
+            raise ConfigError(
+                f"{path}: {BASIS_SLEUTEL} = {basis_waarde!r} is niet toegestaan; de enige "
+                f"toegestane waarde is {BASIS_STANDAARD!r} (de meegeleverde checks.toml)."
+            )
+        standaard = tomllib.loads(default_check_config_path().read_bytes().decode("utf-8-sig"))
+        overschreven = _overschreven_paden(standaard, rauw)
+        rauw = _diep_samengevoegd(standaard, rauw)
+
     try:
         config = CheckConfig.model_validate(rauw)
     except ValidationError as error:
         raise ConfigError(f"{path}: configuratie is ongeldig.\n{error}") from error
+    config._overschreven_paden = overschreven
 
     if bekende_check_ids is not None:
         onbekend = [

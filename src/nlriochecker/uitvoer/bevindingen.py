@@ -543,6 +543,7 @@ def _verantwoording(
         f"uit {len(run.outcomes)} eigen checks.",
         "",
     ]
+    lines += _projectconfiguratie_regels(run.config)
     lines += _nulmeting_section(run, meldingen)
 
     if run.typing_gate_applied:
@@ -700,6 +701,37 @@ def _verantwoording(
             "",
         ]
     return lines
+
+
+def _projectconfiguratie_regels(config: CheckConfig) -> list[str]:
+    """De projectconfiguratie in de Verantwoording: overlay of volledige kopie (issue #163).
+
+    Een overlay (`basis = "standaard"`, BO-98) noemt elk overschreven sleutelpad met de
+    basiswaarde en de projectwaarde, zodat een lezer ziet waarin dit project van de
+    meegeleverde standaard afwijkt zonder de hele config te vergelijken. Een volledige
+    kopie zonder `basis` -- ook de meegeleverde standaard zelf -- draagt geen overlay en
+    zegt dat. Alleen het Markdown-rapport; de andere uitvoervormen dragen het niet.
+    """
+    paden = config.overschreven_paden
+    if paden is None:
+        return ["Projectconfiguratie volledig, geen overlay.", ""]
+    kop = (
+        f"Projectconfiguratie: overlay op de standaard, "
+        f"{getal(len(paden), 'sleutel', 'sleutels')} overschreven:"
+    )
+    regels = [kop, ""]
+    regels += [
+        f"- `{pad}`: {_waarde_tekst(basis)} → {_waarde_tekst(project)}"
+        for pad, basis, project in paden
+    ]
+    return [*regels, ""]
+
+
+def _waarde_tekst(waarde: object) -> str:
+    """Een configwaarde als tekst; een sleutel die de standaard niet kent apart benoemd."""
+    if waarde is None:
+        return "(niet in standaard)"
+    return str(waarde)
 
 
 def _onderdrukking_section(onderdrukking: Onderdrukking) -> list[str]:

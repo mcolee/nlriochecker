@@ -5325,3 +5325,44 @@ geen JSON-veld erbij; `SCHEMA_VERSIE` blijft 1.2. De 14-en-meer `pd.read_csv`-le
 `tests/` lopen sinds dit issue via één gedeelde helper `lees_csv()` (`tests/helpers_csv.py`);
 `scripts/vergelijk_csv.py` leest `utf-8-sig`. Bewijs via unit-tests op de byte-vorm plus één
 handmatige LibreOffice-import; geen CI-afhankelijkheid van een kantoorsuite.
+
+### BO-98 --projectconfig kan een overlay op de standaard zijn (basis = "standaard")
+
+**Wat.** Een projectconfig met de top-level sleutel `basis = "standaard"` is een overlay:
+`load_check_config` laadt eerst de meegeleverde `src/nlriochecker/checks.toml`, legt de
+sleutels uit het projectbestand eroverheen, strips `basis` en valideert pas dan. Zonder
+`basis` blijft `--projectconfig` de configuratie in haar geheel vervangen -- byte-voor-byte
+hetzelfde gedrag als voorheen, met een ontbrekende sectie als configfout. De auteur bracht
+issue #163 (bron: Fable-swarm 2026-09-05, lens arch-evolutie) in een grill-sessie
+(2026-09-06) van `needs-triage` naar `ready-for-agent` en maakte daarbij de keuzes hieronder.
+
+**Waarom.** `configs/dewoldenhoogeveen.toml` was een kopie van 594 regels waarvan er acht
+sleutels werkelijk van de standaard afweken (zeven bronpaden plus `rapport.onderdruk_klassen`).
+De rest liep stil uit de pas: de commentaren waren al gedrift, en een drempelbesluit in
+`checks.toml` bereikte de projectconfig niet vanzelf. Een tweede gemeente moest 594 regels
+lezen en synchroon houden. Met de overlay krimpt dat bestand tot `basis = "standaard"` plus
+de acht sleutels (~15 regels), en bereikt een drempelbesluit alle projecten via één plek.
+
+**Merge-regels (bindend, grilling 2026-09-06).** Tabellen worden sleutel-voor-sleutel diep
+samengevoegd (`[drempels]`, `[bronnen]`, `[klassen]`, `[klassen.stelseltypen]`, …). Een lijst
+vervangt als geheel -- óók een tabel-array als `[[verhang_staffel]]` of `[[puttyperegels]]`:
+wie de staffel wijzigt schrijft hem helemaal, geen deep-merge op index of naam. Er is geen
+verwijdermechanisme; `= []` maakt een lijst leeg, een sleutel "uitzetten" bestaat niet want
+elke sleutel heeft in de basis een waarde. `basis` kent maar één waarde, `"standaard"` (de
+meegeleverde checks.toml); iets anders is een `ConfigError` die de toegestane waarde noemt.
+`[rapport] uitzonderingen` blijft relatief aan het bestand dat hem opschrijft (aanname 1;
+zet de overlay hem, dan relatief aan de overlay); `[bronnen] map` blijft relatief aan de
+werkmap.
+
+**Verantwoording.** Het Markdown-rapport noemt onder Verantwoording elk overschreven
+sleutelpad met de basiswaarde en de projectwaarde (`bronnen.map: data/gis_koekangerveld →
+data/gis_dewoldenhoogeveen`); een volledige kopie zonder `basis` -- ook de standaard zelf --
+zegt "Projectconfiguratie volledig, geen overlay". Alleen Markdown: `CheckConfig` draagt de
+lijst overschreven paden in een privé-attribuut (`overschreven_paden`), geen JSON-veld, geen
+`gwsw_run`-kolom, geen `SCHEMA_VERSIE`-bump. De guard `ClassRoots._pompunit_heeft_een_uitweg`
+(BO-55) blijft staan: hij toetst het gemergede resultaat en is dus nog steeds juist.
+
+**Bewijs.** `configs/dewoldenhoogeveen.toml` 594 → ~60 regels (waarvan de acht sleutels; de
+rest is toelichting). De gemergede overlay is `==` aan de volledige kopie in elke sectie;
+`tests/golden/ledger.json` byte-gelijk; de volle De Wolden en Hoogeveen-run identiek aan de
+referentie (161.661 meldingen, 0 checks met verschil). Geen andere contractwijziging.
