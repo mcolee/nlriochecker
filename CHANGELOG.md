@@ -72,6 +72,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   `uitgave.py` en `.github/workflows/toets.yml` aan elkaar, met een benoemde uitzondering
   per kant. Gemeten: 208 tests, ~476 s wandklok (issue #157 noemde nog 11; issue #139
   voegde er sindsdien een zwaar, per fixture geparametriseerde drifttest aan toe).
+- **Onderzoeksverslag puntbemonstering uit een groot float32-raster** (issue #170, stap 0
+  van #168). `docs/onderzoek/2026-09-06-puntbemonstering-float32-raster.md` toetst
+  GDAL-blokcache, tegelgrootte, compressie-predictors en COG-layout tegen de gdal.org-,
+  rasterio- en OGC/libtiff-documentatie; bepaalt welke van de acht bestands- en vier
+  leesstrategie-varianten uit #168 blijven, vervallen (de COG-varianten #7/#8, want lokaal
+  geen HTTP-rondes te besparen) of geen nieuwe erbij komt (geen ander rasterformaat met
+  brondekking). Geen codewijziging, geen meting.
 
 ### Gewijzigd
 
