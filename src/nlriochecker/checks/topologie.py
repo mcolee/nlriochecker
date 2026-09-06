@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections import defaultdict
 from collections.abc import Iterator
@@ -68,6 +69,21 @@ def _lijn(conduit: Conduit) -> LineString:
     return cast(LineString, conduit.line)
 
 
+def _eindige_eindpunten(punten: tuple[tuple[float, ...], ...]) -> tuple[Point, Point] | None:
+    """De uiteinden van een coordinatenreeks, of None als die er niet eindig zijn.
+
+    Een niet-eindige coordinaat (NaN of oneindig) wordt hier als "geen uiteinden"
+    behandeld, net als een reeks van minder dan twee punten. Shapely's STRtree en de
+    afstands- en snijfuncties vallen op zo'n coordinaat om met een GEOSException (en
+    `round()` op een oneindige lengte met een OverflowError); door de streng hier over
+    te slaan blijven de snapping- en nabijheidsindexen bruikbaar, terwijl TOP-007 en
+    TOP-009 de geometrie langs hun eigen weg melden. Zie issue #152.
+    """
+    if not all(math.isfinite(waarde) for punt in punten for waarde in punt):
+        return None
+    return endpoints_kern(punten)
+
+
 @dataclass(frozen=True)
 class _Topologie:
     """Hulpstructuur met de putten, hun geometrie en een index erop."""
@@ -96,14 +112,19 @@ class _Topologie:
         wordt (issue #123).
         """
         if conduit.uri not in self.eindpunten:
-            self.eindpunten[conduit.uri] = endpoints_kern(
+            self.eindpunten[conduit.uri] = _eindige_eindpunten(
                 coords_van(context, conduit.uri, conduit.line)
             )
         return self.eindpunten[conduit.uri]
 
     def nearest_node(self, punt: Point, tolerantie: float) -> Node | None:
-        """De put binnen de tolerantie die het dichtst bij dit punt ligt."""
-        if self.tree is None:
+        """De put binnen de tolerantie die het dichtst bij dit punt ligt.
+
+        Een niet-eindig zoekpunt levert None: `STRtree.query` valt er met een
+        GEOSException op om (issue #152). De snapping voedt hier al alleen eindige
+        uiteinden in (`endpoints_of`), maar de poort staat er ook direct op.
+        """
+        if self.tree is None or not (math.isfinite(punt.x) and math.isfinite(punt.y)):
             return None
         kandidaten = self.tree.query(punt, predicate="dwithin", distance=tolerantie)
         dichtstbij: Node | None = None
@@ -132,7 +153,7 @@ def _bouw_topologie(context: CheckContext) -> _Topologie:
 
     alle = leidingen(context)
     eindpunten = {
-        conduit.uri: endpoints_kern(coords_van(context, conduit.uri, conduit.line))
+        conduit.uri: _eindige_eindpunten(coords_van(context, conduit.uri, conduit.line))
         for conduit in alle
     }
     met_lijn = [conduit for conduit in alle if eindpunten[conduit.uri] is not None]
@@ -389,7 +410,7 @@ def _bouw_nabijheid(context: CheckContext) -> _Nabijheid:
     conduits: list[Conduit] = []
     eindpunten: dict[str, tuple[Point, Point]] = {}
     for conduit in binnen:
-        uiteinden = endpoints_kern(coords_van(context, conduit.uri, conduit.line))
+        uiteinden = _eindige_eindpunten(coords_van(context, conduit.uri, conduit.line))
         if uiteinden is None:
             continue
         eindpunten[conduit.uri] = uiteinden
@@ -972,7 +993,24 @@ class BuitenRdBereik(Check):
         drempels = context.config.drempels
         grenzen = (drempels.rd_x_min, drempels.rd_x_max, drempels.rd_y_min, drempels.rd_y_max)
 
+        gedekt: set[str] = set()
         for node in _topologie(context).nodes:
+            gedekt.add(node.uri)
+            geval = self._melding(node.point, grenzen, "put")
+            if geval is not None:
+                melding, waarde, drempel = geval
+                yield self.finding(
+                    context, node.uri, node.label, melding, waarde=waarde, drempel=drempel
+                )
+
+        # De topologie-index draagt alleen knopen met een punt (`_bouw_topologie` filtert
+        # daarop); een put zonder coordinaten valt er dus buiten en zou anders nooit
+        # gemeld worden. Dat is precies wat het register onder "ontbrekende coordinaten"
+        # verwacht (BO-4, issue #152). `gedekt` houdt een knoop die de index wél kent
+        # (ook een lege puntgeometrie) uit de tweede lus, zodat niets dubbel telt.
+        for node in netwerkknopen(context):
+            if node.uri in gedekt or (node.point is not None and not node.point.is_empty):
+                continue
             geval = self._melding(node.point, grenzen, "put")
             if geval is not None:
                 melding, waarde, drempel = geval
@@ -1031,9 +1069,18 @@ class BuitenRdBereik(Check):
         ]
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal knopen plus strengen."""
-        topologie = _topologie(context)
-        return len(topologie.nodes) + len(topologie.all_conduits)
+        """Het aantal beoordeelde knopen plus strengen.
+
+        De puttenindex (`_topologie().nodes`) is ná de compartiment-ontdubbeling (BO-71),
+        net als bij de zusterchecks TOP-001/005/014/015/021 die die samenvoeging via
+        `_dedupnotitie` verantwoorden; daar bovenop komen de knopen zonder punt, die de
+        index weglaat maar de tweede lus juist toetst. Een rauwe `len(netwerkknopen)` zou
+        de door dedup samengevoegde knopen dubbel tellen en de dekking-% laten verschuiven
+        (op De Wolden ~91, BO-71). Puntloze knopen worden nooit ontdubbeld, dus de twee
+        tellingen overlappen niet. Zie issue #152.
+        """
+        zonder_punt = sum(1 for node in netwerkknopen(context) if node.point is None)
+        return len(_topologie(context).nodes) + zonder_punt + len(_topologie(context).all_conduits)
 
 
 @register

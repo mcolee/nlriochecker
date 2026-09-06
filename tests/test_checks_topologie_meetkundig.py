@@ -146,6 +146,91 @@ def test_top009_meldt_ook_wat_er_niet_getoetst_is() -> None:
     assert any("beheergebied" in note for note in outcome.notes)
 
 
+def test_top009_meldt_een_put_zonder_coordinaten() -> None:
+    """Issue #152: een put met een Putorientatie maar zonder Punt-aspect.
+
+    De topologie-index laat een knoop zonder punt weg, dus de tak "geen coordinaten"
+    was voor putten dood. De tweede lus over de netwerkknopen meldt put X nu alsnog, en
+    telt hem in `examined` mee (drie knopen plus een streng).
+    """
+    dataset = load_dataset(TTL_DIR / "top009_put_zonder_punt.ttl", [])
+    outcome = run_checks(
+        CheckContext(dataset=dataset, config=fixtureconfig()), ["TOP-009"]
+    ).outcomes[0]
+
+    zonder_punt = [f for f in outcome.findings if f.object_label == "X"]
+    assert len(zonder_punt) == 1
+    assert "geen coordinaten" in zonder_punt[0].message
+    # De drie netwerkknopen (A, B, X) plus de ene streng.
+    assert outcome.examined == 4
+
+
+def test_top009_examined_telt_de_putten_na_dedup() -> None:
+    """Issue #152 (fixronde 1): `examined` telt ná de compartiment-ontdubbeling.
+
+    Een rauwe `len(netwerkknopen)` zou de door dedup samengevoegde knopen (BO-71) dubbel
+    tellen -- op deze fixture 18 in plaats van 16 -- en de dekking-% laten verschuiven
+    t.o.v. de zusterchecks, die ná dedup tellen. Er staan hier geen puntloze knopen, dus
+    `examined` is de ná-dedup-puttentelling (TOP-005) plus de strengen (TOP-013): 16.
+    """
+    dataset = load_dataset(TTL_DIR / "top005_compartimentduplicaat.ttl", [])
+    context = CheckContext(dataset=dataset, config=fixtureconfig())
+    uitkomsten = {
+        o.check_id: o for o in run_checks(context, ["TOP-005", "TOP-009", "TOP-013"]).outcomes
+    }
+
+    na_dedup = uitkomsten["TOP-005"].examined + uitkomsten["TOP-013"].examined
+    assert uitkomsten["TOP-009"].examined == na_dedup
+    assert uitkomsten["TOP-009"].examined == 16
+
+
+def test_top009_en_top007_melden_niet_eindige_coordinaten() -> None:
+    """Issue #152: NaN en 1e999 (oneindig) worden gemeld, niet stilgeslagen.
+
+    TOP-009 meldt de twee putten en de twee strengen met een niet-eindige coordinaat,
+    TOP-007 de twee strengen; de eindige objecten (A, B, streng 1) vallen met het
+    verruimde RD-bereik van de fixtureconfig buiten beide checks.
+    """
+    pad = TTL_DIR / "top009_niet_eindige_coordinaten.ttl"
+    top009 = bevindingen(pad, "TOP-009")
+    top007 = bevindingen(pad, "TOP-007")
+
+    assert labels(top009) == ["I", "N", "inf", "nan"]
+    assert all("geen eindig getal" in f.message for f in top009)
+    assert labels(top007) == ["inf", "nan"]
+    assert all("geen eindig getal" in f.message for f in top007)
+
+
+def test_niet_eindige_coordinaten_laten_de_toets_niet_omvallen(tmp_path: Path) -> None:
+    """Issue #152: de volledige toets eindigt met een melding, niet met een traceback.
+
+    Vóór de fix viel de run om op een GEOSException (STRtree/nabijheid op NaN), een
+    OverflowError (`round()` op een oneindige lengte in de omvangtabel) of een ValueError
+    (een oneindige foutlocatie in de JSON). Nu worden alle vier de uitvoervormen
+    geschreven en dragen TOP-007 en TOP-009 hun meldingen.
+    """
+    from nlriochecker.toetsrun import Toetsopdracht, voer_toets_uit
+
+    uitslag = voer_toets_uit(
+        Toetsopdracht(
+            dataset_pad=TTL_DIR / "top009_niet_eindige_coordinaten.ttl",
+            uitvoermap=tmp_path / "uitvoer",
+            geen_ontologie=True,
+            cachemap=tmp_path / "cache",
+        )
+    )
+
+    geschreven = uitslag.uitvoer.per_gebied[""]
+    assert geschreven.json is not None and geschreven.json.exists()
+    assert geschreven.geopackage is not None and geschreven.geopackage.exists()
+    assert geschreven.csv is not None and geschreven.csv.exists()
+    assert geschreven.markdown.exists()
+
+    outcomes = {o.check_id: o for o in uitslag.runs[0].run.outcomes}
+    assert outcomes["TOP-007"].findings
+    assert outcomes["TOP-009"].findings
+
+
 def test_top010_slaat_niet_aan_zonder_maatvoering() -> None:
     # Dezelfde kruising, maar zonder diameter is er geen buis om te bufferen.
     assert bevindingen(TTL_DIR / "top011_hartlijnkruising.ttl", "TOP-010") == []

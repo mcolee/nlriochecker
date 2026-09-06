@@ -12,6 +12,8 @@ De uitvoer draagt hem als `X`/`Y` in de CSV, als `foutlocatie` in de JSON en als
 
 from __future__ import annotations
 
+import math
+
 from gwsw_orox_helpers.dataset import GwswDataset
 from shapely.geometry import LinearRing, LineString, Point
 from shapely.geometry.base import BaseGeometry
@@ -27,13 +29,13 @@ def foutlocatie(finding: Finding, dataset: GwswDataset) -> Point | None:
     """Bepaalt het punt waarop deze melding op de kaart hoort te staan."""
     eigen = finding.details.get(SLEUTEL_FOUTLOCATIE)
     if eigen is not None:
-        return _punt(eigen)
+        return _eindig(_punt(eigen))
 
     # Een object dat niet uit de GWSW-dataset komt draagt zijn coordinaat zelf. EXT-006
     # (een BGT-putdeksel zonder put) was zo'n check; die is met issue #95 vervallen, maar
     # de weg blijft bestaan voor een volgende check op een externe bron.
     if finding.location is not None:
-        return _punt(finding.location)
+        return _eindig(_punt(finding.location))
 
     return objectlocatie(dataset, finding.object_uri)
 
@@ -46,13 +48,26 @@ def objectlocatie(dataset: GwswDataset, uri: str) -> Point | None:
     """
     node = dataset.nodes.get(uri)
     if node is not None and node.point is not None:
-        return node.point
+        return _eindig(node.point)
 
     conduit = dataset.conduits.get(uri)
     if conduit is not None and conduit.line is not None and not conduit.line.is_empty:
-        return _middelpunt(conduit.line)
+        return _eindig(_middelpunt(conduit.line))
 
     return None
+
+
+def _eindig(punt: Point | None) -> Point | None:
+    """Laat een punt met een niet-eindige coordinaat (NaN of oneindig) vallen.
+
+    Zo'n object heeft geen plek op de kaart, en een `inf`/`nan` zou de JSON-schrijver
+    (die getallen zijn niet JSON-geldig) en de gevectoriseerde X/Y-afleiding laten
+    omvallen. TOP-007 en TOP-009 melden het gebrek al langs hun eigen weg; hier valt de
+    locatie stil weg, net als bij een object zonder geometrie. Zie issue #152.
+    """
+    if punt is None or not (math.isfinite(punt.x) and math.isfinite(punt.y)):
+        return None
+    return punt
 
 
 def _middelpunt(geometrie: BaseGeometry) -> Point:

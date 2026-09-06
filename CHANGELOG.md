@@ -13,6 +13,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Ontbrekende of niet-eindige coordinaten omzeilden TOP-009 en lieten de run omvallen**
+  (issue #152): de topologie-index laat een knoop zonder punt weg, waardoor de TOP-009-tak
+  "geen coordinaten" voor putten dood was -- een put met een Putorientatie maar zonder
+  Punt-aspect kwam op geen enkele kaart, CSV of JSON. TOP-009 loopt nu na de puttenindex een
+  tweede keer over `netwerkknopen`, meldt de knopen zonder punt, en telt ze in `examined`
+  mee. Daarnaast liet één vervuilde coordinaat (NaN of `1e999`) de hele run omvallen met een
+  traceback in plaats van een melding: een `GEOSException` uit de STRtree en de
+  nabijheidstoets, een `OverflowError` op `round()` van een oneindige lengte in de
+  omvangtabel, en een `ValueError` bij het JSON-schrijven van een oneindige foutlocatie. De
+  snapping- en nabijheidsindexen (`checks/topologie.py`) slaan een niet-eindige coordinaat nu
+  over zoals ze een ontbrekend uiteinde al deden, de omvangtabel (`uitvoer/omvang.py`) laat
+  zo'n object buiten de telling, en de foutlocatie (`uitvoer/locatie.py`) valt op geen locatie
+  terug; TOP-007 en TOP-009 melden het gebrek en de run eindigt met een melding (BO-4). Op De
+  Wolden verandert er niets (geen putten zonder punt, geen niet-eindige coordinaten).
 - **Geen richtingspijl op een vlakke BOB** (issue #151): de kaartpijl `richting_bob` in de
   GeoPackage las alleen `verval is None or verval == 0.0` en tekende bij elk ander verval een
   `mee`/`tegen`-pijl -- ook binnen de vlak-band van NET-009 (`drempels.tegenverhang_licht_m`),

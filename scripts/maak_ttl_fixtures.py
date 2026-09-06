@@ -73,17 +73,32 @@ gwsw:Sloot rdfs:subClassOf gwsw:Oppervlaktewater .
 def put(
     naam: str,
     label: str,
-    x: float,
-    y: float,
+    x: float | str,
+    y: float | str,
     klasse: str = "Inspectieput",
     extra: str = "",
     orientatie: str = "Putorientatie",
 ) -> str:
+    # x en y mogen een string zijn (bv. "NaN", "1e999"), zodat een fixture een
+    # niet-eindige coordinaat kan uitschrijven zoals de echte export dat soms doet
+    # (issue #152); voor de gewone fixtures blijven het floats.
     return f''':{naam} rdf:type gwsw:{klasse} ; rdfs:label "{label}" ;
     gwsw:hasAspect :{naam}_ori .{extra}
 :{naam}_ori rdf:type gwsw:{orientatie} ;
     gwsw:hasAspect [ rdf:type gwsw:Punt ;
         gwsw:hasValue "<gml:Point xmlns:gml=\\"http://www.opengis.net/gml\\"><gml:pos>{x} {y}</gml:pos></gml:Point>"^^geo:gmlLiteral ] .
+'''
+
+
+def put_zonder_punt(naam: str, label: str, klasse: str = "Inspectieput") -> str:
+    """Een put met een Putorientatie maar zonder Punt-aspect: geen coordinaten.
+
+    De topologie-index laat een knoop zonder punt weg, dus TOP-009 zag zo'n put niet;
+    sinds issue #152 meldt de tweede lus over de netwerkknopen hem alsnog.
+    """
+    return f''':{naam} rdf:type gwsw:{klasse} ; rdfs:label "{label}" ;
+    gwsw:hasAspect :{naam}_ori .
+:{naam}_ori rdf:type gwsw:Putorientatie .
 '''
 
 
@@ -140,7 +155,7 @@ def hulpstuk(naam: str, label: str, x: float, y: float, klasse: str = "T_stuk") 
 def leiding(
     naam: str,
     label: str,
-    punten: list[tuple[float, float]],
+    punten: list[tuple[float | str, float | str]],
     begin: str | None,
     eind: str | None,
     klasse: str = "GemengdRiool",
@@ -338,6 +353,35 @@ FIXTURES["top009_buiten_rd.ttl"] = (
     put("PutA", "A", 1000.0, 2000.0)
     + put("PutB", "B", 999999.0, 2000.0)
     + leiding("L1", "1", [(1000.0, 2000.0), (999999.0, 2000.0)], "PutA", "PutB"),
+)
+
+# TOP-009 (issue #152): een put zonder Punt-aspect. De topologie-index laat een knoop
+# zonder punt weg, dus de tak "geen coordinaten" was voor putten dood; de tweede lus over
+# de netwerkknopen meldt put X nu alsnog.
+FIXTURES["top009_put_zonder_punt.ttl"] = (
+    "put X draagt een Putorientatie maar geen Punt-aspect: geen coordinaten (issue #152)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put_zonder_punt("PutX", "X")
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB"),
+)
+
+# TOP-009/TOP-007 (issue #152): niet-eindige coordinaten. Put N en streng nan dragen een
+# NaN, put I en streng inf een 1e999 (oneindig). Zonder de fix viel de run om -- een
+# GEOSException uit de STRtree en de nabijheidstoets op NaN, een OverflowError op `round()`
+# van een oneindige lengte in de omvangtabel, en een ValueError bij het JSON-schrijven van
+# een oneindige foutlocatie. Nu melden TOP-007 en TOP-009 ze en eindigt de run met een
+# melding.
+FIXTURES["top009_niet_eindige_coordinaten.ttl"] = (
+    "put N en streng nan dragen een NaN-coordinaat, put I en streng inf een 1e999 "
+    "(oneindig); TOP-007 en TOP-009 melden ze en de run valt er niet meer op om (issue #152)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + put("PutN", "N", "NaN", 2000.0)
+    + put("PutI", "I", "1e999", 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB")
+    + leiding("Lnan", "nan", [(1000.0, 2000.0), ("NaN", 2000.0)], "PutA", "PutN")
+    + leiding("Linf", "inf", [(1050.0, 2000.0), ("1e999", 2000.0)], "PutB", "PutI"),
 )
 
 # TOP-010: twee strengen die elkaar kruisen, met diameter.

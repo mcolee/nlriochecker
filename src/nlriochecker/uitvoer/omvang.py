@@ -16,10 +16,12 @@ put toekennen.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 
 import pandas as pd
+import shapely
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
@@ -121,7 +123,7 @@ def _telt_mee(uri: str, binnen: frozenset[str] | None, geometrie: object) -> boo
     """Of dit object in de tabel hoort: binnen het gebied en met een plek op de kaart."""
     if binnen is not None and uri not in binnen:
         return False
-    return geometrie is not None and not geometrie.is_empty  # type: ignore[attr-defined]
+    return not _leeg(geometrie)
 
 
 def zonder_geometrie(run: CheckRun) -> int:
@@ -138,8 +140,23 @@ def zonder_geometrie(run: CheckRun) -> int:
 
 
 def _leeg(geometrie: object) -> bool:
-    """Of een geometrie ontbreekt of leeg is."""
-    return geometrie is None or geometrie.is_empty  # type: ignore[attr-defined]
+    """Of een geometrie geen bruikbare plek op de kaart draagt.
+
+    Naast ontbreken en leeg zijn telt ook een niet-eindige coordinaat (NaN of oneindig)
+    mee: zo'n object is niet te tekenen en niet aan een gebied toe te wijzen, en
+    `round()` op een oneindige lengte valt er met een OverflowError op om (issue #152).
+    Het wordt daarom -- net als een object zonder geometrie -- uit de omvangtabel
+    gelaten en door `zonder_geometrie` geteld; TOP-007 en TOP-009 melden het gebrek.
+    """
+    if geometrie is None or geometrie.is_empty:  # type: ignore[attr-defined]
+        return True
+    # `bounds` verraadt een NaN in een lijn niet -- GEOS laat de NaN-vertex uit de
+    # omhullende weg -- dus toets elke coordinaat zelf. `get_coordinates` levert ze plat.
+    return not all(
+        math.isfinite(waarde)
+        for coord in shapely.get_coordinates(geometrie)  # type: ignore[arg-type]
+        for waarde in coord
+    )
 
 
 def putten_in_beeld(run: CheckRun) -> frozenset[str]:
