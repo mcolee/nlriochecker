@@ -108,6 +108,18 @@ def test_dekkingrapport_noemt_een_sentinel_zonder_bewijs(
     assert "In deze dataset geldt dat voor: ADM-001." in tekst
 
 
+def test_dekkingrapport_meldt_typering_niet_gemeten_zonder_dataset(analyse, tmp_path: Path) -> None:
+    """Issue #155: zonder `--dataset` moet `dekking.md` zeggen dat de typerings-
+    voorwaarde niet gemeten is, in plaats van dat weg te laten achter een stille '—'.
+    """
+    coverage = assess_coverage(analyse, load_coverage_config())
+    markdown_path, _ = write_coverage_report(coverage, tmp_path)
+    tekst = markdown_path.read_text(encoding="utf-8")
+
+    assert "typering niet gemeten" in tekst
+    assert "geen OroX-dataset meegegeven" in tekst
+
+
 def test_vergelijkingsrapport(analyse, tmp_path: Path) -> None:
     comparison = compare_metingen(analyse, analyse, load_coverage_config())
     markdown_path, csv_path, objects_path = write_comparison_reports(comparison, tmp_path)

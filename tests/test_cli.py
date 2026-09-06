@@ -71,6 +71,23 @@ def test_dekking_schrijft_uitvoer(shacl_drieluik: list[Path], tmp_path: Path) ->
     assert "ADM-001   geraakt" in resultaat.output
 
 
+def test_dekking_zonder_dataset_meldt_dat_de_typering_niet_gemeten_is(
+    shacl_drieluik: list[Path], tmp_path: Path
+) -> None:
+    """Issue #155: `analyseer` zei dit al (`_echo_meting`); `dekking` zweeg erover."""
+    resultaat = CliRunner().invoke(
+        main, ["dekking", *_shacl_args(shacl_drieluik), "--output", str(tmp_path / "uitvoer")]
+    )
+
+    assert resultaat.exit_code == 0, resultaat.output
+    assert "Geen --dataset opgegeven; typeringsscore niet te bepalen." in resultaat.output
+    # Fixronde 1: de per-check-regel moet dezelfde toestand dragen als de tabel in
+    # dekking.md, anders spreken terminal en rapport elkaar tegen op checkniveau.
+    assert "ADM-001   geraakt        Hyd, MdsPlan, MdsProj  [typering niet gemeten]" in (
+        resultaat.output
+    )
+
+
 def test_analyseer_meldt_een_sentinel_zonder_bewijs(
     shacl_drieluik: list[Path], mapping_zonder_bewijs: Path, tmp_path: Path
 ) -> None:

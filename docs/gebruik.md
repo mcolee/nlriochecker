@@ -93,7 +93,9 @@ nlriochecker toets \
 Verder: `nlriochecker dekking` toetst de nulmeting tegen het checkregister
 (`dekking.md` en `dekking.csv`), en `nlriochecker vergelijk --eerder ... --later ...`
 zet twee meetmomenten naast elkaar voor de trend (`vergelijking.md`, `verschillen.csv`
-en `objectverschillen.csv`). Elk subcommando kent `--help`.
+en `objectverschillen.csv`). Elk subcommando kent `--help`. Zonder `--dataset` is de
+typeringsvoorwaarde niet gemeten; `dekking.md` en de terminal zeggen dat expliciet
+(`typering niet gemeten` in plaats van een stille `—`), net als `analyseer` al deed.
 
 ## `toets` en de ontologie
 

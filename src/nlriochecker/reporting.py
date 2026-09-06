@@ -28,6 +28,14 @@ FILE_COMPARISON_MARKDOWN = "vergelijking.md"
 FILE_COMPARISON_CSV = "verschillen.csv"
 FILE_OBJECT_CHANGES_CSV = "objectverschillen.csv"
 
+TYPERING_NIET_GEMETEN = "typering niet gemeten"
+"""Voorbehoudtekst als er geen enkele CFK een opgeloste typeringspoort heeft (issue #155).
+
+Gedeeld door de dekkingtabel (`_coverage_section`, in `dekking.md` en `samenvatting.md`)
+en de per-check-terminalregel van `dekking` (`cli.py`), zodat rapport en terminal
+dezelfde toestand niet met verschillende woorden kunnen tegenspreken.
+"""
+
 TOELICHTING_NIET_GERAAKT = (
     "Een check die *niet geraakt* is, is niet goedgekeurd: de nulmeting geeft over dat "
     "onderwerp in deze dataset geen enkele melding. Dat betekent ofwel dat de data op "
@@ -166,13 +174,22 @@ def _typing_section(analyse: MetingAnalysis) -> list[str]:
         ]
 
     if not any(analyse.per_cfk[cfk].typing_gate.resolved for cfk in analyse.meting.cfks):
-        lines += [
-            "",
-            "> Er is geen OroX-dataset meegegeven, dus het aantal betrokken objecten en "
-            "de score zijn niet te bepalen. Geef `--dataset` op voor een volledig beeld.",
-        ]
+        lines += _typing_missing_notice()
 
     return lines
+
+
+def _typing_missing_notice() -> list[str]:
+    """De regel die meldt dat de typeringspoort niet gemeten is zonder OroX-dataset.
+
+    Gedeeld door `_typing_section` (samenvatting.md) en `_render_coverage`
+    (dekking.md), zodat de twee rapporten niet uit elkaar kunnen lopen (issue #155).
+    """
+    return [
+        "",
+        "> Er is geen OroX-dataset meegegeven, dus het aantal betrokken objecten en "
+        "de score zijn niet te bepalen. Geef `--dataset` op voor een volledig beeld.",
+    ]
 
 
 def write_coverage_report(result: CoverageResult, output_dir: Path) -> tuple[Path, Path]:
@@ -230,6 +247,8 @@ def _render_coverage(result: CoverageResult) -> list[str]:
         f"typeringsdrempel {result.config.drempels.typeringsscore_minimum:.1f}%.",
         "",
     ]
+    if not result.typing_gemeten:
+        lines += [*_typing_missing_notice(), ""]
     lines += _register_section(result)
     lines += _coverage_section(result)
     lines += _discrepancy_section(result)
@@ -341,7 +360,9 @@ def _coverage_section(result: CoverageResult) -> list[str]:
     for check in result.checks:
         gevonden = ", ".join(check.evidence_cfks) or "—"
         voorbehoud = []
-        if not check.typing_reliable:
+        if not result.typing_gemeten:
+            voorbehoud.append(TYPERING_NIET_GEMETEN)
+        elif not check.typing_reliable:
             voorbehoud.append("typering")
         if check.has_counter_evidence:
             voorbehoud.append("tegenbewijs")

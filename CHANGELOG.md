@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **`dekking` zonder `--dataset` zei nergens dat de typeringsvoorwaarde niet gemeten
+  is** (issue #155): `typing_reliable` staat over een lege scorelijst op `True`
+  (`all([])`), dus `_render_coverage` had geen typeringssectie, de tabelkolom
+  Voorbehoud toonde stil `'—'` en `dekking` echode niets, terwijl `analyseer` dat via
+  `_echo_meting` al wel deed. `CoverageResult` draagt nu `typing_gemeten` (of minstens
+  een CFK's `typing_gate.resolved` is); zonder dataset toont `dekking.md` dezelfde
+  waarschuwing als `samenvatting.md` (`_typing_missing_notice`, gedeeld met
+  `_typing_section`), de tabelkolom Voorbehoud zegt `typering niet gemeten` in plaats
+  van `—`, en het subcommando `dekking` echoot het net als `analyseer`. `typing_reliable`
+  zelf blijft ongemoeid.
 - **Een studiegebiedrij zonder geometrie viel stil of gaf een kale traceback** (issue #154):
   in een GeoPackage verdween een rij met een lege geometrieblob zonder log of telling, en in
   GeoJSON gaf een feature zonder de sleutel `geometry` (in plaats van `"geometry": null`) de

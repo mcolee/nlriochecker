@@ -154,6 +154,12 @@ class CoverageResult:
     # boven de tekst: een dekkingclaim die op een deelset rust is minder waard, en
     # `CoverageResult` draagt zelf geen verwijzing naar de analyse waar hij uit komt.
     meetbereik: Meetbereik
+    # Of de typeringspoort voor minstens een CFK is opgelost (issue #155): zonder
+    # `--dataset` is `TypingGate.resolved` overal False en levert `_assess_check`
+    # `typing_reliable=True` op over een lege score-lijst -- geen voorbehoud, dus,
+    # terwijl de voorwaarde helemaal niet gemeten is. Dit veld laat het rapport dat
+    # eigen, aparte gat benoemen in plaats van het weg te laten lezen als "in orde".
+    typing_gemeten: bool
     discrepanties: list[ShapeDiscrepancy] = field(default_factory=list)
     registercontrole: RegisterCheck | None = None
     ongelijke_meting: list[str] = field(default_factory=list)
@@ -194,6 +200,7 @@ def assess_coverage(
         config=config,
         checks=checks,
         meetbereik=analyse.meting.meetbereik,
+        typing_gemeten=any(analysis.typing_gate.resolved for analysis in analyses),
         discrepanties=discrepanties,
         registercontrole=verify_register(config, register) if register is not None else None,
         ongelijke_meting=_ongelijke_meting(analyses),

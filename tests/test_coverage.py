@@ -98,3 +98,10 @@ def test_eigen_mapping_op_vormprefix(analyse: MetingAnalysis, tmp_path: Path) ->
 def test_zonder_dataset_geen_typeringsvoorbehoud(result: CoverageResult) -> None:
     # De score is niet te bepalen zonder OroX-bestand; dan valt er niets voor te behouden.
     assert _check(result, "ADM-004").typing_reliable is True
+
+
+def test_zonder_dataset_is_typering_niet_gemeten(result: CoverageResult) -> None:
+    """Issue #155: `typing_reliable` blijft True over de lege lijst (zie hierboven),
+    maar dat is iets anders dan "gemeten en in orde". `typing_gemeten` draagt dat
+    onderscheid, zodat het rapport het ene niet voor het andere kan aanzien."""
+    assert result.typing_gemeten is False

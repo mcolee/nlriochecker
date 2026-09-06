@@ -21,6 +21,7 @@ from nlriochecker.errors import PipelineError
 from nlriochecker.meting import kies_cfk, laad_nulmeting
 from nlriochecker.register import Register, default_register_path, load_register
 from nlriochecker.reporting import (
+    TYPERING_NIET_GEMETEN,
     write_comparison_reports,
     write_coverage_report,
     write_reports,
@@ -388,7 +389,7 @@ def coverage_command(
 ) -> None:
     """Toetst of de nulmeting de geschrapte checks in deze dataset daadwerkelijk raakt."""
     try:
-        _, _, analyse, _ = _laad_meting(
+        _, _, analyse, dataset = _laad_meting(
             shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze
         )
         config = load_coverage_config(config_path)
@@ -405,11 +406,16 @@ def coverage_command(
         f"Dataset {result.dataset}, checkregister {result.config.checkregister_versie}: "
         f"{len(result.checks)} geschrapte checks getoetst"
     )
+    if dataset is None:
+        click.echo("  Geen --dataset opgegeven; typeringsscore niet te bepalen.")
     if register is None:
         click.echo("  Geen checkregister gevonden; de mapping is er niet tegen geijkt.")
     for check in result.checks:
         gevonden = ", ".join(check.evidence_cfks) or "geen bewijs"
-        voorbehoud = "" if check.typing_reliable else "  [typeringsvoorbehoud]"
+        if not result.typing_gemeten:
+            voorbehoud = f"  [{TYPERING_NIET_GEMETEN}]"
+        else:
+            voorbehoud = "" if check.typing_reliable else "  [typeringsvoorbehoud]"
         click.echo(f"  {check.mapping.id:9s} {check.verdict.value:14s} {gevonden}{voorbehoud}")
     for afwijking in result.discrepanties:
         click.echo(
