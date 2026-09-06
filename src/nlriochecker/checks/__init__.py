@@ -20,6 +20,7 @@ from nlriochecker.checks.base import (
     Severity,
     SkeletonCheck,
     objecten_in_gebied,
+    onbekende_check_ids_melding,
     register,
     run_checks,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "Severity",
     "SkeletonCheck",
     "objecten_in_gebied",
+    "onbekende_check_ids_melding",
     "register",
     "run_checks",
 ]

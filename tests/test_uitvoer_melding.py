@@ -624,6 +624,36 @@ def test_een_uitzondering_accepteert_de_melding_maar_laat_haar_staan() -> None:
     assert any(melding.melding_id == doel.melding_id for melding in stroom.meldingen)
 
 
+def test_een_dubbel_genoemde_uitzondering_telt_een_keer() -> None:
+    """Noemt het bestand dezelfde melding twee keer, dan telt zij één keer (issue #172).
+
+    `geaccepteerd` is ontdubbeld op melding-ID. De drie consumenten lezen precies deze
+    tuple -- de sectiekop van het rapport (`_uitzonderingen_section`), `meldingen_geaccepteerd`
+    in `gwsw_run` (`len(...)`) en de JSON-envelop -- dus met de ontdubbeling dragen ze
+    dezelfde telling. De foutentelling-aftrek was er al immuun voor (die toetst op lidmaatschap).
+    """
+    from nlriochecker.uitvoer.bevindingen import _uitzonderingen_section
+
+    run = _run("top001_losliggende_put.ttl", "TOP-001")
+    doel = bouw_meldingenstroom(run, RUNDATUM).meldingen[0]
+    _met_uitzonderingen(
+        run,
+        Uitzondering(melding_id=doel.melding_id, reden="eerst", waarde_snapshot=doel.waarde),
+        Uitzondering(melding_id=doel.melding_id, reden="nog eens", waarde_snapshot=doel.waarde),
+    )
+
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    # De bron die alle drie de consumenten lezen: precies één keer.
+    assert stroom.uitzonderingen.geaccepteerd == (doel.melding_id,)
+    # `gwsw_run.meldingen_geaccepteerd` en de JSON lezen deze lengte.
+    assert len(stroom.uitzonderingen.geaccepteerd) == 1
+    # En de sectiekop van het rapport telt hetzelfde.
+    tekst = "\n".join(_uitzonderingen_section(stroom.uitzonderingen, stroom.meldingen))
+    assert "1 bevinding geaccepteerd" in tekst
+    assert "TOP-001 1" in tekst
+
+
 def test_een_dode_uitzondering_telt_als_zonder_bevinding() -> None:
     """Een melding-ID uit het bestand dat deze run niet oplevert vervalt niet vanzelf."""
     run = _met_uitzonderingen(

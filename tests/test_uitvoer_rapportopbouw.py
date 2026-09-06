@@ -141,6 +141,21 @@ class TestAantallen:
         assert list(putten["Aantal"]) == [2]
         assert set(putten["Lengte (m)"]) == {"—"}
 
+    def test_leeg_haalt_de_coordinaten_een_keer_en_houdt_dezelfde_booleaan(self) -> None:
+        """`_leeg` haalt de coordinaten één keer op en toetst de eindigheid gevectoriseerd,
+        maar geeft dezelfde booleaan als voorheen (issue #172): geen geometrie, een leeg
+        punt en een niet-eindige coordinaat tellen als 'leeg', een geldige niet."""
+        from shapely.geometry import LineString, Point
+
+        from nlriochecker.uitvoer.omvang import _leeg
+
+        assert _leeg(None) is True
+        assert _leeg(Point()) is True
+        assert _leeg(Point(1.0, 2.0)) is False
+        assert _leeg(LineString([(0, 0), (1, 1)])) is False
+        assert _leeg(Point(float("nan"), 2.0)) is True
+        assert _leeg(LineString([(0, 0), (float("inf"), 1)])) is True
+
     def test_de_tabel_telt_alleen_de_kern(self, tmp_path: Path) -> None:
         """De schil zit in de dataset van de run maar wordt niet gerapporteerd."""
         gebieden = load_studiegebieden(GIS_DIR / "buurt_noord.gpkg")

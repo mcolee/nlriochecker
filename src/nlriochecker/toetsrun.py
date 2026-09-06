@@ -22,7 +22,6 @@ pakket onder 1.0 staat kan de vorm nog schuiven; zie `docs/versionering.md`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 
 from gwsw_orox_helpers.cache import CacheUitslag, laad_met_cache
@@ -31,7 +30,7 @@ from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
 
 from nlriochecker.analysis import analyze
 from nlriochecker.checkconfig import FALLBACK_ENCODING, CheckConfig, load_check_config
-from nlriochecker.checks import REGISTRY, CheckRun, Severity
+from nlriochecker.checks import REGISTRY, CheckRun, Severity, onbekende_check_ids_melding
 from nlriochecker.errors import OpdrachtError
 from nlriochecker.externedata import Dekkingseis, ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik, kies_cfk, laad_nulmeting
@@ -40,7 +39,7 @@ from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.studiegebied import RdGrenzen, Studiegebieden, load_studiegebieden
 from nlriochecker.taal import getal, vorm
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
-from nlriochecker.uitvoer.melding import bouw_meldingenstroom
+from nlriochecker.uitvoer.melding import Meldingenstroom
 from nlriochecker.uitvoer.samenvatting import Regel, eigen_telling
 from nlriochecker.uitvoer.schrijver import UitvoerPerGebied, schrijf_uitvoer_gebieden
 from nlriochecker.uitvoer.tabel import prepare
@@ -115,11 +114,16 @@ class Toetsuitslag:
         regels += self._meetregels()
         regels += self._bronregels()
         if len(self.runs) == 1:
-            regels += _gebied_uitgebreid(self.runs[0], self.config)
+            regels += _gebied_uitgebreid(
+                self.runs[0], self.config, self.uitvoer.stromen[self.runs[0].naam]
+            )
         else:
             # Bij tachtig buurten zou een blok per gebied duizenden regels opleveren;
             # de tellingen per check staan in totaal/synthese.md.
-            regels += [_gebied_kort(gebiedsrun) for gebiedsrun in self.runs]
+            regels += [
+                _gebied_kort(gebiedsrun, self.uitvoer.stromen[gebiedsrun.naam])
+                for gebiedsrun in self.runs
+            ]
         regels += self._geschreven()
         return regels
 
@@ -315,12 +319,10 @@ def _valideer_check_ids(check_ids: tuple[str, ...]) -> None:
     vangnet blijft staan voor een onbekend ID dat deze poort om wat voor reden dan
     ook niet ziet (issue #153).
     """
-    onbekend = sorted(set(check_ids) - set(REGISTRY))
+    onbekend = set(check_ids) - set(REGISTRY)
     if onbekend:
         bekend = ", ".join(sorted(REGISTRY))
-        raise OpdrachtError(
-            f"onbekende check-ID's: {', '.join(onbekend)}. Bekende checks: {bekend}."
-        )
+        raise OpdrachtError(f"{onbekende_check_ids_melding(onbekend)}. Bekende checks: {bekend}.")
 
 
 def _studiegebieden(opdracht: Toetsopdracht, config: CheckConfig) -> Studiegebieden | None:
@@ -417,24 +419,29 @@ def _nulmeting(
     )
 
 
-def _eigen_telling(run: CheckRun) -> Regel:
-    """De foutentelling van de eigen checks over de meldingenstroom (issue #150).
+def _eigen_telling(stroom: Meldingenstroom) -> Regel:
+    """De foutentelling van de eigen checks over de al gebouwde meldingenstroom (issue #172).
 
     Niet `run.count`: dat telt de bevindingen *vóór* de onderdrukking, zodat de terminal
     een ander getal toonde dan het rapport (de samenvatting) en de GeoPackage. Dezelfde
     regel als de Verantwoording en `samenvatting._tel`: register-meldingen, per ernst
     geteld, en de geaccepteerde bevindingen (issue #132) tellen niet mee.
+
+    De stroom is die welke de schrijver al bouwde (met de `run_datum` van de run) en die
+    via `UitvoerPerGebied.stromen` meekomt; hem hier hergebruiken in plaats van hem voor
+    één terminalregel opnieuw op te bouwen met een verse `date.today()` scheelt op een
+    volle run een doorloop over ruim 160k meldingen en houdt terminal en uitvoer op
+    dezelfde telling (issue #150, #172).
     """
-    stroom = bouw_meldingenstroom(run, date.today())
     return eigen_telling(stroom.meldingen, geaccepteerd=stroom.uitzonderingen.geaccepteerd)
 
 
-def _gebied_kort(gebiedsrun: GebiedsRun) -> str:
+def _gebied_kort(gebiedsrun: GebiedsRun, stroom: Meldingenstroom) -> str:
     """Vat een gebiedsrun samen in een regel; het detail staat in de synthese."""
     run = gebiedsrun.run
     kern = len(run.analyseset.kern) if run.analyseset is not None else 0
     weggelaten = run.weggelaten
-    telling = _eigen_telling(run)
+    telling = _eigen_telling(stroom)
     leeg = " -- geen objecten in dit gebied, niets getoetst" if not kern else ""
     return (
         f"  Gebied {gebiedsrun.naam}: {getal(kern, 'object', 'objecten')} in de kern, "
@@ -444,7 +451,9 @@ def _gebied_kort(gebiedsrun: GebiedsRun) -> str:
     )
 
 
-def _gebied_uitgebreid(gebiedsrun: GebiedsRun, config: CheckConfig) -> list[str]:
+def _gebied_uitgebreid(
+    gebiedsrun: GebiedsRun, config: CheckConfig, stroom: Meldingenstroom
+) -> list[str]:
     """De omvang en de uitslag van een enkele gebiedsrun, per check."""
     run = gebiedsrun.run
     regels = []
@@ -477,7 +486,7 @@ def _gebied_uitgebreid(gebiedsrun: GebiedsRun, config: CheckConfig) -> list[str]
             f"  {outcome.check_id:9s} {outcome.severity.value}  "
             f"{aantal:5d} {vorm(aantal, 'bevinding', 'bevindingen')}{voorbehoud}"
         )
-    telling = _eigen_telling(run)
+    telling = _eigen_telling(stroom)
     regels.append(
         f"Totaal {telling.fouten} fouten, {telling.waarschuwingen} "
         f"waarschuwingen uit de eigen checks{_nulmetingtelling(run)}"

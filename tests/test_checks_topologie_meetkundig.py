@@ -437,6 +437,32 @@ def test_de_toelichting_telt_de_leidingen_buiten_de_scope(check_id: str) -> None
     assert any("VrijvervalRioolleiding, Duiker" in note for note in outcome.notes), outcome.notes
 
 
+def test_de_nabijheidscache_draagt_geen_buffers_na_top006() -> None:
+    """De overlapbuffers van TOP-006 blijven lokaal; de cache draagt ze niet (issue #172).
+
+    `topologie:nabijheid` bewaart de hartlijnen (die deelt hij met TOP-010 en TOP-011),
+    maar niet de per-check buffers -- op De Wolden zo'n 18k polygonen die anders na de
+    check in de run-cache zouden blijven staan. Dit is geen `ru_maxrss`-meting maar een
+    structurele toets: `_Nabijheid` heeft geen buffer-veld en de gecachte instantie
+    draagt na TOP-006 geen polygoongeometrie.
+    """
+    import dataclasses
+
+    from nlriochecker.checks.topologie import _Nabijheid, _nabijheid
+
+    dataset = load_dataset(TTL_DIR / "top006_overlappende_streng.ttl", [])
+    context = CheckContext(dataset=dataset, config=fixtureconfig())
+    outcome = run_checks(context, ["TOP-006"]).outcomes[0]
+    assert outcome.findings, "de fixture hoort een overlap op te leveren; anders is niets berekend"
+
+    velden = {veld.name for veld in dataclasses.fields(_Nabijheid)}
+    assert "buffers" not in velden
+    nabijheid = _nabijheid(context)
+    assert not any(
+        getattr(geom, "geom_type", "") in {"Polygon", "MultiPolygon"} for geom in nabijheid.lijnen
+    )
+
+
 def test_top006_zet_de_foutlocatie_op_het_overlappende_deel() -> None:
     dataset, gevonden = _dataset_en_bevindingen("top006_overlappende_streng.ttl", "TOP-006")
     bevinding = gevonden[0]

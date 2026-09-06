@@ -17,7 +17,7 @@ schrijver aan te pas.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 
@@ -80,6 +80,12 @@ class UitvoerPerGebied:
     synthese: Path | None = None
     totaal_csv: Path | None = None
     totaal_json: Path | None = None
+    # De meldingenstroom per gebied, op dezelfde sleutel als `per_gebied` (issue #172).
+    # Al gebouwd bij het schrijven; de terminaltelling van `toetsrun` leest hem hieruit
+    # in plaats van de hele stroom voor één regel opnieuw op te bouwen met een verse
+    # `date.today()`. Zo dragen de geschreven uitvoer en de terminalregel dezelfde
+    # telling en dezelfde `run_datum`.
+    stromen: dict[str, Meldingenstroom] = field(default_factory=dict)
 
 
 def schrijf_uitvoer(
@@ -187,6 +193,10 @@ def schrijf_uitvoer_gebieden(
     run_datum = run_datum or date.today()
     if len(runs) == 1 and not runs[0].map:
         alleen = runs[0]
+        # De stroom hier bouwen en meegeven, zodat de terminaltelling van `toetsrun`
+        # hem via `stromen` kan hergebruiken in plaats van hem opnieuw op te bouwen
+        # (issue #172); `schrijf_uitvoer` bouwde hem anders zelf.
+        stroom = bouw_meldingenstroom(alleen.run, run_datum)
         return UitvoerPerGebied(
             per_gebied={
                 alleen.naam: schrijf_uitvoer(
@@ -197,15 +207,19 @@ def schrijf_uitvoer_gebieden(
                     met_geopackage=met_geopackage,
                     met_json=met_json,
                     voortgang=voortgang,
+                    stroom=stroom,
                     notities=overgeslagen,
                 )
-            }
+            },
+            stromen={alleen.naam: stroom},
         )
 
     per_gebied: dict[str, Uitvoer] = {}
+    stromen: dict[str, Meldingenstroom] = {}
     verzameld: list[GebiedsSamenvatting] = []
     for gebiedsrun in runs:
         stroom = bouw_meldingenstroom(gebiedsrun.run, run_datum)
+        stromen[gebiedsrun.naam] = stroom
         per_gebied[gebiedsrun.naam] = schrijf_uitvoer(
             gebiedsrun.run,
             Path(output_dir) / gebiedsrun.map,
@@ -242,6 +256,7 @@ def schrijf_uitvoer_gebieden(
         synthese=synthese,
         totaal_csv=totaal_csv,
         totaal_json=totaal_json,
+        stromen=stromen,
     )
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
@@ -769,6 +769,17 @@ class SkeletonCheck(Check):
 REGISTRY: dict[str, type[Check]] = {}
 
 
+def onbekende_check_ids_melding(onbekend: Iterable[str]) -> str:
+    """De foutzin bij een of meer onbekende check-ID's; de enige bron voor die tekst.
+
+    `run_checks` gooit hem als `KeyError`, nadat de dataset geladen is; de vooraf-poort
+    `toetsrun._valideer_check_ids` zet er `. Bekende checks: …` omheen en meldt hem als
+    `OpdrachtError` vóór het laden. Beide lazen de zin voorheen elk apart op, met het
+    risico dat ze bij een wijziging uit elkaar zouden lopen (issue #172).
+    """
+    return f"onbekende check-ID's: {', '.join(sorted(onbekend))}"
+
+
 def register(check: type[Check]) -> type[Check]:
     """Registreert een check onder haar ID uit het checkregister.
 
@@ -819,7 +830,7 @@ def run_checks(
 
     onbekend = [check_id for check_id in gekozen if check_id not in REGISTRY]
     if onbekend:
-        raise KeyError(f"onbekende check-ID's: {', '.join(sorted(onbekend))}")
+        raise KeyError(onbekende_check_ids_melding(onbekend))
 
     volledige_ids = set(context.config.studiegebied.volledige_dataset_checks)
 

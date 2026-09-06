@@ -355,7 +355,11 @@ def _uitzonderingen(over: list[Melding], run: CheckRun) -> Uitzonderingen:
             )
     return Uitzonderingen(
         bestand=bestand,
-        geaccepteerd=tuple(sorted(geaccepteerd)),
+        # Ontdubbeld op melding-ID: noemt het uitzonderingenbestand dezelfde melding twee
+        # keer, dan telt zij toch één keer -- zodat de sectiekop, `meldingen_geaccepteerd`
+        # in `gwsw_run` en de JSON-envelop dezelfde telling dragen (issue #172). De
+        # foutentelling-aftrek was hier al immuun voor: die toetst op lidmaatschap.
+        geaccepteerd=tuple(sorted(set(geaccepteerd))),
         zonder_bevinding=tuple(sorted(zonder_bevinding)),
         gewijzigde_waarde=tuple(sorted(gewijzigd, key=lambda g: g.melding_id)),
     )

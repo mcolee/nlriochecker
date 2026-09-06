@@ -347,6 +347,43 @@ def test_regels_beginnen_met_de_omvang_en_eindigen_met_de_bestanden(tmp_path: Pa
     assert any(regel.startswith("Totaal ") for regel in regels)
 
 
+def test_de_terminaltelling_leest_de_al_gebouwde_stroom(tmp_path: Path) -> None:
+    """`_eigen_telling` telt over de al gebouwde meldingenstroom van de run (issue #172).
+
+    `UitvoerPerGebied.stromen` draagt die stroom, op dezelfde sleutel als `per_gebied`;
+    de terminaltelling leest hem in plaats van de stroom voor één regel opnieuw op te
+    bouwen met een verse `date.today()`. Ze is gelijk aan `samenvatting.eigen_telling`
+    over diezelfde stroom, en de terminalregel draagt dat getal.
+    """
+    from nlriochecker.uitvoer.samenvatting import eigen_telling
+
+    uitslag = toets(tmp_path, "hgt010_diameterverjonging.ttl")
+    stroom = uitslag.uitvoer.stromen[""]
+    regel = toetsrun_module._eigen_telling(stroom)
+    verwacht = eigen_telling(stroom.meldingen, geaccepteerd=stroom.uitzonderingen.geaccepteerd)
+    assert (regel.fouten, regel.waarschuwingen) == (verwacht.fouten, verwacht.waarschuwingen)
+    assert any(
+        f"Totaal {regel.fouten} fouten, {regel.waarschuwingen} waarschuwingen" in r
+        for r in uitslag.regels()
+    )
+
+
+def test_de_onbekende_check_tekst_komt_uit_een_bron() -> None:
+    """`onbekende_check_ids_melding` is de enige bron voor die zin (issue #172).
+
+    `_valideer_check_ids` wikkelt er `. Bekende checks: …` omheen; `run_checks` gooit hem
+    kaal als `KeyError`. Zo staat de zin op één plek in plaats van op twee.
+    """
+    from nlriochecker.checks import onbekende_check_ids_melding
+
+    zin = onbekende_check_ids_melding(["TOP-999"])
+    assert zin == "onbekende check-ID's: TOP-999"
+    with pytest.raises(OpdrachtError) as fout:
+        toetsrun_module._valideer_check_ids(("TOP-999",))
+    assert zin in str(fout.value)
+    assert "Bekende checks:" in str(fout.value)
+
+
 @pytest.mark.skipif(
     not (EXT_DIR / "ahn.tif").exists(),
     reason="de GIS-fixtures ontbreken; draai scripts/maak_gis_fixtures.py",

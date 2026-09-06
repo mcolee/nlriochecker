@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from gwsw_orox_helpers.dataset import load_dataset
+from shapely.geometry import Point
 
 from nlriochecker.checks import Dimension, Finding, Severity
 from nlriochecker.uitvoer.locatie import foutlocatie
@@ -83,6 +84,19 @@ def test_extern_object_gebruikt_zijn_eigen_coordinaat() -> None:
 def test_object_zonder_geometrie_krijgt_geen_punt() -> None:
     """Zwijgen is hier het goede antwoord; de teller elders meldt hoeveel dat er zijn."""
     assert foutlocatie(_bevinding("urn:onbekend"), _dataset()) is None
+
+
+def test_een_leeg_eigen_punt_telt_als_geen_locatie() -> None:
+    """Een leeg `Point()` uit een eigen `foutlocatie` valt weg als `None`, zonder te crashen.
+
+    `Point().x` gooit een `GEOSException`; vóór issue #172 liet een lege eigen foutlocatie
+    daarmee de hele meldingenstroom omvallen. Nu telt een leeg punt als "geen locatie",
+    langs dezelfde route als een ontbrekend punt.
+    """
+    dataset = _dataset()
+    uri = _uri(dataset, "A", "nodes")
+
+    assert foutlocatie(_bevinding(uri, details={"foutlocatie": Point()}), dataset) is None
 
 
 def test_onverwachte_geometrie_levert_toch_een_punt() -> None:

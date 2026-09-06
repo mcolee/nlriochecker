@@ -16,10 +16,10 @@ put toekennen.
 
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 import shapely
 
@@ -152,12 +152,11 @@ def _leeg(geometrie: object) -> bool:
     if geometrie is None or geometrie.is_empty:  # type: ignore[attr-defined]
         return True
     # `bounds` verraadt een NaN in een lijn niet -- GEOS laat de NaN-vertex uit de
-    # omhullende weg -- dus toets elke coordinaat zelf. `get_coordinates` levert ze plat.
-    return not all(
-        math.isfinite(waarde)
-        for coord in shapely.get_coordinates(geometrie)  # type: ignore[arg-type]
-        for waarde in coord
-    )
+    # omhullende weg -- dus toets elke coordinaat zelf. De coordinaten worden één keer
+    # opgehaald en de eindigheid gevectoriseerd getoetst, in plaats van in een Python-lus
+    # over de losse getallen (issue #172).
+    coords = shapely.get_coordinates(geometrie)  # type: ignore[arg-type]
+    return not bool(np.isfinite(coords).all())
 
 
 def putten_in_beeld(run: CheckRun) -> frozenset[str]:
@@ -378,7 +377,7 @@ class NulSignaal:
     boodschap: str
 
 
-def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
+def klassen_op_nul(run: CheckRun) -> tuple[NulSignaal, ...]:
     """De klassen en rollen die op nul staan terwijl een check erop leunt.
 
     Het afvoereindpunt per klasse, de andere rollen als geheel (zie `_Rol.per_klasse`);
@@ -391,15 +390,21 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
 
     Twee lezers vragen dit op -- `_signaalmeldingen` (de systemische waarschuwing) en
     `_afhankelijkheden_section` (de rapportkop) -- en ze delen één berekening via de
-    contextcache (issue #149), zodat de rollen niet twee keer geteld worden.
+    contextcache (issue #149), zodat de rollen niet twee keer geteld worden. De uitkomst
+    is een **tuple**: dan kan een lezer haar niet muteren en zo de gedeelde run-cache
+    aanpassen -- twee runs zouden anders van de volgorde van de lezers afhangen (issue #172).
     """
     return run.context.cached("omvang:klassen-op-nul", lambda: _bouw_klassen_op_nul(run))
 
 
-def _bouw_klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
-    """De nul-signalen zelf; `klassen_op_nul` cachet de uitkomst per run."""
+def _bouw_klassen_op_nul(run: CheckRun) -> tuple[NulSignaal, ...]:
+    """De nul-signalen zelf; `klassen_op_nul` cachet de uitkomst per run.
+
+    Een tuple en geen lijst: de uitkomst wordt gedeeld via de contextcache, en een
+    onveranderlijke tuple houdt een lezer die haar zou muteren uit die cache (issue #172).
+    """
     if not run.dataset.klassenhierarchie_bekend:
-        return []
+        return ()
     signalen: list[NulSignaal] = []
     for rol in _rollen(run.config):
         if rol.label in INDICATORROLLEN:
@@ -412,7 +417,7 @@ def _bouw_klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
             ]
         elif _aantal_rol(run, rol) == 0:
             signalen.append(NulSignaal(rol.label, _rol_boodschap(rol)))
-    return signalen
+    return tuple(signalen)
 
 
 def _rol_boodschap(rol: _Rol) -> str:

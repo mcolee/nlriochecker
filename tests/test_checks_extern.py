@@ -857,3 +857,35 @@ def test_ext001_tiebreak_kiest_binnen_een_laag_de_eerste_boompositie() -> None:
     assert (obj_i, laag_i, rang) == (0, 0, 0)
     assert feat_i == eerste_feat
     assert afstand == 0.0
+
+
+def test_van_soort_draait_maar_een_keer_bij_herhaalde_kruisingstoets(
+    config: CheckConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`_van_soort` staat binnen de gecachte kruisingstoets (issue #172).
+
+    `kruisingen()` en `notes()` vragen `kruisingstoets` allebei op; met de versmalling
+    binnen de cache draait `_van_soort` daarbij nog maar één keer in plaats van bij elke
+    aanroep opnieuw. De uitkomst verandert er niet door: de tweede aanroep geeft hetzelfde
+    gecachte object terug.
+    """
+    import nlriochecker.checks.extern as extern_mod
+    from nlriochecker.checks.extern import KruisingZonderZinkerOfDuiker
+
+    dataset = load_dataset(SCENARIO, [])
+    context = CheckContext(dataset=dataset, config=config)
+    check = KruisingZonderZinkerOfDuiker()
+
+    telling = {"n": 0}
+    origineel = extern_mod._van_soort
+
+    def spy(selectie: object, soort: object) -> object:
+        telling["n"] += 1
+        return origineel(selectie, soort)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(extern_mod, "_van_soort", spy)
+    eerste = check.kruisingstoets(context)
+    tweede = check.kruisingstoets(context)
+
+    assert telling["n"] == 1
+    assert eerste is tweede

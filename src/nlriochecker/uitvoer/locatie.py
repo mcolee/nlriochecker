@@ -64,8 +64,16 @@ def _eindig(punt: Point | None) -> Point | None:
     (die getallen zijn niet JSON-geldig) en de gevectoriseerde X/Y-afleiding laten
     omvallen. TOP-007 en TOP-009 melden het gebrek al langs hun eigen weg; hier valt de
     locatie stil weg, net als bij een object zonder geometrie. Zie issue #152.
+
+    Een leeg `Point` (`Point()`, `is_empty`) telt als "geen locatie", langs dezelfde
+    route als `None`: `punt.x` gooit op een leeg punt een `GEOSException`, dus die vraag
+    komt vóór de eindigheidstoets. Zo valt een leeg punt uit een eigen `foutlocatie` of
+    uit `objectlocatie` stil weg in plaats van de meldingenstroom te laten omvallen
+    (issue #172).
     """
-    if punt is None or not (math.isfinite(punt.x) and math.isfinite(punt.y)):
+    if punt is None or punt.is_empty:
+        return None
+    if not (math.isfinite(punt.x) and math.isfinite(punt.y)):
         return None
     return punt
 

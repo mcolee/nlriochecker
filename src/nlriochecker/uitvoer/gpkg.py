@@ -1919,6 +1919,20 @@ def _schrijf_overzicht(
     )
 
 
+def _controleer_runmetadata_kolommen(waarden: dict[str, object], kolommen: list[_Kolom]) -> None:
+    """Faalt luid als de sleutels van `waarden` niet één-op-één de kolomnamen zijn.
+
+    Een expliciete `raise` en geen `assert`: onder `python -O` wordt een `assert` gestript,
+    en dan zou een verwisselde of ontbrekende kolom stil de verkeerde waarde in `gwsw_run`
+    schrijven zonder dat enige test hem bij naam terugleest (issue #169, #172).
+    """
+    if list(waarden) != [kolom.naam for kolom in kolommen]:
+        raise RuntimeError(
+            "gwsw_run: de sleutels van `waarden` wijken af van de kolomnamen -- een "
+            "verwisselde of ontbrekende kolom, geen stille misplaatsing (issue #169)"
+        )
+
+
 def _schrijf_runmetadata(
     verbinding: sqlite3.Connection,
     run: CheckRun,
@@ -2043,10 +2057,7 @@ def _schrijf_runmetadata(
         "uitzonderingen_zonder_bevinding": len(uitzonderingen.zonder_bevinding),
         "markering": markering(run) or "",
     }
-    assert list(waarden) == [kolom.naam for kolom in kolommen], (
-        "gwsw_run: de sleutels van `waarden` wijken af van de kolomnamen -- een "
-        "verwisselde of ontbrekende kolom, geen stille misplaatsing (issue #169)"
-    )
+    _controleer_runmetadata_kolommen(waarden, kolommen)
     velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
     plaatshouders = ", ".join("?" * len(kolommen))
     verbinding.execute(

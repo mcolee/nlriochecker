@@ -118,7 +118,7 @@ def _run(tmp_path: Path, weglaten: set[str]) -> CheckRun:
 
 class TestKlassenOpNul:
     def test_alle_klassen_aanwezig_geeft_geen_enkele(self, tmp_path: Path) -> None:
-        assert klassen_op_nul(_run(tmp_path, set())) == []
+        assert klassen_op_nul(_run(tmp_path, set())) == ()
 
     def test_een_leeg_afvoereindpunt_staat_er_per_klasse_in(self, tmp_path: Path) -> None:
         op_nul = {signaal.label for signaal in klassen_op_nul(_run(tmp_path, {"Overnamepunt"}))}
@@ -129,7 +129,7 @@ class TestKlassenOpNul:
     ) -> None:
         # lozingspunten heeft vier klassen; ontbreekt er een terwijl de rol als
         # geheel gevuld is, dan is dat geen gebrek maar een andere schrijfwijze.
-        assert klassen_op_nul(_run(tmp_path, {"Lozingspunt"})) == []
+        assert klassen_op_nul(_run(tmp_path, {"Lozingspunt"})) == ()
 
     def test_een_hele_lege_rol_geeft_een_signaal_op_rolniveau(self, tmp_path: Path) -> None:
         # `LozingspuntOppervlaktewater` hoort erbij: hij is een subklasse van
@@ -167,6 +167,14 @@ class TestKlassenOpNul:
         run levert per constructie hetzelfde object terug; zonder cache waren het twee."""
         run = _run(tmp_path, set())
         assert klassen_op_nul(run) is klassen_op_nul(run)
+
+    def test_klassen_op_nul_is_een_onveranderlijke_tuple(self, tmp_path: Path) -> None:
+        """Een tuple en geen lijst, zodat een lezer de gedeelde run-cache niet kan
+        muteren (issue #172): de cache geeft telkens hetzelfde object terug, en een
+        `.append` erop zou anders elke volgende lezer raken."""
+        op_nul = klassen_op_nul(_run(tmp_path, {"Overnamepunt"}))
+        assert isinstance(op_nul, tuple)
+        assert op_nul, "de fixture heeft ten minste één nul-signaal, anders toetst dit niets"
 
     def test_een_lege_indicatorrol_geeft_geen_signaal(self, tmp_path: Path) -> None:
         """`pompunits` is voor EXT-009 een uitzonderingsindicator, geen toetspopulatie.

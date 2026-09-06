@@ -1931,3 +1931,40 @@ def test_gwsw_run_leest_elke_kolom_bij_naam_terug(monkeypatch: pytest.MonkeyPatc
 
     gelezen = dict(zip(verwacht, rij, strict=True))
     assert gelezen == verwacht
+
+
+def test_de_kolomcontrole_van_gwsw_run_faalt_luid_op_een_mismatch() -> None:
+    """De invariant achter `gwsw_run` is een expliciete `raise`, geen `assert` (issue #172).
+
+    Onder `python -O` wordt een `assert` gestript, en dan zou een verwisselde of
+    ontbrekende kolom stil de verkeerde waarde schrijven. `_controleer_runmetadata_kolommen`
+    gooit daarom altijd een `RuntimeError` -- ook wanneer `__debug__` uit staat.
+    """
+    from nlriochecker.uitvoer.gpkg import _controleer_runmetadata_kolommen, _Kolom
+
+    kolommen = [_Kolom("a", "text"), _Kolom("b", "text")]
+    _controleer_runmetadata_kolommen({"a": 1, "b": 2}, kolommen)  # gelijk: geen fout
+    with pytest.raises(RuntimeError, match="sleutels van"):
+        _controleer_runmetadata_kolommen({"b": 2, "a": 1}, kolommen)
+
+
+def test_een_paarmelding_op_twee_putten_valt_niet_in_de_trefferjoin(tmp_path: Path) -> None:
+    """Een paarmelding waarvan het tweede object een put is -- geen extern object -- valt
+    niet in de trefferregister-join en levert geen `KeyError` (issue #172).
+
+    Alleen de EXT-checks (`VLAK_CHECKS`) worden op het trefferregister gejoind; een
+    TOP-005-paar op twee samenvallende putten (het analoog van een SHACL-paar op twee
+    putten) verschijnt gewoon in de meldingentabel met zijn tweede object als tekst, en
+    krijgt geen rij in de vlakkenlaag.
+    """
+    run = _run("top005_dubbele_put.ttl", "TOP-005")
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    paar = [m for m in stroom.meldingen if m.check_id == "TOP-005" and m.object2_uri]
+    assert paar, "de fixture hoort een TOP-005-paarmelding met een tweede put op te leveren"
+
+    pad = _schrijf(run, tmp_path)  # mag niet omvallen op een niet-streng tweede object
+
+    rijen = _rijen(pad, "select gwsw_uri_2 from meldingen where check_id = 'TOP-005'")
+    assert any(uri2 for (uri2,) in rijen), "het tweede object hoort als tekst in de tabel"
+    vlak = _rijen(pad, "select count(*) from vlakken where check_ids like '%TOP-005%'")
+    assert vlak == [(0,)], "een paar op twee putten hoort geen vlak te krijgen"
