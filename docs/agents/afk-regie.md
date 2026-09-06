@@ -80,6 +80,11 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    dispatch een fix-agent (Task 2). Is hij groen, dan **draai je hem niet nog eens**: in de run
    van 26-08 waren alle 12 herhalingen groen en kostten ze ~36 calls en ~1 uur pytest.
 5. **Review** (reviewer, verse agent — model naar risico, zie **Modelkeuze subagents**):
+   - **Inerte diff eerst uitsluiten.** Raakt de diff alléén tests, docstrings, commentaar
+     of config (geen codepad), dan is een volle code-/security-review verspilling: stel in
+     één regel vast dat er geen codepad wijzigt en sla de review over (CLAUDE.md: *"geen
+     volle review op een inerte diff"*; sessiereview 06-09: config-only diffs kregen toch
+     een volle review). Raakt de diff wél code, ga verder:
    - **Klein** → `/code-review` (medium).
    - **Substantieel** (kritiek pad, publiek contract, Harde regel) →
      `superpowers:requesting-code-review` met een verse **Opus 4.8**-reviewer (`opus48`-agent): *"Task 3 — review de
