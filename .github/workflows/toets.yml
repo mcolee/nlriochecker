@@ -126,3 +126,24 @@ jobs:
         # ook `pytest-xdist` (`-n 4`, MIT, zelfde `--with`-mechaniek): lokaal geverifieerd
         # dat de takdekking (`branch = true`) ongewijzigd over de workers optelt.
         run: uv run --with pytest-cov --with pytest-xdist pytest -q -n 4 --cov=nlriochecker --cov-fail-under=95
+
+      - name: Wheel-rooktest
+        # Bewijst dat de gebouwde wheel voor ANDEREN installeerbaar is (issue #158): `uv
+        # sync` hierboven installeert editable uit de werkboom en laat een ontbrekende
+        # package-resource of een kapotte Requires-Dist (zoals de git-only dependency vóór
+        # dit issue) nooit zien. Deze stap bouwt de wheel, installeert hem in een schone
+        # venv zonder de broncode of `[tool.uv.sources]` erbij, en draait er een echte
+        # `toets` mee op de Koekangerveld-voorbeelddata (getrackt onder `voorbeelden/`,
+        # anders dan `data/` dat op deze runner grotendeels ontbreekt). Alle drie CFK's
+        # verplicht, CLAUDE.md. Duurt seconden; faalt de stap, dan is de Release net zo
+        # kapot als het artefact dat dit issue repareert.
+        run: |
+          uv build --out-dir "${{ runner.temp }}/dist"
+          uv venv "${{ runner.temp }}/rook"
+          uv pip install --python "${{ runner.temp }}/rook/bin/python" "${{ runner.temp }}"/dist/*.whl
+          "${{ runner.temp }}/rook/bin/nlriochecker" toets \
+            --dataset voorbeelden/koekangerveld/koekangerveld_orox.ttl \
+            --shacl voorbeelden/koekangerveld/gwsw_shacl_report_conformiteit_Hyd.csv \
+            --shacl voorbeelden/koekangerveld/gwsw_shacl_report_conformiteit_MdsPlan.csv \
+            --shacl voorbeelden/koekangerveld/gwsw_shacl_report_MdsProj.csv \
+            --output "${{ runner.temp }}/rook-uit"

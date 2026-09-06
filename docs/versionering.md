@@ -96,6 +96,21 @@ op `dev` gezet en via de merge-commit naar `main` gebracht; de workflow reageert
 tag-push, los van de branch, dus de Release ontstaat al bij de push naar `dev` en de
 latere merge verandert daar niets aan.
 
+Die wheel is ook echt installeerbaar (issue #158). `gwsw-orox-helpers` staat niet op
+PyPI, dus de dependency in `pyproject.toml` is een PEP 508 direct reference
+(`gwsw-orox-helpers @ git+https://github.com/mcolee/gwsw-orox-helpers@v0.2.2`) in plaats
+van een gewone versie-eis; anders draagt de gebouwde wheel een `Requires-Dist` zonder
+bron en weigert elke installatie buiten deze werkboom ("No solution found …
+gwsw-orox-helpers was not found in the package registry"). `[tool.uv.sources]` pint
+dezelfde tag nog eens expliciet voor `uv`, en `tool.hatch.metadata.allow-direct-references`
+staat aan omdat hatchling een directe referentie anders weigert te bouwen. Een CI-stap
+in `.github/workflows/toets.yml` ("Wheel-rooktest", ná de vijf bestaande stappen) bewijst
+dit bij elke push: hij bouwt de wheel, installeert hem in een schone venv zonder de
+broncode of `[tool.uv.sources]`, en draait er een echte `toets` mee op de
+Koekangerveld-voorbeelddata uit `voorbeelden/` (getrackt, anders dan het grotendeels
+ontbrekende `data/` op de CI-runner). Zodra de leeslaag op PyPI staat wordt de dependency
+weer een gewone versie-eis en vervalt deze omweg.
+
 ## Wat betekenen de cijfers
 
 De package staat in `0.x` en blijft daar zolang fase 4 (EXT) loopt en er checks uit het

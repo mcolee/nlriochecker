@@ -286,9 +286,12 @@ def test_main_breekt_af_voor_de_poort_en_de_commit_bij_minor_zonder_zwaar() -> N
 
 
 UITGAVE_EIGEN_STAPPEN = frozenset({"pytest -m zwaar"})
-# Issue #158 voegt hier een wheel-rooktest toe die alleen in toets.yml komt te staan;
-# die naam hoort dan in deze lijst, niet als stilzwijgende asymmetrie.
-WORKFLOW_EIGEN_STAPPEN: frozenset[str] = frozenset()
+# De wheel-rooktest (issue #158) staat alleen in toets.yml: de uitgavepoort bouwt geen
+# wheel, dat doet release.yml al bij de tag-push. `_uv_run_stapnaam` herkent alleen
+# `uv run ...`-regels; de rooktest begint met `uv build` en wordt dus sowieso niet
+# opgepikt, maar de naam staat hier toch expliciet zodat dit geen stilzwijgende
+# asymmetrie is.
+WORKFLOW_EIGEN_STAPPEN: frozenset[str] = frozenset({"wheel-rooktest"})
 
 
 def _uv_run_stapnaam(commando: str) -> str | None:

@@ -17,8 +17,10 @@ dependencies = [
     "geopandas>=1.1.4",
     # De leeslaag (dataset, graaf, geometrie, ontologie, cache, voortgang) plus de
     # gebundelde GWSW-ontologie 1.6 (en sinds 0.2.1 ook 1.7); afgesplitst als eigen
-    # MIT-package.
-    "gwsw-orox-helpers>=0.2.2",
+    # MIT-package. Direct reference (PEP 508) omdat het pakket niet op PyPI staat: een
+    # gewone versie-eis levert bij `uv build` een `Requires-Dist` zonder bron op, en dan
+    # is de wheel voor niemand installeerbaar (issue #158). Pin blijft v0.2.2 tot #166.
+    "gwsw-orox-helpers @ git+https://github.com/mcolee/gwsw-orox-helpers@v0.2.2",
     "networkx>=3.3",
     "pandas>=2.2",
     "pydantic>=2.7",
@@ -42,6 +44,11 @@ dev = [
 
 [tool.uv.sources]
 gwsw-orox-helpers = { git = "https://github.com/mcolee/gwsw-orox-helpers", tag = "v0.2.2" }
+
+[tool.hatch.metadata]
+# Vereist zodra een dependency een directe referentie is (`@ git+...`) in plaats van een
+# gewone versie-eis; zonder deze regel weigert hatchling elke build (issue #158).
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nlriochecker"]

@@ -35,6 +35,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **De release-wheel was voor niemand installeerbaar** (issue #158): `Requires-Dist:
+  gwsw-orox-helpers>=0.2.2` in de gebouwde wheel had geen bron (PyPI heeft het pakket
+  niet), dus `uv pip install`/`pip install` van de wheel gaf "No solution found …
+  gwsw-orox-helpers was not found in the package registry". `gwsw-orox-helpers` staat nu
+  als PEP 508 direct reference (`@ git+https://github.com/mcolee/gwsw-orox-helpers@v0.2.2`)
+  in `pyproject.toml`; daarvoor moest `tool.hatch.metadata.allow-direct-references` aan.
+  Een nieuwe CI-stap ("Wheel-rooktest" in `.github/workflows/toets.yml`) bouwt de wheel,
+  installeert hem in een schone venv en draait er een echte `toets` mee op de
+  Koekangerveld-voorbeelddata, zodat dit niet terug kan sluipen.
+
+### Gerepareerd
+
 - **Vier kleine losse fixes** (issue #156, uit de Fable-swarm van 05-09):
   - **UTF-8-BOM in een SHACL-CSV, config of GeoJSON.** Een rapport dat in Excel
     ("CSV UTF-8"), Notepad of PowerShell is aangeraakt draagt vaak een BOM (U+FEFF);
