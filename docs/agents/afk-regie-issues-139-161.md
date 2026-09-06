@@ -1,4 +1,4 @@
-# AFK-regie na de Fable-swarm van 05-09-2026: issues #139, #141–#161 en sessie E
+# AFK-regie na de Fable-swarm van 05-09-2026: issues #139, #141–#161 en sessies E/F
 
 Geef dit aan een **verse (gecleared) Fable 5.1-sessie** in `/home/martin/Development/nlriochecker`,
 in auto-mode. Fable is de regisseur en schrijft zelf geen code; het werk doen **Opus
@@ -17,9 +17,9 @@ bevestigd, plan in `~/nlriochecker-onderzoek/2026-09-05-fable-swarm/plan.json`) 
 zes koppen). Alle ontwerpkeuzes staan onder kop 2 ("Keuzes die al gemaakt zijn"); kop 6
 (Aannames) is wat de auteur bewust aan de agent laat. Van de vijf geparkeerde punten
 (#162–#166) zijn #163, #165 en #166 op 06-09 in een grilling `ready-for-agent` geworden en
-vormen met #137, #138, #169 en #170 **sessie E**; #162 en #164 blijven geparkeerd.
+vormen met #137, #138, #169 en #170 de **sessies E en F**; #162 en #164 blijven geparkeerd.
 
-**Splits de reeks in vijf sessies** (globale `CLAUDE.md`, "Mega-sessies splitsen"): elke
+**Splits de reeks in zes sessies** (globale `CLAUDE.md`, "Mega-sessies splitsen"): elke
 sessie eindigt met CI groen, issues dicht en een slotcomment; de volgende sessie start vers
 met dit bestand en de sessieletter. Eén sessie draagt nooit meer dan één perf-issue met een
 volle De Wolden-meting tegelijk.
@@ -47,7 +47,7 @@ volle De Wolden-meting tegelijk.
    prototypes daar (`patch_*.py`) zijn de letterlijke vorm van de fix; kopieer de vorm, niet
    het monkeypatch-mechanisme.
 
-## Volgorde — strikt sequentieel, in vijf sessies
+## Volgorde — strikt sequentieel, in zes sessies
 
 | Sessie | # | Issue | Blocked by | Model | Review | Poort-bijzonderheid |
 |---|---|---|---|---|---|---|
@@ -76,10 +76,10 @@ volle De Wolden-meting tegelijk.
 | **E** | 23 | **#137** checks declareren hun `[klassen]`-lijsten; HGT-011 toetst de drempels | — | Opus 4.8 | **Substantieel** | nieuw BO; drifttest rood vóór, groen na; dekkingsmatrix regenereren; volle run |
 | E | 24 | **#138** rol versmallen naar het register: EXT-001, ATTR-017, TOP-014 | #137 | Opus 4.8 | **Substantieel** | nieuw BO (het issue zegt BO-94: neem het vrije nummer); volle run |
 | E | 25 | **#169** `gwsw_run` bij naam schrijven: dict i.p.v. positionele 35-tuple | — | Opus 4.8 | **Substantieel** | GeoPackage sha-gelijk (`update_time` genormaliseerd) |
-| E | 26 | **#165** CONTRACT `bevindingen.csv` als NL-Excel-bestand | #161 | Opus 4.8 | **Altijd Substantieel** | nieuw BO; handmatige `soffice`-controle in de comment |
-| E | 27 | **#163** CONTRACT overlay op `--projectconfig` met `basis = "standaard"` | #161, #165 | Opus 4.8 | **Altijd Substantieel** | zonder `basis` byte-voor-byte hetzelfde gedrag |
-| E | 28 | **#166** LEESLAAG pin v0.2.2 → v0.2.4; `leeslaag.py` delegeert | #158, #159 | Opus 4.8 | **Substantieel** | `uv lock`; cache koud herbouwd; gepaarde meting achter `flock` |
-| E | 29 | **#170** research puntbemonstering uit een float32-raster → `docs/onderzoek/` | — | Sonnet | Klein | geen code; `mattpocock-skills:research`; comment op #168 |
+| **F** | 26 | **#165** CONTRACT `bevindingen.csv` als NL-Excel-bestand | #161 | Opus 4.8 | **Altijd Substantieel** | nieuw BO; handmatige `soffice`-controle in de comment |
+| F | 27 | **#163** CONTRACT overlay op `--projectconfig` met `basis = "standaard"` | #161, #165 | Opus 4.8 | **Altijd Substantieel** | zonder `basis` byte-voor-byte hetzelfde gedrag |
+| F | 28 | **#166** LEESLAAG pin v0.2.2 → v0.2.4; `leeslaag.py` delegeert | #158, #159 | Opus 4.8 | **Substantieel** | `uv lock`; cache koud herbouwd; gepaarde meting achter `flock` |
+| F | 29 | **#170** research puntbemonstering uit een float32-raster → `docs/onderzoek/` | — | Sonnet | Klein | geen code; `mattpocock-skills:research`; comment op #168 |
 
 Eén issue = commit + push + CI groen + comment + close vóór het volgende.
 
@@ -148,10 +148,10 @@ verzin geen nieuwe waarheid.
 - **#161.** De CLAUDE.md-naamregel en het mypy-override-blok zijn auteursbesluiten van 06-09;
   het verwijderen van de rol `stelsels` is dat **niet** (checks.toml bevroren): alleen de
   docstrings worden eerlijk.
-- **Sessie E — referentie.** Tel tegen de laatste slotrun (na sessie D:
-  `uitvoer/<datum>_slotrun_D`), niet tegen 04092026. Sessie E is de zwaarste: #137 en #138
-  vragen elk een volle run vóór de slotstap en #166 een gepaarde meting; nooit twee tegelijk.
-  Loopt de sessie vast of lang, splits dan ná #169 (E1: #137/#138/#169; E2: #165/#163/#166/#170).
+- **Sessies E en F — referentie.** Tel tegen de laatste slotrun (E: na sessie D
+  `uitvoer/<datum>_slotrun_D`; F: `uitvoer/<datum>_slotrun_E`), niet tegen 04092026.
+  E (#137, #138, #169) draagt twee volle runs vóór de slotstap; F (#165, #163, #166, #170)
+  draagt de twee contract-issues en de gepaarde meting van #166. Nooit twee metingen tegelijk.
 - **#137.** Veldnaam `klassenlijsten`; de zes velden uit het issue zijn de volledige lijst.
   HGT-011 houdt `vrijvervalrioolleidingen` als rol (kop Aannames). De nul-bewaking (BO-52)
   blijft ongewijzigd. Nieuw BO: "checks declareren hun `[klassen]`-lijsten; HGT-011 toetst
@@ -212,7 +212,7 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
 2. Vergelijk per check met de referentierun; verwacht: elke check gelijk behalve wat de
    bewijslast hierboven noemt (sessie A: HGT-009 +448 knopen; sessie C: TOP-004 −22;
    sessie E: HGT-011 `examined` → 0, EXT-001 `examined` −~1.605, 962 minder onderdrukt,
-   TOP-014 −3).
+   TOP-014 −3; sessie F: alleen de CSV-vorm van #165, verder sha-gelijk).
    Elk ander verschil is een regressie van deze reeks — zoek de oorzaak.
 3. Slotrapport in `uitvoer/<datum>_slotrun_<letter>/_slotrapport.md` én als laatste bericht:
    per issue wat er landde, gemeten naast verwacht, BO-nummers, open gebleven punten, de
@@ -226,7 +226,7 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
   check-ID. Vindt een implementer dat een issue méér vraagt, dan is dat een fout in het
   issue: comment, issue open laten, door naar het volgende dat er niet op leunt.
 - Geen wijziging aan `gwsw-orox-helpers` of aan zijn internals; alleen publieke namen uit
-  de gepinde v0.2.2 (#139, #159). De pin zelf gaat alleen in #166 (sessie E) naar v0.2.4.
+  de gepinde v0.2.2 (#139, #159). De pin zelf gaat alleen in #166 (sessie F) naar v0.2.4.
 - Een perf-issue zonder eenduidige gepaarde meting en sha-gelijke CSV is **niet klaar**:
   comment met de ruwe cijfers, issue open laten.
 - Overschrijf nooit invoerbestanden; alleen `uitvoer/` schrijft; versienummer alleen in
