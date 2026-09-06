@@ -83,15 +83,31 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    >   `scripts/dekkingsmatrix.py`) en werk de checkdeclaratie (`rollen`/`kenmerken`) bij
    >   als de check anders selecteert/leest.
    > - Voeg een regel toe onder `## [Unreleased]` in `CHANGELOG.md`.
+   > - **Checklist vóór je "klaar" zegt** (de drie fouten die de reviews van sessie C vonden):
+   >   (1) elke nieuwe of gewijzigde rapport-/popup-/terminalregel heeft een test die hem
+   >   aantreft; (2) een telling (`examined`, totalen) telt ná de ontdubbeling en met dezelfde
+   >   regel als de zusterchecks; (3) een invariant die je in één lezer of uitvoervorm invoert
+   >   (GeoPackage/GeoJSON, tabel/terminal/JSON) spiegel je in de andere en test je daar ook.
+   >   Vink de drie af in je rapport.
    > - Draai de **volledige mechanische poort op de voorgrond** en plak de uitvoer:
    >   `uv run ruff check`, `uv run ruff format --check`, `uv run mypy`,
    >   `uv run pytest -m 'not zwaar'`.
-   > - **Niet pushen.** Rapporteer terug: gewijzigde bestanden, poort-uitvoer, BO-nummer, het
-   >   gemeten De Wolden-getal (zie **Meten**), en open aannames.
+   > - **Niet pushen.** Schrijf het volledige rapport naar `<scratchpad>/task-N-report.md`
+   >   en antwoord kort (≤ 15 regels): status, gewijzigde bestanden, de vier poortregels
+   >   letterlijk, het gemeten De Wolden-getal (zie **Meten**), de checklist-vinkjes en open
+   >   aannames. Geen proza-recap: alles wat je terugstuurt reist elke beurt van de regisseur
+   >   opnieuw mee.
 
 4. **Lees de geplakte poort.** Staat er een rode regel of ontbreekt een van de vier stappen,
-   dispatch een fix-agent (Task 2). Is hij groen, dan **draai je hem niet nog eens**: in de run
+   dan een fixronde (Task 2). Is hij groen, dan **draai je hem niet nog eens**: in de run
    van 26-08 waren alle 12 herhalingen groen en kostten ze ~36 calls en ~1 uur pytest.
+   **Elke fixronde gaat via `SendMessage` naar de bestaande implementer**, niet via een verse
+   agent: zijn context en prompt-cache staan nog (code.claude.com, prompt caching); een verse
+   fix-agent leest de docs opnieuw (~12k tokens, 3–5 min). In de fixbrief: eerst `git status`
+   en `git log -1` opnieuw draaien (de regisseur kan intussen gecommit hebben), en alleen
+   binnen hetzelfde issue hervatten. Wissel binnen een issue nooit van model of effort:
+   dat breekt de cache van de hoofdsessie. Geef een reviewer de diff altijd als bestand
+   (`git diff -U10 > <scratchpad>/diff-N.txt`), nooit inline in de prompt.
 5. **Review** (reviewer, verse agent — model naar risico, zie **Modelkeuze subagents**):
    - **Inerte diff eerst uitsluiten.** Raakt de diff alléén tests, docstrings, commentaar
      of config (geen codepad), dan is een volle code-/security-review verspilling: stel in

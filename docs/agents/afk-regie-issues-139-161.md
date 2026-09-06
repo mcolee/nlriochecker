@@ -193,6 +193,10 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
   `analyse-harness.md` weg tenzij het issue meet. Taaklabel "Task N" in het Engels. Geef de implementer het
   issuenummer en de regel "kop 6 (Aannames) is je tweede bron; een afwijking leg je vast in
   je rapport, niet in een vraag".
+- De brief draagt de checklist uit het sjabloon (rapportregel → test; tellen ná dedup;
+  invariant spiegelen) en het korte rapportcontract (rapport naar bestand, antwoord ≤ 15
+  regels); een fixronde is altijd een `SendMessage`-resume (auteursbesluit 06-09, uit
+  `docs/onderzoek/2026-09-06-wallclock-afk-regie.md` en `…-tokens-afk-regie.md`).
 - Vertrouw de geplakte poort van de implementer; draai hem niet nog eens.
   `scripts/runnerpoort.py` alleen als het issue tests toevoegt die echte data laden
   (CLAUDE.md), vlak vóór de push, nooit parallel aan een pytest.
