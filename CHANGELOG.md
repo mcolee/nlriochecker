@@ -13,6 +13,29 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Vier kleine losse fixes** (issue #156, uit de Fable-swarm van 05-09):
+  - **UTF-8-BOM in een SHACL-CSV, config of GeoJSON.** Een rapport dat in Excel
+    ("CSV UTF-8"), Notepad of PowerShell is aangeraakt draagt vaak een BOM (U+FEFF);
+    `shaclrapport.ENCODING` staat nu op `utf-8-sig` (het foutbericht noemt nog `utf-8`),
+    en `checkconfig.load_check_config` en `studiegebied._lees_geojson` lezen met dezelfde
+    codec. Zo verdwijnt de misleidende "kopblok mist"-fout op een BOM-rapport.
+  - **Markdown-tabellen breken niet meer op een vrij tekstlabel.** `uitvoer/tabel._cel`
+    escapet `|` → `\|`, een regelovergang → spatie en `<` → `&lt;`; `table()` en
+    `synthese._multi_melding` gebruiken het. Een label als `1 | zie ook <b>"x"</b>`
+    maakte er anders vier cellen in een driekolomstabel van. CSV, JSON en de popup
+    houden de rauwe waarde.
+  - **TOP-004 meldt een omgekeerd getekende streng niet meer als snappingsfout.** Een
+    streng die administratief van A naar B loopt maar van B naar A getekend is, heeft haar
+    uiteinden wél op een put liggen -- alleen in omgekeerde volgorde. TOP-004 raadpleegt
+    nu `richting_van_geometrie` en slaat zo'n streng over (beide einden binnen de
+    tolerantie), en telt ze in `notes()`; NET-009 signaleert de omgekeerde tekenrichting.
+    Op De Wolden zakt TOP-004 van 24 naar 2 meldingen.
+  - **NET-005, NET-006 en NET-007 beoordelen een zijde op een telbaar hulpstuk.** Ze
+    indexeren hun buur-/koppel-/componentafleiding nu via `_doorgeefknopen` in plaats van
+    `verbonden_knopen`/`resolve_network_node`, zodat de 152 strengen met een T-stuk-zijde
+    (BO-83 draagt het hulpstuk als graafknoop) werkelijk beoordeeld worden in plaats van
+    stil overgeslagen. Op De Wolden komen er geen koppelingen op een T-stuk samen, dus de
+    tellingen blijven gelijk.
 - **`dekking` zonder `--dataset` zei nergens dat de typeringsvoorwaarde niet gemeten
   is** (issue #155): `typing_reliable` staat over een lege scorelijst op `True`
   (`all([])`), dus `_render_coverage` had geen typeringssectie, de tabelkolom

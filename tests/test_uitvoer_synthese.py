@@ -42,6 +42,26 @@ def test_zonder_bevindingen_komt_er_geen_kop() -> None:
     assert rode_draad(_run("schoon.ttl"), []) == []
 
 
+def test_multi_melding_escapet_een_label_met_pipe_en_html() -> None:
+    """Een vrij tekstlabel met `|`, een regelovergang of een `<b>`-tag breekt de rode draad niet.
+
+    Het label komt bij `_multi_melding` in een gewone zin terecht (geen tabelcel), maar
+    `|` en `<` breken de gerenderde Markdown net zo goed. Zie issue #156.
+    """
+    run = _run("schoon.ttl")
+    uri = "http://example.org/toets#PutX"
+    label = "1 | zie ook <b>x</b>\nA"
+    meldingen = [
+        melding(check_id=cid, object_uri=uri, object_label=label)
+        for cid in ("TOP-001", "TOP-005", "TOP-014")
+    ]
+
+    tekst = "\n".join(rode_draad(run, meldingen))
+
+    assert r"1 \| zie ook &lt;b>x&lt;/b> A" in tekst
+    assert "1 | zie ook <b>" not in tekst
+
+
 def test_omgekeerde_registratie_wordt_als_gezamenlijke_oorzaak_benoemd() -> None:
     """Stijgt de bodem bij veel strengen in de afvoerrichting, dan is dat een oorzaak.
 

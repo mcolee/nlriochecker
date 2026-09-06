@@ -35,6 +35,25 @@ def title(label: str, frame: pd.DataFrame) -> str:
     return f"{label} ({len(frame)})"
 
 
+def _cel(value: object) -> str:
+    """Maakt een waarde veilig voor één Markdown-tabelcel.
+
+    Drie tekens breken de tabel of de gerenderde uitvoer: `|` sluit een cel af, een
+    regelovergang breekt de rij in tweeën, en `<` opent een HTML-tag. Een vrij
+    tekstlabel als `1 | zie ook <b>"x"</b>` maakte er anders vier cellen in een
+    driekolomstabel van, en een label met een regelovergang splitste de rij. CSV, JSON
+    en de popup dragen de rauwe waarde; alleen de Markdown-view escapet. Zie issue #156.
+    """
+    return (
+        str(value)
+        .replace("|", r"\|")
+        .replace("\r\n", " ")
+        .replace("\r", " ")
+        .replace("\n", " ")
+        .replace("<", "&lt;")
+    )
+
+
 def table(frame: pd.DataFrame, kop: str) -> list[str]:
     """Rendert een DataFrame als Markdown-tabel met een vetgedrukte titelregel."""
     lines = [f"**{kop}**", ""]
@@ -43,10 +62,10 @@ def table(frame: pd.DataFrame, kop: str) -> list[str]:
 
     columns = list(frame.columns)
     alignment = ["---:" if is_numeric(frame[column]) else "---" for column in columns]
-    lines.append("| " + " | ".join(columns) + " |")
+    lines.append("| " + " | ".join(_cel(column) for column in columns) + " |")
     lines.append("| " + " | ".join(alignment) + " |")
     for row in frame.itertuples(index=False):
-        lines.append("| " + " | ".join(str(value) for value in row) + " |")
+        lines.append("| " + " | ".join(_cel(value) for value in row) + " |")
     return lines
 
 

@@ -128,6 +128,23 @@ def test_geojson(tmp_path: Path) -> None:
     assert gebied.feature_count == 1
 
 
+def test_geojson_met_utf8_bom(tmp_path: Path) -> None:
+    """Een in Excel/Notepad/PowerShell aangeraakt GeoJSON kan een UTF-8-BOM dragen (#156)."""
+    pad = tmp_path / "met_bom.geojson"
+    tekst = json.dumps(
+        {
+            "type": "FeatureCollection",
+            "features": [{"type": "Feature", "geometry": mapping(VIERKANT)}],
+        }
+    )
+    pad.write_bytes(b"\xef\xbb\xbf" + tekst.encode("utf-8"))
+
+    gebied = load_study_area(pad)
+
+    assert gebied.bevat(Point(50, 50))
+    assert gebied.feature_count == 1
+
+
 def test_ontbrekend_bestand(tmp_path: Path) -> None:
     with pytest.raises(StudyAreaError, match="bestaat niet"):
         load_study_area(tmp_path / "weg.gpkg")

@@ -29,7 +29,7 @@ from nlriochecker.uitvoer.melding import (
     Onderdrukking,
     Uitzonderingen,
 )
-from nlriochecker.uitvoer.tabel import table
+from nlriochecker.uitvoer.tabel import _cel, table
 
 ERNST_FOUT = Severity.ERROR.value
 ERNST_WAARSCHUWING = Severity.WARNING.value
@@ -166,8 +166,11 @@ def _multi_melding(meldingen: list[Melding], config: CheckConfig) -> list[str]:
     if not verdacht:
         return []
 
+    # `_cel` ook hier: dit is geen tabelcel maar een zin in de rode draad, en een vrij
+    # tekstlabel met `|`, een regelovergang of een `<b>`-tag zou de gerenderde Markdown
+    # net zo goed breken. Zie issue #156.
     beschrijving = "; ".join(
-        f"{labels[uri]} ({', '.join(sorted(checks))})"
+        f"{_cel(labels[uri])} ({', '.join(sorted(checks))})"
         for uri, checks in verdacht[:MAX_VERDACHTE_OBJECTEN]
     )
     rest = len(verdacht) - MAX_VERDACHTE_OBJECTEN

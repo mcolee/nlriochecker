@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
@@ -15,10 +17,31 @@ TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 NIEUWE_NET_IDS = ["NET-005", "NET-006", "NET-008"]
 
 
+def _generator() -> ModuleType:
+    """Laadt de fixture-generator als module, voor het inline bouwen van T-stuk-stelsels."""
+    pad = Path(__file__).resolve().parents[1] / "scripts" / "maak_ttl_fixtures.py"
+    spec = importlib.util.spec_from_file_location("maak_ttl_fixtures", pad)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+GEN = _generator()
+
+
 def uitkomst(pad: Path, check_id: str, config: CheckConfig | None = None) -> CheckOutcome:
     """Draait een enkele check op een fixture en geeft de volledige uitkomst."""
     dataset = load_dataset(pad, [])
     context = CheckContext(dataset=dataset, config=config or load_check_config())
+    return run_checks(context, [check_id]).outcomes[0]
+
+
+def _uitkomst_uit_ttl(pad: Path, ttl: str, check_id: str) -> CheckOutcome:
+    """Schrijft een inline TTL naar `pad` en draait er een enkele check op."""
+    pad.write_text(ttl, encoding="utf-8")
+    dataset = load_dataset(pad, [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
     return run_checks(context, [check_id]).outcomes[0]
 
 
@@ -205,3 +228,93 @@ def test_stelseltypen_zonder_config_meldt_dat() -> None:
 
     assert outcome.findings == []
     assert any("geen stelseltypen geconfigureerd" in note for note in outcome.notes)
+
+
+# --------------------------------------------------------------------------------------
+# Issue #156: NET-005 en NET-006 indexeren via `_doorgeefknopen`, zodat een streng met een
+# zijde op een telbaar hulpstuk (T-stuk) meedoet. BO-83 draagt zo'n hulpstuk als
+# doorgeefknoop in de graaf; via `verbonden_knopen` (None op een hulpstuk) viel de buur- of
+# koppelbeoordeling aan die zijde stil weg.
+# --------------------------------------------------------------------------------------
+
+
+def _stelsel_met_middenknoop(via_put: bool, streng2: str, streng3: str) -> str:
+    """A --hemelwater--> K --<streng2>--> C --<streng3>--> D, met K als put of als T-stuk."""
+    knoop = GEN.put("K", "K", 1050.0, 2000.0) if via_put else GEN.hulpstuk("K", "K", 1050.0, 2000.0)
+    return (
+        GEN.PRELUDE
+        + GEN.HULPSTUK_KLASSEN
+        + "\n"
+        + GEN.put("PutA", "A", 1000.0, 2000.0)
+        + knoop
+        + GEN.put("PutC", "C", 1100.0, 2000.0)
+        + GEN.put("PutD", "D", 1150.0, 2000.0)
+        + GEN.leiding(
+            "L1",
+            "1",
+            [(1000.0, 2000.0), (1050.0, 2000.0)],
+            "PutA",
+            "K",
+            klasse="Hemelwaterriool",
+            bob=(10.0, 9.9),
+        )
+        + GEN.leiding(
+            "L2",
+            "2",
+            [(1050.0, 2000.0), (1100.0, 2000.0)],
+            "K",
+            "PutC",
+            klasse=streng2,
+            bob=(9.9, 9.8),
+        )
+        + GEN.leiding(
+            "L3",
+            "3",
+            [(1100.0, 2000.0), (1150.0, 2000.0)],
+            "PutC",
+            "PutD",
+            klasse=streng3,
+            bob=(9.8, 9.7),
+        )
+    )
+
+
+def test_net006_koppeling_op_een_t_stuk_wordt_gemeld(tmp_path: Path) -> None:
+    """hemelwater→vuilwater op een T-stuk hoort net zo goed gemeld als op een put (#156).
+
+    A --hemelwater--> K --vuilwater--> C --vuilwater--> D: op K komt hemelwater binnen en
+    gaat vuilwater verder; die koppeling staat niet in de koppelregels.
+    """
+    via_put = _uitkomst_uit_ttl(
+        tmp_path / "net006_via_put.ttl",
+        _stelsel_met_middenknoop(True, "Vuilwaterriool", "Vuilwaterriool"),
+        "NET-006",
+    )
+    assert [f.details["koppelingen"] for f in via_put.findings] == [["hemelwater→vuilwater"]]
+
+    via_tstuk = _uitkomst_uit_ttl(
+        tmp_path / "net006_via_tstuk.ttl",
+        _stelsel_met_middenknoop(False, "Vuilwaterriool", "Vuilwaterriool"),
+        "NET-006",
+    )
+    assert [f.details["koppelingen"] for f in via_tstuk.findings] == [["hemelwater→vuilwater"]]
+
+
+def test_net005_afwijkend_type_via_een_t_stuk_wordt_gemeld(tmp_path: Path) -> None:
+    """Een vuilwaterstreng tussen twee hemelwaterburen via een T-stuk hoort gemeld (#156).
+
+    A --hemelwater--> K --vuilwater--> C --hemelwater--> D: streng 2 wijkt van beide buren af.
+    """
+    via_put = _uitkomst_uit_ttl(
+        tmp_path / "net005_via_put.ttl",
+        _stelsel_met_middenknoop(True, "Vuilwaterriool", "Hemelwaterriool"),
+        "NET-005",
+    )
+    assert labels(via_put) == ["2"]
+
+    via_tstuk = _uitkomst_uit_ttl(
+        tmp_path / "net005_via_tstuk.ttl",
+        _stelsel_met_middenknoop(False, "Vuilwaterriool", "Hemelwaterriool"),
+        "NET-005",
+    )
+    assert labels(via_tstuk) == ["2"]

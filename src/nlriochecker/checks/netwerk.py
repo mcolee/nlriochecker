@@ -754,8 +754,6 @@ class ItStelselZonderDrempel(Check):
         projectconfig. Zie BO-34 in docs/beslislog.md.
         """
         netwerk = _netwerk(context)
-        dataset = context.dataset
-        wortels = context.config.klassen.netwerkknopen
 
         infiltratie = {conduit.uri for conduit in infiltratieleidingen(context)}
         if not infiltratie:
@@ -772,7 +770,11 @@ class ItStelselZonderDrempel(Check):
         for conduit in netwerk.conduits:
             if conduit.uri not in infiltratie:
                 continue
-            begin = dataset.resolve_network_node(conduit.start_node, wortels)
+            # `_doorgeefknopen`, niet `resolve_network_node`: het beginpunt kan een telbaar
+            # hulpstuk zijn, dat sinds BO-83 als graafknoop in `component_van` staat. Met de
+            # putherleiding viel een infiltratieleiding die op een T-stuk begint stil buiten
+            # de indeling. Zie issue #156.
+            begin, _ = _doorgeefknopen(context, conduit)
             index = component_van.get(begin) if begin is not None else None
             if index is not None:
                 per_component.setdefault(index, []).append(conduit)
@@ -1101,9 +1103,13 @@ class StelseltypeWijktAfVanBuren(Check):
         netwerk = _netwerk(context)
 
         soorten = {conduit.uri: _stelseltype(context, conduit) for conduit in netwerk.conduits}
+        # Indexeren via `_doorgeefknopen`, niet `verbonden_knopen`: een telbaar hulpstuk is
+        # geen put en `resolve_network_node` geeft er None voor, maar het draagt sinds BO-83
+        # de graaf door. Zonder deze index staat een streng die op een T-stuk uitkomt zonder
+        # buur aan die zijde en valt zij stil buiten de vergelijking. Zie issue #156.
         per_knoop: dict[str, list[Conduit]] = {}
         for conduit in netwerk.conduits:
-            for uri in verbonden_knopen(context, conduit):
+            for uri in _doorgeefknopen(context, conduit):
                 if uri is not None:
                     per_knoop.setdefault(uri, []).append(conduit)
 
@@ -1111,7 +1117,7 @@ class StelseltypeWijktAfVanBuren(Check):
             eigen = soorten[conduit.uri]
             if eigen is None:
                 continue
-            begin, eind = verbonden_knopen(context, conduit)
+            begin, eind = _doorgeefknopen(context, conduit)
             bovenstrooms = self._buren(per_knoop, begin, conduit.uri, soorten)
             benedenstrooms = self._buren(per_knoop, eind, conduit.uri, soorten)
             # Het register vraagt om afwijking van *boven- en* benedenstroomse
@@ -1312,7 +1318,11 @@ class KoppelingTussenStelseltypen(Check):
             soort = _stelseltype(context, conduit)
             if soort is None:
                 continue
-            begin, eind = verbonden_knopen(context, conduit)
+            # `_doorgeefknopen`, niet `verbonden_knopen`: een koppeling tussen stelseltypen
+            # kan net zo goed op een telbaar hulpstuk (T-stuk) samenkomen, en dat draagt
+            # sinds BO-83 de graaf door. Zonder deze afleiding werd zo'n koppeling stil niet
+            # beoordeeld (op De Wolden vandaag nul, maar wel mogelijk). Zie issue #156.
+            begin, eind = _doorgeefknopen(context, conduit)
             reliable = betrouwbaar.get(conduit.uri, False)
             for uri in (begin, eind):
                 if uri is None:

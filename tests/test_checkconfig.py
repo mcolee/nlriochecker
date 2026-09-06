@@ -51,6 +51,16 @@ def _config_met_uitzonderingen(tmp_path: Path, json_inhoud: str | None, verwijzi
     return pad
 
 
+def test_config_met_utf8_bom_laadt(tmp_path: Path) -> None:
+    """Een in Excel/Notepad/PowerShell aangeraakte config draagt vaak een UTF-8-BOM (#156)."""
+    pad = tmp_path / "met_bom.toml"
+    pad.write_bytes(b"\xef\xbb\xbf" + _MINIMALE_CONFIG.format(extra="").encode("utf-8"))
+
+    config = load_check_config(pad)
+
+    assert config.klassen.put == ["Put"]
+
+
 def test_standaardconfig_laadt() -> None:
     config = load_check_config()
 

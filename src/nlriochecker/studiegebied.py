@@ -577,7 +577,10 @@ def _lees_geojson(path: Path, grenzen: RdGrenzen | None) -> _Ruw:
     vallen. Zonder meegegeven grenzen blijft die tweede toets achterwege.
     """
     try:
-        inhoud = json.loads(path.read_text(encoding="utf-8"))
+        # `utf-8-sig`: een in Excel/Notepad/PowerShell aangeraakt GeoJSON kan een
+        # UTF-8-BOM dragen, en `json.loads` struikelt over een leidende U+FEFF; die codec
+        # leest het bestand met én zonder BOM (issue #156).
+        inhoud = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError, RecursionError) as error:
         # `RecursionError` staat er apart bij: diep genest JSON haalt de scanner van
         # `json` niet, en die fout is een RuntimeError en geen ValueError.

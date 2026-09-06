@@ -87,6 +87,22 @@ def test_max_meldingen_en_lokale_eisen_als_tekst(mini_hyd_shacl: Path, tmp_path:
     assert rapport.lokale_eisen == "dewolden_eisen.ttl"
 
 
+def test_utf8_bom_wordt_gelezen(mini_hyd_shacl: Path, tmp_path: Path) -> None:
+    """Een rapport met een UTF-8-BOM (Excel 'CSV UTF-8', Notepad, PowerShell) leest gewoon.
+
+    Zonder de `utf-8-sig`-codec bleef de BOM (U+FEFF) aan de eerste kopsleutel plakken en
+    faalde het inlezen met een misleidende 'kopblok mist'-fout (issue #156).
+    """
+    tekst = mini_hyd_shacl.read_text(encoding="utf-8")
+    met_bom = tmp_path / "met_bom.csv"
+    met_bom.write_bytes(b"\xef\xbb\xbf" + tekst.encode("utf-8"))
+
+    rapport = lees_shacl_rapport(met_bom)
+
+    assert rapport.cfk == "Hyd"
+    assert not rapport.findings.empty
+
+
 def test_ontbrekende_kolomkop(tmp_path: Path) -> None:
     stuk = tmp_path / "stuk.csv"
     stuk.write_text("Rapport SHACL-meting dd;2026-01-01T00:00:00\n", encoding="utf-8")

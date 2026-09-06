@@ -637,6 +637,52 @@ class StrengMetEenPut(_StrengPutAansluiting):
         )
 
 
+def _omgekeerd_gesnapt(context: CheckContext) -> frozenset[str]:
+    """De vrijvervalstrengen die gesnapt zijn maar omgekeerd getekend (TOP-004, issue #156).
+
+    Een streng die administratief van A naar B loopt maar van B naar A getekend is, heeft
+    haar beide uiteinden wél op een put liggen -- alleen in de omgekeerde volgorde. TOP-004
+    vergelijkt de uiteinden in administratieve volgorde en zou zo'n streng twee keer als
+    'niet gesnapt' melden (elk eind ligt ver van de put waaraan het administratief hangt),
+    terwijl er geen snappingsfout is. NET-009 signaleert de omgekeerde tekenrichting al;
+    deze set houdt die dubbele valse diagnose uit TOP-004.
+
+    Alleen wanneer de lijn omgekeerd is (`richting_van_geometrie`) én beide uiteinden
+    binnen de snapping-tolerantie van de put aan de andere kant liggen. Ligt één eind
+    daarbuiten, dan is er wél een echte snappingsfout en blijft de melding staan.
+    """
+    return context.cached("topologie:omgekeerd_gesnapt", lambda: _bouw_omgekeerd_gesnapt(context))
+
+
+def _bouw_omgekeerd_gesnapt(context: CheckContext) -> frozenset[str]:
+    """Bepaalt welke strengen 'gesnapt maar omgekeerd getekend' zijn; zie `_omgekeerd_gesnapt`."""
+    dataset = context.dataset
+    wortels = context.config.klassen.netwerkknopen
+    tolerantie = context.config.drempels.snapping_tolerantie_m
+    topologie = _topologie(context)
+
+    gevonden: set[str] = set()
+    for conduit in topologie.conduits:
+        uiteinden = topologie.endpoints_of(context, conduit)
+        if uiteinden is None:
+            continue
+        uitslag = dataset.richting_van_geometrie(conduit, wortels)
+        if uitslag is None:
+            continue
+        omgekeerd, begin, eind = uitslag
+        if not omgekeerd or begin.point is None or eind.point is None:
+            continue
+        # Omgekeerd getekend: de lijn loopt van de administratieve eindput naar de beginput.
+        # Beide uiteinden gesnapt = de lijnstart ligt op de eindput en het lijneind op de
+        # beginput, elk binnen de tolerantie.
+        if (
+            eind.point.distance(uiteinden[0]) <= tolerantie
+            and begin.point.distance(uiteinden[1]) <= tolerantie
+        ):
+            gevonden.add(conduit.uri)
+    return frozenset(gevonden)
+
+
 @register
 class NietGesneptStrengeinde(Check):
     """TOP-004: strengeindpunt ligt te ver van de put waaraan het gekoppeld is."""
@@ -649,13 +695,23 @@ class NietGesneptStrengeinde(Check):
     kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Vergelijkt de administratieve koppeling met de geometrische afstand."""
+        """Vergelijkt de administratieve koppeling met de geometrische afstand.
+
+        Een streng die gesnapt is maar omgekeerd getekend, wordt overgeslagen: haar
+        uiteinden liggen wél op een put, alleen in de omgekeerde volgorde, dus de
+        administratieve-volgordevergelijking hieronder zou er twee valse
+        snappingsmeldingen van maken. NET-009 draagt dat signaal al; `notes()` telt ze.
+        Zie issue #156.
+        """
         dataset = context.dataset
         tolerantie = context.config.drempels.snapping_tolerantie_m
         wortels = context.config.klassen.netwerkknopen
         topologie = _topologie(context)
+        omgekeerd = _omgekeerd_gesnapt(context)
 
         for conduit in topologie.conduits:
+            if conduit.uri in omgekeerd:
+                continue
             uiteinden = topologie.endpoints_of(context, conduit)
             if uiteinden is None:
                 continue
@@ -684,6 +740,17 @@ class NietGesneptStrengeinde(Check):
                         tolerantie_m=tolerantie,
                         foutlocatie=(punt.x, punt.y),
                     )
+
+    def notes(self, context: CheckContext) -> list[str]:
+        """Meldt de strengen die gesnapt zijn maar omgekeerd getekend (issue #156)."""
+        aantal = len(_omgekeerd_gesnapt(context))
+        if not aantal:
+            return []
+        return [
+            f"{getal(aantal, 'streng is', 'strengen zijn')} gesnapt maar omgekeerd getekend "
+            f"(van eind naar begin) en {vorm(aantal, 'is', 'zijn')} hier niet als "
+            "snappingsfout gemeld; NET-009 signaleert de omgekeerde tekenrichting."
+        ]
 
     def examined(self, context: CheckContext) -> int:
         """Het aantal strengen met geometrie."""

@@ -12,7 +12,13 @@ import pandas as pd
 
 from nlriochecker.errors import ReportFormatError
 
-ENCODING = "utf-8"
+# `utf-8-sig` in plaats van `utf-8`: een rapport dat in Excel ("CSV UTF-8"), Notepad of
+# PowerShell (`Out-File`) is aangeraakt draagt vaak een UTF-8-BOM (U+FEFF) vooraan. Die
+# codec leest een bestand met én zonder BOM; zonder haar bleef de BOM aan de eerste
+# kopsleutel plakken en faalde het inlezen met een misleidende "kopblok mist"-fout (issue
+# #156). Het foutbericht hieronder noemt bewust nog "utf-8": dat is de verwachte codering
+# van de bron, de `-sig` is alleen onze tolerantie.
+ENCODING = "utf-8-sig"
 DELIMITER = ";"
 
 KOLOMMEN = [
@@ -112,7 +118,7 @@ def _lees_rijen(path: Path) -> list[list[str]]:
     except OSError as error:
         raise ReportFormatError(f"{path}: bestand kan niet gelezen worden ({error}).") from error
     except UnicodeDecodeError as error:
-        raise ReportFormatError(f"{path}: geen geldige {ENCODING} ({error}).") from error
+        raise ReportFormatError(f"{path}: geen geldige utf-8 ({error}).") from error
     except csv.Error as error:
         raise ReportFormatError(f"{path}: geen leesbare CSV ({error}).") from error
 

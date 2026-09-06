@@ -729,7 +729,9 @@ def load_check_config(path: Path | None = None) -> CheckConfig:
         raise ConfigError(f"{path}: configbestand kan niet gelezen worden ({error}).") from error
 
     try:
-        rauw = tomllib.loads(inhoud.decode("utf-8"))
+        # `utf-8-sig`: een in Excel/Notepad/PowerShell aangeraakt configbestand kan een
+        # UTF-8-BOM dragen; die codec leest het met én zonder BOM (issue #156).
+        rauw = tomllib.loads(inhoud.decode("utf-8-sig"))
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
         raise ConfigError(f"{path}: geen geldige TOML ({error}).") from error
 

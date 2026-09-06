@@ -70,6 +70,37 @@ def test_top004_meldt_afstand_en_put() -> None:
     assert bevinding.details["zijde"] == "eindpunt"
 
 
+def test_top004_slaat_een_omgekeerd_getekende_gesnapte_streng_over() -> None:
+    """Een streng die gesnapt is maar omgekeerd getekend is geen snappingsfout (issue #156).
+
+    `net009_omgekeerd_getekend.ttl`: streng '1' loopt administratief A->B maar is van B
+    naar A getekend; beide uiteinden liggen exact op een put. TOP-004 meldde die tweemaal
+    als 'niet gesnapt'; nu slaat hij de streng over en telt hem in `notes()`. NET-009
+    signaleert de omgekeerde tekenrichting.
+    """
+    dataset = load_dataset(TTL_DIR / "net009_omgekeerd_getekend.ttl", [])
+    context = CheckContext(dataset=dataset, config=load_check_config())
+    outcome = run_checks(context, ["TOP-004"]).outcomes[0]
+
+    assert outcome.findings == []
+    assert any("omgekeerd getekend" in notitie for notitie in outcome.notes)
+
+
+def test_top004_meldt_een_echte_snappingsfout_op_een_omgekeerde_streng() -> None:
+    """Alleen 'beide einden binnen tolerantie' dempt; een echt los eind blijft een melding."""
+    outcome = run_checks(
+        CheckContext(
+            dataset=load_dataset(TTL_DIR / "top004_niet_gesnapt.ttl", []),
+            config=load_check_config(),
+        ),
+        ["TOP-004"],
+    ).outcomes[0]
+
+    # De fixture is niet omgekeerd getekend (0,5 m los), dus de melding blijft staan.
+    assert len(outcome.findings) == 1
+    assert outcome.notes == []
+
+
 def test_top005_meldt_beide_putten_een_keer() -> None:
     bevindingen = _bevindingen(TTL_DIR / "top005_dubbele_put.ttl", "TOP-005")
 
