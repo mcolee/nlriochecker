@@ -17,7 +17,13 @@ bevestigd, plan in `~/nlriochecker-onderzoek/2026-09-05-fable-swarm/plan.json`) 
 zes koppen). Alle ontwerpkeuzes staan onder kop 2 ("Keuzes die al gemaakt zijn"); kop 6
 (Aannames) is wat de auteur bewust aan de agent laat. Van de vijf geparkeerde punten
 (#162–#166) zijn #163, #165 en #166 op 06-09 in een grilling `ready-for-agent` geworden en
-vormen met #137, #138, #169 en #170 de **sessies E en F**; #162 en #164 blijven geparkeerd.
+vormen met #137, #138, #169 en #170 de **sessies E en F**; #164 blijft geparkeerd en #162 is
+verwijderd (het bruikbare deel werd #169). Op 06-09 (sessie E) kwamen daar **#171** (testbundel)
+en **#172** (codebundel) bij: twintig uitgestelde review-minors uit de slotrapporten van
+30-08 t/m sessie E, gebundeld als worktree-partners voor F. De minors die gedrag raken
+(#105 hulpstuk-notities en NET-007-telling, #106 `aanwijzingen_van`, #130 TOP-019
+`examined`, #134 hoofdlettergevoeligheid) zijn bewust níét gebundeld: die worden na F als
+één "hulpstuk-notities"-issue gegrild (auteursbesluit 06-09).
 
 **Splits de reeks in zes sessies** (globale `CLAUDE.md`, "Mega-sessies splitsen"): elke
 sessie eindigt met CI groen, issues dicht en een slotcomment; de volgende sessie start vers
@@ -80,13 +86,19 @@ volle De Wolden-meting tegelijk.
 | F | 27 | **#163** CONTRACT overlay op `--projectconfig` met `basis = "standaard"` | #161, #165 | Opus 4.8 | **Altijd Substantieel** | zonder `basis` byte-voor-byte hetzelfde gedrag |
 | F | 28 | **#166** LEESLAAG pin v0.2.2 → v0.2.4; `leeslaag.py` delegeert | #158, #159 | Opus 4.8 | **Substantieel** | `uv lock`; cache koud herbouwd; gepaarde meting achter `flock` |
 | F | 29 | **#170** research puntbemonstering uit een float32-raster → `docs/onderzoek/` | — | Sonnet | Klein | geen code; `mattpocock-skills:research`; comment op #168 |
+| F | 30 | **#171** testbundel: elf review-minors uit de AFK-reeks (alleen `tests/`) | — | Opus 4.8 | Klein | elke test met tegenproef rood/groen; drifttest −26 s; PyQGIS-test lokaal draaien; geen meting |
+| F | 31 | **#172** codebundel: negen review-minors (`toetsrun.py`, `uitvoer/`, `extern.py`, `topologie.py`) | — | Opus 4.8 | **Substantieel** | Koekangerveld CSV sha-gelijk + gpkg byte-gelijk; dubbele-`melding_id`-test; paarmelding-niet-streng-test |
 
 Eén issue = commit + push + CI groen + comment + close; alleen de CI-wacht mag overlappen
-met de dispatch van het volgende issue (sjabloon, stap 7), en twee implementers mogen in
-eigen worktrees naast elkaar werken onder de voorwaarden uit het sjabloon ("Volgorde").
-Paren die daarvoor in aanmerking komen: **D:** #157 + #158 naast #159; **E:** #169 naast
-#137; **F:** #170 (alleen docs) naast elk ander issue. Niet: #159/#160/#161 onderling
-(delen `src/`), #163/#165 (contract), #166 naast een ander (meting + pin).
+met de dispatch van het volgende issue (sjabloon, stap 7). **Het worktree-paar is sinds
+sessie E de standaard** (auteursbesluit 06-09): twee implementers in eigen worktrees, onder de
+voorwaarden uit het sjabloon ("Volgorde"), en bij het indelen van volgorde en werkpakket
+weeg je vooraf mee welke issues naast elkaar kunnen. Paren: **D:** #157 + #158 naast #159;
+**E:** #169 naast #137; **F:** #170 (alleen docs) naast #165, #171 naast #163, #172 naast
+#166. Niet: #159/#160/#161 onderling (delen `src/`), #163/#165 onderling (contract), #166
+naast een ander issue mét meting of pin. Een test- of kleine-codebundel zonder meting en
+zonder contract (#171, #172) mag wél naast een contract- of pin-issue: de reden achter die
+twee sjabloonregels (reviewvolgorde, gedeelde cache en meting) raakt hem niet.
 
 ## Bewijslast per issue (De Wolden, tegen `uitvoer/04092026_slotrun`)
 
@@ -118,6 +130,8 @@ Paren die daarvoor in aanmerking komen: **D:** #157 + #158 naast #159; **E:** #1
 | #163 | CliRunner: projectconfig mét en zonder `basis`; `configs/dewoldenhoogeveen.toml` | zonder `basis` identiek aan vandaag; De Wolden-run sha-gelijk |
 | #166 | meetscript onder `scripts/`: `laad_met_cache` bij cachetreffer, `ru_maxrss`, n ≥ 3 om en om | `uv.lock` op v0.2.4; cache één keer koud (~0,5 min); CSV sha-gelijk aan de referentie |
 | #170 | het verslag in `docs/onderzoek/` | per techniek bron, lossless ja/nee, richting koud/warm; herziene variantenlijst voor #168 |
+| #171 | tegenproef per test (bewaakte fout tijdelijk maken → rood, herstellen → groen); tijd van `tests/test_versie_drift.py` vóór/ná | elf tests rood/groen in het rapport; lichte drifttest ~−26 s; poort groen; geen `src/`-wijziging |
+| #172 | Koekangerveld-run in de worktree vóór/ná; uitzonderingenbestand met dubbele `melding_id` | CSV sha-gelijk na blanken RunDatum; gpkg byte-gelijk na normalisatie `update_time` + `last_change`; naam-test uit #169 blijft rood op een verwisselde tuple; sectiekop = `meldingen_geaccepteerd` = JSON bij een dubbele regel |
 
 Elke andere check blijft gelijk aan de referentierun (na #141 verschoven met precies +448
 knopen HGT-009, na #156 TOP-004 −22). Wijkt iets af: verklaar het in de issue-comment,
@@ -154,9 +168,23 @@ verzin geen nieuwe waarheid.
   het verwijderen van de rol `stelsels` is dat **niet** (checks.toml bevroren): alleen de
   docstrings worden eerlijk.
 - **Sessies E en F — referentie.** Tel tegen de laatste slotrun (E: na sessie D
-  `uitvoer/<datum>_slotrun_D`; F: `uitvoer/<datum>_slotrun_E`), niet tegen 04092026.
-  E (#137, #138, #169) draagt twee volle runs vóór de slotstap; F (#165, #163, #166, #170)
-  draagt de twee contract-issues en de gepaarde meting van #166. Nooit twee metingen tegelijk.
+  `uitvoer/06092026_slotrun_D`; F: `uitvoer/06092026_slotrun_E`), niet tegen 04092026.
+  E (#137, #138, #169) draagt twee volle runs vóór de slotstap; F (#165, #163, #166, #170,
+  #171, #172) draagt de twee contract-issues en de gepaarde meting van #166. Nooit twee
+  metingen tegelijk: elke De Wolden-run achter `flock <scratchpad>/dewolden.lock`.
+- **Lessen uit sessie E voor elke worktree-implementer** (in de brief opnemen): (1) in een
+  worktree is `uv run --directory <pad>` het juiste commando — `--project` laat de cwd op de
+  hoofdwerkboom en collecteert dáár de tests; (2) `data/` staat niet in een worktree: invoerpaden
+  absoluut onder `/home/martin/Development/nlriochecker/data/…`, uitvoer naar de worktree;
+  (3) een GeoPackage-vergelijking tussen runs normaliseert `layer_styles.update_time` én
+  `gpkg_contents.last_change` (beide `now`-tijdstempels van de schrijver); (4) de merge-poort
+  (mypy + pytest op de samengestelde `dev`) draai je pas als geen meting loopt — een
+  `pytest -n 4` naast een volle run raakte op 16 GB de OOM-killer.
+- **#171 en #172.** Geen BO, geen contract, geen De Wolden-meting (#172: Koekangerveld
+  volstaat). Ze delen geen bestanden met #163/#165/#166 en zijn daarom de worktree-partners
+  van F; #171 op Klein-review, #172 Substantieel (`uitvoer/`). Vindt de implementer dat een
+  punt méér is dan een minor (bv. #171 c legt een fouttekst bloot die niet via de CLI komt),
+  dan is dat een comment, geen fix.
 - **#137.** Veldnaam `klassenlijsten`; de zes velden uit het issue zijn de volledige lijst.
   HGT-011 houdt `vrijvervalrioolleidingen` als rol (kop Aannames). De nul-bewaking (BO-52)
   blijft ongewijzigd. Nieuw BO: "checks declareren hun `[klassen]`-lijsten; HGT-011 toetst
@@ -229,7 +257,8 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
 2. Vergelijk per check met de referentierun; verwacht: elke check gelijk behalve wat de
    bewijslast hierboven noemt (sessie A: HGT-009 +448 knopen; sessie C: TOP-004 −22;
    sessie E: HGT-011 `examined` → 0, EXT-001 `examined` −~1.605, 962 minder onderdrukt,
-   TOP-014 −3; sessie F: alleen de CSV-vorm van #165, verder sha-gelijk).
+   TOP-014 −3; sessie F: alleen de CSV-vorm van #165, verder sha-gelijk — #171/#172
+   verschuiven niets).
    Elk ander verschil is een regressie van deze reeks — zoek de oorzaak.
 3. Slotrapport in `uitvoer/<datum>_slotrun_<letter>/_slotrapport.md` én als laatste bericht:
    per issue wat er landde, gemeten naast verwacht, BO-nummers, open gebleven punten, de

@@ -42,15 +42,26 @@ de bron van de punten die hier zijn aangescherpt.
 Issues die bestanden delen doe je één voor één; noteer hier de volgorde en de
 `blocked by`-relaties.
 
-**Twee implementers tegelijk mag** (auteursbesluit 06-09), elk in een eigen worktree via
+**Twee implementers tegelijk is de standaard** (auteursbesluit 06-09, bevestigd na sessie E:
+~30 min wandklok per sessie gewonnen zonder botsing), elk in een eigen worktree via
 `superpowers:using-git-worktrees`, onder vier voorwaarden: de twee issues delen geen
 bestanden buiten `CHANGELOG.md` (dus ook niet `tests/golden/ledger.json` of de
 fixture-generator); hooguit één van de twee doet een De Wolden-meting (4 cores, 16 GB:
 twee pytest-runs kunnen, twee volle runs niet); geen `blocked by`-relatie tussen de twee;
-en geen van beide is een contract-issue (die gaan één voor één door de Substantiële
-review). De regisseur merget in de volgorde van de tabel en lost de `CHANGELOG.md`-botsing
-zelf op; review, commit en CI blijven per issue. Elke worktree heeft een eigen `.venv`
-(`uv sync`, ~1 min eenmalig). Meer dan twee tegelijk nooit.
+en niet twee contract-issues tegelijk (die gaan één voor één door de Substantiële
+review). Een docs-only issue of een test-/kleine-codebundel zonder meting en zonder contract
+mag wél naast een contract- of pin-issue. **Weeg bij het bepalen van de issuevolgorde en de
+werkpakketten (sessie-indeling) vooraf mee welke issues naast elkaar kunnen**, naast
+blocked-by en de meting-grens: een sessie die alleen sequentiële issues bundelt laat winst
+liggen. De regisseur merget in de volgorde van de tabel (rebase op `dev`, fast-forward, één
+merge-poort mypy + pytest op de samengestelde staat, pas als geen meting loopt) en lost de
+`CHANGELOG.md`-botsing zelf op; review, commit en CI blijven per issue. Worktree buiten de
+repo (`/home/martin/Development/nlriochecker-wt<N>`, tak `issue-<N>`; `.worktrees/` in de
+repo is niet git-ignored), eigen `.venv` (`uv sync --project <pad>`, ~1 min); de implementer
+draait `uv run --directory <pad>` (niet `--project`: dat laat de cwd op de hoofdwerkboom),
+gebruikt absolute invoerpaden voor `data/` en normaliseert bij een GeoPackage-vergelijking
+`layer_styles.update_time` én `gpkg_contents.last_change`. Elke De Wolden-run achter
+`flock`. Na de landing worktree en tak verwijderen. Meer dan twee tegelijk nooit.
 
 1. **#…** …
 2. **#…** … — *blocked by #…*
