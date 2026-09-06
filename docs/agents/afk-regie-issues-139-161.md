@@ -199,6 +199,8 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
   `gh run list --commit "$(git rev-parse HEAD)" --json databaseId --jq '.[0].databaseId'`,
   dan `gh run watch <id> --exit-status`. Rood → fixen, niet door naar het volgende issue.
 - Na een dispatch of een achtergrondcommando: niets doen tot de melding komt.
+- Na elke stap en bij elke issuewisseling: de stavaza-tabel met emoticons uit het sjabloon
+  (`afk-regie.md`, "Voortgang tonen") als bericht aan de auteur.
 - De enige `gh`-schrijfacties zijn `edit --add-assignee`, `comment` en `close`. Geen
   `gh issue create`.
 

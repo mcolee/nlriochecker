@@ -108,6 +108,27 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
 9. **Vastloper?** Poort niet groen of iets echt onbeslist → meld nooit "klaar": comment met
    de échte toestand, issue open laten, door naar het volgende issue dat er niet op leunt.
 
+## Voortgang tonen — stavaza-tabel met emoticons
+
+De auteur kijkt tussendoor mee (ook vanaf een ander apparaat) en leest alleen je laatste
+bericht. Toon daarom **na elke stap van de lus** (dispatch, poort gelezen, review, commit,
+CI, close) en **bij elke wisseling van issue** een korte stand-van-zaken-tabel, één rij per
+issue van de sessie plus een rij voor de slotrun:
+
+| Issue | Status | Model | Detail |
+|---|---|---|---|
+| #150 één telling per rapport | ✅ dicht | Opus 4.8 | adb7d9f, CI groen; 79/79/79 |
+| #151 kaartpijl vlak-band | 🔍 review loopt | Opus 4.8 | poort groen; 557 → 0 |
+| #152 TOP-009 / NaN-Inf | 📖 spec gelezen | Opus 4.8 | wacht op #151 |
+| #153 … | ⏳ | Sonnet | |
+| Slotrun C | ⏳ | — | tegen 06092026_slotrun_B |
+
+Vaste emoticons: ⏳ nog niet begonnen · 📖 spec gelezen/geclaimd · 🔄 implementer loopt ·
+🔍 review loopt · 🛠️ fixronde · ✅ dicht (CI groen) · ⚠️ open gebleven (comment gezet) ·
+❌ vastgelopen. De kolom *Detail* draagt het gemeten getal naast het verwachte zodra het er
+is, anders de laatste stap. Houd de tabel kort: geen proza eromheen, geen herhaling van wat
+al vaststaat; vraagt de auteur "stavaza", dan is deze tabel het antwoord.
+
 ## Ledger
 
 Houd één `progress.md` bij in de SDD-werkruimte, maar laat het achtergrondcommando zijn eigen
