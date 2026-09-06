@@ -13,6 +13,7 @@ from click.testing import CliRunner
 from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from shapely.geometry import box, mapping
 
+from nlriochecker import toetsrun as toetsrun_module
 from nlriochecker.cli import _BalkVoortgang, main
 from nlriochecker.register import default_register_path
 from nlriochecker.reporting import (
@@ -212,7 +213,18 @@ def test_toets_meldt_bevindingen_die_in_de_schil_wegvallen(tmp_path: Path) -> No
     assert tabel.empty
 
 
-def test_toets_meldt_onbekende_check(tmp_path: Path) -> None:
+def test_toets_meldt_onbekende_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Een onbekend check-ID valt op vóór het laden (issue #153).
+
+    De dure laadfase (`laad_met_cache`) mag hier niet aangeroepen worden, alleen de
+    goedkope check-ID-validatie.
+    """
+
+    def _faal_als_aangeroepen(*args: object, **kwargs: object) -> None:
+        raise AssertionError("laad_met_cache had niet aangeroepen mogen worden")
+
+    monkeypatch.setattr(toetsrun_module, "laad_met_cache", _faal_als_aangeroepen)
+
     resultaat = CliRunner().invoke(
         main,
         [
@@ -230,6 +242,36 @@ def test_toets_meldt_onbekende_check(tmp_path: Path) -> None:
     assert resultaat.exit_code == 1
     assert "TOP-999" in resultaat.output
     assert "Bekende checks" in resultaat.output
+
+
+def test_toets_op_een_onaanmaakbare_uitvoermap_faalt_meteen(tmp_path: Path) -> None:
+    """`/proc` bestaat maar staat geen nieuwe map toe: een `OSError`, geen datasetgat.
+
+    Vóór issue #153 liep dit door tot de schrijffase (na de volledige laadfase) en
+    knalde daar met een kale `FileNotFoundError` in plaats van de nette `Fout: ...`-
+    regel die elke andere invoerfout krijgt.
+    """
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--geen-ontologie",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--check",
+            "TOP-001",
+            "--output",
+            "/proc/nlrio_verify_153",
+        ],
+    )
+
+    assert resultaat.exit_code == 1
+    assert resultaat.output.startswith("Fout: "), resultaat.output
+    assert "uitvoermap" in resultaat.output
+    # Geen kale traceback: click ving de fout af als een nette ClickException in
+    # plaats van dat de oorspronkelijke uitzondering (hier FileNotFoundError)
+    # doorstroomt naar de gebruiker.
+    assert not isinstance(resultaat.exception, OSError)
 
 
 def test_toets_meldt_onleesbare_dataset(tmp_path: Path) -> None:
@@ -352,7 +394,10 @@ def test_toets_weigert_een_studiegebied_zonder_objecten(tmp_path: Path) -> None:
 
     assert resultaat.exit_code != 0
     assert "geen GWSW-objecten" in resultaat.output
-    assert not (tmp_path / "uitvoer").exists()
+    # Sinds issue #153 maakt `voer_toets_uit` de uitvoermap aan vóór het laden, dus de
+    # map bestaat wel -- maar leeg, want deze fout valt pas na het laden en vóór elke
+    # schrijfactie.
+    assert list((tmp_path / "uitvoer").iterdir()) == []
 
 
 def test_uitvoer_zonder_gpkg_slaat_de_gis_uitvoer_over(tmp_path: Path) -> None:

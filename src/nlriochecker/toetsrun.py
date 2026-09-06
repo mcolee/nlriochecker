@@ -43,6 +43,7 @@ from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
 from nlriochecker.uitvoer.melding import bouw_meldingenstroom
 from nlriochecker.uitvoer.samenvatting import Regel, eigen_telling
 from nlriochecker.uitvoer.schrijver import UitvoerPerGebied, schrijf_uitvoer_gebieden
+from nlriochecker.uitvoer.tabel import prepare
 
 
 @dataclass(frozen=True)
@@ -199,16 +200,20 @@ def voer_toets_uit(
 ) -> Toetsuitslag:
     """Draait de checks uit het checkregister op een GWSW-OroX-dataset.
 
-    De volgorde is niet vrij. De keuzes, de studiegebieden en de externe bronnen
-    worden getoetst voordat de dataset geladen wordt: op De Wolden en Hoogeveen kost dat laden
-    ruim drie minuten en circa 3 GB, en een typefout in `cfk` of `gebieden` hoort
-    niet pas daarna te melden dat de run zinloos was. De dekkingspoort op de bronnen
-    hangt alleen van die bronnen af en hoort om dezelfde reden vooraan.
+    De volgorde is niet vrij. De keuzes, de studiegebieden, de externe bronnen, de
+    check-ID's en de uitvoermap worden getoetst voordat de dataset geladen wordt: op
+    De Wolden en Hoogeveen kost dat laden ruim drie minuten en circa 3 GB, en een
+    typefout in `cfk`, `gebieden` of `check_ids`, of een uitvoermap die niet aan te
+    maken is, hoort niet pas daarna te melden dat de run zinloos was (issue #153). De
+    dekkingspoort op de bronnen hangt alleen van die bronnen af en hoort om dezelfde
+    reden vooraan.
     """
     config = load_check_config(opdracht.projectconfig)
     kies_cfk(opdracht.cfk, config.nulmeting.vereiste_cfk)
     gebieden = _studiegebieden(opdracht, config)
     bronnen = _externe_bronnen(opdracht, config)
+    _valideer_check_ids(opdracht.check_ids)
+    prepare(opdracht.uitvoermap)
 
     dataset, cache = laad_met_cache(
         opdracht.dataset_pad,
@@ -299,6 +304,23 @@ def _ontologiekeuze(opdracht: Toetsopdracht) -> list[Path] | None:
     if opdracht.ontologieen:
         return list(opdracht.ontologieen)
     return [] if opdracht.geen_ontologie else None
+
+
+def _valideer_check_ids(check_ids: tuple[str, ...]) -> None:
+    """Faalt vooraf op een onbekend check-ID, met dezelfde tekst als `run_checks`.
+
+    Zonder deze poort meldt alleen `run_checks` (`checks/base.py`) een onbekend
+    check-ID, en dat gebeurt pas na het laden van de dataset. De tekst blijft gelijk
+    aan de bestaande `KeyError`-vertaling hieronder in `voer_toets_uit`, die als
+    vangnet blijft staan voor een onbekend ID dat deze poort om wat voor reden dan
+    ook niet ziet (issue #153).
+    """
+    onbekend = sorted(set(check_ids) - set(REGISTRY))
+    if onbekend:
+        bekend = ", ".join(sorted(REGISTRY))
+        raise OpdrachtError(
+            f"onbekende check-ID's: {', '.join(onbekend)}. Bekende checks: {bekend}."
+        )
 
 
 def _studiegebieden(opdracht: Toetsopdracht, config: CheckConfig) -> Studiegebieden | None:

@@ -13,6 +13,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Een onbekend check-ID of een onaanmaakbare uitvoermap knalde pas na de volledige
+  laadfase** (issue #153): `voer_toets_uit` (`toetsrun.py`) valideerde de check-ID's pas in
+  `run_checks`, na het laden van de dataset (op De Wolden en Hoogeveen enkele minuten), en de
+  uitvoermap werd pas aangemaakt in de schrijffase -- een `OSError` daar (bijvoorbeeld
+  `--output /proc/iets`) liet een kale `FileNotFoundError` met traceback door de dure laadfase
+  heen lopen. Beide toetsen staan nu vóór `laad_met_cache`: een onbekend check-ID geeft
+  dezelfde melding als voorheen ("onbekende check-ID's: ...; bekende checks: ..."), en een
+  onaanmaakbare uitvoermap een `Fout: uitvoermap ... is niet aan te maken: ...`-regel, in
+  beide gevallen zonder dat er geladen is. `uitvoer/tabel.prepare` vertaalt de `OSError` zelf,
+  zodat `analyseer`, `dekking`, `vergelijk` en `totaal/` dezelfde nette fout krijgen.
 - **Ontbrekende of niet-eindige coordinaten omzeilden TOP-009 en lieten de run omvallen**
   (issue #152): de topologie-index laat een knoop zonder punt weg, waardoor de TOP-009-tak
   "geen coordinaten" voor putten dood was -- een put met een Putorientatie maar zonder

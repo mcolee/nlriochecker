@@ -6,14 +6,25 @@ from pathlib import Path
 
 import pandas as pd
 
+from nlriochecker.errors import OpdrachtError
+
 # De nulmetingtabellen tonen de grootste posten; de volledige lijst staat in de CSV.
 TOP_N = 15
 
 
 def prepare(output_dir: Path) -> Path:
-    """Maakt de uitvoermap aan en geeft hem terug."""
+    """Maakt de uitvoermap aan en geeft hem terug.
+
+    Een onaanmaakbare map (een ontbrekend bovenliggend pad zoals `/proc/...`, geen
+    schrijfrecht) is een opdrachtfout en geen kale `OSError`: zonder deze vertaling
+    valt een schrijver hier met een traceback in plaats van de nette `Fout: ...`-regel
+    die de CLI voor elke andere invoerfout laat zien (issue #153).
+    """
     output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise OpdrachtError(f"uitvoermap {output_dir} is niet aan te maken: {error}") from error
     return output_dir
 
 
