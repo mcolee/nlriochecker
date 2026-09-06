@@ -67,6 +67,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   referentie en experiment om en om in aparte processen in plaats van via een monkeypatch, zodat
   elk volgend perf-issue er zonder patchmechaniek op kan leunen.
 
+- **EXT-001 kiest het geraakte bouwwerk in bulk** (issue #144): de check woog per object en
+  per laag elk kandidaat-bouwwerk met een losse `laag.nabij(...)` (een `buffer()` per object
+  per laag) en daarna `distance`/`within` per kandidaat. Dat is nu per laag één
+  `tree.query(geoms, predicate="dwithin", distance=buffer)` met `shapely.distance`/`within`
+  over alle paren tegelijk; de winnaar per object volgt uit een `np.lexsort` op
+  (rang, afstand, laagvolgorde, boompositie) -- exact dezelfde tiebreak als de oude lus (de
+  eerst aangetroffen kandidaat wint bij gelijke rang en afstand). De melding, het feitenkanaal
+  `afstand_m` en `waarde=relatie` (categorisch, #142) veranderen niet; `VectorLayer.nabij`
+  blijft voor EXT-003/EXT-007. Op De Wolden en Hoogeveen zakt de EXT-001-checktijd van ~11,0 s
+  naar ~2,7 s (gepaard gemeten, referentie `2f44370`), zonder één verschoven melding:
+  `bevindingen.csv` van de volle `toets` is sha256-gelijk (161.692 rijen). De ongebruikte
+  `_sterkste`/`_relatie` zijn vervallen; een unittest bewaakt de tiebreak op gelijke
+  (rang, afstand) met twee lagen.
+
 - **NET-006 keurt hemelwater→vuilwater alleen binnen een VGS goed** (issue #129): de
   koppeling hemelwater → vuilwater is uit de whitelist `[koppelregels]` van beide configs
   gehaald en in code voorwaardelijk gemaakt. Buiten een Verbeterd Gescheiden Stelsel hoort

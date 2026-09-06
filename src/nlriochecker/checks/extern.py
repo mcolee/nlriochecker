@@ -18,6 +18,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 
+import numpy as np
+import shapely
 from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
@@ -310,6 +312,63 @@ RELATIE_NABIJ = "nabij"
 RELATIE_VOLGORDE = (RELATIE_BINNEN, RELATIE_KRUIST, RELATIE_NABIJ)
 
 
+def _geraakte_bouwwerken(
+    geoms: np.ndarray, lagen: Sequence[VectorLayer], buffer: float
+) -> list[tuple[int, int, int, int, float]]:
+    """Per object het zwaarste bouwwerk binnen de buffer, gevectoriseerd.
+
+    Levert per geraakt object een tuple `(obj_i, laag_i, feat_i, rang, afstand)`,
+    oplopend op `obj_i`; `rang` is 0/1/2 (binnen/kruist/nabij). Per laag zoekt één
+    `tree.query(..., predicate="dwithin", distance=buffer)` alle kandidaatparen tegelijk
+    en bepalen `shapely.distance`/`shapely.within` de afstand en de insluiting over alle
+    paren ineens. De winnaar per object volgt uit `np.lexsort` op
+    (rang, afstand, laagvolgorde, boompositie): de kleinste (rang, afstand), en bij
+    gelijkheid de eerst aangetroffen kandidaat -- eerst de laag met de laagste index, dan
+    de volgorde van de boomquery. Dat is dezelfde tiebreak als de lus die hij verving.
+
+    `dwithin` levert precies de paren met een echte afstand <= buffer op; de oude lus
+    zocht ruimer (de omhullende van `geometrie.buffer(buffer)`) en filterde daarna op
+    diezelfde afstand, dus de verzameling kandidaten is gelijk.
+    """
+    kolommen: list[np.ndarray] = []
+    for laagnr, laag in enumerate(lagen):
+        assert laag.tree is not None
+        paren = laag.tree.query(geoms, predicate="dwithin", distance=buffer)
+        if not paren.size:
+            continue
+        feats = np.asarray(laag.geometries, dtype=object)[paren[1]]
+        afstand = shapely.distance(geoms[paren[0]], feats)
+        binnen = shapely.within(geoms[paren[0]], feats)
+        rang = np.where(binnen, 0, np.where(afstand == 0.0, 1, 2))
+        kolommen.append(
+            np.column_stack(
+                [
+                    paren[0],
+                    paren[1],
+                    np.full(len(paren[0]), laagnr),
+                    rang,
+                    afstand,
+                    np.arange(len(paren[0])),
+                ]
+            )
+        )
+    if not kolommen:
+        return []
+    alles = np.vstack(kolommen)
+    # Winnaar per object: kleinste (rang, afstand), daarna eerst aangetroffen (laag, pos).
+    # Bij een tie binnen één laag beslist `pos` -- de rijvolgorde van de gebatchte
+    # `STRtree.query`. Dat is dezelfde afhankelijkheid als de oude `_sterkste`-lus, die per
+    # object over diezelfde query-uitvoer liep; het issue eist exact deze tiebreak en de
+    # sha256-gelijke volle CSV bewijst de gelijkheid (issue #144).
+    volgorde = np.lexsort((alles[:, 5], alles[:, 2], alles[:, 4], alles[:, 3], alles[:, 0]))
+    gesorteerd = alles[volgorde]
+    _, eerste = np.unique(gesorteerd[:, 0], return_index=True)
+    return [
+        (int(rij[0]), int(rij[2]), int(rij[1]), int(rij[3]), float(rij[4]))
+        for rij in gesorteerd[eerste]
+    ]
+
+
 @register
 class KruisingMetBouwwerk(_ExterneCheck):
     """EXT-001: een streng of put die in, door of vlak langs een bouwwerk ligt."""
@@ -344,14 +403,17 @@ class KruisingMetBouwwerk(_ExterneCheck):
             return
         buffer = context.config.drempels.ext_pand_buffer_m
 
-        for object_ in self.selectie(context).toetsbaar:
-            geometrie = self.geometrie_van(object_)
-            if geometrie is None or geometrie.is_empty:
-                continue
-            geraakt = self._sterkste(geometrie, lagen, buffer)
-            if geraakt is None:
-                continue
-            relatie, afstand, laag, vorm, attributen = geraakt
+        objecten = self.selectie(context).toetsbaar
+        geoms = np.array([self.geometrie_van(object_) for object_ in objecten], dtype=object)
+        if not len(geoms):
+            return
+
+        for obj_i, laag_i, feat_i, rang, afstand in _geraakte_bouwwerken(geoms, lagen, buffer):
+            object_ = objecten[obj_i]
+            laag = lagen[laag_i]
+            vorm = laag.geometries[feat_i]
+            attributen = laag.attributen(feat_i)
+            relatie = RELATIE_VOLGORDE[rang]
             sleutel, aanduiding = self._registreer(context, object_, laag, vorm, attributen)
             yield self.finding(
                 context,
@@ -407,47 +469,6 @@ class KruisingMetBouwwerk(_ExterneCheck):
             object_uri=object_.uri,
         )
         return sleutel, aanduiding
-
-    def _sterkste(
-        self, geometrie: BaseGeometry, lagen: Sequence[VectorLayer], buffer: float
-    ) -> tuple[str, float, VectorLayer, BaseGeometry, dict[str, object]] | None:
-        """De zwaarste relatie met een bouwwerk binnen de buffer.
-
-        Bij gelijke relatie wint het dichtstbijzijnde bouwwerk; zo hangt de melding
-        niet af van de volgorde waarin de lagen toevallig gelezen zijn.
-
-        Levert `(relatie, afstand, laag, vorm, attributen)`. De vorm en de attributen
-        zijn nodig om de treffer te registreren voor de GIS-uitvoer; de keuze zelf
-        verandert er niet door, want de vergelijking blijft op `(volgorde, afstand)`.
-        """
-        beste: tuple[int, float, str, VectorLayer, BaseGeometry, dict[str, object]] | None = None
-        for laag in lagen:
-            for vorm, attributen in laag.nabij(geometrie, buffer):
-                afstand = geometrie.distance(vorm)
-                if afstand > buffer:
-                    continue
-                relatie = self._relatie(geometrie, vorm, afstand)
-                kandidaat = (
-                    RELATIE_VOLGORDE.index(relatie),
-                    afstand,
-                    relatie,
-                    laag,
-                    vorm,
-                    attributen,
-                )
-                if beste is None or kandidaat[:2] < beste[:2]:
-                    beste = kandidaat
-        if beste is None:
-            return None
-        return (beste[2], beste[1], beste[3], beste[4], beste[5])
-
-    def _relatie(self, geometrie: BaseGeometry, bouwwerk: BaseGeometry, afstand: float) -> str:
-        """De relatie tussen object en bouwwerk: binnen, kruist of nabij."""
-        if geometrie.within(bouwwerk):
-            return RELATIE_BINNEN
-        if afstand == 0.0:
-            return RELATIE_KRUIST
-        return RELATIE_NABIJ
 
     def _zin(self, relatie: str, afstand: float) -> str:
         """De relatie als leesbare zin voor in de melding."""

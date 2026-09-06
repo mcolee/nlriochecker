@@ -14,9 +14,12 @@ import logging
 from datetime import date
 from pathlib import Path
 
+import numpy as np
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
-from shapely.geometry import LineString, box
+from shapely.geometry import LineString, Point, box
+from shapely.geometry.base import BaseGeometry
+from shapely.strtree import STRtree
 
 from nlriochecker.checkconfig import CheckConfig, load_check_config
 from nlriochecker.checks import REGISTRY, CheckContext, CheckOutcome, run_checks
@@ -25,8 +28,9 @@ from nlriochecker.checks.extern import (
     MARKERING_NIET_TOETSBAAR,
     KruisingMetBouwwerk,
     _ExterneCheck,
+    _geraakte_bouwwerken,
 )
-from nlriochecker.externedata import ExternalData, load_external_data
+from nlriochecker.externedata import ExternalData, VectorLayer, load_external_data
 from nlriochecker.uitvoer.melding import bouw_meldingen
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -763,3 +767,60 @@ def test_ext003_geeft_elke_doorkruising_een_eigen_melding_id(
     assert len(negens) == 2
     assert len({melding.melding_id for melding in negens}) == 2
     assert [record.message for record in caplog.records] == []
+
+
+def _bouwwerklaag(role: str, polygonen: list[BaseGeometry]) -> VectorLayer:
+    """Een minimale bouwwerklaag met STRtree, voor de tiebreak-tests van EXT-001."""
+    return VectorLayer(
+        role=role,
+        source=Path(f"{role}.gpkg"),
+        layer="laag",
+        crs="EPSG:28992",
+        geometries=tuple(polygonen),
+        tree=STRtree(polygonen),
+    )
+
+
+def test_ext001_tiebreak_kiest_bij_gelijke_rang_en_afstand_de_eerste_laag() -> None:
+    """Ligt een object binnen een pand in twee lagen, dan wint de laag met de laagste index.
+
+    Beide treffers hebben rang 0 (binnen) en afstand 0,0 m; alleen de laagvolgorde
+    onderscheidt ze. `_geraakte_bouwwerken` moet dan de eerste laag kiezen, net als de
+    lus die hij verving (de eerst aangetroffen kandidaat wint).
+    """
+    punt = Point(0.0, 0.0)
+    laag_a = _bouwwerklaag("bgt_pand", [box(-1.0, -1.0, 1.0, 1.0)])
+    laag_b = _bouwwerklaag("bag_pand", [box(-2.0, -2.0, 2.0, 2.0)])
+    geoms = np.array([punt], dtype=object)
+
+    winnaars = _geraakte_bouwwerken(geoms, [laag_a, laag_b], 5.0)
+
+    assert len(winnaars) == 1
+    obj_i, laag_i, feat_i, rang, afstand = winnaars[0]
+    assert (obj_i, laag_i, feat_i, rang) == (0, 0, 0, 0)
+    assert afstand == 0.0
+
+
+def test_ext001_tiebreak_kiest_binnen_een_laag_de_eerste_boompositie() -> None:
+    """Twee panden in dezelfde laag omsluiten het object; de eerste boompositie wint.
+
+    Beide hebben rang 0 en afstand 0,0 m, dus na de laagvolgorde beslist de volgorde van
+    de boomquery -- precies de kandidaat die de oude lus als eerste tegenkwam. De
+    verwachte winnaar wordt uit diezelfde query afgeleid, zodat de test niet van de
+    interne boomvolgorde hoeft uit te gaan.
+    """
+    punt = Point(0.7, 0.0)
+    laag = _bouwwerklaag("bgt_pand", [box(-1.0, -1.0, 1.0, 1.0), box(0.5, -1.0, 2.0, 1.0)])
+    geoms = np.array([punt], dtype=object)
+
+    paren = laag.tree.query(geoms, predicate="dwithin", distance=5.0)
+    eerste_feat = int(paren[1][paren[0] == 0][0])
+    assert len(paren[1][paren[0] == 0]) == 2  # beide panden zijn kandidaat en gelijk
+
+    winnaars = _geraakte_bouwwerken(geoms, [laag], 5.0)
+
+    assert len(winnaars) == 1
+    obj_i, laag_i, feat_i, rang, afstand = winnaars[0]
+    assert (obj_i, laag_i, rang) == (0, 0, 0)
+    assert feat_i == eerste_feat
+    assert afstand == 0.0

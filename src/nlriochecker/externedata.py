@@ -77,10 +77,14 @@ class VectorLayer:
         zoekvorm = geometrie.buffer(afstand) if afstand > 0 else geometrie
         for index in self.tree.query(zoekvorm):
             positie = int(index)
-            yield self.geometries[positie], self._attributen(positie)
+            yield self.geometries[positie], self.attributen(positie)
 
-    def _attributen(self, positie: int) -> dict[str, object]:
-        """De attributen van een feature, of een lege dict."""
+    def attributen(self, positie: int) -> dict[str, object]:
+        """De attributen van de feature op deze positie, of een lege dict.
+
+        `positie` is de boompositie: dezelfde index die `tree` en `geometries` delen,
+        zoals `tree.query(...)` en `nabij()` die opleveren.
+        """
         return self.attributes[positie] if positie < len(self.attributes) else {}
 
     def kolom(self, naam: str) -> list[object]:
