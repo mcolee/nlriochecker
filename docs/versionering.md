@@ -38,7 +38,23 @@ Het script doorloopt:
    afdwingt (BO-38);
 5. committen als `Versie X.Y.Z` -- alleen `pyproject.toml` en `uv.lock` bij naam, nooit
    wat de toets toevallig in de werkboom achterliet;
-6. taggen als `vX.Y.Z`.
+6. de `zwaar`-gemarkeerde tests draaien (`uv run --frozen pytest -m zwaar -q`), alleen
+   als `data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl` aanwezig is -- de enige De
+   Wolden-baseline die deze tests dekken (issue #157). Verplicht bij `minor` en `major`;
+   ontbreekt het bestand dan, dan breekt de uitgave af in plaats van de stap stilzwijgend
+   over te slaan. Bij `patch` overslaanbaar met `--zonder-zwaar`; die vlag is bij
+   `minor`/`major` zelf een reden om af te breken, want anders zet hij de verplichte poort
+   ongemerkt uit. Gemeten met een warme leeslaag-cache: 208 tests, ~476 s (7m56s)
+   wandklok, piekgeheugen ~2,4 GB (05-09-2026 telde het issue nog 11 tests op 2232; issue
+   #139 voegde er sindsdien een zwaar gemarkeerde, per fixture geparametriseerde
+   drifttest aan toe die het aantal naar 208 optrekt -- vandaar dat deze stap geen vast
+   aantal noemt);
+7. taggen als `vX.Y.Z`.
+
+Deze zesde stap staat bewust ná de versiecommit en vóór de tag: mislukt hij, dan draait
+`draai_alles_terug` dezelfde commit-en-bump terug als bij elke andere afgebroken stap:
+deze tests draaien zelf niet mee op de CI (die mist de De Wolden-export), dus dit is de
+enige plek waar ze de release kunnen tegenhouden.
 
 De tagcontrole staat bewust voor de bump: een tag die al bestaat is te weten zonder ook
 maar iets te schrijven.

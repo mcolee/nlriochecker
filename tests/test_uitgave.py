@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import re
 import sys
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 from types import ModuleType
@@ -204,6 +205,147 @@ def test_de_workflows_pinnen_hun_actions_op_een_sha() -> None:
         assert gebruiken, f"{naam} noemt geen enkele action"
         for regel in gebruiken:
             assert PATROON_PIN.search(regel), f"{naam}: `{regel.strip()}` is niet op een SHA gepind"
+
+
+def test_zwaar_toets_draait_de_suite_als_de_data_er_is() -> None:
+    """Met de export aanwezig draait de zesde stap gewoon de zwaar-suite (issue #157)."""
+    module = _laad_script()
+    opdrachten: list[tuple[str, ...]] = []
+    module._draai = lambda *opdracht, opvangen=False: (opdrachten.append(opdracht), "")[1]
+    module._meld = lambda *_a, **_k: None
+
+    module.zwaar_toets("major", False, data_pad=SCRIPT)  # SCRIPT bestaat sowieso
+
+    assert opdrachten == [("uv", "run", "--frozen", "pytest", "-m", "zwaar", "-q")]
+
+
+def test_zwaar_toets_slaat_over_met_de_vlag_bij_patch() -> None:
+    """`--zonder-zwaar` mag de suite overslaan, maar alleen bij een patch."""
+    module = _laad_script()
+    module._draai = lambda *_o, **_k: pytest.fail("de suite had niet mogen draaien")
+    module._meld = lambda *_a, **_k: None
+
+    module.zwaar_toets("patch", True, data_pad=Path("/bestaat-niet"))
+
+
+def test_zwaar_toets_breekt_af_zonder_data_bij_minor_of_major() -> None:
+    """Ontbrekende De Wolden-export bij een verplichte run is een afgebroken uitgave,
+    geen stille overslag (het strengste dat consistent is met kop 2/6 van issue #157)."""
+    module = _laad_script()
+
+    with pytest.raises(module.ReleaseAbortedError, match="ontbreekt"):
+        module.zwaar_toets("minor", False, data_pad=Path("/bestaat-niet"))
+
+
+def test_controleer_zonder_zwaar_weigert_de_vlag_buiten_patch() -> None:
+    """`--zonder-zwaar` bij minor/major zou de verplichte poort stilzwijgend uitzetten;
+    deze voorcontrole hoort daarom vooraan, naast de andere `controleer_*`-functies."""
+    module = _laad_script()
+
+    with pytest.raises(module.ReleaseAbortedError, match="patch"):
+        module.controleer_zonder_zwaar("minor", True)
+
+
+def test_controleer_zonder_zwaar_laat_de_geldige_gevallen_door() -> None:
+    """Patch met de vlag, en elk soort zonder de vlag, zijn geen reden om af te breken."""
+    module = _laad_script()
+
+    module.controleer_zonder_zwaar("patch", True)
+    for soort in module.SOORTEN:
+        module.controleer_zonder_zwaar(soort, False)
+
+
+def test_main_breekt_af_voor_de_poort_en_de_commit_bij_minor_zonder_zwaar() -> None:
+    """`uitgave.py minor --zonder-zwaar` mag niet eerst de hele poort en de versiecommit
+    doorlopen om pas daarna te struikelen (reviewbevinding op issue #157): de vlag wordt
+    vooraan geweigerd, vóór `controleer_werkboom` en dus vóór elke state-wijziging.
+    """
+    module = _laad_script()
+    aangeroepen: list[str] = []
+
+    def _spion(naam: str) -> Callable[..., None]:
+        def _fn(*_a: object, **_k: object) -> None:
+            aangeroepen.append(naam)
+
+        return _fn
+
+    module._git = lambda *_a, **_k: str(WORTEL)
+    module.controleer_werkboom = _spion("werkboom")
+    module.controleer_niet_achter = _spion("niet_achter")
+    module.controleer_changelog = _spion("changelog")
+    module.voorspel_versie = _spion("voorspel_versie")
+    module.bump = _spion("bump")
+    module.toets = _spion("toets")
+    module.schrijf_changelog = _spion("schrijf_changelog")
+    module.leg_vast = _spion("leg_vast")
+
+    uitkomst = module.main(["minor", "--zonder-zwaar"])
+
+    assert uitkomst == 1
+    assert aangeroepen == []
+
+
+UITGAVE_EIGEN_STAPPEN = frozenset({"pytest -m zwaar"})
+# Issue #158 voegt hier een wheel-rooktest toe die alleen in toets.yml komt te staan;
+# die naam hoort dan in deze lijst, niet als stilzwijgende asymmetrie.
+WORKFLOW_EIGEN_STAPPEN: frozenset[str] = frozenset()
+
+
+def _uv_run_stapnaam(commando: str) -> str | None:
+    """Herleidt een korte stapnaam uit een `uv run ...`-commandoregel, anders None."""
+    delen = commando.split()
+    if delen[:2] != ["uv", "run"]:
+        return None
+    kern: list[str] = []
+    i = 2
+    while i < len(delen):
+        if delen[i] == "--frozen":
+            i += 1
+            continue
+        if delen[i] == "--with":
+            i += 2
+            continue
+        kern.append(delen[i])
+        i += 1
+    if not kern:
+        return None
+    if kern[0] == "pytest" and "-m" in kern:
+        return f"pytest -m {kern[kern.index('-m') + 1]}"
+    if len(kern) > 1 and not kern[1].startswith("-"):
+        return f"{kern[0]} {kern[1]}"
+    return kern[0]
+
+
+def test_de_stappenlijst_van_uitgave_en_toets_yml_blijft_gelijk() -> None:
+    """De poortstappen van `uitgave.py` en `toets.yml` blijven gelijk, op de benoemde
+    uitzonderingen na (issue #157). De zwaar-suite hoort wel in de uitgave (verplicht bij
+    minor/major) maar niet in de CI-workflow (de runner mist de De Wolden-export); dat is
+    de enige toegestane asymmetrie totdat issue #158 er zelf een aan de workflow-kant
+    aan toevoegt.
+    """
+    module = _laad_script()
+    opdrachten: list[tuple[str, ...]] = []
+    module._draai = lambda *opdracht, opvangen=False: (opdrachten.append(opdracht), "")[1]
+    module._meld = lambda *_a, **_k: None
+
+    module.toets()
+    module.zwaar_toets("major", False, data_pad=SCRIPT)
+
+    uitgave_stappen = {
+        naam
+        for opdracht in opdrachten
+        if (naam := _uv_run_stapnaam(" ".join(opdracht))) is not None
+    }
+
+    workflow_tekst = (WORKFLOWS / "toets.yml").read_text(encoding="utf-8")
+    workflow_stappen = {
+        naam
+        for regel in (ruwe_regel.strip() for ruwe_regel in workflow_tekst.splitlines())
+        if regel.startswith("run: ")
+        if (naam := _uv_run_stapnaam(regel.removeprefix("run: "))) is not None
+    }
+
+    assert uitgave_stappen - UITGAVE_EIGEN_STAPPEN == workflow_stappen - WORKFLOW_EIGEN_STAPPEN
 
 
 def test_het_echte_wijzigingslog_is_verwerkbaar() -> None:

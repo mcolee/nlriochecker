@@ -11,6 +11,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Toegevoegd
+
+- **De `zwaar`-gemarkeerde tests draaien als zesde stap in `scripts/uitgave.py`**
+  (issue #157): ze zijn de enige De Wolden-baseline en geen poort draaide ze voorheen.
+  Verplicht bij `minor`/`major` (breekt af als
+  `data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl` ontbreekt), overslaanbaar met
+  `--zonder-zwaar` bij een `patch`. Een nieuwe drifttest bindt de poortstappen van
+  `uitgave.py` en `.github/workflows/toets.yml` aan elkaar, met een benoemde uitzondering
+  per kant. Gemeten: 208 tests, ~476 s wandklok (issue #157 noemde nog 11; issue #139
+  voegde er sindsdien een zwaar, per fixture geparametriseerde drifttest aan toe).
+
 ### Gewijzigd
 
 - **De mechanische poort draait pytest parallel (`-n 4`) via `pytest-xdist`** (BO-94):

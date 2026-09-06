@@ -41,6 +41,9 @@ VERSIEPATROON = re.compile(r"^\d+\.\d+\.\d+$")
 CHANGELOG = "CHANGELOG.md"
 # Deze drie gaan mee in de versiecommit en worden bij het terugdraaien hersteld.
 VERSIEBESTANDEN = ("pyproject.toml", "uv.lock", CHANGELOG)
+# De enige De Wolden-baseline die de `zwaar`-gemarkeerde tests dekken (issue #157);
+# zonder dit bestand kan de suite niet draaien.
+ZWAAR_DATA = Path("data/gwsw_orox_ttl/dewoldenhoogeveen_orox.ttl")
 KOP_UNRELEASED = "## [Unreleased]"
 # De kop moet aan het begin van een regel staan; anders zou dezelfde tekst in de
 # inleiding het wijzigingslog stilzwijgend op de verkeerde plek doorsnijden.
@@ -124,6 +127,17 @@ def controleer_niet_achter() -> None:
     _meld(f"gelijk met {tracking}", "ok" if voor == "0" else f"{voor} voor")
 
 
+def controleer_zonder_zwaar(soort: str, zonder_zwaar: bool) -> None:
+    """Weigert `--zonder-zwaar` buiten een patch-uitgave, vóór enige state-wijziging.
+
+    Zonder deze vooraan-controle zou `uitgave.py minor --zonder-zwaar` de volledige
+    poort en de versiecommit doorlopen en pas bij `zwaar_toets` (ná minuten werk)
+    struikelen -- precies wat de andere `controleer_*`-functies hier vooraan voorkomen.
+    """
+    if zonder_zwaar and soort != "patch":
+        raise ReleaseAbortedError("--zonder-zwaar is alleen geldig bij een patch-uitgave")
+
+
 def huidige_versie() -> str:
     """Leest het nummer zoals het nu in pyproject.toml staat."""
     return _draai("uv", "version", "--short", opvangen=True).strip()
@@ -195,6 +209,29 @@ def toets() -> None:
         f"--cov-fail-under={DEKKINGSONDERGRENS}",
     )
     _meld(f"pytest + dekking >={DEKKINGSONDERGRENS}%")
+
+
+def zwaar_toets(soort: str, zonder_zwaar: bool, *, data_pad: Path = ZWAAR_DATA) -> None:
+    """Draait de `zwaar`-gemarkeerde tests als extra poort tussen de versiecommit en de tag.
+
+    Verplicht voor `minor` en `major`; bij `patch` overslaanbaar met `--zonder-zwaar`.
+    Zonder de De Wolden-export (`data/gwsw_orox_ttl/...`) kan de suite niet draaien; bij
+    een verplichte run is dat dan een afgebroken uitgave (issue #157), geen stille
+    overslag zoals kop 6 van dat issue voor de CI wél aanneemt.
+
+    `--zonder-zwaar` buiten een patch is al vooraan geweigerd door
+    `controleer_zonder_zwaar`; deze functie past de vlag alleen nog toe.
+    """
+    if zonder_zwaar:
+        _meld("pytest -m zwaar", "overgeslagen (--zonder-zwaar)")
+        return
+    if not data_pad.exists():
+        raise ReleaseAbortedError(
+            f"{data_pad} ontbreekt; de zwaar-suite kan niet draaien en is verplicht bij "
+            f"--{soort} (gebruik --zonder-zwaar alleen bij een patch)"
+        )
+    _draai("uv", "run", "--frozen", "pytest", "-m", "zwaar", "-q")
+    _meld("pytest -m zwaar")
 
 
 def _secties(tekst: str) -> tuple[str, str, str]:
@@ -314,6 +351,11 @@ def main(argv: list[str] | None = None) -> int:
         prog="uitgave", description="Bumpt de versie, toetst, commit en tagt."
     )
     ontleder.add_argument("soort", choices=SOORTEN, help="welk deel van het nummer ophoogt")
+    ontleder.add_argument(
+        "--zonder-zwaar",
+        action="store_true",
+        help="sla de zwaar-gemarkeerde tests over; alleen geldig bij patch (issue #157)",
+    )
     argumenten = ontleder.parse_args(argv)
 
     gebumpt = False
@@ -322,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
     tag: str | None = None
     try:
         os.chdir(Path(_git("rev-parse", "--show-toplevel")))
+        controleer_zonder_zwaar(argumenten.soort, argumenten.zonder_zwaar)
         controleer_werkboom()
         controleer_niet_achter()
 
@@ -346,6 +389,8 @@ def main(argv: list[str] | None = None) -> int:
 
         leg_vast(versie)
         vastgelegd = True
+
+        zwaar_toets(argumenten.soort, argumenten.zonder_zwaar)
 
         _git("tag", "-a", tag, "-m", f"Versie {versie}")
         _meld(f"tag     {tag}")
