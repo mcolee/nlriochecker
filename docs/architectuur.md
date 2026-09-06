@@ -336,7 +336,14 @@ alleen het bestand waarin zij staat is verhuisd.
   bekend. De grijze `onbekend`-stijl wordt hergebruikt; alleen de popupregel splitst
   ("mechanische leiding -- geen vrijvervalrichting" in plaats van "BOB-richting niet te
   bepalen"), via een popup-only sleutel in `RICHTING_IN_WOORDEN` die géén kolomwaarde is.
-  Zie issue #74 en BO-29.
+  Zie issue #74 en BO-29. Dezelfde constructie geldt sinds issue #151 voor een
+  vrijvervalstreng waarvan het verval binnen de vlak-band van NET-009 valt
+  (`drempels.tegenverhang_licht_m`): daar is de tekenrichting wél bekend, maar de BOB zegt
+  binnen die band niets over de stroomrichting (BO-76), dus staat `richting_bob` op
+  `onbekend` en zegt de popup via de sleutel `RICHTING_VLAK` "BOB ligt vlak". Deze
+  beslissing zit wél in `_richting_bob` -- de band hangt aan het verval, niet aan de
+  mechanische populatie -- en `bob_verval_m` blijft ook hier staan. Geen vierde kolomwaarde:
+  het contract van `richting_bob` blijft `mee`/`tegen`/`onbekend`.
 - De laag `vlakken` (MULTIPOLYGON) draagt naast de rioleringslagen alles wat bij de
   uitslag hoort en geen punt of lijn is. Sinds issue #104 drie bronnen, één laag (BO-73,
   issue #98), en de

@@ -623,7 +623,68 @@ def test_strengen_dragen_de_bob_richting(tmp_path: Path) -> None:
         elif richting == "tegen":
             assert verval < 0
         else:
-            assert verval is None or verval == 0
+            # `onbekend` dekt sinds issue #151 ook de vlak-band van NET-009: dan blijft
+            # het gemeten verval staan maar valt het binnen die band. Buiten de band is
+            # de kolom alleen `onbekend` als er geen verval is of geen tekenrichting.
+            assert verval is None or abs(verval) <= 0.01
+
+
+def test_vlakke_bob_binnen_de_band_geeft_geen_pijl(tmp_path: Path) -> None:
+    """Issue #151: een streng met een verval binnen de vlak-band van NET-009 krijgt geen
+    richtingspijl.
+
+    De streng daalt 0,005 m langs de getekende lijn, ruim binnen de band van 0,01 m
+    (`drempels.tegenverhang_licht_m`). NET-009 doet daar geen uitspraak over de
+    stroomrichting, dus een `mee`/`tegen`-pijl zou de kaart met de check laten botsen. De
+    kolom staat op `onbekend` en de popup zegt dat de BOB vlak ligt -- niet dat de richting
+    onbepaalbaar was. Alleen de pijl vervalt: het gemeten verval blijft in `bob_verval_m`.
+    """
+    pad = _schrijf(_run("richting_vlak_met_bob.ttl"), tmp_path)
+
+    ((richting, verval, popup),) = _rijen(
+        pad, "select richting_bob, bob_verval_m, popup_html from strengen"
+    )
+
+    assert richting == "onbekend"
+    assert verval == pytest.approx(0.005)
+    assert "BOB ligt vlak" in popup
+    assert "BOB-richting niet te bepalen" not in popup
+
+
+def test_gewone_onbekende_streng_behoudt_de_niet_te_bepalen_popupregel(tmp_path: Path) -> None:
+    """Een `onbekend` buiten de vlak-band houdt de popupregel "BOB-richting niet te bepalen".
+
+    De streng heeft dezelfde put aan begin- en eindpunt: de tekenrichting is niet te
+    bepalen (buiten de band, niet erdoor). De vlak-band van issue #151 mag die regel niet
+    stilzwijgend wegnemen -- dat gebeurde toen de gewone onbekend-takken een lege
+    popupsleutel teruggaven, waardoor `_feiten` de regel oversloeg.
+    """
+    pad = _schrijf(_run("richting_niet_bepaalbaar_met_bob.ttl"), tmp_path)
+
+    ((richting, popup),) = _rijen(pad, "select richting_bob, popup_html from strengen")
+
+    assert richting == "onbekend"
+    assert "BOB-richting niet te bepalen" in popup
+    assert "BOB ligt vlak" not in popup
+
+
+def test_vlakke_bob_van_precies_nul_geeft_geen_pijl(tmp_path: Path) -> None:
+    """Issue #151 (fixronde 1): een verval van precies 0,0 m valt onder de vlak-band.
+
+    NET-009 classificeert een streng met gelijke BOB aan begin en eind als vlak; de kaart
+    hoort dat te volgen. De kolom staat op `onbekend` (geen pijl) en de popup zegt "BOB ligt
+    vlak", niet "niet te bepalen". Alleen een ontbrekend verval (`None`) blijft onbepaalbaar.
+    """
+    pad = _schrijf(_run("net009_vlakke_streng.ttl"), tmp_path)
+
+    ((richting, verval, popup),) = _rijen(
+        pad, "select richting_bob, bob_verval_m, popup_html from strengen"
+    )
+
+    assert richting == "onbekend"
+    assert verval == pytest.approx(0.0)
+    assert "BOB ligt vlak" in popup
+    assert "BOB-richting niet te bepalen" not in popup
 
 
 def test_omgekeerd_getekende_streng_meet_het_verval_langs_de_lijn(tmp_path: Path) -> None:

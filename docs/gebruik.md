@@ -373,10 +373,13 @@ stille default.
 
 Een streng draagt daarbovenop een richtingpijl: groen als het BOB-verval met de getekende
 lijn meeloopt, **rood en omgekeerd** als het daar tegenin loopt -- de pijl wijst dan waar
-het water werkelijk heen loopt -- en grijs als de richting niet te bepalen is. Een
-persleiding krijgt altijd de grijze pijl, ook als zij een BOB-verval draagt: zij is
-pompgestuurd, dus dat verval zegt niets over de stroomrichting. De popup zegt dat er ook
-bij.
+het water werkelijk heen loopt -- en grijs als de richting niet te bepalen is. Ligt de BOB
+vlak (het verval valt binnen de vlak-band van NET-009, `drempels.tegenverhang_licht_m`),
+dan krijgt de streng ook de grijze pijl: zo'n klein verval valt binnen de
+inwinnauwkeurigheid en zegt niets over de stroomrichting, dus een rode of groene pijl zou
+de kaart met de check laten botsen. De popup zegt dan dat de BOB vlak ligt. Een persleiding
+krijgt altijd de grijze pijl, ook als zij een BOB-verval draagt: zij is pompgestuurd, dus
+dat verval zegt niets over de stroomrichting. De popup zegt dat er ook bij.
 
 De laag `vlakken` heeft een legendaregel per check, met de checkcode voorop: EXT-001 voor
 pand en bouwwerk samen, EXT-003 voor water, RVZ-006 voor het gemengde deelstelsel en

@@ -432,13 +432,25 @@ def _blob(geometrie: BaseGeometry) -> bytes:
 # --------------------------------------------------------------------------- #
 
 
-def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple[str, float | None]:
-    """De BOB-richting ten opzichte van de getekende lijn, en het verval erlangs.
+def _richting_bob(
+    run: CheckRun, conduit: Conduit, config: CheckConfig
+) -> tuple[str, str, float | None]:
+    """De BOB-richting: de kolomwaarde, de popupsleutel en het verval langs de lijn.
 
     Het BOB-verval is administratief: van beginpunt naar eindpunt. De pijl op de
     kaart volgt de getekende lijn. Loopt de lijn andersom dan de administratie, dan
     keert het teken om -- anders zou de kaart het tegenovergestelde tonen van wat er
     staat.
+
+    Geeft drie dingen terug: de waarde van de kolom `richting_bob` (`mee`, `tegen` of
+    `onbekend`), de sleutel waaronder de popup die richting verwoordt (`RICHTING_IN_WOORDEN`)
+    en het verval langs de getekende lijn. Voor een gewone `mee`/`tegen`-streng zijn de
+    eerste twee gelijk; ze lopen uiteen zodra de kolom `onbekend` is om een reden die de
+    popup preciezer kan benoemen dan "niet te bepalen".
+
+    Ontbreekt het verval (`verval is None`: geen geregistreerde BOB), dan is er niets om
+    een richting op te baseren; de rij krijgt `onbekend` met een lege waarde en de popup
+    zegt "BOB-richting niet te bepalen" via de sleutel `RICHTING_ONBEKEND`.
 
     Is de tekenrichting niet te bepalen (`richting_van_geometrie` geeft None: geen
     lijngeometrie, geen herleidbare putten, of dezelfde put aan beide zijden), dan is
@@ -446,21 +458,33 @@ def _richting_bob(run: CheckRun, conduit: Conduit, config: CheckConfig) -> tuple
     stilzwijgend terugvallen op het administratieve teken *niet* terug op iets
     juists: de kolom staat gedocumenteerd als het verval langs de getekende lijn, en
     zonder bekende tekenrichting is er geen waarde die dat eerlijk uitdrukt. De rij
-    krijgt dan `onbekend` met een lege waarde, net als bij een ontbrekend of nul
-    BOB-verval.
+    krijgt dan `onbekend` met een lege waarde; de popupsleutel is `RICHTING_ONBEKEND`
+    en de tekst wordt "BOB-richting niet te bepalen".
+
+    Valt het verval binnen de vlak-band van NET-009 (`drempels.tegenverhang_licht_m`,
+    een verval van precies nul inbegrepen), dan is de tekenrichting wél bekend maar zegt
+    de BOB niets over de stroomrichting: de band is inwinnauwkeurigheid zonder
+    handelingsperspectief (issue #151, BO-76). De kolom gaat op `onbekend` zodat er geen
+    pijl komt -- geen vierde kolomwaarde, het contract blijft intact -- maar de popup zegt
+    via `RICHTING_VLAK` dat de BOB vlak ligt in plaats van dat de richting onbepaalbaar
+    was. Het gemeten verval blijft, net als op mechanisch riool, gewoon in `bob_verval_m`
+    staan.
 
     Deze functie weet niets van mechanisch riool: dat de *pijl* daar wegvalt is een
     besluit van de schrijver en staat op de enige plek waar de mechanische populatie
     bekend is (`_schrijf_features`, issue #74). Het verval zelf blijft er wel staan.
     """
     verval = conduit.bob_verval
-    if verval is None or verval == 0.0:
-        return RICHTING_ONBEKEND, verval
+    if verval is None:
+        return RICHTING_ONBEKEND, RICHTING_ONBEKEND, verval
     uitslag = run.dataset.richting_van_geometrie(conduit, config.klassen.netwerkknopen)
     if uitslag is None:
-        return RICHTING_ONBEKEND, None
+        return RICHTING_ONBEKEND, RICHTING_ONBEKEND, None
     langs_lijn = -verval if uitslag[0] else verval
-    return (RICHTING_MEE if langs_lijn > 0 else RICHTING_TEGEN), langs_lijn
+    if abs(verval) <= config.drempels.tegenverhang_licht_m:
+        return RICHTING_ONBEKEND, RICHTING_VLAK, langs_lijn
+    richting = RICHTING_MEE if langs_lijn > 0 else RICHTING_TEGEN
+    return richting, richting, langs_lijn
 
 
 def _samenvatting_kolommen() -> list[_Kolom]:
@@ -617,8 +641,10 @@ def _schrijf_features(
                 continue
             grenzen.append(geometrie.bounds)
             is_mechanisch = uri in mechanisch
-            richting, verval = (
-                _richting_bob(run, object_, config) if isinstance(object_, Conduit) else ("", None)
+            richting, richting_woord, verval = (
+                _richting_bob(run, object_, config)
+                if isinstance(object_, Conduit)
+                else ("", "", None)
             )
             # Een mechanische leiding is pompgestuurd: het water loopt er niet met het
             # bodemverval mee, dus een groene of rode pijl zou een stroomrichting tekenen
@@ -626,11 +652,11 @@ def _schrijf_features(
             # blijft in `bob_verval_m` staan, want dat is een gemeten waarde en geen
             # bewering over de stroomrichting. De popupregel zegt waarom er geen pijl is;
             # zonder die eigen tekst zou hij "niet te bepalen" beweren waar de leiding er
-            # domweg geen heeft.
+            # domweg geen heeft. Voor vrijvervalstrengen draagt `_richting_bob` de
+            # popupsleutel zelf aan (leeg, `RICHTING_VLAK` binnen de NET-009-band, of gelijk
+            # aan de kolomwaarde).
             if is_mechanisch:
                 richting, richting_woord = RICHTING_ONBEKEND, RICHTING_MECHANISCH
-            else:
-                richting_woord = richting
             afvoer_eindpunt, afvoer_meters, afvoer_stappen = _afvoer_velden(
                 run.context, afvoer_per_knoop, uri, object_
             )
@@ -1528,6 +1554,16 @@ def _samenvatting(
 # hun eigen `objecttype`-regel een paar pixels hoger tegenspreekt.
 RICHTING_MECHANISCH = "mechanisch"
 
+# De sleutel waaronder een streng met een vlakke BOB haar popupregel krijgt (issue #151).
+# Net als `RICHTING_MECHANISCH` geen waarde van de kolom `richting_bob` -- die staat op
+# `onbekend`, zodat er geen pijl komt en de grijze stijl hergebruikt wordt -- maar een
+# popup-only sleutel: valt |verval| binnen de vlak-band van NET-009
+# (`drempels.tegenverhang_licht_m`), dan zegt de BOB niets over de stroomrichting en zou
+# een pijl een richting tekenen die de check zelf niet durft te noemen. Zo houdt de popup
+# "de BOB ligt vlak" en "de richting is niet te bepalen" uit elkaar, twee dingen die op de
+# kaart dezelfde kleur krijgen.
+RICHTING_VLAK = "vlak"
+
 # Hoe de kolom `richting_bob` in de popup gelezen wordt. De logica erachter blijft
 # ongewijzigd (`_richting_bob`); dit is alleen de verwoording.
 RICHTING_IN_WOORDEN = {
@@ -1535,6 +1571,7 @@ RICHTING_IN_WOORDEN = {
     RICHTING_TEGEN: "BOB-verval loopt tegen de getekende lijn in",
     RICHTING_ONBEKEND: "BOB-richting niet te bepalen",
     RICHTING_MECHANISCH: "mechanische leiding — geen vrijvervalrichting",
+    RICHTING_VLAK: "BOB ligt vlak",
 }
 
 

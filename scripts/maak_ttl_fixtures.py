@@ -3282,6 +3282,20 @@ FIXTURES["richting_persleiding_met_bob.ttl"] = (
 )
 
 
+# Issue #151: een streng waarvan de BOB binnen de vlak-band van NET-009 valt
+# (|verval| <= drempels.tegenverhang_licht_m, standaard 0,01 m). Het verval is 0,005 m
+# dalend langs de getekende lijn (A -> B), dus de tekenrichting is bekend en zou anders
+# een pijl `mee` geven; binnen de band zegt de BOB niets over de stroomrichting, dus de
+# kolom `richting_bob` hoort `onbekend` te zijn en de popup 'BOB ligt vlak' te noemen.
+FIXTURES["richting_vlak_met_bob.ttl"] = (
+    "geen; streng 1 daalt 0,005 m langs de getekende lijn en valt binnen de vlak-band "
+    "van NET-009 (issue #151)",
+    put("PutA", "A", 1000.0, 2000.0)
+    + put("PutB", "B", 1050.0, 2000.0)
+    + leiding("L1", "1", [(1000.0, 2000.0), (1050.0, 2000.0)], "PutA", "PutB", bob=(10.005, 10.0)),
+)
+
+
 # EXT-009 (issue #104): drie kandidaat-wegvakken uit `tests/fixtures/gis/ext`, waarvan
 # er precies een riolering in zijn eigen voronoi-cel heeft. De NWB-lijnen, de bebouwde
 # kom en de BGT-wegdelen komen uit `scripts/maak_gis_fixtures.py`:

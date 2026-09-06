@@ -13,6 +13,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Geen richtingspijl op een vlakke BOB** (issue #151): de kaartpijl `richting_bob` in de
+  GeoPackage las alleen `verval is None or verval == 0.0` en tekende bij elk ander verval een
+  `mee`/`tegen`-pijl -- ook binnen de vlak-band van NET-009 (`drempels.tegenverhang_licht_m`),
+  waar de check zelf geen uitspraak doet ("deze toets doet daar geen uitspraak"). Op De Wolden
+  waren dat 557 pijlen (waarvan 176 rode "water loopt andersom") op strengen zonder uitspraak.
+  `_richting_bob` zet `richting_bob` nu op `onbekend` zodra `abs(verval) <=
+  drempels.tegenverhang_licht_m`, met de popuptekst "BOB ligt vlak" via de popup-only sleutel
+  `RICHTING_VLAK` in `RICHTING_IN_WOORDEN`. Geen vierde kolomwaarde: het contract van
+  `richting_bob` blijft `mee`/`tegen`/`onbekend` en `bob_verval_m` blijft de gemeten waarde
+  dragen. Geen enkele melding verandert; op De Wolden zakt het aantal pijlen van 14.816 naar
+  14.259.
 - **Eén foutentotaal per rapport** (issue #150): de Verantwoording en de terminaltelling van
   `toets` telden over `run.count` (de bevindingen *vóór* de onderdrukking uit `[rapport]`),
   terwijl de managementsamenvatting en de meldingentabel over de meldingenstroom (erná)
