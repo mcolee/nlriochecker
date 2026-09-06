@@ -24,9 +24,9 @@ from nlriochecker.plausibiliteit import PlausibilityTables, load_plausibility
 from nlriochecker.studiegebied import StudyArea
 
 if TYPE_CHECKING:  # pragma: no cover
-    # Alleen als type. `nulbevinding` leest `uitvoer.identiteit`, en die module
-    # trekt via haar package `checks` weer binnen; een gewone import zou de kring
-    # rond maken.
+    # Alleen als type. `nulbevinding` hangt aan de leeslaag en de nulmeting; die hier
+    # bij het laden van de checkmodule binnentrekken is onnodig, dus de import staat
+    # onder `TYPE_CHECKING`.
     from nlriochecker.nulbevinding import Nulbevinding
 
 

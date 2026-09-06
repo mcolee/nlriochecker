@@ -87,13 +87,25 @@ RUNDATUM = date(2026, 8, 17)
 # Patronen in plaats van substrings, om twee redenen. Het Nederlandse `knopen(`
 # eindigt op `open(`, dus een kale substring vlagt de halve check-engine. En
 # `pad.open("rb")` is lezen: alleen een modus met w, a of x telt als schrijven.
+#
+# Issue #160 verbreedde de lijst: een tegenproef bewees dat zeven schrijfvormen
+# ontsnapten die in een geopandas/pandas-codebase voor de hand liggen. `to_file`
+# (geopandas), `to_pickle`, `to_html`, `to_markdown`, `to_xml`, `to_feather` en
+# `to_string(buf=...)` zijn `DataFrame`/`GeoDataFrame`-schrijvers, en `open(...,
+# mode="w")` zet de modus als sleutelwoord in plaats van als tweede argument. De
+# `open`-patronen blijven aan `open(` verankerd, zodat `@model_validator(mode="after")`
+# niet meevalt.
 DIRECTE_SCHRIJVERS = (
-    r"\.to_(csv|json|excel|parquet)\(",
+    r"\.to_(csv|json|excel|parquet|file|pickle|html|markdown|xml|feather)\(",
+    r"\.to_string\(\s*buf=",
     r"\.write_(text|bytes)\(",
     # `pad.open("w")` en `open(pad, "w")`. De modus moet op zijn eigen plek staan;
     # anders telt `path.open(encoding=..., newline="")` als schrijven.
     r"\bopen\(\s*[\"'][^\"']*[wax]",
     r"\bopen\([^,)]+,\s*[\"'][^\"']*[wax]",
+    # `open(pad, mode="w")` en `pad.open(encoding=..., mode="w")`: de modus als
+    # sleutelwoord. Verankerd aan `open(` zodat `@model_validator(mode="after")` niet valt.
+    r"\bopen\([^)]*\bmode\s*=\s*[\"'][^\"']*[wax]",
     r"\bjson\.dump",
     r"\bpickle\.dump",
     r"\bshutil\.(copy|move)",
@@ -340,6 +352,41 @@ def test_geen_enkele_module_schrijft_buiten_herkomst_om() -> None:
     )
 
     assert overtreders == []
+
+
+def _schrijft(code: str) -> bool:
+    """Of `DIRECTE_SCHRIJVERS` deze regel code als schrijver herkent."""
+    return any(re.search(patroon, code) for patroon in DIRECTE_SCHRIJVERS)
+
+
+def test_de_schrijversweep_kan_werkelijk_afgaan() -> None:
+    """De tegenproef bij de single-writer-sweep (issue #160).
+
+    Zonder deze proef is een groene sweep niet te onderscheiden van een die de
+    schrijfvorm niet zou herkennen. Dit zijn de zeven vormen uit de repro van de
+    Fable-swarm die eerder ontsnapten; op één na worden ze nu gevangen.
+    """
+    assert _schrijft('with open(pad, mode="w", encoding="utf-8") as f: f.write(tekst)')
+    assert _schrijft('with pad.open(mode="w", encoding="utf-8") as f: f.write(tekst)')
+    assert _schrijft('with pad.open(encoding="utf-8", mode="w") as f: f.write(tekst)')
+    assert _schrijft('gdf.to_file(pad, driver="GPKG", layer="vlakken")')
+    assert _schrijft("tabel.to_pickle(pad)")
+    assert _schrijft("tabel.to_string(buf=pad)")
+
+
+def test_de_schrijversweep_laat_het_toegestane_met_rust() -> None:
+    """De keerzijde: wat geen schrijver is, mag ook echt langs.
+
+    Zonder deze helft zou een sweep die alles vlagt er even groen uitzien. `mode=` staat
+    ook in `@model_validator(mode="after")` en in een lees-`open`; geen van beide schrijft.
+    """
+    assert not _schrijft('@model_validator(mode="after")')
+    assert not _schrijft("@model_validator(mode='after')")
+    assert not _schrijft('with open(pad, mode="r", encoding="utf-8") as f: f.read()')
+    assert not _schrijft('pad.open(encoding="utf-8", newline="")')
+    # `boom.write(pad)` (ElementTree) blijft bewust buiten de lijst: een kale `.write(`
+    # botst met elke legitieme stream-`write` in de herkomstschrijver zelf.
+    assert not _schrijft('boom.write(pad, encoding="utf-8")')
 
 
 def test_meldingen_json_spiegelt_de_dataclass(toets: CheckRun) -> None:

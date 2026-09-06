@@ -265,6 +265,16 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             red=True,
         )
         gezakt = True
+    # Een waarschuwing, geen fout: kruipt het aantal geslaagde tests meer dan 10% boven de
+    # ondergrens, dan is die grens te laag geworden en vangt hij een regressie pas laat.
+    # Alleen als de grens gezet is; lokaal zonder de variabele zegt de poort niets (#160).
+    if minimum is not None and geslaagd > minimum * 1.10:
+        rapporteur.write_line(
+            f"{MINIMUM_ENV}={minimum}, maar er slaagden er {geslaagd} -- meer dan 10% boven de "
+            "ondergrens. Til de grens mee omhoog (nu ~95% van het CI-aantal), anders vangt hij "
+            "een regressie pas laat.",
+            red=True,
+        )
     if _strikt():
         onverwacht = _onverwachte_overslagen(overgeslagen_rapporten)
         if onverwacht:

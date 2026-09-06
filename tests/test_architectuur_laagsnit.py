@@ -18,8 +18,16 @@ issue #118 stonden ze alleen in proza -- net als de "één schrijver"-regel voor
   is de enige naad naar de graaflaag (issue #159).
 
 De sweeps lopen over de AST en niet over regels tekst: een import in een docstring of in
-een commentaarregel is geen import, en `checks/base.py` noemt `uitvoer.identiteit` in
-allebei.
+een commentaarregel is geen import, en een module die een andere module in haar proza
+noemt haalt haar daarmee niet binnen.
+
+Naast de laagsnit bewaakt dit bestand sinds issue #160 dat de eigen importgraaf kringvrij
+is: elke sterk samenhangende component (SCC) is een singleton. Tot dat issue verborg een
+handvol lazy imports één SCC van negentien modules
+(`checkconfig -> checks -> checks.base -> afbakening/externedata/karakteristiek ->
+checkconfig`). Een kring werkt zolang de imports lazy blijven, maar hij maakt de
+laadvolgorde broos en trekt bij één `load_check_config()` de hele check-engine mee; de
+test hieronder dwingt af dat hij weg blijft.
 
 Wat een AST-sweep niet kan, en hier bewust niet staat: "geen module zet een attribuut op
 een object uit `gwsw_orox_helpers`". Een toewijzing op een lokale variabele is statisch
@@ -35,6 +43,8 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+
+import networkx as nx
 
 BRON = Path(__file__).resolve().parents[1] / "src"
 PAKKET = "nlriochecker"
@@ -478,3 +488,87 @@ def test_de_sweeps_laten_het_toegestane_met_rust() -> None:
     # De naad-vragen en de door release B ongemoeide dataset-methoden zijn geen overtreding.
     assert _verwijderde_datasetaanroepen("context.knopen_van(w)") == []
     assert _verwijderde_datasetaanroepen("dataset.resolve_network_node(u, w)") == []
+
+
+def _dotted(pad: str) -> str:
+    """De puntnaam van een module uit haar pad onder `src/` (`a/b/__init__.py` -> `a.b`)."""
+    delen = list(Path(pad).with_suffix("").parts)
+    if delen[-1] == "__init__":
+        delen = delen[:-1]
+    return ".".join(delen)
+
+
+def _eigen_doelen(module: str, namen: tuple[str, ...], bekend: frozenset[str]) -> set[str]:
+    """De modules binnen deze package die een importregel raakt.
+
+    Exact op module, zonder de ouder-package mee te rekenen: `from a.b import c` raakt
+    `a.b.c` als dat een module is, anders `a.b`; het runnen van `a.__init__` bij die
+    import telt hier niet als afhankelijkheid, want anders zou elk pakket met een
+    eager `__init__` per definitie een kring vormen met zijn eigen submodules.
+    """
+    doelen = set()
+    if module in bekend:
+        doelen.add(module)
+    for naam in namen:
+        if (submodule := f"{module}.{naam}") in bekend:
+            doelen.add(submodule)
+    return doelen
+
+
+def _bouw_importgraaf(bronnen: dict[str, str]) -> nx.DiGraph:
+    """De gerichte importgraaf over een verzameling modules (puntnaam -> broncode).
+
+    Elke import die de AST oplevert telt mee -- ook een lazy import in een functie of
+    een import onder `if TYPE_CHECKING` -- want juist een lazy import is de weg waarlangs
+    een kring zich verbergt. Alleen imports naar een andere module in `bronnen` worden
+    een boog.
+    """
+    bekend = frozenset(bronnen)
+    graaf: nx.DiGraph = nx.DiGraph()
+    graaf.add_nodes_from(bekend)
+    for module, bron in bronnen.items():
+        for doelmodule, namen in _importregels(bron):
+            for doel in _eigen_doelen(doelmodule, namen, bekend):
+                if doel != module:
+                    graaf.add_edge(module, doel)
+    return graaf
+
+
+def _kringen(graaf: nx.DiGraph) -> list[list[str]]:
+    """De niet-triviale sterk samenhangende componenten, elk gesorteerd."""
+    return [
+        sorted(component)
+        for component in nx.strongly_connected_components(graaf)
+        if len(component) > 1
+    ]
+
+
+def test_de_eigen_import_graaf_is_kringvrij() -> None:
+    """Geen enkele SCC is groter dan een singleton (issue #160).
+
+    Een importkring maakt de laadvolgorde broos: hij blijft alleen werken zolang de
+    imports die hem sluiten lazy zijn, en trekt bij één `load_check_config()` de hele
+    check-engine mee. De negentien-module-SCC die dit issue opruimde
+    (`checkconfig -> checks -> ...`) hing achter een handvol lazy imports; deze test valt
+    zodra er een terugkomt.
+    """
+    bronnen = {_dotted(pad): bron for pad, bron in _modules()}
+
+    assert _kringen(_bouw_importgraaf(bronnen)) == []
+
+
+def test_de_kringtest_kan_werkelijk_afgaan() -> None:
+    """De tegenproef: op een graaf mét een kring vindt de test hem wel degelijk.
+
+    Zonder deze proef is een groene kringtest niet te onderscheiden van een die een
+    kring niet zou herkennen. Twee synthetische modules die elkaar importeren -- de een
+    lazy, in een functie -- horen als één SCC te verschijnen; een derde, losse module
+    niet.
+    """
+    bronnen = {
+        f"{PAKKET}.aa": f"from {PAKKET}.bb import x",
+        f"{PAKKET}.bb": f"def f():\n    from {PAKKET}.aa import y",
+        f"{PAKKET}.cc": "import os",
+    }
+
+    assert _kringen(_bouw_importgraaf(bronnen)) == [[f"{PAKKET}.aa", f"{PAKKET}.bb"]]

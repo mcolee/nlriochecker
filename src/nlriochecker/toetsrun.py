@@ -208,7 +208,7 @@ def voer_toets_uit(
     dekkingspoort op de bronnen hangt alleen van die bronnen af en hoort om dezelfde
     reden vooraan.
     """
-    config = load_check_config(opdracht.projectconfig)
+    config = load_check_config(opdracht.projectconfig, bekende_check_ids=set(REGISTRY))
     kies_cfk(opdracht.cfk, config.nulmeting.vereiste_cfk)
     gebieden = _studiegebieden(opdracht, config)
     bronnen = _externe_bronnen(opdracht, config)

@@ -13,6 +13,22 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Zes hekken die niet bijten, gerepareerd** (issue #160). (a) Een kringtest in
+  `tests/test_architectuur_laagsnit.py` (networkx) dwingt af dat elke import-SCC een
+  singleton is; de verborgen kring van negentien modules
+  (`checkconfig -> checks -> ...`) is opgeruimd door de `onderdruk_checks`-validatie uit
+  de pydantic-validator te halen (nu via `load_check_config(..., bekende_check_ids=...)`,
+  die de toetsrun voedt) en `kort`/`melding_id` naar de bladmodule
+  `nlriochecker.identiteit` te verplaatsen (`uitvoer.identiteit` blijft als re-export).
+  `load_check_config()` trekt daardoor geen enkele checkmodule meer mee. (b) De
+  single-writer-sweep vangt nu ook `to_file`/`to_pickle`/`to_html`/`to_markdown`/`to_xml`/
+  `to_feather`, `to_string(buf=)` en `open(..., mode="w")`, met een tegenproef. (c) Een
+  AST-test bewaakt dat elke `@register`-klasse in `checks/*.py` een ID in `REGISTRY`
+  levert -- een vergeten import in `checks/__init__.py` valt nu op. (f) Een test bewaakt
+  dat elk `ext_*_m`-veld dat een `.nabij`-aanroep voedt in `ext_zoekafstand_max_m` zit.
+  Elk hek heeft een tegenproef die aantoonbaar rood wordt. Geen verschuiving in de
+  De Wolden-uitvoer.
+
 - **De `zwaar`-gemarkeerde tests draaien als zesde stap in `scripts/uitgave.py`**
   (issue #157): ze zijn de enige De Wolden-baseline en geen poort draaide ze voorheen.
   Verplicht bij `minor`/`major` (breekt af als
@@ -23,6 +39,14 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   voegde er sindsdien een zwaar, per fixture geparametriseerde drifttest aan toe).
 
 ### Gewijzigd
+
+- **De CI toetst op Python 3.12 én 3.14, en de test-ondergrens is aangehaald** (issue
+  #160). `.github/workflows/toets.yml` draait de poort nu als matrix over beide versies
+  (setup-uv `python-version`, `uv sync --frozen` per cel); `.python-version` pint 3.12 als
+  lokale standaard. `NLRIOCHECKER_MIN_GESLAAGD` ging van 1670 (24% marge) naar 2290 (~95%
+  van de 2414 geslaagde tests in de laatste groene run), en een waarschuwing in
+  `pytest_sessionfinish` roept om een herijking zodra er meer dan 10% boven de grens
+  slagen -- alleen als de grens gezet is.
 
 - **De leeslaag-naad `leeslaag.py` bundelt de graafvragen op één plek** (issue #159):
   acht domeinvragen (`knopen_van`, `strengen_van`, `subject_uris_van`, `buren`,

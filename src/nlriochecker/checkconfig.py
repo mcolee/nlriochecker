@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import tomllib
+from collections.abc import Collection
 from importlib import resources
 from pathlib import Path
 from typing import Literal, Self
@@ -671,22 +672,6 @@ class ReportOptions(BaseModel):
         """De geparste records uit het uitzonderingenbestand; leeg zonder bestand."""
         return self._uitzonderingen
 
-    @field_validator("onderdruk_checks")
-    @classmethod
-    def _bekende_check_ids(cls, check_ids: list[str]) -> list[str]:
-        """Weigert een check-ID dat het register niet kent; dat zou stil niets onderdrukken."""
-        # Lazy: `checks/base.py` importeert deze module, dus een import op moduleniveau
-        # is een kringimport. Bij het valideren is het register allang geladen.
-        from nlriochecker.checks import REGISTRY
-
-        onbekend = [check_id for check_id in check_ids if check_id not in REGISTRY]
-        if onbekend:
-            raise ValueError(
-                f"onderdruk_checks kent {', '.join(onbekend)} niet; bekende checks: "
-                f"{', '.join(sorted(REGISTRY))}"
-            )
-        return check_ids
-
 
 class CheckConfig(BaseModel):
     """De volledige projectconfiguratie van de check-engine."""
@@ -719,8 +704,19 @@ def default_check_config_path() -> Path:
     return Path(str(resources.files("nlriochecker").joinpath(DEFAULT_CHECK_CONFIG_NAME)))
 
 
-def load_check_config(path: Path | None = None) -> CheckConfig:
-    """Leest de projectconfiguratie; zonder pad de meegeleverde standaard."""
+def load_check_config(
+    path: Path | None = None, *, bekende_check_ids: Collection[str] | None = None
+) -> CheckConfig:
+    """Leest de projectconfiguratie; zonder pad de meegeleverde standaard.
+
+    `bekende_check_ids` weigert een onbekend check-ID in `[rapport] onderdruk_checks`
+    (issue #65). De check-ID's komen van de beller mee in plaats van dat deze module
+    `nlriochecker.checks` importeert: dat zou een importkring sluiten
+    (`checkconfig -> checks -> checks.base -> ... -> checkconfig`, issue #160). De
+    toetsrun geeft er `set(REGISTRY)` voor; wie geen ID's meegeeft slaat de controle
+    over -- de subcommando's die geen rapport met onderdrukking schrijven hebben haar
+    niet nodig.
+    """
     path = Path(path) if path is not None else default_check_config_path()
 
     try:
@@ -739,6 +735,18 @@ def load_check_config(path: Path | None = None) -> CheckConfig:
         config = CheckConfig.model_validate(rauw)
     except ValidationError as error:
         raise ConfigError(f"{path}: configuratie is ongeldig.\n{error}") from error
+
+    if bekende_check_ids is not None:
+        onbekend = [
+            check_id
+            for check_id in config.rapport.onderdruk_checks
+            if check_id not in bekende_check_ids
+        ]
+        if onbekend:
+            raise ConfigError(
+                f"{path}: onderdruk_checks kent {', '.join(onbekend)} niet; bekende checks: "
+                f"{', '.join(sorted(bekende_check_ids))}."
+            )
 
     if config.rapport.uitzonderingen is not None:
         # Pad relatief t.o.v. het configbestand (aanname 1). Een absoluut pad blijft

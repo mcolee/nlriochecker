@@ -47,9 +47,9 @@ from dataclasses import dataclass
 from gwsw_orox_helpers.dataset import GwswDataset
 
 from nlriochecker import leeslaag
+from nlriochecker.identiteit import kort
 from nlriochecker.meting import Nulmeting
 from nlriochecker.nulmeting_teksten import leesbaar
-from nlriochecker.uitvoer.identiteit import kort
 
 logger = logging.getLogger(__name__)
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import re
 import tomllib
 from pathlib import Path
 
@@ -307,7 +309,15 @@ def test_rapportinstellingen_hebben_bruikbare_defaults() -> None:
 
 
 def test_onbekend_onderdruk_check_id_faalt_bij_het_laden(tmp_path: Path) -> None:
-    """Een typefout in `onderdruk_checks` zou stil niets onderdrukken (issue #65)."""
+    """Een typefout in `onderdruk_checks` zou stil niets onderdrukken (issue #65).
+
+    De controle leunt sinds issue #160 op de check-ID's die de beller meegeeft
+    (`bekende_check_ids`), niet meer op een import van `nlriochecker.checks` in
+    `checkconfig` -- dat sloot een importkring. De toetsrun geeft er `set(REGISTRY)`
+    voor; deze test geeft precies dezelfde verzameling.
+    """
+    from nlriochecker.checks import REGISTRY
+
     bron = default_check_config_path().read_text(encoding="utf-8")
     pad = tmp_path / "checks.toml"
     pad.write_text(
@@ -315,7 +325,26 @@ def test_onbekend_onderdruk_check_id_faalt_bij_het_laden(tmp_path: Path) -> None
     )
 
     with pytest.raises(ConfigError, match="XYZ-999"):
-        load_check_config(pad)
+        load_check_config(pad, bekende_check_ids=set(REGISTRY))
+
+
+def test_onbekend_onderdruk_check_id_glipt_door_zonder_bekende_ids(tmp_path: Path) -> None:
+    """Zonder `bekende_check_ids` valideert het laden `onderdruk_checks` niet (issue #160).
+
+    De subcommando's die geen rapport met onderdrukking schrijven hebben de controle
+    niet nodig, en `checkconfig` mag `nlriochecker.checks` niet importeren om haar te
+    kunnen doen. De toetsrun -- de enige die onderdrukt -- geeft de ID's wél mee, en de
+    test hierboven bewaakt dat pad.
+    """
+    bron = default_check_config_path().read_text(encoding="utf-8")
+    pad = tmp_path / "checks.toml"
+    pad.write_text(
+        bron.replace("onderdruk_checks = []", 'onderdruk_checks = ["XYZ-999"]'), encoding="utf-8"
+    )
+
+    config = load_check_config(pad)
+
+    assert config.rapport.onderdruk_checks == ["XYZ-999"]
 
 
 def test_de_projectconfig_onderdrukt_het_mechanische_riool_en_de_pompunit() -> None:
@@ -636,3 +665,162 @@ def test_ondersteunde_kenmerken_volgen_de_vier_geladen_klassen() -> None:
     )
 
     assert VULWAARDE_KENMERKEN == {str(klasse).rsplit("/", 1)[-1] for klasse in klassen}
+
+
+# --- issue #160: elk ext_*_m-veld dat een `nabij`-aanroep voedt zit in ext_zoekafstand_max_m ---
+
+EXTERN_BRON = (
+    Path(__file__).resolve().parents[1] / "src" / "nlriochecker" / "checks" / "extern.py"
+).read_text(encoding="utf-8")
+CHECKCONFIG_BRON = (
+    Path(__file__).resolve().parents[1] / "src" / "nlriochecker" / "checkconfig.py"
+).read_text(encoding="utf-8")
+_EXT_VELD = re.compile(r"^ext_\w+_m$")
+
+
+def _funcvan(tree: ast.AST) -> dict[int, ast.FunctionDef | None]:
+    """Per knoop de dichtstbijzijnde omvattende functie (of None op moduleniveau)."""
+    mapping: dict[int, ast.FunctionDef | None] = {}
+
+    def bind(node: ast.AST, func: ast.FunctionDef | None) -> None:
+        mapping[id(node)] = func
+        binnen = node if isinstance(node, ast.FunctionDef) else func
+        for kind in ast.iter_child_nodes(node):
+            bind(kind, binnen)
+
+    for top in ast.iter_child_nodes(tree):
+        bind(top, None)
+    return mapping
+
+
+def _drempelveld(node: ast.expr) -> str | None:
+    """De veldnaam als `node` een `<...>.drempels.ext_*_m` leest, anders None."""
+    if (
+        isinstance(node, ast.Attribute)
+        and _EXT_VELD.match(node.attr)
+        and isinstance(node.value, ast.Attribute)
+        and node.value.attr == "drempels"
+    ):
+        return node.attr
+    return None
+
+
+def _lokale_drempels(func: ast.FunctionDef) -> dict[str, str]:
+    """Per lokale variabele het `ext_*_m`-veld waaruit ze toegewezen is."""
+    toewijzingen: dict[str, str] = {}
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign) and (veld := _drempelveld(node.value)) is not None:
+            for doel in node.targets:
+                if isinstance(doel, ast.Name):
+                    toewijzingen[doel.id] = veld
+    return toewijzingen
+
+
+def _naam_van_call(call: ast.Call) -> str | None:
+    """De aangeroepen naam van een call (`f(...)` of `x.f(...)`)."""
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    return call.func.attr if isinstance(call.func, ast.Attribute) else None
+
+
+def nabij_gevoede_velden(bron: str) -> set[str]:
+    """De `ext_*_m`-velden die als tweede argument van een `.nabij(...)`-aanroep landen.
+
+    Uit de code afgeleid, niet aangenomen (issue #160). Een `.nabij`-argument is een
+    variabele; die wordt teruggevolgd naar de `drempels.ext_*_m`-toewijzing in dezelfde
+    functie, en anders -- als ze een parameter is -- via de aanroepplekken van die functie
+    naar de toewijzing bij de aanroeper. Zo vindt hij zowel EXT-007 (`afstand` lokaal) als
+    EXT-003 (`buffer` een parameter van `_zoek_kruisingen`, gezet in `kruisingstoets`).
+    """
+    tree = ast.parse(bron)
+    functie_van = _funcvan(tree)
+    velden: set[str] = set()
+
+    def resolveer(var: str, func: ast.FunctionDef | None, diepte: int = 0) -> set[str]:
+        if func is None or diepte > 4:
+            return set()
+        lokaal = _lokale_drempels(func)
+        if var in lokaal:
+            return {lokaal[var]}
+        params = [arg.arg for arg in func.args.args]
+        if var in params:
+            index = params.index(var)
+            gevonden: set[str] = set()
+            for call in ast.walk(tree):
+                if (
+                    isinstance(call, ast.Call)
+                    and _naam_van_call(call) == func.name
+                    and index < len(call.args)
+                    and isinstance(call.args[index], ast.Name)
+                ):
+                    gevonden |= resolveer(
+                        call.args[index].id, functie_van.get(id(call)), diepte + 1
+                    )
+            return gevonden
+        return set()
+
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "nabij"
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Name)
+        ):
+            velden |= resolveer(node.args[1].id, functie_van.get(id(node)))
+    return velden
+
+
+def zoekafstand_velden(bron: str) -> set[str]:
+    """De `self.ext_*_m`-velden die in de `ext_zoekafstand_max_m`-property samenkomen."""
+    tree = ast.parse(bron)
+    velden: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "ext_zoekafstand_max_m":
+            for kind in ast.walk(node):
+                if (
+                    isinstance(kind, ast.Attribute)
+                    and _EXT_VELD.match(kind.attr)
+                    and isinstance(kind.value, ast.Name)
+                    and kind.value.id == "self"
+                ):
+                    velden.add(kind.attr)
+    return velden
+
+
+def test_elk_nabij_veld_zit_in_de_zoekafstand() -> None:
+    """`ext_zoekafstand_max_m` dekt elk veld waarmee een EXT-check in een bron kijkt (#160).
+
+    De dekkingspoort verruimt het bereik van de externe bronnen met deze afstand. Voedt een
+    `.nabij(...)` een veld dat de handmatige `max()` niet meetelt, dan zoekt die check
+    verder dan het geladen bereik en mist hij objecten net binnen -- zonder dat iets dat
+    meldt. De velden komen uit de code van beide kanten, niet uit een aanname.
+    """
+    gevoed = nabij_gevoede_velden(EXTERN_BRON)
+    gedekt = zoekafstand_velden(CHECKCONFIG_BRON)
+
+    assert gevoed, "geen enkel `.nabij`-veld gevonden; is de sweep stuk?"
+    assert gevoed <= gedekt, f"niet gedekt door ext_zoekafstand_max_m: {sorted(gevoed - gedekt)}"
+
+
+def test_elk_nabij_veld_is_ook_op_waarde_niet_ruimer_dan_de_zoekafstand() -> None:
+    """En op waarde: geen nabij-veld staat verder dan `ext_zoekafstand_max_m` (default)."""
+    drempels = CheckThresholds()
+    for veld in nabij_gevoede_velden(EXTERN_BRON):
+        assert getattr(drempels, veld) <= drempels.ext_zoekafstand_max_m
+
+
+def test_de_nabij_sweep_kan_werkelijk_afgaan() -> None:
+    """De tegenproef: een nabij-veld buiten de zoekafstand wordt gezien als een gat.
+
+    Synthetische bron, geen echt bestand. Voegt iemand een `.nabij`-aanroep toe die
+    gevoed wordt door een veld dat `ext_zoekafstand_max_m` niet meetelt, dan valt de
+    hoofdtest -- dit bewijst dat de sweep dat kan zien.
+    """
+    extern = "def run(self):\n    a = self.config.drempels.ext_nieuw_m\n    laag.nabij(p, a)\n"
+    zoekafstand = "def ext_zoekafstand_max_m(self):\n    return max(self.ext_pand_buffer_m)\n"
+
+    gevoed = nabij_gevoede_velden(extern)
+
+    assert gevoed == {"ext_nieuw_m"}
+    assert not gevoed <= zoekafstand_velden(zoekafstand)

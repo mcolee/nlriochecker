@@ -42,6 +42,17 @@ jobs:
     # uur van de runner opmaken; 15 minuten laat ruim ruimte voor een koude cache en
     # kapt de rest af.
     timeout-minutes: 15
+    # De poort draait op de ondergrens (3.12, ook in `.python-version`) én op de nieuwste
+    # (3.14): een versie-afhankelijke breuk hoort de CI te vangen en niet een gebruiker.
+    # De cellen draaien parallel; `fail-fast: false` laat de ene doorlopen als de andere
+    # valt, zodat zichtbaar is of het probleem versiegebonden is. Elke cel doet de volle
+    # poort inclusief de wheel-rooktest en de dekkingsdrempel -- dat is bewust: een wheel
+    # of een dekkingsgat kan per Python-versie verschillen. Lokaal geverifieerd dat
+    # `uv sync --frozen --python 3.14` slaagt en de suite (`-m 'not zwaar'`) groen is.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
     env:
       # Deze runner mist de niet-getrackte delen van data/ (de OroX-export, de
       # ontologieen, de GIS-bronnen) en PyQGIS; de eerste groene run gaf 673 geslaagd
@@ -74,7 +85,14 @@ jobs:
       # geslaagd, 21 overgeslagen. De negen verhuisde testbestanden vielen weg en de
       # ontologie en de vocabulaire-index komen nu als package-resource mee, dus de
       # index-overslagen zijn er ook af. 1670 houdt daar een marge van 25 onder.
-      NLRIOCHECKER_MIN_GESLAAGD: "1670"
+      #
+      # De suite is sindsdien flink gegroeid en 1670 bood 24% marge -- veel te ruim voor
+      # een grens die een regressie moet vangen (issue #160). Gemeten in de laatste groene
+      # dev-run (2026-09-06, run 34046735032): 2414 geslaagd. 95% daarvan, op tientallen
+      # afgerond, is 2290. De waarschuwing in `tests/conftest.py::pytest_sessionfinish`
+      # roept om een herijking zodra er meer dan 10% (2519) boven deze grens slagen, zodat
+      # de marge niet opnieuw wegkruipt.
+      NLRIOCHECKER_MIN_GESLAAGD: "2290"
       # Overslagen worden niet geteld maar op reden geclassificeerd (BO-48). Een telgrens
       # (`NLRIOCHECKER_MAX_OVERGESLAGEN`, 50 → 57 → 65) telde ook de bedoelde, datagebonden
       # overslagen mee -- het Juinen-voorbeeld, de OroX-export en de SHACL-rapporten staan
@@ -104,6 +122,8 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
+          # Pint de Python van deze matrixcel; `uv sync --frozen` hieronder erft hem.
+          python-version: ${{ matrix.python-version }}
 
       - name: Afhankelijkheden installeren
         run: uv sync --frozen
