@@ -8,6 +8,15 @@ feature, en rapporteert `toets` per gebied in een eigen submap.
 De validatie zit hier en nergens anders, en ze is streng: een defect gebiedsbestand
 dat pas na drie minuten laden opvalt, of erger, dat stilzwijgend een half gebied
 rapporteert, kost meer dan een harde foutmelding vooraf.
+
+Een rij of feature zonder geometrie (issue #154) volgt daaruit een tweedeling, gelijk
+voor GeoPackage en GeoJSON: draagt hij een naam (`naam_gebied`), dan is dat een
+`StudyAreaError` -- net als de lege-naam-fout in `_gebiedsnamen` -- want een genoemd
+gebied dat spoorloos verdwijnt is precies het "stilzwijgend een half gebied
+rapporteren" hierboven. Zonder naam (een terugvalrij die toch geen gebied voorstelt) is
+tellen genoeg: de regel ("N rij(en)" resp. "N feature(s) zonder geometrie
+overgeslagen") gaat mee in `overgeslagen`, en dus in het rapport en de synthese --
+nooit alleen in de log.
 """
 
 from __future__ import annotations
@@ -25,7 +34,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from shapely import from_wkb
-from shapely.errors import GEOSException
+from shapely.errors import GeometryTypeError, GEOSException
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
@@ -247,6 +256,9 @@ class _Ruw:
     features: list[_Vlak]
     laag: str
     aanduiding: str
+    # Regels over wat de lezer zelf al overgeslagen heeft (bv. een naamloze rij zonder
+    # geometrie in een GeoPackage), vóór `_filter_vlakken` de geometrietypen ziet.
+    overgeslagen: tuple[str, ...] = ()
 
 
 def load_studiegebieden(
@@ -286,7 +298,8 @@ def _bouw_gebieden(path: Path, ruw: _Ruw) -> Studiegebieden:
     Deze stap staat los van het formaat, zodat GeoPackage en GeoJSON niet elk hun
     eigen eisen kunnen ontwikkelen.
     """
-    vlakken, overgeslagen = _filter_vlakken(ruw.features)
+    vlakken, type_overgeslagen = _filter_vlakken(ruw.features)
+    overgeslagen = ruw.overgeslagen + type_overgeslagen
     if not vlakken:
         raise StudyAreaError(
             f"{path}: laag {ruw.laag!r} bevat geen enkel vlak. Alleen Polygon en "
@@ -467,15 +480,22 @@ def _lees_geopackage(path: Path, laag: str | None) -> _Ruw:
         kolommen = [beschrijving[0] for beschrijving in cursor.description]
         geometrie_index = kolommen.index(geometriekolom[0])
         features: list[_Vlak] = []
+        zonder_geometrie = 0
         for rijnummer, rij in enumerate(cursor.fetchall(), start=1):
             blob = rij[geometrie_index]
-            if not blob:
-                continue
             attributen = {
                 naam: waarde
                 for index, (naam, waarde) in enumerate(zip(kolommen, rij, strict=True))
                 if index != geometrie_index
             }
+            if not blob:
+                naam = _naamwaarde(attributen)
+                if naam:
+                    raise StudyAreaError(
+                        f"{path} rij {rijnummer}: gebied {naam!r} heeft geen geometrie."
+                    )
+                zonder_geometrie += 1
+                continue
             geometrie = _ontleed_gpkg(blob, f"{path} rij {rijnummer}: ")
             features.append(_Vlak(rijnummer, geometrie, attributen))
         aanduiding = _gebiedsaanduiding(verbinding, laag)
@@ -487,7 +507,10 @@ def _lees_geopackage(path: Path, laag: str | None) -> _Ruw:
     if not features:
         raise StudyAreaError(f"{path}: laag {laag!r} bevat geen geometrieen.")
 
-    return _Ruw(features=features, laag=laag, aanduiding=aanduiding)
+    overgeslagen = (
+        (f"{zonder_geometrie} rij(en) zonder geometrie overgeslagen",) if zonder_geometrie else ()
+    )
+    return _Ruw(features=features, laag=laag, aanduiding=aanduiding, overgeslagen=overgeslagen)
 
 
 def _escape(naam: str) -> str:
@@ -564,15 +587,39 @@ def _lees_geojson(path: Path, grenzen: RdGrenzen | None) -> _Ruw:
     gelezen: list[_Vlak] = []
     zonder_geometrie = 0
     for rijnummer, feature in enumerate(features or [], start=1):
-        geometrie = feature.get("geometry") if "geometry" in feature else feature
+        # Een Feature draagt zijn geometrie onder de sleutel "geometry" (`.get` geeft
+        # `None` terug als die sleutel ontbreekt, issue #154); een bestand dat zelf
+        # geen Feature is maar rechtstreeks een Geometry (geen "FeatureCollection"),
+        # is zelf de geometrie.
+        is_feature = isinstance(feature, dict) and feature.get("type") == "Feature"
+        geometrie = feature.get("geometry") if is_feature else feature
         if not geometrie:
-            # Een feature met `"geometry": null` is geldige GeoJSON en komt uit
-            # exports voor die alleen attributen dragen. Hij telt niet mee, maar
-            # verdwijnt ook niet stilzwijgend.
+            # Een feature met `"geometry": null` of zonder de sleutel `geometry` is
+            # geldige GeoJSON en komt uit exports voor die alleen attributen dragen.
+            # Dezelfde invariant als bij `_lees_geopackage`: draagt de feature een
+            # naam, dan is stilzwijgend overslaan precies het "half gebied
+            # rapporteren" dat de moduledocstring wil voorkomen, dus een harde
+            # `StudyAreaError`; zonder naam wordt hij geteld, niet alleen gelogd.
+            eigenschappen_zonder_geometrie = feature.get("properties") if is_feature else None
+            naam = _naamwaarde(
+                eigenschappen_zonder_geometrie
+                if isinstance(eigenschappen_zonder_geometrie, dict)
+                else {}
+            )
+            if naam:
+                raise StudyAreaError(
+                    f"{path} rij {rijnummer}: gebied {naam!r} heeft geen geometrie."
+                )
             zonder_geometrie += 1
             continue
         eigenschappen = feature.get("properties") or {}
-        gelezen.append(_Vlak(rijnummer, shape(geometrie), dict(eigenschappen)))
+        try:
+            vorm = shape(geometrie)
+        except (KeyError, ValueError, GeometryTypeError) as error:
+            raise StudyAreaError(
+                f"{path} rij {rijnummer}: geen leesbare geometrie ({error})."
+            ) from error
+        gelezen.append(_Vlak(rijnummer, vorm, dict(eigenschappen)))
 
     if not gelezen:
         raise StudyAreaError(f"{path}: bevat geen geometrieen.")
@@ -580,10 +627,12 @@ def _lees_geojson(path: Path, grenzen: RdGrenzen | None) -> _Ruw:
     if not _noemt_rd(inhoud) and grenzen is not None:
         _toets_rd_bereik(path, gelezen, grenzen)
 
-    ruw = _Ruw(features=gelezen, laag=path.stem, aanduiding=path.stem)
-    if zonder_geometrie:
-        logger.warning("%s: %d feature(s) zonder geometrie overgeslagen", path, zonder_geometrie)
-    return ruw
+    overgeslagen = (
+        (f"{zonder_geometrie} feature(s) zonder geometrie overgeslagen",)
+        if zonder_geometrie
+        else ()
+    )
+    return _Ruw(features=gelezen, laag=path.stem, aanduiding=path.stem, overgeslagen=overgeslagen)
 
 
 def _noemt_rd(inhoud: dict[str, object]) -> bool:

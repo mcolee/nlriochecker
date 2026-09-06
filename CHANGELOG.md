@@ -13,6 +13,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Een studiegebiedrij zonder geometrie viel stil of gaf een kale traceback** (issue #154):
+  in een GeoPackage verdween een rij met een lege geometrieblob zonder log of telling, en in
+  GeoJSON gaf een feature zonder de sleutel `geometry` (in plaats van `"geometry": null`) de
+  hele feature aan `shape()` en dus een kale `KeyError` -- een genoemde buurt kon zo
+  spoorloos uit een gebiedenrun vallen (geen submap, geen regel in de synthese). Beide
+  lezers volgen nu dezelfde invariant: draagt de rij of feature een naam (`naam_gebied`),
+  dan is dat een harde `StudyAreaError` -- net als bij een lege naam -- want een genoemd
+  gebied dat verdwijnt is precies het "stilzwijgend een half gebied rapporteren" dat de
+  module wil voorkomen; zonder naam telt hij mee als regel ("N rij(en)" resp. "N feature(s)
+  zonder geometrie overgeslagen") in `overgeslagen`, zodat `_bouw_gebieden` hem logt en het
+  rapport en de synthese hem dragen -- nooit alleen de log. `_lees_geojson` vangt
+  `shape()`-fouten (`KeyError`, `ValueError`, `GeometryTypeError`) bovendien af tot een
+  leesbare `StudyAreaError`.
 - **Een onbekend check-ID of een onaanmaakbare uitvoermap knalde pas na de volledige
   laadfase** (issue #153): `voer_toets_uit` (`toetsrun.py`) valideerde de check-ID's pas in
   `run_checks`, na het laden van de dataset (op De Wolden en Hoogeveen enkele minuten), en de

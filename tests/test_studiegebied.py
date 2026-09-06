@@ -540,3 +540,83 @@ def test_feature_zonder_geometrie_wordt_overgeslagen(tmp_path: Path) -> None:
     )
 
     assert load_studiegebieden(pad).enkel
+
+
+def test_geojson_feature_zonder_geometrie_met_naam_is_een_fout(tmp_path: Path) -> None:
+    """Een feature zonder de sleutel 'geometry' gaf shape() eerder de hele feature en dus
+    een kale `KeyError`-traceback (issue #154). Draagt zo'n feature een naam, dan is
+    hij -- net als bij GeoPackage -- geen stille overslag maar een harde fout: anders
+    verdwijnt 'Zuid' spoorloos (fixronde 1, code-reviewbevinding).
+    """
+    pad = _schrijf_geojson(
+        tmp_path / "zonder_geom.geojson",
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"naam_gebied": "Noord"},
+                    "geometry": mapping(NOORD),
+                },
+                {"type": "Feature", "properties": {"naam_gebied": "Zuid"}},
+            ],
+        },
+    )
+
+    with pytest.raises(StudyAreaError, match="Zuid"):
+        load_studiegebieden(pad)
+
+
+def test_geojson_feature_zonder_geometrie_zonder_naam_wordt_geteld(tmp_path: Path) -> None:
+    """Een naamloze feature zonder geometrie (of zonder de sleutel `geometry`) telt mee
+    in `overgeslagen` en niet alleen in de log (fixronde 1, code-reviewbevinding).
+    """
+    pad = _schrijf_geojson(
+        tmp_path / "zonder_geom.geojson",
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "properties": {}, "geometry": mapping(NOORD)},
+                {"type": "Feature", "properties": {}},
+            ],
+        },
+    )
+
+    gebieden = load_studiegebieden(pad)
+
+    assert gebieden.enkel
+    verwacht = "1 feature(s) zonder geometrie overgeslagen"
+    assert any(verwacht == melding for melding in gebieden.overgeslagen)
+
+
+def test_geopackage_rij_zonder_geometrie_met_naam_is_een_fout(tmp_path: Path) -> None:
+    """Een genoemde rij zonder geometrie verdween eerder spoorloos (issue #154): 'Zuid'
+    kwam nergens in de uitvoer terug, ook niet in `overgeslagen`. Consistent met de
+    lege-`naam_gebied`-fout (`_gebiedsnamen`) is dat een harde `StudyAreaError`.
+    """
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD), ("Zuid", ZUID)])
+    con = sqlite3.connect(pad)
+    con.execute('update "buurten" set geom = NULL where "naam_gebied" = ?', ("Zuid",))
+    con.commit()
+    con.close()
+
+    with pytest.raises(StudyAreaError, match="Zuid"):
+        load_studiegebieden(pad)
+
+
+def test_geopackage_rij_zonder_geometrie_zonder_naam_wordt_geteld(tmp_path: Path) -> None:
+    """Een naamloze rij zonder geometrie blijft mogelijk (bv. een terugval-bestand);
+    ze verdwijnt niet stilzwijgend, maar telt mee in `overgeslagen`.
+    """
+    pad = _maak_buurten_gpkg(tmp_path / "b.gpkg", [("Noord", NOORD)])
+    con = sqlite3.connect(pad)
+    con.execute('insert into "buurten" ("naam_gebied", geom) values (NULL, NULL)')
+    con.commit()
+    con.close()
+
+    gebieden = load_studiegebieden(pad)
+
+    assert gebieden.enkel
+    assert gebieden.gebieden[0].gebied == "Noord"
+    verwacht = "1 rij(en) zonder geometrie overgeslagen"
+    assert any(verwacht == melding for melding in gebieden.overgeslagen)
