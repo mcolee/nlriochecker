@@ -315,6 +315,15 @@ JSON-bestand is een geversioneerd contract voor machinale verwerking; zie
 [json-schema.md](json-schema.md). `--output` staat standaard op `uitvoer/`.
 Invoerbestanden worden nooit overschreven.
 
+De CSV's zijn Nederlands-Excel-bestanden: puntkomma als scheidingsteken, komma als
+decimaalteken en UTF-8 met BOM. In een Nederlandse Excel werkt dubbelklikken zonder meer --
+geen verminkte coördinaten en geen `Ã©Ã©n` in de tekst -- en formulecellen worden niet
+uitgevoerd. In een niet-Nederlandse Excel of in pandas lees je met `sep=';', decimal=','`
+(pandas: `pd.read_csv(pad, sep=';', decimal=',', encoding='utf-8-sig')`). QGIS-gebruikers
+nemen de GeoPackage; wie toch de CSV laadt kiest in "Gescheiden tekst" scheidingsteken `;`
+en decimaalteken komma. `X`, `Y` en de X/Y-kolommen van de meldingentabel staan op 3
+decimalen (millimeter); de JSON houdt `Waarde` en `Drempel` als tekst met een punt.
+
 De GeoPackage draagt drie featurelagen, een per geometrievorm: `putten` (punt),
 `strengen` (lijn) en `vlakken` (vlak). De twee objectlagen dragen de gebreken *op* het
 object. Elk object draagt een kolom `status` met vijf waarden --

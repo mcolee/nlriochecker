@@ -15,9 +15,9 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
-import pandas as pd
 from gwsw_orox_helpers.dataset import load_dataset
 
+from helpers_csv import lees_csv
 from helpers_melding import melding as _basismelding
 from nlriochecker.checkconfig import CheckConfig, Uitzondering, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
@@ -700,7 +700,7 @@ class TestSystemischGeneriek:
         uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)
         tekst = uitvoer.markdown.read_text(encoding="utf-8")
         assert uitvoer.csv is not None and uitvoer.json is not None
-        tabel = pd.read_csv(uitvoer.csv, sep=";", encoding="utf-8")
+        tabel = lees_csv(uitvoer.csv)
         rijen = json.loads(uitvoer.json.read_text(encoding="utf-8"))["meldingen"]
 
         uit_csv = tabel[tabel["Check"] == "NET-001"]

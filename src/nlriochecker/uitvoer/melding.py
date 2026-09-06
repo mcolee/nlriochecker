@@ -74,23 +74,33 @@ Feiten = dict[str, dict[str, str]]
 # `shapely.get_coordinates` gevuld en door alle vier gelezen.
 Coordinaten = dict[str, tuple[float, float]]
 
+# Op zoveel decimalen ronden de X/Y van een melding af (issue #165, BO-97). Aan de bron,
+# hier in `bouw_xy`, zodat CSV, JSON en de meldingentabel van de GeoPackage dezelfde
+# waarde dragen; de GeoPackage-geometrie van de objecten zelf blijft ongemoeid. Een RD-
+# coördinaat op millimeter is 3 decimalen; de float-ruis daarachter (`525754.1599999999`)
+# is geen meetwaarde en hoort niet in een archief.
+XY_DECIMALEN = 3
+
 
 def bouw_xy(meldingen: list[Melding]) -> Coordinaten:
-    """Per melding-ID de foutlocatie als (x, y), in één gevectoriseerde doorloop.
+    """Per melding-ID de foutlocatie als (x, y), afgerond, in één gevectoriseerde doorloop.
 
     Een melding zonder foutlocatie staat niet in de map; de schrijvers vallen daar op
     `None` terug, net als bij de losse `foutlocatie.x`/`.y`. De coordinaten worden naar
-    Python-`float` gebracht, zodat de X/Y-tekst in de CSV en de `foutlocatie` in de JSON
-    byte-gelijk blijven aan de losse property-aanroep. `return_index` houdt elke rij bij
-    haar melding, ook mocht een punt ooit leeg zijn (dan levert het geen rij en valt het
-    net als voorheen buiten de map).
+    Python-`float` gebracht en op `XY_DECIMALEN` afgerond (issue #165): zo dragen CSV, JSON
+    en de meldingentabel van de GeoPackage dezelfde waarde en verdwijnt de float-ruis uit
+    de archieven. `return_index` houdt elke rij bij haar melding, ook mocht een punt ooit
+    leeg zijn (dan levert het geen rij en valt het net als voorheen buiten de map).
     """
     punten = [melding.foutlocatie for melding in meldingen if melding.foutlocatie is not None]
     if not punten:
         return {}
     ids = [melding.melding_id for melding in meldingen if melding.foutlocatie is not None]
     coords, index = shapely.get_coordinates(punten, return_index=True)
-    return {ids[i]: (float(x), float(y)) for (x, y), i in zip(coords, index, strict=True)}
+    return {
+        ids[i]: (round(float(x), XY_DECIMALEN), round(float(y), XY_DECIMALEN))
+        for (x, y), i in zip(coords, index, strict=True)
+    }
 
 
 @dataclass(frozen=True)

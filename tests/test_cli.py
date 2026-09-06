@@ -7,12 +7,12 @@ import json
 import sys
 from pathlib import Path
 
-import pandas as pd
 import pytest
 from click.testing import CliRunner
 from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from shapely.geometry import box, mapping
 
+from helpers_csv import lees_csv
 from nlriochecker import toetsrun as toetsrun_module
 from nlriochecker.cli import _BalkVoortgang, main
 from nlriochecker.register import default_register_path
@@ -192,7 +192,7 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
     assert resultaat.exit_code == 0, resultaat.output
     assert "Studiegebied" in resultaat.output
     assert "0 bevindingen buiten het gebied weggelaten" in resultaat.output
-    tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
+    tabel = lees_csv(uitvoer / FILE_CHECKS_CSV)
     # Geen checkbevindingen; de datasetsignalen (bron "dataset", issue #22) staan er los
     # van en gaan over de export als geheel, niet over dit gebied.
     assert tabel[tabel["Bron"] == "register"].empty
@@ -226,7 +226,7 @@ def test_toets_meldt_bevindingen_die_in_de_schil_wegvallen(tmp_path: Path) -> No
 
     assert resultaat.exit_code == 0, resultaat.output
     assert "1 bevinding buiten het gebied weggelaten" in resultaat.output
-    tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
+    tabel = lees_csv(uitvoer / FILE_CHECKS_CSV)
     assert tabel.empty
 
 
@@ -595,7 +595,7 @@ def test_aantallen_komen_overeen_in_md_csv_en_gpkg(tmp_path: Path) -> None:
     )
     assert resultaat.exit_code == 0, resultaat.output
 
-    tabel = pd.read_csv(uitvoer / FILE_CHECKS_CSV, sep=";", encoding="utf-8")
+    tabel = lees_csv(uitvoer / FILE_CHECKS_CSV)
     # De datasetsignalen (bron "dataset", issue #22) zijn geen check en horen niet in
     # het per-check-overzicht of in de detailsecties; ze staan in de omvangsectie. Deze
     # test vergelijkt de check-boekhouding, dus zonder die bron.

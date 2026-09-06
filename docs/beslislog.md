@@ -5285,3 +5285,43 @@ bevindingen expliciet "verwacht beeld, geen plausibiliteitsgebrek"), geen regres
 volledig verklaard (-28 EXT-001 + -3 TOP-014). De brief-schattingen -1.605 (EXT-001 `examined`)
 en ~20.664 (TOP-014 `examined`) wijken 4 resp. 3 af: dat is welke gemalen/uitlaten daadwerkelijk
 toetsbaar zijn (binnen bereik, betrouwbaar getypeerd) resp. de merge van compartimentputten.
+
+### BO-97 de CSV is een NL-Excel-bestand: komma-decimaal, BOM, formule-veilig, X/Y op 3 decimalen
+
+**Wat.** `bevindingen.csv` (en de vijf andere CSV's uit `schrijf_csv`) wordt een Nederlands-
+Excel-bestand. De enige dubbelklik-gebruiker van dit bestand is een Nederlandse beheerder,
+en die kreeg tot nu toe verminkte coördinaten (`218994.745` → `218994745`, punt als
+duizendtal), mojibake (`één` → `Ã©Ã©n`, UTF-8 zonder BOM als Windows-1252 gelezen) en een
+onbeveiligde formule-injectie (een TTL-label `=HYPERLINK(...)` landde onaangeraakt in de
+kolom). De auteur bracht issue #165 in een grill-sessie (2026-09-06) van `needs-triage` naar
+`ready-for-agent` en maakte daarbij de keuzes hieronder; dit blok legt ze vast. JSON en
+GeoPackage blijven internationaal (punt) en veranderen niet.
+
+**Conventie.** `schrijf_csv` schrijft met `sep=';', decimal=',', encoding='utf-8-sig'`. De
+puntkomma is wat nl-NL Excel als scheidingsteken verwacht (geen wijziging); de komma is het
+decimaalteken; de BOM zet Excel op UTF-8. Niet-NL Excel en pandas lezen met
+`sep=';', decimal=','`; QGIS-gebruikers nemen de GeoPackage.
+
+**Afronding.** X en Y worden op 3 decimalen (millimeter) afgerond, aan de bron in
+`bouw_xy` (`XY_DECIMALEN`), zodat CSV, JSON én de meldingentabel van de GeoPackage dezelfde
+waarde dragen en de float-ruis (`525754.1599999999`) uit de archieven verdwijnt. De
+GeoPackage-geometrie van de objecten zelf blijft ongemoeid. Gevolg: de `foutlocatie`-waarden
+in `bevindingen.json` verschuiven eenmalig van de rauwe coördinaat naar de op 3 decimalen
+afgeronde -- het enige verschil t.o.v. een run vóór dit issue.
+
+**Celregels** (kolomonafhankelijk, over alle tekstcellen; float- en int-kolommen lopen er
+niet langs, die formatteert `to_csv` met `decimal=','`):
+1. **Getalcel.** Een tekstcel die een kaal getal is (`^-?\d+(\.\d+)?$`, bv. `Waarde`
+   `-0.350`) krijgt een decimaalkomma. In de kolom `Drempel` krijgt alleen het leidende
+   getal een komma (`0,10 (drempels.tegenverhang_fors_m)`); de configverwijzing erachter,
+   met haar eigen punten, blijft tekst.
+2. **Formule-prefix.** Een cel die begint met `=`, `@`, tab of CR krijgt een apostrof
+   ervoor; `+`/`-` alleen als het volgende teken géén cijfer of punt is, zodat `-0,350` een
+   getal blijft. Apostrof als prefix, over alle cellen, geen kolomlijst.
+
+**Wat níét.** `Waarde` en `Drempel` blijven in de JSON tekst met een punt (issue #142);
+`decimal=','` raakt ze daar niet. Geen andere contractwijziging: geen kolom, geen CLI-optie,
+geen JSON-veld erbij; `SCHEMA_VERSIE` blijft 1.2. De 14-en-meer `pd.read_csv`-lezingen in
+`tests/` lopen sinds dit issue via één gedeelde helper `lees_csv()` (`tests/helpers_csv.py`);
+`scripts/vergelijk_csv.py` leest `utf-8-sig`. Bewijs via unit-tests op de byte-vorm plus één
+handmatige LibreOffice-import; geen CI-afhankelijkheid van een kantoorsuite.

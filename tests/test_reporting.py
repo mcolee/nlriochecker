@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
 
+from helpers_csv import lees_csv
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.analysis import analyze
 from nlriochecker.checkconfig import load_check_config
@@ -51,7 +52,7 @@ def test_schrijft_samenvatting_en_csv(analyse, tmp_path: Path) -> None:
 
     assert markdown_path.name == FILE_MARKDOWN
     assert csv_path.name == FILE_CSV
-    tabel = pd.read_csv(csv_path, sep=";", encoding="utf-8")
+    tabel = lees_csv(csv_path)
     assert set(tabel["CFK"]) == {"Hyd", "MdsPlan", "MdsProj"}
 
 
@@ -126,9 +127,9 @@ def test_vergelijkingsrapport(analyse, tmp_path: Path) -> None:
 
     assert markdown_path.name == FILE_COMPARISON_MARKDOWN
     assert "# Trendvergelijking dewolden_orox.ttl" in markdown_path.read_text(encoding="utf-8")
-    verschillen = pd.read_csv(csv_path, sep=";", encoding="utf-8")
+    verschillen = lees_csv(csv_path)
     assert set(verschillen["Niveau"]) == {"vorm", "objecttype"}
-    objecten = pd.read_csv(objects_path, sep=";", encoding="utf-8")
+    objecten = lees_csv(objects_path)
     assert set(objecten["Status"]) == {"gebleven"}
 
 
@@ -310,7 +311,7 @@ def test_bevindingen_csv_draagt_de_uitgebreide_kolommen(tmp_path: Path) -> None:
     run = _checkrun("top011_hartlijnkruising.ttl", "TOP-011")
 
     _, csv_path = write_check_report(run, tmp_path)
-    tabel = pd.read_csv(csv_path, sep=";", encoding="utf-8")
+    tabel = lees_csv(csv_path)
 
     # De bestaande kolommen houden hun naam en plaats; hernoemen breekt bestaande
     # verwerking zonder dat er iets tegenover staat.
@@ -351,7 +352,7 @@ def test_bevindingen_csv_zet_de_foutlocatie_in_x_en_y(tmp_path: Path) -> None:
     run = _checkrun("top011_hartlijnkruising.ttl", "TOP-011")
 
     _, csv_path = write_check_report(run, tmp_path)
-    rij = pd.read_csv(csv_path, sep=";", encoding="utf-8").iloc[0]
+    rij = lees_csv(csv_path).iloc[0]
 
     assert pd.notna(rij["X"]) and pd.notna(rij["Y"])
     assert "#" not in rij["Object2"]
@@ -476,7 +477,7 @@ def test_rapport_volgt_de_meegegeven_meldingen(tmp_path: Path) -> None:
     # komt nog steeds uit de meegegeven stroom en niet uit `run.outcomes`.
     assert "Systemisch: 2 bevindingen op" in tekst
     assert "| TOP-013 |" in tekst and "| 2 |" in tekst
-    assert len(pd.read_csv(csv_path, sep=";", encoding="utf-8")) == 2
+    assert len(lees_csv(csv_path)) == 2
 
 
 def test_rapport_meldt_bevindingen_zonder_plek_op_de_kaart(tmp_path: Path) -> None:

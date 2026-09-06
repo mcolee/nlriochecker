@@ -18,11 +18,11 @@ import json
 import sqlite3
 from pathlib import Path
 
-import pandas as pd
 import pytest
 from gwsw_orox_helpers.bronnen import gebundelde_ontologie
 from shapely.geometry import box, mapping
 
+from helpers_csv import lees_csv
 from nlriochecker import toetsrun as toetsrun_module
 from nlriochecker.checkconfig import default_check_config_path
 from nlriochecker.errors import OpdrachtError, StudyAreaError
@@ -327,7 +327,7 @@ def test_de_csv_en_de_uitslag_tellen_hetzelfde(tmp_path: Path) -> None:
 
     uitslag = toets(tmp_path, "hgt010_diameterverjonging.ttl")
 
-    tabel = pd.read_csv(uitslag.uitvoer.per_gebied[""].csv, sep=";", encoding="utf-8")
+    tabel = lees_csv(uitslag.uitvoer.per_gebied[""].csv)
     assert len(tabel) == len(bouw_meldingen(uitslag.runs[0].run, date.today()))
 
 
@@ -615,7 +615,7 @@ class TestNulmetingInDeMeldingen:
         """De mini-nulmeting bevat overtredingen; die horen in de CSV te staan."""
         uitslag = toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",), shacl=drieluik())
 
-        tabel = pd.read_csv(uitslag.uitvoer.per_gebied[""].csv, sep=";", keep_default_na=False)
+        tabel = lees_csv(uitslag.uitvoer.per_gebied[""].csv, keep_default_na=False)
         uit_nulmeting = tabel[tabel["Bron"] == "nulmeting"]
 
         assert len(uit_nulmeting) == len(uitslag.runs[0].run.nulbevindingen) > 0

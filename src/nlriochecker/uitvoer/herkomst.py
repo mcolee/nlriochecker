@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -45,6 +46,70 @@ PAKKET = __name__.split(".", 1)[0]
 # kolommen; de waarde erin is dezelfde.
 KOLOM_GEREEDSCHAP = "Gereedschap"
 VELD_GEREEDSCHAP = "gereedschap"
+
+# De CSV is een NL-Excel-bestand (issue #165, BO-97): puntkomma als scheidingsteken,
+# komma als decimaalteken, UTF-8 met BOM. Twee celregels maken hem daarnaast
+# getalzuiver en formule-veilig; ze werken over alle tekstcellen, met één
+# kolomafhankelijke uitzondering voor `Drempel` (zie hieronder).
+
+# Een tekstcel die er als een kaal getal uitziet: die krijgt een decimaalkomma, zodat
+# `Waarde` `-0.350` als `-0,350` in nl-NL Excel een getal is en geen tekst. Float- en
+# int-kolommen (X, Y, Prioriteit) lopen hier niet langs -- die formatteert `to_csv` zelf
+# met `decimal=','`.
+_KAAL_GETAL = re.compile(r"^-?\d+(\.\d+)?$")
+# Het leidende getal van een cel, voor de kolom `Drempel`: `0.10 (drempels.x)` wordt
+# `0,10 (drempels.x)` -- alleen de grens krijgt een komma, de configverwijzing erachter
+# (met haar eigen punten) blijft tekst.
+_LEIDEND_GETAL = re.compile(r"^(-?\d+)\.(\d+)")
+# De enige kolom met de leidend-getal-uitzondering; overal elders geldt de kale-getalregel.
+_KOLOM_DREMPEL = "Drempel"
+# Een cel die zo begint is voor Excel een formule; een apostrof ervoor maakt haar tekst.
+# `+`/`-` alleen als het volgende teken géén cijfer of punt is, zodat `-0,350` een getal blijft.
+_FORMULE_START = ("=", "@", "\t", "\r")
+
+
+def _met_decimaalkomma(waarde: str, kolom: str) -> str:
+    """De decimaalkomma van nl-NL Excel op een kale-getalcel; in `Drempel` alleen leidend."""
+    if kolom == _KOLOM_DREMPEL:
+        return _LEIDEND_GETAL.sub(r"\1,\2", waarde, count=1)
+    if _KAAL_GETAL.match(waarde):
+        return waarde.replace(".", ",")
+    return waarde
+
+
+def _formuleveilig(waarde: str) -> str:
+    """Een apostrof voor een cel die Excel anders als formule zou uitvoeren."""
+    if not waarde:
+        return waarde
+    eerste = waarde[0]
+    if eerste in _FORMULE_START:
+        return "'" + waarde
+    if eerste in ("+", "-") and not (len(waarde) > 1 and (waarde[1].isdigit() or waarde[1] == ".")):
+        return "'" + waarde
+    return waarde
+
+
+def _excel_cel(waarde: object, kolom: str) -> object:
+    """Eén tekstcel getalzuiver en formule-veilig maken; niet-tekst blijft ongemoeid."""
+    if not isinstance(waarde, str):
+        return waarde
+    return _formuleveilig(_met_decimaalkomma(waarde, kolom))
+
+
+def _excel_veilig(tabel: pd.DataFrame) -> pd.DataFrame:
+    """Een kopie van de tabel met elke tekstcel getalzuiver en formule-veilig (issue #165).
+
+    Alleen tekstkolommen lopen langs de celregels: `is_string_dtype` dekt zowel het oude
+    `object`-dtype als het nieuwe `str`-dtype (PDEP-14). Getal- en booleaanse kolommen (X,
+    Y, Prioriteit, Systemisch) blijven ongemoeid -- die formatteert `to_csv` zelf, met de
+    decimaalkomma voor de floats.
+    """
+    nieuw = tabel.copy()
+    for kolom in nieuw.columns:
+        if pd.api.types.is_string_dtype(nieuw[kolom]):
+            nieuw[kolom] = nieuw[kolom].map(lambda w, k=kolom: _excel_cel(w, k))
+    return nieuw
+
 
 # Hoeveel meldingen `schrijf_json` per keer door de C-encoder haalt. De rijen streamen zo
 # blok voor blok naar het bestand in plaats van als één string van tientallen MB in het
@@ -120,12 +185,19 @@ def schrijf_markdown(
 
 
 def schrijf_csv(tabel: pd.DataFrame, pad: Path) -> Path:
-    """Schrijft een tabel als CSV met de herkomstkolom achteraan.
+    """Schrijft een tabel als NL-Excel-CSV met de herkomstkolom achteraan (issue #165).
 
-    De kolom staat op elke rij in plaats van in een commentaarregel bovenaan, zodat
-    pandas, Excel en QGIS het bestand zonder extra opties blijven lezen -- de
-    kolommen `ObjectURI` en `Object2URI` bevatten GWSW-URI's met een `#`, en
-    `read_csv(comment="#")` zou die stilzwijgend afkappen.
+    Het is een Nederlands-Excel-bestand (BO-97): puntkomma als scheidingsteken, komma
+    als decimaalteken en UTF-8 met BOM, zodat een beheerder de CSV in nl-NL Excel kan
+    dubbelklikken zonder verminkte coördinaten (`218994.745` → `218994745`) of mojibake
+    (`één` → `Ã©Ã©n`). Twee celregels maken hem getalzuiver en formule-veilig: een
+    kale-getalcel krijgt een decimaalkomma (`Drempel` alleen zijn leidende getal), en een
+    cel die Excel als formule zou lezen krijgt een apostrof ervoor. Een niet-NL Excel of
+    pandas leest hem met `sep=';', decimal=','`; QGIS-gebruikers nemen de GeoPackage.
+
+    De herkomstkolom staat op elke rij in plaats van in een commentaarregel bovenaan,
+    zodat `read_csv(comment="#")` niet nodig is -- de kolommen `ObjectURI` en `Object2URI`
+    bevatten GWSW-URI's met een `#` en die zou zo'n lezing stilzwijgend afkappen.
 
     Een tabel zonder rijen krijgt wel de kolomkop maar geen enkele waarde; de
     herkomst van zo'n bestand staat dan alleen in het Markdown-rapport ernaast.
@@ -135,12 +207,15 @@ def schrijf_csv(tabel: pd.DataFrame, pad: Path) -> Path:
             f"de tabel voor {pad.name} draagt zelf al een kolom {KOLOM_GEREEDSCHAP!r}; "
             "hernoem die, anders overschrijft de herkomst hem stilzwijgend."
         )
-    met_herkomst = tabel.assign(**{KOLOM_GEREEDSCHAP: gereedschap()})
+    met_herkomst = _excel_veilig(tabel).assign(**{KOLOM_GEREEDSCHAP: gereedschap()})
     # Via tmp + rename (issue #148): pandas' bytes zijn hetzelfde ongeacht het pad, dus dit
     # is byte-voor-byte gelijk aan een directe `to_csv`, maar een mislukte run laat geen half
     # afgeschreven CSV op de doelplek staan.
     return _atomisch_schrijf(
-        pad, lambda doel: met_herkomst.to_csv(doel, sep=";", index=False, encoding="utf-8")
+        pad,
+        lambda doel: met_herkomst.to_csv(
+            doel, sep=";", index=False, decimal=",", encoding="utf-8-sig"
+        ),
     )
 
 

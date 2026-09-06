@@ -13,6 +13,15 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **`bevindingen.csv` is een NL-Excel-bestand** (issue #165, BO-97). Alle CSV's worden
+  geschreven met komma als decimaalteken en een UTF-8-BOM (naast de bestaande puntkomma),
+  zodat een Nederlandse Excel ze zonder verminkte coördinaten (`218994.745` -> `218994745`)
+  of mojibake (`één` -> `Ã©Ã©n`) dubbelklikt. Getalcellen krijgen een decimaalkomma (in
+  `Drempel` alleen het leidende getal) en cellen die met `=`, `@`, `+`, `-`, tab of CR
+  beginnen krijgen een formule-veilige apostrof. X en Y staan nu op 3 decimalen, aan de bron
+  afgerond zodat CSV, JSON en de GeoPackage-meldingentabel dezelfde waarde dragen; de
+  `foutlocatie` in `bevindingen.json` verschuift daardoor eenmalig naar de afgeronde waarde.
+  JSON en GeoPackage blijven internationaal (punt); geen kolom-, CLI- of JSON-veldwijziging.
 - **Drie rollen versmald naar het checkregister** (issue #138, BO-96). Drie checks
   gingen over een bredere populatie dan het register noemt, terwijl de ontologie niet
   besliste (een domeinkeuze zoals issue #64 ze voorlegt). **EXT-001** toetst nog

@@ -25,7 +25,10 @@ csv.field_size_limit(10_000_000)
 
 def lees(pad: str) -> tuple[list[str], list[tuple[str, ...]]]:
     """De kop en de rijen van een `;`-gescheiden bevindingen-CSV, met RunDatum geblankt."""
-    with open(pad, newline="", encoding="utf-8") as f:
+    # De CSV draagt sinds issue #165 een UTF-8-BOM; `utf-8-sig` strookt hem, anders zou
+    # de eerste kolomnaam `﻿Check` heten en `kop.index("RunDatum")` nog wél werken maar de
+    # kop-vergelijking tussen twee runs op een onzichtbaar teken kunnen struikelen.
+    with open(pad, newline="", encoding="utf-8-sig") as f:
         lezer = csv.reader(f, delimiter=";")
         kop = next(lezer)
         blank = {kop.index("RunDatum")}

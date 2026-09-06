@@ -160,7 +160,10 @@ alleen het bestand waarin zij staat is verhuisd.
   coordinaten nu uit één gevectoriseerde `shapely.get_coordinates` over de meldingen die de
   schrijvers werkelijk zien; om dezelfde reden als `feiten` een zijmap en geen veld op `Melding`
   (dat zou reflectief in de bevroren JSON-envelop landen). De waarden worden naar Python-`float`
-  gebracht zodat de X/Y-tekst byte-gelijk blijft aan de losse property-aanroep. Een melding
+  gebracht en sinds issue #165 (BO-97) op `XY_DECIMALEN` (3) afgerond -- aan de bron, zodat CSV,
+  JSON en de meldingentabel van de GeoPackage byte-voor-byte dezelfde X/Y dragen en de float-ruis
+  (`525754.1599999999`) uit de archieven verdwijnt; de GeoPackage-geometrie van de objecten zelf
+  blijft ongemoeid. Een melding
   zonder foutlocatie staat niet in de map; de schrijvers vallen daar op `None` terug. De
   schrijvers nemen `xy` optioneel aan en bouwen hem zelf over hun meldingen als hij ontbreekt,
   zodat een directe aanroep buiten `schrijf_uitvoer` om blijft werken.
@@ -281,6 +284,15 @@ alleen het bestand waarin zij staat is verhuisd.
   lijst als één string van tientallen MB in het geheugen te zetten; de bytes blijven identiek
   (`test_schrijf_json_is_bytegelijk_aan_een_dumps_referentie`), maar de geheugenpiek van de
   JSON-fase zakt op De Wolden van ~817 naar ~27 MiB.
+- **De CSV is een NL-Excel-bestand** (issue #165, BO-97). `schrijf_csv` schrijft alle zes
+  CSV's met puntkomma als scheidingsteken, komma als decimaalteken en UTF-8 met BOM
+  (`sep=';', decimal=',', encoding='utf-8-sig'`), zodat een beheerder ze in nl-NL Excel kan
+  dubbelklikken zonder verminkte coördinaten of mojibake. Twee celregels, over alle
+  tekstcellen: een kale-getalcel krijgt een decimaalkomma (`Waarde` `-0.350` → `-0,350`; in
+  `Drempel` alleen het leidende getal, `0,10 (drempels.x)`), en een cel die met `=`, `@`,
+  tab of CR begint -- of met `+`/`-` gevolgd door een niet-cijfer -- krijgt een apostrof
+  ervoor zodat Excel haar niet als formule uitvoert. `Waarde` en `Drempel` blijven in de
+  JSON tekst met een punt (#142); JSON en GeoPackage zijn internationaal en veranderen niet.
 - Elk uitvoerbestand draagt zijn herkomst: pakketnaam plus versie, uit
   `uitvoer/herkomst.py`. Dat is de enige schrijver in `src/`: `schrijf_markdown` zet de
   titel en de herkomstregel erboven (plus een optionele runbrede markering),

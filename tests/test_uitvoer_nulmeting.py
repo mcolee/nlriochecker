@@ -14,9 +14,9 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
-import pandas as pd
 from gwsw_orox_helpers.dataset import load_dataset
 
+from helpers_csv import lees_csv
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
 from nlriochecker.meting import Meetbereik, laad_nulmeting
@@ -59,7 +59,7 @@ def test_de_csv_draagt_de_conformiteitsklassen(tmp_path: Path) -> None:
     """De kolom `CFK` somt op welke klassen de overtreding noemen."""
     uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM, met_geopackage=False)
 
-    tabel = pd.read_csv(uitvoer.csv, sep=";")
+    tabel = lees_csv(uitvoer.csv)
     put_a = tabel[(tabel["Check"] == "NULMETING-Put_HoogtePut_card") & (tabel["Label"] == "A")]
 
     assert list(put_a["CFK"]) == ["MdsPlan, MdsProj"]
@@ -70,7 +70,7 @@ def test_een_eigen_check_laat_de_kolom_leeg(tmp_path: Path) -> None:
     """De kolom bestaat op elke rij; alleen de nulmeting vult hem."""
     uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM, met_geopackage=False)
 
-    tabel = pd.read_csv(uitvoer.csv, sep=";", keep_default_na=False)
+    tabel = lees_csv(uitvoer.csv, keep_default_na=False)
     eigen = tabel[tabel["Bron"] == "register"]
 
     assert set(eigen["CFK"]) <= {""}
@@ -214,7 +214,7 @@ def test_zonder_nulmeting_schrijft_het_rapport_geen_nulmetingblok(tmp_path: Path
 
     uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)
     tekst = uitvoer.markdown.read_text(encoding="utf-8")
-    tabel = pd.read_csv(tmp_path / FILE_CHECKS_CSV, sep=";", keep_default_na=False)
+    tabel = lees_csv(tmp_path / FILE_CHECKS_CSV, keep_default_na=False)
 
     assert "**GWSW-nulmeting**" not in tekst
     assert "SHACL-nulmeting" not in tekst
@@ -266,7 +266,7 @@ def test_de_csv_draagt_de_zin_en_de_brontekst(tmp_path: Path) -> None:
     """Een archief houdt beide: de zin om te lezen, de brontekst om op te herleiden."""
     uitvoer = schrijf_uitvoer(_run(), tmp_path, RUNDATUM, met_geopackage=False)
 
-    tabel = pd.read_csv(uitvoer.csv, sep=";", keep_default_na=False)
+    tabel = lees_csv(uitvoer.csv, keep_default_na=False)
     put_a = tabel[(tabel["Check"] == "NULMETING-Put_HoogtePut_card") & (tabel["Label"] == "A")]
     eigen = tabel[tabel["Bron"] == "register"]
 
@@ -341,7 +341,7 @@ def test_een_onvertaalde_vorm_valt_terug_en_wordt_geteld(tmp_path: Path) -> None
 
     uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=False)
     tekst = uitvoer.markdown.read_text(encoding="utf-8")
-    tabel = pd.read_csv(uitvoer.csv, sep=";", keep_default_na=False)
+    tabel = lees_csv(uitvoer.csv, keep_default_na=False)
     rij = tabel[tabel["Check"] == "NULMETING-Iets_Anders_card"]
 
     assert list(rij["Melding"]) == list(rij["MeldingTechnisch"]) == [onbekend.boodschap]

@@ -32,14 +32,15 @@ er een echte verwisseling in de uitvoer.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, fields, replace
 from pathlib import Path
 
-import pandas as pd
 import pytest
 from shapely.geometry import Point
 
+from helpers_csv import lees_csv
 from helpers_melding import nulbevinding
 from nlriochecker.checks import CheckRun
 from nlriochecker.uitvoer.bevindingen import (
@@ -50,7 +51,13 @@ from nlriochecker.uitvoer.bevindingen import (
 )
 from nlriochecker.uitvoer.gpkg import CATEGORIEEN, MELDING_KOLOMMEN, MELDING_VELD_NAAR_KOLOM
 from nlriochecker.uitvoer.herkomst import KOLOM_GEREEDSCHAP
-from nlriochecker.uitvoer.melding import Melding, Meldingenstroom, bouw_meldingenstroom, bouw_xy
+from nlriochecker.uitvoer.melding import (
+    XY_DECIMALEN,
+    Melding,
+    Meldingenstroom,
+    bouw_meldingenstroom,
+    bouw_xy,
+)
 from nlriochecker.uitvoer.objectkaart import (
     STATUS_GRIJS,
     STATUS_GROEN,
@@ -159,7 +166,7 @@ def archieven(tmp_path_factory: pytest.TempPathFactory) -> Archieven:
     uitvoer = schrijf_uitvoer(run, doel, RUNDATUM, stroom=stroom)
 
     assert uitvoer.csv is not None and uitvoer.json is not None and uitvoer.geopackage is not None
-    tabel = pd.read_csv(doel / FILE_CHECKS_CSV, sep=";", dtype=str, keep_default_na=False)
+    tabel = lees_csv(doel / FILE_CHECKS_CSV, dtype=str, keep_default_na=False)
     document = json.loads((doel / FILE_CHECKS_JSON).read_text(encoding="utf-8"))
     return Archieven(
         meldingen=stroom.meldingen,
@@ -183,22 +190,66 @@ def _uit_melding(veld: str, melding: Melding) -> object:
     Dit is het orakel: de stroom die `schrijf_uitvoer` aan alle drie de schrijvers gaf.
     Zou een van de archieven de maat zijn, dan blijven drie schrijvers die samen
     hetzelfde verkeerde antwoord geven onopgemerkt.
+
+    De foutlocatie wordt op `XY_DECIMALEN` afgerond (issue #165): de schrijvers lezen niet
+    de rauwe `Point` maar de aan de bron afgeronde zijmap `xy`, dus dat is de waarde die
+    zij horen te dragen. `ONRONDE_LOCATIE` heeft meer cijfers, zodat een schrijver die de
+    afronding oversloeg hier zou opvallen.
     """
     waarde = getattr(melding, veld)
     if veld == PUNTVELD:
-        return None if waarde is None else (waarde.x, waarde.y)
+        return (
+            None
+            if waarde is None
+            else (round(waarde.x, XY_DECIMALEN), round(waarde.y, XY_DECIMALEN))
+        )
+    return waarde
+
+
+# Een kale-getalcel met komma (`-0,350`) en het leidende getal van `Drempel` (`0,10 ...`):
+# de CSV-kant van de nl-NL-conventie terug naar de puntvorm van het orakel (issue #165).
+_KAAL_GETAL_KOMMA = re.compile(r"^-?\d+(,\d+)?$")
+_LEIDEND_GETAL_KOMMA = re.compile(r"^(-?\d+),(\d+)")
+_FORMULE_TRIGGER = ("=", "@", "\t", "\r")
+
+
+def _ont_excel(waarde: str, kolom: str) -> str:
+    """Draait de Excel-veilige vorm van `schrijf_csv` terug (issue #165).
+
+    Eerst een eventuele formule-apostrof eraf -- alleen als er werkelijk een formule-teken
+    achter zat, zodat een label dat toevallig met een apostrof begint blijft staan -- dan
+    de decimaalkomma terug naar een punt, met dezelfde `Drempel`-uitzondering als de
+    schrijver.
+    """
+    if len(waarde) > 1 and waarde[0] == "'":
+        tweede = waarde[1]
+        if tweede in _FORMULE_TRIGGER or (
+            tweede in ("+", "-")
+            and not (len(waarde) > 2 and (waarde[2].isdigit() or waarde[2] == "."))
+        ):
+            waarde = waarde[1:]
+    if kolom == "Drempel":
+        return _LEIDEND_GETAL_KOMMA.sub(r"\1.\2", waarde, count=1)
+    if _KAAL_GETAL_KOMMA.match(waarde):
+        return waarde.replace(",", ".")
     return waarde
 
 
 def _uit_csv(veld: str, rij: dict[str, str]) -> object:
-    """De waarde van een `Melding`-veld zoals de CSV hem draagt, genormaliseerd."""
+    """De waarde van een `Melding`-veld zoals de CSV hem draagt, genormaliseerd.
+
+    De CSV is sinds issue #165 een NL-Excel-bestand: komma-decimaal en formule-apostrof.
+    De normalisatie hier draait die conventie terug (`_ont_excel`) zodat de vergelijking
+    tegen de puntvorm van het orakel gaat, niet tegen een formaatverschil.
+    """
     kolommen = CSV_VELD_NAAR_KOLOM[veld]
     if veld == PUNTVELD:
         x, y = (rij[kolom] for kolom in kolommen)
         # De schrijver vult X en Y los (`bevindingen.meldingen_tabel`); alleen naar X
         # kijken zou een half geschreven coördinaat als "geen locatie" laten passeren.
         assert (x == "") == (y == ""), (veld, x, y)
-        return None if x == "" else (float(x), float(y))
+        # Komma-decimaal terug naar een punt vóór `float`; anders faalt de parse.
+        return None if x == "" else (float(x.replace(",", ".")), float(y.replace(",", ".")))
     (kolom,) = kolommen
     waarde = rij[kolom]
     if veld in BOOLVELDEN:
@@ -209,7 +260,7 @@ def _uit_csv(veld: str, rij: dict[str, str]) -> object:
         return int(waarde)
     if veld == LIJSTVELD:
         return tuple(waarde.split(", ")) if waarde else ()
-    return waarde
+    return _ont_excel(waarde, kolom)
 
 
 def _uit_json(veld: str, rij: dict[str, object]) -> object:
@@ -296,6 +347,41 @@ def test_elk_meldingveld_draagt_in_de_drie_archieven_dezelfde_waarde(
                     sleutel,
                     veld.name,
                 )
+
+
+def test_de_foutlocatie_is_in_de_drie_archieven_op_drie_decimalen_afgerond(
+    archieven: Archieven,
+) -> None:
+    """X en Y dragen in CSV, JSON en de meldingentabel dezelfde, op 3 decimalen afgeronde waarde.
+
+    De invariant van issue #165: de afronding zit aan de bron (`bouw_xy`), zodat de drie
+    archieven niet uit elkaar kunnen lopen. `ONRONDE_LOCATIE` heeft méér cijfers dan drie,
+    dus de gelijkheid hieronder bewijst dat er werkelijk afgerond is en niet alleen dat de
+    drie toevallig hetzelfde ronde getal dragen.
+    """
+    doel = next(
+        melding
+        for melding in archieven.meldingen
+        if melding.foutlocatie is not None and melding.foutlocatie.x == ONRONDE_LOCATIE.x
+    )
+    verwacht = (round(ONRONDE_LOCATIE.x, XY_DECIMALEN), round(ONRONDE_LOCATIE.y, XY_DECIMALEN))
+    assert (ONRONDE_LOCATIE.x, ONRONDE_LOCATIE.y) != verwacht
+
+    sleutel = doel.melding_id
+    per_csv = _op_id(archieven.csv, "MeldingID")
+    per_json = _op_id(archieven.json, "melding_id")
+    per_tabel = _op_id(archieven.tabel, "melding_id")
+
+    for lezer, rijen in (
+        (_uit_csv, per_csv),
+        (_uit_json, per_json),
+        (_uit_gpkg, per_tabel),
+    ):
+        assert lezer(PUNTVELD, rijen[sleutel]) == pytest.approx(verwacht, abs=LOCATIE_TOLERANTIE)
+
+    # En de CSV draagt de afgeronde coördinaat letterlijk met een decimaalkomma.
+    assert per_csv[sleutel]["X"] == "1023,457"
+    assert per_csv[sleutel]["Y"] == "1987,654"
 
 
 def _vacuum(waarde: object) -> bool:
