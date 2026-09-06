@@ -377,3 +377,188 @@ def analyseer_alle_checks() -> dict[str, Declaratie]:
     modules = _bouw_modules()
     sweep = _Sweep(modules, _rolnamen(), _veld_naar_rol())
     return {check_id: sweep.analyseer(REGISTRY[check_id]) for check_id in sorted(REGISTRY)}
+
+
+# ---------------------------------------------------------------------------
+# Drempelsleutels per check (issue #142)
+#
+# Naast de rollen en kenmerken van issue #64 leidt deze sweep af welke
+# `[drempels]`-sleutels een check leest, zodat `test_checkdeclaraties` kan afdwingen dat
+# elke check die een drempel leest die drempel ook in haar bevinding zet (traceerbaarheid:
+# elke rij is te herleiden zonder `checks.toml` te openen).
+#
+# De sweep loopt de eigen methoden van de check af -- `run`, `notes`, `examined` en de
+# `self.`-methoden die daaruit bereikt worden -- en NIET de module-vrije hulpfuncties.
+# Dat laatste is bewust: `_bouw_topologie` leest `snapping_tolerantie_m` voor de gedeelde
+# index, en die lezing hoort niet bij elke topologiecheck die de index gebruikt. Wat een
+# check zelf in haar methoden leest is de drempel die haar bevindingen stuurt.
+
+
+def _class_index(modules: dict[str, ModuleModel]) -> dict[str, tuple[str, ast.ClassDef]]:
+    """Elke checkklasse bij naam, over alle modules heen: naam -> (module, ClassDef)."""
+    index: dict[str, tuple[str, ast.ClassDef]] = {}
+    for model in modules.values():
+        for naam, classdef in model.classes.items():
+            index.setdefault(naam, (model.naam, classdef))
+    return index
+
+
+def _basisnamen(classdef: ast.ClassDef) -> list[str]:
+    """De directe basisklassenamen (`class X(A, B)` -> ['A', 'B'])."""
+    return [basis.id for basis in classdef.bases if isinstance(basis, ast.Name)]
+
+
+def _classvar_constante(index: dict[str, tuple[str, ast.ClassDef]], naam: str, veld: str) -> object:
+    """De waarde van een string-ClassVar op deze klasse of een van haar bases, of None."""
+    seen: set[str] = set()
+    stapel = [naam]
+    while stapel:
+        klass = stapel.pop()
+        if klass in seen or klass not in index:
+            continue
+        seen.add(klass)
+        _, classdef = index[klass]
+        for item in classdef.body:
+            if isinstance(item, ast.Assign) and any(
+                isinstance(doel, ast.Name) and doel.id == veld for doel in item.targets
+            ):
+                if isinstance(item.value, ast.Constant):
+                    return item.value.value
+        stapel.extend(_basisnamen(classdef))
+    return None
+
+
+def _methoden_van(
+    index: dict[str, tuple[str, ast.ClassDef]], naam: str
+) -> dict[str, ast.FunctionDef]:
+    """Elke methode van deze klasse plus haar bases; de meest afgeleide wint."""
+    volgorde: list[str] = []
+    seen: set[str] = set()
+    stapel = [naam]
+    while stapel:
+        klass = stapel.pop(0)
+        if klass in seen or klass not in index:
+            continue
+        seen.add(klass)
+        volgorde.append(klass)
+        stapel.extend(_basisnamen(index[klass][1]))
+    methoden: dict[str, ast.FunctionDef] = {}
+    for klass in volgorde:
+        for item in index[klass][1].body:
+            if isinstance(item, ast.FunctionDef) and item.name not in methoden:
+                methoden[item.name] = item
+    return methoden
+
+
+def _drempelsleutels_in(
+    func: ast.FunctionDef, index: dict[str, tuple[str, ast.ClassDef]], clsnaam: str
+) -> set[str]:
+    """De `[drempels]`-sleutels die deze functie direct leest.
+
+    Herkent `context.config.drempels.<sleutel>`, een aan `context.config.drempels`
+    gebonden lokale naam (`drempels = context.config.drempels; drempels.<sleutel>`), en
+    `getattr(drempels, <literal>|self.<classvar>)` -- de vorm van `_Tegenverhang` en
+    `_DekselAfwijking`.
+    """
+    drempelnamen = {"drempels"}
+    for knoop in ast.walk(func):
+        if (
+            isinstance(knoop, ast.Assign)
+            and isinstance(knoop.value, ast.Attribute)
+            and knoop.value.attr == "drempels"
+        ):
+            for doel in knoop.targets:
+                if isinstance(doel, ast.Name):
+                    drempelnamen.add(doel.id)
+
+    sleutels: set[str] = set()
+    for knoop in ast.walk(func):
+        if isinstance(knoop, ast.Attribute):
+            binnen = knoop.value
+            if isinstance(binnen, ast.Attribute) and binnen.attr == "drempels":
+                sleutels.add(knoop.attr)
+            elif isinstance(binnen, ast.Name) and binnen.id in drempelnamen:
+                sleutels.add(knoop.attr)
+        if (
+            isinstance(knoop, ast.Call)
+            and isinstance(knoop.func, ast.Name)
+            and knoop.func.id == "getattr"
+            and len(knoop.args) >= 2
+        ):
+            basis = knoop.args[0]
+            is_drempel = (isinstance(basis, ast.Name) and basis.id in drempelnamen) or (
+                isinstance(basis, ast.Attribute) and basis.attr == "drempels"
+            )
+            if is_drempel:
+                arg = knoop.args[1]
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    sleutels.add(arg.value)
+                elif isinstance(arg, ast.Attribute) and _is_self(arg.value):
+                    waarde = _classvar_constante(index, clsnaam, arg.attr)
+                    if isinstance(waarde, str):
+                        sleutels.add(waarde)
+    return sleutels
+
+
+def _self_aanroepen(func: ast.FunctionDef) -> set[str]:
+    """De namen van de `self.<methode>()`-aanroepen in deze functie."""
+    namen: set[str] = set()
+    for knoop in ast.walk(func):
+        if (
+            isinstance(knoop, ast.Call)
+            and isinstance(knoop.func, ast.Attribute)
+            and _is_self(knoop.func.value)
+        ):
+            namen.add(knoop.func.attr)
+    return namen
+
+
+def _classnaam_van(check: type) -> str:
+    """De AST-klassenaam van een check: de Python-klassenaam zelf."""
+    return check.__name__
+
+
+def drempelsleutels_van_check(check: type) -> frozenset[str]:
+    """De `[drempels]`-sleutels die deze check in haar eigen methoden leest.
+
+    Loopt `run`, `notes` en `examined` af plus de `self.`-methoden die daaruit bereikt
+    worden; module-vrije hulpfuncties blijven buiten beeld (zie de kop hierboven).
+    """
+    modules = _bouw_modules()
+    index = _class_index(modules)
+    clsnaam = _classnaam_van(check)
+    if clsnaam not in index:
+        return frozenset()
+    methoden = _methoden_van(index, clsnaam)
+
+    sleutels: set[str] = set()
+    bezocht: set[str] = set()
+    stapel = [naam for naam in ("run", "notes", "examined") if naam in methoden]
+    while stapel:
+        naam = stapel.pop()
+        if naam in bezocht or naam not in methoden:
+            continue
+        bezocht.add(naam)
+        func = methoden[naam]
+        sleutels |= _drempelsleutels_in(func, index, clsnaam)
+        stapel.extend(_self_aanroepen(func))
+    return frozenset(sleutels)
+
+
+def bevinding_kwargs_van_check(check: type) -> frozenset[str]:
+    """De keyword-namen die deze check aan `self.finding(...)` meegeeft, over al haar methoden."""
+    modules = _bouw_modules()
+    index = _class_index(modules)
+    clsnaam = _classnaam_van(check)
+    if clsnaam not in index:
+        return frozenset()
+    kwargs: set[str] = set()
+    for func in _methoden_van(index, clsnaam).values():
+        for knoop in ast.walk(func):
+            if (
+                isinstance(knoop, ast.Call)
+                and isinstance(knoop.func, ast.Attribute)
+                and knoop.func.attr == "finding"
+            ):
+                kwargs.update(kw.arg for kw in knoop.keywords if kw.arg)
+    return frozenset(kwargs)

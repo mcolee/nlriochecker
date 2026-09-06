@@ -136,6 +136,8 @@ class SystematischAfgerondeHoogtewaarden(Check):
                 f"{aandeel:.1f}% van de {len(waarden)} {naam} valt precies op een raster van "
                 f"{raster:g} m ({op_raster} van {len(waarden)}, drempel "
                 f"{aandeel_drempel:g}%). Dat wijst op geschatte in plaats van gemeten waarden.",
+                waarde=f"{aandeel:.1f}",
+                drempel=f"{aandeel_drempel:g} (drempels.afronding_aandeel_procent)",
                 kenmerk=naam,
                 aantal=len(waarden),
                 op_raster=op_raster,

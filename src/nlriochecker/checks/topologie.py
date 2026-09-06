@@ -484,6 +484,7 @@ class LosliggendePut(Check):
                     node.uri,
                     node.label,
                     f"Geen strengeindpunt binnen {tolerantie:g} m van deze put.",
+                    drempel=f"{tolerantie:g} (drempels.snapping_tolerantie_m)",
                     tolerantie_m=tolerantie,
                 )
 
@@ -532,6 +533,7 @@ class _StrengPutAansluiting(Check):
                 conduit.uri,
                 conduit.label,
                 self.melding(tolerantie),
+                drempel=f"{tolerantie:g} (drempels.snapping_tolerantie_m)",
                 tolerantie_m=tolerantie,
             )
 
@@ -646,6 +648,8 @@ class NietGesneptStrengeinde(Check):
                         conduit.label,
                         f"Het {zijde} ligt {afstand:.3f} m van put {node.label!r}, "
                         f"meer dan de tolerantie van {tolerantie:g} m.",
+                        waarde=f"{afstand:.3f}",
+                        drempel=f"{tolerantie:g} (drempels.snapping_tolerantie_m)",
                         zijde=zijde,
                         afstand_m=round(afstand, 3),
                         put=node.label,
@@ -697,6 +701,8 @@ class DubbelePut(Check):
                     node.label,
                     f"Ligt {afstand:.3f} m van put {ander.label!r}, binnen de "
                     f"tolerantie van {tolerantie:g} m.",
+                    waarde=f"{afstand:.3f}",
+                    drempel=f"{tolerantie:g} (drempels.dubbele_put_tolerantie_m)",
                     object2_label=ander.label,
                     object2_uri=ander.uri,
                     afstand_m=round(afstand, 3),
@@ -790,6 +796,8 @@ class OverlappendeStreng(Check):
                     conduit.label,
                     f"Valt over {lengte:.2f} m samen met streng {ander.label!r} "
                     f"(tolerantie {tolerantie:g} m).",
+                    waarde=f"{lengte:.2f}",
+                    drempel=f"{minimum:g} (drempels.overlap_minimale_lengte_m)",
                     object2_label=ander.label,
                     object2_uri=ander.uri,
                     overlaplengte_m=round(lengte, 3),
@@ -828,32 +836,49 @@ class DegeneratieveGeometrie(Check):
         drempel = context.config.drempels.nul_lengte_m
 
         for conduit in _topologie(context).all_conduits:
-            reden = self._reden(context, conduit, drempel)
-            if reden is None:
+            geval = self._reden(context, conduit, drempel)
+            if geval is None:
                 continue
+            reden, waarde, drempeltekst = geval
             yield self.finding(
                 context,
                 conduit.uri,
                 conduit.label,
                 reden,
+                waarde=waarde,
+                drempel=drempeltekst,
                 nul_lengte_m=drempel,
             )
 
-    def _reden(self, context: CheckContext, conduit: Conduit, drempel: float) -> str | None:
-        """De reden waarom deze geometrie onbruikbaar is, of None."""
+    def _reden(
+        self, context: CheckContext, conduit: Conduit, drempel: float
+    ) -> tuple[str, str, str] | None:
+        """De reden waarom deze geometrie onbruikbaar is, met de gemeten lengte en drempel.
+
+        Alleen de lengtegrens vergelijkt een gemeten waarde met de drempel; de andere
+        redenen (geen lijn, oneindige coordinaten, te weinig punten, zelfkruising) dragen
+        geen waarde en geen drempel en laten die velden leeg.
+        """
         if conduit.line is None or conduit.line.is_empty:
-            return "Heeft geen lijngeometrie."
+            return "Heeft geen lijngeometrie.", "", ""
         if not is_finite(conduit.line):
-            return "Bevat coordinaten die geen eindig getal zijn."
+            return "Bevat coordinaten die geen eindig getal zijn.", "", ""
         punten = unieke_coords_van(context, conduit.uri, conduit.line)
         if len(punten) < 2:
-            return f"Bestaat uit {len(punten)} verschillend(e) punt(en) en heeft geen verloop."
-        if conduit.line.length <= drempel:
             return (
-                f"Heeft een lengte van {conduit.line.length:.4f} m, onder de drempel {drempel:g} m."
+                f"Bestaat uit {len(punten)} verschillend(e) punt(en) en heeft geen verloop.",
+                "",
+                "",
+            )
+        if conduit.line.length <= drempel:
+            lengte = conduit.line.length
+            return (
+                f"Heeft een lengte van {lengte:.4f} m, onder de drempel {drempel:g} m.",
+                f"{lengte:.4f}",
+                f"{drempel:g} (drempels.nul_lengte_m)",
             )
         if not conduit.line.is_simple:
-            return "Kruist zichzelf; zie ook TOP-017."
+            return "Kruist zichzelf; zie ook TOP-017.", "", ""
         return None
 
     def examined(self, context: CheckContext) -> int:
@@ -896,6 +921,8 @@ class StrengNietRecht(Check):
                 conduit.label,
                 f"Wijkt {afwijking:.2f} m af van de rechte lijn tussen begin- en eindpunt "
                 f"({len(punten) - 2} tussenpunt(en), drempel {drempel:g} m).",
+                waarde=f"{afwijking:.2f}",
+                drempel=f"{drempel:g} (drempels.rechtheid_afwijking_m)",
                 afwijking_m=round(afwijking, 3),
                 tussenpunten=len(punten) - 2,
                 drempel_m=drempel,
@@ -923,33 +950,51 @@ class BuitenRdBereik(Check):
         grenzen = (drempels.rd_x_min, drempels.rd_x_max, drempels.rd_y_min, drempels.rd_y_max)
 
         for node in _topologie(context).nodes:
-            melding = self._melding(node.point, grenzen, "put")
-            if melding is not None:
-                yield self.finding(context, node.uri, node.label, melding)
+            geval = self._melding(node.point, grenzen, "put")
+            if geval is not None:
+                melding, waarde, drempel = geval
+                yield self.finding(
+                    context, node.uri, node.label, melding, waarde=waarde, drempel=drempel
+                )
 
         for conduit in _topologie(context).all_conduits:
-            melding = self._melding(conduit.line, grenzen, "streng")
-            if melding is not None:
-                yield self.finding(context, conduit.uri, conduit.label, melding)
+            geval = self._melding(conduit.line, grenzen, "streng")
+            if geval is not None:
+                melding, waarde, drempel = geval
+                yield self.finding(
+                    context, conduit.uri, conduit.label, melding, waarde=waarde, drempel=drempel
+                )
 
-    def _melding(self, geometrie, grenzen: tuple[float, ...], soort: str) -> str | None:
-        """De reden waarom deze geometrie buiten het geldige bereik valt, of None."""
+    def _melding(
+        self, geometrie, grenzen: tuple[float, ...], soort: str
+    ) -> tuple[str, str, str] | None:
+        """De reden waarom deze geometrie buiten het geldige bereik valt, met waarde en drempel.
+
+        De overschreden coordinaat is de gemeten waarde en de RD-grens die zij passeert de
+        drempel; een ontbrekende of oneindige coordinaat draagt er geen en laat ze leeg.
+        """
         x_min, x_max, y_min, y_max = grenzen
         if geometrie is None or geometrie.is_empty:
-            return f"Deze {soort} heeft geen coordinaten."
+            return f"Deze {soort} heeft geen coordinaten.", "", ""
         if not is_finite(geometrie):
-            return f"Deze {soort} heeft coordinaten die geen eindig getal zijn."
+            return f"Deze {soort} heeft coordinaten die geen eindig getal zijn.", "", ""
         omhullende = geometrie.bounds
         if omhullende[0] < x_min or omhullende[2] > x_max:
-            return (
+            melding = (
                 f"De x-coordinaat ligt buiten het RD-bereik "
                 f"[{x_min:g}, {x_max:g}]: {omhullende[0]:.1f} tot {omhullende[2]:.1f}."
             )
+            if omhullende[0] < x_min:
+                return melding, f"{omhullende[0]:.1f}", f"{x_min:g} (drempels.rd_x_min)"
+            return melding, f"{omhullende[2]:.1f}", f"{x_max:g} (drempels.rd_x_max)"
         if omhullende[1] < y_min or omhullende[3] > y_max:
-            return (
+            melding = (
                 f"De y-coordinaat ligt buiten het RD-bereik "
                 f"[{y_min:g}, {y_max:g}]: {omhullende[1]:.1f} tot {omhullende[3]:.1f}."
             )
+            if omhullende[1] < y_min:
+                return melding, f"{omhullende[1]:.1f}", f"{y_min:g} (drempels.rd_y_min)"
+            return melding, f"{omhullende[3]:.1f}", f"{y_max:g} (drempels.rd_y_max)"
         return None
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -1023,6 +1068,8 @@ class StrengenRakenMetBuffer(Check):
                     conduit.label,
                     f"Ligt {afstand:.2f} m van streng "
                     f"{ander.label!r}, binnen de gezamenlijke buisbuffer van {buffer:.2f} m.",
+                    waarde=f"{afstand:.2f}",
+                    drempel=f"{marge:g} (drempels.diameterbuffer_marge_m)",
                     object2_label=ander.label,
                     object2_uri=ander.uri,
                     afstand_m=round(afstand, 3),
@@ -1157,6 +1204,8 @@ class ParallelleStrengen(Check):
                     conduit.label,
                     f"Een van {len(strengen)} strengen tussen de putten "
                     f"{putten[0]!r} en {putten[-1]!r} (maximum {maximum}): {', '.join(labels)}.",
+                    waarde=str(len(strengen)),
+                    drempel=f"{maximum:g} (drempels.parallelle_strengen_maximum)",
                     aantal=len(strengen),
                     putten=putten,
                     maximum=maximum,
@@ -1203,6 +1252,8 @@ class VeelAansluitendeStrengen(Check):
                 node.label,
                 f"Er sluiten {len(strengen)} strengen aan op deze put (maximum {maximum}): "
                 f"{', '.join(sorted(strengen))}.",
+                waarde=str(len(strengen)),
+                drempel=f"{maximum:g} (drempels.aansluitende_strengen_maximum)",
                 aantal=len(strengen),
                 maximum=maximum,
             )
@@ -1569,6 +1620,8 @@ class PutNaastDoorlopendeStreng(Check):
                     node.label,
                     f"Ligt {afstand:.2f} m van streng {conduit.label!r}, die er langs "
                     "doorloopt in plaats van erin te eindigen.",
+                    waarde=f"{afstand:.2f}",
+                    drempel=f"{tolerantie:g} (drempels.put_op_streng_tolerantie_m)",
                     streng=conduit.label,
                     streng_uri=conduit.uri,
                     afstand_m=round(afstand, 3),

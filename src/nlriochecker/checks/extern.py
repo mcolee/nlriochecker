@@ -359,8 +359,11 @@ class KruisingMetBouwwerk(_ExterneCheck):
                 object_.label,
                 f"Dit object {self._zin(relatie, afstand)} een bouwwerk uit "
                 f"`{laag.source.name}` (laag {laag.layer}); buffer {buffer:g} m.",
+                # `waarde` blijft hier de categorische relatie (binnen/kruist/nabij) en geen
+                # afstand: `uitvoer/gpkg.py` `_sterkste_relatie` leest haar om de vlakkenlaag
+                # te kleuren. De gemeten afstand staat in `afstand_m` (het feitenkanaal).
                 waarde=relatie,
-                drempel=buffer,
+                drempel=f"{buffer:g} (drempels.ext_pand_buffer_m)",
                 afstand_m=round(afstand, 3),
                 bron=laag.source.name,
                 laag=laag.layer,
@@ -880,6 +883,7 @@ class LozingspuntZonderWatergang(_ExterneCheck):
                 node.uri,
                 node.label,
                 f"Geen BGT-waterdeel binnen {afstand:g} m van dit lozingspunt.",
+                drempel=f"{afstand:g} (drempels.ext_lozingspunt_water_afstand_m)",
                 afstand_m=afstand,
             )
 
@@ -976,7 +980,7 @@ class StraatZonderRiolering(_ExterneCheck):
                 f"maal de straatlengte, minder dan de drempel {drempel:g}.",
                 location=(punt.x, punt.y),
                 waarde=round(oordeel.streng_in_cel, 3),
-                drempel=drempel,
+                drempel=f"{drempel:g} (drempels.ext_wegvak_streng_in_cel)",
                 straat=oordeel.straat,
                 plaats=oordeel.plaats,
                 straatlengte_m=round(oordeel.straatlengte_m, 1),
@@ -1159,6 +1163,8 @@ class _DekselAfwijking(_AhnCheck):
                 node.label,
                 f"{_hoofdletter(met_lidwoord(bron))} ({geregistreerd:.3f} m NAP) wijkt "
                 f"{afwijking:.3f} m af van het AHN ({gemeten:.3f} m NAP).{kanttekening}",
+                waarde=f"{afwijking:.3f}",
+                drempel=f"{onder:g} (drempels.{self.ondergrens})",
                 afwijking_m=afwijking,
                 geregistreerd=geregistreerd,
                 ahn=round(gemeten, 3),
@@ -1315,14 +1321,17 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
                 maaiveld = raster.sample(node.point.x, node.point.y)
                 if maaiveld is None:
                     continue
-                melding = self._melding(bob, maaiveld, diepte, zijde, node)
-                if melding is None:
+                geval = self._melding(bob, maaiveld, diepte, zijde, node)
+                if geval is None:
                     continue
+                melding, waarde, drempeltekst = geval
                 yield self.finding(
                     context,
                     conduit.uri,
                     conduit.label,
                     melding,
+                    waarde=waarde,
+                    drempel=drempeltekst,
                     zijde=zijde,
                     bob=bob,
                     ahn=round(maaiveld, 3),
@@ -1350,16 +1359,26 @@ class BobSanityTenOpzichteVanAhn(_AhnCheck):
 
     def _melding(
         self, bob: float, maaiveld: float, diepte: float, zijde: str, node: Node
-    ) -> str | None:
-        """De reden waarom deze BOB niet bij het AHN-maaiveld past, of None."""
+    ) -> tuple[str, str, str] | None:
+        """De reden waarom deze BOB niet bij het AHN-maaiveld past, met waarde en drempel.
+
+        Alleen de te-diep-tak weegt een gemeten diepte tegen `bob_maximale_diepte_m`; die
+        vult `waarde` (de diepte onder het AHN) en `drempel`. De boven-maaiveld-tak is
+        categorisch en kent geen drempel (zie `notes()`), dus daar blijven beide leeg --
+        anders zou de rij een negatieve waarde onder een positieve drempel dragen.
+        """
         if bob > maaiveld:
             return (
                 f"De BOB aan het {zijde} ({bob:.3f} m NAP) ligt boven het AHN-maaiveld bij "
-                f"put {node.label!r} ({maaiveld:.3f} m NAP)."
+                f"put {node.label!r} ({maaiveld:.3f} m NAP).",
+                "",
+                "",
             )
         if maaiveld - bob > diepte:
             return (
                 f"De BOB aan het {zijde} ({bob:.3f} m NAP) ligt {maaiveld - bob:.2f} m onder "
-                f"het AHN-maaiveld bij put {node.label!r}, meer dan {diepte:g} m."
+                f"het AHN-maaiveld bij put {node.label!r}, meer dan {diepte:g} m.",
+                f"{maaiveld - bob:.3f}",
+                f"{diepte:g} (drempels.bob_maximale_diepte_m)",
             )
         return None

@@ -663,6 +663,7 @@ class ExterneOverstortZonderWater(Check):
                 node.label,
                 f"Geen oppervlaktewater uit de GWSW-dataset binnen {afstand:g} m van deze "
                 "overstort.",
+                drempel=f"{afstand:g} (drempels.overstort_water_afstand_m)",
                 afstand_m=afstand,
             )
 
@@ -1105,8 +1106,10 @@ class OnvoldoendeWaking(Check):
                     f"Waking {waking:.3f} m tussen drempel {drempel.label!r} "
                     f"({drempel.niveau:.3f} m NAP) en het {_bovenkant_bron(node)} "
                     f"({boven:.3f} m NAP), onder het minimum van {minimum:g} m.",
+                    waarde=f"{waking:.3f}",
+                    drempel=f"{minimum:g} (drempels.minimale_waking_m)",
                     waking_m=round(waking, 3),
-                    drempel=drempel.label,
+                    drempel_label=drempel.label,
                     drempelniveau=drempel.niveau,
                     bovenkant=boven,
                     minimum_m=minimum,

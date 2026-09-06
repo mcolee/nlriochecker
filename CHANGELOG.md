@@ -13,6 +13,25 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Elke meetcheck vult nu `waarde` en `drempel`** (issue #142): de checks die een gemeten
+  grootheid tegen een drempel afwegen zetten die grootheid als tekst in `waarde` en de
+  configwaarde plus haar sleutel in `drempel` (`'0.10 (drempels.tegenverhang_fors_m)'`), zoals
+  HGT-009 sinds #141. Zo is elke rij in CSV, JSON, GeoPackage en rapport te herleiden zonder
+  `checks.toml` te openen, en een werklijst als "alle tegenverhangen > 0,5 m" wordt een filter
+  op twee kolommen. Op Koekangerveld dragen nu 49 van de 163 register-meldingen deze kolommen
+  (was 2); de rest zijn meldingen zonder meting (ontbrekende begindatum/putdiepte, systemische
+  deelstelsel- en netwerkbevindingen). Een drifttest (`test_een_drempellezende_check_vult_drempel`)
+  houdt af dat een check die een `[drempels]`-sleutel leest die drempel ook meldt. HGT-011 en
+  RVZ-011 gebruikten de gereserveerde sleutel `drempel` voor een objectlabel; dat heet nu
+  `drempel_label`, zodat `drempel` vrij is voor de configdrempel. EXT-001 houdt bewust de
+  categorische relatie (binnen/kruist/nabij) in `waarde` -- de GeoPackage-vlakkenlaag leest
+  die om zich te kleuren -- en trekt alleen de kale `drempel` naar de gelabelde vorm. Gevolg voor bestaande
+  uitzonderingen (issue #132): een geaccepteerde bevinding op een meetcheck droeg vaak een lege
+  `waarde`, waardoor een `waarde_snapshot=""` stil bleef matchen; nu de melding een echte waarde
+  draagt landt zo'n uitzondering in `gewijzigde_waarde` -- een luide vraag om herbeoordeling. Geen
+  schema-bump: de velden bestonden al, en de aantallen op De Wolden schuiven niet (ledger
+  ongewijzigd).
+
 - **HGT-009 toetst per aanvoerende streng in plaats van op de laagste aanvoer** (issue #141):
   de BOB-sprongcheck vergeleek `min(aanvoer-BOB) - max(afvoer-BOB)` per put en miste zo een put
   met twee aanvoeren waarvan er één ver boven de afvoer binnenkomt terwijl de andere gelijk ligt.

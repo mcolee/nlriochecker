@@ -1170,7 +1170,13 @@ def test_de_systemische_bevindingen_lopen_veld_voor_veld_door_de_gedeelde_fabrie
             "aanlegdatum."
         ),
         typing_reliable=True,
-        details={"jaar": 1900, "aandeel_procent": 40.0, "aantal": 16},
+        details={
+            "waarde": "40.0",
+            "drempel": "20 (drempels.begindatum_vulwaarde_aandeel)",
+            "jaar": 1900,
+            "aandeel_procent": 40.0,
+            "aantal": 16,
+        },
         location=None,
         systemisch=True,
     )

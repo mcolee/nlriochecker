@@ -259,6 +259,8 @@ class DiameterOnderMinimum(_StrengCheck):
                 conduit.label,
                 f"Profielmaat {maat:g} mm ligt onder de gangbare ondergrens van "
                 f"{regel.minimum_mm:g} mm voor {waarvoor}.",
+                waarde=f"{maat:g}",
+                drempel=f"{regel.minimum_mm:g} (plausibiliteit.minimale_diameter)",
                 maat_mm=maat,
                 minimum_mm=regel.minimum_mm,
             )
@@ -425,6 +427,7 @@ class VormVersusAfmetingen(_StrengCheck):
                 conduit.uri,
                 conduit.label,
                 melding,
+                drempel=f"{tolerantie:g} (drempels.rondheid_tolerantie_mm)",
                 vorm=conduit.vorm,
                 breedte_mm=breedte,
                 hoogte_mm=hoogte,
@@ -504,6 +507,8 @@ class EenhedenfoutBinnenBereik(_StrengCheck):
                     conduit.label,
                     f"De {naam} van {maat:g} mm is geen handelsmaat, maar {maat * 10:g} mm "
                     "wel; de waarde lijkt in centimeters genoteerd.",
+                    waarde=f"{maat:g}",
+                    drempel=f"{drempel:g} (drempels.eenheidsverdenking_diameter_mm)",
                     kenmerk=naam,
                     waarde_mm=maat,
                     vermoedelijke_waarde_mm=maat * 10,
@@ -571,6 +576,8 @@ class DiameterGroterDanPut(_StrengCheck):
                     conduit.label,
                     f"Profielmaat {maat:g} mm is groter dan de grootste binnenmaat "
                     f"{putmaat:g} mm van put {node.label!r} aan het {zijde}.",
+                    waarde=f"{maat:g}",
+                    drempel=f"{marge:g} (drempels.put_diameter_marge_mm)",
                     maat_mm=maat,
                     putmaat_mm=putmaat,
                     put=node.label,
@@ -819,6 +826,7 @@ class VormPutVersusAfmetingen(_PutCheck):
                 node.uri,
                 node.label,
                 _putmaatboodschap(breedte, lengte),
+                drempel=f"{tolerantie:g} (drempels.rondheid_tolerantie_mm)",
                 vorm="Rond",
                 breedte_mm=breedte,
                 lengte_mm=lengte,
@@ -900,11 +908,14 @@ class BegindatumBuitenBereik(_StrengCheck):
                 continue
             kant = "voor" if datum.year < minimum else "na"
             grens = minimum if datum.year < minimum else maximum
+            grenssleutel = "begindatum_minimum" if kant == "voor" else "begindatum_maximum"
             yield self.finding(
                 context,
                 object_.uri,
                 object_.label,
                 f"Begindatum {datum.isoformat()} ligt {kant} {grens}.",
+                waarde=str(datum.year),
+                drempel=f"{grens} (drempels.{grenssleutel})",
                 begindatum_jaar=datum.year,
                 grensjaar=grens,
             )
@@ -1097,6 +1108,8 @@ class BegindatumVulwaardejaar(Check):
                 f"objecten ({aantal}); boven de signaaldrempel van {drempel * 100:g}% en "
                 "mogelijk een vulwaarde in plaats van een echte aanlegdatum.",
                 systemisch=True,
+                waarde=f"{aandeel * 100:.1f}",
+                drempel=f"{drempel * 100:g} (drempels.begindatum_vulwaarde_aandeel)",
                 jaar=jaar,
                 aandeel_procent=round(aandeel * 100, 1),
                 aantal=aantal,
@@ -1158,6 +1171,8 @@ class LengteWijktAfVanGeometrie(_StrengCheck):
                 f"De hartlijn is {gemeten:.2f} m lang terwijl de administratie "
                 f"{administratief:g} m zegt: {afwijking:.1f}% afwijking (drempel "
                 f"{drempel:g}%).",
+                waarde=f"{afwijking:.1f}",
+                drempel=f"{drempel:g} (drempels.lengte_afwijking_procent)",
                 geometrische_lengte_m=round(gemeten, 3),
                 administratieve_lengte_m=administratief,
                 afwijking_procent=round(afwijking, 2),

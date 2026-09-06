@@ -244,6 +244,8 @@ class _Tegenverhang(_StrengCheck):
                 conduit.label,
                 f"De bodem stijgt {stijging:.3f} m in de afvoerrichting "
                 f"(BOB {conduit.bob_start:.3f} naar {conduit.bob_end:.3f} m NAP).",
+                waarde=f"{stijging:.3f}",
+                drempel=f"{onder:g} (drempels.{self.ondergrens})",
                 stijging_m=round(stijging, 3),
                 ondergrens_m=onder,
                 bovengrens_m=boven,
@@ -353,6 +355,8 @@ class OnvoldoendeVerhang(_StrengCheck):
                 f"Verhang {verhang * 1000:.2f} promille ({_als_helling(verhang)}), onder het "
                 f"minimale afschot {_als_helling(drempel)} dat de RIONED-staffel bij diameter "
                 f"{conduit.breedte_mm:g} mm vraagt.",
+                waarde=_als_helling(verhang),
+                drempel=f"{_als_helling(drempel)} (verhang_staffel)",
                 verhang_promille=round(verhang * 1000, 3),
                 drempel_promille=round(drempel * 1000, 3),
                 diameter_mm=conduit.breedte_mm,
@@ -425,6 +429,8 @@ class ExtreemVerhang(_StrengCheck):
                 conduit.uri,
                 conduit.label,
                 f"Verhang 1:{1 / verhang:.0f}, steiler dan 1:{een_op:g}.",
+                waarde=f"1:{1 / verhang:.0f}",
+                drempel=f"1:{een_op:g} (drempels.extreem_verhang_een_op)",
                 verhang=round(verhang, 5),
                 een_op=een_op,
             )
@@ -540,6 +546,7 @@ class DiameterverkleiningInAfvoerrichting(_KnoopVergelijking):
                 afvoerend.label,
                 f"Voert af uit put {node.label!r} met {max(uit):g} mm terwijl er "
                 f"{max(binnen):g} mm binnenkomt.",
+                waarde=f"{max(uit):g}",
                 afvoer_mm=max(uit),
                 aanvoer_mm=max(binnen),
                 put=node.label,
@@ -582,7 +589,8 @@ class DrempelBuitenBereik(_PutCheck):
                         node.label,
                         f"Drempelniveau van {drempel.label!r} ({niveau:.3f} m NAP) ligt onder "
                         f"de laagste aanvoerende BOB ({min(aanvoer):.3f} m NAP).",
-                        drempel=drempel.label,
+                        waarde=f"{niveau:.3f}",
+                        drempel_label=drempel.label,
                         drempelniveau=niveau,
                         laagste_bob=min(aanvoer),
                     )
@@ -594,7 +602,8 @@ class DrempelBuitenBereik(_PutCheck):
                         node.label,
                         f"Drempelniveau van {drempel.label!r} ({niveau:.3f} m NAP) ligt boven "
                         f"het {_bovenkant_bron(node)} ({boven:.3f} m NAP).",
-                        drempel=drempel.label,
+                        waarde=f"{niveau:.3f}",
+                        drempel_label=drempel.label,
                         drempelniveau=niveau,
                         bovenkant=boven,
                     )
@@ -645,6 +654,9 @@ class PutdiepteBuitenBereik(_PutCheck):
                 node.uri,
                 node.label,
                 f"Putdiepte {diepte:.3f} m ligt {kant} de grens van {grens:g} m.",
+                waarde=f"{diepte:.3f}",
+                drempel=f"{grens:g} (drempels.{'minimale' if kant == 'onder' else 'maximale'}"
+                "_putdiepte_m)",
                 putdiepte_m=round(diepte, 3),
                 grens_m=grens,
             )
@@ -704,6 +716,9 @@ class GronddekkingBuitenBereik(_StrengCheck):
                 uiteinde.conduit.label,
                 f"Gronddekking {dekking:.2f} m aan het {uiteinde.zijde} ligt {kant} de grens "
                 f"van {grens:g} m (maaiveld {maaiveld:.2f}, buiskruin {kruin:.2f} m NAP).",
+                waarde=f"{dekking:.2f}",
+                drempel=f"{grens:g} (drempels.{'minimale' if kant == 'onder' else 'maximale'}"
+                "_gronddekking_m)",
                 zijde=uiteinde.zijde,
                 gronddekking_m=round(dekking, 3),
                 grens_m=grens,
@@ -765,6 +780,8 @@ class VerhangVolgtMaaiveldNiet(_StrengCheck):
                 conduit.label,
                 f"Het bodemverval is {leiding:+.3f} m terwijl het maaiveld {maaiveld:+.3f} m "
                 f"verloopt: {afwijking:.3f} m verschil (drempel {drempel:g} m).",
+                waarde=f"{afwijking:.3f}",
+                drempel=f"{drempel:g} (drempels.maaiveldvolging_afwijking_m)",
                 bodemverval_m=round(leiding, 3),
                 maaiveldverval_m=round(maaiveld, 3),
                 afwijking_m=round(afwijking, 3),
@@ -841,6 +858,8 @@ class PutbodemBuitenMarge(_PutCheck):
                     node.label,
                     f"De putbodem ({bodem:.3f} m NAP) ligt {bodem - bob:.3f} m boven de "
                     f"laagste aansluitende BOB ({bob:.3f} m NAP).",
+                    waarde=f"{bodem - bob:.3f}",
+                    drempel=f"{boven_marge:g} (drempels.putbodem_boven_bob_m)",
                     bodem=bodem,
                     laagste_bob=bob,
                     marge_m=boven_marge,
@@ -852,6 +871,8 @@ class PutbodemBuitenMarge(_PutCheck):
                     node.label,
                     f"De putbodem ({bodem:.3f} m NAP) ligt {bob - bodem:.3f} m onder de "
                     f"laagste aansluitende BOB: een zonk dieper dan {zonk_marge:g} m.",
+                    waarde=f"{bob - bodem:.3f}",
+                    drempel=f"{zonk_marge:g} (drempels.putbodem_zonk_m)",
                     bodem=bodem,
                     laagste_bob=bob,
                     marge_m=zonk_marge,
@@ -915,6 +936,8 @@ class BobBovenPutbodemZonderConstructie(_PutCheck):
                 uiteinde.conduit.label,
                 f"Komt {verschil:.3f} m boven de bodem van put {node.label!r} binnen zonder "
                 f"geregistreerde zandvang- of valconstructie (drempel {drempel:g} m).",
+                waarde=f"{verschil:.3f}",
+                drempel=f"{drempel:g} (drempels.bob_sprong_m)",
                 zijde=uiteinde.zijde,
                 verschil_m=round(verschil, 3),
                 put=node.label,
@@ -964,6 +987,8 @@ class ZWaardeWijktAf(_StrengCheck):
                     conduit.label,
                     f"De z-waarde van het {zijde} ({z_waarde:.3f}) wijkt "
                     f"{abs(z_waarde - bob):.3f} m af van de BOB ({bob:.3f} m NAP).",
+                    waarde=f"{abs(z_waarde - bob):.3f}",
+                    drempel=f"{drempel:g} (drempels.z_afwijking_m)",
                     zijde=zijde,
                     z=z_waarde,
                     bob=bob,
@@ -980,6 +1005,8 @@ class ZWaardeWijktAf(_StrengCheck):
                 node.label,
                 f"De z-waarde van de putgeometrie ({node.z:.3f}) wijkt "
                 f"{abs(node.z - niveau):.3f} m af van het putdekselniveau ({niveau:.3f} m NAP).",
+                waarde=f"{abs(node.z - niveau):.3f}",
+                drempel=f"{drempel:g} (drempels.z_afwijking_m)",
                 z=node.z,
                 dekselniveau=niveau,
                 drempel_m=drempel,

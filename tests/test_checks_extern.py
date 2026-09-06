@@ -213,10 +213,9 @@ def test_ext001_benoemt_de_relatie_met_het_bouwwerk(
 
     # Streng 1 steekt door de gevel, streng 4 en de twee putten liggen er binnen.
     assert relaties == {"1": "kruist", "4": "binnen", "P": "binnen", "Q": "binnen"}
-    assert all(
-        finding.details["drempel"] == config.drempels.ext_pand_buffer_m
-        for finding in outcome.findings
-    )
+    # De drempel draagt sinds issue #142 de configwaarde plus haar sleutel als tekst.
+    verwacht = f"{config.drempels.ext_pand_buffer_m:g} (drempels.ext_pand_buffer_m)"
+    assert all(finding.details["drempel"] == verwacht for finding in outcome.findings)
 
 
 def test_ext003_zwijgt_over_een_zinker(config: CheckConfig, bronnen: ExternalData) -> None:
@@ -329,6 +328,26 @@ def test_hgt003_meldt_beide_richtingen(config: CheckConfig, bronnen: ExternalDat
 
     assert "boven het AHN-maaiveld" in meldingen["1"]
     assert "onder het AHN-maaiveld" in meldingen["2"]
+
+
+def test_hgt003_vult_waarde_en_drempel_alleen_op_de_diepte_tak(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """De te-diep-tak weegt een gemeten diepte tegen de drempel; de boven-maaiveld-tak niet.
+
+    Streng 1 ligt boven het AHN-maaiveld -- dat is altijd een fout en kent geen drempel
+    (issue #142), dus `waarde` en `drempel` blijven leeg; anders zou de rij een negatieve
+    waarde onder een positieve drempel dragen. Streng 2 ligt te diep en vult beide.
+    """
+    findings = {f.object_label: f for f in uitkomst("HGT-003", config, bronnen).findings}
+
+    boven = findings["1"]
+    assert boven.details["waarde"] == ""
+    assert boven.details["drempel"] == ""
+
+    diep = findings["2"]
+    assert diep.details["waarde"]
+    assert "drempels.bob_maximale_diepte_m" in diep.details["drempel"]
 
 
 def test_hgt003_meldt_pas_boven_de_diepte_drempel(

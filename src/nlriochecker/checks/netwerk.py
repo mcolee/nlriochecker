@@ -1016,6 +1016,7 @@ class RichtingssignalenSprekenElkaarTegen(Check):
         kloppen -- de topologisch dichtstbijzijnde uitstroom is vaak niet de werkelijke,
         en drie eensgezinde signalen wegen zwaarder dan die heuristiek.
         """
+        drempel = context.config.drempels.tegenverhang_licht_m
         for diagnose in _richtingsdiagnoses(context):
             if not _tegenspraak(diagnose):
                 continue
@@ -1030,6 +1031,8 @@ class RichtingssignalenSprekenElkaarTegen(Check):
                 diagnose.conduit.uri,
                 diagnose.conduit.label,
                 boodschap,
+                waarde=f"{diagnose.bob_verval:.3f}" if diagnose.bob_verval is not None else "",
+                drempel=f"{drempel:g} (drempels.tegenverhang_licht_m)",
                 geometrie=diagnose.geometrie,
                 bob=diagnose.bob,
                 bob_verval_m=round(diagnose.bob_verval, 3)
@@ -1434,6 +1437,9 @@ class VeelLozingspuntenInDeelstelsel(Check):
                     f"{putten} knopen (maximaal {drempels.lozingspunten_per_deelstelsel} "
                     f"bij ten hoogste {drempels.klein_deelstelsel_knopen} knopen): "
                     f"{', '.join(labels)}.",
+                    waarde=str(len(lozingen)),
+                    drempel=f"{drempels.lozingspunten_per_deelstelsel} "
+                    "(drempels.lozingspunten_per_deelstelsel)",
                     knopen_in_deelstelsel=putten,
                     lozingspunten=len(lozingen),
                 )

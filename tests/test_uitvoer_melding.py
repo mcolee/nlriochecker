@@ -616,6 +616,42 @@ def test_een_verschoven_waarde_telt_als_gewijzigde_waarde() -> None:
     assert gewijzigd.waarde == doel.waarde
 
 
+def test_een_gemeten_check_vult_de_waarde_van_haar_melding() -> None:
+    """Een meetcheck als HGT-006 draagt sinds issue #142 haar gemeten grootheid in `waarde`."""
+    run = _run("hgt006_tegenverhang_fors.ttl", "HGT-006")
+
+    melding = next(
+        m for m in bouw_meldingenstroom(run, RUNDATUM).meldingen if m.check_id == "HGT-006"
+    )
+
+    assert melding.waarde
+    assert "drempels.tegenverhang_fors_m" in melding.drempel
+
+
+def test_een_uitzondering_op_een_verschoven_gemeten_waarde_vraagt_herbeoordeling() -> None:
+    """De product-hefboom-repro: een uitzondering met een lege snapshot mag niet meer
+    stilzwijgend geaccepteerd worden zodra de melding een echte waarde draagt (issue #142).
+
+    Vóór dit issue droeg HGT-006 een lege `waarde`, zodat een `waarde_snapshot=""` exact
+    matchte en de bevinding als geaccepteerd uit de foutentelling viel. Nu de melding een
+    gemeten stijging draagt, landt zo'n uitzondering in `gewijzigde_waarde` -- een luide
+    vraag om herbeoordeling.
+    """
+    run = _run("hgt006_tegenverhang_fors.ttl", "HGT-006")
+    doel = next(m for m in bouw_meldingenstroom(run, RUNDATUM).meldingen if m.check_id == "HGT-006")
+    _met_uitzonderingen(
+        run, Uitzondering(melding_id=doel.melding_id, reden="repro", waarde_snapshot="")
+    )
+
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+
+    assert stroom.uitzonderingen.geaccepteerd == ()
+    assert [g.melding_id for g in stroom.uitzonderingen.gewijzigde_waarde] == [doel.melding_id]
+    (gewijzigd,) = stroom.uitzonderingen.gewijzigde_waarde
+    assert gewijzigd.snapshot == ""
+    assert gewijzigd.waarde == doel.waarde
+
+
 def test_een_uitzondering_op_een_shacl_nulmelding_werkt() -> None:
     """Reikwijdte: alle checks incl. de nulmeting, omdat ze dezelfde melding-ID krijgen."""
     nul = nulbevinding()

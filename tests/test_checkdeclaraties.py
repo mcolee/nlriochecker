@@ -24,7 +24,12 @@ import pytest
 from gwsw_orox_helpers.dataset import Conduit, Node
 
 import nlriochecker.checks  # noqa: F401  (vult de registry)
-from checkdeclaratie_analyse import DERIVED_PROPS, analyseer_alle_checks
+from checkdeclaratie_analyse import (
+    DERIVED_PROPS,
+    analyseer_alle_checks,
+    bevinding_kwargs_van_check,
+    drempelsleutels_van_check,
+)
 from nlriochecker.checks.base import REGISTRY, Check, Dimension, Severity, SkeletonCheck, register
 
 # De eigenschappen van `Node`/`Conduit` die geen GWSW-kenmerk lezen maar de geometrie: de
@@ -197,6 +202,58 @@ def _bouwt_finding(bron: str) -> bool:
         )
         for knoop in ast.walk(ast.parse(bron))
     )
+
+
+# Issue #142: een check die een `[drempels]`-sleutel leest, hoort die drempel ook in haar
+# bevinding te zetten (`drempel=`), zodat elke rij zonder `checks.toml` herleidbaar is. De
+# uitzonderingen zijn checks waar de gelezen drempel de bevinding niet als grens stuurt maar
+# als filter, classificatie of geometrie-hulp -- daar zou een `drempel=` de lezer op het
+# verkeerde been zetten.
+GEEN_DREMPELMELDING = {
+    "EXT-003": "ext_watergang_buffer_m is de zoekstraal; de bevinding is een geometrisch "
+    "bevestigde doorkruising en geen drempeloverschrijding.",
+    "NET-004": "bob_sprong_m classificeert welke kringen als putsprong wegvallen; de gemelde "
+    "kring is er juist geen, dus de drempel stuurt de bevinding niet.",
+    "RVZ-006": "snapping_tolerantie_m is een geometrie-hulp in de aanwijzing bij het gebrek, "
+    "niet de grens waarop het gemengde deelstelsel gemeld wordt.",
+    "TOP-018": "spike_hoek_graden en dubbele_vertex_tolerantie_m zijn twee losse "
+    "geometriegrenzen; een bevinding kan beide overschrijden, dus geen enkele waarde is "
+    "'de drempel' van de rij.",
+}
+
+
+@pytest.mark.parametrize("check_id", CODE_CHECK_IDS)
+def test_een_drempellezende_check_vult_drempel(check_id: str) -> None:
+    """Leest een check een `[drempels]`-sleutel, dan zet zij die drempel in haar bevinding.
+
+    De AST-sweep leidt per check af welke `[drempels]`-sleutels zij in haar eigen methoden
+    leest; leest zij er geen, dan valt er niets af te dwingen. Leest zij er wel een, dan hoort
+    `drempel=` in een van haar `self.finding(...)`-aanroepen te staan -- tenzij de sleutel in
+    `GEEN_DREMPELMELDING` als filter of classificatie verantwoord is.
+    """
+    sleutels = drempelsleutels_van_check(REGISTRY[check_id])
+    if not sleutels:
+        return
+    if check_id in GEEN_DREMPELMELDING:
+        return
+    assert "drempel" in bevinding_kwargs_van_check(REGISTRY[check_id]), (
+        f"{check_id} leest de drempel(s) {sorted(sleutels)} maar zet geen `drempel=` in haar "
+        'bevinding (issue #142). Voeg `drempel=f"{waarde:g} (drempels.<sleutel>)"` toe, of '
+        "verantwoord de check in GEEN_DREMPELMELDING als de drempel een filter is."
+    )
+
+
+def test_geen_drempelmelding_is_niet_verlopen() -> None:
+    """Elke naam in `GEEN_DREMPELMELDING` is een geregistreerde, drempellezende check.
+
+    Zonder deze bewaking blijft een uitzondering staan nadat de check verdween of geen
+    drempel meer leest, en dekt zij stil een toekomstige check met dezelfde naam.
+    """
+    for check_id in GEEN_DREMPELMELDING:
+        assert check_id in REGISTRY, f"{check_id} in GEEN_DREMPELMELDING bestaat niet meer"
+        assert drempelsleutels_van_check(REGISTRY[check_id]), (
+            f"{check_id} leest geen `[drempels]`-sleutel meer; haal het uit GEEN_DREMPELMELDING"
+        )
 
 
 def test_alleen_de_gedeelde_fabriek_bouwt_een_finding() -> None:
