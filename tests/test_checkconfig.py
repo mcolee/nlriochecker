@@ -669,9 +669,7 @@ def test_ondersteunde_kenmerken_volgen_de_vier_geladen_klassen() -> None:
 
 # --- issue #160: elk ext_*_m-veld dat een `nabij`-aanroep voedt zit in ext_zoekafstand_max_m ---
 
-EXTERN_BRON = (
-    Path(__file__).resolve().parents[1] / "src" / "nlriochecker" / "checks" / "extern.py"
-).read_text(encoding="utf-8")
+CHECKS_DIR = Path(__file__).resolve().parents[1] / "src" / "nlriochecker" / "checks"
 CHECKCONFIG_BRON = (
     Path(__file__).resolve().parents[1] / "src" / "nlriochecker" / "checkconfig.py"
 ).read_text(encoding="utf-8")
@@ -771,6 +769,21 @@ def nabij_gevoede_velden(bron: str) -> set[str]:
     return velden
 
 
+def alle_nabij_gevoede_velden() -> set[str]:
+    """De `ext_*_m`-velden die een `.nabij(...)` in *elke* checkmodule voedt (issue #171).
+
+    De sweep leest sinds issue #160 wel de code van beide kanten, maar keek alleen naar
+    `extern.py`; een `.nabij`-aanroep met een niet-gedekt veld in een andere checkmodule zou
+    hem zo ontgaan. De verzameling loopt daarom over `checks/*.py` en verenigt het resultaat
+    per module -- per module, want de argument-terugkoppeling van `nabij_gevoede_velden`
+    werkt binnen één AST-boom.
+    """
+    velden: set[str] = set()
+    for pad in sorted(CHECKS_DIR.glob("*.py")):
+        velden |= nabij_gevoede_velden(pad.read_text(encoding="utf-8"))
+    return velden
+
+
 def zoekafstand_velden(bron: str) -> set[str]:
     """De `self.ext_*_m`-velden die in de `ext_zoekafstand_max_m`-property samenkomen."""
     tree = ast.parse(bron)
@@ -794,9 +807,10 @@ def test_elk_nabij_veld_zit_in_de_zoekafstand() -> None:
     De dekkingspoort verruimt het bereik van de externe bronnen met deze afstand. Voedt een
     `.nabij(...)` een veld dat de handmatige `max()` niet meetelt, dan zoekt die check
     verder dan het geladen bereik en mist hij objecten net binnen -- zonder dat iets dat
-    meldt. De velden komen uit de code van beide kanten, niet uit een aanname.
+    meldt. De velden komen uit de code van beide kanten, niet uit een aanname, en uit elke
+    checkmodule -- niet alleen `extern.py` (issue #171).
     """
-    gevoed = nabij_gevoede_velden(EXTERN_BRON)
+    gevoed = alle_nabij_gevoede_velden()
     gedekt = zoekafstand_velden(CHECKCONFIG_BRON)
 
     assert gevoed, "geen enkel `.nabij`-veld gevonden; is de sweep stuk?"
@@ -806,7 +820,7 @@ def test_elk_nabij_veld_zit_in_de_zoekafstand() -> None:
 def test_elk_nabij_veld_is_ook_op_waarde_niet_ruimer_dan_de_zoekafstand() -> None:
     """En op waarde: geen nabij-veld staat verder dan `ext_zoekafstand_max_m` (default)."""
     drempels = CheckThresholds()
-    for veld in nabij_gevoede_velden(EXTERN_BRON):
+    for veld in alle_nabij_gevoede_velden():
         assert getattr(drempels, veld) <= drempels.ext_zoekafstand_max_m
 
 

@@ -22,6 +22,7 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   afgerond zodat CSV, JSON en de GeoPackage-meldingentabel dezelfde waarde dragen; de
   `foutlocatie` in `bevindingen.json` verschuift daardoor eenmalig naar de afgeronde waarde.
   JSON en GeoPackage blijven internationaal (punt); geen kolom-, CLI- of JSON-veldwijziging.
+- Tests: elf review-minors uit de AFK-reeks (issue #171).
 - **Drie rollen versmald naar het checkregister** (issue #138, BO-96). Drie checks
   gingen over een bredere populatie dan het register noemt, terwijl de ontologie niet
   besliste (een domeinkeuze zoals issue #64 ze voorlegt). **EXT-001** toetst nog

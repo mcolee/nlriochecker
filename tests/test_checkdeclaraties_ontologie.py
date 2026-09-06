@@ -48,9 +48,9 @@ from pathlib import Path
 from gwsw_orox_helpers.bronnen import vocabulaire_index_pad, vocabulaire_index_pad_voor
 
 import nlriochecker.checks  # noqa: F401  (vult de registry)
-from checkdeclaratie_analyse import _veld_naar_rol
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks.base import REGISTRY
+from nlriochecker.checks.selectie import klassen_van_rol
 
 WORTEL = Path(__file__).resolve().parents[1]
 INDEXBESTAND = vocabulaire_index_pad()
@@ -176,19 +176,6 @@ def _bereikbaar(klasse: str) -> frozenset[str]:
     return frozenset(resultaat)
 
 
-_ROL_NAAR_VELD = {rol: veld for veld, rol in _veld_naar_rol().items()}
-
-
-def _wortels(rol: str, klassen) -> list[str]:
-    """De wortelklassen van een rol in deze `[klassen]`-configuratie."""
-    veld = _ROL_NAAR_VELD.get(rol)
-    if veld is None:
-        return []
-    if veld == "netwerkknopen":
-        return klassen.netwerkknopen
-    return list(getattr(klassen, veld, []))
-
-
 def _concrete_kenmerken(check) -> list[str]:
     """De gedeclareerde kenmerken zonder de `config:`- en `*`-verwijzingen."""
     return [k for k in check.kenmerken if not k.startswith("config:") and k != "*"]
@@ -201,7 +188,9 @@ def _schendingen() -> dict[tuple[str, str], list[str]]:
         klassen = load_check_config(pad).klassen
         for check_id in sorted(REGISTRY):
             check = REGISTRY[check_id]
-            nietleeg = {rol: wortels for rol in check.rollen if (wortels := _wortels(rol, klassen))}
+            nietleeg = {
+                rol: wortels for rol in check.rollen if (wortels := klassen_van_rol(rol, klassen))
+            }
             if not nietleeg:
                 # Een check zonder (niet-lege) rol valt hier buiten: RVZ-011 en ADM-007 halen
                 # hun populatie via de overstortdrempel-index respectievelijk `[[puttyperegels]]`

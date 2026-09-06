@@ -333,7 +333,7 @@ def test_een_groen_of_grijs_wegvak_blijft_een_rij_maar_krijgt_geen_regel(
 
     assert gemengd, "de fixture levert geen deelstelselvlak als controle"
     for kenmerk in gemengd:
-        assert _regels_voor(vector, kenmerk) == {"RVZ-006 - Gemengd stelsel zonder overstort"}
+        assert _regels_voor(vector, kenmerk) == {VLAKKEN_LEGENDA[2]}
 
 
 def test_de_maptip_van_een_deelstelselvlak_toont_de_voorgebakken_popup(

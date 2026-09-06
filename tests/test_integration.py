@@ -27,6 +27,7 @@ from nlriochecker.reporting import write_check_report, write_reports
 from nlriochecker.studiegebied import load_studiegebieden, load_study_area
 from nlriochecker.toetsloop import toets_gebieden
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer_gebieden
+from test_nulmeting_teksten import VORMEN_DE_WOLDEN
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 SHACL_DIR = DATA_DIR / "shacl_nulmeting"
@@ -49,9 +50,10 @@ STUDIEGEBIED = GIS_DIR / "cbs_buurt_koekangerveld_studiegebied.gpkg"
 SHACL_PADEN = sorted(SHACL_DIR.glob("*.csv"))
 RUNDATUM = date(2026, 8, 18)
 
-# Zoveel unieke SHACL-vormen (kolom `Source`) dragen de drie rapporten samen; gemeten
-# 28-08-2026. De vertaaltabel van issue #101 dekt er precies evenveel.
-VORMEN_DE_WOLDEN = 43
+# `VORMEN_DE_WOLDEN` (het aantal unieke SHACL-vormen dat de drie rapporten samen dragen)
+# heeft één bron: `test_nulmeting_teksten` (issue #171). Daar wordt het tegen `vormteksten()`
+# getoetst, hier tegen de rapporten in `data/`; twee kopieën van hetzelfde getal zouden
+# stilzwijgend uit elkaar kunnen lopen.
 
 pytestmark = pytest.mark.integratie
 

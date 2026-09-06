@@ -624,6 +624,9 @@ def test_strengen_dragen_de_bob_richting(tmp_path: Path) -> None:
     pad = _schrijf(_run("hgt_schoon.ttl"), tmp_path)
 
     rijen = _rijen(pad, "select richting_bob, bob_verval_m from strengen")
+    # De vlak-band uit dezelfde bron als `_richting_bob` (issue #151), niet een los 0.01:
+    # loopt de drempel, dan volgt de test hem in plaats van stil te verouderen.
+    band = load_check_config().drempels.tegenverhang_licht_m
 
     assert rijen
     assert {rij[0] for rij in rijen} <= {"mee", "tegen", "onbekend"}
@@ -636,7 +639,7 @@ def test_strengen_dragen_de_bob_richting(tmp_path: Path) -> None:
             # `onbekend` dekt sinds issue #151 ook de vlak-band van NET-009: dan blijft
             # het gemeten verval staan maar valt het binnen die band. Buiten de band is
             # de kolom alleen `onbekend` als er geen verval is of geen tekenrichting.
-            assert verval is None or abs(verval) <= 0.01
+            assert verval is None or abs(verval) <= band
 
 
 def test_vlakke_bob_binnen_de_band_geeft_geen_pijl(tmp_path: Path) -> None:

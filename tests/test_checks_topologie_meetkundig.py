@@ -319,6 +319,11 @@ def test_paarmeldingen_dragen_het_tweede_object() -> None:
 
     assert bevinding.details["object2_uri"].startswith("http")
     assert bevinding.details["object2_label"]
+    # De oriëntatie is niet vrij: de check meldt de streng die het eerst in de
+    # nabijheidspopulatie staat als object1 en de tegenpartij als object2 (topologie.py,
+    # `conduits[min(i, j)]` gaat voor). Zonder deze assertie zou een omgewisseld paar --
+    # dat de melding aan de verkeerde kant koppelt -- door de paarset-test heen glippen.
+    assert (bevinding.object_label, bevinding.details["object2_label"]) == ("1", "2")
 
 
 def _dataset_en_bevindingen(bestand: str, check_id: str):
@@ -363,34 +368,38 @@ def test_top010_zet_de_foutlocatie_tussen_de_twee_strengen() -> None:
 # vrijvervalrioolleiding of een duiker zijn. De fixture legt per check drie gelijkvormige
 # paren naast elkaar -- met een drain, een aansluitleiding en een duiker -- zodat de
 # populatiegrens het enige verschil is.
+# De verwachte paren als geordend (object1, object2), niet als set: de check meldt de
+# streng die het eerst in de nabijheidspopulatie staat als object1 en de duiker (die er in
+# de fixture na komt) als object2. Zo toetsen deze twee tests naast de paarset ook de
+# oriëntatie van elke melding (issue #145).
 @pytest.mark.parametrize(
     ("check_id", "paar"),
     [
-        ("TOP-006", {"W3", "OverDuiker"}),
-        ("TOP-010", {"V3", "KruisDuiker"}),
-        ("TOP-011", {"V3", "KruisDuiker"}),
+        ("TOP-006", ("W3", "OverDuiker")),
+        ("TOP-010", ("V3", "KruisDuiker")),
+        ("TOP-011", ("V3", "KruisDuiker")),
     ],
 )
-def test_alleen_het_duikerpaar_valt_binnen_de_scope(check_id: str, paar: set[str]) -> None:
+def test_alleen_het_duikerpaar_valt_binnen_de_scope(check_id: str, paar: tuple[str, str]) -> None:
     gevonden = bevindingen(TTL_DIR / "top_nabijheid_scope.ttl", check_id)
 
     assert len(gevonden) == 1, [
         (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
     ]
     bevinding = gevonden[0]
-    assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
+    assert (bevinding.object_label, bevinding.details["object2_label"]) == paar
 
 
 @pytest.mark.parametrize(
     ("check_id", "paar"),
     [
-        ("TOP-006", {"W3", "OverDuiker"}),
-        ("TOP-010", {"V3", "KruisDuiker"}),
-        ("TOP-011", {"V3", "KruisDuiker"}),
+        ("TOP-006", ("W3", "OverDuiker")),
+        ("TOP-010", ("V3", "KruisDuiker")),
+        ("TOP-011", ("V3", "KruisDuiker")),
     ],
 )
 def test_de_populatie_is_de_eigen_rol_en_niet_haar_doorsnede_met_de_leidingen(
-    check_id: str, paar: set[str]
+    check_id: str, paar: tuple[str, str]
 ) -> None:
     """`[klassen] streng` en `[klassen] nabijheidsleiding` zijn los configureerbaar.
 
@@ -412,7 +421,7 @@ def test_de_populatie_is_de_eigen_rol_en_niet_haar_doorsnede_met_de_leidingen(
         (finding.object_label, finding.details.get("object2_label")) for finding in gevonden
     ]
     bevinding = gevonden[0]
-    assert {bevinding.object_label, bevinding.details["object2_label"]} == paar
+    assert (bevinding.object_label, bevinding.details["object2_label"]) == paar
     assert any("0 van de 8 leidingen" in note for note in outcome.notes), outcome.notes
 
 

@@ -251,19 +251,60 @@ def _rdflib_imports(bron: str) -> list[str]:
     ]
 
 
+def _omvattende_functie(boom: ast.AST) -> dict[int, ast.FunctionDef | ast.AsyncFunctionDef | None]:
+    """Per knoop de dichtstbijzijnde omvattende functie (None op moduleniveau)."""
+    mapping: dict[int, ast.FunctionDef | ast.AsyncFunctionDef | None] = {}
+
+    def bind(node: ast.AST, func: ast.FunctionDef | ast.AsyncFunctionDef | None) -> None:
+        mapping[id(node)] = func
+        binnen = node if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) else func
+        for kind in ast.iter_child_nodes(node):
+            bind(kind, binnen)
+
+    for top in ast.iter_child_nodes(boom):
+        bind(top, None)
+    return mapping
+
+
+def _dataset_aliassen(
+    boom: ast.AST, functie_van: dict[int, ast.FunctionDef | ast.AsyncFunctionDef | None]
+) -> dict[ast.FunctionDef | ast.AsyncFunctionDef | None, set[str]]:
+    """Per scope de lokale namen die aan een dataset-expressie zijn toegewezen.
+
+    `ds = context.dataset` maakt `ds` binnen die functie (of op moduleniveau) een datasetnaam
+    (issue #171). Zonder deze koppeling ontsnapt een hernoemde datasetvariabele die daarna
+    `ds.graph` leest aan de a4-sweep, terwijl `dataset.graph` zelf wél gevlagd wordt.
+    """
+    per_scope: dict[ast.FunctionDef | ast.AsyncFunctionDef | None, set[str]] = {}
+    for knoop in ast.walk(boom):
+        if isinstance(knoop, ast.Assign) and _is_datasetnaam(knoop.value):
+            scope = functie_van.get(id(knoop))
+            for doel in knoop.targets:
+                if isinstance(doel, ast.Name):
+                    per_scope.setdefault(scope, set()).add(doel.id)
+    return per_scope
+
+
 def _graaftoegang(bron: str) -> list[str]:
     """De plekken waar deze broncode de dataset-graaf aanraakt.
 
-    Twee vormen: `<dataset>.graph` (attribuut op een datasetnaam) en `<x>.graph.<methode>`
-    waar de methode uit het `GraafIndex`-leescontract komt. De tweede vangt ook een
-    hernoemde datasetvariabele die inline het contract aanroept; de eerste vangt de
-    tussenstap `graph = dataset.graph`. `netwerk.graph` (networkx) valt onder geen van beide.
+    Twee vormen: `<dataset>.graph` (attribuut op een datasetnaam of op een lokale naam die
+    binnen dezelfde functie aan een dataset is toegewezen -- `ds = context.dataset; ds.graph`,
+    issue #171) en `<x>.graph.<methode>` waar de methode uit het `GraafIndex`-leescontract
+    komt. De tweede vangt ook een hernoemde datasetvariabele die inline het contract
+    aanroept; de eerste vangt de tussenstap `graph = dataset.graph`. `netwerk.graph`
+    (networkx) valt onder geen van beide.
     """
+    boom = ast.parse(bron)
+    functie_van = _omvattende_functie(boom)
+    aliassen = _dataset_aliassen(boom, functie_van)
     gevonden: list[str] = []
-    for knoop in ast.walk(ast.parse(bron)):
+    for knoop in ast.walk(boom):
         if not isinstance(knoop, ast.Attribute):
             continue
-        if knoop.attr == "graph" and _is_datasetnaam(knoop.value):
+        if knoop.attr == "graph" and _raakt_dataset(
+            knoop.value, functie_van.get(id(knoop)), aliassen
+        ):
             gevonden.append(".graph")
         elif (
             knoop.attr in GRAAF_LEESCONTRACT
@@ -272,6 +313,17 @@ def _graaftoegang(bron: str) -> list[str]:
         ):
             gevonden.append(f".graph.{knoop.attr}")
     return gevonden
+
+
+def _raakt_dataset(
+    node: ast.expr,
+    scope: ast.FunctionDef | ast.AsyncFunctionDef | None,
+    aliassen: dict[ast.FunctionDef | ast.AsyncFunctionDef | None, set[str]],
+) -> bool:
+    """Of `node` een `GwswDataset` aanspreekt: een datasetnaam, of een lokale dataset-alias."""
+    if _is_datasetnaam(node):
+        return True
+    return isinstance(node, ast.Name) and node.id in aliassen.get(scope, set())
 
 
 def _verwijderde_datasetaanroepen(bron: str) -> list[str]:
@@ -458,6 +510,10 @@ def test_de_sweeps_kunnen_werkelijk_afgaan() -> None:
     ]
     assert _rdflib_imports("from rdflib import URIRef") == ["rdflib"]
     assert _graaftoegang("g = dataset.graph") == [".graph"]
+    # Een hernoemde datasetvariabele (`ds = context.dataset; ds.graph`), op moduleniveau en
+    # binnen een functie: zonder de aliastracking van #171 zou deze vorm ontsnappen.
+    assert _graaftoegang("ds = context.dataset\nds.graph") == [".graph"]
+    assert _graaftoegang("def f():\n    ds = context.dataset\n    return ds.graph") == [".graph"]
     # De tweede vorm: een hernoemde datasetvariabele die inline het leescontract aanroept.
     assert _graaftoegang("g.graph.subject_objects(p)") == [".graph.subject_objects"]
     # De release-B-methoden, ook op een willekeurig genaamde variabele.
@@ -485,6 +541,8 @@ def test_de_sweeps_laten_het_toegestane_met_rust() -> None:
     assert _leeslaagnamen_buiten_kop2(kop2) == []
     assert _rdflib_imports("from nlriochecker.checks.base import Check") == []
     assert _graaftoegang("sinks = [netwerk.graph.out_degree(u) for u in netwerk.graph]") == []
+    # Een naam die niet aan een dataset is toegewezen, maakt `.graph` erop geen overtreding.
+    assert _graaftoegang("q = maak_netwerk()\nq.graph") == []
     # De naad-vragen en de door release B ongemoeide dataset-methoden zijn geen overtreding.
     assert _verwijderde_datasetaanroepen("context.knopen_van(w)") == []
     assert _verwijderde_datasetaanroepen("dataset.resolve_network_node(u, w)") == []

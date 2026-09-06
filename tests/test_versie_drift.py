@@ -35,9 +35,13 @@ from nlriochecker.checks import CheckContext, run_checks
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
 
-# De prefixes van de graafrakende checks: ADM-008/009 (hasConnection),
-# ATTR-014 (hasValue/hasReference), en de netwerk- en overstortchecks die de graaf aflopen.
-GRAAFRAKEND = ("adm008", "adm009", "attr014", "net007", "rvz")
+# De prefixes van de fixtures die de door #139 gerepareerde predicaten werkelijk raken:
+# ADM-008/009 (hasConnection) en ATTR-014 (hasValue/hasReference, kenmerkklasse-IRI). De
+# rvz- en net007-fixtures lopen de graaf ook af, maar hun uitkomst hangt niet aan een van
+# die predicaat-namespaces (ze staan niet in `GEREPAREERD`); ze kostten de lichte set ~26 s
+# zonder eigen #139-dekking en draaien daarom alleen nog in de zware set hieronder, die
+# onverkort alles toetst (issue #171).
+GRAAFRAKEND = ("adm008", "adm009", "attr014")
 
 ALLE = sorted(p.name for p in TTL_DIR.glob("*.ttl"))
 LICHT = [naam for naam in ALLE if naam.startswith(GRAAFRAKEND)]
@@ -100,6 +104,30 @@ def test_alle_fixtures_gelijk_over_16_en_17(naam: str, tmp_path: Path) -> None:
     verschilt; die worden hieronder apart getoetst.
     """
     _vergelijk(naam, tmp_path)
+
+
+def test_joiner_herleidt_via_hasconnection_op_16_en_17(tmp_path: Path) -> None:
+    """`_Joiner` herleidt een maaiveldorientatie via hasConnection, versie-onafhankelijk.
+
+    De hasConnection-route van `_Joiner._ouders` loopt over `leeslaag.buren`, die het
+    predicaat opzoekt via `termen_voor(dataset.gwsw_versie.basis)` (issue #139/BO-93). De
+    fixtureparen hierboven dekken de check-kant (ADM-008 c.s.) via `run_checks`, maar raken
+    de nulbevinding-kant niet: die draait op de SHACL-nulmeting, niet op `run_checks`. Deze
+    gerichte proef dekt haar rechtstreeks -- een 1.6-namespace-constante zou op een
+    1.7-export stil niets vinden en de maaiveldmelding van de put laten vallen. Beide
+    schrijfrichtingen van hasConnection doen mee (PutC als subject, PutD als object).
+    """
+    from nlriochecker.nulbevinding import _Joiner
+
+    bron = TTL_DIR / "nulmeting_join.ttl"
+    for pad in (bron, _als_zeventien(bron, tmp_path)):
+        dataset = load_dataset(pad, fallback_encoding=FALLBACK_ENCODING)
+        joiner = _Joiner(dataset)
+
+        put_c = joiner.herleid("PutC_ori_maa")
+        assert put_c in dataset.nodes and dataset.nodes[put_c].label == "C"
+        put_d = joiner.herleid("PutD_ori_maa")
+        assert put_d in dataset.nodes and dataset.nodes[put_d].label == "D"
 
 
 @pytest.mark.parametrize("naam", sorted(ONTOLOGIE_VERSCHIL_16_17))

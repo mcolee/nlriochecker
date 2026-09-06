@@ -303,6 +303,47 @@ def test_toets_meldt_onleesbare_dataset(tmp_path: Path) -> None:
     assert "geldige Turtle" in resultaat.output
 
 
+def test_toets_meldt_een_onbekend_onderdruk_check_id(tmp_path: Path) -> None:
+    """Een onbekend `onderdruk_checks`-ID valt luid op via de CLI (issue #160).
+
+    De unittest in `test_checkconfig` toetst dit rechtstreeks op
+    `load_check_config(..., bekende_check_ids=…)`; hier loopt de tekst door een echte
+    `toets`-invoke over de CLI, en hoort als nette `Fout: ...`-regel zonder traceback naar
+    boven te komen -- zoals #153 dat voor de andere invoervalidaties doet.
+    """
+    from nlriochecker.checkconfig import default_check_config_path
+    from nlriochecker.errors import ConfigError
+
+    config = tmp_path / "config.toml"
+    config.write_text(
+        default_check_config_path()
+        .read_text(encoding="utf-8")
+        .replace("onderdruk_checks = []", 'onderdruk_checks = ["XYZ-999"]'),
+        encoding="utf-8",
+    )
+
+    resultaat = CliRunner().invoke(
+        main,
+        [
+            "toets",
+            "--geen-ontologie",
+            "--dataset",
+            str(TTL_DIR / "schoon.ttl"),
+            "--projectconfig",
+            str(config),
+            "--output",
+            str(tmp_path / "uitvoer"),
+        ],
+    )
+
+    assert resultaat.exit_code == 1
+    assert resultaat.output.startswith("Fout: "), resultaat.output
+    assert "XYZ-999" in resultaat.output
+    assert "onderdruk_checks" in resultaat.output
+    # Geen kale traceback: de ConfigError kwam als nette ClickException naar boven.
+    assert not isinstance(resultaat.exception, ConfigError)
+
+
 def test_ongeldige_config_geeft_exitcode_1(shacl_drieluik: list[Path], tmp_path: Path) -> None:
     stuk = tmp_path / "stuk.toml"
     stuk.write_text("dit is [geen geldige toml", encoding="utf-8")
