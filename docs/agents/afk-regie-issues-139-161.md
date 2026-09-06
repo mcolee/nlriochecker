@@ -1,4 +1,4 @@
-# AFK-regie na de Fable-swarm van 05-09-2026: issues #139, #141–#161
+# AFK-regie na de Fable-swarm van 05-09-2026: issues #139, #141–#161 en sessie E
 
 Geef dit aan een **verse (gecleared) Fable 5.1-sessie** in `/home/martin/Development/nlriochecker`,
 in auto-mode. Fable is de regisseur en schrijft zelf geen code; het werk doen **Opus
@@ -15,10 +15,11 @@ run `wf_77797a1d-338`: 12 lenzen met bewijsplicht, 51 van 52 bevindingen door ee
 bevestigd, plan in `~/nlriochecker-onderzoek/2026-09-05-fable-swarm/plan.json`) en zijn op
 06-09 in een grilling met de auteur naar de huisstijl gebracht (`docs/agents/issue-tracker.md`,
 zes koppen). Alle ontwerpkeuzes staan onder kop 2 ("Keuzes die al gemaakt zijn"); kop 6
-(Aannames) is wat de auteur bewust aan de agent laat. Vijf punten zijn **geparkeerd**
-(#162–#166, labels `contract`/`needs-triage`) en horen **niet** in deze reeks.
+(Aannames) is wat de auteur bewust aan de agent laat. Van de vijf geparkeerde punten
+(#162–#166) zijn #163, #165 en #166 op 06-09 in een grilling `ready-for-agent` geworden en
+vormen met #137, #138, #169 en #170 **sessie E**; #162 en #164 blijven geparkeerd.
 
-**Splits de reeks in vier sessies** (globale `CLAUDE.md`, "Mega-sessies splitsen"): elke
+**Splits de reeks in vijf sessies** (globale `CLAUDE.md`, "Mega-sessies splitsen"): elke
 sessie eindigt met CI groen, issues dicht en een slotcomment; de volgende sessie start vers
 met dit bestand en de sessieletter. Eén sessie draagt nooit meer dan één perf-issue met een
 volle De Wolden-meting tegelijk.
@@ -46,7 +47,7 @@ volle De Wolden-meting tegelijk.
    prototypes daar (`patch_*.py`) zijn de letterlijke vorm van de fix; kopieer de vorm, niet
    het monkeypatch-mechanisme.
 
-## Volgorde — strikt sequentieel, in vier sessies
+## Volgorde — strikt sequentieel, in vijf sessies
 
 | Sessie | # | Issue | Blocked by | Model | Review | Poort-bijzonderheid |
 |---|---|---|---|---|---|---|
@@ -72,6 +73,13 @@ volle De Wolden-meting tegelijk.
 | D | 20 | **#159** `leeslaag.py` + hek a4 | #139 | Opus 4.8 | **Substantieel** | `tel_oppervlak.py`: 14 → 1 bestand |
 | D | 21 | **#160** zes hekken die niet bijten | — | Opus 4.8 | Klein; (a) Substantieel | elk hek met tegenproef |
 | D | 22 | **#161** kopieën, docstrings, naamregel, mypy-ratchet | — | Opus 4.8 | **Substantieel** | ledger gelijk; override-blok leeg |
+| **E** | 23 | **#137** checks declareren hun `[klassen]`-lijsten; HGT-011 toetst de drempels | — | Opus 4.8 | **Substantieel** | nieuw BO; drifttest rood vóór, groen na; dekkingsmatrix regenereren; volle run |
+| E | 24 | **#138** rol versmallen naar het register: EXT-001, ATTR-017, TOP-014 | #137 | Opus 4.8 | **Substantieel** | nieuw BO (het issue zegt BO-94: neem het vrije nummer); volle run |
+| E | 25 | **#169** `gwsw_run` bij naam schrijven: dict i.p.v. positionele 35-tuple | — | Opus 4.8 | **Substantieel** | GeoPackage sha-gelijk (`update_time` genormaliseerd) |
+| E | 26 | **#165** CONTRACT `bevindingen.csv` als NL-Excel-bestand | #161 | Opus 4.8 | **Altijd Substantieel** | nieuw BO; handmatige `soffice`-controle in de comment |
+| E | 27 | **#163** CONTRACT overlay op `--projectconfig` met `basis = "standaard"` | #161, #165 | Opus 4.8 | **Altijd Substantieel** | zonder `basis` byte-voor-byte hetzelfde gedrag |
+| E | 28 | **#166** LEESLAAG pin v0.2.2 → v0.2.4; `leeslaag.py` delegeert | #158, #159 | Opus 4.8 | **Substantieel** | `uv lock`; cache koud herbouwd; gepaarde meting achter `flock` |
+| E | 29 | **#170** research puntbemonstering uit een float32-raster → `docs/onderzoek/` | — | Sonnet | Klein | geen code; `mattpocock-skills:research`; comment op #168 |
 
 Eén issue = commit + push + CI groen + comment + close vóór het volgende.
 
@@ -98,6 +106,13 @@ Eén issue = commit + push + CI groen + comment + close vóór het volgende.
 | #159 | `tel_oppervlak.py` | bestanden die release B raken **14 → 1**; hek a4 groen en kan afgaan |
 | #160 | elk hek met tegenproef; `load_check_config()` | geen checkmodule geladen bij een TOML-load (was 16) |
 | #161 | ledger; `ruff --select ARG`; `mypy` zonder override | byte-gelijk; 0 ARG001; groen |
+| #137 | `examined` van HGT-011 in de volle run; `aantal_meldingen` | HGT-011 `examined` **22.363 → 0** (gelijk aan RVZ-011); 0 F / 0 W blijft; geen enkele bevinding verschuift |
+| #138 | volle run: `examined` EXT-001, onderdrukkingstelling, TOP-014 | EXT-001 `examined` **−~1.605**; **962** ATTR-017-meldingen weg uit de onderdrukking (`gwsw_run`, JSON); TOP-014 **−3** |
+| #169 | sha256 van de GeoPackage vóór/na (Koekangerveld en De Wolden) | gelijk; de nieuwe naam-test rood op een bewust verwisselde tuple, groen op de dict |
+| #165 | `soffice --headless --convert-to ods` op `bevindingen.csv` van een volle run | alle X/Y-cellen numeriek; JSON/GeoPackage ongewijzigd |
+| #163 | CliRunner: projectconfig mét en zonder `basis`; `configs/dewoldenhoogeveen.toml` | zonder `basis` identiek aan vandaag; De Wolden-run sha-gelijk |
+| #166 | meetscript onder `scripts/`: `laad_met_cache` bij cachetreffer, `ru_maxrss`, n ≥ 3 om en om | `uv.lock` op v0.2.4; cache één keer koud (~0,5 min); CSV sha-gelijk aan de referentie |
+| #170 | het verslag in `docs/onderzoek/` | per techniek bron, lossless ja/nee, richting koud/warm; herziene variantenlijst voor #168 |
 
 Elke andere check blijft gelijk aan de referentierun (na #141 verschoven met precies +448
 knopen HGT-009, na #156 TOP-004 −22). Wijkt iets af: verklaar het in de issue-comment,
@@ -133,6 +148,32 @@ verzin geen nieuwe waarheid.
 - **#161.** De CLAUDE.md-naamregel en het mypy-override-blok zijn auteursbesluiten van 06-09;
   het verwijderen van de rol `stelsels` is dat **niet** (checks.toml bevroren): alleen de
   docstrings worden eerlijk.
+- **Sessie E — referentie.** Tel tegen de laatste slotrun (na sessie D:
+  `uitvoer/<datum>_slotrun_D`), niet tegen 04092026. Sessie E is de zwaarste: #137 en #138
+  vragen elk een volle run vóór de slotstap en #166 een gepaarde meting; nooit twee tegelijk.
+  Loopt de sessie vast of lang, splits dan ná #169 (E1: #137/#138/#169; E2: #165/#163/#166/#170).
+- **#137.** Veldnaam `klassenlijsten`; de zes velden uit het issue zijn de volledige lijst.
+  HGT-011 houdt `vrijvervalrioolleidingen` als rol (kop Aannames). De nul-bewaking (BO-52)
+  blijft ongewijzigd. Nieuw BO: "checks declareren hun `[klassen]`-lijsten; HGT-011 toetst
+  de drempels".
+- **#138.** Drie auteurskeuzes van 06-09, één opruimpass, één BO-blok. Het issue noemt BO-94;
+  is dat nummer al vergeven, neem het vrije nummer en meld dat in de comment. ATTR-017 óók
+  op mechanische leidingen toetsen is **niet** in scope.
+- **#169.** Alleen `_schrijf_runmetadata` en de naam-test; `_eis_feiten`, de bewakingen,
+  de fid-volgorde en objectkaart/omvang/voorbehoud blijven ongemoeid. Geen kolomwijziging.
+- **#165 en #163.** Publiek contract (label `contract` blijft als reviewsignaal): review
+  Altijd Substantieel, BO verplicht bij #165. `Waarde`/`Drempel` blijven tekst (#142).
+  Zonder `basis` mag geen byte veranderen.
+- **#166.** Heft de harde grens "pin blijft v0.2.2" op, en alleen dáár: `pyproject.toml`
+  (direct reference uit #158) en `uv lock`; `LADER_VERSIE` "1" → "3". De leeslaag-punten
+  zelf (`knoop_boven`, `isfinite`, `afnemers.md`) leven als gwsw-orox-helpers#77–#79 en
+  horen hier niet. HMAC/pickle blijft buiten beeld (BO-6).
+- **#170.** Alleen leeswerk tegen primaire bronnen (GDAL/rasterio-docs, GeoTIFF/COG-spec);
+  geen meting, geen code, geen nieuwe dependency (BO-3). Draait als
+  `mattpocock-skills:research` op Sonnet; `WebFetch` eerst via ToolSearch laden.
+- **#140 hoort niet in deze reeks.** Het bouwen van `nlrio-fable-product.js` kan een agent,
+  maar "klaar" eist dat de audit-stap van de swarm draait, en dat is een gefactureerde run
+  die de auteur zelf start (`args: {stap: 'audit'}`). Pas oppakken na een expliciet startsein.
 
 ## De lus per issue
 
@@ -169,7 +210,9 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
    `uitvoer/<datum>_slotrun_<sessieletter>`, als `run_in_background` (~2,5–5 min, ~4 GB;
    na sessie B korter en lichter — noteer de wandklok en `ru_maxrss` in het slotrapport).
 2. Vergelijk per check met de referentierun; verwacht: elke check gelijk behalve wat de
-   bewijslast hierboven noemt (sessie A: HGT-009 +448 knopen; sessie C: TOP-004 −22).
+   bewijslast hierboven noemt (sessie A: HGT-009 +448 knopen; sessie C: TOP-004 −22;
+   sessie E: HGT-011 `examined` → 0, EXT-001 `examined` −~1.605, 962 minder onderdrukt,
+   TOP-014 −3).
    Elk ander verschil is een regressie van deze reeks — zoek de oorzaak.
 3. Slotrapport in `uitvoer/<datum>_slotrun_<letter>/_slotrapport.md` én als laatste bericht:
    per issue wat er landde, gemeten naast verwacht, BO-nummers, open gebleven punten, de
@@ -183,7 +226,7 @@ Precies het sjabloon (`docs/agents/afk-regie.md`, "De lus per issue N"):
   check-ID. Vindt een implementer dat een issue méér vraagt, dan is dat een fout in het
   issue: comment, issue open laten, door naar het volgende dat er niet op leunt.
 - Geen wijziging aan `gwsw-orox-helpers` of aan zijn internals; alleen publieke namen uit
-  de gepinde v0.2.2 (#139, #159).
+  de gepinde v0.2.2 (#139, #159). De pin zelf gaat alleen in #166 (sessie E) naar v0.2.4.
 - Een perf-issue zonder eenduidige gepaarde meting en sha-gelijke CSV is **niet klaar**:
   comment met de ruwe cijfers, issue open laten.
 - Overschrijf nooit invoerbestanden; alleen `uitvoer/` schrijft; versienummer alleen in
