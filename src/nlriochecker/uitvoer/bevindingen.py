@@ -28,7 +28,6 @@ from nlriochecker.uitvoer.herkomst import schrijf_csv, schrijf_markdown
 from nlriochecker.uitvoer.melding import (
     BRON_DATASET,
     BRON_NULMETING,
-    BRON_REGISTER,
     GEEN_ONDERDRUKKING,
     GEEN_UITZONDERINGEN,
     Coordinaten,
@@ -51,6 +50,7 @@ from nlriochecker.uitvoer.samenvatting import (
     NIET_GEMETEN,
     VINKJE,
     als_tabel,
+    eigen_telling,
     samenvatting,
 )
 from nlriochecker.uitvoer.synthese import rode_draad
@@ -525,20 +525,19 @@ def _verantwoording(
     blijven wel als rij in de archieven en in de detailtabellen staan.
     """
     onbetrouwbaar = sum(outcome.unreliable_count for outcome in run.outcomes)
-    # `run.count` telt de eigen-check-bevindingen; trek de geaccepteerde register-
-    # meldingen ervan af, zodat de foutentelling dezelfde bevindingen negeert als de
-    # kaartstatus. De onderdrukking blijft ongemoeid: die zit niet in de stroom en dus
-    # niet in `geaccepteerd`, dat alleen melding-ID's uit `over` bevat.
-    geaccepteerd_fout = _geaccepteerd_eigen(meldingen, geaccepteerd, Severity.ERROR)
-    geaccepteerd_waarschuwing = _geaccepteerd_eigen(meldingen, geaccepteerd, Severity.WARNING)
+    # Tel over de meldingenstroom, niet over `run.count`: die telt de eigen-check-
+    # bevindingen *vóór* de onderdrukking, zodat de Verantwoording met `onderdruk_checks`
+    # een hoger getal toonde dan de samenvatting en de meldingentabel (issue #150).
+    # `eigen_telling` past dezelfde regel toe als `samenvatting._tel` (register-meldingen,
+    # per ernst) en negeert de geaccepteerde bevindingen, precies zoals de kaartstatus.
+    eigen = eigen_telling(meldingen, geaccepteerd=geaccepteerd)
     lines = [
         "## Verantwoording",
         "",
         f"Bron: `{run.dataset.source}` — {len(run.dataset.nodes)} knooppunten, "
         f"{len(run.dataset.conduits)} strengen.",
         "",
-        f"{run.count(Severity.ERROR) - geaccepteerd_fout} fouten en "
-        f"{run.count(Severity.WARNING) - geaccepteerd_waarschuwing} waarschuwingen "
+        f"{eigen.fouten} fouten en {eigen.waarschuwingen} waarschuwingen "
         f"uit {len(run.outcomes)} eigen checks.",
         "",
     ]
@@ -803,26 +802,6 @@ def _uitzonderingen_section(uitzonderingen: Uitzonderingen, meldingen: list[Meld
         regels += [""]
 
     return regels
-
-
-def _geaccepteerd_eigen(
-    meldingen: list[Melding], geaccepteerd: frozenset[str], severity: Severity
-) -> int:
-    """Hoeveel geaccepteerde eigen-check-meldingen deze ernst dragen (issue #132).
-
-    Precies de bevindingen die `run.count` telde maar die de acceptatie uit de
-    foutentelling haalt: register-meldingen met een geaccepteerde melding-ID. Nulmeting-
-    en datasetmeldingen tellen niet in `run.count` en horen hier dus niet af.
-    """
-    if not geaccepteerd:
-        return 0
-    return sum(
-        1
-        for melding in meldingen
-        if melding.bron == BRON_REGISTER
-        and melding.ernst == severity.value
-        and melding.melding_id in geaccepteerd
-    )
 
 
 def _per_check(meldingen: list[Melding]) -> dict[str, list[Melding]]:
@@ -1459,8 +1438,8 @@ def _clusterduiding(meldingen: list[Melding]) -> list[str]:
 def _zonder_locatie(meldingen: list[Melding], *, met_csv: bool = True) -> list[str]:
     """Meldt hoeveel meldingen geen plek op de kaart kregen, en waarom.
 
-    De GeoPackage telt ze in `gwsw_run`, maar wie alleen het rapport leest zou denken
-    dat het kaartbeeld compleet is. Zwijgen leest hier als "alles staat erop".
+    Wie alleen het rapport leest zou denken dat het kaartbeeld compleet is; zwijgen
+    leest hier als "alles staat erop".
 
     Twee oorzaken, en ze horen uit elkaar gehouden te worden: een melding die geen
     object aanwijst (dataset-breed, een EXT-verwijzing zonder rioolobject, een
@@ -1468,6 +1447,12 @@ def _zonder_locatie(meldingen: list[Melding], *, met_csv: bool = True) -> list[s
     zonder bruikbare geometrie. Ze op een hoop gooien leverde een rapport op dat in
     de ene alinea 578 meldingen aan een ontbrekende geometrie weet en in de andere
     telde dat er nul zo'n geval was.
+
+    De kolom `meldingen_zonder_locatie` in `gwsw_run` telt méér dan deze regel: zij
+    telt élke melding zonder foutlocatie, dus ook de datasetsignalen (`bron =
+    "dataset"`) die hier juist buiten de telling blijven. Een bijzin noemt hoeveel dat
+    er zijn, zodat het verschil (op De Wolden 17 = 6 + 11) verklaard is in plaats van
+    onbenoemd (issue #150).
     """
     # Datasetsignalen (bron "dataset") horen hier niet: ze zijn geen bevinding die niet
     # te plaatsen viel maar een signaal over de export, dat de omvangsectie al noemt. Ze
@@ -1483,6 +1468,9 @@ def _zonder_locatie(meldingen: list[Melding], *, met_csv: bool = True) -> list[s
 
     objectloos = [melding for melding in zonder if not melding.object_uri]
     zonder_geometrie = [melding for melding in zonder if melding.object_uri]
+    datasetsignalen = sum(
+        1 for melding in meldingen if melding.foutlocatie is None and melding.bron == BRON_DATASET
+    )
     # Zonder CSV mag die hier niet genoemd worden: dan verwijst het rapport naar een
     # bestand dat `--uitvoer` heeft uitgezet (issue #66).
     waar = (
@@ -1492,11 +1480,20 @@ def _zonder_locatie(meldingen: list[Melding], *, met_csv: bool = True) -> list[s
         else f"Ze staan wel in `{FILE_CHECKS_JSON}` en in de meldingentabel van de GeoPackage, "
         "die de kolommen `x` en `y` draagt, voor zover die gevraagd zijn"
     )
+    # De kolom `meldingen_zonder_locatie` in `gwsw_run` telt de datasetsignalen wél mee;
+    # noem hun aantal, zodat het verschil met deze regel verklaard is (issue #150).
+    signaalzin = (
+        f" Daarnaast {vorm(datasetsignalen, 'staat', 'staan')} er "
+        f"{getal(datasetsignalen, 'datasetsignaal', 'datasetsignalen')} zonder object; "
+        "`gwsw_run` telt die in `meldingen_zonder_locatie` mee, dit rapport niet."
+        if datasetsignalen
+        else ""
+    )
     regels = [
         f"> **{getal(len(zonder), 'melding heeft', 'meldingen hebben')} geen plek op de "
         f"kaart** gekregen. {_oorzaak(objectloos, 'wijst', 'wijzen')} geen object aan; "
         f"{_oorzaak(zonder_geometrie, 'staat', 'staan')} op een object zonder bruikbare "
-        f"geometrie. {waar}; alleen kleuren ze geen object op de kaart.",
+        f"geometrie. {waar}; alleen kleuren ze geen object op de kaart.{signaalzin}",
         "",
     ]
     return regels

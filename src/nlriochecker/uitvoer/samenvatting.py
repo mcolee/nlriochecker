@@ -152,6 +152,19 @@ def _eigen_regel(meldingen: Sequence[Melding]) -> Regel:
     )
 
 
+def eigen_telling(meldingen: Sequence[Melding], *, geaccepteerd: Collection[str] = ()) -> Regel:
+    """De totaalregel van de eigen checks, los van de volledige samenvatting (issue #150).
+
+    Dezelfde regel als in `samenvatting()`: register-meldingen, per ernst geteld, en de
+    geaccepteerde bevindingen (issue #132) tellen niet mee. De Verantwoording in het
+    rapport en de terminaltelling van `toets` lezen hem, zodat er één foutentotaal is dat
+    over de meldingenstroom (dus ná de onderdrukking) telt in plaats van over `run.count`.
+    """
+    if geaccepteerd:
+        meldingen = [melding for melding in meldingen if melding.melding_id not in geaccepteerd]
+    return _eigen_regel(meldingen)
+
+
 def _tel(onderwerp: str, meldingen: Sequence[Melding]) -> Regel:
     """Telt fouten en waarschuwingen, en hoeveel daarvan systemisch zijn."""
     fouten = [m for m in meldingen if m.ernst == Severity.ERROR.value]

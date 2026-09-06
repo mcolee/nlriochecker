@@ -13,6 +13,18 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gerepareerd
 
+- **Eén foutentotaal per rapport** (issue #150): de Verantwoording en de terminaltelling van
+  `toets` telden over `run.count` (de bevindingen *vóór* de onderdrukking uit `[rapport]`),
+  terwijl de managementsamenvatting en de meldingentabel over de meldingenstroom (erná)
+  telden. Met `onderdruk_checks` stonden er zo twee foutentotalen in één rapport en een derde
+  op het scherm. Alle drie tellen nu over de stroom, met dezelfde regel als `samenvatting._tel`
+  (register-meldingen, per ernst, geaccepteerde bevindingen niet meegeteld) via de nieuwe
+  `samenvatting.eigen_telling`. Op Koekangerveld met `onderdruk_checks=["TOP-022", "ADM-010"]`
+  tonen tabel, Verantwoording en terminal nu alle drie 79 fouten. Daarnaast noemt de regel
+  "geen plek op de kaart" nu hoeveel datasetsignalen (`bron="dataset"`) geen object dragen, met
+  de opmerking dat `gwsw_run.meldingen_zonder_locatie` die wél meetelt — zo is het verschil
+  (op De Wolden 17 = 6 + 11) verklaard in plaats van onbenoemd. Geen contractwijziging: de
+  kolomwaarde in `gwsw_run` blijft en `SCHEMA_VERSIE` blijft 1.2.
 - **Elke meetcheck vult nu `waarde` en `drempel`** (issue #142): de checks die een gemeten
   grootheid tegen een drempel afwegen zetten die grootheid als tekst in `waarde` en de
   configwaarde plus haar sleutel in `drempel` (`'0.10 (drempels.tegenverhang_fors_m)'`), zoals

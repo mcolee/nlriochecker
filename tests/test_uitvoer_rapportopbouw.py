@@ -8,6 +8,8 @@ herkomstblokken met de fouten voorop.
 from __future__ import annotations
 
 import json
+import re
+import sqlite3
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
@@ -397,6 +399,60 @@ class TestOnderdrukking:
         """Gesorteerd op sleutel: anders verschilt de zin tussen twee runs op dezelfde data."""
         assert _telling({"TOP-011": 3, "ATTR-001": 2}) == "ATTR-001 2, TOP-011 3"
         assert _telling({}) == "geen"
+
+
+class TestEenTellingPerRapport:
+    """Issue #150: samenvatting, Verantwoording en meldingentabel tonen één foutentotaal.
+
+    De Verantwoording telde op `run.count` (de bevindingen *vóór* de onderdrukking), de
+    samenvatting en de meldingentabel op de stroom (erná). Met `onderdruk_checks` liepen
+    ze uiteen -- twee foutentotalen in één rapport. Nu tellen alle drie over de stroom,
+    met dezelfde regel als `samenvatting._tel`.
+    """
+
+    @staticmethod
+    def _run(onderdruk_checks: Sequence[str]) -> CheckRun:
+        config = _config()
+        config.rapport.onderdruk_checks = list(onderdruk_checks)
+        dataset = load_dataset(TTL_DIR / "onderdruk_persleiding.ttl", [])
+        return run_checks(CheckContext(dataset=dataset, config=config), ["TOP-011"])
+
+    @staticmethod
+    def _tellingen(
+        run: CheckRun, tmp_path: Path
+    ) -> tuple[tuple[str, str], tuple[str, str], tuple[str, str]]:
+        """De (fouten, waarschuwingen) uit de samenvatting, de Verantwoording en de tabel."""
+        uitvoer = schrijf_uitvoer(run, tmp_path, RUNDATUM, met_geopackage=True)
+        md = uitvoer.markdown.read_text(encoding="utf-8")
+        s = re.search(
+            r"Eigen checks buiten GWSW \| (\d+) fout(?:en)? \(waarvan \d+ systemisch\), "
+            r"(\d+) waarschuwing",
+            md,
+        )
+        v = re.search(r"^(\d+) fouten en (\d+) waarschuwingen uit \d+ eigen checks", md, re.M)
+        assert s is not None and v is not None
+        assert uitvoer.geopackage is not None
+        tabel = (
+            sqlite3.connect(uitvoer.geopackage)
+            .execute(
+                "select coalesce(sum(ernst='F'), 0), coalesce(sum(ernst='W'), 0) "
+                "from meldingen where bron='register'"
+            )
+            .fetchone()
+        )
+        return ((s.group(1), s.group(2)), (v.group(1), v.group(2)), tuple(map(str, tabel)))
+
+    def test_zonder_onderdrukking_zijn_de_drie_tellingen_gelijk(self, tmp_path: Path) -> None:
+        samenvatting_fw, verantwoording_fw, tabel_fw = self._tellingen(self._run([]), tmp_path)
+        assert samenvatting_fw == verantwoording_fw == tabel_fw
+
+    def test_met_onderdruk_checks_blijven_de_drie_tellingen_gelijk(self, tmp_path: Path) -> None:
+        """De regressie: `onderdruk_checks` haalde de bevinding wel uit de stroom, niet uit
+        `run.count`, dus de Verantwoording bleef het oude getal tonen."""
+        samenvatting_fw, verantwoording_fw, tabel_fw = self._tellingen(
+            self._run(["TOP-011"]), tmp_path
+        )
+        assert samenvatting_fw == verantwoording_fw == tabel_fw
 
 
 class TestUitzonderingen:

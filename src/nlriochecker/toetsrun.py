@@ -22,6 +22,7 @@ pakket onder 1.0 staat kan de vorm nog schuiven; zie `docs/versionering.md`.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from gwsw_orox_helpers.cache import CacheUitslag, laad_met_cache
@@ -39,6 +40,8 @@ from nlriochecker.plausibiliteit import load_plausibility
 from nlriochecker.studiegebied import RdGrenzen, Studiegebieden, load_studiegebieden
 from nlriochecker.taal import getal, vorm
 from nlriochecker.toetsloop import GebiedsRun, toets_gebieden
+from nlriochecker.uitvoer.melding import bouw_meldingenstroom
+from nlriochecker.uitvoer.samenvatting import Regel, eigen_telling
 from nlriochecker.uitvoer.schrijver import UitvoerPerGebied, schrijf_uitvoer_gebieden
 
 
@@ -392,15 +395,28 @@ def _nulmeting(
     )
 
 
+def _eigen_telling(run: CheckRun) -> Regel:
+    """De foutentelling van de eigen checks over de meldingenstroom (issue #150).
+
+    Niet `run.count`: dat telt de bevindingen *vóór* de onderdrukking, zodat de terminal
+    een ander getal toonde dan het rapport (de samenvatting) en de GeoPackage. Dezelfde
+    regel als de Verantwoording en `samenvatting._tel`: register-meldingen, per ernst
+    geteld, en de geaccepteerde bevindingen (issue #132) tellen niet mee.
+    """
+    stroom = bouw_meldingenstroom(run, date.today())
+    return eigen_telling(stroom.meldingen, geaccepteerd=stroom.uitzonderingen.geaccepteerd)
+
+
 def _gebied_kort(gebiedsrun: GebiedsRun) -> str:
     """Vat een gebiedsrun samen in een regel; het detail staat in de synthese."""
     run = gebiedsrun.run
     kern = len(run.analyseset.kern) if run.analyseset is not None else 0
     weggelaten = run.weggelaten
+    telling = _eigen_telling(run)
     leeg = " -- geen objecten in dit gebied, niets getoetst" if not kern else ""
     return (
         f"  Gebied {gebiedsrun.naam}: {getal(kern, 'object', 'objecten')} in de kern, "
-        f"{run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} waarschuwingen "
+        f"{telling.fouten} fouten, {telling.waarschuwingen} waarschuwingen "
         f"uit de eigen checks{_nulmetingtelling(run)}, "
         f"{weggelaten} buiten het gebied weggelaten{leeg}."
     )
@@ -439,8 +455,9 @@ def _gebied_uitgebreid(gebiedsrun: GebiedsRun, config: CheckConfig) -> list[str]
             f"  {outcome.check_id:9s} {outcome.severity.value}  "
             f"{aantal:5d} {vorm(aantal, 'bevinding', 'bevindingen')}{voorbehoud}"
         )
+    telling = _eigen_telling(run)
     regels.append(
-        f"Totaal {run.count(Severity.ERROR)} fouten, {run.count(Severity.WARNING)} "
+        f"Totaal {telling.fouten} fouten, {telling.waarschuwingen} "
         f"waarschuwingen uit de eigen checks{_nulmetingtelling(run)}"
     )
     return regels
