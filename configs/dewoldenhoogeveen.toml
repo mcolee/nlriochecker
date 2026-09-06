@@ -249,7 +249,7 @@ nwb_wegvakken = "NWB_wegvakken_DeWoldenHoogeveen.gpkg"
 top10nl = "TOP10NL_plaats_vlak_DeWoldenHoogeveen.gpkg"
 top10nl_komlagen = ["plaats_vlak"]
 studiegebied = "CBS_buurten_DeWoldenHoogeveen_buffer_100m.gpkg"
-ahn_dtm = "AHN6_DeWoldenHoogeveen_DTM.tif"
+ahn_dtm = "AHN6_DeWoldenHoogeveen_DTM_tiled.tif"
 # Welke BGT-lagen welke rol vervullen. De namen komen uit de aangeleverde export;
 # zie docs/gis-inventarisatie.md. Een lege of ontbrekende laag laat de bijbehorende
 # checks overslaan met de melding "laag niet aanwezig in aangeleverde data".
