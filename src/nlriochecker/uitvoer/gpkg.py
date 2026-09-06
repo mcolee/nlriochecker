@@ -1994,51 +1994,64 @@ def _schrijf_runmetadata(
     gebied = run.study_area
     stel = run.analyseset
     fallback = run.dataset.decode_fallback
+    # Elke waarde bij de naam van haar kolom, niet als losse positionele tuple: een
+    # verwisseling (bv. `fouten` <-> `waarschuwingen`) is met deze vorm een luide
+    # `AssertionError` hieronder in plaats van een stille verkeerde telling die geen
+    # enkele test bij naam terugleest (issue #169).
+    waarden: dict[str, object] = {
+        VELD_GEREEDSCHAP: gereedschap(),
+        "dataset": run.dataset.source.name,
+        "run_datum": run_datum.isoformat(),
+        "register_versie": config.rapport.register_versie,
+        "ontologieen": ", ".join(pad.name for pad in run.dataset.ontologies),
+        "typeringspoort": int(run.typing_gate_applied),
+        "codering_terugval": f"{fallback.encoding} ({fallback.byte_count} bytes)"
+        if fallback
+        else "",
+        "meldingen_totaal": len(meldingen),
+        "meldingen_zonder_locatie": sum(1 for melding in meldingen if melding.foutlocatie is None),
+        # `fouten`/`waarschuwingen` uit de meldingenstroom en niet uit `run.count`: die
+        # telt alleen de bevindingen van de eigen checks, terwijl `meldingen_totaal`
+        # erboven de nulmeting meetelt. Bleven ze uit elkaar lopen, dan zou een lezer van
+        # deze tabel een onverklaard verschil van tienduizenden zien.
+        "fouten": sum(1 for melding in meldingen if melding.ernst == Severity.ERROR.value),
+        "waarschuwingen": sum(
+            1 for melding in meldingen if melding.ernst == Severity.WARNING.value
+        ),
+        "grens_bron": gebied.source.name if gebied is not None else "",
+        "grens_laag": gebied.name if gebied is not None else "",
+        "grens_oppervlak_ha": round(gebied.area_ha, 2) if gebied is not None else None,
+        "grens_vlakken": gebied.feature_count if gebied is not None else None,
+        "gebied": _gebied(run),
+        "n_putten": tellingen.putten,
+        "n_strengen": tellingen.strengen,
+        "n_mechanisch": tellingen.mechanisch,
+        "n_vlakken": tellingen.vlakken,
+        "n_gemengd_zonder_overstort": tellingen.gemengd_zonder_overstort,
+        "n_gemengd_zonder_vlak": tellingen.gemengd_zonder_vlak,
+        "n_wegvakken": tellingen.wegvakken,
+        "kern_objecten": len(stel.kern) if stel is not None else None,
+        "schil_objecten": len(stel.schil) if stel is not None else None,
+        "dataset_objecten": stel.volledig_aantal if stel is not None else None,
+        "cfk_set": run.meetbereik.cfk_tekst,
+        "volledig": int(run.meetbereik.volledig),
+        "onderdruk_klassen": ", ".join(onderdrukking.klassen),
+        "onderdruk_checks": ", ".join(onderdrukking.checks),
+        "meldingen_onderdrukt": onderdrukking.totaal,
+        "uitzonderingen_bestand": uitzonderingen.bestand,
+        "meldingen_geaccepteerd": len(uitzonderingen.geaccepteerd),
+        "uitzonderingen_zonder_bevinding": len(uitzonderingen.zonder_bevinding),
+        "markering": markering(run) or "",
+    }
+    assert list(waarden) == [kolom.naam for kolom in kolommen], (
+        "gwsw_run: de sleutels van `waarden` wijken af van de kolomnamen -- een "
+        "verwisselde of ontbrekende kolom, geen stille misplaatsing (issue #169)"
+    )
     velden = ", ".join(f'"{kolom.naam}"' for kolom in kolommen)
     plaatshouders = ", ".join("?" * len(kolommen))
     verbinding.execute(
         f"insert into gwsw_run ({velden}) values ({plaatshouders})",
-        (
-            gereedschap(),
-            run.dataset.source.name,
-            run_datum.isoformat(),
-            config.rapport.register_versie,
-            ", ".join(pad.name for pad in run.dataset.ontologies),
-            int(run.typing_gate_applied),
-            f"{fallback.encoding} ({fallback.byte_count} bytes)" if fallback else "",
-            len(meldingen),
-            sum(1 for melding in meldingen if melding.foutlocatie is None),
-            # Uit de meldingenstroom en niet uit `run.count`: die telt alleen de
-            # bevindingen van de eigen checks, terwijl `meldingen_totaal` erboven de
-            # nulmeting meetelt. Bleven ze uit elkaar lopen, dan zou een lezer van
-            # deze tabel een onverklaard verschil van tienduizenden zien.
-            sum(1 for melding in meldingen if melding.ernst == Severity.ERROR.value),
-            sum(1 for melding in meldingen if melding.ernst == Severity.WARNING.value),
-            gebied.source.name if gebied is not None else "",
-            gebied.name if gebied is not None else "",
-            round(gebied.area_ha, 2) if gebied is not None else None,
-            gebied.feature_count if gebied is not None else None,
-            _gebied(run),
-            tellingen.putten,
-            tellingen.strengen,
-            tellingen.mechanisch,
-            tellingen.vlakken,
-            tellingen.gemengd_zonder_overstort,
-            tellingen.gemengd_zonder_vlak,
-            tellingen.wegvakken,
-            len(stel.kern) if stel is not None else None,
-            len(stel.schil) if stel is not None else None,
-            stel.volledig_aantal if stel is not None else None,
-            run.meetbereik.cfk_tekst,
-            int(run.meetbereik.volledig),
-            ", ".join(onderdrukking.klassen),
-            ", ".join(onderdrukking.checks),
-            onderdrukking.totaal,
-            uitzonderingen.bestand,
-            len(uitzonderingen.geaccepteerd),
-            len(uitzonderingen.zonder_bevinding),
-            markering(run) or "",
-        ),
+        tuple(waarden.values()),
     )
 
 

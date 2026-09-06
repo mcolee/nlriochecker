@@ -11,6 +11,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gewijzigd
+
+- **`gwsw_run` schrijft bij naam in plaats van als 35-tuple** (issue #169).
+  `_schrijf_runmetadata` in `uitvoer/gpkg.py` bouwt nu een `dict[str, object]` per
+  kolomnaam en leidt de positionele rij daaruit af, met een `assert` op sleutelgelijkheid
+  tegen de `_Kolom`-namen: een verwisseling (`fouten` <-> `waarschuwingen` en de andere
+  tellingen) wordt een luide `AssertionError` in plaats van een stille verkeerde telling.
+  Een nieuwe test schrijft alle 35 kolommen met onderling ongelijke waarden en leest ze
+  bij naam terug. Geen kolom- of contractwijziging; de uitvoer blijft byte-gelijk.
+
 ### Toegevoegd
 
 - **Checks declareren hun `[klassen]`-lijsten; HGT-011 toetst de drempels** (issue #137,

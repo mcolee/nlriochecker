@@ -14,12 +14,14 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from gwsw_orox_helpers.dataset import load_dataset
-from shapely.geometry import box
+from shapely.geometry import Point, box
 
 from gpkghelper import schrijf_vlakken
+from helpers_melding import melding as _basismelding
 from nlriochecker.afbakening import bouw_analyseset
 from nlriochecker.checkconfig import CheckConfig, Uitzondering, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, Severity, run_checks
@@ -37,9 +39,17 @@ from nlriochecker.uitvoer.gpkg import (
     REDEN_ONDERDRUKT,
     VLAK_CHECKS,
     VLAK_SOORT_GEMENGD,
+    _LaagTellingen,
+    _schrijf_runmetadata,
     schrijf_geopackage,
 )
-from nlriochecker.uitvoer.melding import bouw_meldingen, bouw_meldingenstroom
+from nlriochecker.uitvoer.herkomst import VELD_GEREEDSCHAP, gereedschap
+from nlriochecker.uitvoer.melding import (
+    Onderdrukking,
+    Uitzonderingen,
+    bouw_meldingen,
+    bouw_meldingenstroom,
+)
 from nlriochecker.uitvoer.schrijver import schrijf_uitvoer
 
 TTL_DIR = Path(__file__).parent / "fixtures" / "ttl"
@@ -1802,3 +1812,119 @@ def test_mislukte_geopackage_laat_geen_verouderde_json_achter(
     tweede = (tmp_path / FILE_CHECKS_JSON).read_text(encoding="utf-8")
     assert tweede != eerste
     assert json.loads(tweede)["aantal_meldingen"] > 0
+
+
+def test_gwsw_run_leest_elke_kolom_bij_naam_terug(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Elke kolom van `gwsw_run` draagt de waarde onder haar eigen naam (issue #169).
+
+    `_schrijf_runmetadata` vult een dict per kolomnaam en leidt daaruit de positionele
+    rij af. Deze test schrijft alle 35 kolommen met onderling ongelijke waarden en leest
+    ze bij naam terug: een verwisseling -- zoals de `fouten` <-> `waarschuwingen`-swap uit
+    de issue -- wordt zo een testfout in plaats van een groene run. De 253 bestaande
+    `gwsw_run`-tests lezen geen enkel veld bij naam en zouden die swap niet vangen.
+    """
+    monkeypatch.setattr("nlriochecker.uitvoer.gpkg._gebied", lambda run: "gebiedwaarde")
+    monkeypatch.setattr("nlriochecker.uitvoer.gpkg.markering", lambda run: "markeringstekst")
+
+    run = SimpleNamespace(
+        config=SimpleNamespace(rapport=SimpleNamespace(register_versie="reg-v9")),
+        dataset=SimpleNamespace(
+            source=SimpleNamespace(name="ds-source.ttl"),
+            ontologies=[Path("onto-a.ttl"), Path("onto-b.ttl")],
+            decode_fallback=SimpleNamespace(encoding="cp850", byte_count=42),
+        ),
+        typing_gate_applied=True,
+        study_area=SimpleNamespace(
+            source=SimpleNamespace(name="grens.gpkg"),
+            name="Gebiednaam",
+            area_ha=12.3456,
+            feature_count=71,
+        ),
+        analyseset=SimpleNamespace(kern=[0] * 5, schil=[0] * 9, volledig_aantal=123),
+        meetbereik=SimpleNamespace(cfk_tekst="Hyd, MdsPlan", volledig=False),
+    )
+    # Vier fouten, drie waarschuwingen, twee zonder foutlocatie: vier onderling ongelijke
+    # tellingen (7, 4, 3, 2), zodat een swap tussen twee ervan bij naam opvalt.
+    plek = Point(1.0, 2.0)
+    meldingen = [
+        _basismelding(ernst="F", foutlocatie=plek),
+        _basismelding(ernst="F", foutlocatie=plek),
+        _basismelding(ernst="F", foutlocatie=plek),
+        _basismelding(ernst="F", foutlocatie=None),
+        _basismelding(ernst="W", foutlocatie=plek),
+        _basismelding(ernst="W", foutlocatie=plek),
+        _basismelding(ernst="W", foutlocatie=None),
+    ]
+    tellingen = _LaagTellingen(
+        putten=11,
+        strengen=12,
+        mechanisch=13,
+        vlakken=14,
+        gemengd_zonder_overstort=15,
+        wegvakken=17,
+        gemengd_zonder_vlak=16,
+    )
+    onderdrukking = Onderdrukking(
+        klassen=("KlasseX",), checks=("TOP-099", "TOP-098"), per_check={"a": 21}
+    )
+    uitzonderingen = Uitzonderingen(
+        bestand="uitz.toml",
+        geaccepteerd=tuple(f"g{i}" for i in range(31)),
+        zonder_bevinding=tuple(f"z{i}" for i in range(32)),
+    )
+    verwacht: dict[str, object] = {
+        VELD_GEREEDSCHAP: gereedschap(),
+        "dataset": "ds-source.ttl",
+        "run_datum": RUNDATUM.isoformat(),
+        "register_versie": "reg-v9",
+        "ontologieen": "onto-a.ttl, onto-b.ttl",
+        "typeringspoort": 1,
+        "codering_terugval": "cp850 (42 bytes)",
+        "meldingen_totaal": 7,
+        "meldingen_zonder_locatie": 2,
+        "fouten": 4,
+        "waarschuwingen": 3,
+        "grens_bron": "grens.gpkg",
+        "grens_laag": "Gebiednaam",
+        "grens_oppervlak_ha": 12.35,
+        "grens_vlakken": 71,
+        "gebied": "gebiedwaarde",
+        "n_putten": 11,
+        "n_strengen": 12,
+        "n_mechanisch": 13,
+        "n_vlakken": 14,
+        "n_gemengd_zonder_overstort": 15,
+        "n_gemengd_zonder_vlak": 16,
+        "n_wegvakken": 17,
+        "kern_objecten": 5,
+        "schil_objecten": 9,
+        "dataset_objecten": 123,
+        "cfk_set": "Hyd, MdsPlan",
+        "volledig": 0,
+        "onderdruk_klassen": "KlasseX",
+        "onderdruk_checks": "TOP-099, TOP-098",
+        "meldingen_onderdrukt": 21,
+        "uitzonderingen_bestand": "uitz.toml",
+        "meldingen_geaccepteerd": 31,
+        "uitzonderingen_zonder_bevinding": 32,
+        "markering": "markeringstekst",
+    }
+    # Alle 35 waarden zijn onderling ongelijk, zodat elke verwisseling zichtbaar wordt.
+    assert len(set(verwacht.values())) == len(verwacht)
+
+    con = sqlite3.connect(":memory:")
+    try:
+        con.execute(
+            "create table gpkg_contents (table_name text, data_type text, identifier text, "
+            "description text, last_change text, srs_id integer)"
+        )
+        _schrijf_runmetadata(
+            con, run, meldingen, RUNDATUM, tellingen, onderdrukking, uitzonderingen
+        )
+        kolommen = ", ".join(f'"{naam}"' for naam in verwacht)
+        rij = con.execute(f"select {kolommen} from gwsw_run").fetchone()
+    finally:
+        con.close()
+
+    gelezen = dict(zip(verwacht, rij, strict=True))
+    assert gelezen == verwacht
