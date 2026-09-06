@@ -53,6 +53,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De uitvoerarchieven worden atomair geschreven en de JSON streamt** (issue #148). `schrijf_csv`,
+  `schrijf_json` (`uitvoer/herkomst.py`) en `schrijf_geopackage` (`uitvoer/gpkg.py`) schrijven
+  eerst naar een tmp-bestand naast het doel en hernoemen dat met `os.replace` pas als het
+  compleet is; faalt een schrijver onderweg -- bijvoorbeeld een luide `PipelineError` uit de
+  vlakkenlaag -- dan wordt het tmp-bestand opgeruimd en blijft de doelplek ongemoeid. Zo blijft
+  er nooit meer een half `dq_*.gpkg` (dat in QGIS als "leeg" oogt) naast een verouderde
+  `bevindingen.json` staan. `schrijf_uitvoer` schrijft daarom de JSON vóór de zwaardere,
+  foutgevoeliger GeoPackage. De JSON streamt de gesorteerde meldingen bovendien blok voor blok
+  naar het bestand in plaats van de hele lijst als één string van tientallen MB in het geheugen
+  te zetten: de geheugenpiek van de JSON-fase zakt op De Wolden en Hoogeveen van ~824 naar ~27
+  MiB (`tracemalloc`, gepaard, referentie `d42c90a`), en de volle `toets` piekt ~3,92 → ~3,33 GB
+  `ru_maxrss` (n=3 om en om; wandklok gelijk, ~1:35). De bytes blijven exact gelijk aan de oude
+  uitvoer -- `cmp` op `bevindingen.json` en `bevindingen.csv` van Koekangerveld en de gemeentebrede
+  De Wolden-run tegen een `d42c90a`-run is identiek -- dus geen contractwijziging en `schema_versie`
+  blijft 1.2. Meetscript: `scripts/meet_uitvoer_geheugen.py` (BO-43).
 - **De externe bronnen worden smal ingelezen** (issue #147): `externedata._lees_laag` leest
   voortaan alleen de kolommen die de checks en de uitvoer werkelijk gebruiken
   (`LEESKOLOMMEN`, als `columns=` aan `gpd.read_file`) in plaats van elke kolom van elke laag.

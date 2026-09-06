@@ -13,6 +13,7 @@ nieuw rapport dat zijn eigen `to_csv` aanroept nooit zien.
 from __future__ import annotations
 
 import json
+import random
 import re
 import sqlite3
 from dataclasses import fields, replace
@@ -476,6 +477,46 @@ def test_schrijf_json_is_compacte_utf8(tmp_path: Path) -> None:
     # Compact: geen inspringing en geen spaties rond scheidingstekens.
     assert tekst.startswith('{"schema_versie":')
     assert tekst.endswith("\n")
+
+
+def test_schrijf_json_is_bytegelijk_aan_een_dumps_referentie(tmp_path: Path) -> None:
+    """De streamende schrijver levert exact dezelfde bytes als één `json.dumps` (issue #148).
+
+    Meer dan 5000 meldingen, zodat de rijen in meerdere blokken naar het bestand gaan en
+    de blokgrens getoetst wordt: precies daar zou de streamende vorm van de referentie
+    kunnen afwijken. In willekeurige volgorde aangeboden, zodat de sortering meetelt.
+    """
+    meldingen = [
+        {"melding_id": f"m{i:05d}", "waarde": i, "tekst": "Ruinerwold één #/"} for i in range(12000)
+    ]
+    door_elkaar = meldingen[:]
+    random.Random(0).shuffle(door_elkaar)
+
+    pad = schrijf_json(
+        tmp_path / "b.json",
+        door_elkaar,
+        run_datum=RUNDATUM,
+        dataset="d.ttl",
+        cfk_set=["Hyd"],
+        volledig=False,
+        typeringspoort_toegepast=False,
+    )
+
+    referentie = {
+        "schema_versie": SCHEMA_VERSIE,
+        "gereedschap": gereedschap(),
+        "run_datum": "2026-08-17",
+        "dataset": "d.ttl",
+        "cfk_set": ["Hyd"],
+        "volledig": False,
+        "typeringspoort_toegepast": False,
+        "aantal_meldingen": len(meldingen),
+        "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),
+    }
+    verwacht = (
+        json.dumps(referentie, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
+    )
+    assert pad.read_text(encoding="utf-8") == verwacht
 
 
 def test_schrijf_uitvoer_levert_de_json_uit_dezelfde_meldingenstroom(

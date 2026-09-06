@@ -25,6 +25,7 @@ past QGIS de default-symbologie toe.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import struct
 from collections import defaultdict
@@ -226,7 +227,13 @@ def schrijf_geopackage(
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)
-    doel.unlink(missing_ok=True)
+    # Naar een tmp-bestand naast het doel, en pas na een geslaagde `commit()` atomair
+    # hernoemen (issue #148). Faalt de schrijver ergens onderweg -- bijvoorbeeld een luide
+    # `PipelineError` uit de vlakkenlaag -- dan wordt het halve tmp-bestand opgeruimd en
+    # blijft de doelplek ongemoeid, in plaats van dat er een `dq_*.gpkg` met alleen wat
+    # fundament-tabellen achterblijft dat in QGIS als "leeg" oogt.
+    tmp = doel.with_suffix(".gpkg.tmp")
+    tmp.unlink(missing_ok=True)
 
     binnen = run.objecten_binnen()
     # `connect` staat binnen de try: faalde hij ervoor, dan werd `einde_fase` nooit
@@ -235,7 +242,7 @@ def schrijf_geopackage(
     voortgang.start_fase("GeoPackage", len(GEOPACKAGE_STAPPEN))
     verbinding: sqlite3.Connection | None = None
     try:
-        verbinding = sqlite3.connect(doel)
+        verbinding = sqlite3.connect(tmp)
         _leg_fundament(verbinding)
         tellingen = _schrijf_features(
             verbinding,
@@ -259,10 +266,19 @@ def schrijf_geopackage(
         _schrijf_stijlen(verbinding)
         voortgang.stap(label="layer_styles")
         verbinding.commit()
+    except BaseException:
+        if verbinding is not None:
+            verbinding.close()
+            verbinding = None
+        tmp.unlink(missing_ok=True)
+        raise
     finally:
         if verbinding is not None:
             verbinding.close()
         voortgang.einde_fase()
+    # Buiten de try: de verbinding is dicht en de commit is rond, dus de hernoeming schuift
+    # een compleet bestand op zijn plek.
+    os.replace(tmp, doel)
     return doel
 
 

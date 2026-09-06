@@ -122,20 +122,11 @@ def schrijf_uitvoer(
         onderdrukking=stroom.onderdrukking,
         uitzonderingen=stroom.uitzonderingen,
     )
-    geopackage = (
-        schrijf_geopackage(
-            run,
-            meldingen,
-            output_dir,
-            run_datum,
-            voortgang=voortgang,
-            onderdrukking=stroom.onderdrukking,
-            uitzonderingen=stroom.uitzonderingen,
-            feiten=stroom.feiten,
-        )
-        if met_geopackage
-        else None
-    )
+    # De JSON komt vóór de GeoPackage: beide schrijven nu atomair via een tmp-bestand
+    # (issue #148), en de GeoPackage is de zwaarste en meest foutgevoelige van de twee. Zo
+    # staat de JSON nooit verouderd naast een net geschreven GeoPackage, en laat een
+    # mislukte GeoPackage-fase geen half bestand achter -- ze is dan hoogstens nog de
+    # geldige gpkg van een eerdere geslaagde run van dezelfde dag.
     json_pad = (
         schrijf_json(
             Path(output_dir) / FILE_CHECKS_JSON,
@@ -152,6 +143,20 @@ def schrijf_uitvoer(
             checks=checks_json(run),
         )
         if met_json
+        else None
+    )
+    geopackage = (
+        schrijf_geopackage(
+            run,
+            meldingen,
+            output_dir,
+            run_datum,
+            voortgang=voortgang,
+            onderdrukking=stroom.onderdrukking,
+            uitzonderingen=stroom.uitzonderingen,
+            feiten=stroom.feiten,
+        )
+        if met_geopackage
         else None
     )
     return Uitvoer(markdown=markdown, csv=csv, geopackage=geopackage, json=json_pad)

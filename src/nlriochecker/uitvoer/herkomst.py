@@ -21,6 +21,8 @@ bijkomt.
 from __future__ import annotations
 
 import json
+import os
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -43,6 +45,33 @@ PAKKET = __name__.split(".", 1)[0]
 # kolommen; de waarde erin is dezelfde.
 KOLOM_GEREEDSCHAP = "Gereedschap"
 VELD_GEREEDSCHAP = "gereedschap"
+
+# Hoeveel meldingen `schrijf_json` per keer door de C-encoder haalt. De rijen streamen zo
+# blok voor blok naar het bestand in plaats van als één string van tientallen MB in het
+# geheugen te staan (issue #148). De bytes blijven identiek: `json.dumps(blok)[1:-1]` levert
+# de rijen zonder de omhullende `[]`, en de blokken worden met komma's aaneengeregen tot
+# precies dezelfde reeks als `json.dumps(hele_lijst)[1:-1]`.
+_JSON_BLOK = 5000
+
+
+def _atomisch_schrijf(pad: Path, schrijf: Callable[[Path], None]) -> Path:
+    """Schrijft via een tmp-bestand in dezelfde map en hernoemt het atomair naar `pad`.
+
+    Zo blijft er bij een fout (of een crash) nooit een half of verouderd bestand op de
+    doelplek staan: `os.replace` schuift het complete tmp-bestand er in één keer overheen,
+    en faalt de schrijver ervoor, dan wordt het tmp-bestand opgeruimd. Het tmp-bestand
+    staat naast het doel, zodat de hernoeming binnen hetzelfde bestandssysteem valt.
+    """
+    tmp = pad.with_name(pad.name + ".tmp")
+    tmp.unlink(missing_ok=True)
+    try:
+        schrijf(tmp)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    os.replace(tmp, pad)
+    return pad
+
 
 # De versie van het JSON-contract, los van het versienummer van deze package. Een
 # afnemer pint hierop, niet op de packageversie: de checks mogen veranderen zonder
@@ -106,10 +135,13 @@ def schrijf_csv(tabel: pd.DataFrame, pad: Path) -> Path:
             f"de tabel voor {pad.name} draagt zelf al een kolom {KOLOM_GEREEDSCHAP!r}; "
             "hernoem die, anders overschrijft de herkomst hem stilzwijgend."
         )
-    tabel.assign(**{KOLOM_GEREEDSCHAP: gereedschap()}).to_csv(
-        pad, sep=";", index=False, encoding="utf-8"
+    met_herkomst = tabel.assign(**{KOLOM_GEREEDSCHAP: gereedschap()})
+    # Via tmp + rename (issue #148): pandas' bytes zijn hetzelfde ongeacht het pad, dus dit
+    # is byte-voor-byte gelijk aan een directe `to_csv`, maar een mislukte run laat geen half
+    # afgeschreven CSV op de doelplek staan.
+    return _atomisch_schrijf(
+        pad, lambda doel: met_herkomst.to_csv(doel, sep=";", index=False, encoding="utf-8")
     )
-    return pad
 
 
 def schrijf_json(
@@ -223,10 +255,28 @@ def schrijf_json(
         document["markering"] = markering
     if checks is not None:
         document["checks"] = checks
-    document |= {
-        "aantal_meldingen": len(meldingen),
-        "meldingen": sorted(meldingen, key=lambda rij: str(rij["melding_id"])),
-    }
-    tekst = json.dumps(document, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-    pad.write_text(tekst + "\n", encoding="utf-8")
-    return pad
+    document["aantal_meldingen"] = len(meldingen)
+    gesorteerd = sorted(meldingen, key=lambda rij: str(rij["melding_id"]))
+
+    # De envelop zonder de meldingen als één string, dan de meldingen blok voor blok naar
+    # het bestand (issue #148). Zo staat de volledige lijst van tientallen MB nooit ook nog
+    # eens als één JSON-string in het geheugen. De bytes blijven identiek aan één
+    # `json.dumps(document)`: `kop` eindigt op `}`, dat vervangen we door `,"meldingen":[`,
+    # en `json.dumps(blok)[1:-1]` levert de rijen zonder de omhullende `[]`. De envelop draagt
+    # altijd `schema_versie`, dus de invoegkomma is veilig.
+    kop = json.dumps(document, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+    def schrijf(doel: Path) -> None:
+        with doel.open("w", encoding="utf-8") as bestand:
+            bestand.write(kop[:-1] + ',"meldingen":[')
+            for start in range(0, len(gesorteerd), _JSON_BLOK):
+                blok = json.dumps(
+                    gesorteerd[start : start + _JSON_BLOK],
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+                bestand.write(("," if start else "") + blok[1:-1])
+            bestand.write("]}\n")
+
+    return _atomisch_schrijf(pad, schrijf)

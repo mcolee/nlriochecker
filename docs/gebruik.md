@@ -51,6 +51,15 @@ Vier bestanden dus, en samen 337 meldingen in `bevindingen.json` (de eigen bevin
 de nulmeting en de datasetsignalen). De naam van de GeoPackage draagt de rundatum, dus
 die verschilt bij jou.
 
+De CSV, de JSON en de GeoPackage worden atomair geschreven: elk verschijnt eerst als een
+tmp-bestand ernaast (`bevindingen.csv.tmp`, `bevindingen.json.tmp`, `dq_*.gpkg.tmp`) en
+komt pas onder zijn echte naam te staan als het compleet is. Loopt een run vast, dan blijft
+er dus geen half bestand achter -- geen GeoPackage die in QGIS "leeg" oogt -- en geen JSON
+van een vorige keer naast een net geschreven GeoPackage. Wél kan een eerder geslaagde
+`dq_<dataset>_<datum>.gpkg` van dezelfde dag blijven staan als je de run overdoet en die de
+tweede keer luid faalt: de mislukte poging vervangt hem dan niet. Zie je na een mislukte run
+een `.tmp`-bestand liggen, dan is dat een halve schrijfpoging die je zonder risico weggooit.
+
 Twee bronnen ontbreken, en dat scheelt maar één ding. Het **hoogteraster** (AHN) is te
 groot voor een repository; HGT-001 tot en met HGT-003 melden daarom zelf dat ze niets
 konden toetsen. De **BGT-putdekselaag** is leeg in dit extract, maar geen enkele check

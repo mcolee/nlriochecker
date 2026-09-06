@@ -235,6 +235,18 @@ alleen het bestand waarin zij staat is verhuisd.
   `schema_versie`, los van het packagenummer; het staat beschreven in
   `docs/json-schema.md` en twee drifttests houden dat document aan `Melding` vast. Het
   veld `voorstel` is daarin gereserveerd voor een latere fase en wordt niet geschreven.
+- **De drie archieven schrijven atomair, en de JSON gaat vóór de GeoPackage** (issue #148).
+  `schrijf_csv`, `schrijf_json` (beide in `uitvoer/herkomst.py`, via `_atomisch_schrijf`) en
+  `schrijf_geopackage` (`uitvoer/gpkg.py`) schrijven eerst naar een tmp-bestand naast het doel
+  (`.tmp`, resp. `.gpkg.tmp`) en hernoemen dat met `os.replace` pas als het compleet is;
+  faalt een schrijver onderweg -- bijvoorbeeld een luide `PipelineError` uit de vlakkenlaag --
+  dan wordt het tmp-bestand opgeruimd en blijft de doelplek ongemoeid. Zo blijft er nooit een
+  half `dq_*.gpkg` (dat in QGIS als "leeg" oogt) naast een verouderde `bevindingen.json` staan.
+  `schrijf_uitvoer` schrijft daarom de JSON vóór de zwaardere, foutgevoeliger GeoPackage. De
+  JSON streamt de meldingen bovendien blok voor blok naar het bestand in plaats van de hele
+  lijst als één string van tientallen MB in het geheugen te zetten; de bytes blijven identiek
+  (`test_schrijf_json_is_bytegelijk_aan_een_dumps_referentie`), maar de geheugenpiek van de
+  JSON-fase zakt op De Wolden van ~817 naar ~27 MiB.
 - Elk uitvoerbestand draagt zijn herkomst: pakketnaam plus versie, uit
   `uitvoer/herkomst.py`. Dat is de enige schrijver in `src/`: `schrijf_markdown` zet de
   titel en de herkomstregel erboven (plus een optionele runbrede markering),

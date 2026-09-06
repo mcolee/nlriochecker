@@ -28,6 +28,7 @@ from nlriochecker.externedata import ExternalData, load_external_data
 from nlriochecker.meting import Meetbereik
 from nlriochecker.nulbevinding import Nulbevinding
 from nlriochecker.studiegebied import _lees_geopackage, load_study_area
+from nlriochecker.uitvoer.bevindingen import FILE_CHECKS_JSON
 from nlriochecker.uitvoer.gpkg import (
     FEATURELAGEN,
     GEOPACKAGE_STAPPEN,
@@ -1685,3 +1686,58 @@ def test_de_grijze_objecten_en_de_telling_komen_uit_dezelfde_onderdrukking(
     assert all(REDEN_ONDERDRUKT not in popup for popup in popups_zonder.values())
     assert _rijen(met, kolommen) == [("MechanischeTransportleiding", "", 1)]
     assert REDEN_ONDERDRUKT in popups_met["L2"]
+
+
+def _laat_gpkg_falen(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Laat de GeoPackage-schrijver luid falen midden in het schrijven.
+
+    `_schrijf_meldingen` draait na de featurelagen: putten, strengen en vlakken staan dan
+    al in het bestand (de `create table`-DDL commit vanzelf). Precies de toestand waarin de
+    oude code een half `dq_*.gpkg` liet staan.
+    """
+
+    def boem(*args: object, **kwargs: object) -> None:
+        raise PipelineError("bewust falen midden in de GeoPackage-schrijver")
+
+    monkeypatch.setattr("nlriochecker.uitvoer.gpkg._schrijf_meldingen", boem)
+
+
+def test_mislukte_geopackage_laat_geen_half_bestand_achter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Faalt de schrijver luid, dan blijft er geen half `dq_*.gpkg` en geen tmp staan (#148)."""
+    run = _run("top001_losliggende_put.ttl", "TOP-001")
+    stroom = bouw_meldingenstroom(run, RUNDATUM)
+    _laat_gpkg_falen(monkeypatch)
+
+    with pytest.raises(PipelineError):
+        schrijf_geopackage(run, stroom.meldingen, tmp_path, RUNDATUM, feiten=stroom.feiten)
+
+    assert list(tmp_path.glob("dq_*.gpkg")) == []
+    assert list(tmp_path.glob("dq_*.gpkg.tmp")) == []
+
+
+def test_mislukte_geopackage_laat_geen_verouderde_json_achter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """De JSON gaat vóór de GeoPackage; een mislukte gpkg laat geen verouderde JSON staan (#148).
+
+    Een eerste run zonder bevindingen schrijft `bevindingen.json`; een tweede run met
+    bevindingen faalt in de GeoPackage-fase. De JSON hoort dan die van de tweede run te
+    zijn -- vers geschreven vóór de GeoPackage begon -- en niet de verouderde eerste.
+    """
+    schoon = _run("schoon.ttl")
+    met_meldingen = _run("top001_losliggende_put.ttl", "TOP-001")
+
+    schrijf_uitvoer(schoon, tmp_path, RUNDATUM, met_geopackage=False)
+    eerste = (tmp_path / FILE_CHECKS_JSON).read_text(encoding="utf-8")
+
+    _laat_gpkg_falen(monkeypatch)
+    with pytest.raises(PipelineError):
+        schrijf_uitvoer(met_meldingen, tmp_path, RUNDATUM)
+
+    assert list(tmp_path.glob("dq_*.gpkg")) == []
+    assert list(tmp_path.glob("dq_*.gpkg.tmp")) == []
+    tweede = (tmp_path / FILE_CHECKS_JSON).read_text(encoding="utf-8")
+    assert tweede != eerste
+    assert json.loads(tweede)["aantal_meldingen"] > 0
