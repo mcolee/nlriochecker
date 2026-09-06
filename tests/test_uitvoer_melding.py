@@ -176,6 +176,48 @@ def test_cluster_id_komt_mee_uit_de_netwerkchecks() -> None:
     assert meldingen[0].cluster_id.startswith("ds-")
 
 
+# Issue #149: de xy-zijmap. De vier schrijvers (CSV, JSON, en de meldingentabel en de
+# stapeling van de GeoPackage) lazen elk `foutlocatie.x`/`.y` per melding; één
+# gevectoriseerde `shapely.get_coordinates` levert dezelfde coordinaten in een fractie
+# van de tijd. Net als `feiten` een zijmap op `Meldingenstroom`, geen veld op `Melding`.
+
+
+def test_bouw_xy_geeft_dezelfde_coordinaten_als_point_x_y() -> None:
+    """De gevectoriseerde coordinaat is byte-gelijk aan de losse `foutlocatie.x`/`.y`.
+
+    Een melding zonder foutlocatie staat niet in de zijmap; de schrijvers vallen daar op
+    `None` terug, net als voorheen. De waarde is een Python-`float` en geen `numpy`-float,
+    anders verschuift de X/Y-tekst in de CSV.
+    """
+    from shapely.geometry import Point
+
+    from helpers_melding import melding
+    from nlriochecker.uitvoer.melding import bouw_xy
+
+    punt = Point(229981.98, 500123.45)
+    met_plek = melding(melding_id="a", foutlocatie=punt)
+    zonder_plek = melding(melding_id="b", foutlocatie=None)
+
+    xy = bouw_xy([met_plek, zonder_plek])
+
+    assert xy == {"a": (punt.x, punt.y)}
+    assert type(xy["a"][0]) is float
+    assert type(xy["a"][1]) is float
+
+
+def test_de_meldingenstroom_draagt_de_xy_zijmap() -> None:
+    """`Meldingenstroom.xy` dekt precies de meldingen met een plek op de kaart."""
+    stroom = bouw_meldingenstroom(_run("top011_hartlijnkruising.ttl", "TOP-011"), RUNDATUM)
+
+    gelokaliseerd = [melding for melding in stroom.meldingen if melding.foutlocatie is not None]
+    assert gelokaliseerd
+    for melding in gelokaliseerd:
+        assert stroom.xy[melding.melding_id] == (melding.foutlocatie.x, melding.foutlocatie.y)
+    for melding in stroom.meldingen:
+        if melding.foutlocatie is None:
+            assert melding.melding_id not in stroom.xy
+
+
 # Issue #122: het feitenkanaal naast de meldingenstroom. Een check declareert met
 # `feit_sleutels` welke detailsleutels de uitvoer mag lezen; ze reizen in een zijmap
 # `melding_id -> feiten` en niet in een veld op `Melding` -- dat zou reflectief in de

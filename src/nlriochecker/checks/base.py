@@ -120,6 +120,7 @@ CACHE_VOORVOEGSELS: dict[str, tuple[str, ...]] = {
     "hulpstukken": ("nlriochecker.checks.hulpstukken",),
     "net004": ("nlriochecker.checks.netwerk",),
     "net006": ("nlriochecker.checks.netwerk",),
+    "omvang": ("nlriochecker.uitvoer.omvang",),
     "onbereikbaar": ("nlriochecker.checks.netwerk",),
     "rvz": ("nlriochecker.checks.randvoorzieningen",),
     "sel": ("nlriochecker.checks.selectie",),

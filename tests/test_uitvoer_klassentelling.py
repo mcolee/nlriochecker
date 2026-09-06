@@ -161,6 +161,13 @@ class TestKlassenOpNul:
         signaal = next(s for s in klassen_op_nul(_run(tmp_path, {"Gemaal"})) if s.label == "Gemaal")
         assert "NET-001" in signaal.boodschap
 
+    def test_klassen_op_nul_wordt_een_keer_berekend(self, tmp_path: Path) -> None:
+        """De twee lezers -- `_signaalmeldingen` en `_afhankelijkheden_section` -- delen
+        één berekening via de contextcache (issue #149). Een tweede aanroep op dezelfde
+        run levert per constructie hetzelfde object terug; zonder cache waren het twee."""
+        run = _run(tmp_path, set())
+        assert klassen_op_nul(run) is klassen_op_nul(run)
+
     def test_een_lege_indicatorrol_geeft_geen_signaal(self, tmp_path: Path) -> None:
         """`pompunits` is voor EXT-009 een uitzonderingsindicator, geen toetspopulatie.
 

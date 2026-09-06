@@ -20,7 +20,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import pandas as pd
-from gwsw_orox_helpers.dataset import GwswDataset
 
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
@@ -254,21 +253,63 @@ def _rollen(config: CheckConfig) -> list[_Rol]:
     return speciaal + gedeclareerd
 
 
-def _aantal_klasse(dataset: GwswDataset, klasse: str, via_onderdeel: bool) -> int:
+def _type_index(run: CheckRun) -> dict[str, set[str]]:
+    """Per type-URI de knopen en strengen die dat type dragen, één keer per run gebouwd.
+
+    De rollentelling en de nul-bewaking vroegen elke klasse los via `of_class` op, en
+    `of_class` loopt telkens over alle knopen en strengen (issue #149). Op De Wolden en
+    Hoogeveen zijn dat tientallen doorlopen; deze index doet die doorloop één keer en
+    wordt daarna via de contextcache hergebruikt. `types_of` levert voor een knoop de
+    typen van het object plus die van zijn orientatie, precies zoals `of_class` leest.
+    """
+
+    def bouw() -> dict[str, set[str]]:
+        """Vult de index in één doorloop over alle knopen en strengen."""
+        index: defaultdict[str, set[str]] = defaultdict(set)
+        dataset = run.dataset
+        for uri in (*dataset.nodes, *dataset.conduits):
+            for soort in dataset.types_of(uri):
+                index[soort].add(uri)
+        return index
+
+    return run.context.cached("omvang:type-index", bouw)
+
+
+def _of_class(run: CheckRun, klasse: str) -> set[str]:
+    """De knopen en strengen van deze klasse, uit de type-index in plaats van `of_class`.
+
+    Dezelfde verzameling als `dataset.of_class`, maar zonder de doorloop over alle
+    objecten: de afsluiting van de klasse wordt tegen de index gehouden. De poort van
+    `of_class` blijft: een verbindingsklasse kan nooit een treffer geven en is als rol
+    een harde fout, dus die valt hier op dezelfde `InhoudError` (via `of_class` zelf).
+    """
+    dataset = run.dataset
+    if dataset.is_connection_class(klasse):
+        return set(dataset.of_class(klasse))  # verbindingsklasse: dezelfde InhoudError-poort
+    index = _type_index(run)
+    uris: set[str] = set()
+    for soort in dataset.closure(klasse):
+        uris |= index.get(soort, set())
+    return uris
+
+
+def _aantal_klasse(run: CheckRun, klasse: str, via_onderdeel: bool) -> int:
     """Hoeveel objecten van deze klasse de bijbehorende check ziet."""
     if via_onderdeel:
-        return len({str(subject) for subject in dataset.subjects_of_class(klasse)})
-    return len(dataset.of_class(klasse))
+        return len({str(subject) for subject in run.dataset.subjects_of_class(klasse)})
+    return len(_of_class(run, klasse))
 
 
-def _aantal_rol(dataset: GwswDataset, rol: _Rol) -> int:
+def _aantal_rol(run: CheckRun, rol: _Rol) -> int:
     """Hoeveel objecten deze rol samen telt, ontdubbeld over haar klassen."""
     if rol.via_onderdeel:
         uris = {
-            str(subject) for klasse in rol.klassen for subject in dataset.subjects_of_class(klasse)
+            str(subject)
+            for klasse in rol.klassen
+            for subject in run.dataset.subjects_of_class(klasse)
         }
     else:
-        uris = {uri for klasse in rol.klassen for uri in dataset.of_class(klasse)}
+        uris = {uri for klasse in rol.klassen for uri in _of_class(run, klasse)}
     return len(uris)
 
 
@@ -281,12 +322,11 @@ def klassentelling(run: CheckRun) -> pd.DataFrame:
     van de rapportage.
     """
     config = run.config
-    dataset = run.dataset
     rijen = [
         {
             "Rol": rol.label,
             "Klassen": ", ".join(rol.klassen),
-            "Aantal": _aantal_rol(dataset, rol),
+            "Aantal": _aantal_rol(run, rol),
         }
         for rol in _rollen(config)
     ]
@@ -301,9 +341,8 @@ def eindpunttelling(run: CheckRun) -> pd.DataFrame:
     een getal boven nul toont, kan dat noodverband weg. Zie issue #22.
     """
     config = run.config
-    dataset = run.dataset
     rijen = [
-        {"Klasse": klasse, "Aantal": _aantal_klasse(dataset, klasse, False)}
+        {"Klasse": klasse, "Aantal": _aantal_klasse(run, klasse, False)}
         for klasse in config.klassen.afvoer_eindpunt
     ]
     return pd.DataFrame(rijen, columns=EINDPUNT_KOLOMMEN)
@@ -332,9 +371,17 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
 
     De rollen in `INDICATORROLLEN` blijven erbuiten: daar zegt nul niet dat een check niets
     te beoordelen heeft maar dat een uitzondering nooit afgaat.
+
+    Twee lezers vragen dit op -- `_signaalmeldingen` (de systemische waarschuwing) en
+    `_afhankelijkheden_section` (de rapportkop) -- en ze delen één berekening via de
+    contextcache (issue #149), zodat de rollen niet twee keer geteld worden.
     """
-    dataset = run.dataset
-    if not dataset.klassenhierarchie_bekend:
+    return run.context.cached("omvang:klassen-op-nul", lambda: _bouw_klassen_op_nul(run))
+
+
+def _bouw_klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
+    """De nul-signalen zelf; `klassen_op_nul` cachet de uitkomst per run."""
+    if not run.dataset.klassenhierarchie_bekend:
         return []
     signalen: list[NulSignaal] = []
     for rol in _rollen(run.config):
@@ -344,9 +391,9 @@ def klassen_op_nul(run: CheckRun) -> list[NulSignaal]:
             signalen += [
                 NulSignaal(klasse, _per_klasse_boodschap(klasse, rol))
                 for klasse in rol.klassen
-                if _aantal_klasse(dataset, klasse, rol.via_onderdeel) == 0
+                if _aantal_klasse(run, klasse, rol.via_onderdeel) == 0
             ]
-        elif _aantal_rol(dataset, rol) == 0:
+        elif _aantal_rol(run, rol) == 0:
             signalen.append(NulSignaal(rol.label, _rol_boodschap(rol)))
     return signalen
 

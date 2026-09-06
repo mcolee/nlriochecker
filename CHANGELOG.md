@@ -53,6 +53,23 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De uitvoerfase van een gemeentebrede run is sneller** (issue #149). De rapportkop telde elke
+  rol via `dataset.of_class`, en `of_class` loopt telkens over alle knopen en strengen -- op De
+  Wolden en Hoogeveen met `configs/dewoldenhoogeveen.toml` ruim 140 doorlopen. `uitvoer/omvang.py`
+  bouwt die telling nu op één type-index (`omvang:type-index` in de contextcache) en berekent
+  `klassen_op_nul` nog maar één keer (`omvang:klassen-op-nul`), gedeeld door de twee lezers
+  (`_signaalmeldingen` en `_afhankelijkheden_section`); de kop wordt daarmee O(objecten) in plaats
+  van O(objecten × klassen). Daarnaast lazen de vier archiefschrijvers (CSV, JSON, en de
+  meldingentabel en de stapeling van de GeoPackage) elk `foutlocatie.x`/`.y` per melding; die
+  coordinaten komen nu uit één gevectoriseerde `shapely.get_coordinates` in de zijmap
+  `Meldingenstroom.xy` (net als `feiten`, geen veld op `Melding`, geen schema-bump). Gepaard
+  gemeten (n=3, aparte processen) op de gemeentebrede run: de Markdown-kop 3,5 s → 0,8-1,1 s en
+  de meldingenstroom 4,8 s → 4,5-4,75 s (dun maar eenduidig -- de type-index versnelt vooral de
+  kop). De xy-winst zit in de schrijvers en wordt door dat gepaard-harnas niet geïsoleerd; een
+  aparte techniek-micro over 161k punten meet 4×`foutlocatie.x`/`.y` ~5,5-7,3 s tegen één
+  `shapely.get_coordinates` ~0,2-0,3 s. De uitvoer is byte-identiek: `bevindingen.csv` en
+  `.json` zijn sha256- respectievelijk cmp-gelijk aan een run op de vorige codestand.
+
 - **De uitvoerarchieven worden atomair geschreven en de JSON streamt** (issue #148). `schrijf_csv`,
   `schrijf_json` (`uitvoer/herkomst.py`) en `schrijf_geopackage` (`uitvoer/gpkg.py`) schrijven
   eerst naar een tmp-bestand naast het doel en hernoemen dat met `os.replace` pas als het

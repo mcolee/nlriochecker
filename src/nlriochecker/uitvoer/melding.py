@@ -16,6 +16,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date
 
+import shapely
 from shapely.geometry import Point
 
 from nlriochecker.checkconfig import CheckConfig
@@ -65,6 +66,31 @@ SLEUTEL_CLUSTER = "cluster_id"
 # is een schemabesluit. Deze map wordt nergens geserialiseerd: alleen de
 # GeoPackage-schrijver leest haar.
 Feiten = dict[str, dict[str, str]]
+
+# De xy-zijmap naast `feiten` (issue #149): per melding-ID de foutlocatie als (x, y).
+# Om dezelfde reden een zijmap en geen veld op `Melding`. De vier schrijvers (CSV, JSON,
+# en de meldingentabel en de stapeling van de GeoPackage) lazen elk `foutlocatie.x`/`.y`
+# per melding -- acht GEOS-aanroepen per melding; deze map wordt in één gevectoriseerde
+# `shapely.get_coordinates` gevuld en door alle vier gelezen.
+Coordinaten = dict[str, tuple[float, float]]
+
+
+def bouw_xy(meldingen: list[Melding]) -> Coordinaten:
+    """Per melding-ID de foutlocatie als (x, y), in één gevectoriseerde doorloop.
+
+    Een melding zonder foutlocatie staat niet in de map; de schrijvers vallen daar op
+    `None` terug, net als bij de losse `foutlocatie.x`/`.y`. De coordinaten worden naar
+    Python-`float` gebracht, zodat de X/Y-tekst in de CSV en de `foutlocatie` in de JSON
+    byte-gelijk blijven aan de losse property-aanroep. `return_index` houdt elke rij bij
+    haar melding, ook mocht een punt ooit leeg zijn (dan levert het geen rij en valt het
+    net als voorheen buiten de map).
+    """
+    punten = [melding.foutlocatie for melding in meldingen if melding.foutlocatie is not None]
+    if not punten:
+        return {}
+    ids = [melding.melding_id for melding in meldingen if melding.foutlocatie is not None]
+    coords, index = shapely.get_coordinates(punten, return_index=True)
+    return {ids[i]: (float(x), float(y)) for (x, y), i in zip(coords, index, strict=True)}
 
 
 @dataclass(frozen=True)
@@ -211,6 +237,10 @@ class Meldingenstroom:
     # voor de checks met `feit_sleutels`; hij loopt gelijk op met `meldingen`, dus wat
     # de onderdrukking wegliet laat ook geen feit achter.
     feiten: Feiten = field(default_factory=dict)
+    # Per melding-ID de foutlocatie als (x, y) (issue #149). Eén keer gevectoriseerd
+    # gebouwd over de meldingen die de schrijvers werkelijk zien; de vier schrijvers
+    # lezen hem in plaats van elk `foutlocatie.x`/`.y` per melding op te vragen.
+    xy: Coordinaten = field(default_factory=dict)
     # De geaccepteerde bevindingen (issue #132). Ze blijven in `meldingen` staan; dit
     # blok telt ze apart en draagt de twee luide lijsten. Berekend na de onderdrukking,
     # dus over de meldingen die de schrijvers werkelijk zien.
@@ -274,6 +304,7 @@ def _onderdruk(meldingen: list[Melding], feiten: Feiten, run: CheckRun) -> Meldi
             for melding in over
             if melding.melding_id in feiten
         },
+        bouw_xy(over),
         _uitzonderingen(over, run),
     )
 

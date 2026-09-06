@@ -50,7 +50,7 @@ from nlriochecker.uitvoer.bevindingen import (
 )
 from nlriochecker.uitvoer.gpkg import CATEGORIEEN, MELDING_KOLOMMEN, MELDING_VELD_NAAR_KOLOM
 from nlriochecker.uitvoer.herkomst import KOLOM_GEREEDSCHAP
-from nlriochecker.uitvoer.melding import Melding, Meldingenstroom, bouw_meldingenstroom
+from nlriochecker.uitvoer.melding import Melding, Meldingenstroom, bouw_meldingenstroom, bouw_xy
 from nlriochecker.uitvoer.objectkaart import (
     STATUS_GRIJS,
     STATUS_GROEN,
@@ -139,7 +139,9 @@ def _stroom_met_alle_velden(run: CheckRun) -> Meldingenstroom:
     meldingen[doel] = replace(
         meldingen[doel], drempel="0.10", gebied="Testgebied", foutlocatie=ONRONDE_LOCATIE
     )
-    return Meldingenstroom(meldingen, stroom.onderdrukking, stroom.feiten)
+    # De xy-zijmap moet bij de gewijzigde meldingen horen (issue #149): de onronde plek
+    # is net op één melding gezet, dus de gecachete zijmap opnieuw bouwen.
+    return Meldingenstroom(meldingen, stroom.onderdrukking, stroom.feiten, bouw_xy(meldingen))
 
 
 @pytest.fixture(scope="module")

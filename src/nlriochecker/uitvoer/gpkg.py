@@ -60,10 +60,12 @@ from nlriochecker.uitvoer.melding import (
     BRON_REGISTER,
     GEEN_ONDERDRUKKING,
     GEEN_UITZONDERINGEN,
+    Coordinaten,
     Feiten,
     Melding,
     Onderdrukking,
     Uitzonderingen,
+    bouw_xy,
     categorie_van,
 )
 from nlriochecker.uitvoer.objectkaart import (
@@ -199,6 +201,7 @@ def schrijf_geopackage(
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
     uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
     feiten: Feiten | None = None,
+    xy: Coordinaten | None = None,
 ) -> Path:
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
 
@@ -224,6 +227,11 @@ def schrijf_geopackage(
     melding-ID's bepalen welke objecten de status `geaccepteerd` krijgen, en de drie
     tellingen komen in `gwsw_run`. De melding zelf blijft in `meldingen` en dus in de
     meldingentabel staan.
+
+    `xy` is de zijmap van de foutlocaties uit dezelfde stroom (issue #149): de kolommen
+    `x`/`y` en de stapeling van de meldingentabel lezen hem in plaats van elk
+    `foutlocatie.x`/`.y` per melding. Geeft de aanroeper er geen mee, dan bouwt de
+    meldingenschrijver hem zelf over dezelfde meldingen.
     """
     output_dir = prepare(output_dir)
     doel = _doelpad(run, output_dir, run_datum)
@@ -255,7 +263,7 @@ def schrijf_geopackage(
             onderdrukking,
             uitzonderingen,
         )
-        _schrijf_meldingen(verbinding, meldingen)
+        _schrijf_meldingen(verbinding, meldingen, xy)
         voortgang.stap(label="meldingen")
         _schrijf_overzicht(verbinding, run, meldingen)
         voortgang.stap(label="overzicht_checks")
@@ -1688,20 +1696,21 @@ MELDING_VELD_NAAR_KOLOM: dict[str, tuple[str, ...]] = {
 }
 
 
-def _stapels(meldingen: list[Melding]) -> dict[str, tuple[int, int]]:
+def _stapels(meldingen: list[Melding], xy: Coordinaten) -> dict[str, tuple[int, int]]:
     """Per melding het aantal meldingen op haar plek en haar volgnummer daarin.
 
     De volgorde is die van de melding-ID en niet die van de lijst, zodat twee runs
     over dezelfde data dezelfde nummering opleveren en het kaartbeeld niet
-    verspringt.
+    verspringt. De coordinaat komt uit de zijmap `xy` (issue #149).
     """
     per_plek: dict[tuple[int, int], list[str]] = defaultdict(list)
     for melding in sorted(meldingen, key=lambda m: m.melding_id):
-        if melding.foutlocatie is None:
+        plek = xy.get(melding.melding_id)
+        if plek is None:
             continue
         sleutel = (
-            round(melding.foutlocatie.x / STAPEL_RASTER_M),
-            round(melding.foutlocatie.y / STAPEL_RASTER_M),
+            round(plek[0] / STAPEL_RASTER_M),
+            round(plek[1] / STAPEL_RASTER_M),
         )
         per_plek[sleutel].append(melding.melding_id)
 
@@ -1712,8 +1721,12 @@ def _stapels(meldingen: list[Melding]) -> dict[str, tuple[int, int]]:
     }
 
 
-def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
-    """Een melding als rij, in de volgorde van MELDING_KOLOMMEN."""
+def _melding_rij(melding: Melding, stapel: tuple[int, int], xy: Coordinaten) -> tuple:
+    """Een melding als rij, in de volgorde van MELDING_KOLOMMEN.
+
+    De kolommen `x`/`y` komen uit de zijmap `xy` (issue #149).
+    """
+    plek = xy.get(melding.melding_id)
     return (
         melding.melding_id,
         melding.object_id,
@@ -1739,33 +1752,41 @@ def _melding_rij(melding: Melding, stapel: tuple[int, int]) -> tuple:
         melding.object2_uri,
         stapel[0],
         stapel[1],
-        melding.foutlocatie.x if melding.foutlocatie is not None else None,
-        melding.foutlocatie.y if melding.foutlocatie is not None else None,
+        plek[0] if plek is not None else None,
+        plek[1] if plek is not None else None,
         ", ".join(melding.cfk),
         melding.boodschap_technisch,
     )
 
 
-def _schrijf_meldingen(verbinding: sqlite3.Connection, meldingen: list[Melding]) -> None:
+def _schrijf_meldingen(
+    verbinding: sqlite3.Connection, meldingen: list[Melding], xy: Coordinaten | None = None
+) -> None:
     """Schrijft de meldingentabel: het volledige register, zonder geometrie.
 
     De kolommen `x` en `y` dragen de foutlocatie. Sinds de laag `meldinglocaties`
     verviel (issue #13) staat de exacte plek van een melding -- het snijpunt van een
     kruising, het midden van een streng -- alleen nog hier; wie hem als punten wil,
-    bouwt er in QGIS een geometriegenerator of een puntenlaag van.
+    bouwt er in QGIS een geometriegenerator of een puntenlaag van. De coordinaten komen
+    uit de zijmap `xy` (issue #149); geeft de aanroeper er geen mee, dan bouwt deze
+    functie hem zelf over dezelfde meldingen.
     """
+    coordinaten = bouw_xy(meldingen) if xy is None else xy
     _maak_attribuuttabel(
         verbinding,
         "meldingen",
         MELDING_KOLOMMEN,
         "Alle meldingen van deze run, koppelbaar op feature_id; x/y is de foutlocatie.",
     )
-    stapels = _stapels(meldingen)
+    stapels = _stapels(meldingen, coordinaten)
     velden = ", ".join(f'"{kolom.naam}"' for kolom in MELDING_KOLOMMEN)
     plaatshouders = ", ".join("?" * len(MELDING_KOLOMMEN))
     verbinding.executemany(
         f"insert into meldingen ({velden}) values ({plaatshouders})",
-        [_melding_rij(melding, stapels.get(melding.melding_id, (1, 1))) for melding in meldingen],
+        [
+            _melding_rij(melding, stapels.get(melding.melding_id, (1, 1)), coordinaten)
+            for melding in meldingen
+        ],
     )
 
 

@@ -31,10 +31,12 @@ from nlriochecker.uitvoer.melding import (
     BRON_REGISTER,
     GEEN_ONDERDRUKKING,
     GEEN_UITZONDERINGEN,
+    Coordinaten,
     Melding,
     Onderdrukking,
     Uitzonderingen,
     bouw_meldingenstroom,
+    bouw_xy,
 )
 from nlriochecker.uitvoer.omvang import (
     eindpunttelling,
@@ -151,6 +153,7 @@ def write_check_report(
     met_csv: bool = True,
     onderdrukking: Onderdrukking = GEEN_ONDERDRUKKING,
     uitzonderingen: Uitzonderingen = GEEN_UITZONDERINGEN,
+    xy: Coordinaten | None = None,
 ) -> tuple[Path, Path | None]:
     """Schrijft de bevindingen van de check-engine als Markdown en CSV.
 
@@ -183,6 +186,7 @@ def write_check_report(
         meldingen = stroom.meldingen
         onderdrukking = stroom.onderdrukking
         uitzonderingen = stroom.uitzonderingen
+        xy = stroom.xy
 
     markdown_path = schrijf_markdown(
         Path(output_dir) / FILE_CHECKS_MARKDOWN,
@@ -193,7 +197,7 @@ def write_check_report(
     )
 
     csv_path = (
-        schrijf_csv(meldingen_tabel(meldingen), Path(output_dir) / FILE_CHECKS_CSV)
+        schrijf_csv(meldingen_tabel(meldingen, xy), Path(output_dir) / FILE_CHECKS_CSV)
         if met_csv
         else None
     )
@@ -201,7 +205,9 @@ def write_check_report(
     return markdown_path, csv_path
 
 
-def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
+def meldingen_json(
+    meldingen: list[Melding], xy: Coordinaten | None = None
+) -> list[dict[str, object]]:
     """Zet de meldingen om in JSON-klare rijen met dezelfde veldnamen als de dataclass.
 
     De veldnamen komen uit `fields(Melding)` en niet uit een lijst met de hand: die
@@ -215,15 +221,19 @@ def meldingen_json(meldingen: list[Melding]) -> list[dict[str, object]]:
 
     Twee velden worden omgezet. `foutlocatie` wordt `[x, y]` in EPSG:28992, want een
     shapely `Point` is niet serialiseerbaar; er wordt niet geherprojecteerd, net als
-    in de rest van de uitvoer. `cfk` wordt een lijst: de JSON-schrijver maakt van een
-    tuple ook een array, maar dan spreekt de code het contract niet uit.
+    in de rest van de uitvoer. De coordinaten komen uit de zijmap `xy` (issue #149) --
+    één gevectoriseerde doorloop in plaats van `foutlocatie.x`/`.y` per melding. Geeft de
+    beller er geen mee, dan bouwt deze functie hem zelf over dezelfde meldingen. `cfk`
+    wordt een lijst: de JSON-schrijver maakt van een tuple ook een array, maar dan
+    spreekt de code het contract niet uit.
     """
+    coordinaten = bouw_xy(meldingen) if xy is None else xy
     namen = [veld.name for veld in fields(Melding)]
     rijen: list[dict[str, object]] = []
     for melding in meldingen:
         rij: dict[str, object] = {naam: getattr(melding, naam) for naam in namen}
-        punt = melding.foutlocatie
-        rij["foutlocatie"] = None if punt is None else [punt.x, punt.y]
+        plek = coordinaten.get(melding.melding_id)
+        rij["foutlocatie"] = None if plek is None else [plek[0], plek[1]]
         rij["cfk"] = list(melding.cfk)
         rijen.append(rij)
     return rijen
@@ -248,40 +258,48 @@ def checks_json(run: CheckRun) -> list[dict[str, object]]:
     ]
 
 
-def meldingen_tabel(meldingen: list[Melding]) -> pd.DataFrame:
-    """Zet de meldingen in de archieftabel."""
-    rows = [
-        {
-            "Check": melding.check_id,
-            "Ernst": melding.ernst,
-            "Dimensie": melding.dimensie,
-            "Label": melding.object_label,
-            "Object": melding.object_id,
-            "Melding": melding.boodschap,
-            "TyperingBetrouwbaar": melding.typering_betrouwbaar,
-            "X": melding.foutlocatie.x if melding.foutlocatie is not None else None,
-            "Y": melding.foutlocatie.y if melding.foutlocatie is not None else None,
-            "MeldingID": melding.melding_id,
-            "Categorie": melding.categorie,
-            "Bron": melding.bron,
-            "Object2Label": melding.object2_label,
-            "Object2": melding.object2_id,
-            "Waarde": melding.waarde,
-            "Drempel": melding.drempel,
-            "ClusterID": melding.cluster_id,
-            "Scope": melding.scope,
-            "Gebied": melding.gebied,
-            "Prioriteit": melding.prioriteit,
-            "Systemisch": melding.systemisch,
-            "RunDatum": melding.run_datum,
-            "Dataset": melding.dataset,
-            "ObjectURI": melding.object_uri,
-            "Object2URI": melding.object2_uri,
-            "CFK": ", ".join(melding.cfk),
-            "MeldingTechnisch": melding.boodschap_technisch,
-        }
-        for melding in meldingen
-    ]
+def meldingen_tabel(meldingen: list[Melding], xy: Coordinaten | None = None) -> pd.DataFrame:
+    """Zet de meldingen in de archieftabel.
+
+    De kolommen X en Y komen uit de zijmap `xy` (issue #149): één gevectoriseerde
+    doorloop in plaats van `foutlocatie.x`/`.y` per melding. Geeft de beller er geen mee,
+    dan bouwt deze functie hem zelf over dezelfde meldingen.
+    """
+    coordinaten = bouw_xy(meldingen) if xy is None else xy
+    rows = []
+    for melding in meldingen:
+        plek = coordinaten.get(melding.melding_id)
+        rows.append(
+            {
+                "Check": melding.check_id,
+                "Ernst": melding.ernst,
+                "Dimensie": melding.dimensie,
+                "Label": melding.object_label,
+                "Object": melding.object_id,
+                "Melding": melding.boodschap,
+                "TyperingBetrouwbaar": melding.typering_betrouwbaar,
+                "X": plek[0] if plek is not None else None,
+                "Y": plek[1] if plek is not None else None,
+                "MeldingID": melding.melding_id,
+                "Categorie": melding.categorie,
+                "Bron": melding.bron,
+                "Object2Label": melding.object2_label,
+                "Object2": melding.object2_id,
+                "Waarde": melding.waarde,
+                "Drempel": melding.drempel,
+                "ClusterID": melding.cluster_id,
+                "Scope": melding.scope,
+                "Gebied": melding.gebied,
+                "Prioriteit": melding.prioriteit,
+                "Systemisch": melding.systemisch,
+                "RunDatum": melding.run_datum,
+                "Dataset": melding.dataset,
+                "ObjectURI": melding.object_uri,
+                "Object2URI": melding.object2_uri,
+                "CFK": ", ".join(melding.cfk),
+                "MeldingTechnisch": melding.boodschap_technisch,
+            }
+        )
     return pd.DataFrame(rows, columns=CSV_KOLOMMEN)
 
 

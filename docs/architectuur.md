@@ -153,6 +153,25 @@ alleen het bestand waarin zij staat is verhuisd.
   hebben in `gpkg.py` een luide bewaking naast die op het trefferregister en die op de
   deelstelsel-ID's: draagt zo'n melding geen rij in de zijmap, dan faalt het in plaats van
   stil een lege popupregel of een lege kolom te schrijven.
+- **De xy-zijmap naast `feiten`** (issue #149). De vier archiefschrijvers -- de CSV
+  (`meldingen_tabel`), de JSON (`meldingen_json`), en de meldingentabel (`_melding_rij`) en de
+  stapeling (`_stapels`) van de GeoPackage -- lazen elk `foutlocatie.x`/`.y` per melding, acht
+  GEOS-aanroepen per melding. `Meldingenstroom.xy` (`melding_id -> (x, y)`) draagt die
+  coordinaten nu uit één gevectoriseerde `shapely.get_coordinates` over de meldingen die de
+  schrijvers werkelijk zien; om dezelfde reden als `feiten` een zijmap en geen veld op `Melding`
+  (dat zou reflectief in de bevroren JSON-envelop landen). De waarden worden naar Python-`float`
+  gebracht zodat de X/Y-tekst byte-gelijk blijft aan de losse property-aanroep. Een melding
+  zonder foutlocatie staat niet in de map; de schrijvers vallen daar op `None` terug. De
+  schrijvers nemen `xy` optioneel aan en bouwen hem zelf over hun meldingen als hij ontbreekt,
+  zodat een directe aanroep buiten `schrijf_uitvoer` om blijft werken.
+- **De rollentelling van de rapportkop leunt op een type-index** (issue #149). `uitvoer/omvang.py`
+  telde elke rol via `dataset.of_class`, en `of_class` loopt telkens over alle knopen en strengen.
+  De telling gaat nu over één index type-URI → knopen/strengen (`omvang:type-index` in de
+  contextcache, één doorloop over `types_of`), met dezelfde `InhoudError`-poort voor een
+  verbindingsklasse; en `klassen_op_nul` wordt nog maar één keer berekend
+  (`omvang:klassen-op-nul`), gedeeld door `_signaalmeldingen` (de systemische waarschuwing) en
+  `_afhankelijkheden_section` (de rapportkop). De twee cachesleutels dragen het voorvoegsel
+  `omvang`, dat in `CACHE_VOORVOEGSELS` (`checks/base.py`) bij `uitvoer/omvang.py` hoort.
 - Het bevindingenrapport van `toets` leest van gebied naar detail: gebiedsnaam als
   titel, aantallen (objecttype x stelseltype over de kern, leidingen ook in meters),
   managementsamenvatting (een regel per CFK plus de eigen checks; vinkje = nul fouten),

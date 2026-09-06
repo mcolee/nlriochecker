@@ -46,6 +46,7 @@ from nlriochecker.uitvoer.melding import (
     Onderdrukking,
     Uitzonderingen,
     bouw_meldingenstroom,
+    bouw_xy,
 )
 from nlriochecker.uitvoer.synthese import GebiedsSamenvatting, totaalsynthese
 from nlriochecker.uitvoer.tabel import prepare
@@ -121,6 +122,7 @@ def schrijf_uitvoer(
         met_csv=met_csv,
         onderdrukking=stroom.onderdrukking,
         uitzonderingen=stroom.uitzonderingen,
+        xy=stroom.xy,
     )
     # De JSON komt vóór de GeoPackage: beide schrijven nu atomair via een tmp-bestand
     # (issue #148), en de GeoPackage is de zwaarste en meest foutgevoelige van de twee. Zo
@@ -130,7 +132,7 @@ def schrijf_uitvoer(
     json_pad = (
         schrijf_json(
             Path(output_dir) / FILE_CHECKS_JSON,
-            meldingen_json(meldingen),
+            meldingen_json(meldingen, stroom.xy),
             run_datum=run_datum,
             dataset=run.dataset.source.name,
             cfk_set=list(run.meetbereik.gekozen),
@@ -155,6 +157,7 @@ def schrijf_uitvoer(
             onderdrukking=stroom.onderdrukking,
             uitzonderingen=stroom.uitzonderingen,
             feiten=stroom.feiten,
+            xy=stroom.xy,
         )
         if met_geopackage
         else None
@@ -269,6 +272,10 @@ def _schrijf_totaal(
         for melding in deel.meldingen:
             uniek.setdefault(melding.melding_id, melding)
     unieke = list(uniek.values())
+    # De unieke meldingen komen uit meerdere gebiedsstromen; hun foutlocaties in één
+    # gevectoriseerde doorloop, zodat de CSV en de JSON van `totaal/` dezelfde winst
+    # krijgen als een gebiedsrapport (issue #149).
+    xy_uniek = bouw_xy(unieke)
     uitzonderingen = _som_uitzonderingen(verzameld, eerste.config.rapport)
 
     synthese = schrijf_markdown(
@@ -288,11 +295,13 @@ def _schrijf_totaal(
         run_datum,
         markering=markering(eerste),
     )
-    totaal_csv = schrijf_csv(meldingen_tabel(unieke), doel / FILE_CHECKS_CSV) if met_csv else None
+    totaal_csv = (
+        schrijf_csv(meldingen_tabel(unieke, xy_uniek), doel / FILE_CHECKS_CSV) if met_csv else None
+    )
     totaal_json = (
         schrijf_json(
             doel / FILE_CHECKS_JSON,
-            meldingen_json(unieke),
+            meldingen_json(unieke, xy_uniek),
             run_datum=run_datum,
             dataset=eerste.dataset.source.name,
             cfk_set=list(eerste.meetbereik.gekozen),
