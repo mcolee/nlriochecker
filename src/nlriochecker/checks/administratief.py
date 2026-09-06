@@ -15,9 +15,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date
 
-from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node, part_holders_of, parts_of
-from gwsw_orox_helpers.namen import termen_voor
-from rdflib import URIRef
+from gwsw_orox_helpers.dataset import Conduit, Node
 
 from nlriochecker.checks.base import (
     Check,
@@ -30,16 +28,6 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import leidingen, lozeleidingen, netwerkknopen
 from nlriochecker.checks.verbanden import aansluitingen
 from nlriochecker.taal import getal, vorm
-
-
-def _has_connection(dataset: GwswDataset) -> URIRef:
-    """Het `hasConnection`-predicaat in de basis van deze export.
-
-    Uit `dataset.gwsw_versie.basis`, zodat ADM-008 op een 1.7-export niet stil nul buren
-    ziet en elk compartiment onverbonden noemt (issue #139). Voorlopig een privé-helper;
-    #159 vervangt hem door de graafvraag `buren` uit de leeslaag.
-    """
-    return URIRef(termen_voor(dataset.gwsw_versie.basis).has_connection)
 
 
 @register
@@ -264,7 +252,7 @@ class PuttypePastNietBijLeiding(Check):
         index = aansluitingen(context)
 
         for regel in context.config.puttyperegels:
-            for uri in dataset.of_class(regel.puttype):
+            for uri in context.knopen_van(regel.puttype):
                 node = dataset.nodes.get(uri)
                 if node is None:
                     continue
@@ -286,8 +274,8 @@ class PuttypePastNietBijLeiding(Check):
         for conduit in index.strengen(node.uri):
             if any(dataset.is_a(conduit.uri, wortel) for wortel in regel.vereist_een_van):
                 return True
-        for deel in dataset.onderdelen(node.uri):
-            if any(dataset.graph_is_a(deel, wortel) for wortel in regel.vereist_een_van):
+        for deel in context.onderdelen_van(node.uri):
+            if any(context.is_van_klasse(deel, wortel) for wortel in regel.vereist_een_van):
                 return True
         return False
 
@@ -315,7 +303,7 @@ class PuttypePastNietBijLeiding(Check):
             {
                 uri
                 for regel in context.config.puttyperegels
-                for uri in dataset.of_class(regel.puttype)
+                for uri in context.knopen_van(regel.puttype)
                 if uri in dataset.nodes
             }
         )
@@ -363,7 +351,7 @@ class PutonderdelenZonderVerbinding(Check):
         """De compartimenten van een put, als URI's."""
         dataset = context.dataset
         gevonden = []
-        for uri in dataset.onderdelen(node.uri):
+        for uri in context.onderdelen_van(node.uri):
             if uri in dataset.nodes and dataset.nodes[uri].orientation is not None:
                 gevonden.append(uri)
         return gevonden
@@ -371,39 +359,29 @@ class PutonderdelenZonderVerbinding(Check):
     def _verbonden(self, context: CheckContext, onderdelen: list[str]) -> bool:
         """Geeft aan of er tussen deze onderdelen een verbinding geregistreerd is."""
         dataset = context.dataset
-        has_connection = _has_connection(dataset)
         orientaties = {
             orientatie
             for uri in onderdelen
             if uri in dataset.nodes and (orientatie := dataset.nodes[uri].orientation) is not None
         }
         for orientatie in orientaties:
-            subject = URIRef(orientatie)
-            buren = {str(buur) for buur in dataset.graph.objects(subject, has_connection)}
-            buren |= {str(buur) for buur in dataset.graph.subjects(has_connection, subject)}
             # Een verbinding loopt via een begin- of eindpunt van een onderdeel; dat
             # eindpunt hangt met hasPart aan een onderdeelorientatie.
-            for buur in buren:
-                for houder in part_holders_of(dataset.graph, URIRef(buur)):
-                    andere = self._raakt_ander_onderdeel(
-                        dataset, houder, orientaties, orientatie, has_connection
-                    )
-                    if andere:
+            for buur in context.buren(orientatie):
+                for houder in context.houders(buur):
+                    if self._raakt_ander_onderdeel(context, houder, orientaties, orientatie):
                         return True
                 if buur in orientaties:
                     return True
         return False
 
     def _raakt_ander_onderdeel(
-        self, dataset, houder, orientaties: set[str], eigen: str, has_connection: URIRef
+        self, context: CheckContext, houder: str, orientaties: set[str], eigen: str
     ) -> bool:
         """Geeft aan of deze onderdeelorientatie ook een ander compartiment raakt."""
-        for deel in parts_of(dataset.graph, houder):
-            for buur in dataset.graph.objects(deel, has_connection):
-                if str(buur) in orientaties and str(buur) != eigen:
-                    return True
-            for buur in dataset.graph.subjects(has_connection, deel):
-                if str(buur) in orientaties and str(buur) != eigen:
+        for deel in context.onderdelen_van(houder):
+            for buur in context.buren(deel):
+                if buur in orientaties and buur != eigen:
                     return True
         return False
 
@@ -482,7 +460,7 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
         gebundelde GWSW-totaalontologie geen enkele klasse, dus geen orientatietype valt
         onder `Compartiment`.
         """
-        return context.dataset.onderdelen(node.uri, "Compartiment")
+        return context.onderdelen_van(node.uri, "Compartiment")
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt hoeveel putten compartimenten hebben."""

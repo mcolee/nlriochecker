@@ -24,6 +24,22 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De leeslaag-naad `leeslaag.py` bundelt de graafvragen op één plek** (issue #159):
+  acht domeinvragen (`knopen_van`, `strengen_van`, `subject_uris_van`, `buren`,
+  `houders`, `onderdelen_van`, `is_van_klasse`, `kenmerkinstanties`) plus de twee
+  kenmerkvragen van ATTR-014, met dunne doorgeefmethoden op `CheckContext`. De
+  versie-juiste predicaatkeuze (`hasConnection`/`hasValue`/`hasReference` via
+  `gwsw_versie.basis`, issue #139) staat nu op één plek in plaats van als privé-helper in
+  drie modules. Een nieuw hek a4 in `tests/test_architectuur_laagsnit.py` bewaakt dat
+  buiten `leeslaag.py` niets van de leeslaag-graafsurface staat: geen import uit
+  `gwsw_orox_helpers` buiten de type- en laadnamen, geen `rdflib`-import, geen
+  `dataset.graph`, en geen aanroep van de publieke `GwswDataset`-methoden die release B
+  verwijdert of hertypeert (`of_class`, `subjects_of_class`, `graph_is_a`, `onderdelen`);
+  methoden die release B ongemoeid laat blijven toegestane API. De CI bewaakt daarmee de
+  "één bestand"-garantie zelf, niet langer alleen het researchscript. Een toekomstige
+  leeslaagrelease raakt daardoor één bestand in plaats van veertien; de uitvoer blijft
+  ongewijzigd.
+
 - **De mechanische poort draait pytest parallel (`-n 4`) via `pytest-xdist`** (BO-94):
   lokaal geverifieerd dat de takdekking (`branch = true`) tot op de tweede decimaal
   gelijk blijft aan de seriële run (96,21% in beide, 2426 geslaagd/2 overgeslagen, twee

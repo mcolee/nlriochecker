@@ -44,10 +44,9 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
-from gwsw_orox_helpers.dataset import GwswDataset, aspect_holders_of, part_holders_of
-from gwsw_orox_helpers.namen import termen_voor
-from rdflib import URIRef
+from gwsw_orox_helpers.dataset import GwswDataset
 
+from nlriochecker import leeslaag
 from nlriochecker.meting import Nulmeting
 from nlriochecker.nulmeting_teksten import leesbaar
 from nlriochecker.uitvoer.identiteit import kort
@@ -66,16 +65,6 @@ ERNST_VIOLATION = "Violation"
 # Hoe ver er omhoog gelopen wordt. De langste keten in de export is drie stappen
 # (beginpunt, orientatie, streng); de rem is er tegen een cyclus in de brondata.
 MAX_DIEPTE = 6
-
-
-def _has_connection(dataset: GwswDataset) -> URIRef:
-    """Het `hasConnection`-predicaat in de basis van deze export.
-
-    Uit `dataset.gwsw_versie.basis`, zodat een 1.7-export (basis
-    `http://data.gwsw.nl/1.7/totaal/`) niet stil nul buren geeft (issue #139). Voorlopig
-    een privé-helper; #159 vervangt hem door de graafvraag `buren` uit de leeslaag.
-    """
-    return URIRef(termen_voor(dataset.gwsw_versie.basis).has_connection)
 
 
 @dataclass(frozen=True)
@@ -284,7 +273,6 @@ class _Joiner:
         self._objecten = frozenset(dataset.nodes) | frozenset(dataset.conduits)
         self._per_fragment = {kort(uri): uri for uri in self._objecten}
         self._basis = _basis(self._objecten)
-        self._has_connection = _has_connection(dataset)
         self._memo: dict[str, str] = {}
         self._instanties: dict[str, int] | None = None
 
@@ -328,7 +316,7 @@ class _Joiner:
         if not self._basis:
             return ""
         kandidaat = f"{self._basis}{focus}"
-        if not self._dataset.graph_is_a(kandidaat, "Stelsel"):
+        if not leeslaag.is_van_klasse(self._dataset, kandidaat, "Stelsel"):
             return ""
         strengen, knopen = self._dataset.stelsel_leden(kandidaat)
         return kandidaat if strengen and not knopen else ""
@@ -402,15 +390,10 @@ class _Joiner:
         `:knp1_put gwsw:hasConnection :knp1_put_maa`; een export die het andersom doet
         zou anders stil 1.605 meldingen van de kaart laten vallen.
         """
-        knoop = URIRef(uri)
-        graaf = self._dataset.graph
-        insluitend = {str(houder) for houder in part_holders_of(graaf, knoop)}
-        insluitend |= {str(houder) for houder in aspect_holders_of(graaf, knoop)}
+        insluitend = set(leeslaag.houders(self._dataset, uri, aspecten=True))
         if insluitend or not met_verbinding:
             return insluitend
-        verbonden = {str(ander) for ander in graaf.subjects(self._has_connection, knoop)}
-        verbonden |= {str(ander) for ander in graaf.objects(knoop, self._has_connection)}
-        return verbonden
+        return leeslaag.buren(self._dataset, uri)
 
 
 def _basis(objecten: frozenset[str]) -> str:

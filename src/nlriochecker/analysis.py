@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 from gwsw_orox_helpers.dataset import GwswDataset
 
+from nlriochecker import leeslaag
 from nlriochecker.meting import Nulmeting
 from nlriochecker.shaclrapport import ShaclReport
 
@@ -161,8 +162,8 @@ def bepaal_typeringspoort(report: ShaclReport, dataset: GwswDataset | None = Non
         if dataset.is_connection_class(klasse):
             onbeoordeelbaar.append(klasse)
             continue
-        gevonden = dataset.of_class(klasse)
-        if not gevonden and dataset.subjects_of_class(klasse):
+        gevonden = leeslaag.knopen_van(dataset, klasse)
+        if not gevonden and leeslaag.subject_uris_van(dataset, klasse):
             onbeoordeelbaar.append(klasse)
             continue
         objecten.update(gevonden)

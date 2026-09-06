@@ -699,7 +699,7 @@ class _WatergangKruising(_ExterneCheck):
         for wortel in context.config.klassen.kruisingsleiding:
             buiten = [
                 uri
-                for uri in dataset.of_class(wortel)
+                for uri in context.strengen_van(wortel)
                 if uri in dataset.conduits and uri not in binnen
             ]
             if buiten:

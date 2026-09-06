@@ -12,6 +12,7 @@ from gwsw_orox_helpers.dataset import GwswDataset
 from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
 from shapely.geometry import Point
 
+from nlriochecker import leeslaag
 from nlriochecker.afbakening import Analyseset, objecten_in_gebied
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks.treffers import Trefferregister, Wegvakregister
@@ -255,6 +256,46 @@ class CheckContext:
             return "deze dataset"
         return "het geanalyseerde deel (kern plus contextschil)"
 
+    def knopen_van(self, wortel: str) -> list[str]:
+        """De knopen (en strengen) van een klasse. Naad naar `leeslaag.knopen_van`."""
+        return leeslaag.knopen_van(self.dataset, wortel)
+
+    def strengen_van(self, wortel: str) -> list[str]:
+        """De strengen (en knopen) van een klasse. Naad naar `leeslaag.strengen_van`."""
+        return leeslaag.strengen_van(self.dataset, wortel)
+
+    def subject_uris_van(self, wortel: str) -> list[str]:
+        """De URI's van alle objecten van een klasse. Naad naar `leeslaag.subject_uris_van`."""
+        return leeslaag.subject_uris_van(self.dataset, wortel)
+
+    def is_van_klasse(self, uri: str, wortel: str) -> bool:
+        """Of dit object van deze klasse is. Naad naar `leeslaag.is_van_klasse`."""
+        return leeslaag.is_van_klasse(self.dataset, uri, wortel)
+
+    def onderdelen_van(self, uri: str, wortel: str | None = None) -> list[str]:
+        """De directe onderdelen van een object. Naad naar `leeslaag.onderdelen_van`."""
+        return leeslaag.onderdelen_van(self.dataset, uri, wortel)
+
+    def houders(self, uri: str, *, aspecten: bool = False) -> list[str]:
+        """De objecten die dit object bevatten. Naad naar `leeslaag.houders`."""
+        return leeslaag.houders(self.dataset, uri, aspecten=aspecten)
+
+    def buren(self, uri: str) -> set[str]:
+        """De via `hasConnection` verbonden objecten. Naad naar `leeslaag.buren`."""
+        return leeslaag.buren(self.dataset, uri)
+
+    def kenmerkinstanties(self, kenmerk: str) -> list[str]:
+        """De instanties van een kenmerktype. Naad naar `leeslaag.kenmerkinstanties`."""
+        return leeslaag.kenmerkinstanties(self.dataset, kenmerk)
+
+    def subjecten_met_waardeproperty(self) -> tuple[set[str], set[str]]:
+        """De subjecten met `hasValue`/`hasReference`. Naad naar de gelijknamige leeslaagvraag."""
+        return leeslaag.subjecten_met_waardeproperty(self.dataset)
+
+    def vulwaarde(self, uri: str) -> str | None:
+        """De `hasValue`-waarde van een object als tekst. Naad naar `leeslaag.vulwaarde`."""
+        return leeslaag.vulwaarde(self.dataset, uri)
+
     def stelsels_van(self, uri: str) -> tuple[str, ...]:
         """De stelselinstanties die deze knoop of streng via `hasPart` omvatten (issue #131).
 
@@ -280,8 +321,7 @@ class CheckContext:
             """Bouwt de inverse index uit alle stelselinstanties."""
             omvat: dict[str, set[str]] = {}
             for wortel in self.config.klassen.stelsel:
-                for subject in self.dataset.subjects_of_class(wortel):
-                    stelsel = str(subject)
+                for stelsel in self.subject_uris_van(wortel):
                     strengen, knopen = self.dataset.stelsel_leden(stelsel)
                     for lid in (*strengen, *knopen):
                         omvat.setdefault(lid, set()).add(stelsel)

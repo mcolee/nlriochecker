@@ -23,6 +23,7 @@ from dataclasses import dataclass
 import pandas as pd
 import shapely
 
+from nlriochecker import leeslaag
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckRun
 from nlriochecker.checks.base import REGISTRY
@@ -302,7 +303,8 @@ def _of_class(run: CheckRun, klasse: str) -> set[str]:
     """
     dataset = run.dataset
     if dataset.is_connection_class(klasse):
-        return set(dataset.of_class(klasse))  # verbindingsklasse: dezelfde InhoudError-poort
+        # verbindingsklasse: dezelfde InhoudError-poort
+        return set(leeslaag.knopen_van(dataset, klasse))
     index = _type_index(run)
     uris: set[str] = set()
     for soort in dataset.closure(klasse):
@@ -313,7 +315,7 @@ def _of_class(run: CheckRun, klasse: str) -> set[str]:
 def _aantal_klasse(run: CheckRun, klasse: str, via_onderdeel: bool) -> int:
     """Hoeveel objecten van deze klasse de bijbehorende check ziet."""
     if via_onderdeel:
-        return len({str(subject) for subject in run.dataset.subjects_of_class(klasse)})
+        return len(set(leeslaag.subject_uris_van(run.dataset, klasse)))
     return len(_of_class(run, klasse))
 
 
@@ -321,9 +323,7 @@ def _aantal_rol(run: CheckRun, rol: _Rol) -> int:
     """Hoeveel objecten deze rol samen telt, ontdubbeld over haar klassen."""
     if rol.via_onderdeel:
         uris = {
-            str(subject)
-            for klasse in rol.klassen
-            for subject in run.dataset.subjects_of_class(klasse)
+            uri for klasse in rol.klassen for uri in leeslaag.subject_uris_van(run.dataset, klasse)
         }
     else:
         uris = {uri for klasse in rol.klassen for uri in _of_class(run, klasse)}

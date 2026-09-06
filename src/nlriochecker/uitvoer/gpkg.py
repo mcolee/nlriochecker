@@ -40,6 +40,7 @@ from shapely.geometry import MultiPolygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
+from nlriochecker import leeslaag
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, Severity
 from nlriochecker.checks.selectie import mechanischeleidingen
@@ -554,7 +555,7 @@ def _onderdrukte_uris(run: CheckRun, klassen: tuple[str, ...]) -> frozenset[str]
     gerapporteerd" en bij het andere "beoordeeld en in orde" zeggen op grond van
     hetzelfde besluit.
     """
-    return frozenset(uri for wortel in klassen for uri in run.dataset.of_class(wortel))
+    return frozenset(uri for wortel in klassen for uri in leeslaag.knopen_van(run.dataset, wortel))
 
 
 def _schrijf_features(

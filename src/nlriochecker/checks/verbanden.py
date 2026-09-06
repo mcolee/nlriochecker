@@ -109,7 +109,7 @@ def _bouw_aansluitingen(context: CheckContext, rol: str) -> Aansluitingen:
     strengen = {
         uri: dataset.conduits[uri]
         for wortel in wortels
-        for uri in dataset.of_class(wortel)
+        for uri in context.strengen_van(wortel)
         if uri in dataset.conduits
     }
 
@@ -376,11 +376,10 @@ def _eindpunten(context: CheckContext, rol: str) -> frozenset[str]:
 def _bouw_eindpunten(context: CheckContext, rol: str) -> frozenset[str]:
     """Scant de wortelklassen van deze rol en houdt de knopen over die in de graaf staan."""
     graaf = _bereikbaarheid(context)
-    dataset = context.dataset
     return frozenset(
         uri
         for wortel in getattr(context.config.klassen, rol)
-        for uri in dataset.of_class(wortel)
+        for uri in context.knopen_van(wortel)
         if uri in graaf
     )
 

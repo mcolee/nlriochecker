@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from nlriochecker import leeslaag
 from nlriochecker.checks import CheckRun, Severity
 from nlriochecker.checks.extern import bronrollen_met_check
 from nlriochecker.checks.selectie import klassen_van_rol
@@ -1065,7 +1066,7 @@ def _nulmeting_section(run: CheckRun, meldingen: list[Melding]) -> list[str]:
         "Overtredingen per conformiteitsklasse",
     )
 
-    stelsel_uris = {str(subject) for subject in run.dataset.subjects_of_class("Stelsel")}
+    stelsel_uris = set(leeslaag.subject_uris_van(run.dataset, "Stelsel"))
     op_stelsel = sum(1 for melding in uit_nulmeting if melding.object_uri in stelsel_uris)
     zonder_object = sum(1 for melding in uit_nulmeting if not melding.object_uri)
     zonder_plek = sum(

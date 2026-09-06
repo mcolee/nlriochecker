@@ -28,6 +28,7 @@ from collections.abc import Callable, Mapping, Sequence
 
 from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
 
+from nlriochecker import leeslaag
 from nlriochecker.checkconfig import ClassRoots
 from nlriochecker.checks.base import CheckContext
 
@@ -46,7 +47,7 @@ def _van_klassen[Object: (Node, Conduit)](
     gevonden = {
         uri: verzameling[uri]
         for wortel in wortels
-        for uri in dataset.of_class(wortel)
+        for uri in leeslaag.knopen_van(dataset, wortel)
         if uri in verzameling
     }
     return list(gevonden.values())
@@ -326,7 +327,7 @@ def oppervlaktewaterobjecten(context: CheckContext) -> list[Node | Conduit]:
         """Zoekt de objecten in de knopen en anders in de verbindingen."""
         gevonden: dict[str, Node | Conduit] = {}
         for wortel in context.config.klassen.oppervlaktewater:
-            for uri in context.dataset.of_class(wortel):
+            for uri in context.knopen_van(wortel):
                 # Expliciet op None toetsen en niet op de waarheidswaarde: die is
                 # voor een dataclass met velden altijd waar, maar erop leunen is
                 # precies wat deze codebase elders weigert te doen.
@@ -354,9 +355,9 @@ def stelsels(context: CheckContext) -> list[str]:
     def bouw() -> list[str]:
         """De unieke stelsel-URI's over de sluiting van `[klassen] stelsel`, in vaste volgorde."""
         gevonden = {
-            str(subject)
+            uri
             for wortel in context.config.klassen.stelsel
-            for subject in context.dataset.subjects_of_class(wortel)
+            for uri in context.subject_uris_van(wortel)
         }
         return sorted(gevonden)
 

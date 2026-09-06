@@ -6,7 +6,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
 import networkx as nx
-from gwsw_orox_helpers.dataset import Conduit, GwswDataset, part_holders_of
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset
 
 from nlriochecker.checks.base import (
     Check,
@@ -422,7 +422,10 @@ class _ZonderAfvoerpad(Check):
         soorten = getattr(context.config.klassen, self.stelselrol)
 
         gezocht = {
-            uri for wortel in soorten for uri in dataset.of_class(wortel) if uri in dataset.conduits
+            uri
+            for wortel in soorten
+            for uri in context.strengen_van(wortel)
+            if uri in dataset.conduits
         }
 
         gevonden: list[tuple[Conduit, str]] = []
@@ -819,9 +822,9 @@ class ItStelselZonderDrempel(Check):
 
         knopen: set[str] = set()
         for wortel in context.config.klassen.drempel:
-            for drempel in dataset.subjects_of_class(wortel):
-                for houder in part_holders_of(dataset.graph, drempel):
-                    knoop = dataset.resolve_network_node(str(houder), wortels)
+            for drempel in context.subject_uris_van(wortel):
+                for houder in context.houders(drempel):
+                    knoop = dataset.resolve_network_node(houder, wortels)
                     if knoop is not None:
                         knopen.add(knoop)
         for put in overstortputten(context):
@@ -1212,9 +1215,7 @@ def _vgs_instanties(context: CheckContext) -> tuple[str, ...]:
     def bouw() -> tuple[str, ...]:
         """De unieke VGS-instantie-URI's over de typesluiting van `[klassen] vgs`."""
         gevonden = {
-            str(subject)
-            for wortel in context.config.klassen.vgs
-            for subject in context.dataset.subjects_of_class(wortel)
+            uri for wortel in context.config.klassen.vgs for uri in context.subject_uris_van(wortel)
         }
         return tuple(sorted(gevonden))
 

@@ -21,7 +21,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar
 
-from gwsw_orox_helpers.dataset import Conduit, Node, part_holders_of
+from gwsw_orox_helpers.dataset import Conduit, Node
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
@@ -125,16 +125,15 @@ def _bouw_drempels(context: CheckContext) -> dict[str, list[Drempel]]:
 
     gezien: set[str] = set()
     for wortel in context.config.klassen.drempel:
-        for subject in dataset.subjects_of_class(wortel):
-            uri = str(subject)
+        for uri in context.subject_uris_van(wortel):
             if uri in gezien:
                 continue
             gezien.add(uri)
-            niveau = _waarde(context, subject, "Drempelniveau")
-            breedte = _waarde(context, subject, "Drempelbreedte")
+            niveau = _waarde(context, uri, "Drempelniveau")
+            breedte = _waarde(context, uri, "Drempelbreedte")
             put_uri = None
-            for houder in part_holders_of(dataset.graph, subject):
-                put_uri = dataset.resolve_network_node(str(houder), wortels)
+            for houder in context.houders(uri):
+                put_uri = dataset.resolve_network_node(houder, wortels)
                 if put_uri is not None:
                     break
             if put_uri is None:
@@ -142,7 +141,7 @@ def _bouw_drempels(context: CheckContext) -> dict[str, list[Drempel]]:
             gevonden.setdefault(put_uri, []).append(
                 Drempel(
                     uri=uri,
-                    label=_label(context, subject) or uri,
+                    label=_label(context, uri) or uri,
                     niveau=niveau,
                     breedte=breedte,
                     put_uri=put_uri,
@@ -245,9 +244,10 @@ def _afvoereindpunten(context: CheckContext) -> set[str]:
     `Pompunit` telt sinds issue #73 niet mee: dat is een overdrachtspunt naar de
     drukriolering, geen einde van de afvoer (BO-55).
     """
-    dataset = context.dataset
     return {
-        uri for wortel in context.config.klassen.afvoer_eindpunt for uri in dataset.of_class(wortel)
+        uri
+        for wortel in context.config.klassen.afvoer_eindpunt
+        for uri in context.knopen_van(wortel)
     }
 
 
@@ -935,9 +935,8 @@ class BbbZonderLediging(Check):
 
     def _heeft_voorziening(self, context: CheckContext, node: Node, klassen: list[str]) -> bool:
         """Geeft aan of de BBB een ledigingsvoorziening als onderdeel heeft."""
-        dataset = context.dataset
-        for deel in dataset.onderdelen(node.uri):
-            if any(dataset.graph_is_a(deel, wortel) for wortel in klassen):
+        for deel in context.onderdelen_van(node.uri):
+            if any(context.is_van_klasse(deel, wortel) for wortel in klassen):
                 return True
         return False
 

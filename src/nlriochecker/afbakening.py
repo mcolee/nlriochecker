@@ -18,6 +18,7 @@ from gwsw_orox_helpers.dataset import GwswDataset
 from shapely import STRtree
 from shapely.geometry.base import BaseGeometry
 
+from nlriochecker import leeslaag
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.studiegebied import StudyArea
 
@@ -302,7 +303,7 @@ def _componentstructuur(
     strengen: list[tuple[str, str]] = []
     zonder_netwerkverband = 0
     for wortel in config.klassen.vrijvervalleiding:
-        for uri in dataset.of_class(wortel):
+        for uri in leeslaag.strengen_van(dataset, wortel):
             conduit = dataset.conduits.get(uri)
             if conduit is None:
                 continue
@@ -315,7 +316,7 @@ def _componentstructuur(
             strengen.append((uri, begin))
 
     for wortel in config.klassen.mechanisch:
-        for uri in dataset.of_class(wortel):
+        for uri in leeslaag.strengen_van(dataset, wortel):
             conduit = dataset.conduits.get(uri)
             if conduit is None:
                 continue
