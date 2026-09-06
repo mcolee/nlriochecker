@@ -297,6 +297,13 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   bespaart de ~1,5-min/3-GB herlaadronde op een verkeerde gok.
 - **`docs/agents/afk-regie.md`** is het sjabloon voor een onbewaakte regiesessie die een reeks
   issues met Opus-subagents afwerkt (lus per issue, één poort, review-timing, slotrun).
+  Drie tempo-regels daarin zijn auteursbesluiten (06-09, sessie C) en gelden voor elke
+  regie: (1) `runnerpoort.py` alleen als het issue tests toevoegt die echte data laden --
+  dat is de regel hierboven, niet "bij elk issue"; (2) na `git push` meteen de volgende
+  implementer dispatchen en pas dán op de CI wachten (comment en close ná groen);
+  (3) een Klein-issue op Sonnet leest van `docs/architectuur.md` alleen de secties die het
+  raakt en `analyse-harness.md` alleen bij een meting. Samen ~10 min en 20-30 % van de
+  tokens per issue; de reviews en fixrondes blijven, die vingen 3 van 5 keer een echte fout.
 - Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
   `gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
   niemand een openstaand punt in twee toestanden aantreft.
