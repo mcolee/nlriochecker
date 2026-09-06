@@ -5229,3 +5229,59 @@ verviel.
 verandert (22.363 -> 0, gelijk aan RVZ-011) en de toelichtings-/rapportregels van HGT-011 en
 de elf andere declarerende checks. De nul-bewaking (BO-52) blijft ongewijzigd; haar aan
 `klassenlijsten` hangen is een schoon vervolg.
+
+### BO-96 drie rollen versmald naar het checkregister (EXT-001, ATTR-017, TOP-014)
+
+**Wat.** Drie checks gingen over een bredere populatie dan het checkregister v0.9 noemt,
+terwijl de ontologie niet besliste (het kenmerk bestaat op alle klassen) -- dus een
+domeinkeuze zoals issue #64 ze aan de auteur voorlegt. De auteur maakte de keuze
+(grill-sessie 2026-09-06); dit blok legt de drie vast. Ze horen bij elkaar: rol breder dan
+register -> versmallen.
+
+* **EXT-001** (`checks/extern.py`): `netwerkknopen` -> `putten`. Register regel 168 en de
+  `soort`-tekst zeggen "strengen en putten". Een gemaal (`Rioolgemaal`) of uitlaat
+  (`Uitlaatconstructie`) is in de BGT zelf een bouwwerk, dus "ligt binnen een bouwwerk" is
+  daar verwacht beeld en geen plausibiliteitsgebrek.
+* **ATTR-017** (`checks/attributen.py`): `_LeidingCheck` -> `_StrengCheck`, rol `leidingen`
+  -> `vrijvervalrioolleidingen`, gelijk aan de zusterchecks ATTR-001/003/004/012. De
+  k-waarde-vs-materiaal-toets gaf 962 meldingen, alle op mechanische klassen, die tegen
+  `[rapport] onderdruk_klassen` wegvielen -- een schijn-nul die de config maakte, niet de
+  data. Een `notes()`-regel benoemt nu de leidingen die geen vrijvervalstreng zijn
+  (mechanisch riool en andere), zoals ATTR-018. Het mechanische riool óók gaan toetsen
+  (fysisch geldig voor persleidingen) is een aparte, nog niet gevraagde scope -- bewust
+  buiten dit blok.
+* **TOP-014** (`checks/topologie.py`): melding en telling versmald van `netwerkknopen` naar
+  `putten` (register regel 53, "op een put"). Consequentie van EXT-001: dezelfde grens.
+
+**Twee declaratie-afwijkingen t.o.v. de letterlijke spec, met reden.** De spec schreef voor
+ATTR-017 en TOP-014 "rol X -> Y" (vervangen). De AST-sweep (`test_declaratie_volgt_de_code`)
+eist echter exacte gelijkheid met wat de code *leest*, en beide checks lezen na de versmalling
+nog steeds de oude rol:
+* ATTR-017 declareert `("leidingen", "vrijvervalrioolleidingen")`, niet alleen
+  vrijvervalrioolleidingen: de nieuwe `notes()`-regel leest `leidingen(context)` om de
+  buitengesloten mechanische leidingen te tellen -- exact de constructie van ATTR-018, dat
+  `leidingen` om dezelfde reden declareert. De *getoetste* populatie (`run`/`examined`) is
+  wel enkel vrijverval.
+* TOP-014 declareert `("leidingen", "netwerkknopen", "putten", "vrijvervalrioolleidingen")`:
+  `putten` erbij, `netwerkknopen` blijft. De check leest de gedeelde `_topologie` (op
+  `netwerkknopen` gebouwd, mét de compartiment-ontdubbeling van BO-71) en filtert de te
+  melden knopen daarna tot `putten`. `_topologie` niet lezen zou de merge verliezen.
+
+**Gemeten verschuiving op De Wolden en Hoogeveen** (referentierun `uitvoer/06092026_issue137`
+-> `uitvoer/06092026_issue138`, identieke vlaggen):
+* EXT-001 `examined` 39.741 -> 38.140 (-1.601, de toetsbare gemalen/uitlaten); EXT-001
+  meldingen 441 -> 413 (-28: bevindingen op gemalen/uitlaten die binnen een bouwwerk liggen
+  -- de categorische ruis die deze keuze wilde verwijderen).
+* `onderdrukt.meldingen` 16.395 -> 15.433 (-962, de ATTR-017-meldingen op mechanische
+  klassen); ATTR-017 blijft 0 W in de uitvoer, `examined` 23.440 -> 17.603.
+* TOP-014 `examined` 22.269 -> 20.667 (-1.602); meldingen 50 -> 47 (-3, de gemalen).
+* `aantal_meldingen` 161.692 -> 161.661 (-31 = -28 EXT-001 + -3 TOP-014). Geen andere check
+  verschuift in aantal of `bekeken`.
+
+**Afwijking van de opdrachtverwachting.** De taakbrief verwachtte `aantal_meldingen` -3 en
+"EXT-001 gelijk in aantal": dat oversloeg dat het versmallen van EXT-001 óók de 28 EXT-001
+bevindingen op gemalen/uitlaten laat vervallen. Dat is het bedoelde effect (de spec noemt die
+bevindingen expliciet "verwacht beeld, geen plausibiliteitsgebrek"), geen regressie; de -31 is
+volledig verklaard (-28 EXT-001 + -3 TOP-014). De brief-schattingen -1.605 (EXT-001 `examined`)
+en ~20.664 (TOP-014 `examined`) wijken 4 resp. 3 af: dat is welke gemalen/uitlaten daadwerkelijk
+toetsbaar zijn (binnen bereik, betrouwbaar getypeerd) resp. de merge van compartimentputten.

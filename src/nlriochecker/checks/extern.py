@@ -37,6 +37,7 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import (
     lozingspunten,
     netwerkknopen,
+    putten,
     vrijvervalrioolleidingen,
     waterlozingspunten,
 )
@@ -389,7 +390,7 @@ class KruisingMetBouwwerk(_ExterneCheck):
     title = "Kruising of nabijheid van BGT-panden en overige bouwwerken"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
+    rollen = ("putten", "vrijvervalrioolleidingen")
     kenmerken = ()
     # De afstand die de kolom `afstand_min_m` van de laag `vlakken` vult (issue #122).
     # Zij hoort bij deze ene melding en niet bij het pand -- twee objecten kunnen
@@ -399,8 +400,14 @@ class KruisingMetBouwwerk(_ExterneCheck):
     soort = "vrijvervalstrengen en putten"
 
     def objecten(self, context: CheckContext) -> Sequence[Node | Conduit]:
-        """De vrijvervalstrengen en de putten; beide horen niet in een pand."""
-        return [*vrijvervalrioolleidingen(context), *netwerkknopen(context)]
+        """De vrijvervalstrengen en de putten; beide horen niet in een pand.
+
+        Alleen `putten`, niet de bredere `netwerkknopen`: een gemaal (`Rioolgemaal`) of
+        een uitlaat (`Uitlaatconstructie`) is in de BGT zelf een bouwwerk, dus "ligt
+        binnen een bouwwerk" is daar verwacht beeld en geen plausibiliteitsgebrek. Zie
+        het register (regel 168, "strengen en putten") en issue #138.
+        """
+        return [*vrijvervalrioolleidingen(context), *putten(context)]
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt elk object dat binnen, door of vlak langs een bouwwerk ligt.

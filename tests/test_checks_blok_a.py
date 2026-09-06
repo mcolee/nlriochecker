@@ -608,6 +608,21 @@ def test_attr017_verantwoordt_de_ongetoetste_leidingen() -> None:
     assert any("Polypropyleen" in note for note in outcome.notes), outcome.notes
 
 
+def test_attr017_toetst_alleen_de_vrijvervalstrengen() -> None:
+    """De mechanische leidingen vallen buiten de toets en staan in de toelichting (issue #138).
+
+    Streng 1 (vrijverval, PE, wandruwheid 30) meldt; persleiding 2 draagt dezelfde
+    mismatch maar is mechanisch riool en wordt niet getoetst. De toelichting benoemt haar,
+    zoals ATTR-018 dat voor het aanlegjaar doet.
+    """
+    outcome = uitkomst("attr017_mechanische_leiding.ttl", "ATTR-017")
+
+    assert labels(outcome) == ["1"]
+    assert any(
+        "buiten deze toets omdat ze geen vrijvervalrioolleiding" in note for note in outcome.notes
+    ), outcome.notes
+
+
 def test_attr009_meldt_beide_lengten() -> None:
     bevinding = uitkomst("attr009_lengte_wijkt_af.ttl", "ATTR-009").findings[0]
 

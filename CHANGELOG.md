@@ -13,6 +13,20 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Drie rollen versmald naar het checkregister** (issue #138, BO-96). Drie checks
+  gingen over een bredere populatie dan het register noemt, terwijl de ontologie niet
+  besliste (een domeinkeuze zoals issue #64 ze voorlegt). **EXT-001** toetst nog
+  vrijvervalstrengen en `putten` (was `netwerkknopen`): een gemaal of uitlaat is in de
+  BGT zelf een bouwwerk, dus "ligt binnen een bouwwerk" is daar verwacht beeld. `examined`
+  zakt 1.601 (39.741 -> 38.140) en 28 meldingen op zulke gemalen/uitlaten vervallen
+  (441 -> 413) -- precies die categorische ruis. **ATTR-017** toetst nog de vrijvervalstrengen (was elke
+  `gwsw:Leiding`), gelijk aan de zusterchecks ATTR-001/003/004/012; een `notes()`-regel
+  benoemt de mechanische leidingen die buiten de toets vallen, zoals ATTR-018. De 962
+  meldingen die op mechanische klassen stonden en toch tegen `[rapport] onderdruk_klassen`
+  wegvielen ontstaan niet meer (`onderdrukt.meldingen` zakt met 962). **TOP-014** meldt en
+  telt nog `putten` (was `netwerkknopen`; register regel 53, "op een put"); `netwerkknopen`
+  blijft in de declaratie omdat de check de gedeelde topologie leest. Geen contract-,
+  kolom- of check-ID-wijziging.
 - **`gwsw_run` schrijft bij naam in plaats van als 35-tuple** (issue #169).
   `_schrijf_runmetadata` in `uitvoer/gpkg.py` bouwt nu een `dict[str, object]` per
   kolomnaam en leidt de positionele rij daaruit af, met een `assert` op sleutelgelijkheid

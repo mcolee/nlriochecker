@@ -607,18 +607,6 @@ class DiameterGroterDanPut(_StrengCheck):
         ]
 
 
-class _LeidingCheck(Check):
-    """Basis voor de ATTR-checks die over alle leidingen redeneren.
-
-    Breder dan `_StrengCheck`: niet alleen de vrijvervalstrengen maar ook de pers-,
-    druk- en vacuumleidingen. Een kenmerk als de wandruwheid staat op elke leiding.
-    """
-
-    def examined(self, context: CheckContext) -> int:
-        """Het aantal leidingen."""
-        return len(leidingen(context))
-
-
 def _wandruwheid(conduit: Conduit) -> float | None:
     """De geregistreerde wandruwheid van een leiding, in de eenheid van de export.
 
@@ -652,7 +640,7 @@ def _gekozen_schaal(context: CheckContext) -> float:
     schalen = context.config.drempels.wandruwheid_schalen
     testbaar = [
         (ruw, regel)
-        for conduit in leidingen(context)
+        for conduit in vrijvervalrioolleidingen(context)
         if (regel := tabel.wandruwheid(conduit.materiaal)) is not None
         and (ruw := _wandruwheid(conduit)) is not None
     ]
@@ -667,13 +655,20 @@ def _gekozen_schaal(context: CheckContext) -> float:
 
 
 @register
-class WandruwheidPastNietBijMateriaal(_LeidingCheck):
+class WandruwheidPastNietBijMateriaal(_StrengCheck):
     """ATTR-017: de wandruwheid past niet bij het leidingmateriaal.
 
     Elke leiding draagt een `WandruwheidBinnenboven` en `WandruwheidBinnenonder` (de
     k-Nikuradse waarde van de buiswand); geen enkele nulmeting toetst of die waarde bij
     het materiaal past. De aannemelijke band per materiaal komt uit Leidraad Riolering
     C2100 tabel B2.1 en staat in `plausibiliteit.toml`.
+
+    Toetst sinds issue #138 alleen de vrijvervalstrengen, gelijk aan de zusterchecks
+    ATTR-001/003/004/012. De k-waarde-vs-materiaal-vraag geldt fysisch ook voor het
+    mechanische riool, maar op De Wolden vielen alle meldingen daarop weg tegen
+    `[rapport] onderdruk_klassen`: een schijn-nul die de config maakte, niet de data.
+    Het mechanische riool is een aparte, nog niet gevraagde scope; `notes()` verantwoordt
+    de leidingen die zo buiten de toets vallen, zoals ATTR-018 dat doet.
 
     De eenheid is subtiel: het GWSW-datatype is een geheel getal in mm en kan de
     kunststofwaarden niet uitdrukken, dus een export noteert de waarde soms in tienden
@@ -686,15 +681,15 @@ class WandruwheidPastNietBijMateriaal(_LeidingCheck):
     title = "Wandruwheid past niet bij materiaal"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("leidingen",)
+    rollen = ("leidingen", "vrijvervalrioolleidingen")
     kenmerken = ("MateriaalLeiding", "WandruwheidBinnenboven", "WandruwheidBinnenonder")
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
-        """Meldt elke leiding waarvan de wandruwheid buiten de band van haar materiaal valt."""
+        """Meldt elke streng waarvan de wandruwheid buiten de band van haar materiaal valt."""
         tabel = context.plausibiliteit
         schaal = _gekozen_schaal(context)
 
-        for conduit in leidingen(context):
+        for conduit in vrijvervalrioolleidingen(context):
             regel = tabel.wandruwheid(conduit.materiaal)
             ruw = _wandruwheid(conduit)
             if regel is None or ruw is None:
@@ -721,19 +716,20 @@ class WandruwheidPastNietBijMateriaal(_LeidingCheck):
     def notes(self, context: CheckContext) -> list[str]:
         """Verantwoordt de gekozen schaal en de leidingen die buiten de toets vielen.
 
-        Drie redenen waarom een leiding niet getoetst is, elk een eigen getal: geen
+        Drie redenen waarom een streng niet getoetst is, elk een eigen getal: geen
         wandruwheid (gat in de aanlevering), een materiaal zonder band in
         `plausibiliteit.toml` (Polypropyleen en Asbestcement kennen geen C2100-waarde),
-        en een wandruwheid zonder materiaal. Stilte zou lezen als "alle leidingen
-        gecontroleerd".
+        en een wandruwheid zonder materiaal. Een vierde regel verantwoordt de leidingen
+        die geen vrijvervalstreng zijn (mechanisch riool en andere leidingen), zoals
+        ATTR-018 dat doet. Stilte zou lezen als "alle strengen gecontroleerd".
         """
         tabel = context.plausibiliteit
-        alle = leidingen(context)
+        alle = vrijvervalrioolleidingen(context)
         totaal = len(alle)
         met_wandruwheid = [conduit for conduit in alle if _wandruwheid(conduit) is not None]
-        # De schaal is gekozen op de leidingen met een wandruwheid *en* een band; de
+        # De schaal is gekozen op de strengen met een wandruwheid *en* een band; de
         # rest telt niet mee (er valt niets tegen af te wegen). De toelichtingsregel
-        # moet dus dat kleinere getal noemen, niet alle leidingen met een wandruwheid.
+        # moet dus dat kleinere getal noemen, niet alle strengen met een wandruwheid.
         getoetst = [
             conduit
             for conduit in met_wandruwheid
@@ -745,21 +741,21 @@ class WandruwheidPastNietBijMateriaal(_LeidingCheck):
             schaal = _gekozen_schaal(context)
             regels.append(
                 f"De wandruwheid is gelezen op schaal 1:{schaal:g}: de lezing met de minste "
-                f"afwijkingen op de {len(getoetst)} van de {totaal} leidingen met een getoetst "
+                f"afwijkingen op de {len(getoetst)} van de {totaal} strengen met een getoetst "
                 "materiaal."
             )
 
         zonder_wandruwheid = totaal - len(met_wandruwheid)
         if zonder_wandruwheid:
             regels.append(
-                f"{zonder_wandruwheid} van de {totaal} leidingen dragen geen wandruwheid en "
+                f"{zonder_wandruwheid} van de {totaal} strengen dragen geen wandruwheid en "
                 "zijn niet getoetst."
             )
 
         zonder_materiaal = sum(1 for conduit in met_wandruwheid if conduit.materiaal is None)
         if zonder_materiaal:
             regels.append(
-                f"{zonder_materiaal} van de {totaal} leidingen dragen een wandruwheid maar geen "
+                f"{zonder_materiaal} van de {totaal} strengen dragen een wandruwheid maar geen "
                 "materiaal en zijn niet getoetst."
             )
 
@@ -773,8 +769,21 @@ class WandruwheidPastNietBijMateriaal(_LeidingCheck):
         if zonder_band:
             aantal = sum(1 for conduit in met_wandruwheid if conduit.materiaal in zonder_band)
             regels.append(
-                f"{aantal} van de {totaal} leidingen dragen een materiaal zonder wandruwheidsband "
+                f"{aantal} van de {totaal} strengen dragen een materiaal zonder wandruwheidsband "
                 f"in `plausibiliteit.toml` ({', '.join(zonder_band)}) en zijn niet getoetst."
+            )
+
+        # De leidingen die geen vrijvervalstreng zijn vallen sinds issue #138 buiten deze
+        # toets (mechanisch riool, duikers en andere leidingen); zonder deze regel leest
+        # de telling als het hele leidingenbestand. Zelfde verantwoording als ATTR-018.
+        vrijverval = {conduit.uri for conduit in alle}
+        buiten = [conduit for conduit in leidingen(context) if conduit.uri not in vrijverval]
+        if buiten:
+            regels.append(
+                f"{len(buiten)} van de {len(leidingen(context))} leidingen "
+                f"{taal.vorm(len(buiten), 'valt', 'vallen')} buiten deze toets omdat ze "
+                f"geen vrijvervalrioolleiding {taal.vorm(len(buiten), 'is', 'zijn')} "
+                "(mechanisch riool en andere leidingen)."
             )
         return regels
 

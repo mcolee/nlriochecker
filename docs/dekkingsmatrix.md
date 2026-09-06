@@ -33,7 +33,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | TOP-011 | Hartlijnkruisingen strengen onderling (zonder buffer). Zelfde populatie-afbakening als TOP-006 (BO-69, issue #82) | W | Plausibiliteit | geimplementeerd met test | leidingen, nabijheidsleidingen · — | — |
 | TOP-012 | Streng met dezelfde put aan begin- en eindpunt | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-013 | Meer dan twee parallelle strengen tussen hetzelfde putpaar | W | Plausibiliteit | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
-| TOP-014 | Meer dan vier aansluitende strengen op een put | W | Plausibiliteit | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
+| TOP-014 | Meer dan vier aansluitende strengen op een put | W | Plausibiliteit | geimplementeerd met test | leidingen, netwerkknopen, putten, vrijvervalrioolleidingen · — | — |
 | TOP-015 | Streng of put met multipart-geometrie (meerdere losse delen in een feature) | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-016 | Ongeldige geometrie volgens OGC Simple Features (ST_IsValid: zelf-intersectie, niet-gesloten ringen) | F | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
 | TOP-017 | Niet-simple geometrie (ST_IsSimple: spikes, herhaalde structuren) | W | Consistentie | geimplementeerd met test | leidingen, netwerkknopen, vrijvervalrioolleidingen · — | — |
@@ -78,7 +78,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 | ATTR-014 | Kenmerk gebruikt `hasValue` waar de ontologie via een restrictie `hasReference` naar een collectie eist (of andersom); een fout die de SHACL-nulmetin… | F | Consistentie | geimplementeerd met test | — · alle kenmerken | — |
 | ATTR-015 | Jaartal draagt een onevenredig deel van de begindatums (mogelijke vulwaarde); een signaaldetector, geen norm, met een instelbare drempel (`begindatum… | W | Compleetheid | geimplementeerd met test | putten, vrijvervalrioolleidingen · Begindatum | — |
 | ATTR-016 | Vorm put versus afmetingen inconsistent: een ronde put (`VormPut = Rond`) waarvan breedte en lengte verschillen; een ronde put heeft een diameter. De… | F | Consistentie | geimplementeerd met test | putten · BreedtePut, LengtePut, VormPut | — |
-| ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2… | W | Plausibiliteit | geimplementeerd met test | leidingen · MateriaalLeiding, WandruwheidBinnenboven, WandruwheidBinnenonder | — |
+| ATTR-017 | Wandruwheid (`WandruwheidBinnenboven`/`-onder`) past niet bij het leidingmateriaal; de aannemelijke band per materiaal komt uit Leidraad Riolering C2… | W | Plausibiliteit | geimplementeerd met test | leidingen, vrijvervalrioolleidingen · MateriaalLeiding, WandruwheidBinnenboven, WandruwheidBinnenonder | — |
 | ATTR-018 | Begindatum ontbreekt op een vrijvervalrioolleiding of put. ATTR-003, ATTR-007 en ATTR-015 toetsen alleen een aanwezige datum en de nulmeting eist `Be… | F | Compleetheid | geimplementeerd met test | leidingen, putten, vrijvervalrioolleidingen · Begindatum | — |
 | ATTR-019 | Putdiepte (`HoogtePut`) ontbreekt op een put. Het GWSW kent geen `Putbodemniveau`; de putbodem volgt uit putdekselniveau min `HoogtePut`, en zonder d… | W | Compleetheid | geimplementeerd met test | putten · HoogtePut | — |
 
@@ -145,7 +145,7 @@ Status per check-ID: *geimplementeerd met test*, *geimplementeerd zonder test*, 
 
 | ID | Omschrijving | Ernst | Dimensie | Status | Rollen · kenmerken | Toelichting |
 | --- | --- | --- | --- | --- | --- | --- |
-| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit | geimplementeerd met test | netwerkknopen, vrijvervalrioolleidingen · — | — |
+| EXT-001 | Kruising of nabijheid van BGT-panden en overige bouwwerken; getoetst op strengen en putten, met als uitkomst de relatie binnen, kruist of nabij | W | Plausibiliteit | geimplementeerd met test | putten, vrijvervalrioolleidingen · — | — |
 | EXT-003 | Kruising met watergang zonder registratie als zinker; een duiker is in het GWSW geen rioolleiding (subklasse van Leiding) en valt buiten de populatie… | W | Compleetheid | geimplementeerd met test | vrijvervalrioolleidingen · — · [klassen] kruisingsleiding | — |
 | EXT-004 | Streng op of nabij particulier terrein (op basis van BRK-percelen) | W | Plausibiliteit | geimplementeerd met test | vrijvervalrioolleidingen · — | skelet: bron buiten scope in deze fase — BRK-percelen zijn in deze fase niet aangeleverd en er wordt geen vervangende bron gezocht. De check is als s… |
 | EXT-007 | Lozingspunt zonder watergang binnen X m; alleen de klassen die op oppervlaktewater lozen (`[klassen] waterlozingspunt`); scopeafwijking in BO-67 | W | Plausibiliteit | geimplementeerd met test | lozingspunten, waterlozingspunten · — | — |

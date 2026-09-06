@@ -41,6 +41,7 @@ from nlriochecker.checks.selectie import (
     leidingen,
     nabijheidsleidingen,
     netwerkknopen,
+    putten,
     vrijvervalrioolleidingen,
 )
 from nlriochecker.checks.verbanden import verbonden_knopen
@@ -1386,7 +1387,11 @@ class VeelAansluitendeStrengen(Check):
     title = "Meer dan vier aansluitende strengen op een put"
     severity = Severity.WARNING
     dimension = Dimension.PLAUSIBILITY
-    rollen = ("leidingen", "netwerkknopen", "vrijvervalrioolleidingen")
+    # `netwerkknopen` blijft in de declaratie omdat de check de gedeelde `_topologie`
+    # leest (die op `netwerkknopen` gebouwd is, mét de compartiment-ontdubbeling van
+    # BO-71); de melding en de telling zijn sinds issue #138 wél tot `putten` versmald --
+    # een gemaal of uitlaat is geen put (register regel 53, "op een put").
+    rollen = ("leidingen", "netwerkknopen", "putten", "vrijvervalrioolleidingen")
     kenmerken = ()
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
@@ -1399,7 +1404,10 @@ class VeelAansluitendeStrengen(Check):
                 if uri is not None:
                     telling.setdefault(uri, []).append(conduit.label)
 
+        put_uris = {node.uri for node in putten(context)}
         for node in _topologie(context).nodes:
+            if node.uri not in put_uris:
+                continue
             strengen = telling.get(node.uri, [])
             if len(strengen) <= maximum:
                 continue
@@ -1420,8 +1428,9 @@ class VeelAansluitendeStrengen(Check):
         return _dedupnotitie(context)
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal putten."""
-        return len(_topologie(context).nodes)
+        """Het aantal putten in de topologie (zonder gemalen en uitlaten)."""
+        put_uris = {node.uri for node in putten(context)}
+        return sum(1 for node in _topologie(context).nodes if node.uri in put_uris)
 
 
 @register

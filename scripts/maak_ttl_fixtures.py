@@ -1537,6 +1537,42 @@ FIXTURES["attr017_wandruwheid_hele_mm.ttl"] = (
     ),
 )
 
+# ATTR-017 versmald tot de vrijvervalstrengen (issue #138): streng 1 (PE, wandruwheid 30)
+# valt buiten de PE-band en meldt; persleiding 2 draagt dezelfde mismatch maar is
+# mechanisch riool en valt buiten de toets -- de toelichting benoemt haar, zoals ATTR-018.
+FIXTURES["attr017_mechanische_leiding.ttl"] = (
+    "streng 1 (PE, wandruwheid 30) meldt; persleiding 2 is mechanisch en valt buiten de "
+    "toets (issue #138)",
+    nette_put("PutA", "A", *A)
+    + nette_put("PutB", "B", *B)
+    + nette_put("PutC", "C", *C)
+    + nette_leiding(
+        "L1",
+        "1",
+        [A, B],
+        "PutA",
+        "PutB",
+        velden={
+            "MateriaalLeiding_ref": "PE",
+            "WandruwheidBinnenboven": 30,
+            "WandruwheidBinnenonder": 30,
+        },
+    )
+    + nette_leiding(
+        "L2",
+        "2",
+        [B, C],
+        "PutB",
+        "PutC",
+        klasse="Persleiding",
+        velden={
+            "MateriaalLeiding_ref": "PE",
+            "WandruwheidBinnenboven": 30,
+            "WandruwheidBinnenonder": 30,
+        },
+    ),
+)
+
 FIXTURES["attr005_centimeters.ttl"] = (
     "streng 1 heeft breedte en hoogte 30; maal tien is dat 300 mm, een handelsmaat",
     nette_put("PutA", "A", *A)
