@@ -91,7 +91,7 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    >   Vink de drie af in je rapport.
    > - Draai de **volledige mechanische poort op de voorgrond** en plak de uitvoer:
    >   `uv run ruff check`, `uv run ruff format --check`, `uv run mypy`,
-   >   `uv run pytest -m 'not zwaar'`.
+   >   `uv run --with pytest-xdist pytest -n 4 -m 'not zwaar'` (BO-94).
    > - **Niet pushen.** Schrijf het volledige rapport naar `<scratchpad>/task-N-report.md`
    >   en antwoord kort (≤ 15 regels): status, gewijzigde bestanden, de vier poortregels
    >   letterlijk, het gemeten De Wolden-getal (zie **Meten**), de checklist-vinkjes en open

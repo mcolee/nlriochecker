@@ -205,9 +205,10 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien dezelfde
   vijf stappen (ruff lint, ruff format, mypy, pytest en een dekkingsondergrens).
   De package levert `py.typed`, dus haar hints komen bij een importeur aan.
-- **Testdekking meet je met `uv run --with pytest-cov pytest --cov=nlriochecker`.**
-  `pytest-cov` staat bewust niet in de dev-groep (afhankelijkheden minimaal); `--with`
-  lost hem per run op. Beide poorten dwingen een ondergrens van 95% af
+- **Testdekking meet je met `uv run --with pytest-cov --with pytest-xdist pytest -n 4 --cov=nlriochecker`.**
+  `pytest-cov` en, sinds BO-94, `pytest-xdist` staan bewust niet in de dev-groep
+  (afhankelijkheden minimaal); `--with` lost ze per run op. Beide poorten dwingen een
+  ondergrens van 95% af
   (`DEKKINGSONDERGRENS` in `scripts/uitgave.py`, gelijk in de CI; `--cov-fail-under`).
   De meting telt sinds issue #115 **takken** mee: `[tool.coverage.run] branch = true` in
   `pyproject.toml` is de enige vindplaats, dus de CI, de uitgavepoort en een handmatige
@@ -250,8 +251,9 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   bewerkt bestand achter zonder die comment -- anders herontdekt de volgende sessie het gat
   (of doet werk over dat al gedaan was). Zie `docs/agents/issue-tracker.md`.
 - Kleine stappen; na elke werkende stap een commit. De **mechanische poort** --
-  `uv run ruff check` en `uv run ruff format`, `uv run mypy`, `uv run pytest` (zonder
-  `zwaar`) -- draait bij elke commit die `src/**.py` raakt. Vóór een push die tests
+  `uv run ruff check` en `uv run ruff format`, `uv run mypy`,
+  `uv run --with pytest-xdist pytest -n 4 -m 'not zwaar'` (BO-94) -- draait bij elke
+  commit die `src/**.py` raakt. Vóór een push die tests
   toevoegt die echte data laden: `uv run python scripts/runnerpoort.py` -- dezelfde poort
   in de conditie van de CI-runner (alleen getrackte `data/`, geen PyQGIS, strikte
   overslagbewaking). Kies daarbovenop de review

@@ -165,7 +165,8 @@ def toets() -> None:
     `pytest-cov` staat bewust niet in de dev-groep en wordt per run met `--with` opgelost;
     `--cov-fail-under=DEKKINGSONDERGRENS` laat de run vallen zodra de dekking eronder zakt.
     Zowel deze poort (met de volledige `data/`) als de CI (zonder) meet ruim boven die
-    grens; zie BO-38.
+    grens; zie BO-38. Sinds BO-94 draait pytest parallel (`-n 4`) via `pytest-xdist`,
+    ook via `--with`; lokaal geverifieerd dat de takdekking daarmee ongewijzigd optelt.
 
     Alle vier de stappen draaien met `--frozen`, zodat de poort `uv.lock` niet aanraakt:
     die lock staat in `VERSIEBESTANDEN` en zou anders halverwege de uitgave gewijzigd
@@ -184,8 +185,12 @@ def toets() -> None:
         "--frozen",
         "--with",
         "pytest-cov",
+        "--with",
+        "pytest-xdist",
         "pytest",
         "-q",
+        "-n",
+        "4",
         "--cov=nlriochecker",
         f"--cov-fail-under={DEKKINGSONDERGRENS}",
     )

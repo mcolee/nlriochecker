@@ -38,7 +38,9 @@ def ci_omgeving() -> dict[str, str]:
 def ci_pytest_opdracht() -> list[str]:
     """De pytest-regel van de stap 'Pytest en dekking' in de workflow, als argumentenlijst."""
     tekst = WORKFLOW.read_text(encoding="utf-8")
-    treffer = re.search(r"^\s+run:\s*(uv run --with pytest-cov pytest .*)$", tekst, re.MULTILINE)
+    # `(?:--with \S+ )+` staat een of meer `--with`-pakketten toe (pytest-cov, sinds
+    # BO-94 ook pytest-xdist), zodat deze regex niet aan een vast aantal vastzit.
+    treffer = re.search(r"^\s+run:\s*(uv run (?:--with \S+ )+pytest .*)$", tekst, re.MULTILINE)
     if treffer is None:
         raise SystemExit("de pytest-stap is niet gevonden in .github/workflows/toets.yml")
     return treffer.group(1).split()

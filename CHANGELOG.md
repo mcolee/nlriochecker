@@ -11,6 +11,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gewijzigd
+
+- **De mechanische poort draait pytest parallel (`-n 4`) via `pytest-xdist`** (BO-94):
+  lokaal geverifieerd dat de takdekking (`branch = true`) tot op de tweede decimaal
+  gelijk blijft aan de seriële run (96,21% in beide, 2426 geslaagd/2 overgeslagen, twee
+  parallelle herhalingen zonder afwijking) terwijl de wandklok van ~96 s naar ~54–57 s
+  zakt. `pytest-xdist` (MIT) loopt net als `pytest-cov` via `--with`, niet in de
+  dev-groep. `.github/workflows/toets.yml`, `scripts/uitgave.py` en
+  `scripts/runnerpoort.py` (regex verbreed voor meerdere `--with`-pakketten) volgen de
+  nieuwe regel.
+
 ### Gerepareerd
 
 - **Vier kleine losse fixes** (issue #156, uit de Fable-swarm van 05-09):

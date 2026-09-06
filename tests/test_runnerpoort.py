@@ -40,7 +40,15 @@ def test_de_grenzen_komen_uit_de_workflow() -> None:
 def test_de_pytest_regel_is_die_van_de_ci() -> None:
     opdracht = RUNNERPOORT.ci_pytest_opdracht()
 
-    assert opdracht[:5] == ["uv", "run", "--with", "pytest-cov", "pytest"]
+    assert opdracht[:7] == [
+        "uv",
+        "run",
+        "--with",
+        "pytest-cov",
+        "--with",
+        "pytest-xdist",
+        "pytest",
+    ]
     assert any(deel.startswith("--cov-fail-under=") for deel in opdracht)
 
 

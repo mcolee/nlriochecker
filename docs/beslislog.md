@@ -5148,3 +5148,44 @@ meldt) naast de bestaande `hgt009_bob_sprong.ttl` (enkele aanvoer). De ledger en
 gelijk).
 
 Zie [#141](https://github.com/mcolee/nlriochecker/issues/141), BO-43 en BO-51.
+
+### BO-94 pytest-xdist in de mechanische poort, na lokale verificatie
+
+**Wat.** De mechanische poort draait pytest sinds deze BO parallel: `-n 4` via
+`pytest-xdist`, opgelost per run met `--with` net als `pytest-cov` (BO-38-precedent) --
+niet in de dev-groep, want "afhankelijkheden minimaal" geldt onverkort. Geraakt:
+`.github/workflows/toets.yml` (de stap "Pytest en dekking"), `scripts/uitgave.py`
+(`toets()`), `CLAUDE.md` (de zin over de mechanische poort en de zin over
+`pytest-cov`/`--with`) en `docs/agents/afk-regie.md` (de implementer-brief).
+`scripts/runnerpoort.py` leest de CI-pytest-regel via een regex uit `toets.yml`; die
+regex is verbreed naar een of meer `--with`-pakketten (`(?:--with \S+ )+`) zodat hij de
+nieuwe regel blijft herkennen.
+
+**Waarom.** Hefboom 4 uit `docs/onderzoek/2026-09-06-wallclock-afk-regie.md` (secties 1.1
+en 2.3): de poort draait meerdere keren per issue (implementer, evt. fixronde, evt.
+`runnerpoort.py`), dus een snellere pytest-stap telt cumulatief mee in de wall-clock van
+een agent-gestuurde regie.
+
+**Verificatie vóór invoering.** Het onderzoek noemde als enige echte risico dat
+`pytest-cov`'s dekkingscombinatie over workers niet expliciet met `branch = true`
+(takdekking, BO-38) bevestigd was. Lokaal gemeten op deze machine (4 kernen), seriële
+referentie tegen twee parallelle herhalingen, alle drie met `-m 'not zwaar'
+--cov=nlriochecker --cov-fail-under=95`:
+
+| Run | Wandklok | Dekking (TOTAL) | Geslaagd / overgeslagen |
+|---|---|---|---|
+| Serieel | 96,0 s | 96,21% | 2426 / 2 |
+| Parallel (`-n 4`), poging 1 | 56,8 s | 96,21% | 2426 / 2 |
+| Parallel (`-n 4`), poging 2 | 54,3 s | 96,21% | 2426 / 2 |
+
+De dekking is tot op de tweede decimaal gelijk in alle drie de runs, evenals
+geslaagd/overgeslagen; geen nieuwe fouten en geen parallel-only afwijking over de twee
+herhalingen. De wandklok daalt van ~96 s naar ~54-57 s (circa 40-45%). De gedeelde
+schijf-cache `~/.cache/gwsw-orox-helpers` en het `tmp_path`-gebruik in 37 van de 74
+testbestanden gaven in deze meting geen aanleiding tot conflicten.
+
+**Voorwaarde.** Zonder deze gelijkheid (dekkingsgetal of testresultaat wijkt af tussen
+serieel en parallel) gaat `pytest-xdist` niet in de poort; dat is precies wat hierboven
+geverifieerd is vóór de invoering.
+
+Zie `docs/onderzoek/2026-09-06-wallclock-afk-regie.md` (secties 1.1, 2.3).

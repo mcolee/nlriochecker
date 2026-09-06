@@ -152,7 +152,7 @@ def test_de_dekkingsondergrens_is_overal_hetzelfde_getal() -> None:
 
     # En CLAUDE.md noemt hetzelfde getal en het meetcommando.
     claude = (WORTEL / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "uv run --with pytest-cov pytest --cov=nlriochecker" in claude
+    assert "uv run --with pytest-cov --with pytest-xdist pytest -n 4 --cov=nlriochecker" in claude
     # Anker op de ondergrens-zin, niet op het losse "97%" van de laatste meting.
     assert f"ondergrens van {grens}%" in claude
 
