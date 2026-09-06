@@ -16,6 +16,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import shapely
 from gwsw_orox_helpers.dataset import load_dataset
 from shapely.geometry import LineString, Point, box
 from shapely.geometry.base import BaseGeometry
@@ -744,6 +745,38 @@ def test_ahn_monsters_delen_een_enkele_cachesleutel(
 
     ahn_sleutels = sorted(s for s in context._cache if s.split(":", 1)[0] == "ahn")
     assert ahn_sleutels == ["ahn:monsters"]
+
+
+def test_extent_is_geprepareerd_na_lees_studiegebied(bronnen: ExternalData) -> None:
+    """`load_external_data` prepareert de extent in situ (issue #146).
+
+    `shapely.prepare` bouwt eenmalig een ruimtelijke index op de begrenzingspolygoon;
+    daarna leunt elke `binnen_bereik`-toets (extent.intersects per object) op die index
+    in plaats van hem per aanroep opnieuw op te bouwen. `prepare` muteert de geometrie
+    zelf, dus het frozen dataclass-veld blijft dezelfde -- nu geprepareerde -- geometrie.
+    """
+    assert bronnen.extent is not None
+    assert shapely.is_prepared(bronnen.extent)
+
+
+def test_hgt_selectie_deelt_een_enkele_cachesleutel(
+    config: CheckConfig, bronnen: ExternalData
+) -> None:
+    """HGT-001/002/003 delen één `ext:selectie:`-sleutel (issue #146).
+
+    De drie lezen dezelfde populatie (`netwerkknopen`) via dezelfde `geometrie_van`, dus
+    de selectie -- de splitsing in toetsbaar/buiten/onbetrouwbaar/zonder geometrie -- is
+    voor alle drie identiek. Vroeger sleutelde `selectie()` per check-id
+    (`ext:selectie:HGT-001` enz.) en draaide `_selecteer` drie keer over dezelfde knopen;
+    de sleutel op de populatie-afleiding laat de drie er één delen.
+    """
+    dataset = load_dataset(SCENARIO, [])
+    context = CheckContext(dataset=dataset, config=config, bronnen=bronnen)
+
+    run_checks(context, ["HGT-001", "HGT-002", "HGT-003"])
+
+    ext_selectie = sorted(s for s in context._cache if s.startswith("ext:selectie:"))
+    assert ext_selectie == ["ext:selectie:netwerkknopen"]
 
 
 def test_ext003_geeft_elke_doorkruising_een_eigen_melding_id(

@@ -53,6 +53,21 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **De extent-toets van de EXT-checks is geprepareerd en de selectie wordt per populatie
+  gedeeld** (issue #146): `binnen_bereik` toetst voor elk GWSW-object
+  `extent.intersects(geometrie)` -- op De Wolden en Hoogeveen ruim 125.000 aanroepen op een
+  begrenzingspolygoon van bijna 6.000 punten. `load_external_data` roept nu direct na
+  `load_study_area` één keer `shapely.prepare(extent)` aan; dat bouwt een ruimtelijke index op
+  de polygoon en muteert haar in situ (het frozen `ExternalData.extent`-veld draagt dezelfde,
+  nu geprepareerde geometrie). Micro-meting op de EXT-001-populatie (39.966 geometrieën): de
+  per-object-toets zakt van ~1,5 s naar ~0,19 s per pas, de bulkvorm `shapely.intersects` doet
+  ~0,012 s, met dezelfde uitkomst (`scripts/meet_extent_prepare.py`). Daarnaast sleutelt
+  `_ExterneCheck.selectie` haar cache niet meer per check-id maar op de populatie-afleiding
+  (`populatie_sleutel`), zodat HGT-001/002/003 hun `netwerkknopen`-selectie delen in plaats van
+  `_selecteer` drie keer over dezelfde knopen te laten lopen. Samen zakt de checktijd van
+  HGT-001/002/003 van ~7,3 s naar ~4,5 s (gepaard gemeten, referentie `c4f5694`), zonder één
+  verschoven melding: `bevindingen.csv` van de volle `toets` is sha256-gelijk (161.692 rijen).
+
 - **TOP-006, TOP-010 en TOP-011 zoeken hun strengparen in bulk** (issue #145): de drie
   nabijheidschecks liepen per streng door `_buren` (een STRtree-rondgang per streng, ~219k
   aanroepen op De Wolden en Hoogeveen) en rekenden hun overlap, afstand of kruising per paar

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+import shapely
 from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
 
@@ -434,6 +435,13 @@ def _lees_studiegebied(
 
     try:
         gebied = load_study_area(pad)
+        # `binnen_bereik` toetst voor elk GWSW-object `extent.intersects(geometrie)`; op De
+        # Wolden en Hoogeveen is dat ruim 125.000 aanroepen op een polygoon van duizenden
+        # punten. `shapely.prepare` bouwt daar eenmalig een ruimtelijke index op, zodat elke
+        # `intersects` er daarna op leunt in plaats van hem opnieuw op te bouwen. Het muteert
+        # de geometrie in situ (het frozen dataclass-veld draagt straks dezelfde, nu
+        # geprepareerde geometrie) en levert niets terug. Zie issue #146.
+        shapely.prepare(gebied.geometry)
     except StudyAreaError as error:
         raise ExternalDataError(
             f"{pad}: het studiegebied is niet leesbaar ({error}). Zonder begrenzing mag "

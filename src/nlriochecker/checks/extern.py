@@ -207,6 +207,13 @@ class _ExterneCheck(Check):
 
     rol: str = ""
     soort: str = "objecten"
+    # De naam van de populatie die `objecten()` oplevert, waarop `selectie()` haar cache
+    # sleutelt. Checks met dezelfde `objecten()` (en de gedeelde `geometrie_van`) leveren
+    # dezelfde `_Selectie`, dus die delen deze sleutel en `_selecteer` draait voor hen één
+    # keer -- zo delen HGT-001/002/003 hun `netwerkknopen`-selectie. Leeg betekent: elk zijn
+    # eigen sleutel op check-id. Wie hem deelt, moet er zeker van zijn dat de populaties
+    # gelijk zijn; anders geeft de gedeelde cache stil de selectie van de eerste beller.
+    populatie_sleutel: str = ""
 
     @classmethod
     def bronrollen(cls) -> frozenset[str]:
@@ -242,9 +249,14 @@ class _ExterneCheck(Check):
         return None
 
     def selectie(self, context: CheckContext) -> _Selectie:
-        """De toetsbare objecten, een keer per context bepaald."""
+        """De toetsbare objecten, een keer per populatie bepaald.
+
+        De sleutel hangt aan de populatie-afleiding (`populatie_sleutel`) en niet aan het
+        check-id, zodat checks met dezelfde `objecten()` de selectie delen in plaats van
+        `_selecteer` elk over dezelfde objecten te laten lopen (issue #146).
+        """
         return context.cached(
-            f"ext:selectie:{self.id}",
+            f"ext:selectie:{self.populatie_sleutel or self.id}",
             lambda: _selecteer(context, self.objecten(context), self.geometrie_van),
         )
 
@@ -1071,6 +1083,9 @@ class _AhnCheck(_ExterneCheck):
     """Basis voor de hoogtechecks die het AHN als referentie gebruiken."""
 
     soort = "putten"
+    # HGT-001/002/003 lezen dezelfde populatie (`netwerkknopen`), dus delen ze één
+    # `ext:selectie:`-sleutel in plaats van elk per check-id te selecteren (issue #146).
+    populatie_sleutel = "netwerkknopen"
 
     @classmethod
     def bronrollen(cls) -> frozenset[str]:
