@@ -23,6 +23,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   voor-byte hetzelfde gedrag als voorheen. De Verantwoording in het rapport noemt elk
   overschreven sleutelpad met basiswaarde en projectwaarde; geen JSON-, CSV-, `gwsw_run`- of
   schemawijziging.
+- **Leeslaag gepind op `gwsw-orox-helpers` v0.2.4 en twee naadfuncties gedelegeerd**
+  (issue #166). De direct reference en `[tool.uv.sources]` in `pyproject.toml` gaan van
+  `v0.2.2` naar `v0.2.4` (`uv.lock` op commit `f306f57`); de bump levert het snellere
+  koude-na-treffer-laadpad (graafpickle met GC uit, hybride containers, snelpad-pickler --
+  gemeten in de leeslaag: graaflading 7,7 -> 2,75 s, piek 1202 -> 842 MiB) plus de acht
+  versie-juiste graafvraag-methoden op `GwswDataset`. `leeslaag.houders` en
+  `leeslaag.kenmerkinstanties` worden éénregelige delegaties naar `GwswDataset.houders`/
+  `dragers` respectievelijk `kenmerkinstanties`; de instantieset, de volgorde en de
+  BNode-terugval blijven gelijk, dus geen gedragswijziging (gouden ledger byte-gelijk).
+  `RdfNode` komt in `leeslaag.py` nu rechtstreeks uit `rdflib.term` (v0.2.4 re-exporteert
+  die rdflib-alias niet meer uit `gwsw_orox_helpers.dataset`); het is dezelfde `rdflib`-type.
+  `scripts/meet_leeslaag_cache.py` onderbouwt de cachetreffer-winst (BO-43). Geen contract-,
+  kolom-, CLI- of JSON-wijziging.
 - **`bevindingen.csv` is een NL-Excel-bestand** (issue #165, BO-97). Alle CSV's worden
   geschreven met komma als decimaalteken en een UTF-8-BOM (naast de bestaande puntkomma),
   zodat een Nederlandse Excel ze zonder verminkte coördinaten (`218994.745` -> `218994745`)

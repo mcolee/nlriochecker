@@ -19,8 +19,9 @@ dependencies = [
     # gebundelde GWSW-ontologie 1.6 (en sinds 0.2.1 ook 1.7); afgesplitst als eigen
     # MIT-package. Direct reference (PEP 508) omdat het pakket niet op PyPI staat: een
     # gewone versie-eis levert bij `uv build` een `Requires-Dist` zonder bron op, en dan
-    # is de wheel voor niemand installeerbaar (issue #158). Pin blijft v0.2.2 tot #166.
-    "gwsw-orox-helpers @ git+https://github.com/mcolee/gwsw-orox-helpers@v0.2.2",
+    # is de wheel voor niemand installeerbaar (issue #158). Gepind op v0.2.4 (issue #166):
+    # koud laadpad en acht versie-juiste graafvragen die `leeslaag.py` delegeert.
+    "gwsw-orox-helpers @ git+https://github.com/mcolee/gwsw-orox-helpers@v0.2.4",
     "networkx>=3.3",
     "pandas>=2.2",
     "pydantic>=2.7",
@@ -43,7 +44,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-gwsw-orox-helpers = { git = "https://github.com/mcolee/gwsw-orox-helpers", tag = "v0.2.2" }
+gwsw-orox-helpers = { git = "https://github.com/mcolee/gwsw-orox-helpers", tag = "v0.2.4" }
 
 [tool.hatch.metadata]
 # Vereist zodra een dependency een directe referentie is (`@ git+...`) in plaats van een

@@ -1,10 +1,11 @@
 """De naad tussen de checks en de graaflaag van `gwsw-orox-helpers`.
 
 Dit is de enige module in `src/` die de graafvragen van de leeslaag stelt: `of_class`,
-`subjects_of_class`, `onderdelen`, `graph_is_a`, de `hasPart`/`hasAspect`-houders, de
-`hasConnection`-buren en de kenmerkvragen die rechtstreeks op `dataset.graph` en rdflib
-leunen. Elders in `src/` staat achter elke bewerking een van de acht domeinvragen
-hieronder (plus de twee kenmerkvragen die ATTR-014 nodig heeft); `tests/
+`subjects_of_class`, `onderdelen`, `graph_is_a` (rechtstreeks), de `hasPart`/`hasAspect`-
+houders en de kenmerkinstanties (gedelegeerd naar `GwswDataset.houders`/`dragers`/
+`kenmerkinstanties` sinds v0.2.4, issue #166), en de `hasConnection`-buren en de
+overige kenmerkvragen die nog rechtstreeks op `dataset.graph` en rdflib leunen. Elders in
+`src/` staat achter elke bewerking een van de domeinvragen hieronder; `tests/
 test_architectuur_laagsnit.py` (hek a4) bewaakt dat geen andere module nog rdflib
 importeert of `dataset.graph` aanraakt.
 
@@ -21,14 +22,10 @@ De module leunt uitsluitend op de publieke API van `gwsw-orox-helpers`
 
 from __future__ import annotations
 
-from gwsw_orox_helpers.dataset import (
-    GwswDataset,
-    RdfNode,
-    aspect_holders_of,
-    part_holders_of,
-)
+from gwsw_orox_helpers.dataset import GwswDataset
 from gwsw_orox_helpers.namen import termen_voor
-from rdflib import RDF, BNode, URIRef
+from rdflib import BNode, URIRef
+from rdflib.term import Node as RdfNode
 
 
 def knopen_van(dataset: GwswDataset, wortel: str) -> list[str]:
@@ -74,14 +71,15 @@ def onderdelen_van(dataset: GwswDataset, uri: str, wortel: str | None = None) ->
 def houders(dataset: GwswDataset, uri: str, *, aspecten: bool = False) -> list[str]:
     """De objecten die dit object via `hasPart` (en optioneel `hasAspect`) bevatten.
 
-    In de graafvolgorde van de leeslaag: eerst de `hasPart`-houders in beide
-    schrijfrichtingen, en met `aspecten=True` daarachter de `hasAspect`-houders.
+    Delegeert naar `GwswDataset.houders`/`dragers` (v0.2.4): dezelfde lezing van de
+    `hasPart`-houders in beide schrijfrichtingen, en met `aspecten=True` daarachter de
+    `hasAspect`-houders, in dezelfde graafvolgorde. De BNode-terugval waar dit lichaam
+    vroeger `_term` voor riep, zit nu in de leeslaag zelf (`_subject_term`, gelijk aan
+    het `_term` hieronder), dus de uitkomst blijft byte-gelijk (issue #166).
     """
-    term = _term(dataset, uri)
-    graaf = dataset.graph
-    gevonden = [str(houder) for houder in part_holders_of(graaf, term)]
+    gevonden = dataset.houders(uri)
     if aspecten:
-        gevonden += [str(houder) for houder in aspect_holders_of(graaf, term)]
+        gevonden += dataset.dragers(uri)
     return gevonden
 
 
@@ -104,12 +102,13 @@ def buren(dataset: GwswDataset, uri: str) -> set[str]:
 def kenmerkinstanties(dataset: GwswDataset, kenmerk: str) -> list[str]:
     """De URI's van de instanties van een kenmerktype (`rdf:type` gelijk aan `basis+kenmerk`).
 
-    De basis komt versie-juist uit `gwsw_versie.basis`, zodat ATTR-014 op een
-    1.7-export niet stil nul instanties telt (issue #139).
+    Delegeert naar `GwswDataset.kenmerkinstanties` (v0.2.4) en houdt alleen de URI aan:
+    die methode geeft per instantie ook de `hasValue`/`hasReference`, die ATTR-014 langs
+    deze weg niet nodig heeft. Versie-juist via de gedetecteerde basis, dus op een
+    1.7-export geen stille nul (issue #139); de instantieset en -volgorde blijven gelijk
+    (issue #166).
     """
-    basis = termen_voor(dataset.gwsw_versie.basis).basis
-    kenmerk_uri = URIRef(basis + kenmerk)
-    return [str(instantie) for instantie in dataset.graph.subjects(RDF.type, kenmerk_uri)]
+    return [uri for uri, _waarde, _referentie in dataset.kenmerkinstanties(kenmerk)]
 
 
 def subjecten_met_waardeproperty(dataset: GwswDataset) -> tuple[set[str], set[str]]:
