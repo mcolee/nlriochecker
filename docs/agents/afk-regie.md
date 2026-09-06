@@ -37,10 +37,20 @@ de bron van de punten die hier zijn aangescherpt.
   een bug los je op met `superpowers:systematic-debugging`; de review gaat via
   `superpowers:requesting-code-review`. Een agent die een skill negeert, doet het over.
 
-## Volgorde — strikt sequentieel
+## Volgorde — strikt sequentieel, met één toegestane overlap
 
 Issues die bestanden delen doe je één voor één; noteer hier de volgorde en de
-`blocked by`-relaties:
+`blocked by`-relaties.
+
+**Twee implementers tegelijk mag** (auteursbesluit 06-09), elk in een eigen worktree via
+`superpowers:using-git-worktrees`, onder vier voorwaarden: de twee issues delen geen
+bestanden buiten `CHANGELOG.md` (dus ook niet `tests/golden/ledger.json` of de
+fixture-generator); hooguit één van de twee doet een De Wolden-meting (4 cores, 16 GB:
+twee pytest-runs kunnen, twee volle runs niet); geen `blocked by`-relatie tussen de twee;
+en geen van beide is een contract-issue (die gaan één voor één door de Substantiële
+review). De regisseur merget in de volgorde van de tabel en lost de `CHANGELOG.md`-botsing
+zelf op; review, commit en CI blijven per issue. Elke worktree heeft een eigen `.venv`
+(`uv sync`, ~1 min eenmalig). Meer dan twee tegelijk nooit.
 
 1. **#…** …
 2. **#…** … — *blocked by #…*

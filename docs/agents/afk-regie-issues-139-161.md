@@ -82,7 +82,11 @@ volle De Wolden-meting tegelijk.
 | F | 29 | **#170** research puntbemonstering uit een float32-raster → `docs/onderzoek/` | — | Sonnet | Klein | geen code; `mattpocock-skills:research`; comment op #168 |
 
 Eén issue = commit + push + CI groen + comment + close; alleen de CI-wacht mag overlappen
-met de dispatch van het volgende issue (sjabloon, stap 7).
+met de dispatch van het volgende issue (sjabloon, stap 7), en twee implementers mogen in
+eigen worktrees naast elkaar werken onder de voorwaarden uit het sjabloon ("Volgorde").
+Paren die daarvoor in aanmerking komen: **D:** #157 + #158 naast #159; **E:** #169 naast
+#137; **F:** #170 (alleen docs) naast elk ander issue. Niet: #159/#160/#161 onderling
+(delen `src/`), #163/#165 (contract), #166 naast een ander (meting + pin).
 
 ## Bewijslast per issue (De Wolden, tegen `uitvoer/04092026_slotrun`)
 

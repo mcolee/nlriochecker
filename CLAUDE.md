@@ -304,6 +304,9 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   (3) een Klein-issue op Sonnet leest van `docs/architectuur.md` alleen de secties die het
   raakt en `analyse-harness.md` alleen bij een meting. Samen ~10 min en 20-30 % van de
   tokens per issue; de reviews en fixrondes blijven, die vingen 3 van 5 keer een echte fout.
+  (4) Twee implementers tegelijk mag, elk in een eigen worktree, alleen voor issues die
+  geen bestanden delen buiten `CHANGELOG.md`, zonder `blocked by`, geen contract-issue en
+  hooguit één De Wolden-meting; de regisseur merget in tabelvolgorde. Nooit meer dan twee.
 - Openstaand werk staat als GitHub-issue op `mcolee/nlriochecker`, niet hier. Lijst ze met
   `gh issue list`; zie `docs/agents/issue-tracker.md`. Hou die lijst de enige plek, zodat
   niemand een openstaand punt in twee toestanden aantreft.
