@@ -15,7 +15,8 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date
 
-from gwsw_orox_helpers.dataset import HAS_CONNECTION, Conduit, Node, part_holders_of, parts_of
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node, part_holders_of, parts_of
+from gwsw_orox_helpers.namen import termen_voor
 from rdflib import URIRef
 
 from nlriochecker.checks.base import (
@@ -29,6 +30,16 @@ from nlriochecker.checks.base import (
 from nlriochecker.checks.selectie import leidingen, lozeleidingen, netwerkknopen
 from nlriochecker.checks.verbanden import aansluitingen
 from nlriochecker.taal import getal, vorm
+
+
+def _has_connection(dataset: GwswDataset) -> URIRef:
+    """Het `hasConnection`-predicaat in de basis van deze export.
+
+    Uit `dataset.gwsw_versie.basis`, zodat ADM-008 op een 1.7-export niet stil nul buren
+    ziet en elk compartiment onverbonden noemt (issue #139). Voorlopig een privé-helper;
+    #159 vervangt hem door de graafvraag `buren` uit de leeslaag.
+    """
+    return URIRef(termen_voor(dataset.gwsw_versie.basis).has_connection)
 
 
 @register
@@ -360,6 +371,7 @@ class PutonderdelenZonderVerbinding(Check):
     def _verbonden(self, context: CheckContext, onderdelen: list[str]) -> bool:
         """Geeft aan of er tussen deze onderdelen een verbinding geregistreerd is."""
         dataset = context.dataset
+        has_connection = _has_connection(dataset)
         orientaties = {
             orientatie
             for uri in onderdelen
@@ -367,26 +379,30 @@ class PutonderdelenZonderVerbinding(Check):
         }
         for orientatie in orientaties:
             subject = URIRef(orientatie)
-            buren = {str(buur) for buur in dataset.graph.objects(subject, HAS_CONNECTION)}
-            buren |= {str(buur) for buur in dataset.graph.subjects(HAS_CONNECTION, subject)}
+            buren = {str(buur) for buur in dataset.graph.objects(subject, has_connection)}
+            buren |= {str(buur) for buur in dataset.graph.subjects(has_connection, subject)}
             # Een verbinding loopt via een begin- of eindpunt van een onderdeel; dat
             # eindpunt hangt met hasPart aan een onderdeelorientatie.
             for buur in buren:
                 for houder in part_holders_of(dataset.graph, URIRef(buur)):
-                    andere = self._raakt_ander_onderdeel(dataset, houder, orientaties, orientatie)
+                    andere = self._raakt_ander_onderdeel(
+                        dataset, houder, orientaties, orientatie, has_connection
+                    )
                     if andere:
                         return True
                 if buur in orientaties:
                     return True
         return False
 
-    def _raakt_ander_onderdeel(self, dataset, houder, orientaties: set[str], eigen: str) -> bool:
+    def _raakt_ander_onderdeel(
+        self, dataset, houder, orientaties: set[str], eigen: str, has_connection: URIRef
+    ) -> bool:
         """Geeft aan of deze onderdeelorientatie ook een ander compartiment raakt."""
         for deel in parts_of(dataset.graph, houder):
-            for buur in dataset.graph.objects(deel, HAS_CONNECTION):
+            for buur in dataset.graph.objects(deel, has_connection):
                 if str(buur) in orientaties and str(buur) != eigen:
                     return True
-            for buur in dataset.graph.subjects(HAS_CONNECTION, deel):
+            for buur in dataset.graph.subjects(has_connection, deel):
                 if str(buur) in orientaties and str(buur) != eigen:
                     return True
         return False

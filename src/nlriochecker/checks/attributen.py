@@ -13,7 +13,8 @@ from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from gwsw_orox_helpers.dataset import GWSW, HAS_REFERENCE, HAS_VALUE, Conduit, Node
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
+from gwsw_orox_helpers.namen import termen_voor
 from rdflib import RDF, URIRef
 
 from nlriochecker import taal
@@ -1407,6 +1408,17 @@ def _is_vulwaarde_nul(waarde: object) -> bool:
         return False
 
 
+def _waardepredikaten(dataset: GwswDataset) -> tuple[str, URIRef, URIRef]:
+    """De basis en de twee waardeproperty's (`hasValue`, `hasReference`) van deze export.
+
+    Uit `dataset.gwsw_versie.basis`, zodat ATTR-014 op een 1.7-export niet stil nul
+    kenmerkinstanties telt en haar bevindingen mist (issue #139). Voorlopig een
+    privé-helper; #159 vervangt hem door de predicaat- en kenmerkvragen uit de leeslaag.
+    """
+    termen = termen_voor(dataset.gwsw_versie.basis)
+    return termen.basis, URIRef(termen.has_value), URIRef(termen.has_reference)
+
+
 def _property_tellingen(context: CheckContext) -> dict[str, _PropertyTelling]:
     """Telt per kenmerktype de instanties die de door de ontologie geeiste property missen.
 
@@ -1433,18 +1445,19 @@ def _property_tellingen(context: CheckContext) -> dict[str, _PropertyTelling]:
     if not context.dataset.kenmerk_property:
         return {}
     graph = context.dataset.graph
-    met_waarde = {subject for subject, _ in graph.subject_objects(HAS_VALUE)}
-    met_referentie = {subject for subject, _ in graph.subject_objects(HAS_REFERENCE)}
+    basis, has_value, has_reference = _waardepredikaten(context.dataset)
+    met_waarde = {subject for subject, _ in graph.subject_objects(has_value)}
+    met_referentie = {subject for subject, _ in graph.subject_objects(has_reference)}
     tellingen: dict[str, _PropertyTelling] = {}
     for kenmerk, verwacht in context.dataset.kenmerk_property.items():
         totaal = fout = vulwaarde_nul = 0
-        for instantie in graph.subjects(RDF.type, URIRef(GWSW + kenmerk)):
+        for instantie in graph.subjects(RDF.type, URIRef(basis + kenmerk)):
             totaal += 1
             heeft_waarde = instantie in met_waarde
             heeft_referentie = instantie in met_referentie
             if verwacht == "hasReference" and not heeft_referentie and heeft_waarde:
                 fout += 1
-                if _is_vulwaarde_nul(graph.value(instantie, HAS_VALUE)):
+                if _is_vulwaarde_nul(graph.value(instantie, has_value)):
                     vulwaarde_nul += 1
             elif verwacht == "hasValue" and not heeft_waarde and heeft_referentie:
                 fout += 1

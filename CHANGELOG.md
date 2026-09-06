@@ -11,6 +11,19 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Gerepareerd
+
+- **De checks lezen de graaf versie-onafhankelijk** (issue #139): drie plekken bevroegen de
+  datagraaf met de vaste 1.6-namespaceconstanten (`hasConnection` in `nulbevinding._Joiner`
+  en ADM-008, `hasValue`/`hasReference` en de kenmerkklasse-IRI in ATTR-014). Op een
+  GWSW-1.7-export (basis `http://data.gwsw.nl/1.7/totaal/`) matchte dat niets en lazen ze
+  stil nul: ADM-008 gaf een valse melding, ATTR-014 miste haar bevindingen. De drie plekken
+  leiden het predicaat nu af uit `dataset.gwsw_versie.basis` via
+  `gwsw_orox_helpers.namen.termen_voor` (publieke API van v0.2.2). Geen verschil op De Wolden
+  en Hoogeveen (1.6): de ledger blijft byte-gelijk. Een gepaarde 1.6/1.7-drifttest
+  (`tests/test_versie_drift.py`) bewaakt per fixture gelijke bevindingen; de volle 195 paren
+  draaien onder de marker `zwaar`.
+
 ### Gewijzigd
 
 - **NET-006 keurt hemelwater→vuilwater alleen binnen een VGS goed** (issue #129): de

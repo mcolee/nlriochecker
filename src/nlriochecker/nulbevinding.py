@@ -44,7 +44,8 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
-from gwsw_orox_helpers.dataset import GWSW, GwswDataset, aspect_holders_of, part_holders_of
+from gwsw_orox_helpers.dataset import GwswDataset, aspect_holders_of, part_holders_of
+from gwsw_orox_helpers.namen import termen_voor
 from rdflib import URIRef
 
 from nlriochecker.meting import Nulmeting
@@ -66,7 +67,15 @@ ERNST_VIOLATION = "Violation"
 # (beginpunt, orientatie, streng); de rem is er tegen een cyclus in de brondata.
 MAX_DIEPTE = 6
 
-HAS_CONNECTION = URIRef(f"{GWSW}hasConnection")
+
+def _has_connection(dataset: GwswDataset) -> URIRef:
+    """Het `hasConnection`-predicaat in de basis van deze export.
+
+    Uit `dataset.gwsw_versie.basis`, zodat een 1.7-export (basis
+    `http://data.gwsw.nl/1.7/totaal/`) niet stil nul buren geeft (issue #139). Voorlopig
+    een privé-helper; #159 vervangt hem door de graafvraag `buren` uit de leeslaag.
+    """
+    return URIRef(termen_voor(dataset.gwsw_versie.basis).has_connection)
 
 
 @dataclass(frozen=True)
@@ -275,6 +284,7 @@ class _Joiner:
         self._objecten = frozenset(dataset.nodes) | frozenset(dataset.conduits)
         self._per_fragment = {kort(uri): uri for uri in self._objecten}
         self._basis = _basis(self._objecten)
+        self._has_connection = _has_connection(dataset)
         self._memo: dict[str, str] = {}
         self._instanties: dict[str, int] | None = None
 
@@ -398,8 +408,8 @@ class _Joiner:
         insluitend |= {str(houder) for houder in aspect_holders_of(graaf, knoop)}
         if insluitend or not met_verbinding:
             return insluitend
-        verbonden = {str(ander) for ander in graaf.subjects(HAS_CONNECTION, knoop)}
-        verbonden |= {str(ander) for ander in graaf.objects(knoop, HAS_CONNECTION)}
+        verbonden = {str(ander) for ander in graaf.subjects(self._has_connection, knoop)}
+        verbonden |= {str(ander) for ander in graaf.objects(knoop, self._has_connection)}
         return verbonden
 
 
