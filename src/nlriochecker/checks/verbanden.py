@@ -135,6 +135,24 @@ def putten_van(context: CheckContext, conduit: Conduit) -> list[Node]:
     return gevonden
 
 
+def knooplabel(context: CheckContext, uri: str | None) -> str:
+    """Het label van de knoop boven een strengkoppeling, of de URI als er geen label is."""
+    dataset = context.dataset
+    knoop = dataset.resolve_network_node(uri, context.config.klassen.netwerkknopen)
+    # Een streng die op een telbaar hulpstuk eindigt zit sinds BO-83 in de graaf en wordt
+    # dus door NET-009 beoordeeld; zonder deze terugval noemt de melding daar een lege
+    # naam ("van 'A' naar ''") in plaats van het T-stuk waar zij werkelijk op uitkomt.
+    if knoop is None and uri is not None and uri in telbare_hulpstukken(context):
+        knoop = uri
+    node = dataset.nodes.get(knoop or "")
+    return node.label if node is not None and node.label else (knoop or "")
+
+
+def stelseltype_van(context: CheckContext, conduit: Conduit) -> str | None:
+    """Het stelseltype van een streng volgens de projectconfig."""
+    return context.config.klassen.stelseltype(conduit.types, context.dataset.closure)
+
+
 def netwerkdelen(context: CheckContext) -> list[set[str]]:
     """De samenhangende delen van het vrijvervalnetwerk, als knoopverzamelingen.
 

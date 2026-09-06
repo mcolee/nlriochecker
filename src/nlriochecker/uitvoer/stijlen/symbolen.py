@@ -35,7 +35,7 @@ drain, duiker, berging, loos.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from xml.sax.saxutils import escape, quoteattr
 
@@ -342,7 +342,7 @@ class _Opbouw:
         self._teller += 1
         return _SLEUTELBASIS.format(self._teller)
 
-    def voeg_symbool_toe(self, xml_van_naam) -> str:
+    def voeg_symbool_toe(self, xml_van_naam: Callable[[str], str]) -> str:
         """Voegt een symbool toe en levert zijn nummer als tekst."""
         naam = str(len(self.symbolen))
         self.symbolen.append(xml_van_naam(naam))
@@ -394,7 +394,7 @@ def _qml_lijnen(objecttypen: Collection[str] | None = None) -> str:
         ),
     ):
         naam = opbouw.voeg_symbool_toe(
-            lambda n, k=kleur, h=hoek, g=grootte: _pijlsymbool(n, k, h, g)
+            lambda n, k=kleur, h=hoek, g=grootte: _pijlsymbool(n, k, h, g)  # type: ignore[misc]
         )
         voorwaarde = f'"richting_bob" = {_tekst(richting)}'
         opbouw.regels.append(
@@ -460,7 +460,7 @@ def _filter_type(objecttype: str) -> str:
     return f'lower("objecttype") = {_tekst(objecttype.lower())}'
 
 
-def _filter_vangnet(tabel: dict) -> str:
+def _filter_vangnet(tabel: Mapping[str, object]) -> str:
     """Alles wat niet in de tabel staat, plus objecten zonder objecttype."""
     bekend = ", ".join(_tekst(naam.lower()) for naam in sorted(tabel))
     return f'lower("objecttype") not in ({bekend}) or "objecttype" is null'

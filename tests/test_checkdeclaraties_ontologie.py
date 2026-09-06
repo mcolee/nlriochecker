@@ -92,6 +92,15 @@ UITZONDERINGEN: dict[tuple[str, str], str] = {
     ("HGT-011", "Putdekselniveau"): (
         "[domeinkeuze] Leest het bovenkantniveau (deksel/maaiveld) op `netwerkknopen`."
     ),
+    ("HGT-011", "Drempelniveau"): (
+        "[structuur] Leest de overstortdrempels via `drempels_per_put` (engine-navigatie, "
+        "niet via een rol): die hangen aan overstortputten en niet aan elke netwerkknoop. "
+        "Dezelfde drempelpopulatie als RVZ-011."
+    ),
+    ("HGT-011", "Drempelbreedte"): (
+        "[structuur] Als Drempelniveau: `drempels_per_put` bouwt elke drempel met niveau én "
+        "breedte; HGT-011 gebruikt alleen het niveau."
+    ),
     ("HGT-018", "Putdekselniveau"): (
         "[domeinkeuze] Leest het bovenkantniveau (deksel/maaiveld) op de put aan het "
         "streng-uiteinde; de gedeclareerde rol is de vrijvervalstreng."

@@ -204,7 +204,7 @@ class PlausibilityTables(BaseModel):
         )
 
 
-def _zoek(regels: list, veld: str, waarde: str | None):
+def _zoek[T](regels: list[T], veld: str, waarde: str | None) -> T | None:
     """De eerste regel waarvan het veld gelijk is aan de waarde."""
     if waarde is None:
         return None

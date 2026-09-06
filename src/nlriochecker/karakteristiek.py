@@ -12,14 +12,35 @@ check in het register.
 
 from __future__ import annotations
 
+import datetime
 from collections import Counter
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from gwsw_orox_helpers.dataset import GwswDataset, Inwinning
 
 from nlriochecker.checkconfig import CheckConfig
 
 JAARGRENS = (1, 1)
+
+
+class _Aspect(Protocol):
+    """De kenmerkvorm die deze module leest.
+
+    Het concrete `Aspect`-type leeft in de leeslaag (`gwsw-orox-helpers`); die naam
+    valt buiten de bevroren publieke API (`tests/test_architectuur_laagsnit.py`, a4),
+    dus wordt hij hier structureel beschreven in plaats van geimporteerd.
+    """
+
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def inwinning(self) -> Inwinning | None: ...
+
+    @property
+    def date(self) -> datetime.date | None: ...
 
 
 @dataclass(frozen=True)
@@ -181,7 +202,7 @@ def _inwinningsvulling(dataset: GwswDataset, config: CheckConfig) -> list[Inwinn
     return vullingen
 
 
-def _herkomsten(aspecten) -> list[Inwinning | None]:
+def _herkomsten(aspecten: Iterable[_Aspect | None]) -> list[Inwinning | None]:
     """De inwinning van de aanwezige kenmerken; ontbrekende kenmerken tellen niet mee.
 
     Voor de BOB's is er geen terugval nodig: die hangen aan een begin- of
@@ -191,7 +212,7 @@ def _herkomsten(aspecten) -> list[Inwinning | None]:
     return [aspect.inwinning for aspect in aspecten if aspect is not None]
 
 
-def _alle_aspecten(dataset: GwswDataset):
+def _alle_aspecten(dataset: GwswDataset) -> Iterator[_Aspect]:
     """Alle kenmerken van alle knopen en strengen."""
     for node in dataset.nodes.values():
         yield from node.aspects

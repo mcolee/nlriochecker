@@ -18,7 +18,8 @@ from pathlib import Path
 import pandas as pd
 
 from nlriochecker import leeslaag
-from nlriochecker.checks import CheckRun, Severity
+from nlriochecker.checkconfig import CheckConfig
+from nlriochecker.checks import CheckOutcome, CheckRun, Severity
 from nlriochecker.checks.extern import bronrollen_met_check
 from nlriochecker.checks.selectie import klassen_van_rol
 from nlriochecker.externedata import rol_van
@@ -874,7 +875,7 @@ def _detail_nulmeting(run: CheckRun, meldingen: list[Melding]) -> list[str]:
     return [*regels, ""]
 
 
-def _kenmerk_labels(outcome, config) -> list[str]:
+def _kenmerk_labels(outcome: CheckOutcome, config: CheckConfig) -> list[str]:
     """De gedeclareerde kenmerken van een check als leesbare labels.
 
     Een `config:<pad>`-verwijzing (ATTR-013) wordt naar de geconfigureerde lijst
@@ -895,7 +896,7 @@ def _kenmerk_labels(outcome, config) -> list[str]:
     return labels
 
 
-def _toetst_regel(outcome, config) -> str:
+def _toetst_regel(outcome: CheckOutcome, config: CheckConfig) -> str:
     """De regel "Toetst <klassen> op <kenmerken>" onder een eigen check (issue #64).
 
     Zonder rollen noemt de check zelf de deelpopulatie die hij bekeek
@@ -967,7 +968,7 @@ def _detail_eigen(
     return regels
 
 
-def _bekeken_regel(outcome) -> str:
+def _bekeken_regel(outcome: CheckOutcome) -> str:
     """Wat `bekeken` van deze check telde: het aantal en de scope, plus waar hij over gaat.
 
     Eén formulering voor de detailregel en voor de generieke systemische regel
@@ -1000,7 +1001,9 @@ def _volledige_lijst(met_csv: bool) -> str:
     )
 
 
-def _systemische_regel(aantal: int, outcome, *, alle: bool, met_csv: bool) -> list[str]:
+def _systemische_regel(
+    aantal: int, outcome: CheckOutcome, *, alle: bool, met_csv: bool
+) -> list[str]:
     """De generieke regel voor systemische bevindingen (issue #76).
 
     Check, aantal en bekeken populatie, in de vorm die het nulmetingblok per SHACL-vorm

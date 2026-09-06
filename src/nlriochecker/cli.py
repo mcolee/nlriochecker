@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import click
 from gwsw_orox_helpers.dataset import GwswDataset, load_dataset
@@ -13,12 +14,12 @@ from gwsw_orox_helpers.errors import DatasetError
 
 from nlriochecker import __version__
 from nlriochecker.analysis import MetingAnalysis, analyze
-from nlriochecker.checkconfig import FALLBACK_ENCODING, load_check_config
+from nlriochecker.checkconfig import FALLBACK_ENCODING, CheckConfig, load_check_config
 from nlriochecker.comparison import compare_metingen
 from nlriochecker.config import CoverageConfig, load_coverage_config
 from nlriochecker.coverage import assess_coverage, verify_register
 from nlriochecker.errors import PipelineError
-from nlriochecker.meting import kies_cfk, laad_nulmeting
+from nlriochecker.meting import Nulmeting, kies_cfk, laad_nulmeting
 from nlriochecker.register import Register, default_register_path, load_register
 from nlriochecker.reporting import (
     TYPERING_NIET_GEMETEN,
@@ -27,6 +28,10 @@ from nlriochecker.reporting import (
     write_reports,
 )
 from nlriochecker.toetsrun import Toetsopdracht, voer_toets_uit
+
+# Het type dat een click-optiefabriek doorgeeft: de gedecoreerde functie komt er
+# ongewijzigd getypeerd weer uit. Dezelfde vorm als in click's eigen stubs.
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 class _CliError(click.ClickException):
@@ -130,12 +135,12 @@ def main() -> None:
 RAPPORT_TYPE = click.Path(exists=True, dir_okay=False, path_type=Path)
 
 
-def _report_option(naam: str, doel: str, hulp: str):
+def _report_option(naam: str, doel: str, hulp: str) -> Callable[[F], F]:
     """Bouwt een verplichte optie die naar een detailrapport wijst."""
     return click.option(naam, doel, required=True, type=RAPPORT_TYPE, help=hulp)
 
 
-def _config_option():
+def _config_option() -> Callable[[F], F]:
     """Bouwt de optionele optie voor een eigen dekkingmapping."""
     return click.option(
         "--config",
@@ -146,7 +151,7 @@ def _config_option():
     )
 
 
-def _output_option(hulp: str):
+def _output_option(hulp: str) -> Callable[[F], F]:
     """Bouwt de optie voor de uitvoermap."""
     return click.option(
         "--output",
@@ -158,7 +163,7 @@ def _output_option(hulp: str):
     )
 
 
-def _shacl_option():
+def _shacl_option() -> Callable[[F], F]:
     """Bouwt de optie voor de SHACL-rapporten; meermaals toegestaan."""
     return click.option(
         "--shacl",
@@ -170,10 +175,10 @@ def _shacl_option():
     )
 
 
-def _dataset_options():
+def _dataset_options() -> Callable[[F], F]:
     """Bouwt de opties voor de OroX-dataset en de ontologie."""
 
-    def versier(functie):
+    def versier(functie: F) -> F:
         """Hangt de dataset- en ontologieopties aan een commando."""
         functie = click.option(
             "--ontologie",
@@ -193,10 +198,10 @@ def _dataset_options():
     return versier
 
 
-def _studiegebied_options():
+def _studiegebied_options() -> Callable[[F], F]:
     """Bouwt de opties voor de afbakening tot een studiegebied."""
 
-    def versier(functie):
+    def versier(functie: F) -> F:
         """Hangt de studiegebiedopties aan een commando."""
         functie = click.option(
             "--studiegebied-laag",
@@ -215,7 +220,7 @@ def _studiegebied_options():
     return versier
 
 
-def _checkregister_option():
+def _checkregister_option() -> Callable[[F], F]:
     """Bouwt de optie voor het checkregister waartegen de mapping geijkt wordt."""
     return click.option(
         "--checkregister",
@@ -246,7 +251,7 @@ def _laad_register(register_path: Path | None, config: CoverageConfig) -> Regist
     return load_register(register_path)
 
 
-def _cfk_option():
+def _cfk_option() -> Callable[[F], F]:
     """Bouwt de optie voor een deelverzameling conformiteitsklassen."""
     return click.option(
         "--cfk",
@@ -260,7 +265,7 @@ def _cfk_option():
     )
 
 
-def _projectconfig_option():
+def _projectconfig_option() -> Callable[[F], F]:
     """Bouwt de optie voor de projectconfiguratie."""
     return click.option(
         "--projectconfig",
@@ -271,7 +276,7 @@ def _projectconfig_option():
     )
 
 
-def _plausibiliteit_option():
+def _plausibiliteit_option() -> Callable[[F], F]:
     """Bouwt de optie voor de plausibiliteitstabellen van de ATTR-checks."""
     return click.option(
         "--plausibiliteit",
@@ -285,7 +290,7 @@ def _plausibiliteit_option():
     )
 
 
-def _bronnen_option():
+def _bronnen_option() -> Callable[[F], F]:
     """Bouwt de optie voor de map met externe geodata."""
     return click.option(
         "--bronnen",
@@ -299,7 +304,13 @@ def _bronnen_option():
     )
 
 
-def _laad_meting(shacl_paths, project_config_path, dataset_path, ontology_paths, cfk_keuze=()):
+def _laad_meting(
+    shacl_paths: Sequence[Path],
+    project_config_path: Path | None,
+    dataset_path: Path | None,
+    ontology_paths: Sequence[Path],
+    cfk_keuze: Sequence[str] = (),
+) -> tuple[CheckConfig, Nulmeting, MetingAnalysis, GwswDataset | None]:
     """Leest de nulmeting en optioneel de dataset, en analyseert ze."""
     project = load_check_config(project_config_path)
     gekozen = kies_cfk(cfk_keuze, project.nulmeting.vereiste_cfk)

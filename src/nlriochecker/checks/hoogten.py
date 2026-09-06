@@ -24,8 +24,11 @@ from nlriochecker.checks.base import (
     Dimension,
     Finding,
     Severity,
+    _ontbreekt,
     register,
 )
+from nlriochecker.checks.meetkunde import bovenkant_bron, grootste_maat
+from nlriochecker.checks.randvoorzieningen import drempelnotitie, drempels_per_put
 from nlriochecker.checks.selectie import (
     netwerkknopen,
     rioolputten,
@@ -68,40 +71,6 @@ def _bouw_uiteinden(context: CheckContext) -> list[_Uiteinde]:
     return gevonden
 
 
-def _ontbreekt(
-    context: CheckContext,
-    kenmerk: str,
-    kies,
-    objecten: list,
-    soort: str = "putten",
-) -> list[str]:
-    """Een toelichting als een hoogtekenmerk in deze dataset nauwelijks voorkomt.
-
-    De telling gaat over de objecten die de check zelf bekijkt; een strengcheck die
-    over putten telt zou een getal noemen dat niet bij haar eenheid past. `objecten` is
-    daarom verplicht: een verborgen `netwerkknopen`-default zou de rol-declaratie van de
-    beller vertroebelen (de AST-sweep van issue #64 ziet de default en niet het
-    doorgegeven argument).
-    """
-    if not objecten:
-        return []
-    zonder = sum(1 for object_ in objecten if kies(object_) is None)
-    if not zonder:
-        return []
-    if zonder == len(objecten):
-        return [
-            f"Geen enkele van de {len(objecten)} {soort} in {context.scope_in_woorden()} "
-            f"heeft een {kenmerk}. Deze check heeft daardoor niets kunnen toetsen; nul "
-            "bevindingen betekent hier niet dat het in orde is."
-        ]
-    return [f"{zonder} van de {len(objecten)} {soort} hebben geen {kenmerk} en zijn overgeslagen."]
-
-
-def _bovenkant_bron(node: Node) -> str:
-    """Waar het bovenkantniveau vandaan komt: dekselniveau of maaiveld."""
-    return "dekselniveau" if node.dekselniveau is not None else "maaiveldhoogte"
-
-
 def _verhang(conduit: Conduit) -> float | None:
     """Het verval per meter in de administratieve richting; positief is afwaarts."""
     if conduit.bob_start is None or conduit.bob_end is None:
@@ -122,11 +91,11 @@ class _StrengCheck(Check):
         return len(vrijvervalrioolleidingen(context))
 
 
-class _PutCheck(Check):
-    """Basis voor de HGT-checks die per put redeneren."""
+class _KnoopCheck(Check):
+    """Basis voor de HGT-checks die per netwerkknoop redeneren."""
 
     def examined(self, context: CheckContext) -> int:
-        """Het aantal putten."""
+        """Het aantal netwerkknopen."""
         return len(netwerkknopen(context))
 
 
@@ -167,11 +136,11 @@ class BobBuitenDePut(_StrengCheck):
                     uiteinde.conduit.uri,
                     uiteinde.conduit.label,
                     f"De BOB aan het {uiteinde.zijde} ({uiteinde.bob:.3f} m NAP) ligt boven "
-                    f"het {_bovenkant_bron(node)} van put {node.label!r} ({boven:.3f} m NAP).",
+                    f"het {bovenkant_bron(node)} van put {node.label!r} ({boven:.3f} m NAP).",
                     zijde=uiteinde.zijde,
                     bob=uiteinde.bob,
                     bovenkant=boven,
-                    bron=_bovenkant_bron(node),
+                    bron=bovenkant_bron(node),
                     put=node.label,
                 )
             if node.uri not in rioolput_uris:
@@ -436,10 +405,10 @@ class ExtreemVerhang(_StrengCheck):
             )
 
 
-class _KnoopVergelijking(_PutCheck):
+class _KnoopVergelijking(_KnoopCheck):
     """Basis voor de checks die boven- en benedenstroomse strengen op een put vergelijken."""
 
-    def paren(self, context: CheckContext):
+    def paren(self, context: CheckContext) -> Iterator[tuple[Node, list[Conduit], list[Conduit]]]:
         """Levert per put de aanvoerende en afvoerende strengen op.
 
         Aanvoerend is een streng die met haar eindpunt op deze put uitkomt,
@@ -533,13 +502,13 @@ class DiameterverkleiningInAfvoerrichting(_KnoopVergelijking):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Vergelijkt de grootste aanvoerdiameter met de grootste afvoerdiameter."""
         for node, aanvoer, afvoer in self.paren(context):
-            binnen = [maat for c in aanvoer if (maat := _maat(c)) is not None]
-            uit = [maat for c in afvoer if (maat := _maat(c)) is not None]
+            binnen = [maat for c in aanvoer if (maat := grootste_maat(c)) is not None]
+            uit = [maat for c in afvoer if (maat := grootste_maat(c)) is not None]
             if not binnen or not uit:
                 continue
             if max(uit) >= max(binnen):
                 continue
-            afvoerend = max(afvoer, key=lambda c: _maat(c) or 0)
+            afvoerend = max(afvoer, key=lambda c: grootste_maat(c) or 0)
             yield self.finding(
                 context,
                 afvoerend.uri,
@@ -554,7 +523,7 @@ class DiameterverkleiningInAfvoerrichting(_KnoopVergelijking):
 
 
 @register
-class DrempelBuitenBereik(_PutCheck):
+class DrempelBuitenBereik(_KnoopCheck):
     """HGT-011: een overstortdrempel onder de aanvoerende BOB of boven maaiveld."""
 
     id = "HGT-011"
@@ -562,12 +531,16 @@ class DrempelBuitenBereik(_PutCheck):
     severity = Severity.ERROR
     dimension = Dimension.CONSISTENCY
     rollen = ("netwerkknopen", "vrijvervalrioolleidingen")
-    kenmerken = ("BobEindpuntLeiding", "Maaiveldhoogte", "Putdekselniveau")
+    kenmerken = (
+        "BobEindpuntLeiding",
+        "Drempelbreedte",
+        "Drempelniveau",
+        "Maaiveldhoogte",
+        "Putdekselniveau",
+    )
 
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Toetst elk drempelniveau tegen de aanvoerende BOB en het maaiveld."""
-        from nlriochecker.checks.randvoorzieningen import drempels_per_put
-
         index = aansluitingen(context, "vrijvervalleiding")
         for knoop_uri, groep in drempels_per_put(context).items():
             node = context.dataset.nodes.get(knoop_uri)
@@ -601,7 +574,7 @@ class DrempelBuitenBereik(_PutCheck):
                         node.uri,
                         node.label,
                         f"Drempelniveau van {drempel.label!r} ({niveau:.3f} m NAP) ligt boven "
-                        f"het {_bovenkant_bron(node)} ({boven:.3f} m NAP).",
+                        f"het {bovenkant_bron(node)} ({boven:.3f} m NAP).",
                         waarde=f"{niveau:.3f}",
                         drempel_label=drempel.label,
                         drempelniveau=niveau,
@@ -610,13 +583,11 @@ class DrempelBuitenBereik(_PutCheck):
 
     def notes(self, context: CheckContext) -> list[str]:
         """Meldt of er uberhaupt drempelniveaus in de dataset staan."""
-        from nlriochecker.checks.randvoorzieningen import drempelnotitie
-
         return drempelnotitie(context)
 
 
 @register
-class PutdiepteBuitenBereik(_PutCheck):
+class PutdiepteBuitenBereik(_KnoopCheck):
     """HGT-012: een putdiepte buiten het door de ontologie gedeclareerde bereik."""
 
     id = "HGT-012"
@@ -812,7 +783,7 @@ class VerhangVolgtMaaiveldNiet(_StrengCheck):
 
 
 @register
-class PutbodemBuitenMarge(_PutCheck):
+class PutbodemBuitenMarge(_KnoopCheck):
     """HGT-015: het bodemniveau past niet bij de laagste aansluitende BOB."""
 
     id = "HGT-015"
@@ -894,7 +865,7 @@ class PutbodemBuitenMarge(_PutCheck):
 
 
 @register
-class BobBovenPutbodemZonderConstructie(_PutCheck):
+class BobBovenPutbodemZonderConstructie(_KnoopCheck):
     """HGT-016: een aansluitende BOB ver boven de putbodem zonder val of zandvang."""
 
     id = "HGT-016"
@@ -1064,12 +1035,12 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
                 uiteinde.conduit.uri,
                 uiteinde.conduit.label,
                 f"De buiskruin aan het {uiteinde.zijde} ({kruin:.3f} m NAP) ligt boven het "
-                f"{_bovenkant_bron(uiteinde.node)} van put {uiteinde.node.label!r} "
+                f"{bovenkant_bron(uiteinde.node)} van put {uiteinde.node.label!r} "
                 f"({boven:.3f} m NAP).",
                 zijde=uiteinde.zijde,
                 buiskruin=round(kruin, 3),
                 bovenkant=boven,
-                bron=_bovenkant_bron(uiteinde.node),
+                bron=bovenkant_bron(uiteinde.node),
                 put=uiteinde.node.label,
             )
 
@@ -1099,9 +1070,3 @@ class BuiskruinBovenMaaiveld(_StrengCheck):
                 soort="strengeinden",
             ),
         ]
-
-
-def _maat(conduit: Conduit) -> float | None:
-    """De grootste profielmaat van een streng in millimeters."""
-    maten = [maat for maat in (conduit.breedte_mm, conduit.hoogte_mm) if maat and maat > 0]
-    return max(maten) if maten else None

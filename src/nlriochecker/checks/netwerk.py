@@ -16,7 +16,6 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
-from nlriochecker.checks.hulpstukken import telbare_hulpstukken
 from nlriochecker.checks.selectie import (
     infiltratieleidingen,
     overstortputten,
@@ -28,7 +27,9 @@ from nlriochecker.checks.verbanden import (
     _Netwerk,
     _netwerk,
     deelstelsel_ids,
+    knooplabel,
     putknopen,
+    stelseltype_van,
     verbonden_knopen,
 )
 from nlriochecker.taal import getal, vorm
@@ -82,7 +83,7 @@ def _gemengd_benedenstrooms(context: CheckContext, netwerk: _Netwerk) -> set[str
     """
     startknopen: set[str] = set()
     for conduit in netwerk.conduits:
-        if _stelseltype(context, conduit) != "gemengd":
+        if stelseltype_van(context, conduit) != "gemengd":
             continue
         begin, _ = _doorgeefknopen(context, conduit)
         if begin is not None:
@@ -373,7 +374,7 @@ class _ZonderAfvoerpad(Check):
         )
 
         for conduit, cluster in onbereikbaar:
-            stelsel = _stelseltype(context, conduit) or self.stelselrol
+            stelsel = stelseltype_van(context, conduit) or self.stelselrol
             yield self.finding(
                 context,
                 conduit.uri,
@@ -674,7 +675,7 @@ class KringloopInNetwerk(Check):
         knoop = next(iter(deel))
         return graaf.has_edge(knoop, knoop)
 
-    def _voorbeeldkring(self, subgraaf) -> list[str]:
+    def _voorbeeldkring(self, subgraaf: nx.DiGraph) -> list[str]:
         """Een kringloop uit dit deel, als illustratie in de melding.
 
         Met een vast beginpunt, want zonder `source` begint `find_cycle` bij de eerste
@@ -838,11 +839,6 @@ class ItStelselZonderDrempel(Check):
         return len(_netwerk(context).conduits)
 
 
-def _stelseltype(context: CheckContext, conduit: Conduit) -> str | None:
-    """Het stelseltype van een streng volgens de projectconfig."""
-    return context.config.klassen.stelseltype(conduit.types, context.dataset.closure)
-
-
 # NET-003 (strengorientatie tegen de afvoerrichting) is per issue #80 opgegaan in NET-009
 # en vervallen; het ID wordt niet hergebruikt. De BOB-tegen-richting is nu een deelgeval
 # van de integrale richtingscheck hieronder.
@@ -869,19 +865,6 @@ class _Richtingsdiagnose:
     geometrie: str
     bob: str
     bob_verval: float | None
-
-
-def _knooplabel(context: CheckContext, uri: str | None) -> str:
-    """Het label van de knoop boven een strengkoppeling, of de URI als er geen label is."""
-    dataset = context.dataset
-    knoop = dataset.resolve_network_node(uri, context.config.klassen.netwerkknopen)
-    # Een streng die op een telbaar hulpstuk eindigt zit sinds BO-83 in de graaf en wordt
-    # dus door NET-009 beoordeeld; zonder deze terugval noemt de melding daar een lege
-    # naam ("van 'A' naar ''") in plaats van het T-stuk waar zij werkelijk op uitkomt.
-    if knoop is None and uri is not None and uri in telbare_hulpstukken(context):
-        knoop = uri
-    node = dataset.nodes.get(knoop or "")
-    return node.label if node is not None and node.label else (knoop or "")
 
 
 def _geometrie_richting(context: CheckContext, conduit: Conduit) -> str:
@@ -916,8 +899,8 @@ def _bouw_richtingsdiagnoses(context: CheckContext) -> list[_Richtingsdiagnose]:
     return [
         _Richtingsdiagnose(
             conduit=conduit,
-            begin_label=_knooplabel(context, conduit.start_node),
-            eind_label=_knooplabel(context, conduit.end_node),
+            begin_label=knooplabel(context, conduit.start_node),
+            eind_label=knooplabel(context, conduit.end_node),
             geometrie=_geometrie_richting(context, conduit),
             bob=_bob_richting(conduit, drempel),
             bob_verval=conduit.bob_verval,
@@ -1105,7 +1088,7 @@ class StelseltypeWijktAfVanBuren(Check):
         """
         netwerk = _netwerk(context)
 
-        soorten = {conduit.uri: _stelseltype(context, conduit) for conduit in netwerk.conduits}
+        soorten = {conduit.uri: stelseltype_van(context, conduit) for conduit in netwerk.conduits}
         # Indexeren via `_doorgeefknopen`, niet `verbonden_knopen`: een telbaar hulpstuk is
         # geen put en `resolve_network_node` geeft er None voor, maar het draagt sinds BO-83
         # de graaf door. Zonder deze index staat een streng die op een T-stuk uitkomt zonder
@@ -1316,7 +1299,7 @@ class KoppelingTussenStelseltypen(Check):
         typen_per_knoop: dict[str, set[str]] = {}
         onbetrouwbaar_bij: set[str] = set()
         for conduit in netwerk.conduits:
-            soort = _stelseltype(context, conduit)
+            soort = stelseltype_van(context, conduit)
             if soort is None:
                 continue
             # `_doorgeefknopen`, niet `verbonden_knopen`: een koppeling tussen stelseltypen
@@ -1479,7 +1462,7 @@ def _stelseltype_notities(context: CheckContext) -> list[str]:
         ]
     netwerk = _netwerk(context)
     zonder = [
-        conduit.label for conduit in netwerk.conduits if _stelseltype(context, conduit) is None
+        conduit.label for conduit in netwerk.conduits if stelseltype_van(context, conduit) is None
     ]
     notities = [f"Stelseltypen uit de config: {', '.join(sorted(klassen))}."]
     if zonder:

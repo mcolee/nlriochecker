@@ -24,6 +24,7 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
+from nlriochecker.checks.meetkunde import grootste_maat, soortnaam
 from nlriochecker.checks.selectie import (
     leidingen,
     netwerkknopen,
@@ -35,7 +36,9 @@ from nlriochecker.plausibiliteit import (
     ConstructionTypeDiameter,
     MaterialDiameter,
     MaterialRoughness,
+    MaterialYear,
     MinimumDiameter,
+    ShapeDimensions,
 )
 
 # Het diameterbereik van een streng hangt aan haar constructietype of aan haar materiaal
@@ -122,7 +125,7 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
         """Vergelijkt de grootste profielmaat met het bereik uit de tabel."""
         for conduit in vrijvervalrioolleidingen(context):
             regel = _diameterregel(context, conduit)
-            maat = _grootste_maat(conduit)
+            maat = grootste_maat(conduit)
             if regel is None or maat is None:
                 continue
             kant = _kant_van_bereik(regel, maat)
@@ -130,7 +133,7 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
                 yield self._bevinding(context, conduit, maat, regel, kant)
 
     def _bevinding(
-        self, context, conduit: Conduit, maat: float, regel: Diameterregel, kant: str
+        self, context: CheckContext, conduit: Conduit, maat: float, regel: Diameterregel, kant: str
     ) -> Finding:
         """Bouwt de bevinding met het overschreden bereik erbij.
 
@@ -208,7 +211,7 @@ class DiameterPastNietBijMateriaal(_StrengCheck):
                 f"({namen}); een drainageleiding is naar haar functie dunner dan een "
                 f"riool.{staart}"
             )
-        zonder_maat = [conduit for conduit in strengen if _grootste_maat(conduit) is None]
+        zonder_maat = [conduit for conduit in strengen if grootste_maat(conduit) is None]
         if zonder_maat:
             nul = sum(1 for conduit in zonder_maat if _registreert_nulmaat(conduit))
             staart = (
@@ -240,7 +243,7 @@ class DiameterOnderMinimum(_StrengCheck):
     def run(self, context: CheckContext) -> Iterator[Finding]:
         """Meldt strengen waarvan de grootste profielmaat onder het stelselminimum ligt."""
         for conduit in vrijvervalrioolleidingen(context):
-            maat = _grootste_maat(conduit)
+            maat = grootste_maat(conduit)
             if maat is None:
                 continue
             regel = _diameterondergrens(context, conduit)
@@ -274,7 +277,7 @@ class DiameterOnderMinimum(_StrengCheck):
         klein = []
         ongetoetst = 0
         for conduit in vrijvervalrioolleidingen(context):
-            maat = _grootste_maat(conduit)
+            maat = grootste_maat(conduit)
             regel = _diameterondergrens(context, conduit)
             if maat is not None and regel is None:
                 # Een stelseltype zonder eigen regel en zonder `overig`-vangnet: niet
@@ -297,7 +300,7 @@ class DiameterOnderMinimum(_StrengCheck):
         if klein:
             telling: dict[str, int] = {}
             for conduit in klein:
-                soort = _soortnaam(conduit)
+                soort = soortnaam(conduit)
                 telling[soort] = telling.get(soort, 0) + 1
             top = ", ".join(
                 f"{soort} {aantal}"
@@ -336,7 +339,15 @@ class MateriaalPastNietBijBegindatum(_StrengCheck):
             elif regel.tot_jaar is not None and jaar > regel.tot_jaar:
                 yield self._bevinding(context, conduit, jaar, regel.tot_jaar, "na", regel)
 
-    def _bevinding(self, context, conduit, jaar: int, grens: int, kant: str, regel) -> Finding:
+    def _bevinding(
+        self,
+        context: CheckContext,
+        conduit: Conduit,
+        jaar: int,
+        grens: int,
+        kant: str,
+        regel: MaterialYear,
+    ) -> Finding:
         """Bouwt de bevinding met de grens en de toelichting erbij.
 
         De boodschap vraagt om een controle en stelt niets vast (issue #84): de
@@ -431,7 +442,9 @@ class VormVersusAfmetingen(_StrengCheck):
                 hoogte_mm=hoogte,
             )
 
-    def _melding(self, regel, breedte, hoogte, tolerantie: float) -> str | None:
+    def _melding(
+        self, regel: ShapeDimensions, breedte: float | None, hoogte: float | None, tolerantie: float
+    ) -> str | None:
         """De reden waarom vorm en afmetingen niet bij elkaar passen, of None."""
         if breedte is None or hoogte is None:
             ontbreekt = "breedte" if breedte is None else "hoogte"
@@ -557,7 +570,7 @@ class DiameterGroterDanPut(_StrengCheck):
         marge = context.config.drempels.put_diameter_marge_mm
 
         for conduit in vrijvervalrioolleidingen(context):
-            maat = _grootste_maat(conduit)
+            maat = grootste_maat(conduit)
             if maat is None:
                 continue
             begin, eind = verbonden_knopen(context, conduit)
@@ -1538,18 +1551,6 @@ def _property_boodschap(kenmerk: str, telling: _PropertyTelling) -> str:
     return f"{kenmerk} gebruikt hasReference in plaats van hasValue op {telling.fout} objecten."
 
 
-def _soortnaam(object_) -> str:
-    """De korte GWSW-klassenaam van een object."""
-    types = sorted(soort.rsplit("/", 1)[-1] for soort in object_.types)
-    return types[0] if types else "onbekend"
-
-
-def _grootste_maat(conduit: Conduit) -> float | None:
-    """De grootste profielmaat van een streng in millimeters."""
-    maten = [maat for maat in (conduit.breedte_mm, conduit.hoogte_mm) if maat and maat > 0]
-    return max(maten) if maten else None
-
-
 def _diameterondergrens(context: CheckContext, conduit: Conduit) -> MinimumDiameter | None:
     """De ondergrensregel voor deze streng, op grond van haar stelseltype (met terugval)."""
     stelseltype = context.config.klassen.stelseltype(conduit.types, context.dataset.closure)
@@ -1621,7 +1622,7 @@ def _buiten_diameterbereik(context: CheckContext, conduit: Conduit) -> bool:
     bereik in de verdelingstabel de bevindingen telt en niet iets anders.
     """
     regel = _diameterregel(context, conduit)
-    maat = _grootste_maat(conduit)
+    maat = grootste_maat(conduit)
     if regel is None or maat is None:
         return False
     return _kant_van_bereik(regel, maat) is not None
@@ -1639,7 +1640,7 @@ def _kant_van_bereik(regel: Diameterregel, maat: float) -> str | None:
 def _registreert_nulmaat(conduit: Conduit) -> bool:
     """True als een profielmaat als 0 geregistreerd staat in plaats van te ontbreken.
 
-    `_grootste_maat` filtert de 0 weg net als een ontbrekend kenmerk; deze regel maakt
+    `grootste_maat` filtert de 0 weg net als een ontbrekend kenmerk; deze regel maakt
     de twee weer uit elkaar door het kenmerk zelf op te vragen.
     """
     for kind in ("BreedteLeiding", "HoogteLeiding"):
@@ -1674,7 +1675,7 @@ def _diameterverdeling(context: CheckContext, strengen: Sequence[Conduit]) -> st
     ]
     for materiaal in sorted(per_materiaal):
         groep = per_materiaal[materiaal]
-        maten = [maat for conduit in groep if (maat := _grootste_maat(conduit)) is not None]
+        maten = [maat for conduit in groep if (maat := grootste_maat(conduit)) is not None]
         buiten = sum(1 for conduit in groep if _buiten_diameterbereik(context, conduit))
         min_mm = f"{min(maten):g}" if maten else "–"
         max_mm = f"{max(maten):g}" if maten else "–"
@@ -1682,7 +1683,7 @@ def _diameterverdeling(context: CheckContext, strengen: Sequence[Conduit]) -> st
     return "\n".join(regels)
 
 
-def _grootste_putmaat(node) -> float | None:
+def _grootste_putmaat(node: Node) -> float | None:
     """De grootste binnenmaat van een put in millimeters."""
     maten = [
         node.number(kenmerk)

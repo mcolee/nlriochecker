@@ -441,7 +441,7 @@ def _nabijheidsnotitie(context: CheckContext) -> list[str]:
     ]
 
 
-def _buren(nabijheid: _Nabijheid, conduit: Conduit, marge: float):
+def _buren(nabijheid: _Nabijheid, conduit: Conduit, marge: float) -> Iterator[Conduit]:
     """De andere strengen die binnen de marge van deze streng liggen.
 
     `dwithin` toetst de echte afstand en is daarmee strenger dan de oude
@@ -1094,7 +1094,7 @@ class BuitenRdBereik(Check):
                 )
 
     def _melding(
-        self, geometrie, grenzen: tuple[float, ...], soort: str
+        self, geometrie: BaseGeometry, grenzen: tuple[float, ...], soort: str
     ) -> tuple[str, str, str] | None:
         """De reden waarom deze geometrie buiten het geldige bereik valt, met waarde en drempel.
 
@@ -1228,7 +1228,9 @@ class StrengenRakenMetBuffer(Check):
                 foutlocatie=_dichtste_midden(conduit.line, ander.line),
             )
 
-    def _deelt_put(self, links: tuple[str | None, str | None], rechts) -> bool:
+    def _deelt_put(
+        self, links: tuple[str | None, str | None], rechts: tuple[str | None, str | None]
+    ) -> bool:
         """Geeft aan of twee strengen administratief een put delen."""
         return bool({uri for uri in links if uri} & {uri for uri in rechts if uri})
 
@@ -1590,7 +1592,13 @@ class DubbeleVertexOfSpike(Check):
                 spikes=len(spikes),
             )
 
-    def _melding(self, dubbel, spikes, tolerantie: float, hoekdrempel: float) -> str:
+    def _melding(
+        self,
+        dubbel: list[int],
+        spikes: list[tuple[int, float]],
+        tolerantie: float,
+        hoekdrempel: float,
+    ) -> str:
         """De tekst van de bevinding."""
         delen = []
         if dubbel:
@@ -1793,7 +1801,7 @@ class PutNaastDoorlopendeStreng(Check):
         return len(_topologie(context).nodes)
 
 
-def _alle_geometrieen(topologie: _Topologie):
+def _alle_geometrieen(topologie: _Topologie) -> Iterator[tuple[str, str, BaseGeometry | None]]:
     """De geometrie van elke knoop en streng, met URI en label erbij."""
     for node in topologie.nodes:
         yield node.uri, node.label, node.point

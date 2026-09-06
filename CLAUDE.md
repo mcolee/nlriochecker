@@ -201,7 +201,10 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
 - Tests met pytest. Fixtures: kleine uittreksels van de echte rapporten en handgeschreven TTL's met precies een ingebouwd defect. Integratietests op de volledige De Wolden-bestanden; de zwaarste staan onder de marker `zwaar` en draaien niet standaard mee (laden kost sinds de eigen graafindexen circa een halve minuut koud en de volledige toetsrun met `--bronnen` en JSON piekt op ~4,2 GB, gemeten 05-09; na issue #147 op ~3,8 GB; zie BO-41 en BO-42).
 - Codekwaliteit: ruff (lint en format), mypy schoon over `src/nlriochecker`
   (`uv run mypy`; `scripts/` en `tests/` vallen er nog buiten), type hints overal,
-  Nederlandse docstrings, Engelse code-identifiers. De poort staat in
+  Nederlandse docstrings; identifiers volgen de taal van de module; de Check-API
+  (`run`/`notes`/`examined`/`finding`), de leeslaagtypen en de
+  analysis/coverage/comparison-kern blijven Engels — niet hernoemen, niet verder mengen.
+  De poort staat in
   `.github/workflows/toets.yml` en in `scripts/uitgave.py`; die twee draaien dezelfde
   vijf stappen (ruff lint, ruff format, mypy, pytest en een dekkingsondergrens).
   De package levert `py.typed`, dus haar hints komen bij een importeur aan.

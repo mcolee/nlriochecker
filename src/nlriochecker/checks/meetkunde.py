@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING
 
 from shapely.geometry import LineString, Point, Polygon
@@ -11,7 +11,10 @@ from shapely.geometry.base import BaseGeometry
 
 if TYPE_CHECKING:
     # Alleen als typehint: zo houdt deze module haar meetkunde los van de checklaag en
-    # krijgt `checks/base.py` er geen importer bij tijdens het draaien.
+    # krijgt `checks/base.py` er geen importer bij tijdens het draaien. `Node`/`Conduit`
+    # dragen alleen de annotaties van de kenmerkhelpers hieronder en reizen daarom mee.
+    from gwsw_orox_helpers.dataset import Conduit, Node
+
     from nlriochecker.checks.base import CheckContext
 
 # Een coordinatenreeks zoals `coords_of` en de gedeelde tabel hem opleveren: een lijst of
@@ -126,7 +129,7 @@ def is_finite(geometry: BaseGeometry | None) -> bool:
     return all(math.isfinite(waarde) for waarde in _flat_coords(geometry))
 
 
-def _flat_coords(geometry: BaseGeometry):
+def _flat_coords(geometry: BaseGeometry) -> Iterator[float]:
     """Alle coordinaatwaarden van een geometrie, plat achter elkaar.
 
     Een vlak heeft geen eigen `coords` maar wel ringen; `hasattr` helpt daar niet,
@@ -224,3 +227,20 @@ def half_diameter_m(breedte_mm: float | None, hoogte_mm: float | None) -> float:
     """De halve breedte van een profiel in meters; nul als de maat ontbreekt."""
     maten = [maat for maat in (breedte_mm, hoogte_mm) if maat is not None and maat > 0]
     return max(maten) / 2000 if maten else 0.0
+
+
+def grootste_maat(conduit: Conduit) -> float | None:
+    """De grootste profielmaat van een streng in millimeters."""
+    maten = [maat for maat in (conduit.breedte_mm, conduit.hoogte_mm) if maat and maat > 0]
+    return max(maten) if maten else None
+
+
+def bovenkant_bron(node: Node) -> str:
+    """Waar het bovenkantniveau vandaan komt: dekselniveau of maaiveld."""
+    return "dekselniveau" if node.dekselniveau is not None else "maaiveldhoogte"
+
+
+def soortnaam(object_: Node | Conduit) -> str:
+    """De korte GWSW-klassenaam van een object."""
+    types = sorted(soort.rsplit("/", 1)[-1] for soort in object_.types)
+    return types[0] if types else "onbekend"

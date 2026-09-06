@@ -35,6 +35,7 @@ from nlriochecker.checks.base import (
     Severity,
     register,
 )
+from nlriochecker.checks.meetkunde import bovenkant_bron, soortnaam
 from nlriochecker.checks.selectie import (
     bergbezinkleidingen,
     bergbezinkvoorzieningen,
@@ -150,7 +151,7 @@ def _bouw_drempels(context: CheckContext) -> dict[str, list[Drempel]]:
     return gevonden
 
 
-def _waarde(context: CheckContext, subject, kenmerk: str) -> float | None:
+def _waarde(context: CheckContext, subject: str, kenmerk: str) -> float | None:
     """De numerieke waarde van een kenmerk dat aan dit object hangt."""
     for aspect in context.dataset.onderdeel_aspecten(str(subject)):
         if aspect.kind == kenmerk:
@@ -158,7 +159,7 @@ def _waarde(context: CheckContext, subject, kenmerk: str) -> float | None:
     return None
 
 
-def _label(context: CheckContext, subject) -> str:
+def _label(context: CheckContext, subject: str) -> str:
     """Het rdfs:label van een object in de graaf."""
     return context.dataset.onderdeel_label(str(subject)) or ""
 
@@ -524,7 +525,7 @@ class RandvoorzieningNietAangesloten(Check):
                 node.label,
                 "Deze randvoorziening heeft geen actieve aangesloten streng (loze "
                 "leidingen niet meegerekend).",
-                soort=_soortnaam(context, node),
+                soort=soortnaam(node),
             )
 
     def examined(self, context: CheckContext) -> int:
@@ -856,7 +857,7 @@ class _BbbKenmerk(Check):
                 node.uri,
                 node.label,
                 self.ontbreekt,
-                soort=_soortnaam(context, node),
+                soort=soortnaam(node),
             )
 
     def aanwezig(self, context: CheckContext, node: Node) -> bool:
@@ -930,7 +931,7 @@ class BbbZonderLediging(Check):
                 node.label,
                 "Geen ledigingsvoorziening als onderdeel en geen afvoerende streng terug "
                 "het stelsel in.",
-                soort=_soortnaam(context, node),
+                soort=soortnaam(node),
             )
 
     def _heeft_voorziening(self, context: CheckContext, node: Node, klassen: list[str]) -> bool:
@@ -981,7 +982,7 @@ class BbbZonderNooduitlaat(Check):
                 node.label,
                 "Geen overstortdrempel als onderdeel en geen overstortleiding eraan; er is "
                 "geen nooduitlaat geregistreerd.",
-                soort=_soortnaam(context, node),
+                soort=soortnaam(node),
             )
 
     def notes(self, context: CheckContext) -> list[str]:
@@ -1103,7 +1104,7 @@ class OnvoldoendeWaking(Check):
                     node.uri,
                     node.label,
                     f"Waking {waking:.3f} m tussen drempel {drempel.label!r} "
-                    f"({drempel.niveau:.3f} m NAP) en het {_bovenkant_bron(node)} "
+                    f"({drempel.niveau:.3f} m NAP) en het {bovenkant_bron(node)} "
                     f"({boven:.3f} m NAP), onder het minimum van {minimum:g} m.",
                     waarde=f"{waking:.3f}",
                     drempel=f"{minimum:g} (drempels.minimale_waking_m)",
@@ -1123,23 +1124,12 @@ class OnvoldoendeWaking(Check):
         return len(alle_drempels(context))
 
 
-def _bovenkant_bron(node: Node) -> str:
-    """Waar het bovenkantniveau vandaan komt: dekselniveau of maaiveld."""
-    return "dekselniveau" if node.dekselniveau is not None else "maaiveldhoogte"
-
-
-def _soortnaam(context: CheckContext, node: Node) -> str:
-    """De korte GWSW-klassenaam van een object."""
-    types = sorted(soort.rsplit("/", 1)[-1] for soort in node.types)
-    return types[0] if types else "onbekend"
-
-
-def _watergeometrieen(context: CheckContext) -> list:
+def _watergeometrieen(context: CheckContext) -> list[BaseGeometry]:
     """De geometrieen van de oppervlaktewaterobjecten uit de GWSW-dataset."""
     return context.cached("rvz:water", lambda: _bouw_watergeometrieen(context))
 
 
-def _bouw_watergeometrieen(context: CheckContext) -> list:
+def _bouw_watergeometrieen(context: CheckContext) -> list[BaseGeometry]:
     """Verzamelt punt- en lijngeometrie van alle oppervlaktewaterobjecten.
 
     De selectie levert de objecten van de klasse, ook die zonder geometrie; het

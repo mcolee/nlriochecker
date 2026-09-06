@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
@@ -84,8 +84,9 @@ class Finding:
     details: dict[str, object] = field(default_factory=dict)
     # De weg voor een bevinding op een object dat niet uit de GWSW-dataset komt: dat
     # heeft geen dataset-URI om op af te bakenen, dus zijn eigen RD-coordinaat neemt
-    # die rol over. Geen enkele check vult dit veld nog sinds EXT-006 verviel; de weg
-    # blijft bestaan voor de volgende check op een externe bron (BO-65).
+    # die rol over. EXT-009 vult `location` met het middelpunt van het beoordeelde
+    # wegvak (sinds issue #104, BO-79); de nulmeting en de checks op GWSW-objecten
+    # laten het leeg en bakenen op de dataset-URI af (BO-65).
     location: tuple[float, float] | None = None
     # Een bevinding die niet over een los object maar over de export als geheel gaat
     # (ATTR-014 meldt per kenmerk, over alle objecten samen). De meldingenlaag OR't
@@ -305,7 +306,8 @@ class CheckContext:
         context gebouwd (`stelsel:inverse`) uit `dataset.stelsel_leden` over alle
         stelselinstanties.
 
-        Nog geen consumer: dit is de leeslaag waarop #129 verder bouwt.
+        NET-006 leest het VGS sinds BO-92 rechtstreeks uit `[klassen] stelseltypen` en niet
+        via deze index; die blijft de leeslaag zonder consumer.
         """
         return self._stelsel_inverse().get(uri, ())
 
@@ -328,6 +330,35 @@ class CheckContext:
             return {lid: tuple(sorted(stelsels)) for lid, stelsels in omvat.items()}
 
         return self.cached("stelsel:inverse", bouw)
+
+
+def _ontbreekt[T](
+    context: CheckContext,
+    kenmerk: str,
+    kies: Callable[[T], object | None],
+    objecten: Sequence[T],
+    soort: str = "putten",
+) -> list[str]:
+    """Een toelichting als een kenmerk in deze dataset nauwelijks voorkomt.
+
+    De telling gaat over de objecten die de check zelf bekijkt; een strengcheck die
+    over putten telt zou een getal noemen dat niet bij haar eenheid past. `objecten` is
+    daarom verplicht: een verborgen `netwerkknopen`-default zou de rol-declaratie van de
+    beller vertroebelen (de AST-sweep van issue #64 ziet de default en niet het
+    doorgegeven argument).
+    """
+    if not objecten:
+        return []
+    zonder = sum(1 for object_ in objecten if kies(object_) is None)
+    if not zonder:
+        return []
+    if zonder == len(objecten):
+        return [
+            f"Geen enkele van de {len(objecten)} {soort} in {context.scope_in_woorden()} "
+            f"heeft een {kenmerk}. Deze check heeft daardoor niets kunnen toetsen; nul "
+            "bevindingen betekent hier niet dat het in orde is."
+        ]
+    return [f"{zonder} van de {len(objecten)} {soort} hebben geen {kenmerk} en zijn overgeslagen."]
 
 
 @dataclass(frozen=True)

@@ -977,7 +977,7 @@ def _eis_feiten(feiten: Feiten, meldingen: list[Melding], wat: str, *sleutels: s
 
 def _trefferrijen(
     run: CheckRun, meldingen: list[Melding], feiten: Feiten
-) -> tuple[list[tuple], _Grenzen]:
+) -> tuple[list[tuple[object, ...]], _Grenzen]:
     """De rijen voor de externe objecten waarnaar de EXT-meldingen verwijzen.
 
     Pand, bouwwerk en water in dezelfde laag (issue #67); de soort staat in de kolom
@@ -1151,7 +1151,7 @@ def _gemengde_deelstelselrijen(
     config: CheckConfig,
     meldingen: list[Melding],
     feiten: Feiten,
-) -> tuple[list[tuple], _Grenzen, int]:
+) -> tuple[list[tuple[object, ...]], _Grenzen, int]:
     """De rijen voor de gemengde deelstelsels; geeft ook de niet-tekenbare terug.
 
     Een vlak per gemengd deelstelsel waarop RVZ-006 aansloeg (issue #75): de buffer om
@@ -1338,7 +1338,9 @@ def _gemengd_rij(
     )
 
 
-def _wegvakrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], _Grenzen]:
+def _wegvakrijen(
+    run: CheckRun, meldingen: list[Melding]
+) -> tuple[list[tuple[object, ...]], _Grenzen]:
     """De rijen voor de wegvakken die EXT-009 beoordeelde (issue #104).
 
     De enige soort in deze laag die ook zonder melding een rij krijgt. Voor de andere
@@ -1377,7 +1379,7 @@ def _wegvakrijen(run: CheckRun, meldingen: list[Melding]) -> tuple[list[tuple], 
             "registreert."
         )
 
-    rijen: list[tuple] = []
+    rijen: list[tuple[object, ...]] = []
     grenzen: _Grenzen = []
     for oordeel in run.wegvakken:
         eigen = per_sleutel.get(oordeel.sleutel, [])
@@ -1759,7 +1761,7 @@ def _stapels(meldingen: list[Melding], xy: Coordinaten) -> dict[str, tuple[int, 
     }
 
 
-def _melding_rij(melding: Melding, stapel: tuple[int, int], xy: Coordinaten) -> tuple:
+def _melding_rij(melding: Melding, stapel: tuple[int, int], xy: Coordinaten) -> tuple[object, ...]:
     """Een melding als rij, in de volgorde van MELDING_KOLOMMEN.
 
     De kolommen `x`/`y` komen uit de zijmap `xy` (issue #149).

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import tomllib
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from importlib import resources
 from pathlib import Path
 from typing import Literal, Self
@@ -180,7 +180,9 @@ class ClassRoots(BaseModel):
             *self.bergbezinkvoorziening,
         ]
 
-    def stelseltype(self, dataset_types: frozenset[str], closure) -> str | None:
+    def stelseltype(
+        self, dataset_types: frozenset[str], closure: Callable[[str], frozenset[str]]
+    ) -> str | None:
         """Het stelseltype waar deze leidingklassen onder vallen, of None."""
         for naam in sorted(self.stelseltypen):
             for wortel in self.stelseltypen[naam]:

@@ -15,8 +15,9 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date
 
-from gwsw_orox_helpers.dataset import Conduit, Node
+from gwsw_orox_helpers.dataset import Conduit, GwswDataset, Node
 
+from nlriochecker.checkconfig import PutTypeRule
 from nlriochecker.checks.base import (
     Check,
     CheckContext,
@@ -26,7 +27,7 @@ from nlriochecker.checks.base import (
     register,
 )
 from nlriochecker.checks.selectie import leidingen, lozeleidingen, netwerkknopen
-from nlriochecker.checks.verbanden import aansluitingen
+from nlriochecker.checks.verbanden import Aansluitingen, aansluitingen
 from nlriochecker.taal import getal, vorm
 
 
@@ -192,7 +193,7 @@ class VervallenObjectInActiefNetwerk(Check):
                 einddatum=_iso(object_.date("Einddatum")),
             )
 
-    def _reden(self, object_, vandaag: date) -> str | None:
+    def _reden(self, object_: Node | Conduit, vandaag: date) -> str | None:
         """De reden waarom dit object niet actief hoort te zijn, of None."""
         einde = object_.date("Einddatum")
         if einde is not None and einde < vandaag:
@@ -202,7 +203,9 @@ class VervallenObjectInActiefNetwerk(Check):
             return f"Begindatum {begin.isoformat()} ligt in de toekomst, maar het object doet mee."
         return None
 
-    def _doet_mee(self, object_, index, dataset) -> bool:
+    def _doet_mee(
+        self, object_: Node | Conduit, index: Aansluitingen, dataset: GwswDataset
+    ) -> bool:
         """Geeft aan of dit object topologisch in het netwerk hangt."""
         if object_.uri in dataset.nodes:
             return bool(index.strengen(object_.uri))
@@ -268,7 +271,9 @@ class PuttypePastNietBijLeiding(Check):
                     vereist=regel.vereist_een_van,
                 )
 
-    def _voldoet(self, context: CheckContext, node, regel, index) -> bool:
+    def _voldoet(
+        self, context: CheckContext, node: Node, regel: PutTypeRule, index: Aansluitingen
+    ) -> bool:
         """Geeft aan of de put aan een van de vereiste klassen voldoet."""
         dataset = context.dataset
         for conduit in index.strengen(node.uri):
@@ -347,7 +352,7 @@ class PutonderdelenZonderVerbinding(Check):
                 onderdelen=labels,
             )
 
-    def _onderdelen(self, context: CheckContext, node) -> list[str]:
+    def _onderdelen(self, context: CheckContext, node: Node) -> list[str]:
         """De compartimenten van een put, als URI's."""
         dataset = context.dataset
         gevonden = []
@@ -449,7 +454,7 @@ class LeidingAanPutInPlaatsVanCompartiment(Check):
                         compartimenten=len(compartimenten),
                     )
 
-    def _compartimenten(self, context: CheckContext, node) -> list[str]:
+    def _compartimenten(self, context: CheckContext, node: Node) -> list[str]:
         """De compartimenten van een put, inclusief subklassen als een pompkelder.
 
         `graph_is_a` en niet de expliciete typematch op de graaf: een compartiment is

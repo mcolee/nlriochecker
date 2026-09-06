@@ -349,7 +349,8 @@ def stelsels(context: CheckContext) -> list[str]:
     `dataset.nodes` of `.conduits`, maar wel in `dataset.subjects_of_class`. Wie de leden van
     een stelsel wil -- of andersom, het stelsel van een lid -- leest `CheckContext.stelsels_van`.
 
-    Geen consumer nog: deze rol en de inverse zijn de leeslaag voor #129 (issue #131).
+    NET-006 leest het VGS sinds BO-92 rechtstreeks uit `[klassen] stelseltypen`; deze rol
+    en de inverse (`CheckContext.stelsels_van`) blijven de leeslaag zonder consumer.
     """
 
     def bouw() -> list[str]:

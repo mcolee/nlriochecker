@@ -145,7 +145,7 @@ class SystematischAfgerondeHoogtewaarden(Check):
                 raster_m=raster,
             )
 
-    def _reeksen(self, context: CheckContext):
+    def _reeksen(self, context: CheckContext) -> Iterator[tuple[str, list[float], tuple[str, str]]]:
         """De hoogtereeksen die op afronding getoetst worden, met een voorbeeld erbij."""
         strengen = vrijvervalrioolleidingen(context)
         knopen = netwerkknopen(context)
@@ -163,7 +163,7 @@ class SystematischAfgerondeHoogtewaarden(Check):
             ("putdekselniveaus", lambda node: node.dekselniveau),
             ("maaiveldhoogten", lambda node: node.maaiveld),
         ):
-            waarden = [kies(node) for node in knopen if kies(node) is not None]
+            waarden = [w for node in knopen if (w := kies(node)) is not None]
             if waarden and knopen:
                 yield naam, waarden, (knopen[0].uri, knopen[0].label)
 

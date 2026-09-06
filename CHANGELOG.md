@@ -40,6 +40,27 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Kopieën ontdubbeld, drie docstrings eerlijk gemaakt en de mypy-ratchet gesloten**
+  (issue #161). Gedeelde helpers wonen nu op één plek: `grootste_maat`, `bovenkant_bron`
+  en `soortnaam` in `checks/meetkunde.py` (weg uit `hoogten.py`, `attributen.py` en
+  `randvoorzieningen.py`; de ongebruikte `context` op het oude `_soortnaam` in
+  `randvoorzieningen.py` -- de enige ARG001 daar -- verdwijnt mee), `knooplabel` en
+  `stelseltype_van` in `checks/verbanden.py` (weg uit `netwerk.py`), en `_ontbreekt` in
+  `checks/base.py`. De hoogten-variant `_PutCheck` heet nu `_KnoopCheck` (hij telt
+  netwerkknopen, niet putten; de noemer verandert niet). Drie docstrings kloppen weer met
+  de code: `Finding.location` (EXT-009 vult het), en `stelsels_van`/`selectie.stelsels`
+  (NET-006 leest het VGS sinds BO-92 rechtstreeks). De lazy imports in `hoogten.py` staan
+  nu top-level; daardoor ziet de #64-AST-sweep dat HGT-011 via `drempels_per_put` ook
+  `Drempelniveau`/`Drempelbreedte` leest, dus die twee staan nu in zijn declaratie (met een
+  `[structuur]`-uitzondering in de ontologietoets). De naamregel in `CLAUDE.md` is
+  herschreven ("identifiers volgen de taal van de module ..."). Tot slot is de
+  `[[tool.mypy.overrides]]`-ratchet leeggelopen en verwijderd (BO-86 stond dat toe zodra de
+  lijst leeg was): 56 modules draaien nu onder strikte mypy, en `ANN` staat aan in ruff
+  (uitgezonderd in `tests/`, `scripts/` en `.claude/`, waar mypy niet komt). De bevindingen
+  en `examined` blijven byte-gelijk (de ledger is ongewijzigd); HGT-011 declareert nu ook
+  `Drempelniveau` en `Drempelbreedte` (de kenmerken die `drempels_per_put` leest), waardoor
+  de "Toetst … op …"-regel in het rapport meebeweegt en `docs/dekkingsmatrix.md`
+  geregenereerd is. De rol en het `examined` van HGT-011 volgen in #137.
 - **De CI toetst op Python 3.12 én 3.14, en de test-ondergrens is aangehaald** (issue
   #160). `.github/workflows/toets.yml` draait de poort nu als matrix over beide versies
   (setup-uv `python-version`, `uv sync --frozen` per cel); `.python-version` pint 3.12 als
