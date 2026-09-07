@@ -9,7 +9,7 @@ export const meta = {
 }
 
 const CONTEXT = `
-Repo-root (cwd): /home/martin/nlriochecker  (Python 3.12+, src-layout, uv).
+Repo-root (cwd): /home/martin/Development/nlriochecker  (Python 3.12+, src-layout, uv).
 Package: src/nlriochecker/ (~24.5k LOC) — toetst de datakwaliteit van vrijvervalriolering
 op de GWSW-nulmeting (SHACL-rapporten) en met eigen checks op de GWSW-OroX/TTL-dataset.
 Grote modules (LOC): uitvoer/gpkg 1907, checks/attributen 1638, checks/topologie 1625,

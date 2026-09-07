@@ -1,7 +1,7 @@
 # AFK-regie: een reeks issues fixen met subagents (sjabloon)
 
 Geef dit, met de issuelijst ingevuld, aan een **verse (gecleared) Fable-sessie** in
-`/home/martin/nlriochecker`. Fable is de regisseur; het echte werk doen **subagents**. Kies
+`/home/martin/Development/nlriochecker`. Fable is de regisseur; het echte werk doen **subagents**. Kies
 per issue het model naar zwaarte volgens de globale `CLAUDE.md` (sectie **Modelkeuze
 subagents**): substantieel/kritiek-pad → **Opus 4.8** via de `opus48`-agent (de kale alias
 `model: opus` levert in deze harness Opus 5), klein/docs/config/test-only → **Sonnet**.
@@ -78,7 +78,7 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    klein/test-/config-only → `model: sonnet`, `subagent_type: general-purpose`. **Meld
    expliciet welk model deze dispatch inzet.** Brief, zelfstandig en met een taaklabel:
 
-   > **Task 1 — implementeer issue #N.** Repo `/home/martin/nlriochecker`, tak `dev`. Volg de
+   > **Task 1 — implementeer issue #N.** Repo `/home/martin/Development/nlriochecker`, tak `dev`. Volg de
    > body van #N verbatim en `CLAUDE.md` strikt (Harde regels + Werkwijze). Draai
    > `superpowers:test-driven-development` (eerst de falende test/fixture, dan de code) en
    > sluit af met `superpowers:verification-before-completion`. Concreet:

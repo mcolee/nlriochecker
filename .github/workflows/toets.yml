@@ -88,11 +88,11 @@ jobs:
       #
       # De suite is sindsdien flink gegroeid en 1670 bood 24% marge -- veel te ruim voor
       # een grens die een regressie moet vangen (issue #160). Gemeten in de laatste groene
-      # dev-run (2026-09-06, run 34046735032): 2414 geslaagd. 95% daarvan, op tientallen
-      # afgerond, is 2290. De waarschuwing in `tests/conftest.py::pytest_sessionfinish`
-      # roept om een herijking zodra er meer dan 10% (2519) boven deze grens slagen, zodat
+      # dev-run (2026-09-07, run 34098943937): 2525 geslaagd. 95% daarvan, op tientallen
+      # afgerond, is 2400. De waarschuwing in `tests/conftest.py::pytest_sessionfinish`
+      # roept om een herijking zodra er meer dan 10% (2640) boven deze grens slagen, zodat
       # de marge niet opnieuw wegkruipt.
-      NLRIOCHECKER_MIN_GESLAAGD: "2290"
+      NLRIOCHECKER_MIN_GESLAAGD: "2400"
       # Overslagen worden niet geteld maar op reden geclassificeerd (BO-48). Een telgrens
       # (`NLRIOCHECKER_MAX_OVERGESLAGEN`, 50 → 57 → 65) telde ook de bedoelde, datagebonden
       # overslagen mee -- het Juinen-voorbeeld, de OroX-export en de SHACL-rapporten staan

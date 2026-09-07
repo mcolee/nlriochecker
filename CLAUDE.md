@@ -239,8 +239,7 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   staat in `docs/versionering.md`.
 - **Release-poort naar bump-grootte: de review-swarm.** Twee scripts staan geborgd in
   `.claude/workflows/`: `nlrio-swarm.js` (8 Opus-lens-agents → adversariële verify →
-  Fable-regisseur met ≤25 aanbevelingen; let op: zijn `CONTEXT` noemt nog het oude pad
-  `/home/martin/nlriochecker`) en de zwaardere `nlrio-fable-swarm.js` (12 Fable-lenzen met
+  Fable-regisseur met ≤25 aanbevelingen) en de zwaardere `nlrio-fable-swarm.js` (12 Fable-lenzen met
   bewijsplicht → Fable-skepticus → Fable-regisseur; eerst `args: {stap: 'audit'}` als
   kostenmeting, dan volledig met `resumeFromRunId`; ~65 agents, ~2 u, ~5,7 M subagent-tokens
   op 05-09-2026). De poort hangt af van de bump:
