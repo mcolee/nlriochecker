@@ -13,6 +13,17 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Product-hefboom-swarm** (issue #140): `.claude/workflows/nlrio-fable-product.js`, naar het
+  model van `orox-fable-archperf.js` in `gwsw-orox-helpers`. Vijf Fable-lenzen langs de zeven
+  terugkerende beheerderstaken uit de grill-sessie van 06-09 (databeheerder-aanlevering,
+  modelleur-poort, bestuurder-en-trend, tweede-gemeente, sector-gat), elk met eigen skills, een
+  doorlopen taak met de klok erbij op de gemeentebrede run (`uitvoer/04092026_slotrun`) en de
+  huidige kosten in uren × tarief (bureau € 120, intern € 100); skepticus op "grootste hefboom
+  en klopt het kostenbewijs", regisseur met `hefbomen10x`, kosten per taak, een totaal-anker per
+  gemeente-nulmeting en ≤ 15 aanbevelingen. Het RIONED-corpus wordt gelezen maar nooit
+  geciteerd (een lek wordt door de skepticus afgekeurd en uit het resultaat gehaald).
+  `args:{stap:'droog'}` spawnt geen agent (parse-check), `args:{stap:'audit'}` is de kostenmeting,
+  daarna volledig met `resumeFromRunId`; de auteur triggert de run.
 - **Meting dev tegen v0.2.0** (07-09, commit 67d0cd3): de kern-`toets` op De Wolden (dataset
   plus de drie SHACL-rapporten, zonder `--bronnen` want die vlag bestond in 0.2.0 niet, één run
   per cel achter `flock`) daalt koud (lege `--cache-map`) van 252 s naar 90 s en warm
