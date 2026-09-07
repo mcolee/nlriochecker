@@ -436,15 +436,22 @@ en het tekort per zijde noemt. De vectorlagen moeten het bereik plus de grootste
 EXT-zoekafstand dekken; het raster alleen het bereik zelf, want bemonsteren is
 puntsgewijs.
 
-Het hoogteraster mag elke vorm hebben die rasterio opent: strips of tiles, gecomprimeerd
-of niet, BigTIFF of niet. Zo leest het sneller: **tiles van 256×256 zonder compressie**.
-Op het AHN6-DTM van De Wolden en Hoogeveen (9,6 GB, 22.356 putten) kostte de bemonstering
-koud 23 s met strips van één rij en 8,5 s met tiles 256; compressie (DEFLATE, ZSTD, LZW)
-maakt het bestand kleiner maar het lezen trager, omdat elke geraakte tegel per run
-opnieuw gedecodeerd wordt. Omzetten kan met
-`gdal_translate -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 -co BIGTIFF=YES in.tif uit.tif`;
-de waarden blijven bit-gelijk. De meting staat in
-`docs/onderzoek/2026-09-07-ahn-rasterindeling-leesstrategie.md`.
+**Aanbeveling voor het hoogteraster: lever het aan als GeoTIFF met tiles van 256×256,
+zonder compressie.** Het raster mag elke vorm hebben die rasterio opent (strips of tiles,
+gecomprimeerd of niet, BigTIFF of niet) en de uitkomsten zijn in elke vorm gelijk; alleen de
+leestijd verschilt, en die verschillen zijn groot. Op het AHN6-DTM van De Wolden en
+Hoogeveen (9,6 GB, 22.356 putten) kostte de bemonstering koud 23 s met strips van één rij
+(zoals het AHN standaard geleverd wordt) en 8,5 s met tiles 256; de volle toets werd daarmee
+15,7 s (13%) sneller. Grotere tiles (512, 1024) helpen minder; compressie (DEFLATE, ZSTD,
+LZW) maakt het bestand kleiner maar het lezen 3 tot 7 keer trager, omdat elke geraakte tegel
+per run opnieuw gedecodeerd wordt. Omzetten kost een minuut en de waarden blijven
+bit-gelijk:
+
+```
+gdal_translate -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 -co BIGTIFF=YES in.tif uit.tif
+```
+
+De meting staat in `docs/onderzoek/2026-09-07-ahn-rasterindeling-leesstrategie.md` (BO-99).
 
 Wat die toets niet kan: een gat midden in een extract valt er niet mee op, en een
 tekort op een dunne laag betekent "hier staan geen features" en niet per se "extract

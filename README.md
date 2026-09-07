@@ -93,6 +93,8 @@ met toestemming gepubliceerd, BGT, BAG, NWB en GWSW zijn CC0, TOP10NL is CC-BY 4
 3. **Een map met externe bronnen** voor de EXT-checks (`--bronnen`): BGT, BAG, NWB, TOP10NL en het AHN-raster. Welke
    bestanden en laagnamen het programma verwacht staat onder `[bronnen]` in de projectconfiguratie. Elke bron wordt
    vóór de eerste check gecontroleerd op dekking van je gebied ([meer](docs/gebruik.md#externe-bronnen-en-hun-dekking)).
+   Lever het AHN-raster bij voorkeur aan als GeoTIFF met tiles van 256×256 zonder compressie: dat leest koud
+   bijna drie keer zo snel als de standaard strips, met dezelfde uitkomsten (gemeten in issue #168, BO-99).
 4. **Een projectconfiguratie** met je eigen drempels en bronpaden (`--projectconfig`; voorbeeld:
    `configs/dewoldenhoogeveen.toml`). Begin met `basis = "standaard"` en zet er alleen de sleutels onder die van de
    meegeleverde `src/nlriochecker/checks.toml` afwijken -- dat is een overlay van een paar regels. Zonder `basis` blijft
