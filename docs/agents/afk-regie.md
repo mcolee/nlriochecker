@@ -87,7 +87,11 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    > sluit af met `superpowers:verification-before-completion`. Concreet:
    > - **Lezen:** lees `docs/architectuur.md` en `docs/agents/analyse-harness.md` één keer
    >   volledig vóór je begint, en daarna elk bestand dat je aanraakt één keer volledig — niet
-   >   per symbool in plakjes. Geen `cd`: de werkmap is al de repo-root.
+   >   per symbool in plakjes. Je werkt in de worktree `<pad>` terwijl je werkmap de
+   >   hoofdrepo is: gebruik `uv run --directory <pad>` en `git -C <pad>`, geen
+   >   `cd <pad> &&`-prefix op elk commando. Geen `echo "=== kop ==="` in Bash: de
+   >   globale hook blokkeert dat en de tool labelt de uitvoer al (25 blokkades in
+   >   sessie F, 07-09). Edit/Write eisen dat je het bestand eerst met Read gelezen hebt.
    >   (**Klein-issue op Sonnet:** van `docs/architectuur.md` alleen de sectie(s) die het
    >   issue raakt — noem ze in de brief — en `analyse-harness.md` alleen als het issue een
    >   meting of scratch-script vraagt; de volle leesfase kostte 3–5 min per dispatch.)
