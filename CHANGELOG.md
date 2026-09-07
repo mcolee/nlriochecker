@@ -11,6 +11,16 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ## [Unreleased]
 
+### Toegevoegd
+
+- **Meting AHN-rasterindeling × leesstrategie** (issue #168): `scripts/meet_raster_bemonstering.py`
+  meet de bemonstering koud (`posix_fadvise`, `mincore`-controle) en warm per bestandsvariant en
+  leesstrategie, bit-gelijk bewaakt; verslag in
+  `docs/onderzoek/2026-09-07-ahn-rasterindeling-leesstrategie.md`. Uitkomst: tiles 256×256
+  zonder compressie lezen koud 23 → 8,5 s en maken de volle `toets` koud 13% sneller; compressie
+  en een grotere `GDAL_CACHEMAX` verliezen. `docs/gebruik.md` draagt het advies; de config en de
+  leesstrategie zijn niet gewijzigd.
+
 ### Gewijzigd
 
 - **`--projectconfig` kan een overlay op de standaard zijn** (issue #163, BO-98). Een

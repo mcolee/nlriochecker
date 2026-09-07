@@ -436,6 +436,16 @@ en het tekort per zijde noemt. De vectorlagen moeten het bereik plus de grootste
 EXT-zoekafstand dekken; het raster alleen het bereik zelf, want bemonsteren is
 puntsgewijs.
 
+Het hoogteraster mag elke vorm hebben die rasterio opent: strips of tiles, gecomprimeerd
+of niet, BigTIFF of niet. Zo leest het sneller: **tiles van 256×256 zonder compressie**.
+Op het AHN6-DTM van De Wolden en Hoogeveen (9,6 GB, 22.356 putten) kostte de bemonstering
+koud 23 s met strips van één rij en 8,5 s met tiles 256; compressie (DEFLATE, ZSTD, LZW)
+maakt het bestand kleiner maar het lezen trager, omdat elke geraakte tegel per run
+opnieuw gedecodeerd wordt. Omzetten kan met
+`gdal_translate -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 -co BIGTIFF=YES in.tif uit.tif`;
+de waarden blijven bit-gelijk. De meting staat in
+`docs/onderzoek/2026-09-07-ahn-rasterindeling-leesstrategie.md`.
+
 Wat die toets niet kan: een gat midden in een extract valt er niet mee op, en een
 tekort op een dunne laag betekent "hier staan geen features" en niet per se "extract
 afgeknipt". Daarvoor is `[bronnen] dekking_tolerantie_m`. De code staat standaard op
