@@ -13,6 +13,13 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Toegevoegd
 
+- **Meting dev tegen v0.2.0** (07-09, commit 67d0cd3): de kern-`toets` op De Wolden (dataset
+  plus de drie SHACL-rapporten, zonder `--bronnen` want die vlag bestond in 0.2.0 niet, één run
+  per cel achter `flock`) daalt koud (lege `--cache-map`) van 252 s naar 90 s en warm
+  (cachetreffer) van 111 s naar 72 s; de geheugenpiek van 5,3 GB naar 1,2 GB koud en van 4,1 GB
+  naar 1,2 GB warm, de cache op schijf van 434 MB naar 109 MB. Daarbij levert dev 170.657
+  CSV-rijen tegen 35.975 en schrijft hij ook de JSON. Voorbehoud: n = 1 en de TTL zat bij
+  beide in de paginacache; 0.2.0 las de ontologie uit `data/gwsw_ontologieen/`, dev gebundeld.
 - **Meting AHN-rasterindeling × leesstrategie** (issue #168): `scripts/meet_raster_bemonstering.py`
   meet de bemonstering koud (`posix_fadvise`, `mincore`-controle) en warm per bestandsvariant en
   leesstrategie, bit-gelijk bewaakt; verslag in
