@@ -175,5 +175,15 @@ Mechanisch, geen domeinlogica — maar telkens teruggevonden door te zoeken:
   terwijl `git push` en reads gewoon werken; opnieuw proberen slaagt meestal. Niet je
   token-scope of account onderzoeken — dat is dood werk.
 - **Byte-/inhoudsvergelijking van `toets`-gpkg tussen runs:** de `update_time`-kolom in
-  `layer_styles` is een tijdstempel die per schrijfactie verandert; normaliseer hem, anders
-  faalt een verder identieke vergelijking.
+  `layer_styles` én `gpkg_contents.last_change` zijn tijdstempels die per schrijfactie
+  veranderen; normaliseer beide, anders faalt een verder identieke vergelijking.
+- **Tekstkolommen in pandas 2.x zijn `str`-dtype, niet `object`.** Toets met
+  `pd.api.types.is_string_dtype(kolom)` (zo doet `uitvoer/herkomst.py` het), niet met
+  `dtype == object`; die vergelijking mist de kolommen die je wilt raken (#165).
+- **De drempel-drifttest volgt bewust alleen eigen methoden van een check, geen
+  module-helpers.** Module-helpers meenemen laat de allowlist (EXT-003/NET-004/RVZ-006/TOP-018)
+  groeien met ATTR-017 en TOP-015/016, die de tolerantie alleen voor een toelichting lezen;
+  besloten in issue #171 (punt i), niet opnieuw proberen.
+- **De GeoPackage schrijft `""` (lege string, `is_null = 0`) en geen NULL** voor `status` op
+  vlakken die geen NWB-wegvak zijn; een fixture of vergelijking die NULL verwacht wijkt af
+  (issue #171, punt j.2).
