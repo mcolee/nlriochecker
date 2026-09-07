@@ -5368,3 +5368,25 @@ ook met een `basis = "standaard"`-overlay nog juist.
 rest is toelichting). De gemergede overlay is `==` aan de volledige kopie in elke sectie;
 `tests/golden/ledger.json` byte-gelijk; de volle De Wolden en Hoogeveen-run identiek aan de
 referentie (161.661 meldingen, 0 checks met verschil). Geen andere contractwijziging.
+
+### BO-99 het De Wolden-AHN staat in de config als tiles 256×256 zonder compressie
+
+**Wat.** `configs/dewoldenhoogeveen.toml` wijst met `ahn_dtm` naar
+`AHN6_DeWoldenHoogeveen_DTM_tiles256.tif`: hetzelfde AHN6-DTM als het aangeleverde
+`AHN6_DeWoldenHoogeveen_DTM.tif` (strips van 1 rij, 9,64 GB), omgezet met
+`gdal_translate -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 -co BIGTIFF=YES`;
+float32 en nodata ongewijzigd, elke bemonsterde waarde bit-gelijk. Besluit van de auteur op
+2026-09-07 na het meetverslag van issue #168
+(`docs/onderzoek/2026-09-07-ahn-rasterindeling-leesstrategie.md`).
+
+**Waarom.** De bemonstering van 22.356 putten leest koud 23 s uit de strips en 8,5 s uit de
+tiles; de volle `toets` gaat koud van 119,6 naar 103,9 s (−15,7 s, −13%) en is sha-gelijk aan
+slotrun F. Compressie (DEFLATE, ZSTD, LZW) maakt het bestand kleiner maar warm 3–7 keer
+trager, en een grotere `GDAL_CACHEMAX` helpt nergens. De package eist geen indeling: elk
+raster dat rasterio opent blijft leesbaar, alleen trager (`docs/gebruik.md` draagt het
+advies). De leesstrategie in `src/` blijft ongewijzigd: de eigen vensterlezer wint bovenop het
+betere bestand nog 1–2 s en haalt het kill-criterium van #168 niet.
+
+**Bewijs.** `uitvoer/meting_168/` (n=3 om en om met de referentie, koud met
+`posix_fadvise` en `mincore`-controle) en de vier `toets`-runs daarin; het meetscript is
+`scripts/meet_raster_bemonstering.py`.

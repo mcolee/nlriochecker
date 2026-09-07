@@ -140,10 +140,10 @@ sindsdien wijzigde #165 de CSV-vorm, dus F is de juiste sha-referentie voor deze
   TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 -co BIGTIFF=YES`, 62 s, gelijke grootte).
   Boven het kill-criterium (−15,7 s / −13% koud op de volle run, bit- en sha-gelijk). Wordt
   een advies in `docs/gebruik.md` ("zo leest het sneller"), geen eis: de package leest elk
-  raster dat rasterio opent. Of `configs/dewoldenhoogeveen.toml` naar het getilede bestand
-  wijst is een auteursbesluit; het bestand staat klaar als
-  `data/gis_dewoldenhoogeveen/AHN6_v1_tiles256.tif` (niet getrackt; de andere varianten zijn
-  verwijderd).
+  raster dat rasterio opent. De auteur besloot op 07-09 `configs/dewoldenhoogeveen.toml` naar
+  het getilede bestand te laten wijzen (BO-99); het heet nu
+  `data/gis_dewoldenhoogeveen/AHN6_DeWoldenHoogeveen_DTM_tiles256.tif` (niet getrackt, naast
+  het origineel; de andere varianten zijn verwijderd).
 - **Leesstrategie-as: L3 (vensterlezer) niet bouwen.** Hij is de snelste, maar bovenop tiles
   256 wint hij nog 1,9 s koud en 1,1 s warm op een run van 104 s -- onder het kill-criterium.
   Daar staat een eigen lezer tegenover die de `rowcol`-afronding en de randafhandeling van

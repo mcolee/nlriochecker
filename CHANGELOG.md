@@ -18,8 +18,10 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   leesstrategie, bit-gelijk bewaakt; verslag in
   `docs/onderzoek/2026-09-07-ahn-rasterindeling-leesstrategie.md`. Uitkomst: tiles 256×256
   zonder compressie lezen koud 23 → 8,5 s en maken de volle `toets` koud 13% sneller; compressie
-  en een grotere `GDAL_CACHEMAX` verliezen. `docs/gebruik.md` draagt het advies; de config en de
-  leesstrategie zijn niet gewijzigd.
+  en een grotere `GDAL_CACHEMAX` verliezen. `docs/gebruik.md` draagt het advies;
+  `configs/dewoldenhoogeveen.toml` wijst sindsdien naar het getilede bestand
+  `AHN6_DeWoldenHoogeveen_DTM_tiles256.tif` (BO-99, bit- en sha-gelijk); de leesstrategie in
+  `src/` is niet gewijzigd.
 
 ### Gewijzigd
 

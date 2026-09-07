@@ -14,7 +14,7 @@
 #   nwb_wegvakken        NWB_wegvakken_DeWoldenHoogeveen.gpkg (9787 wegvakken)
 #   top10nl              TOP10NL_plaats_vlak_DeWoldenHoogeveen.gpkg (laag plaats_vlak)
 #   studiegebied         de CBS-buurtenkaart met 100 m buffer (36.708,5 ha, een feature)
-#   ahn_dtm              AHN6 in plaats van AHN5
+#   ahn_dtm              AHN6 in plaats van AHN5, als tiles 256 (BO-99)
 #   bgt_putdeksellagen   leeg (de BGT-laag `put` is spoorinfrastructuur; EXT-005/006 vervielen)
 #   onderdruk_klassen    het mechanische riool plus de pompunit uit de uitvoer houden
 #
@@ -45,7 +45,11 @@ bag_pand = "BAG_light_pand.gpkg"
 nwb_wegvakken = "NWB_wegvakken_DeWoldenHoogeveen.gpkg"
 top10nl = "TOP10NL_plaats_vlak_DeWoldenHoogeveen.gpkg"
 studiegebied = "CBS_buurten_DeWoldenHoogeveen_buffer_100m.gpkg"
-ahn_dtm = "AHN6_DeWoldenHoogeveen_DTM.tif"
+# Het AHN6-DTM als tiles van 256x256 zonder compressie (gdal_translate uit het origineel
+# `AHN6_DeWoldenHoogeveen_DTM.tif`, strips van 1 rij; waarden bit-gelijk). Koud leest de
+# bemonstering zo 23 -> 8,5 s en de volle toets 15,7 s sneller; zie BO-99 en
+# docs/onderzoek/2026-09-07-ahn-rasterindeling-leesstrategie.md.
+ahn_dtm = "AHN6_DeWoldenHoogeveen_DTM_tiles256.tif"
 # De BGT-laag `put` telt hier 843 objecten, waarvan 595 van ProRail: geen putdekselbron
 # maar spoorinfrastructuur. EXT-005 en EXT-006 vervielen met issue #95; de rol blijft leeg.
 bgt_putdeksellagen = []
