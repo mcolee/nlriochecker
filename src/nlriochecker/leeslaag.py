@@ -25,7 +25,6 @@ from __future__ import annotations
 from gwsw_orox_helpers.dataset import GwswDataset
 from gwsw_orox_helpers.namen import termen_voor
 from rdflib import BNode, URIRef
-from rdflib.term import Node as RdfNode
 
 
 def knopen_van(dataset: GwswDataset, wortel: str) -> list[str]:
@@ -138,7 +137,7 @@ def vulwaarde(dataset: GwswDataset, uri: str) -> str | None:
     return None if waarde is None else str(waarde)
 
 
-def _term(dataset: GwswDataset, uri: str) -> RdfNode:
+def _term(dataset: GwswDataset, uri: str) -> URIRef | BNode:
     """De graafterm achter deze URI-tekst: de URIRef, of anders de gelijknamige BNode.
 
     Dezelfde afweging als de leeslaag zelf maakt voor haar `onderdeel_*`-lezers: een
@@ -146,7 +145,7 @@ def _term(dataset: GwswDataset, uri: str) -> RdfNode:
     als die als subject voorkomt; anders telt de gelijknamige BNode; is geen van beide
     een subject, dan blijft de URIRef -- hetzelfde lege antwoord als een kale omweg.
     """
-    term: RdfNode = URIRef(uri)
+    term = URIRef(uri)
     if dataset.graph.heeft_subject(term):
         return term
     bnode = BNode(uri)
