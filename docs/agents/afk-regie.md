@@ -62,6 +62,9 @@ draait `uv run --directory <pad>` (niet `--project`: dat laat de cwd op de hoofd
 gebruikt absolute invoerpaden voor `data/` en normaliseert bij een GeoPackage-vergelijking
 `layer_styles.update_time` én `gpkg_contents.last_change`. Elke De Wolden-run achter
 `flock`. Na de landing worktree en tak verwijderen. Meer dan twee tegelijk nooit.
+**Elke implementer werkt in een worktree, ook als hij alleen loopt; `dev` is van de
+regisseur.** Eén brief-sjabloon voor beide situaties, en een implementer die halverwege
+stopt laat geen half bewerkt bestand op `dev` achter (auteursbesluit 07-09).
 
 1. **#…** …
 2. **#…** … — *blocked by #…*
