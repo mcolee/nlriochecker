@@ -1,7 +1,8 @@
 # Project: nlriochecker
 
-Lees vóór je code aanraakt `manifesto.md` in de repo-root (lokaal, git-ignored): het
-draagt de missie, de prioriteiten bij botsende doelen en wat we nadrukkelijk niet doen.
+Lees vóór je iets bouwt, wijzigt of reviewt `manifesto.md` in de repo-root (lokaal,
+git-ignored): het draagt de missie, de principes, de beslisregels bij botsende doelen en wat
+we nadrukkelijk niet doen.
 
 ## Doel
 Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen:
