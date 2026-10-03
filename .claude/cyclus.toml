@@ -1,0 +1,46 @@
+naam = "nlriochecker"
+github = "mcolee/nlriochecker"
+basis = "dev"                          # integratiebranch volgens CLAUDE.md; main draagt alleen uitgebrachte versies
+manifesto = "manifesto.md"
+
+[test]
+volledig = "uv run --with pytest-cov --with pytest-xdist pytest -q -n 4 --cov=nlriochecker --cov-fail-under=95"   # gelijk aan .github/workflows/toets.yml
+snel = "uv run --with pytest-xdist pytest -n 4 -m 'not zwaar'"                                                    # mechanische poort uit CLAUDE.md
+lint = ["uv run ruff check .", "uv run ruff format --check .", "uv run mypy"]
+lock = ""
+
+[data]
+productie_db = ""
+env_symlink = false
+
+[labels]
+klaar = "ready-for-agent"
+vraag = "needs-info"
+
+[budget]
+audit_tokens = 2_000_000
+audit_agents = 8
+afk_tokens = 1_000_000
+afk_issues = 8
+stop_bij = 0.8
+
+[beschermd]
+generiek = [
+  "<manifesto>",
+  "CLAUDE.md (werkregels; beschrijving van nieuwe functies mag)",
+  ".claude/skills/onderhoud/",
+  ".claude/cyclus.toml",
+  ".github/workflows/",
+  "tests/conftest.py",
+  "elke bestaande testfunctie (een nieuwe testfunctie toevoegen mag)",
+]
+domein = [
+  { pad = "data/checkregister-gwsw-nulmeting-v0_9.md", wat = "checkregister: check-ID's (stabiel) en normen", bron = "CLAUDE.md, Doel en Harde regels/Domein" },
+  { pad = "src/nlriochecker/checks.toml", wat = "drempels en klassenlijsten (verplicht in TOML, niet in Python)", bron = "CLAUDE.md, Harde regels/Domein (drempelwaarden, CFK-lijst)" },
+  { pad = "docs/beslislog.md", wat = "BO-nummers: onderbouwde afwijkingen van GWSW en bronnen", bron = "CLAUDE.md, Harde regels/Domein (GWSW is leidend)" },
+  { pad = "docs/json-schema.md", wat = "JSON-contract van de uitvoer (publiek contract)", bron = "CLAUDE.md, Werkwijze (Altijd Substantieel)" },
+  { pad = "tests/golden/", wat = "vaste referentie-uitvoer", bron = "CLAUDE.md, Werkwijze (Tests: fixtures) en manifesto principe 4" },
+  { pad = "tests/fixtures/", wat = "handgeschreven TTL en rapportuittreksels met één ingebouwd defect", bron = "CLAUDE.md, Werkwijze (Tests)" },
+  { pad = "scripts/uitgave.py", wat = "uitgavepoort met DEKKINGSONDERGRENS (95)", bron = "CLAUDE.md, Werkwijze (dekking)" },
+  { pad = "pyproject.toml", wat = "versienummer en vastgepinde gwsw-orox-helpers-release", bron = "CLAUDE.md, Harde regels/Techniek (versie, leeslaag)" },
+]

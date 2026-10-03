@@ -4,6 +4,14 @@ Lees vóór je iets bouwt, wijzigt of reviewt `manifesto.md` in de repo-root (lo
 git-ignored): het draagt de missie, de principes, de beslisregels bij botsende doelen en wat
 we nadrukkelijk niet doen.
 
+## Lessen (begrensde zelfverbetering)
+
+Corrigeert de eigenaar een uitkomst, schrijf dan een les in `docs/lessen.md`, onder de kop van
+het onderdeel, in de vorm bovenaan dat bestand. Ook als je de fout meteen repareert. Verwerken
+gaat alleen via de skill `onderhoud` (`.claude/skills/onderhoud/SKILL.md`): één onderdeel,
+rode test naar groen, één PR naar `dev`; de eigenaar merget. Testcommando's en beschermde paden
+staan in `.claude/cyclus.toml`. Principe 9 (voorstel) van `manifesto.md`.
+
 ## Doel
 Python-package dat de datakwaliteit van vrijvervalriolering toetst in twee lagen:
 1. Inlezen en analyseren van de GWSW-nulmeting, aangeleverd als SHACL-validatierapporten (apps.gwsw.nl/item_validate_shacl).
