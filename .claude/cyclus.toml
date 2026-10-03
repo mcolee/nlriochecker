@@ -43,4 +43,7 @@ domein = [
   { pad = "tests/fixtures/", wat = "handgeschreven TTL en rapportuittreksels met één ingebouwd defect", bron = "CLAUDE.md, Werkwijze (Tests)" },
   { pad = "scripts/uitgave.py", wat = "uitgavepoort met DEKKINGSONDERGRENS (95)", bron = "CLAUDE.md, Werkwijze (dekking)" },
   { pad = "pyproject.toml", wat = "versienummer en vastgepinde gwsw-orox-helpers-release", bron = "CLAUDE.md, Harde regels/Techniek (versie, leeslaag)" },
+  { pad = "src/nlriochecker/plausibiliteit.toml", wat = "drempels en bereiken van de ATTR-checks, met bron per regel", bron = "BA-1 in docs/beslislog.md, issue #20, manifesto principe 9 (drempels)" },
+  { pad = "src/nlriochecker/dekking.toml", wat = "dekkingclaims letterlijk uit checkregister v0.9 en typeringsscore_minimum", bron = "kop van het bestand, manifesto principe 9 (checkregister)" },
+  { pad = "src/nlriochecker/nulmeting_teksten.toml", wat = "43 door de auteur vastgestelde meldingsteksten", bron = "BO-74 in docs/beslislog.md, issue #101" },
 ]
