@@ -1975,8 +1975,8 @@ def _schrijf_runmetadata(
         # leiden: dat is nu `n_vlakken` min de deelstelsels min de wegvakken.
         _Kolom("n_wegvakken", "integer"),
         _Kolom("kern_objecten", "integer"),
-        # Sinds BO-100 de objecten buiten de kern die de checks zagen: de rest van de
-        # export, want er is geen contextschil meer. Kolomnaam ongewijzigd (contract).
+        # Sinds BO-100 de ring: de objecten die de kaart grijs om het gebied tekent
+        # (BO-29). Er is geen contextschil meer; de kolomnaam blijft (contract).
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
         _Kolom("cfk_set", "text"),
@@ -2044,7 +2044,7 @@ def _schrijf_runmetadata(
         "n_gemengd_zonder_vlak": tellingen.gemengd_zonder_vlak,
         "n_wegvakken": tellingen.wegvakken,
         "kern_objecten": len(stel.kern) if stel is not None else None,
-        "schil_objecten": stel.volledig_aantal - len(stel.kern) if stel is not None else None,
+        "schil_objecten": len(stel.buffer) if stel is not None else None,
         "dataset_objecten": stel.volledig_aantal if stel is not None else None,
         "cfk_set": run.meetbereik.cfk_tekst,
         "volledig": int(run.meetbereik.volledig),

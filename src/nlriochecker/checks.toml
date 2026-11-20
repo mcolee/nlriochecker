@@ -585,9 +585,12 @@ register_versie = "v0.9"
 onderdruk_klassen = []
 onderdruk_checks = []
 
-# Hoe een analyse wordt afgebakend als er een studiegebied is opgegeven. De checks
-# draaien dan op de kern (wat het gebied raakt) plus een contextschil, zodat de
-# netwerkchecks hun antwoord houden; gerapporteerd wordt alleen de kern.
+# Hoe een studiegebied wordt afgebakend. Sinds BO-100 draaien de checks altijd over de
+# volledige export en wordt alleen de kern (wat het gebied raakt) gerapporteerd.
+# `context_buffer_m` bepaalt nu alleen de ring die de GeoPackage grijs meetekent (BO-29).
+# `volledige_dataset_checks` bepaalt zonder studiegebied nog `bekeken_scope`; met een
+# studiegebied heeft de lijst geen effect. `component_waarschuwingsdrempel` heeft in
+# `toets` geen effect meer.
 [studiegebied]
 context_buffer_m = 50.0
 volledige_dataset_checks = ["ADM-002"]

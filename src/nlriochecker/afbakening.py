@@ -16,7 +16,8 @@ wel, en daarvoor blijft zij staan.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import cached_property
 
 import networkx as nx
 from gwsw_orox_helpers.dataset import GwswDataset
@@ -87,11 +88,6 @@ class Analyseset:
         """Kern en schil samen: waarover de checks redeneren."""
         return self.kern | self.schil
 
-    @property
-    def aandeel(self) -> float:
-        """Welk deel van de export de analyseset beslaat."""
-        return len(self.alles) / self.volledig_aantal if self.volledig_aantal else 0.0
-
 
 @dataclass(frozen=True)
 class GedeeldeIndex:
@@ -111,28 +107,29 @@ class GedeeldeIndex:
 
     boom: STRtree
     uris: tuple[str, ...]
-    componenten: list[set[str]]
-    component_van: dict[str, int]
-    strengen: tuple[tuple[str, str], ...]
-    zonder_netwerkverband: int
+    dataset: GwswDataset = field(compare=False, repr=False)
+    config: CheckConfig = field(compare=False, repr=False)
 
     def kandidaten(self, geometrie: BaseGeometry) -> Iterator[str]:
         """De URI's waarvan de omhullende die van `geometrie` raakt."""
         for index in self.boom.query(geometrie):
             yield self.uris[index]
 
+    @cached_property
+    def _structuur(self) -> tuple[list[set[str]], dict[str, int], tuple[tuple[str, str], ...], int]:
+        """De componentstructuur, lui: alleen `bouw_analyseset` vraagt hem (BO-100)."""
+        return _componentstructuur(self.dataset, self.config)
+
     def component(self, kern: frozenset[str]) -> tuple[set[str], int]:
         """De samenhangende vrijvervalcomponenten die deze kern raken.
 
         Alleen deze selectie hangt van het gebied af; de componentstructuur zelf niet.
         """
-        return _selecteer_component(
-            self.componenten, self.component_van, self.strengen, self.zonder_netwerkverband, kern
-        )
+        return _selecteer_component(*self._structuur, kern)
 
 
 def bouw_gedeelde_index(dataset: GwswDataset, config: CheckConfig) -> GedeeldeIndex:
-    """Bouwt de ruimtelijke index en de componentenstructuur van de volledige export."""
+    """Bouwt de ruimtelijke index; de componentstructuur volgt pas bij de eerste vraag."""
     uris: list[str] = []
     geometrieen: list[BaseGeometry] = []
     for uri, node in dataset.nodes.items():
@@ -144,16 +141,8 @@ def bouw_gedeelde_index(dataset: GwswDataset, config: CheckConfig) -> GedeeldeIn
             uris.append(uri)
             geometrieen.append(conduit.line)
 
-    componenten, component_van, strengen, zonder_netwerkverband = _componentstructuur(
-        dataset, config
-    )
     return GedeeldeIndex(
-        boom=STRtree(geometrieen),
-        uris=tuple(uris),
-        componenten=componenten,
-        component_van=component_van,
-        strengen=strengen,
-        zonder_netwerkverband=zonder_netwerkverband,
+        boom=STRtree(geometrieen), uris=tuple(uris), dataset=dataset, config=config
     )
 
 

@@ -462,15 +462,17 @@ class StudyAreaOptions(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # Hoe ver om het gebied heen objecten meedoen die geen netwerkverband met de
-    # kern hebben. Nodig voor TOP-005, TOP-006, TOP-010, TOP-011, TOP-021 en de
-    # EXT-checks, die naar buren kijken zonder de graaf te volgen.
+    # De breedte van de ring om het gebied die de GeoPackage grijs meetekent (BO-29).
+    # Sinds BO-100 zien de checks altijd de volledige export; deze afstand bepaalt
+    # niet meer wat een check ziet (wel nog de oude analyseset in de analysescripts).
     context_buffer_m: float = Field(default=50.0, ge=0.0)
-    # Checks die over de hele populatie gaan in plaats van over losse objecten; die
-    # draaien altijd op de volledige export.
+    # Checks die over de hele populatie gaan in plaats van over losse objecten. Zonder
+    # studiegebied krijgen ze `bekeken_scope` `volledige_export`; met een studiegebied
+    # heeft de lijst sinds BO-100 geen effect, want dan telt elke check over de export.
     volledige_dataset_checks: list[str] = Field(default_factory=lambda: ["ADM-002"])
-    # Boven dit aandeel van de dataset levert de afbakening zo weinig op dat de run
-    # dat meldt. Een mededeling, geen fout.
+    # Tot BO-100 de grens waarboven de run meldde dat de analyseset vrijwel de hele
+    # export besloeg. Sinds BO-100 leest `toets` hem niet meer; hij blijft voor
+    # bestaande projectconfigs (`extra="forbid"` zou ze anders weigeren).
     component_waarschuwingsdrempel: float = Field(default=0.5, gt=0.0, le=1.0)
 
 

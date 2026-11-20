@@ -385,7 +385,7 @@ def test_met_studiegebied_is_het_gebied_de_grens(tmp_path: Path) -> None:
     assert grens[1] == pytest.approx(0.14, abs=0.01)
 
 
-def test_zonder_analyseset_blijven_de_kolommen_leeg(tmp_path: Path) -> None:
+def test_zonder_afbakening_blijven_de_kolommen_leeg(tmp_path: Path) -> None:
     run = _run("schoon.ttl")
     pad = _schrijf(run, tmp_path)
 
@@ -394,8 +394,8 @@ def test_zonder_analyseset_blijven_de_kolommen_leeg(tmp_path: Path) -> None:
 
 
 def test_de_omvang_van_de_kern_staat_in_de_runmetadata(tmp_path: Path) -> None:
-    """`schil_objecten` telt sinds BO-100 de rest van de export: wat de checks buiten de
-    kern zagen. De kolom behoudt haar naam."""
+    """`schil_objecten` telt sinds BO-100 de ring die de kaart grijs tekent (BO-29). De
+    kolom behoudt haar naam."""
     dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = _config()
@@ -407,7 +407,7 @@ def test_de_omvang_van_de_kern_staat_in_de_runmetadata(tmp_path: Path) -> None:
 
     rij = _rijen(pad, "select kern_objecten, schil_objecten, dataset_objecten from gwsw_run")[0]
     totaal = len(dataset.nodes) + len(dataset.conduits)
-    assert rij == (len(afbakening.kern), totaal - len(afbakening.kern), totaal)
+    assert rij == (len(afbakening.kern), len(afbakening.buffer), totaal)
 
 
 def test_export_overschrijft_geen_invoerbestand(tmp_path: Path) -> None:
@@ -1840,7 +1840,7 @@ def test_gwsw_run_leest_elke_kolom_bij_naam_terug(monkeypatch: pytest.MonkeyPatc
             area_ha=12.3456,
             feature_count=71,
         ),
-        afbakening=SimpleNamespace(kern=[0] * 5, volledig_aantal=123),
+        afbakening=SimpleNamespace(kern=[0] * 5, buffer=[0] * 9, volledig_aantal=123),
         meetbereik=SimpleNamespace(cfk_tekst="Hyd, MdsPlan", volledig=False),
     )
     # Vier fouten, drie waarschuwingen, twee zonder foutlocatie: vier onderling ongelijke
@@ -1897,7 +1897,7 @@ def test_gwsw_run_leest_elke_kolom_bij_naam_terug(monkeypatch: pytest.MonkeyPatc
         "n_gemengd_zonder_vlak": 16,
         "n_wegvakken": 17,
         "kern_objecten": 5,
-        "schil_objecten": 118,
+        "schil_objecten": 9,
         "dataset_objecten": 123,
         "cfk_set": "Hyd, MdsPlan",
         "volledig": 0,
