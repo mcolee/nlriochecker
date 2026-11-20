@@ -166,11 +166,11 @@ def test_toets_schrijft_uitvoer(tmp_path: Path) -> None:
 
 
 def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
-    """Put C ligt los en ver buiten gebied en buffer, en komt dus niet in de analyseset.
+    """Put C ligt los en ver buiten het gebied; zijn bevinding valt bij het afbakenen weg.
 
-    De check ziet hem niet eens, dus valt er niets meer weg op het moment dat het
-    rapport wordt afgebakend. Het rapport blijft leeg, alleen op een andere manier
-    dan toen de check nog over de volledige dataset liep.
+    Sinds BO-100 draait de check over de volledige export en ziet hij put C dus wel.
+    Het rapport blijft leeg, en de opdrachtregel zegt dat er een bevinding buiten het
+    gebied viel.
     """
     uitvoer = tmp_path / "uitvoer"
     resultaat = CliRunner().invoke(
@@ -191,7 +191,7 @@ def test_toets_met_studiegebied_meldt_wat_wegvalt(tmp_path: Path) -> None:
 
     assert resultaat.exit_code == 0, resultaat.output
     assert "Studiegebied" in resultaat.output
-    assert "0 bevindingen buiten het gebied weggelaten" in resultaat.output
+    assert "1 bevinding buiten het gebied weggelaten" in resultaat.output
     tabel = lees_csv(uitvoer / FILE_CHECKS_CSV)
     # Geen checkbevindingen; de datasetsignalen (bron "dataset", issue #22) staan er los
     # van en gaan over de export als geheel, niet over dit gebied.

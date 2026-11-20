@@ -12,6 +12,7 @@ from gwsw_orox_helpers.dataset import load_dataset
 
 from nlriochecker.afbakening import (
     _component,
+    bouw_afbakening,
     bouw_analyseset,
     bouw_gedeelde_index,
     objecten_in_gebied,
@@ -37,6 +38,18 @@ def _opzet():
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
     return dataset, area, config
+
+
+def test_de_afbakening_heeft_dezelfde_kern_en_ring_als_de_analyseset() -> None:
+    """BO-100: `Afbakening` vervangt de analyseset in `toets`; kern en grijze ring blijven."""
+    dataset, area, config = _opzet()
+
+    afbakening = bouw_afbakening(dataset, area, config, bouw_gedeelde_index(dataset, config))
+    analyseset = bouw_analyseset(dataset, area, config)
+
+    assert afbakening.kern == analyseset.kern
+    assert afbakening.buffer == analyseset.buffer
+    assert afbakening.volledig_aantal == analyseset.volledig_aantal
 
 
 def test_de_kern_is_wat_het_gebied_raakt() -> None:
@@ -251,18 +264,6 @@ def test_een_via_config_aangewezen_check_ziet_ook_de_hele_export() -> None:
 
     assert breed.outcomes[0].examined > smal.outcomes[0].examined
     assert breed.outcomes[0].examined == referentie.outcomes[0].examined
-
-
-def test_de_run_onthoudt_de_omvang_van_kern_en_schil() -> None:
-    dataset, area, config = _opzet()
-    analyseset = bouw_analyseset(dataset, area, config)
-
-    run = run_checks(
-        CheckContext(dataset=analyseset.dataset, config=config, analyseset=analyseset),
-        ["TOP-001"],
-    )
-
-    assert run.analyseset is analyseset
 
 
 def test_de_uitslag_zegt_waarover_bekeken_geteld_is() -> None:

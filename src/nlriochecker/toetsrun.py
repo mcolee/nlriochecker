@@ -114,9 +114,7 @@ class Toetsuitslag:
         regels += self._meetregels()
         regels += self._bronregels()
         if len(self.runs) == 1:
-            regels += _gebied_uitgebreid(
-                self.runs[0], self.config, self.uitvoer.stromen[self.runs[0].naam]
-            )
+            regels += _gebied_uitgebreid(self.runs[0], self.uitvoer.stromen[self.runs[0].naam])
         else:
             # Bij tachtig buurten zou een blok per gebied duizenden regels opleveren;
             # de tellingen per check staan in totaal/synthese.md.
@@ -439,7 +437,7 @@ def _eigen_telling(stroom: Meldingenstroom) -> Regel:
 def _gebied_kort(gebiedsrun: GebiedsRun, stroom: Meldingenstroom) -> str:
     """Vat een gebiedsrun samen in een regel; het detail staat in de synthese."""
     run = gebiedsrun.run
-    kern = len(run.analyseset.kern) if run.analyseset is not None else 0
+    kern = len(run.afbakening.kern) if run.afbakening is not None else 0
     weggelaten = run.weggelaten
     telling = _eigen_telling(stroom)
     leeg = " -- geen objecten in dit gebied, niets getoetst" if not kern else ""
@@ -451,9 +449,7 @@ def _gebied_kort(gebiedsrun: GebiedsRun, stroom: Meldingenstroom) -> str:
     )
 
 
-def _gebied_uitgebreid(
-    gebiedsrun: GebiedsRun, config: CheckConfig, stroom: Meldingenstroom
-) -> list[str]:
+def _gebied_uitgebreid(gebiedsrun: GebiedsRun, stroom: Meldingenstroom) -> list[str]:
     """De omvang en de uitslag van een enkele gebiedsrun, per check."""
     run = gebiedsrun.run
     regels = []
@@ -464,17 +460,12 @@ def _gebied_uitgebreid(
             f"  Studiegebied {gebied.name} ({gebied.area_ha:.1f} ha): "
             f"{getal(weggelaten, 'bevinding', 'bevindingen')} buiten het gebied weggelaten."
         )
-    if run.analyseset is not None:
-        stel = run.analyseset
+    if run.afbakening is not None:
+        afbakening = run.afbakening
         regels.append(
-            f"  Analyseset: {getal(len(stel.kern), 'object', 'objecten')} in de kern, "
-            f"{len(stel.schil)} in de contextschil, van {stel.volledig_aantal} in de export."
+            f"  Kern: {getal(len(afbakening.kern), 'object', 'objecten')} van "
+            f"{afbakening.volledig_aantal} in de export; de checks draaiden over de hele export."
         )
-        if stel.aandeel > config.studiegebied.component_waarschuwingsdrempel:
-            regels.append(
-                "  Let op: het net binnen dit gebied hangt met vrijwel de hele export samen; "
-                "de afbakening levert weinig tijdwinst op."
-            )
     for outcome in run.outcomes:
         voorbehoud = (
             f", {outcome.unreliable_count} met typeringsvoorbehoud"

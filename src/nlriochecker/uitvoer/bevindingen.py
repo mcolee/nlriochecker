@@ -390,8 +390,9 @@ def _gwsw_versie_regel(run: CheckRun) -> str:
 def _omvang_section(run: CheckRun) -> list[str]:
     """Wat er in het gebied ligt: aantallen per objecttype en stelseltype.
 
-    De schil staat als voetnoot en niet in de tabel: er wordt niet over gerapporteerd,
-    en hem meetellen zou de aantallen laten afwijken van de bevindingen eronder.
+    Wat buiten de kern ligt staat als voetnoot en niet in de tabel: er wordt niet over
+    gerapporteerd, en het meetellen zou de aantallen laten afwijken van de bevindingen
+    eronder.
     """
     regels = ["## Wat er in dit gebied ligt", ""]
     regels += table(omvangtabel(run), "Aantallen in de kern")
@@ -404,14 +405,14 @@ def _omvang_section(run: CheckRun) -> list[str]:
             "compartimenten en hulpstukken zonder eigen punt, bijvoorbeeld. De checks "
             "zien ze wel.",
         ]
-    stel = run.analyseset
-    if stel is not None:
+    afbakening = run.afbakening
+    if afbakening is not None:
         regels += [
             "",
-            f"> De tabel telt de {getal(len(stel.kern), 'object', 'objecten')} in de kern. "
-            f"Daarbuiten zag de analyse nog {len(stel.schil)} objecten in de contextschil, "
-            "nodig om de netwerkchecks hun antwoord te laten houden; daar wordt niet over "
-            "gerapporteerd.",
+            f"> De tabel telt de {getal(len(afbakening.kern), 'object', 'objecten')} in de "
+            f"kern. De checks zagen de hele export ({afbakening.volledig_aantal} objecten), "
+            "zodat een streng die het gebied uit loopt geen randeffect geeft; over de rest "
+            "wordt hier niet gerapporteerd.",
         ]
     regels += _afhankelijkheden_section(run)
     herstel = koppelingsherstel(run)
@@ -443,8 +444,8 @@ def _afhankelijkheden_section(run: CheckRun) -> list[str]:
     regels = ["", "**Objecten waar de checks van afhangen**", ""]
     if run.study_area is not None:
         regels += [
-            "> Geteld over de **geanalyseerde export** (kern plus contextschil), niet "
-            "alleen de kern: of een klasse voorkomt is een eigenschap van de aanlevering "
+            "> Geteld over de **volledige export**, niet alleen de kern: of een klasse "
+            "voorkomt is een eigenschap van de aanlevering "
             "en verandert niet met de afbakening van de rapportage.",
             "",
         ]
@@ -602,15 +603,15 @@ def _verantwoording(
             f"**Studiegebied:** {gebied.name} ({gebied.area_ha:.1f} ha, "
             f"{gebied.feature_count} vlak(ken), bron `{gebied.source.name}`).",
             "",
-            f"> De checks draaiden op de kern plus de contextschil -- ruim genoeg dat "
-            f"netwerkchecks geen randeffecten krijgen van strengen die het gebied uit lopen "
-            f"-- en pas daarna is tot de kern afgebakend. "
+            f"> De checks draaiden over de volledige export -- zodat netwerkchecks geen "
+            f"randeffecten krijgen van strengen die het gebied uit lopen -- en pas daarna is "
+            f"tot de kern afgebakend. "
             f"**{getal(weggelaten, 'bevinding viel', 'bevindingen vielen')} buiten "
             f"het gebied** en {vorm(weggelaten, 'staat', 'staan')} hier niet in; dit rapport "
             "zegt dus niets over de rest van de dataset.",
             "",
         ]
-        if run.analyseset is not None and not run.analyseset.kern:
+        if run.afbakening is not None and not run.afbakening.kern:
             # Nul bevindingen op een leeg gebied leest als "hier is alles in orde".
             # Bij rapportage over meerdere gebieden is zo'n gebied normaal (water,
             # natuur, bedrijventerrein) en mag het de andere niet meeslepen, maar het
@@ -624,30 +625,15 @@ def _verantwoording(
 
     lines += _onderdrukking_section(onderdrukking)
 
-    if run.analyseset is not None:
-        stel = run.analyseset
-        zin = (
-            f"Analyseset: {getal(len(stel.kern), 'object', 'objecten')} in de kern, "
-            f"{len(stel.schil)} in de contextschil, van {stel.volledig_aantal} in de export. "
-            "De checks redeneren over kern en schil samen; gerapporteerd wordt alleen de "
-            "kern."
-        )
-        populatiechecks = _volledige_populatie_check_ids(run)
-        if populatiechecks:
-            zin += (
-                f" Checks die over de hele populatie gaan ({', '.join(populatiechecks)}) "
-                "draaien op de volledige export."
-            )
-        lines += [zin]
-        if stel.strengen_zonder_netwerkverband:
-            aantal = stel.strengen_zonder_netwerkverband
-            lines += [
-                f"{getal(aantal, 'vrijvervalstreng', 'vrijvervalstrengen')} "
-                f"{vorm(aantal, 'heeft', 'hebben')} een uiteinde dat niet naar een "
-                "netwerkknoop herleidt en kon daardoor niet meewegen bij het bepalen van de "
-                "schil; ze tellen niet mee in de aantallen hierboven.",
-            ]
-        lines += [""]
+    if run.afbakening is not None:
+        afbakening = run.afbakening
+        lines += [
+            f"Kern: {getal(len(afbakening.kern), 'object', 'objecten')} van "
+            f"{afbakening.volledig_aantal} in de export. De checks redeneren over de hele "
+            "export; gerapporteerd wordt alleen de kern. Bekeken en de toelichtingen per "
+            "check gaan daarom over de hele export.",
+            "",
+        ]
 
     lines += _bronnen_section(run)
     lines += _karakteristiek_section(run, meldingen, met_csv=met_csv)
@@ -1182,23 +1168,6 @@ def _onvertaald_section(uit_nulmeting: list[Melding]) -> list[str]:
         "gewoon mee; alleen de zin erbij is nog die van de GWSW-server.",
         "",
     ]
-
-
-def _volledige_populatie_check_ids(run: CheckRun) -> list[str]:
-    """De check-ID's die altijd op de volledige export draaien, gesorteerd.
-
-    Dat zijn checks met `Check.volledig_bereik` en checks die alleen via
-    `config.studiegebied.volledige_dataset_checks` zijn aangewezen (zie
-    `checks.base.run_checks`). Hardcoderen van een naam hier -- zoals eerder
-    alleen "ADM-002" -- laat een via de config toegevoegde check onvermeld.
-    """
-    geconfigureerd = set(run.config.studiegebied.volledige_dataset_checks)
-    ids = {
-        outcome.check_id
-        for outcome in run.outcomes
-        if outcome.volledig_bereik or outcome.check_id in geconfigureerd
-    }
-    return sorted(ids)
 
 
 def _karakteristiek_section(run: CheckRun, meldingen: list[Melding], *, met_csv: bool) -> list[str]:

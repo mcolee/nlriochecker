@@ -2,24 +2,19 @@
 
 Het laden van de dataset kost op de De Wolden en Hoogeveen-export ruim drie minuten en circa
 3 GB; N keer laden is uitgesloten. Deze module laadt daarom niets zelf, maar krijgt
-de geladen dataset mee en bouwt er per gebied een eigen analyseset op. De
-schilsemantiek blijft daarmee per gebied gelijk aan die van een losse run: dat is de
-correctheidseis van de rapportage per gebied, en `tests/test_toetsloop.py` legt hem
-vast.
+de geladen dataset mee.
 
-Wat over gebieden heen gedeeld wordt, is uitsluitend wat niet van het gebied
-afhangt:
+Sinds BO-100 draaien de checks ook maar één keer: over de volledige export, precies
+zoals zonder studiegebied. Daarna bakent de loop die ene run per gebied af tot de kern.
+Een gebiedsrapport is daarmee per constructie gelijk aan de gemeentebrede run beperkt
+tot dat gebied -- de correctheidseis van de rapportage per gebied, die
+`tests/test_toetsloop.py` vastlegt. Tot BO-100 draaide elk gebied de checks op een
+eigen analyseset (kern plus contextschil); bij 88 buurten kostte dat 51 minuten checks,
+omdat de schil van elke buurt bijna het hele net besloeg.
 
-- de geparseerde dataset en ontologie -- invoer;
-- de ruimtelijke index en de vrijvervalcomponenten van het volledige net
-  (`GedeeldeIndex`) -- de boom levert kandidaten, het oordeel blijft `area.bevat`,
-  en de componentstructuur hing al niet van een gebied af;
-- de volledige-export-`CheckContext` -- die hangt af van de volledige dataset, de
-  config en de onbetrouwbare objecten, alle drie gebiedsonafhankelijk. Hierin zitten
-  de datakarakteristiek en de structuren van de checks met `volledig_bereik`.
-
-Nooit gedeeld: de context van een gebied en alles in zijn cache. De topologie-index
-en de netwerkgraaf horen bij de uitgedunde dataset van dat ene gebied.
+Per gebied wordt alleen nog de kern en de ring bepaald (`afbakening.Afbakening`), via
+één gedeelde ruimtelijke index (`GedeeldeIndex`): de boom levert kandidaten, het
+oordeel blijft `area.bevat`.
 """
 
 from __future__ import annotations
@@ -29,10 +24,9 @@ from dataclasses import dataclass, replace
 from gwsw_orox_helpers.dataset import GwswDataset
 from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
 
-from nlriochecker.afbakening import GedeeldeIndex, bouw_analyseset, bouw_gedeelde_index
+from nlriochecker.afbakening import GedeeldeIndex, bouw_afbakening, bouw_gedeelde_index
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks import CheckContext, CheckRun, run_checks
-from nlriochecker.checks.treffers import Trefferregister, Wegvakregister
 from nlriochecker.externedata import ExternalData
 from nlriochecker.meting import Meetbereik
 from nlriochecker.nulbevinding import Nulbevinding
@@ -73,14 +67,15 @@ def toets_gebieden(
     niet_beoordeelde_klassen: tuple[str, ...] = (),
     voortgang: Voortgang = NUL_VOORTGANG,
 ) -> list[GebiedsRun]:
-    """Draait de checks per studiegebied en levert een run per gebied.
+    """Draait de checks één keer over de volledige export en levert een run per gebied.
 
     Zonder studiegebieden is er precies een run, over de volledige dataset. Met een
-    enkel gebied ook, maar dan afgebakend -- exact zoals voor de rapportage per
-    gebied bestond. Met meer gebieden is het er een per gebied, elk met een eigen
-    kern, contextschil en uitgedunde dataset.
+    enkel gebied ook, maar dan afgebakend tot de kern van dat gebied. Met meer gebieden
+    is het er een per gebied: telkens dezelfde run, elk tot de eigen kern afgebakend
+    (BO-100). Een enkel gebied gaat bewust dezelfde route, zodat de gelijkwaardigheid
+    met de gemeentebrede run voor beide per constructie geldt.
     """
-    basis = CheckContext(
+    context = CheckContext(
         dataset=dataset,
         config=config,
         unreliable_objects=onbetrouwbaar,
@@ -88,150 +83,40 @@ def toets_gebieden(
         bronnen=bronnen,
         volledige_dataset=dataset,
     )
-    if gebieden is None:
-        return [
-            GebiedsRun(
-                gebied=None,
-                run=_draai(
-                    basis,
-                    check_ids,
-                    typing_gate_applied,
-                    meetbereik,
-                    max_meldingen,
-                    lokale_eisen,
-                    nulbevindingen,
-                    niet_beoordeelde_klassen,
-                    voortgang,
-                    "Checks",
-                ),
-                map="",
-            )
-        ]
-
-    gedeeld = bouw_gedeelde_index(dataset, config)
-    # Bewust zonder analyseset: deze context ziet de volledige export, en een check
-    # die zijn bereik in woorden noemt hoort dat te zeggen. Zie de CHANGELOG.
-    volledig = basis.volledige_context()
-    return [
-        _per_gebied(
-            basis,
-            volledig,
-            gedeeld,
-            area,
-            config,
-            check_ids=check_ids,
-            typing_gate_applied=typing_gate_applied,
-            meetbereik=meetbereik,
-            max_meldingen=max_meldingen,
-            lokale_eisen=lokale_eisen,
-            nulbevindingen=nulbevindingen,
-            niet_beoordeelde_klassen=niet_beoordeelde_klassen,
-            voortgang=voortgang,
-            met_submap=not gebieden.enkel,
-        )
-        for area in gebieden.gebieden
-    ]
-
-
-def _per_gebied(
-    basis: CheckContext,
-    volledig: CheckContext,
-    gedeeld: GedeeldeIndex,
-    area: StudyArea,
-    config: CheckConfig,
-    *,
-    check_ids: list[str] | None,
-    typing_gate_applied: bool,
-    meetbereik: Meetbereik,
-    max_meldingen: str,
-    lokale_eisen: str,
-    nulbevindingen: tuple[Nulbevinding, ...],
-    niet_beoordeelde_klassen: tuple[str, ...],
-    voortgang: Voortgang,
-    met_submap: bool,
-) -> GebiedsRun:
-    """Bouwt de analyseset van een gebied en draait er de checks op."""
-    analyseset = bouw_analyseset(basis.dataset, area, config, gedeeld=gedeeld)
-    # Verse registers en verse cache per gebied. Bij het trefferregister is dat netheid:
-    # een gedeeld exemplaar zou geen verkeerde laag opleveren -- de join op de meldingen
-    # van dit gebied beslist -- maar het zou wel meegroeien met het aantal buurten en bij
-    # het debuggen treffers van een ander gebied tonen.
-    #
-    # Bij het wegvakregister is het correctheid, en dat is de reden dat dit twee regels
-    # zijn en geen een. Dat register wordt niet via de meldingen gejoind: élke rij erin
-    # komt in de laag `vlakken` terecht (BO-79). `_cache={}` hieronder laat
-    # `beoordeel(context)` per gebied opnieuw draaien, en dan tegen de uitgedunde dataset
-    # van dát gebied -- een straat buiten deze kern en schil telt daar nul meter streng en
-    # heet dus rood. Met een gedeeld register won het eerste gebied, en erfden alle volgende
-    # zijn oordeel over straten die zij zelf heel anders zien: een bediende straat verdween
-    # dan uit de laag (rood zonder melding krijgt geen rij) of kreeg een groen vlak met een
-    # rode melding erin. `tests/test_toetsloop.py` legt de equivalentie vast, en
-    # `Wegvakregister.registreer` weigert zo'n tegenspraak sindsdien luid.
-    context = replace(
-        basis,
-        dataset=analyseset.dataset,
-        analyseset=analyseset,
-        gedeelde_volledige_context=volledig,
-        treffers=Trefferregister(),
-        wegvakken=Wegvakregister(),
-        _cache={},
-    )
-    naam = area.gebied or area.name
-    fase = f"Checks {naam}" if met_submap else "Checks"
-    run = _draai(
-        context,
-        check_ids,
-        typing_gate_applied,
-        meetbereik,
-        max_meldingen,
-        lokale_eisen,
-        nulbevindingen,
-        niet_beoordeelde_klassen,
-        voortgang,
-        fase,
-    )
-    return GebiedsRun(
-        gebied=area,
-        # `analyseset.kern` is per constructie wat `beperk_tot_studiegebied` zelf zou
-        # uitrekenen; hem meegeven scheelt per gebied een doorloop over alle
-        # geometrieen, en dat is bij tachtig buurten de post die telt.
-        run=run.beperk_tot_studiegebied(area, analyseset.kern, leeg_toegestaan=met_submap),
-        map=mapnaam(naam) if met_submap else "",
-    )
-
-
-def _draai(
-    context: CheckContext,
-    check_ids: list[str] | None,
-    typing_gate_applied: bool,
-    meetbereik: Meetbereik,
-    max_meldingen: str,
-    lokale_eisen: str,
-    nulbevindingen: tuple[Nulbevinding, ...],
-    niet_beoordeelde_klassen: tuple[str, ...],
-    voortgang: Voortgang,
-    fase: str,
-) -> CheckRun:
-    """Draait de checks en hangt er het meetbereik en de nulmeting van de run aan.
-
-    De nulbevindingen zijn over de volledige export gebouwd, net als de
-    systemisch-vlag erop. Ze worden hier op elke gebiedsrun gezet en pas daarna door
-    `beperk_tot_studiegebied` tot de kern afgebakend -- dezelfde volgorde als bij de
-    checkbevindingen, en de reden waarom een gebiedsrapport gelijk is aan een losse
-    run over dat ene gebied.
-    """
     run = run_checks(
         context,
         check_ids,
         typing_gate_applied=typing_gate_applied,
         voortgang=voortgang,
-        fase=fase,
     )
-    return replace(
+    # De nulbevindingen zijn over de volledige export gebouwd, net als de
+    # systemisch-vlag erop. Ze komen hier op de run en worden pas daarna door
+    # `beperk_tot_studiegebied` tot de kern afgebakend -- dezelfde volgorde als bij de
+    # checkbevindingen.
+    run = replace(
         run,
         meetbereik=meetbereik,
         max_meldingen=max_meldingen,
         lokale_eisen=lokale_eisen,
         nulbevindingen=nulbevindingen,
         niet_beoordeelde_klassen=niet_beoordeelde_klassen,
+    )
+    if gebieden is None:
+        return [GebiedsRun(gebied=None, run=run, map="")]
+
+    gedeeld = bouw_gedeelde_index(dataset, config)
+    met_submap = not gebieden.enkel
+    return [_per_gebied(run, gedeeld, area, config, met_submap) for area in gebieden.gebieden]
+
+
+def _per_gebied(
+    run: CheckRun, gedeeld: GedeeldeIndex, area: StudyArea, config: CheckConfig, met_submap: bool
+) -> GebiedsRun:
+    """Bakent de run over de volledige export af tot de kern van een gebied."""
+    afbakening = bouw_afbakening(run.dataset, area, config, gedeeld)
+    beperkt = run.beperk_tot_studiegebied(area, afbakening.kern, leeg_toegestaan=met_submap)
+    return GebiedsRun(
+        gebied=area,
+        run=replace(beperkt, afbakening=afbakening),
+        map=mapnaam(area.gebied or area.name) if met_submap else "",
     )

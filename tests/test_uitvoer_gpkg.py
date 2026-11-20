@@ -22,7 +22,7 @@ from shapely.geometry import Point, box
 
 from gpkghelper import schrijf_vlakken
 from helpers_melding import melding as _basismelding
-from nlriochecker.afbakening import bouw_analyseset
+from nlriochecker.afbakening import bouw_afbakening, bouw_gedeelde_index
 from nlriochecker.checkconfig import CheckConfig, Uitzondering, load_check_config
 from nlriochecker.checks import CheckContext, CheckRun, Severity, run_checks
 from nlriochecker.errors import PipelineError
@@ -393,27 +393,21 @@ def test_zonder_analyseset_blijven_de_kolommen_leeg(tmp_path: Path) -> None:
     assert rij == (None, None, None)
 
 
-def test_de_analyseset_omvang_staat_in_de_runmetadata(tmp_path: Path) -> None:
+def test_de_omvang_van_de_kern_staat_in_de_runmetadata(tmp_path: Path) -> None:
+    """`schil_objecten` telt sinds BO-100 de rest van de export: wat de checks buiten de
+    kern zagen. De kolom behoudt haar naam."""
     dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     area = load_study_area(GIS_DIR / "afbakening_gebied.geojson")
     config = _config()
-    analyseset = bouw_analyseset(dataset, area, config)
+    afbakening = bouw_afbakening(dataset, area, config, bouw_gedeelde_index(dataset, config))
 
-    context = CheckContext(
-        dataset=analyseset.dataset,
-        config=config,
-        volledige_dataset=dataset,
-        analyseset=analyseset,
-    )
-    run = run_checks(context, ["NET-001"]).beperk_tot_studiegebied(area)
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+    run = replace(run.beperk_tot_studiegebied(area, afbakening.kern), afbakening=afbakening)
     pad = _schrijf(run, tmp_path)
 
     rij = _rijen(pad, "select kern_objecten, schil_objecten, dataset_objecten from gwsw_run")[0]
-    assert rij == (
-        len(analyseset.kern),
-        len(analyseset.schil),
-        analyseset.volledig_aantal,
-    )
+    totaal = len(dataset.nodes) + len(dataset.conduits)
+    assert rij == (len(afbakening.kern), totaal - len(afbakening.kern), totaal)
 
 
 def test_export_overschrijft_geen_invoerbestand(tmp_path: Path) -> None:
@@ -1262,8 +1256,8 @@ class TestStatusEnPopup:
     def test_de_ring_om_het_gebied_komt_grijs_mee(self, tmp_path: Path) -> None:
         """Wat naast het gebied ligt hoort zichtbaar te zijn, maar wel begrensd.
 
-        De ring is `Analyseset.buffer` en niet de hele schil: die bevat ook de
-        samenhangende vrijvervalcomponent, en die kan in een stad het halve net zijn.
+        De ring is `Afbakening.buffer` en niet alles buiten de kern: de checks zagen de
+        hele export, en die grijs meesturen zou elk buurtbestand met het hele net opzadelen.
         """
         from nlriochecker.meting import Meetbereik
         from nlriochecker.studiegebied import load_studiegebieden
@@ -1279,7 +1273,8 @@ class TestStatusEnPopup:
             meetbereik=Meetbereik.niet_gemeten(()),
         )
         run = runs[0].run
-        assert run.analyseset is not None and run.analyseset.buffer
+        afbakening = run.afbakening
+        assert afbakening is not None and afbakening.buffer
         pad = _schrijf(run, tmp_path)
 
         statussen = dict(
@@ -1290,10 +1285,12 @@ class TestStatusEnPopup:
             )
         )
 
-        for uri in run.analyseset.buffer:
+        for uri in afbakening.buffer:
             assert statussen.get(uri) == "grijs", uri
-        assert any(statussen.get(uri) != "grijs" for uri in run.analyseset.kern)
-        buiten_de_ring = run.analyseset.schil - run.analyseset.buffer
+        assert any(statussen.get(uri) != "grijs" for uri in afbakening.kern)
+        alles = set(run.dataset.nodes) | set(run.dataset.conduits)
+        buiten_de_ring = alles - afbakening.kern - afbakening.buffer
+        assert buiten_de_ring
         assert all(uri not in statussen for uri in buiten_de_ring)
 
 
@@ -1843,7 +1840,7 @@ def test_gwsw_run_leest_elke_kolom_bij_naam_terug(monkeypatch: pytest.MonkeyPatc
             area_ha=12.3456,
             feature_count=71,
         ),
-        analyseset=SimpleNamespace(kern=[0] * 5, schil=[0] * 9, volledig_aantal=123),
+        afbakening=SimpleNamespace(kern=[0] * 5, volledig_aantal=123),
         meetbereik=SimpleNamespace(cfk_tekst="Hyd, MdsPlan", volledig=False),
     )
     # Vier fouten, drie waarschuwingen, twee zonder foutlocatie: vier onderling ongelijke
@@ -1900,7 +1897,7 @@ def test_gwsw_run_leest_elke_kolom_bij_naam_terug(monkeypatch: pytest.MonkeyPatc
         "n_gemengd_zonder_vlak": 16,
         "n_wegvakken": 17,
         "kern_objecten": 5,
-        "schil_objecten": 9,
+        "schil_objecten": 118,
         "dataset_objecten": 123,
         "cfk_set": "Hyd, MdsPlan",
         "volledig": 0,

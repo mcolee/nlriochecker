@@ -157,7 +157,7 @@ class TestAantallen:
         assert _leeg(LineString([(0, 0), (float("inf"), 1)])) is True
 
     def test_de_tabel_telt_alleen_de_kern(self, tmp_path: Path) -> None:
-        """De schil zit in de dataset van de run maar wordt niet gerapporteerd."""
+        """De rest van de export zit in de dataset van de run maar wordt niet gerapporteerd."""
         gebieden = load_studiegebieden(GIS_DIR / "buurt_noord.gpkg")
         runs = toets_gebieden(
             load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
@@ -166,13 +166,14 @@ class TestAantallen:
             meetbereik=Meetbereik.niet_gemeten(()),
         )
         run = runs[0].run
-        assert run.analyseset is not None and run.analyseset.schil
+        assert run.afbakening is not None
+        assert run.afbakening.volledig_aantal > len(run.afbakening.kern)
 
         tabel = omvangtabel(run)
 
-        assert int(tabel["Aantal"].sum()) == len(run.analyseset.kern)
+        assert int(tabel["Aantal"].sum()) == len(run.afbakening.kern)
 
-    def test_het_rapport_noemt_de_schil_als_voetnoot(self, tmp_path: Path) -> None:
+    def test_het_rapport_noemt_de_rest_van_de_export_als_voetnoot(self, tmp_path: Path) -> None:
         gebieden = load_studiegebieden(GIS_DIR / "buurt_noord.gpkg")
         runs = toets_gebieden(
             load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", []),
@@ -183,7 +184,7 @@ class TestAantallen:
 
         tekst = _rapport(runs[0].run, tmp_path)
 
-        assert "in de contextschil" in tekst
+        assert "De checks zagen de hele export" in tekst
 
 
 class TestManagementsamenvatting:
@@ -301,7 +302,7 @@ class TestVerantwoordingBlijft:
         assert "Samenvatting per check" in tekst
         assert "buiten het gebied" in tekst
         assert "typeringspoort" in tekst
-        assert "Analyseset:" in tekst
+        assert "De checks redeneren over de hele export" in tekst
         assert "Externe bronnen" in tekst
 
 

@@ -72,7 +72,7 @@ class Objectkop:
     # BOB-richtingsregel van een streng. Ze staan als kant-en-klare regels in de
     # lijst, zodat deze module niets over strengen hoeft te weten.
     feiten: tuple[str, ...] = field(default=())
-    # Waarom dit object buiten de beoordeling viel: mechanisch riool of contextschil.
+    # Waarom dit object buiten de beoordeling viel: mechanisch riool of de ring.
     # Staat er ook als het object toch gekleurd is -- mechanisch riool wordt door de
     # meeste checks overgeslagen maar niet door alle, en dan hoort de lezer te weten
     # dat de stilte eromheen niets bewijst.
@@ -88,7 +88,7 @@ def bepaal_status(
     """De status van een object: rood, oranje, groen, grijs of geaccepteerd.
 
     `geanalyseerd` is onwaar voor een object dat buiten de beoordeling viel -- de
-    contextschil van een studiegebied, of mechanisch riool, dat het checkregister
+    ring om een studiegebied, of mechanisch riool, dat het checkregister
     grotendeels overslaat.
 
     `geaccepteerd` zijn de melding-ID's die een uitzondering (issue #132) uit de

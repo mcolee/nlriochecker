@@ -1,11 +1,16 @@
-"""De analyseset: welke objecten met een studiegebied door de checks gaan.
+"""De afbakening van een studiegebied: kern, ring en (historisch) de analyseset.
 
-Analyseer de kern plus een contextschil, rapporteer de kern. De schil is precies zo
-groot dat de netwerkchecks hun antwoord houden: de samenhangende component waar de
-kern in ligt -- vrijverval EN persnet, want de bereikbaarheid loopt sinds issue #72
-door het mechanische riool (BO-54, BO-56) -- plus een buffer voor de checks die naar
-nabijheid kijken zonder netwerkverband. Zonder die schil zou een streng die het gebied
-uit loopt als doodlopend gelden en zouden NET-001 en NET-002 valse bevindingen geven.
+Sinds BO-100 draait `toets` de checks één keer over de volledige export en bakent hij
+die ene run per gebied af tot de kern. Daarvoor is per gebied alleen `Afbakening`
+nodig: de kern en de ring die de GeoPackage grijs meetekent (BO-29). De STRtree van
+`GedeeldeIndex` levert de kandidaten, het oordeel blijft `area.bevat`.
+
+De analyseset hieronder (kern plus contextschil, met een uitgedunde dataset) was tot
+BO-100 de rekenbasis van een gebiedsrun. De schil was precies zo groot dat de
+netwerkchecks hun antwoord hielden: de samenhangende component waar de kern in ligt --
+vrijverval EN persnet (BO-54, BO-56) -- plus een buffer. De toetsroute gebruikt haar
+niet meer; `scripts/maak_voorbeeld.py` en de analysescripts die de oude route nameten
+wel, en daarvoor blijft zij staan.
 """
 
 from __future__ import annotations
@@ -24,8 +29,37 @@ from nlriochecker.studiegebied import StudyArea
 
 
 @dataclass(frozen=True)
+class Afbakening:
+    """Wat de rapportage van één studiegebied nodig heeft (BO-100).
+
+    Geen schil en geen uitgedunde dataset: de checks zagen de volledige export. Over
+    blijven de kern, waartoe de run afgebakend wordt, en de ring om het gebied die de
+    GeoPackage grijs meetekent, zodat de kaart niet bij de gebiedsgrens ophoudt alsof
+    daar niets ligt (BO-29).
+    """
+
+    kern: frozenset[str]
+    # De objecten binnen `[studiegebied] context_buffer_m` om het gebied, zonder de kern.
+    buffer: frozenset[str]
+    # Het aantal knopen en strengen in de export: waarover de checks gedraaid hebben.
+    volledig_aantal: int
+
+
+def bouw_afbakening(
+    dataset: GwswDataset, area: StudyArea, config: CheckConfig, gedeeld: GedeeldeIndex
+) -> Afbakening:
+    """Kern en ring van een gebied, uit de gedeelde ruimtelijke index."""
+    kern = objecten_in_gebied(dataset, area, gedeeld=gedeeld)
+    return Afbakening(
+        kern=kern,
+        buffer=frozenset(_binnen_buffer(dataset, area, config, gedeeld) - kern),
+        volledig_aantal=len(dataset.nodes) + len(dataset.conduits),
+    )
+
+
+@dataclass(frozen=True)
 class Analyseset:
-    """De objecten die met een studiegebied door de checks gaan."""
+    """De objecten die met een studiegebied door de checks gingen (vóór BO-100)."""
 
     kern: frozenset[str]
     schil: frozenset[str]

@@ -199,8 +199,8 @@ def test_studiegebied_zonder_objecten_faalt(tmp_path: Path) -> None:
         toets(tmp_path, "schoon.ttl", check_ids=("TOP-001",), studiegebied=leeg)
 
 
-def test_analyseset_splitst_kern_en_schil(tmp_path: Path) -> None:
-    """Met een studiegebied draaien de checks op de kern plus de contextschil."""
+def test_afbakening_noemt_de_kern_van_de_export(tmp_path: Path) -> None:
+    """Met een studiegebied draaien de checks over de hele export en telt de kern (BO-100)."""
     uitslag = toets(
         tmp_path,
         "afbakening_kern_en_schil.ttl",
@@ -208,16 +208,15 @@ def test_analyseset_splitst_kern_en_schil(tmp_path: Path) -> None:
         studiegebied=GIS_DIR / "afbakening_gebied.geojson",
     )
 
-    analyseset = uitslag.runs[0].run.analyseset
-    assert analyseset is not None
-    assert analyseset.kern
-    assert analyseset.schil
-    assert analyseset.volledig_aantal >= len(analyseset.alles)
-    # De omvang van elk deel hoort ook op het scherm; wat een check niet gezien
-    # heeft mag niet als "alles gecontroleerd" lezen.
+    afbakening = uitslag.runs[0].run.afbakening
+    assert afbakening is not None
+    assert afbakening.kern
+    assert afbakening.volledig_aantal == len(uitslag.dataset.nodes) + len(uitslag.dataset.conduits)
+    assert afbakening.volledig_aantal > len(afbakening.kern)
+    # De omvang hoort ook op het scherm, met de zin dat de checks de hele export zagen.
     assert any(
-        f"Analyseset: {len(analyseset.kern)} objecten in de kern, "
-        f"{len(analyseset.schil)} in de contextschil" in regel
+        f"Kern: {len(afbakening.kern)} objecten van {afbakening.volledig_aantal} in de export; "
+        "de checks draaiden over de hele export." in regel
         for regel in uitslag.regels()
     )
 

@@ -12,7 +12,7 @@ import pytest
 from gwsw_orox_helpers.dataset import load_dataset
 
 from helpers_csv import lees_csv
-from nlriochecker.afbakening import bouw_analyseset
+from nlriochecker.afbakening import bouw_afbakening, bouw_gedeelde_index
 from nlriochecker.analysis import analyze
 from nlriochecker.checkconfig import load_check_config
 from nlriochecker.checks import CheckContext, run_checks
@@ -178,68 +178,30 @@ def test_checkrapport_meldt_het_studiegebied(tmp_path: Path) -> None:
     assert sum(outcome.weggelaten for outcome in beperkt.outcomes) == 1
 
 
-def test_checkrapport_meldt_de_omvang_van_de_analyseset(tmp_path: Path) -> None:
+def test_checkrapport_meldt_de_omvang_van_de_kern(tmp_path: Path) -> None:
+    """Sinds BO-100 zagen de checks de hele export; het rapport zegt dat en noemt de kern."""
     dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
     gebied = load_study_area(
         Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
     )
     config = load_check_config()
     config.drempels.rd_y_min = 0.0
-    analyseset = bouw_analyseset(dataset, gebied, config)
+    afbakening = bouw_afbakening(dataset, gebied, config, bouw_gedeelde_index(dataset, config))
 
-    context = CheckContext(
-        dataset=analyseset.dataset,
-        config=config,
-        volledige_dataset=dataset,
-        analyseset=analyseset,
-    )
-    # ADM-002 draait mee zodat de zin over checks met een volledig bereik iets te
-    # noemen heeft; die zin wordt sinds de reparatie afgeleid uit de checks die
-    # daadwerkelijk gedraaid hebben, niet meer hardcoded.
-    run = run_checks(context, ["NET-001", "ADM-002"]).beperk_tot_studiegebied(gebied)
+    run = run_checks(CheckContext(dataset=dataset, config=config), ["NET-001"])
+    run = replace(run.beperk_tot_studiegebied(gebied, afbakening.kern), afbakening=afbakening)
 
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")
 
     assert (
-        f"Analyseset: {len(analyseset.kern)} objecten in de kern, "
-        f"{len(analyseset.schil)} in de contextschil, van {analyseset.volledig_aantal} "
-        "in de export." in tekst
-    )
-    assert (
-        "Checks die over de hele populatie gaan (ADM-002) draaien op de volledige export." in tekst
+        f"Kern: {len(afbakening.kern)} objecten van {afbakening.volledig_aantal} in de export. "
+        "De checks redeneren over de hele export" in tekst
     )
 
 
-def test_checkrapport_noemt_ook_een_via_config_aangewezen_check(tmp_path: Path) -> None:
-    """De opsomming moet ADM-002 (klasse-attribuut) en een via de config aangewezen
-    check allebei noemen, gesorteerd, in plaats van alleen "ADM-002" hard te coderen.
-    """
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
-    gebied = load_study_area(
-        Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
-    )
-    config = load_check_config()
-    config.drempels.rd_y_min = 0.0
-    config.studiegebied.volledige_dataset_checks = ["ADM-002", "TOP-001"]
-    analyseset = bouw_analyseset(dataset, gebied, config)
-
-    context = CheckContext(
-        dataset=analyseset.dataset,
-        config=config,
-        volledige_dataset=dataset,
-        analyseset=analyseset,
-    )
-    run = run_checks(context, ["TOP-001", "ADM-002"]).beperk_tot_studiegebied(gebied)
-
-    markdown_path, _ = write_check_report(run, tmp_path)
-    tekst = markdown_path.read_text(encoding="utf-8")
-
-    assert "(ADM-002, TOP-001)" in tekst
-
-
-def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path: Path) -> None:
-    """Zonder studiegebied is er geen analyseset en dus geen regel erover."""
+def test_checkrapport_blijft_zonder_studiegebied_stil_over_de_kern(tmp_path: Path) -> None:
+    """Zonder studiegebied is er geen afbakening en dus geen regel erover."""
     dataset = load_dataset(TTL_DIR / "top001_losliggende_put.ttl", [])
     context = CheckContext(dataset=dataset, config=load_check_config())
     run = run_checks(context, ["TOP-001"])
@@ -247,31 +209,7 @@ def test_checkrapport_blijft_zonder_analyseset_stil_over_de_analyseset(tmp_path:
     markdown_path, _ = write_check_report(run, tmp_path)
     tekst = markdown_path.read_text(encoding="utf-8")
 
-    assert "Analyseset" not in tekst
-
-
-def test_checkrapport_meldt_strengen_zonder_netwerkverband(tmp_path: Path) -> None:
-    """Wat de afbakening niet kon meewegen, hoort net zo goed in het rapport."""
-    dataset = load_dataset(TTL_DIR / "afbakening_kern_en_schil.ttl", [])
-    gebied = load_study_area(
-        Path(__file__).parent / "fixtures" / "gis" / "afbakening_gebied.geojson"
-    )
-    config = load_check_config()
-    config.drempels.rd_y_min = 0.0
-    analyseset = replace(bouw_analyseset(dataset, gebied, config), strengen_zonder_netwerkverband=3)
-
-    context = CheckContext(
-        dataset=analyseset.dataset,
-        config=config,
-        volledige_dataset=dataset,
-        analyseset=analyseset,
-    )
-    run = run_checks(context, ["NET-001"]).beperk_tot_studiegebied(gebied)
-
-    markdown_path, _ = write_check_report(run, tmp_path)
-    tekst = markdown_path.read_text(encoding="utf-8")
-
-    assert "3 vrijvervalstrengen hebben" in tekst
+    assert "De checks redeneren over de hele export" not in tekst
 
 
 def test_studiegebied_zonder_enig_object_faalt_hard() -> None:

@@ -123,12 +123,35 @@ def test_ook_het_tweede_gebied_is_equivalent() -> None:
     assert _uitslagen(zuid) == _uitslagen(los[0])
 
 
-def test_de_analysesets_verschillen_per_gebied() -> None:
+def test_de_kernen_verschillen_per_gebied() -> None:
     """Anders zou de equivalentietest ook slagen als de afbakening niets deed."""
     noord, zuid = _draai("buurten_twee.gpkg")
 
-    assert noord.run.analyseset is not None and zuid.run.analyseset is not None
-    assert noord.run.analyseset.kern != zuid.run.analyseset.kern
+    assert noord.run.afbakening is not None and zuid.run.afbakening is not None
+    assert noord.run.afbakening.kern != zuid.run.afbakening.kern
+
+
+def test_gebiedsrun_gelijk_aan_de_gemeentebrede_run_beperkt_tot_het_gebied() -> None:
+    """BO-100: een gebiedsrun is per constructie de gemeentebrede run, afgebakend.
+
+    De eis die BO-12 en BO-56 al stelden, en die de contextschil moest nabootsen. Met
+    nulbevindingen erbij, zodat ook de onherleide bevinding in elk gebied blijft.
+    """
+    gemeentebreed = _draai(None, nulbevindingen=NULBEVINDINGEN)[0].run
+
+    for gebiedsrun in _draai("buurten_twee.gpkg", nulbevindingen=NULBEVINDINGEN):
+        assert gebiedsrun.gebied is not None
+        beperkt = GebiedsRun(
+            gebied=gebiedsrun.gebied,
+            run=gemeentebreed.beperk_tot_studiegebied(gebiedsrun.gebied, leeg_toegestaan=True),
+            map=gebiedsrun.map,
+        )
+        assert _sleutels(gebiedsrun) == _sleutels(beperkt), gebiedsrun.naam
+        assert _uitslagen(gebiedsrun) == _uitslagen(beperkt), gebiedsrun.naam
+        assert {o.bekeken_scope.value for o in gebiedsrun.run.outcomes} <= {
+            "volledige_export",
+            "attribuut_instanties",
+        }
 
 
 def test_zonder_studiegebied_een_run_zonder_gebied() -> None:
@@ -371,8 +394,8 @@ def test_een_leeg_gebied_sloopt_de_run_niet(tmp_path: Path) -> None:
     )
 
     leeg = next(run for run in runs if run.naam == "Leeg")
-    assert leeg.run.analyseset is not None
-    assert not leeg.run.analyseset.kern
+    assert leeg.run.afbakening is not None
+    assert not leeg.run.afbakening.kern
     assert not leeg.run.findings
 
 
@@ -506,14 +529,16 @@ EXT_DIR = GIS_DIR / "ext"
 # `scripts/maak_gis_fixtures.py`. `Buiten` omsluit Lege Laan (1060, 1940) plus de losse put
 # W3 (1200, 1905); `Kern` omsluit Rioolstraat (960, 1940), Grindweg (960, 1910) en de hele
 # riolering van de fixture. Tussen de twee zit een gat van 20 m, ruim genoeg dat de
-# contextschil van 50 m om `Buiten` de riolering van `Kern` niet meepakt -- en dat is precies
-# het punt: `Buiten` ziet nul meter streng en noemt Rioolstraat dus rood, terwijl `Kern` haar
-# groen noemt. W3 zorgt dat `Buiten` niet leeg is; een leeg gebied is bij een run op een
-# enkel gebied een harde fout en dan valt de losse run niet te draaien.
+# contextschil van 50 m om `Buiten` de riolering van `Kern` niet meepakte. Vóór BO-100 zag
+# `Buiten` daardoor nul meter streng en noemde Rioolstraat rood, terwijl `Kern` haar groen
+# noemde. Sinds BO-100 zien beide gebieden de hele export en is er één oordeel; de test
+# blijft staan als regressie op het register. W3 zorgt dat `Buiten` niet leeg is; een leeg
+# gebied is bij een run op een enkel gebied een harde fout en dan valt de losse run niet te
+# draaien.
 #
-# De vololgorde doet ertoe voor de regressie, niet voor de assertie: `load_studiegebieden`
+# De volgorde doet ertoe voor de regressie, niet voor de assertie: `load_studiegebieden`
 # houdt de bestandsvolgorde aan, en met een gedeeld register won het eerste gebied. Staat
-# `Buiten` voorop, dan erft `Kern` diens "rood" voor Rioolstraat en verdwijnt die straat uit
+# `Buiten` voorop, dan erfde `Kern` diens "rood" voor Rioolstraat en verdween die straat uit
 # zijn laag `vlakken` -- rood zonder melding krijgt geen rij.
 WEGVAKBUURTEN = [("Buiten", box(1050, 1900, 1250, 1970)), ("Kern", box(900, 1900, 1030, 1970))]
 
@@ -567,9 +592,9 @@ def test_wegvakken_per_gebied_gelijk_aan_een_losse_run(tmp_path: Path) -> None:
     """De equivalentie-eis voor het wegvakregister van EXT-009 (BO-79, issue #104).
 
     Anders dan het trefferregister wordt dit register niet via de meldingen gejoind: élke
-    rij erin komt in de laag `vlakken` terecht. Deelden de gebieden er een, dan won het
-    eerste gebied met `setdefault` -- terwijl elk gebied het oordeel opnieuw berekent tegen
-    zijn eigen uitgedunde dataset, waarin een straat van de buren geen riolering heeft.
+    rij erin komt in de laag `vlakken` terecht. Vóór BO-100 berekende elk gebied het oordeel
+    opnieuw tegen zijn eigen uitgedunde dataset, en won bij een gedeeld register het eerste
+    gebied met `setdefault`. Sinds BO-100 is er één run en dus één oordeel per wegvak.
     Stil gevolg: een bediende straat verdwijnt uit de laag (rood zonder melding krijgt geen
     rij), of zij krijgt een groen vlak met een rode melding in de popup.
     """
@@ -588,7 +613,7 @@ def test_wegvakken_per_gebied_gelijk_aan_een_losse_run(tmp_path: Path) -> None:
         los_gpkg = next(los_map.glob("*.gpkg"))
         assert _wegvakstatus(samen_gpkg) == _wegvakstatus(los_gpkg), naam
 
-    # En het oordeel zelf klopt: Kern ziet zijn eigen riolering, Buiten alleen de lege straat.
+    # En het oordeel zelf klopt: Rioolstraat is bediend, Lege Laan niet.
     kern = _wegvakstatus(next((samen_map / "kern").glob("*.gpkg")))
     buiten = _wegvakstatus(next((samen_map / "buiten").glob("*.gpkg")))
     assert kern == {"nwb:wegvak/2": "groen", "nwb:wegvak/4": "grijs"}

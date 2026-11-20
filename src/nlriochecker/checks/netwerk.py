@@ -449,10 +449,10 @@ class _ZonderAfvoerpad(Check):
         """Meldt wat er buiten de graaf viel; dat mag niet stilzwijgend verdwijnen.
 
         De clusterduiding staat bewust niet hier maar in het rapport: een check
-        draait op de kern plus de contextschil (met een studiegebied) of op de
-        volledige dataset (zonder), terwijl het rapport altijd tot de kern
-        afgebakend is. Hier geteld zou de duiding het aantal deelstelsels van het
-        hele werkbereik van de check melden bij de bevindingen van een enkele buurt.
+        draait over de volledige export (BO-100), terwijl het rapport met een
+        studiegebied tot de kern afgebakend is. Hier geteld zou de duiding het aantal
+        deelstelsels van het hele werkbereik van de check melden bij de bevindingen van
+        een enkele buurt.
         """
         return _netwerk_notities(context) + _eindpuntnotities(
             context, self.eindpuntrollen, self.eindpuntrollen_via_gemengd

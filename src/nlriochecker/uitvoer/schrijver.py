@@ -235,13 +235,13 @@ def schrijf_uitvoer_gebieden(
             stroom=_zonder_dode_uitzonderingen(stroom),
             notities=overgeslagen,
         )
-        analyseset = gebiedsrun.run.analyseset
+        afbakening = gebiedsrun.run.afbakening
         verzameld.append(
             GebiedsSamenvatting(
                 naam=gebiedsrun.naam,
                 oppervlak_ha=gebiedsrun.gebied.area_ha if gebiedsrun.gebied is not None else 0.0,
                 weggelaten=gebiedsrun.run.weggelaten,
-                kern_objecten=len(analyseset.kern) if analyseset is not None else 0,
+                kern_objecten=len(afbakening.kern) if afbakening is not None else 0,
                 meldingen=stroom.meldingen,
                 onderdrukking=stroom.onderdrukking,
                 uitzonderingen=stroom.uitzonderingen,

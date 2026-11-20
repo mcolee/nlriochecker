@@ -189,8 +189,8 @@ class Wegvakregister:
         Anders dan bij het trefferregister hierboven is een tweede, *afwijkend* oordeel op
         dezelfde sleutel hier geen onschuldige dubbeling maar een fout: élke rij in dit
         register komt in de laag `vlakken` terecht, dus stil de eerste laten winnen betekent
-        een kaart die iets anders zegt dan de uitslag. Precies zo ging het mis toen
-        `toetsloop._per_gebied` het register niet per gebied ververste: elk gebied
+        een kaart die iets anders zegt dan de uitslag. Precies zo ging het mis toen de
+        toetsloop (vóór BO-100) het register niet per gebied ververste: elk gebied
         herberekende het oordeel tegen zijn eigen uitgedunde dataset en het eerste gebied
         won. Een gelijk oordeel opnieuw registreren mag; dat is geen tegenspraak.
         """
@@ -203,7 +203,7 @@ class Wegvakregister:
                 f"wegvakregister: {oordeel.sleutel} ({oordeel.label}) is al geregistreerd als "
                 f"{eerder.status!r} en wordt nu {oordeel.status!r}. Twee runs delen hetzelfde "
                 "register terwijl zij op verschillende datasets draaien; geef elke run een "
-                "eigen `Wegvakregister` (zie `toetsloop._per_gebied`)."
+                "eigen `Wegvakregister`."
             )
 
     def get(self, sleutel: str) -> Wegvakoordeel | None:

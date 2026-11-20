@@ -8,10 +8,10 @@ Er zijn drie featurelagen, een per geometrievorm: `putten` (punt), `strengen` (l
 `vlakken` (vlak). De twee objectlagen dragen de gebreken *op* het object: de kolom
 `status` draagt de uitslag in vier waarden en `popup_html` de voorgebakken hoverpopup.
 Mechanisch riool staat tussen de strengen met status `grijs`, en met een studiegebied
-staat de contextschil er ook grijs bij: wat de checks wel zagen maar niet beoordeelden,
-hoort zichtbaar te zijn. `vlakken` draagt wat geen punt of lijn is: de externe objecten
-waarnaar een EXT-melding wijst en de gemengde deelstelsels van RVZ-006, uit elkaar te
-houden met de kolom `soort` (issue #98).
+staat de ring om het gebied er ook grijs bij: wat de checks wel zagen maar hier niet
+beoordeeld wordt, hoort zichtbaar te zijn. `vlakken` draagt wat geen punt of lijn is:
+de externe objecten waarnaar een EXT-melding wijst en de gemengde deelstelsels van
+RVZ-006, uit elkaar te houden met de kolom `soort` (issue #98).
 
 Het bestand is bewust zelfvoorzienend: de featurelagen bevatten genoeg samenvatting
 om zonder join bruikbaar te zijn, de tabel `meldingen` draagt elke melding met haar
@@ -167,7 +167,7 @@ class _LaagTellingen:
     """
 
     putten: int
-    # Alle lijnen in de laag `strengen`, mechanisch riool en contextschil inbegrepen.
+    # Alle lijnen in de laag `strengen`, mechanisch riool en de ring inbegrepen.
     strengen: int
     # Hoeveel van die lijnen mechanisch riool zijn; ze staan sinds issue #13 tussen de
     # strengen met status `grijs` in plaats van in een eigen laag.
@@ -207,9 +207,9 @@ def schrijf_geopackage(
     """Schrijft de GeoPackage van deze run en geeft het pad terug.
 
     Is er een studiegebied, dan is dat de grens van het bestand: de featurelagen
-    bevatten alleen objecten binnen of snijdend met het gebied. De checks draaiden
-    op de kern plus de contextschil (ruim genoeg voor randeffectvrije netwerkchecks),
-    dus wat hier buiten valt is bewust weggelaten, niet over het hoofd gezien.
+    bevatten alleen objecten binnen of snijdend met het gebied, plus de grijze ring. De
+    checks draaiden over de volledige export (BO-100), dus wat hier buiten valt is
+    bewust weggelaten, niet over het hoofd gezien.
 
     `onderdrukking` komt uit de meldingenstroom en is de enige bron voor beide dingen
     die zij hier bepaalt: welke objecten grijs worden met `REDEN_ONDERDRUKT` en wat
@@ -536,8 +536,7 @@ def _mechanische_uris(run: CheckRun) -> frozenset[str]:
     Zonder die uitzondering zou 'geen kleur' hier als 'getoetst en in orde' lezen.
 
     De selectie komt uit `checks/selectie.py` en leest `run.context`: exact de
-    context waarmee de checks draaiden -- onder een studiegebied dus de kern plus
-    de contextschil -- inclusief haar cache.
+    context waarmee de checks draaiden, inclusief haar cache.
     """
     return frozenset(conduit.uri for conduit in mechanischeleidingen(run.context))
 
@@ -573,7 +572,7 @@ def _schrijf_features(
 
     Naast de beoordeelde objecten komt erin wat de checks wel zagen maar niet
     beoordeelden: mechanisch riool, dat volgens het checkregister buiten scope valt,
-    de klassen uit `onderdrukking`, en de contextschil van een studiegebied. Alle drie
+    de klassen uit `onderdrukking`, en de ring om een studiegebied. Alle drie
     krijgen status `grijs` met de reden in hun popup. Ze weglaten zou de kaart bij de
     gebiedsgrens laten ophouden alsof daar niets ligt, en een lege mechanische laag zou
     als "geen mechanisch riool aanwezig" lezen.
@@ -584,13 +583,11 @@ def _schrijf_features(
     in `gwsw_run`, maar dat is een metadatatabel die niemand in QGIS openslaat, en een
     groene kaart eronder zou het tegenovergestelde uitstralen.
 
-    De grijze context is `Analyseset.buffer`: de objecten die binnen de buffer om het
-    gebied liggen. Niet de hele schil -- daar hoort ook de samenhangende
-    vrijvervalcomponent bij, en die kan in een stad het halve net zijn, zodat elk
-    buurtbestand met het net van de hele stad zou worden opgezadeld. En niet "alles wat
-    niet in de kern ligt": een run die met `beperk_tot_studiegebied` op de volledige
-    export is afgebakend heeft geen analyseset, en dan hoort het bestand bij de
-    gebiedsgrens op te houden zoals het altijd deed.
+    De grijze ring is `Afbakening.buffer`: de objecten die binnen de buffer om het
+    gebied liggen. Niet "alles wat niet in de kern ligt": de checks zagen de hele
+    export, en die grijs meesturen zou elk buurtbestand met het net van de hele
+    gemeente opzadelen (BO-29). Een run die zonder `Afbakening` met
+    `beperk_tot_studiegebied` is afgebakend, houdt bij de gebiedsgrens op.
     """
     kolommen = _samenvatting_kolommen()
     _maak_featurelaag(
@@ -616,7 +613,7 @@ def _schrijf_features(
     mechanisch = _mechanische_uris(run)
     onderdrukt = _onderdrukte_uris(run, onderdrukking.klassen)
     geaccepteerd = frozenset(uitzonderingen.geaccepteerd)
-    ring = run.analyseset.buffer if run.analyseset is not None else frozenset()
+    ring = run.afbakening.buffer if run.afbakening is not None else frozenset()
     geen_hierarchie = not run.dataset.klassenhierarchie_bekend
     # Het afvoerpad per knoop, uit `run.context`: de NET-checks hebben de graaf daar
     # al gebouwd, en de strengen leunen erop via `afvoerpad_van_streng`, dat
@@ -1978,6 +1975,8 @@ def _schrijf_runmetadata(
         # leiden: dat is nu `n_vlakken` min de deelstelsels min de wegvakken.
         _Kolom("n_wegvakken", "integer"),
         _Kolom("kern_objecten", "integer"),
+        # Sinds BO-100 de objecten buiten de kern die de checks zagen: de rest van de
+        # export, want er is geen contextschil meer. Kolomnaam ongewijzigd (contract).
         _Kolom("schil_objecten", "integer"),
         _Kolom("dataset_objecten", "integer"),
         _Kolom("cfk_set", "text"),
@@ -2006,7 +2005,7 @@ def _schrijf_runmetadata(
 
     config = run.config
     gebied = run.study_area
-    stel = run.analyseset
+    stel = run.afbakening
     fallback = run.dataset.decode_fallback
     # Elke waarde bij de naam van haar kolom, niet als losse positionele tuple: een
     # verwisseling (bv. `fouten` <-> `waarschuwingen`) is met deze vorm een luide
@@ -2045,7 +2044,7 @@ def _schrijf_runmetadata(
         "n_gemengd_zonder_vlak": tellingen.gemengd_zonder_vlak,
         "n_wegvakken": tellingen.wegvakken,
         "kern_objecten": len(stel.kern) if stel is not None else None,
-        "schil_objecten": len(stel.schil) if stel is not None else None,
+        "schil_objecten": stel.volledig_aantal - len(stel.kern) if stel is not None else None,
         "dataset_objecten": stel.volledig_aantal if stel is not None else None,
         "cfk_set": run.meetbereik.cfk_tekst,
         "volledig": int(run.meetbereik.volledig),

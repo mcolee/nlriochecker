@@ -13,7 +13,7 @@ from gwsw_orox_helpers.voortgang import NUL_VOORTGANG, Voortgang
 from shapely.geometry import Point
 
 from nlriochecker import leeslaag
-from nlriochecker.afbakening import Analyseset, objecten_in_gebied
+from nlriochecker.afbakening import Afbakening, Analyseset, objecten_in_gebied
 from nlriochecker.checkconfig import CheckConfig
 from nlriochecker.checks.treffers import Trefferregister, Wegvakregister
 from nlriochecker.errors import StudyAreaError
@@ -62,7 +62,9 @@ class Scope(StrEnum):
     `ANALYSESET` is de scope die `run_checks` een gewone check meegeeft. Zonder
     studiegebied valt die samen met de volledige export; het onderscheid met
     `VOLLEDIGE_EXPORT` zegt dus niet dat er minder gezien is, maar dat deze check
-    meebeweegt met de afbakening en de andere niet.
+    meebeweegt met de afbakening en de andere niet. Sinds BO-100 beweegt in `toets` met
+    een studiegebied niets meer mee: de checks draaien over de volledige export, en
+    `CheckRun.beperk_tot_studiegebied` zet het label dan op `VOLLEDIGE_EXPORT`.
     """
 
     ANALYSESET = "analyseset"
@@ -158,16 +160,18 @@ class CheckContext:
     unreliable_objects: frozenset[str] = frozenset()
     plausibiliteit: PlausibilityTables = field(default_factory=load_plausibility)
     bronnen: ExternalData | None = None
-    # Met een studiegebied draaien de checks op de analyseset. Een check met
-    # `volledig_bereik` heeft de volledige export nodig; die staat hier.
+    # Draaien de checks op een analyseset (kern plus contextschil), dan heeft een check
+    # met `volledig_bereik` de volledige export nodig; die staat hier. Sinds BO-100 zet
+    # `toets` geen analyseset meer -- de checks zien altijd de volledige export -- maar
+    # de analysescripts die de oude route nameten wel.
     volledige_dataset: GwswDataset | None = None
     analyseset: Analyseset | None = None
-    # De volledige-export-context van een run over meerdere studiegebieden. Hij hangt
-    # af van de volledige dataset, de config en de onbetrouwbare objecten -- alle drie
-    # gebiedsonafhankelijk -- en mag daarom over gebieden heen gedeeld worden. Zonder
-    # dit veld bouwt elk gebied zijn eigen volledige context met een lege cache, en
-    # draaien de karakteristiek en de checks met `volledig_bereik` per gebied opnieuw
-    # over de hele export.
+    # De volledige-export-context van een reeks analysesets (de route van vóór BO-100,
+    # alleen nog in de analysescripts). Hij hangt af van de volledige dataset, de config
+    # en de onbetrouwbare objecten -- alle drie gebiedsonafhankelijk -- en mag daarom
+    # over gebieden heen gedeeld worden. Zonder dit veld bouwt elk gebied zijn eigen
+    # volledige context met een lege cache, en draaien de karakteristiek en de checks
+    # met `volledig_bereik` per gebied opnieuw over de hele export.
     gedeelde_volledige_context: CheckContext | None = field(default=None, compare=False, repr=False)
     # De externe objecten die de EXT-checks tijdens deze run raken. Mutabel, net als
     # `_cache`: een check registreert zijn treffer terwijl hij draait, en `run_checks`
@@ -449,13 +453,14 @@ class CheckRun:
     study_area: StudyArea | None = None
     bronnen: ExternalData | None = None
     karakteristiek: DataCharacteristics | None = None
-    # De kern en de contextschil waarop de checks gedraaid hebben; None zonder
-    # studiegebied. De uitvoerlaag meldt hieruit hoe groot elk deel was.
-    analyseset: Analyseset | None = None
+    # De kern en de ring van het studiegebied waartoe deze run is afgebakend; None
+    # zonder studiegebied. De uitvoerlaag meldt hieruit hoe groot de kern was en tekent
+    # de ring grijs mee (BO-29, BO-100).
+    afbakening: Afbakening | None = None
     # Tegen welke conformiteitsklassen deze run getoetst is. De uitvoerlaag heeft het
     # nodig voor de markering boven het rapport, voor `gwsw_run` en voor de
     # JSON-envelop; het hier meegeven is minder broos dan het langs elke schrijver
-    # doorreiken -- dezelfde reden waarom `config` en `analyseset` hier staan.
+    # doorreiken -- dezelfde reden waarom `config` en `afbakening` hier staan.
     #
     # Nooit None. Een run die zijn bereik niet kreeg is er een zonder nulmeting, en
     # dat is een toestand die `Meetbereik` al kent. Zou `None` toegestaan zijn, dan
@@ -545,20 +550,18 @@ class CheckRun:
     ) -> CheckRun:
         """Geeft een run terug met alleen de bevindingen binnen het gebied.
 
-        Met een studiegebied zijn de checks al op de kern plus de contextschil
-        gedraaid -- ruim genoeg dat de netwerkchecks hetzelfde antwoord geven als
-        op de volledige dataset -- en pas hier wordt tot de kern afgebakend. Zo
-        ontstaan er geen randeffecten doordat een streng het gebied uit loopt.
-        Checks die over de hele populatie gaan (`Check.volledig_bereik`, of hun
-        ID in `config.studiegebied.volledige_dataset_checks`) zijn sowieso op de
-        volledige export blijven draaien.
+        Sinds BO-100 hebben de checks in `toets` één keer over de volledige export
+        gedraaid, en wordt die ene run hier per gebied tot de kern afgebakend. Een
+        streng die het gebied uit loopt geeft zo per constructie geen randeffect: de
+        checks zagen het hele net. `examined` en de notities gaan dan over de hele
+        export, en het scopelabel zegt dat (`Scope.VOLLEDIGE_EXPORT`). Draaide de run
+        op een analyseset (de oude route, alleen nog in de analysescripts), dan blijft
+        het label staan.
 
-        `binnen` mag de beller meegeven als hij de kern al kent. Dat is precies
-        `Analyseset.kern`: die is de verzameling objecten van de *volledige* export
-        die het gebied raken, de schil is er per constructie van losgetrokken, en de
-        uitgedunde dataset is kern plus schil. Opnieuw over alle geometrieen lopen
-        levert dus dezelfde verzameling, tegen de prijs van een volledige doorloop
-        per gebied.
+        `binnen` mag de beller meegeven als hij de kern al kent: `Afbakening.kern` is
+        de verzameling objecten van de volledige export die het gebied raken, dus
+        opnieuw over alle geometrieen lopen levert dezelfde verzameling, tegen de prijs
+        van een volledige doorloop per gebied.
 
         `leeg_toegestaan` is voor de rapportage over meerdere gebieden: een buurt
         zonder riolering (water, natuur, bedrijventerrein) is daar een normaal
@@ -592,6 +595,7 @@ class CheckRun:
         # als bij de run hieronder: de opsomming vergat `rollen` en `kenmerken`, zodat
         # elk gebiedsrapport "Toetst de hele export" zei, en het scopelabel van issue
         # #77 zou er langs diezelfde weg uitvallen.
+        over_export = self.context.analyseset is None
         outcomes = []
         for outcome in self.outcomes:
             binnen_gebied = [f for f in outcome.findings if hoort_erbij(f)]
@@ -600,6 +604,9 @@ class CheckRun:
                     outcome,
                     findings=binnen_gebied,
                     weggelaten=len(outcome.findings) - len(binnen_gebied),
+                    bekeken_scope=Scope.VOLLEDIGE_EXPORT
+                    if over_export and outcome.bekeken_scope is Scope.ANALYSESET
+                    else outcome.bekeken_scope,
                 )
             )
         # `replace` in plaats van elk veld opsommen: die opsomming vergat bij elke
@@ -895,7 +902,6 @@ def run_checks(
         ),
         config=context.config,
         context=context,
-        analyseset=context.analyseset,
         treffers=context.treffers,
         wegvakken=context.wegvakken,
     )

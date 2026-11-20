@@ -4,10 +4,10 @@ Het bevindingenrapport opent met deze tabel. De lezer wil eerst weten waar het o
 gaat -- hoeveel putten, hoeveel meter riool, van welk stelsel -- en pas daarna of het
 in orde is.
 
-De telling gaat over de **kern**: de objecten binnen het studiegebied. De contextschil
-zit wel in de dataset van de run, want de netwerkchecks hebben hem nodig, maar er wordt
-niet over gerapporteerd; hij staat als voetnoot onder de tabel. Zonder studiegebied is
-alles kern.
+De telling gaat over de **kern**: de objecten binnen het studiegebied. De rest van de
+export zit wel in de dataset van de run, want de checks draaiden erover (BO-100), maar
+er wordt niet over gerapporteerd; het staat als voetnoot onder de tabel. Zonder
+studiegebied is alles kern.
 
 `stelseltypen` staat hier omdat zowel deze tabel als de GeoPackage hem nodig heeft. Hij
 stond in `gpkg.py`; twee kopieen zouden op een dag verschillende stelsels aan dezelfde
