@@ -798,6 +798,27 @@ per gebied) loopt de checkfase op -- maar ze laat wel zien dat er op dit moment 
 aanleiding is om de equivalentiegarantie op het spel te zetten. Herhaal de meting op een
 echt 80-buurtenbestand met alle checks voordat je BO-14 heroverweegt.
 
+**Tweede meting (20 november 2026).** Dit is de meting die hierboven gevraagd wordt: een echt
+buurtenbestand met alle checks. De run gebruikte `CBS_buurten_DeWoldenHoogeveen.gpkg`
+(88 buurten), alle drie de CFK's, `--bronnen` en `configs/dewoldenhoogeveen.toml`, met warme
+cache, op dev `c080795`. Het repobestand draagt "Verspreide huizen Alteveer" twee keer, dus
+de meting liep op een kopie met unieke namen. Uitkomst:
+
+- Wandklok **3289 s (55 min)**, piekgeheugen **3,8 GB**, uitvoer 613 MB.
+- Checkfase **3051 s (93%)**, gemiddeld 35 s per buurt. Een gemeentebrede checkfase duurt
+  circa 50-60 s, dus één buurt kost ruim de helft van de hele gemeente.
+- De schrijvers voor alle 88 buurten plus het totaal kosten circa 3,5 min (6%). Het laden
+  kost circa 0,5 min.
+
+De checkfase is nu dus wel de post die telt. Waarom: de schil is de hele samenhangende
+component (vrijverval plus persnet, BO-56) plus de buffer, dus elke buurt rekent over bijna
+de hele export. Lokale checks één keer draaien (het voorstel hierboven) haalt naar schatting
+een factor 2 op de checkfase, omdat de contextuele checks per buurt over hetzelfde grote net
+blijven rekenen. Een factor 10 of meer vraagt dat ook de contextuele checks één keer
+gemeentebreed draaien en per kern gefilterd worden. Dat verandert de BO-12-equivalentie
+(EXT-009, `examined` en de notities per gebied) en is een auteursbesluit. Dat besluit is
+BO-100.
+
 ### BO-15 Een gebied zonder GWSW-objecten stopt een meervoudige run niet
 
 **Wat.** Bij een run over meerdere studiegebied-features levert een gebied zonder enkele
@@ -5390,3 +5411,24 @@ betere bestand nog 1–2 s en haalt het kill-criterium van #168 niet.
 **Bewijs.** `uitvoer/meting_168/` (n=3 om en om met de referentie, koud met
 `posix_fadvise` en `mincore`-controle) en de vier `toets`-runs daarin; het meetscript is
 `scripts/meet_raster_bemonstering.py`.
+
+### BO-100 Meer gebieden: één checkronde over de hele export, daarna afbakenen per gebied
+
+**Wat.** Besluit van de auteur, 20 november 2026, en de heroverweging die BO-14 vroeg. Een
+`toets` met meer studiegebieden draait de checks één keer over de volledige export. Daarna
+bakent `CheckRun.beperk_tot_studiegebied` die ene run per gebied af tot de kern. De
+analyseset per gebied (kern plus contextschil) vervalt als rekenbasis voor de checks.
+
+**Waarom.** De tweede meting onder BO-14: 88 buurten kosten 55 min, waarvan 51 min checks,
+tegen ruim een minuut checks voor de hele gemeente. Dit besluit brengt de run naar circa
+5 min (factor ~11). Dat past bij de meetlat van het manifest: een terugkerende taak gaat
+van een uur naar minuten. Correctheid levert niets in. BO-12 en BO-56 eisen al dat een
+gebiedsrun gelijk is aan de gemeentebrede run beperkt tot dat gebied. Die gelijkheid geldt
+nu per constructie, in plaats van via een schil die het net moet nabootsen. De gemeten rest
+uit BO-56 (TOP-023 in "Verspreide huizen Koekange") verdwijnt daarmee ook.
+
+**Wat er per gebied verandert.** De meldingen in de kern blijven gelijk. De noemer verandert:
+`examined` en de notities van een check gaan over de hele export, niet meer over kern plus
+schil, en `bekeken_scope` wordt `volledige_export`. EXT-009 classificeert de wegvakken tegen
+het hele net, niet meer tegen de uitgedunde dataset van het gebied. De rapportteksten die "kern
+plus contextschil" noemen, gaan mee. De uitwerking staat in issue #186.
