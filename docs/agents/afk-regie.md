@@ -2,9 +2,10 @@
 
 Geef dit, met de issuelijst ingevuld, aan een **verse (gecleared) Fable-sessie** in
 `/home/martin/Development/nlriochecker`. Fable is de regisseur; het echte werk doen **subagents**. Kies
-per issue het model naar zwaarte volgens de globale `CLAUDE.md` (sectie **Modelkeuze
-subagents**): substantieel/kritiek-pad → **Opus 4.8** via de `opus48`-agent (de kale alias
-`model: opus` levert in deze harness Opus 5), klein/docs/config/test-only → **Sonnet**.
+het model volgens de globale `CLAUDE.md` (sectie **Modelkeuze subagents**): elke implementer
+en reviewer is **Opus 5.5 medium** — `subagent_type: general-purpose`, geen `model`-veld (de
+default is `claude-opus-5-5`), `effort: "medium"` (auteursbesluit 20-11-2026; de
+`opus48`-agent blijft alleen voor een expliciete vergelijking).
 **Rapporteer bij elke dispatch expliciet welk model je inzet.** De auteur is er niet bij — **unattended**.
 De vorige invulling staat in `afk-regie-issues-72-77.md`; de meting van die run (26-08) is
 de bron van de punten die hier zijn aangescherpt.
@@ -76,10 +77,9 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
 1. **Lees** het issue volledig: `gh api repos/mcolee/nlriochecker/issues/N --jq .body` en
    `.../issues/N/comments` (`gh issue view` faalt op een GraphQL-deprecatie). Dat is de spec.
 2. **Claim**: `gh issue edit N --add-assignee @me`.
-3. **Dispatch de implementer** — kies het model naar de zwaarte van #N (globale `CLAUDE.md`,
-   **Modelkeuze subagents**): substantieel/kritiek-pad → Opus 4.8 via `subagent_type: opus48`;
-   klein/test-/config-only → `model: sonnet`, `subagent_type: general-purpose`. **Meld
-   expliciet welk model deze dispatch inzet.** Brief, zelfstandig en met een taaklabel:
+3. **Dispatch de implementer** — Opus 5.5 medium (`subagent_type: general-purpose`,
+   `effort: "medium"`; globale `CLAUDE.md`, **Modelkeuze subagents**). **Meld expliciet welk
+   model deze dispatch inzet.** Brief, zelfstandig en met een taaklabel:
 
    > **Task 1 — implementeer issue #N.** Repo `/home/martin/Development/nlriochecker`, tak `dev`. Volg de
    > body van #N verbatim en `CLAUDE.md` strikt (Harde regels + Werkwijze). Draai
@@ -92,7 +92,7 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
    >   `cd <pad> &&`-prefix op elk commando. Geen `echo "=== kop ==="` in Bash: de
    >   globale hook blokkeert dat en de tool labelt de uitvoer al (25 blokkades in
    >   sessie F, 07-09). Edit/Write eisen dat je het bestand eerst met Read gelezen hebt.
-   >   (**Klein-issue op Sonnet:** van `docs/architectuur.md` alleen de sectie(s) die het
+   >   (**Klein-issue:** van `docs/architectuur.md` alleen de sectie(s) die het
    >   issue raakt — noem ze in de brief — en `analyse-harness.md` alleen als het issue een
    >   meting of scratch-script vraagt; de volle leesfase kostte 3–5 min per dispatch.)
    > - Maak de BO('s) die het issue noemt aan in `docs/beslislog.md`; het volgende nummer is
@@ -137,7 +137,7 @@ Eén issue = één sessie-eenheid: commit + push + CI groen + comment + close v�
      een volle review). Raakt de diff wél code, ga verder:
    - **Klein** → `/code-review` (medium).
    - **Substantieel** (kritiek pad, publiek contract, Harde regel) →
-     `superpowers:requesting-code-review` met een verse **Opus 4.8**-reviewer (`opus48`-agent): *"Task 3 — review de
+     `superpowers:requesting-code-review` met een verse **Opus 5.5 medium**-reviewer (`general-purpose`, `effort: "medium"`): *"Task 3 — review de
      diff op `dev` sinds de laatste commit tegen de spec van #N en de Harde regels.
      Adversarieel: correctheid, dekt het de spec, kloppen de drifttests, breekt het een publiek
      contract (JSON-schema, CLI, GeoPackage-structuur)?"* Verwerk de uitkomsten met
@@ -175,10 +175,10 @@ issue van de sessie plus een rij voor de slotrun:
 
 | Issue | Status | Model | Detail |
 |---|---|---|---|
-| #150 één telling per rapport | ✅ dicht | Opus 4.8 | adb7d9f, CI groen; 79/79/79 |
-| #151 kaartpijl vlak-band | 🔍 review loopt | Opus 4.8 | poort groen; 557 → 0 |
-| #152 TOP-009 / NaN-Inf | 📖 spec gelezen | Opus 4.8 | wacht op #151 |
-| #153 … | ⏳ | Sonnet | |
+| #150 één telling per rapport | ✅ dicht | Opus 5.5 medium | adb7d9f, CI groen; 79/79/79 |
+| #151 kaartpijl vlak-band | 🔍 review loopt | Opus 5.5 medium | poort groen; 557 → 0 |
+| #152 TOP-009 / NaN-Inf | 📖 spec gelezen | Opus 5.5 medium | wacht op #151 |
+| #153 … | ⏳ | Opus 5.5 medium | |
 | Slotrun C | ⏳ | — | tegen 06092026_slotrun_B |
 
 Vaste emoticons: ⏳ nog niet begonnen · 📖 spec gelezen/geclaimd · 🔄 implementer loopt ·

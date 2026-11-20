@@ -320,7 +320,7 @@ uitvoer- en versie-integriteit. De mechaniek en achtergrond staan in
   regie: (1) `runnerpoort.py` alleen als het issue tests toevoegt die echte data laden --
   dat is de regel hierboven, niet "bij elk issue"; (2) na `git push` meteen de volgende
   implementer dispatchen en pas dán op de CI wachten (comment en close ná groen);
-  (3) een Klein-issue op Sonnet leest van `docs/architectuur.md` alleen de secties die het
+  (3) een Klein-issue leest van `docs/architectuur.md` alleen de secties die het
   raakt en `analyse-harness.md` alleen bij een meting. Samen ~10 min en 20-30 % van de
   tokens per issue; de reviews en fixrondes blijven, die vingen 3 van 5 keer een echte fout.
   (4) Twee implementers tegelijk mag, elk in een eigen worktree, alleen voor issues die
