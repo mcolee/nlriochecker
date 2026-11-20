@@ -44,15 +44,19 @@ alleen het bestand waarin zij staat is verhuisd.
   daardoor over de hele export, en `bekeken_scope` staat per gebied op
   `volledige_export`. Per gebied blijft alleen `afbakening.Afbakening` over: de kern, de
   ring binnen `[studiegebied] context_buffer_m` die de GeoPackage grijs meetekent (BO-29),
-  en de omvang van de export. Meld altijd hoeveel bevindingen buiten het gebied vielen en
+  en de omvang van de export. In `gwsw_run` telt `schil_objecten` sindsdien die ring (de
+  kolomnaam bleef). Meld altijd hoeveel bevindingen buiten het gebied vielen en
   hoe groot kern en export zijn.
 - Tot BO-100 draaide elk gebied op een eigen analyseset: kern plus contextschil (de
   samenhangende component over vrijverval en persnet plus de buffer, BO-56) met een
   uitgedunde dataset. Op 88 buurten kostte dat 51 minuten checks. `bouw_analyseset` en de
   componentstructuur in `GedeeldeIndex` blijven staan voor `scripts/maak_voorbeeld.py` en
   de analysescripts die de oude route nameten; de toetsroute gebruikt ze niet meer.
-  `[studiegebied] volledige_dataset_checks`, `Check.volledig_bereik` en
-  `component_waarschuwingsdrempel` hebben in `toets` daardoor geen effect meer.
+  Met een studiegebied hebben `[studiegebied] volledige_dataset_checks` en
+  `Check.volledig_bereik` daardoor geen effect meer; zonder studiegebied bepalen ze nog
+  `bekeken_scope`. `component_waarschuwingsdrempel` leest `toets` niet meer. De
+  componentstructuur van `GedeeldeIndex` wordt pas berekend als `bouw_analyseset` erom
+  vraagt.
 - Bevat het bestand meer dan een feature, dan rapporteert `toets` per feature: een submap
   per gebied (de gesaneerde `naam_gebied`) plus `totaal/` met de synthese en de unieke
   meldingen. Bij een enkele feature verandert er niets. De harde eis is equivalentie: de

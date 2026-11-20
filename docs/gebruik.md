@@ -338,7 +338,7 @@ objecttype klopt, alleen is er niets getoetst. Met een studiegebied staat de rin
 gebied (`[studiegebied] context_buffer_m`, standaard 50 m) er ook grijs bij, zodat de kaart
 niet bij de gebiedsgrens ophoudt alsof daar niets ligt. De popup zegt per grijs object
 waarom. In `gwsw_run` telt `kern_objecten` de kern, `dataset_objecten` de export en
-`schil_objecten` sinds BO-100 de rest van de export: wat de checks buiten de kern zagen.
+`schil_objecten` sinds BO-100 de grijze ring.
 
 `status` telt systemische meldingen niet mee, net als `ergste_ernst`, `n_fout` en
 `n_waarschuwing`. Een object waarvan álle meldingen systemisch zijn is dus groen; dat

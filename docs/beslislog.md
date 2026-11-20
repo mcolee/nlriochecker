@@ -5439,3 +5439,22 @@ uit BO-56 (TOP-023 in "Verspreide huizen Koekange") verdwijnt daarmee ook.
 schil, en `bekeken_scope` wordt `volledige_export`. EXT-009 classificeert de wegvakken tegen
 het hele net, niet meer tegen de uitgedunde dataset van het gebied. De rapportteksten die "kern
 plus contextschil" noemen, gaan mee. De uitwerking staat in issue #186.
+
+**Meting (20 november 2026).** Dezelfde buurtenrun als de tweede BO-14-meting (88 buurten,
+alle drie de CFK's, `--bronnen`, projectconfig, warme cache, n = 1), oude route op dev
+`c080795` tegen de nieuwe: wandklok **3289 s → 211 s**, piekgeheugen **3,8 → 3,0 GB**. Per
+buurt (sleutel check-ID plus object-URI, of de locatie) verschillen de meldingen alleen hier:
+
+| Check | Buurten | Verschil | Oorzaak |
+|---|---|---|---|
+| EXT-009 | 1 | −1 | Wegvak 435449004 in "Verspreide huizen Koekange" is tegen het hele net bediend en dus groen. |
+| TOP-023 | 1 | +1 | De rest uit BO-56: een leiding van hulpstuk knp3414 lag buiten de oude analyseset. |
+| NET-001 | 4 | −30 | De schil volgde de doorgeefhulpstukken van BO-83 niet, dus de oude route meldde strengen die wel afvoeren. |
+| TOP-013 | 3 | +101 | Aansluitleidingen op hetzelfde putpaar lagen buiten buffer en component, en ontbraken in de oude telling. |
+| TOP-014 | 1 | +4 | Dezelfde aansluitleidingen ontbraken in de telling per put. |
+| SIG-nulklasse | 88 | −306 | De nul-bewaking telt nu over de hele export; elke buurt draagt dezelfde vijf klassen. |
+
+Elk verschil komt dus uit objecten die de oude analyseset miste. De nieuwe buurtuitvoer
+(`totaal/`) bevat geen melding die de gemeentebrede run `uitvoer/07092026_slotrun_F` niet
+heeft, op sleutel én op melding-ID. In `gwsw_run` telt `schil_objecten` sindsdien de grijze
+ring om het gebied (besluit van de auteur, 20 november 2026); de kolomnaam bleef.

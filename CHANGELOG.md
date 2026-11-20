@@ -63,9 +63,12 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
   over checks met volledig bereik, de waarschuwing `component_waarschuwingsdrempel` en de
   regel over strengen zonder netwerkverband vervallen. `CheckRun.analyseset` heet
   `CheckRun.afbakening` (kern, ring, omvang export); `schil_objecten` in `gwsw_run` telt
-  de rest van de export. `[studiegebied] volledige_dataset_checks` en
-  `component_waarschuwingsdrempel` blijven in de config maar hebben in `toets` geen effect
-  meer.
+  de grijze ring om het gebied (BO-29). `[studiegebied] volledige_dataset_checks` heeft
+  alleen met een studiegebied geen effect meer; zonder studiegebied bepaalt de lijst nog
+  `bekeken_scope` (`volledige_export`). `component_waarschuwingsdrempel` blijft in de
+  config, maar `toets` leest hem niet meer. `context_buffer_m` bepaalt alleen nog de
+  grijze ring. De componentstructuur van `GedeeldeIndex` wordt lui berekend, dus `toets`
+  rekent haar niet meer uit.
 - **`--projectconfig` kan een overlay op de standaard zijn** (issue #163, BO-98). Een
   projectconfig met `basis = "standaard"` bovenaan laadt eerst de meegeleverde `checks.toml`
   en legt alleen de sleutels die hij noemt eroverheen: tabellen sleutel-voor-sleutel diep,
