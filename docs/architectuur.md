@@ -36,21 +36,31 @@ alleen het bestand waarin zij staat is verhuisd.
 
 ### Studiegebied (data/gis_koekangerveld/, data/gis_dewoldenhoogeveen/)
 - GeoPackage of GeoJSON, gelezen met stdlib sqlite3 plus shapely; geen extra afhankelijkheid. Moet in EPSG:28992 staan, net als de GWSW-coordinaten; herprojecteren doen we niet.
-- Analyseer de kern plus een contextschil, rapporteer de kern. De schil is de
-  samenhangende component waar de kern in ligt plus een buffer om het gebied; precies zo
-  groot dat NET-001 en NET-002 geen valse bevindingen geven. Die component loopt sinds
-  issue #73 over vrijverval EN persnet: de bereikbaarheid volgt sinds #72 de mechanische
-  leidingen (BO-54) en een pompput is zelf geen eindpunt meer (BO-55), dus zonder het
-  persnet in de schil valt het gemaal erachter buiten de analyseset. Zie BO-56 voor de
-  meting (17 van de 88 buurten weken af) en de prijs (analyseset 1,7x). Zonder
-  studiegebied draait alles op de volledige dataset. Meld altijd hoeveel bevindingen
-  buiten het gebied vielen en hoe groot kern, schil en export zijn.
+- Analyseer de hele export, rapporteer de kern (BO-100). Met een studiegebied draait
+  `toets` de checks één keer over de volledige export, precies zoals zonder gebied, en
+  bakent `CheckRun.beperk_tot_studiegebied` die ene run per gebied af tot de kern: de
+  objecten waarvan de geometrie het gebied raakt. Een streng die het gebied uit loopt
+  geeft zo per constructie geen randeffect. `examined` en de notities per check gaan
+  daardoor over de hele export, en `bekeken_scope` staat per gebied op
+  `volledige_export`. Per gebied blijft alleen `afbakening.Afbakening` over: de kern, de
+  ring binnen `[studiegebied] context_buffer_m` die de GeoPackage grijs meetekent (BO-29),
+  en de omvang van de export. Meld altijd hoeveel bevindingen buiten het gebied vielen en
+  hoe groot kern en export zijn.
+- Tot BO-100 draaide elk gebied op een eigen analyseset: kern plus contextschil (de
+  samenhangende component over vrijverval en persnet plus de buffer, BO-56) met een
+  uitgedunde dataset. Op 88 buurten kostte dat 51 minuten checks. `bouw_analyseset` en de
+  componentstructuur in `GedeeldeIndex` blijven staan voor `scripts/maak_voorbeeld.py` en
+  de analysescripts die de oude route nameten; de toetsroute gebruikt ze niet meer.
+  `[studiegebied] volledige_dataset_checks`, `Check.volledig_bereik` en
+  `component_waarschuwingsdrempel` hebben in `toets` daardoor geen effect meer.
 - Bevat het bestand meer dan een feature, dan rapporteert `toets` per feature: een submap
   per gebied (de gesaneerde `naam_gebied`) plus `totaal/` met de synthese en de unieke
   meldingen. Bij een enkele feature verandert er niets. De harde eis is equivalentie: de
-  meldingen van een gebied zijn gelijk aan die van een losse run met alleen dat gebied.
-  De loop staat in `toetsloop.py`, de gedeelde structuren in `afbakening.GedeeldeIndex`;
-  wat wel en niet gedeeld mag worden staat in BO-12 van de beslislog.
+  meldingen van een gebied zijn gelijk aan die van een losse run met alleen dat gebied,
+  en aan de gemeentebrede run beperkt tot dat gebied; sinds BO-100 geldt dat per
+  constructie. De loop staat in `toetsloop.py`; de STRtree van `afbakening.GedeeldeIndex`
+  levert de kandidaten voor kern en ring, het oordeel blijft `area.bevat`. Zie BO-12 en
+  BO-100 in de beslislog.
 - Validatie van het gebiedsbestand hoort in `studiegebied.py` en nergens anders: alleen
   Polygon en MultiPolygon (GeometryCollection wordt niet uitgepakt, overgeslagen typen
   worden gemeld), en vanaf twee features een verplichte, gevulde, unieke kolom
@@ -210,7 +220,8 @@ alleen het bestand waarin zij staat is verhuisd.
   views vouwen samen.
 - **Wat `bekeken` telde staat erbij** (issue #77): elke `CheckOutcome` draagt
   `bekeken_scope` -- `analyseset`, `volledige_export` of `attribuut_instanties`, de enum
-  `checks.base.Scope` -- en `populatie`, de gedeclareerde rollen van de check (zonder
+  `checks.base.Scope`; met een studiegebied wordt `analyseset` sinds BO-100 per gebied
+  `volledige_export` -- en `populatie`, de gedeclareerde rollen van de check (zonder
   rollen: zijn kenmerken; zonder beide: leeg). `run_checks` leidt de scope af uit
   dezelfde beslissing die de check zijn dataset gaf (`over_volledige_populatie`) plus de
   klassevlag `Check.telt_instanties`, die staat op de twee checks waarvan `examined()`

@@ -67,11 +67,11 @@ kennen die instelling niet. De uitvoer ziet er zo uit (ingekort; in werkelijkhei
 
 ```
 koekangerveld_orox.ttl: 109 knooppunten, 107 strengen
-  Analyseset: 98 objecten in de kern, 118 in de contextschil, van 216 in de export.
+  Kern: 98 objecten van 216 in de export; de checks draaiden over de hele export.
   ADM-010   F      2 bevindingen
   ...
   TOP-022   F      3 bevindingen
-Totaal 84 fouten, 41 waarschuwingen uit de eigen checks; 201 overtredingen uit de nulmeting (162 fouten, 39 waarschuwingen)
+Totaal 83 fouten, 80 waarschuwingen uit de eigen checks; 201 overtredingen uit de nulmeting (162 fouten, 39 waarschuwingen)
 Geschreven: uitvoer/voorbeeld/bevindingen.md
 Geschreven: uitvoer/voorbeeld/bevindingen.csv
 Geschreven: uitvoer/voorbeeld/dq_koekangerveld_orox_20260829.gpkg

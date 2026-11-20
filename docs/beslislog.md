@@ -750,6 +750,9 @@ losse run met alleen dat gebied. Elke optimalisatie is daarop getoetst:
 `tests/test_toetsloop.py` toetst de equivalentie per gebied, en
 `tests/test_afbakening.py` de gedeelde index tegen de directe route.
 
+*Herzien door BO-100:* de checks draaien niet meer per gebied op een analyseset, maar één
+keer over de volledige export; per gebied wordt die run alleen afgebakend (issue #186).
+
 ### BO-13 De CRS-heuristiek voor GeoJSON, en waarom de fixtures hun stelsel noemen
 
 **Wat.** Een GeoPackage draagt zijn `srs_id` en wordt daarop getoetst. GeoJSON kent
@@ -2968,6 +2971,10 @@ alleen valse bevindingen wegnemen.
 leidingen) in de buurt "Verspreide huizen Koekange". Die bestond vóór deze wijziging ook al en
 gaat niet over de bereikbaarheid maar over de leidingtelling rond een hulpstuk op de
 gebiedsrand. Niet in dit issue aangepakt; hij hoort in een eigen issue thuis.
+
+*Herzien door BO-100:* `toets` gebruikt de contextschil niet meer; de checks draaien over de
+volledige export en de gelijkwaardigheid geldt per constructie. De TOP-023-afwijking
+verdwijnt daarmee (issue #186).
 
 ### BO-57 De laag `stelsels` vervalt; RVZ-006 meldt per gemengde streng en krijgt een eigen vlak
 

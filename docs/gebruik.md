@@ -27,20 +27,19 @@ nlriochecker toets \
 
 Er hoeft geen `--projectconfig` bij: het voorbeeld draait op de meegeleverde
 `src/nlriochecker/checks.toml`. Wat je ziet, ingekort tot de hoofdregels -- er staat een
-regel per check, plus een regel over de cache en een waarschuwing dat het net in dit
-gebied met vrijwel de hele export samenhangt:
+regel per check, plus een regel over de cache:
 
 ```
 koekangerveld_orox.ttl: 109 knooppunten, 107 strengen
   Externe bronnen: 7 lagen, bereik cbs_buurt_koekangerveld_studiegebied:buurt_gegeneraliseerd.
     Niet aanwezig: bgt_putdeksel (lagen put bevatten geen features)
     Niet aanwezig: ahn_dtm (voorbeelden/koekangerveld/ahn5_dtm_koekangerveld.tif)
-  Studiegebied cbs_buurt_koekangerveld_studiegebied:buurt_gegeneraliseerd (43.2 ha): 390 bevindingen buiten het gebied weggelaten.
-  Analyseset: 98 objecten in de kern, 118 in de contextschil, van 216 in de export.
+  Studiegebied cbs_buurt_koekangerveld_studiegebied:buurt_gegeneraliseerd (43.2 ha): 421 bevindingen buiten het gebied weggelaten.
+  Kern: 98 objecten van 216 in de export; de checks draaiden over de hele export.
   ADM-010   F      2 bevindingen
   ...
   TOP-022   F      3 bevindingen
-Totaal 84 fouten, 41 waarschuwingen uit de eigen checks; 201 overtredingen uit de nulmeting (162 fouten, 39 waarschuwingen)
+Totaal 83 fouten, 80 waarschuwingen uit de eigen checks; 201 overtredingen uit de nulmeting (162 fouten, 39 waarschuwingen)
 Geschreven: uitvoer/voorbeeld/bevindingen.md
 Geschreven: uitvoer/voorbeeld/bevindingen.csv
 Geschreven: uitvoer/voorbeeld/dq_koekangerveld_orox_20260829.gpkg
@@ -235,10 +234,14 @@ naam). Het volledige bestand wordt altijd eerst gevalideerd: een deelrun mag een
 in een ander gebied niet maskeren. De synthese vermeldt dat het een selectie was en
 hoeveel gebieden het bestand telde.
 
-De dataset wordt ook bij tachtig gebieden precies een keer geladen, en per gebied wordt
-een eigen kern, contextschil en uitgedunde dataset gebouwd. De meldingen van een gebied
-zijn daardoor gelijk aan die van een losse run met alleen dat gebied; daar staat een
-test op.
+De dataset wordt ook bij tachtig gebieden precies een keer geladen, en de checks draaien
+precies een keer, over de hele export. Daarna wordt die ene uitslag per gebied afgebakend
+tot de kern: de objecten die het gebied raken. Een gebiedsrapport is daardoor gelijk aan
+de gemeentebrede run beperkt tot dat gebied, en aan een losse run met alleen dat gebied;
+daar staan tests op. Een run over de 88 CBS-buurten van De Wolden en Hoogeveen duurt zo
+circa 3,5 minuut. Gevolg dat je moet kennen: de kolom Bekeken en de toelichtingen per
+check gaan ook in een gebiedsrapport over de hele export (scope `volledige_export`), niet
+over het gebied. Alleen de bevindingen zijn afgebakend.
 
 Een gebied zonder GWSW-objecten -- water, natuur, een bedrijventerrein op eigen beheer --
 stopt een meervoudige run niet: het krijgt een eigen rapport met nul bevindingen en een
@@ -285,8 +288,8 @@ gebiedsaanduiding, en anders geldt de terugval op `statcode`/`statnaam` of de la
    zelf. Kon de leeslaag die versie niet herkennen, dan staat er een terugval op de
    standaardversie en draagt de kop daarnaast een voorbehoud.
 2. **Wat er in dit gebied ligt:** een tabel objecttype x stelseltype over de kern, met bij
-   de leidingen zowel het aantal als de meters. De contextschil staat als voetnoot en telt
-   niet mee -- er wordt niet over gerapporteerd.
+   de leidingen zowel het aantal als de meters. Dat de checks de hele export zagen staat
+   als voetnoot; de rest van de export telt niet mee -- er wordt niet over gerapporteerd.
 3. **Voldoen we in dit gebied?** Een regel per conformiteitsklasse plus een totaalregel
    voor de eigen checks. Een vinkje betekent **nul fouten**; waarschuwingen blokkeren niet
    maar hun aantal staat er wel bij, met tussen haakjes hoeveel er systemisch zijn. Is er
@@ -331,9 +334,11 @@ object. Elk object draagt een kolom `status` met vijf waarden --
 is, `grijs` als er niet beoordeeld is, en `geaccepteerd` als elke bevinding op het object
 via `[rapport] uitzonderingen` bewust aanvaard is -- en een kolom `popup_html` met de
 voorgebakken hoverpopup. Mechanisch riool staat tussen de strengen met status `grijs`: het
-objecttype klopt, alleen is er niets getoetst. Met een studiegebied staat de contextschil
-er ook grijs bij, zodat de kaart niet bij de gebiedsgrens ophoudt alsof daar niets ligt. De
-popup zegt per grijs object waarom.
+objecttype klopt, alleen is er niets getoetst. Met een studiegebied staat de ring om het
+gebied (`[studiegebied] context_buffer_m`, standaard 50 m) er ook grijs bij, zodat de kaart
+niet bij de gebiedsgrens ophoudt alsof daar niets ligt. De popup zegt per grijs object
+waarom. In `gwsw_run` telt `kern_objecten` de kern, `dataset_objecten` de export en
+`schil_objecten` sinds BO-100 de rest van de export: wat de checks buiten de kern zagen.
 
 `status` telt systemische meldingen niet mee, net als `ergste_ernst`, `n_fout` en
 `n_waarschuwing`. Een object waarvan álle meldingen systemisch zijn is dus groen; dat

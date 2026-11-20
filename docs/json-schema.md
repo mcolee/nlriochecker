@@ -208,12 +208,15 @@ onderling niet te vergelijken. Zie BO-58 in [docs/beslislog.md](beslislog.md).
 
 De drie waarden van `bekeken_scope`:
 
-- **`analyseset`** — geteld over de dataset die de check meekreeg: met een studiegebied
-  de kern plus de contextschil, zonder studiegebied de volledige export. Dit is de
-  gewone waarde; ze zegt dat het getal met de afbakening meebeweegt.
-- **`volledige_export`** — de check gaat over de hele populatie (`Check.volledig_bereik`
-  of `[studiegebied] volledige_dataset_checks`) en telt daarom altijd de volledige
-  export, ook met een studiegebied. ADM-002 (dubbele identificaties) is er een.
+- **`analyseset`** — geteld over de dataset die de check meekreeg. In `toets` komt deze
+  waarde alleen nog zonder studiegebied voor, en dan is dat de volledige export. Met een
+  studiegebied draaien de checks sinds BO-100 over de volledige export en staat er per
+  gebied `volledige_export`.
+- **`volledige_export`** — geteld over de volledige export. Zonder studiegebied geldt dat
+  voor de checks die over de hele populatie gaan (`Check.volledig_bereik` of
+  `[studiegebied] volledige_dataset_checks`; ADM-002, dubbele identificaties, is er een).
+  Met een studiegebied geldt het sinds BO-100 voor elke check die objecten telt: de
+  checks zagen de hele export, alleen de meldingen zijn tot het gebied afgebakend.
 - **`attribuut_instanties`** — het getal telt geen objecten maar instanties van een
   kenmerk: ATTR-014 elke kenmerkinstantie met een property-restrictie, BTR-006 elke
   hoogtewaarde. Op De Wolden staat 459.108 tegenover 45.803 objecten; die twee getallen

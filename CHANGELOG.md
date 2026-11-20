@@ -43,6 +43,29 @@ het nieuwe nummer en de datum, en opent een lege nieuwe. Hij weigert uit te bren
 
 ### Gewijzigd
 
+- **Met studiegebieden draaien de checks één keer over de hele export** (issue #186,
+  BO-100). `toets` draait de checks met een of meer studiegebieden niet meer per gebied op
+  een analyseset (kern plus contextschil), maar één keer over de volledige export, en
+  bakent die ene run per gebied af tot de kern. Een gebiedsrapport is daarmee per
+  constructie gelijk aan de gemeentebrede run beperkt tot dat gebied. Gemeten op de 88
+  CBS-buurten van De Wolden en Hoogeveen (alle CFK's, `--bronnen`, projectconfig, warme
+  cache, n = 1): wandklok **3289 s → 211 s**, piekgeheugen **3,8 GB → 3,0 GB**. Per gebied
+  gaan `bekeken` en de toelichtingen per check over de hele export, en `bekeken_scope` staat
+  er op `volledige_export`. De meldingen per buurt verschillen op vijf plekken van de oude
+  route, telkens omdat de oude analyseset objecten miste die de gemeentebrede run wel ziet:
+  NET-001 (−30 in 4 buurten: de schil volgde de doorgeefhulpstukken van BO-83 niet),
+  TOP-013 (+101 in 3 buurten) en TOP-014 (+4 in 1 buurt: aansluitleidingen op een
+  kernput die buiten buffer en component lagen), TOP-023 (+1 in "Verspreide huizen
+  Koekange", de rest uit BO-56), EXT-009 (−1 rood wegvak, nu groen) en `SIG-nulklasse`
+  (−306 over 88 buurten: de nul-bewaking telt nu over de hele export, in elke buurt
+  dezelfde vijf klassen). Rapporttekst: de regel
+  "Analyseset: … in de contextschil" wordt "Kern: N objecten van M in de export"; de zin
+  over checks met volledig bereik, de waarschuwing `component_waarschuwingsdrempel` en de
+  regel over strengen zonder netwerkverband vervallen. `CheckRun.analyseset` heet
+  `CheckRun.afbakening` (kern, ring, omvang export); `schil_objecten` in `gwsw_run` telt
+  de rest van de export. `[studiegebied] volledige_dataset_checks` en
+  `component_waarschuwingsdrempel` blijven in de config maar hebben in `toets` geen effect
+  meer.
 - **`--projectconfig` kan een overlay op de standaard zijn** (issue #163, BO-98). Een
   projectconfig met `basis = "standaard"` bovenaan laadt eerst de meegeleverde `checks.toml`
   en legt alleen de sleutels die hij noemt eroverheen: tabellen sleutel-voor-sleutel diep,
